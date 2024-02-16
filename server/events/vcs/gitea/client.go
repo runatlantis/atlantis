@@ -1,24 +1,61 @@
+// Copyright 2024 Martijn van der Kleijn & Florian Beisel
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package gitea
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
+	"strings"
+	"time"
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 type GiteaClient struct {
 	giteaClient *gitea.Client
 	username    string
 	token       string
+	ctx         context.Context
+	logger      logging.SimpleLogging
+}
+
+type GiteaPRReviewSummary struct {
+	Reviews []GiteaReview
+}
+
+type GiteaReview struct {
+	ID          int64
+	Body        string
+	Reviewer    string
+	State       gitea.ReviewStateType // e.g., "APPROVED", "PENDING", "REQUEST_CHANGES"
+	SubmittedAt time.Time
+}
+
+type GiteaPullGetter interface {
+	GetPullRequest(repo models.Repo, pullNum int) (*gitea.PullRequest, error)
 }
 
 // NewClient builds a client that makes API calls to Gitea. httpClient is the
 // client to use to make the requests, username and password are used as basic
 // auth in the requests, baseURL is the API's baseURL, ex. https://corp.com:7990.
 // Don't include the API version, ex. '/1.0'.
-func NewClient(baseURL string, username string, token string) (*GiteaClient, error) {
+func NewClient(baseURL string, username string, token string, logger logging.SimpleLogging) (*GiteaClient, error) {
 	giteaClient, err := gitea.NewClient(baseURL,
 		gitea.SetToken(token),
 		gitea.SetUserAgent("atlantis"),
@@ -32,7 +69,19 @@ func NewClient(baseURL string, username string, token string) (*GiteaClient, err
 		giteaClient: giteaClient,
 		username:    username,
 		token:       token,
+		ctx:         context.Background(),
+		logger:      logger,
 	}, nil
+}
+
+func (c *GiteaClient) GetPullRequest(repo models.Repo, pullNum int) (*gitea.PullRequest, error) {
+	pr, _, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pullNum))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return pr, nil
 }
 
 // GetModifiedFiles returns the names of files that were modified in the merge request
@@ -71,8 +120,7 @@ func (c *GiteaClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest
 	return changedFiles, nil
 }
 
-// CreateComment creates a comment on the merge request. It will write multiple
-// comments if a single comment is too long.
+// CreateComment creates a comment on the merge request. As far as we're aware, Gitea has no built in max comment length right now.
 func (c *GiteaClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
 	opt := gitea.CreateIssueCommentOption{
 		Body: comment,
@@ -100,7 +148,62 @@ func (c *GiteaClient) ReactToComment(repo models.Repo, pullNum int, commentID in
 
 // HidePrevCommandComments hides the previous command comments from the pull
 // request.
-func (c *GiteaClient) HidePrevCommandComments(_ models.Repo, _ int, _ string, _ string) error {
+func (c *GiteaClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error {
+	var allComments []*gitea.Comment
+
+	nextPage := int(1)
+	for {
+		// Initialize ListIssueCommentOptions with the current page
+		opts := gitea.ListIssueCommentOptions{
+			ListOptions: gitea.ListOptions{
+				Page:     int(nextPage),
+				PageSize: 100,
+			},
+		}
+
+		comments, resp, err := c.giteaClient.ListIssueComments(repo.Owner, repo.Name, int64(pullNum), opts)
+		if err != nil {
+			return err
+		}
+
+		allComments = append(allComments, comments...)
+
+		// Break the loop if there are no more pages to fetch
+		if resp.NextPage == 0 {
+			break
+		}
+		nextPage = resp.NextPage
+	}
+
+	currentUser, _, err := c.giteaClient.GetMyUserInfo()
+	if err != nil {
+		return err
+	}
+
+	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>", command)
+	summaryFooter := "</details>"
+	lineFeed := "\n"
+
+	for _, comment := range allComments {
+		if comment.Poster == nil || comment.Poster.UserName != currentUser.UserName {
+			continue
+		}
+
+		body := strings.Split(comment.Body, "\n")
+		if len(body) == 0 || (!strings.Contains(strings.ToLower(body[0]), strings.ToLower(command)) && dir != "" && !strings.Contains(strings.ToLower(body[0]), strings.ToLower(dir))) {
+			continue
+		}
+
+		supersededComment := summaryHeader + lineFeed + comment.Body + lineFeed + summaryFooter + lineFeed
+
+		_, _, err := c.giteaClient.EditIssueComment(repo.Owner, repo.Name, comment.ID, gitea.EditIssueCommentOption{
+			Body: supersededComment,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -285,7 +388,11 @@ func (c *GiteaClient) GetFileContent(pull models.PullRequest, fileName string) (
 	}
 
 	if content.Type == "file" {
-		return true, []byte(*content.Content), nil
+		decodedData, err := base64.StdEncoding.DecodeString(*content.Content)
+		if err != nil {
+			return true, []byte{}, err
+		}
+		return true, []byte(decodedData), nil
 	}
 
 	return false, nil, nil
@@ -297,8 +404,17 @@ func (c *GiteaClient) SupportsSingleFileDownload(repo models.Repo) bool {
 }
 
 // GetCloneURL returns the clone URL of the repo
-func (c *GiteaClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
-	return "", errors.New("GetCloneURL not (yet) implemented for Gitea client")
+func (c *GiteaClient) GetCloneURL(_ models.VCSHostType, repo string) (string, error) {
+	parts := strings.Split(repo, "/")
+	if len(parts) < 2 {
+		return "", errors.New("invalid repo format, expected 'owner/repo'")
+	}
+	repository, _, err := c.giteaClient.GetRepo(parts[0], parts[1])
+	if err != nil {
+		c.logger.Debug("GET /repos/%v/%v returned an error: %v", parts[0], parts[1], err)
+		return "", err
+	}
+	return repository.CloneURL, nil
 }
 
 // GetPullLabels returns the labels of a pull request
@@ -337,4 +453,16 @@ func (c *GiteaClient) GetPullLabels(repo models.Repo, pull models.PullRequest) (
 	}
 
 	return results, nil
+}
+
+func ValidateSignature(payload []byte, signature string, secretKey []byte) error {
+	isValid, err := gitea.VerifyWebhookSignature(string(secretKey), signature, payload)
+	if err != nil {
+		return errors.New("signature verification internal error")
+	}
+	if !isValid {
+		return errors.New("invalid signature")
+	}
+
+	return nil
 }

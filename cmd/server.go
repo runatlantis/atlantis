@@ -160,6 +160,7 @@ const (
 	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
+	DefaultGiteaBaseURL                 = "https://cloud.gitea.com"
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
@@ -322,16 +323,15 @@ var stringFlags = map[string]stringFlag{
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
 	},
+	GiteaBaseURLFlag: {
+		description: "Base URL of Gitea server installation. Must include 'http://' or 'https://'.",
+	},
 	GiteaUserFlag: {
 		description:  "Gitea username of API user.",
 		defaultValue: "",
 	},
 	GiteaTokenFlag: {
 		description: "Gitea token of API user. Can also be specified via the ATLANTIS_GITEA_TOKEN environment variable.",
-	},
-	GiteaBaseURLFlag: {
-		description: "Base URL of Gitea server installation." +
-			" Must include 'http://' or 'https://'.",
 	},
 	GiteaWebhookSecretFlag: {
 		description: "Optional secret used to validate Gitea webhooks." +
@@ -834,6 +834,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.GitlabHostname == "" {
 		c.GitlabHostname = DefaultGitlabHostname
 	}
+	if c.GiteaBaseURL == "" {
+		c.GiteaBaseURL = DefaultGiteaBaseURL
+	}
 	if c.BitbucketBaseURL == "" {
 		c.BitbucketBaseURL = DefaultBitbucketBaseURL
 	}
@@ -966,11 +969,12 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	for name, token := range map[string]string{
 		GHTokenFlag:                userConfig.GithubToken,
 		GHWebhookSecretFlag:        userConfig.GithubWebhookSecret,
-		GiteaTokenFlag:             userConfig.GiteaToken,
 		GitlabTokenFlag:            userConfig.GitlabToken,
 		GitlabWebhookSecretFlag:    userConfig.GitlabWebhookSecret,
 		BitbucketTokenFlag:         userConfig.BitbucketToken,
 		BitbucketWebhookSecretFlag: userConfig.BitbucketWebhookSecret,
+		GiteaTokenFlag:             userConfig.GiteaToken,
+		GiteaWebhookSecretFlag:     userConfig.GiteaWebhookSecret,
 	} {
 		if strings.Contains(token, "\n") {
 			s.Logger.Warn("--%s contains a newline which is usually unintentional", name)
