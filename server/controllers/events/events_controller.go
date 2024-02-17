@@ -101,22 +101,6 @@ type VCSEventsController struct {
 	GiteaWebhookSecret              []byte
 }
 
-func mapGiteaActionToPullRequestEventType(action string) models.PullRequestEventType {
-	switch action {
-	case "opened":
-		return models.OpenedPullEvent
-	case "closed":
-		return models.ClosedPullEvent
-	case "reopened":
-		return models.UpdatedPullEvent // Or whichever is most appropriate
-	case "synchronized":
-		return models.UpdatedPullEvent // Assuming this is for PR updates
-	// Add more mappings as necessary
-	default:
-		return models.OtherPullEvent // Fallback for unrecognized actions
-	}
-}
-
 // Post handles POST webhook requests.
 func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get(giteaHeader) != "" {
