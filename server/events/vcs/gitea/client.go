@@ -137,7 +137,7 @@ func (c *GiteaClient) CreateComment(repo models.Repo, pullNum int, comment strin
 
 // ReactToComment adds a reaction to a comment.
 func (c *GiteaClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {
-	_, _, err := c.giteaClient.PostIssueCommentReaction(repo.Owner, repo.Name, int64(commentID), reaction)
+	_, _, err := c.giteaClient.PostIssueCommentReaction(repo.Owner, repo.Name, commentID, reaction)
 
 	if err != nil {
 		return err
@@ -156,7 +156,7 @@ func (c *GiteaClient) HidePrevCommandComments(repo models.Repo, pullNum int, com
 		// Initialize ListIssueCommentOptions with the current page
 		opts := gitea.ListIssueCommentOptions{
 			ListOptions: gitea.ListOptions{
-				Page:     int(nextPage),
+				Page:     nextPage,
 				PageSize: 100,
 			},
 		}
@@ -324,7 +324,7 @@ func (c *GiteaClient) DiscardReviews(repo models.Repo, pull models.PullRequest) 
 		}
 
 		for _, review := range pullReviews {
-			_, err := c.giteaClient.DismissPullReview(repo.Owner, repo.Name, int64(pull.Num), int64(review.ID), dismissOptions)
+			_, err := c.giteaClient.DismissPullReview(repo.Owner, repo.Name, int64(pull.Num), review.ID, dismissOptions)
 
 			if err != nil {
 				return err
