@@ -1,5 +1,5 @@
 # Git Host Access Credentials
-This page describes how to create credentials for your Git host (GitHub, GitLab, Bitbucket, or Azure DevOps)
+This page describes how to create credentials for your Git host (GitHub, GitLab, Gitea, Bitbucket, or Azure DevOps)
 
 that Atlantis will use to make API calls.
 [[toc]]
@@ -19,6 +19,7 @@ generate an access token. Read on for the instructions for your specific Git hos
 * [GitHub](#github-user)
 * [GitHub app](#github-app)
 * [GitLab](#gitlab)
+* [Gitea](#gitea)
 * [Bitbucket Cloud (bitbucket.org)](#bitbucket-cloud-bitbucket-org)
 * [Bitbucket Server (aka Stash)](#bitbucket-server-aka-stash)
 * [Azure DevOps](#azure-devops)
@@ -107,6 +108,14 @@ Since v0.22.3, a new permission for `Members` has been added, which is required 
 ### GitLab
 - Follow: [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
 - Create a token with **api** scope
+- Record the access token
+
+### Gitea
+- Go to "Profile and Settings" > "Settings" in Gitea (top-right)
+- Go to "Applications" under "User Settings" in Gitea
+- Create a token under the "Manage Access Tokens" with the following permissions:
+  - issue: Read and Write
+  - repository: Read and Write
 - Record the access token
 
 ### Bitbucket Cloud (bitbucket.org)

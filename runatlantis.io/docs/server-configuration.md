@@ -472,6 +472,43 @@ and set `--autoplan-modules` to `false`.
 
   Fail and do not run the requested Atlantis command if any of the pre workflow hooks error.
 
+### `--gitea-base-url`
+  ```bash
+  atlantis server --gitea-base-url="http://your-gitea.corp:7990/basepath"
+  # or
+  ATLANTIS_GITEA_BASE_URL="http://your-gitea.corp:7990/basepath"
+  ```
+  Base URL of Gitea installation. Must include `http://` or `https://`. If using Gitea cloud (gitea.com), do not set.  /Defaults to `https://gitea.com`.
+
+### `--gitea-token`
+  ```bash
+  atlantis server --gitea-token="token"
+  # or (recommended)
+  ATLANTIS_GITEA_TOKEN="token"
+  ```
+  Gitea app password of API user.
+
+### `--gitea-user`
+  ```bash
+  atlantis server --gitea-user="myuser"
+  # or
+  ATLANTIS_GITEA_USER="myuser"
+  ```
+  Gitea username of API user.
+
+### `--gitea-webhook-secret`
+  ```bash
+  atlantis server --gitea-webhook-secret="secret"
+  # or (recommended)
+  ATLANTIS_GITEA_WEBHOOK_SECRET="secret"
+  ```
+  Secret used to validate Gitea webhooks.
+
+  ::: warning SECURITY WARNING
+  If not specified, Atlantis won't be able to validate that the incoming webhook call came from Gitea.
+  This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
+  :::
+
 ### `--gh-allow-mergeable-bypass-apply`
   ```bash
   atlantis server --gh-allow-mergeable-bypass-apply
