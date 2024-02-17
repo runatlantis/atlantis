@@ -113,7 +113,7 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if r.Header.Get(githubHeader) != "" {
 		if !e.supportsHost(models.Github) {
-			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Github")
+			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitHub")
 			return
 		}
 		e.Logger.Debug("handling GitHub post")

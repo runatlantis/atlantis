@@ -110,7 +110,7 @@ func TestPost_InvalidGiteaSecret(t *testing.T) {
 	req.Header.Set(giteaHeader, "value")
 	When(v.Validate(req, secret)).ThenReturn(nil, errors.New("err"))
 	e.Post(w, req)
-	ResponseContains(t, w, http.StatusBadRequest, "err")
+	ResponseContains(t, w, http.StatusBadRequest, "request did not pass validation")
 }
 
 func TestPost_InvalidGitlabSecret(t *testing.T) {
@@ -1006,7 +1006,8 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 		CommandRunner:                   cr,
 		PullCleaner:                     c,
 		GithubWebhookSecret:             secret,
-		SupportedVCSHosts:               []models.VCSHostType{models.Github, models.Gitlab, models.AzureDevops},
+		SupportedVCSHosts:               []models.VCSHostType{models.Github, models.Gitlab, models.AzureDevops, models.Gitea},
+		GiteaWebhookSecret:              secret,
 		GitlabWebhookSecret:             secret,
 		GitlabRequestParserValidator:    gl,
 		RepoAllowlistChecker:            repoAllowlistChecker,
