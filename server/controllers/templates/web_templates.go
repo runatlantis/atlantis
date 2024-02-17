@@ -497,7 +497,7 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
       function updateTerminalStatus(msg) {
           document.getElementsByTagName("footer")[0].innerText = msg;
       }
-      var term = new Terminal({scrollback: 15000});
+      var term = new Terminal({scrollback: 15000, smoothScrollDuration:125 });
       var socket = new WebSocket(
         (document.location.protocol === "http:" ? "ws://" : "wss://") +
         document.location.host +
