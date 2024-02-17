@@ -160,7 +160,7 @@ const (
 	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
-	DefaultGiteaBaseURL                 = "https://cloud.gitea.com"
+	DefaultGiteaBaseURL                 = "https://gitea.com"
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
