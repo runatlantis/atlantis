@@ -392,7 +392,7 @@ func (c *GiteaClient) GetFileContent(pull models.PullRequest, fileName string) (
 		if err != nil {
 			return true, []byte{}, err
 		}
-		return true, []byte(decodedData), nil
+		return true, decodedData, nil
 	}
 
 	return false, nil, nil
