@@ -141,9 +141,10 @@ func TestPost_UnsupportedGiteaEvent(t *testing.T) {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(giteaHeader, "value")
+	e.GiteaWebhookSecret = nil
 	When(v.Validate(req, nil)).ThenReturn([]byte(`{"not an event": ""}`), nil)
 	e.Post(w, req)
-	ResponseContains(t, w, http.StatusOK, "Ignoring unsupported event")
+	ResponseContains(t, w, http.StatusOK, "Ignoring unsupported Gitea event")
 }
 
 func TestPost_UnsupportedGitlabEvent(t *testing.T) {
