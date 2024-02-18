@@ -144,15 +144,29 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
 <details>
     <summary>Expand</summary>
     <ul>
-      <li>Go to "Profile and Settings" &gt; "Settings" in Gitea (top-right)</li>
-      <li>Go to "Applications" under "User Settings" in Gitea</li>
-      <li>Create a token under the "Manage Access Tokens" with the following permissions: 
+        <li>Click <strong>Settings &gt; Webhooks</strong> in the top- and then sidebar</li>
+        <li>Click <strong>Add webhook &gt; Gitea</strong> (Gitea webhooks are service specific, but this works)</li>
+        <li>set <strong>Target URL</strong> to <code>http://$URL/events</code> (or <code>https://$URL/events</code> if you're using SSL) where <code>$URL</code> is where Atlantis is hosted. <strong>Be sure to add <code>/events</code></strong></li>
+        <li>double-check you added <code>/events</code> to the end of your URL.</li>
+        <li>set <strong>Secret</strong> to the Webhook Secret you generated previously 
         <ul>
-          <li>issue: Read and Write</li>
-          <li>repository: Read and Write</li>
+            <li><strong>NOTE</strong> If you're adding a webhook to multiple repositories, each repository will need to use the <strong>same</strong> secret.</li>
         </ul>
-      </li>
-      <li>Record the access token</li>
+        </li>
+        <li>Select <strong>Custom Events...</strong></li>
+        <li>Check the boxes 
+            <ul>
+                <li><strong>Repository events &gt; Push</strong></li>
+                <li><strong>Issue events &gt; Issue Comment</strong></li>
+                <li><strong>Pull Request events &gt; Pull Request</strong></li>
+                <li><strong>Pull Request events &gt; Pull Request Comment</strong></li>
+                <li><strong>Pull Request events &gt; Pull Request Reviewed</strong></li>
+                <li><strong>Pull Request events &gt; Pull Request Synchronized</strong></li>
+            </ul>
+        </li>
+        <li>Leave <strong>Active</strong> checked</li>
+        <li>Click <strong>Add Webhook</strong></li>
+        <li>See <a href="#next-steps">Next Steps</a></li>
     </ul>
 </details>
 
