@@ -140,6 +140,22 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
     </ul>
 </details>
 
+### Gitea Webhook
+<details>
+    <summary>Expand</summary>
+    <ul>
+      <li>Go to "Profile and Settings" &gt; "Settings" in Gitea (top-right)</li>
+      <li>Go to "Applications" under "User Settings" in Gitea</li>
+      <li>Create a token under the "Manage Access Tokens" with the following permissions: 
+        <ul>
+          <li>issue: Read and Write</li>
+          <li>repository: Read and Write</li>
+        </ul>
+      </li>
+      <li>Record the access token</li>
+    </ul>
+</details>
+
 
 ## Create an access token for Atlantis
 We recommend using a dedicated CI user or creating a new user named **@atlantis** that performs all API actions, however for testing,
@@ -183,6 +199,13 @@ TOKEN="{YOUR_TOKEN}"
 TOKEN="{YOUR_TOKEN}"
 ```
 
+### Gite Access Token
+- Go to "Profile and Settings" > "Settings" in Gitea (top-right)
+- Go to "Applications" under "User Settings" in Gitea
+- Create a token under the "Manage Access Tokens" with the following permissions:
+  - issue: Read and Write
+  - repository: Read and Write
+- Record the access token
 
 ## Start Atlantis
 You're almost ready to start Atlantis, just set two more variables:
@@ -273,6 +296,20 @@ atlantis server \
 --azuredevops-token="$TOKEN" \
 --azuredevops-webhook-user="$ATLANTIS_AZUREDEVOPS_WEBHOOK_USER" \
 --azuredevops-webhook-password="$ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD" \
+--repo-allowlist="$REPO_ALLOWLIST"
+--ssl-cert-file=file.crt
+--ssl-key-file=file.key
+```
+
+### Gitea 
+
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--gitea-user="$ATLANTIS_GITEA_USER" \
+--gitea-token="$ATLANTIS_GITEA_TOKEN" \
+--gitea-webhook-secret="$ATLANTIS_GITEA_WEBHOOK_SECRET" \
+--gitea-base-url="$ATLANTIS_GITEA_BASE_URL" \
 --repo-allowlist="$REPO_ALLOWLIST"
 --ssl-cert-file=file.crt
 --ssl-key-file=file.key
