@@ -434,8 +434,8 @@ github.com/uber-go/tally/v4 v4.1.10 h1:2GSX7Tmq26wjAvOtQEc5EvRROIkX2OX4vpROt6mlR
 github.com/uber-go/tally/v4 v4.1.10/go.mod h1:pPR56rjthjtLB8xQlEx2I1VwAwRGCh/i4xMUcmG+6z4=
 github.com/ulikunitz/xz v0.5.11 h1:kpFauv27b6ynzBNT/Xy+1k+fK4WswhN/6PN5WhFAGw8=
 github.com/ulikunitz/xz v0.5.11/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
-github.com/urfave/negroni/v3 v3.0.0 h1:Vo8CeZfu1lFR9gW8GnAb6dOGCJyijfil9j/jKKc/JhU=
-github.com/urfave/negroni/v3 v3.0.0/go.mod h1:jWvnX03kcSjDBl/ShB0iHvx5uOs7mAzZXW+JvJ5XYAs=
+github.com/urfave/negroni/v3 v3.1.0 h1:lzmuxGSpnJCT/ujgIAjkU3+LW3NX8alCglO/L6KjIGQ=
+github.com/urfave/negroni/v3 v3.1.0/go.mod h1:jWvnX03kcSjDBl/ShB0iHvx5uOs7mAzZXW+JvJ5XYAs=
 github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605 h1:bRt3KvPapqnO3s9XenyU4COpU9X7cNW3BMELyHRxuSs=
 github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605/go.mod h1:saryXNaL624mlulV138FP+HhVw7IpvETUXLS3nTvH1g=
 github.com/xanzy/go-gitlab v0.97.0 h1:StMqJ1Kvt00X43pYIBBjj52dFlghwSeBhRDRfzaZ7xY=
