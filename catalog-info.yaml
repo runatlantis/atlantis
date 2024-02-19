@@ -1,0 +1,56 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: zenapi
+  title: ZenAPI
+  description: Original API for ZenBusiness
+  annotations:
+    github.com/project-slug: zenbusiness/zenapi
+    google.com/cloudbuild-project-slug: zen-dev-166315
+    backstage.io/techdocs-ref: dir:.
+    backstage.io/kubernetes-id: zenapi
+    backstage.io/kubernetes-label-selector: 'app.kubernetes.io/name=zena'
+  tags:
+    - python
+  links:
+    - url: https://api.zenbusiness.com/
+      title: ZenAPI
+      icon: dashboard
+    - url: https://github.com/zenbusiness/infrastructure/tree/master/kubernetes/helm/zenapi
+      title: Helm Charts
+      icon: settings
+    - url: https://zenbusinesspbc.slack.com/archives/C029NPCHYAY
+      title: "#guild-apidev"
+      icon: chat
+spec:
+  type: service
+  owner: zenapi-governance
+  system: zenbusiness-com
+  lifecycle: production
+  dependsOn:
+    - Resource:zenapi-db
+  providesApis:
+    - zenapi
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: zenapi
+  description: Original API for ZenBusiness
+spec:
+  type: openapi
+  lifecycle: production
+  owner: zenapi-governance
+  system: zenbusiness-com
+  definition:
+    $text: https://github.com/zenbusiness/zenapi/blob/main/repo_docs/openapi.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: zenapi-db
+  description: ZenAPI database
+spec:
+  type: database
+  owner: zenapi-governance
+  system: zenbusiness-com
