@@ -40,7 +40,7 @@ require (
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.8.4
 	github.com/uber-go/tally/v4 v4.1.10
-	github.com/urfave/negroni/v3 v3.0.0
+	github.com/urfave/negroni/v3 v3.1.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605
 	github.com/xanzy/go-gitlab v0.97.0
 	go.etcd.io/bbolt v1.3.8
