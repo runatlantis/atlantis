@@ -478,7 +478,7 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_GITEA_BASE_URL="http://your-gitea.corp:7990/basepath"
   ```
-  Base URL of Gitea installation. Must include `http://` or `https://`. If using Gitea cloud (gitea.com), do not set.  /Defaults to `https://gitea.com`.
+  Base URL of Gitea installation. Must include `http://` or `https://`. Defaults to `https://gitea.com` if left empty/absent.
 
 ### `--gitea-token`
   ```bash
