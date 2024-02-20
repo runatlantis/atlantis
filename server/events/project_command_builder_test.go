@@ -33,6 +33,7 @@ var defaultUserConfig = struct {
 	RestrictFileList         bool
 	SilenceNoProjects        bool
 	IncludeGitUntrackedFiles bool
+	AutoDiscoverMode         string
 }{
 	SkipCloneNoChanges:       false,
 	EnableRegExpCmd:          false,
@@ -44,6 +45,7 @@ var defaultUserConfig = struct {
 	RestrictFileList:         false,
 	SilenceNoProjects:        false,
 	IncludeGitUntrackedFiles: true,
+	AutoDiscoverMode:         "auto",
 }
 
 func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
@@ -167,12 +169,7 @@ projects:
 				Ok(t, err)
 			}
 
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
+			globalCfgArgs := valid.GlobalCfgArgs{}
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -194,6 +191,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -232,6 +230,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 		ExpErr                     string
 		ExpApplyReqs               []string
 		EnableAutoMergeUserCfg     bool
+		AutoDiscoverModeUserCfg    string
 		EnableParallelPlanUserCfg  bool
 		EnableParallelApplyUserCfg bool
 		ExpAutoMerge               bool
@@ -521,10 +520,7 @@ projects:
 				}
 
 				globalCfgArgs := valid.GlobalCfgArgs{
-					AllowRepoCfg:  true,
-					MergeableReq:  false,
-					ApprovedReq:   false,
-					UnDivergedReq: false,
+					AllowAllRepoSettings: true,
 				}
 
 				terraformClient := terraform_mocks.NewMockClient()
@@ -550,6 +546,7 @@ projects:
 					userConfig.RestrictFileList,
 					c.Silenced,
 					userConfig.IncludeGitUntrackedFiles,
+					c.AutoDiscoverModeUserCfg,
 					scope,
 					logger,
 					terraformClient,
@@ -557,13 +554,14 @@ projects:
 
 				var actCtxs []command.ProjectContext
 				var err error
+				cmd := c.Cmd
 				if cmdName == command.Plan {
 					actCtxs, err = builder.BuildPlanCommands(&command.Context{
 						Log:   logger,
 						Scope: scope,
-					}, &c.Cmd)
+					}, &cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope}, &c.Cmd)
+					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope}, &cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -710,10 +708,7 @@ projects:
 			}
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
@@ -739,6 +734,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -746,10 +742,11 @@ projects:
 
 			var actCtxs []command.ProjectContext
 			var err error
+			cmd := c.Cmd
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
 				Log:   logger,
 				Scope: scope,
-			}, &c.Cmd)
+			}, &cmd)
 
 			if c.ExpErr != "" {
 				ErrEquals(t, c.ExpErr, err)
@@ -770,6 +767,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 		RepoRelDir       string
 		Workspace        string
 		Automerge        bool
+		AutoDiscover     valid.AutoDiscover
 		ExpParallelPlan  bool
 		ExpParallelApply bool
 	}
@@ -956,6 +954,67 @@ projects:
 				},
 			},
 		},
+		"follow autodiscover enabled config": {
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project3": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `version: 3
+autodiscover:
+  mode: enabled
+projects:
+- name: project1-custom-name
+  dir: project1`,
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			// project2 is autodiscovered, whereas project1 is not
+			Exp: []expCtxFields{
+				{
+					ProjectName: "project1-custom-name",
+					RepoRelDir:  "project1",
+					Workspace:   "default",
+				},
+				{
+					ProjectName: "",
+					RepoRelDir:  "project2",
+					Workspace:   "default",
+				},
+			},
+		},
+		"autodiscover enabled but project excluded by empty when_modified": {
+			DirStructure: map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project3": map[string]interface{}{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `version: 3
+autodiscover:
+  mode: enabled
+projects:
+- dir: project1
+  autoplan:
+    when_modified: []`,
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			Exp: []expCtxFields{
+				{
+					ProjectName: "",
+					RepoRelDir:  "project2",
+					Workspace:   "default",
+				},
+			},
+		},
 	}
 
 	logger := logging.NewNoopLogger(t)
@@ -978,10 +1037,7 @@ projects:
 			}
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
@@ -1007,6 +1063,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -1021,7 +1078,7 @@ projects:
 					RepoRelDir:  "",
 					Flags:       nil,
 					Name:        command.Plan,
-					Verbose:     false,
+					Verbose:     true,
 					Workspace:   "",
 					ProjectName: "",
 				})
@@ -1080,12 +1137,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	userConfig := defaultUserConfig
 
-	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  false,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
-	}
+	globalCfgArgs := valid.GlobalCfgArgs{}
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	terraformClient := terraform_mocks.NewMockClient()
@@ -1111,6 +1163,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
 		scope,
 		logger,
 		terraformClient,
@@ -1174,10 +1227,7 @@ projects:
 		Any[string]())).ThenReturn(repoDir, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  true,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
+		AllowAllRepoSettings: true,
 	}
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
@@ -1206,6 +1256,7 @@ projects:
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
 		scope,
 		logger,
 		terraformClient,
@@ -1267,10 +1318,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
@@ -1296,6 +1344,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -1430,10 +1479,7 @@ projects:
 				Any[string]())).ThenReturn(tmpDir, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  true,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: true,
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
@@ -1467,6 +1513,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -1523,6 +1570,17 @@ parallel_plan: true`,
 			ExpectedClones: Once(),
 			ModifiedFiles:  []string{"README.md"},
 		},
+		{
+			AtlantisYAML: `
+version: 3
+autodiscover:
+  mode: enabled
+projects:
+- dir: dir1`,
+			ExpectedCtxs:   0,
+			ExpectedClones: Once(),
+			ModifiedFiles:  []string{"dir2/main.tf"},
+		},
 	}
 
 	userConfig := defaultUserConfig
@@ -1539,10 +1597,7 @@ parallel_plan: true`,
 		logger := logging.NewNoopLogger(t)
 
 		globalCfgArgs := valid.GlobalCfgArgs{
-			AllowRepoCfg:  true,
-			MergeableReq:  false,
-			ApprovedReq:   false,
-			UnDivergedReq: false,
+			AllowAllRepoSettings: true,
 		}
 		scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 		terraformClient := terraform_mocks.NewMockClient()
@@ -1568,6 +1623,7 @@ parallel_plan: true`,
 			userConfig.RestrictFileList,
 			userConfig.SilenceNoProjects,
 			userConfig.IncludeGitUntrackedFiles,
+			userConfig.AutoDiscoverMode,
 			scope,
 			logger,
 			terraformClient,
@@ -1607,11 +1663,8 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:       false,
-		MergeableReq:       false,
-		ApprovedReq:        false,
-		UnDivergedReq:      false,
-		PolicyCheckEnabled: true,
+		AllowAllRepoSettings: false,
+		PolicyCheckEnabled:   true,
 	}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
@@ -1638,6 +1691,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
 		scope,
 		logger,
 		terraformClient,
@@ -1702,10 +1756,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	userConfig := defaultUserConfig
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  false,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
+		AllowAllRepoSettings: false,
 	}
 	terraformClient := terraform_mocks.NewMockClient()
 	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
@@ -1730,6 +1781,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		userConfig.RestrictFileList,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
 		scope,
 		logger,
 		terraformClient,
@@ -1810,10 +1862,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 	}
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  true,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
+		AllowAllRepoSettings: true,
 	}
 
 	logger := logging.NewNoopLogger(t)
@@ -1861,6 +1910,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -1868,10 +1918,11 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 
 			var actCtxs []command.ProjectContext
 			var err error
+			cmd := c.Cmd
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
 				Log:   logger,
 				Scope: scope,
-			}, &c.Cmd)
+			}, &cmd)
 			if c.ExpErr != "" {
 				ErrEquals(t, c.ExpErr, err)
 				return
@@ -1921,10 +1972,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 	}
 
 	globalCfgArgs := valid.GlobalCfgArgs{
-		AllowRepoCfg:  true,
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
+		AllowAllRepoSettings: true,
 	}
 
 	logger := logging.NewNoopLogger(t)
@@ -1972,6 +2020,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				userConfig.RestrictFileList,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
 				scope,
 				logger,
 				terraformClient,
@@ -1979,10 +2028,11 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 
 			var actCtxs []command.ProjectContext
 			var err error
+			cmd := c.Cmd
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
 				Log:   logger,
 				Scope: scope,
-			}, &c.Cmd)
+			}, &cmd)
 			if c.ExpErr != "" {
 				ErrEquals(t, c.ExpErr, err)
 				return

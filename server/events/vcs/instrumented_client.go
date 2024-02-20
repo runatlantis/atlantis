@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v54/github"
+	"github.com/google/go-github/v58/github"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -43,7 +43,7 @@ type IGithubClient interface {
 }
 
 // InstrumentedGithubClient should delegate to the underlying InstrumentedClient for vcs provider-agnostic
-// methods and implement soley any github specific interfaces.
+// methods and implement solely any github specific interfaces.
 type InstrumentedGithubClient struct {
 	*InstrumentedClient
 	PullRequestGetter GithubPullRequestGetter
@@ -147,7 +147,7 @@ func (c *InstrumentedClient) ReactToComment(repo models.Repo, pullNum int, comme
 	return nil
 }
 
-func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error {
 	scope := c.StatsScope.SubScope("hide_prev_plan_comments")
 	scope = SetGitScopeTags(scope, repo.FullName, pullNum)
 	logger := c.Logger.WithHistory(fmtLogSrc(repo, pullNum)...)
@@ -158,7 +158,7 @@ func (c *InstrumentedClient) HidePrevCommandComments(repo models.Repo, pullNum i
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	if err := c.Client.HidePrevCommandComments(repo, pullNum, command); err != nil {
+	if err := c.Client.HidePrevCommandComments(repo, pullNum, command, dir); err != nil {
 		executionError.Inc(1)
 		logger.Err("Unable to hide previous %s comments, error: %s", command, err.Error())
 		return err
@@ -218,7 +218,14 @@ func (c *InstrumentedClient) PullIsMergeable(repo models.Repo, pull models.PullR
 func (c *InstrumentedClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	scope := c.StatsScope.SubScope("update_status")
 	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
-	logger := c.Logger.WithHistory(fmtLogSrc(repo, pull.Num)...)
+	logger := c.Logger.WithHistory([]interface{}{
+		"repository", fmt.Sprintf("%s/%s", repo.Owner, repo.Name),
+		"pull-num", strconv.Itoa(pull.Num),
+		"src", src,
+		"description", description,
+		"state", state,
+		"url", url,
+	}...)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -226,6 +233,7 @@ func (c *InstrumentedClient) UpdateStatus(repo models.Repo, pull models.PullRequ
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
+	logger.Info("updating vcs status")
 	if err := c.Client.UpdateStatus(repo, pull, state, src, description, url); err != nil {
 		executionError.Inc(1)
 		logger.Err("Unable to update status at url: %s, error: %s", url, err.Error())
@@ -250,6 +258,7 @@ func (c *InstrumentedClient) MergePull(pull models.PullRequest, pullOptions mode
 	if err := c.Client.MergePull(pull, pullOptions); err != nil {
 		executionError.Inc(1)
 		logger.Err("Unable to merge pull, error: %s", err.Error())
+		return err
 	}
 
 	executionSuccess.Inc(1)

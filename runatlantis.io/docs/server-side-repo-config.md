@@ -88,6 +88,10 @@ repos:
   # policy_check defines if policy checking should be enable on this repository.
   policy_check: false
 
+  # autodiscover defines how atlantis should automatically discover projects in this repository.
+  autodiscover:
+    mode: auto
+
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
 
@@ -447,6 +451,7 @@ Each servers handle different repository config files.
 | repos     | array[[Repo](#repo)]                                    | see below | no       | List of repos to apply settings to.                                                   |
 | workflows | map[string: [Workflow](custom-workflows.html#workflow)] | see below | no       | Map from workflow name to workflow. Workflows override the default Atlantis commands. |
 | policies  | Policies.                                               | none      | no       | List of policy sets to run and associated metadata                                      |
+| metrics   | Metrics.                                                | none      | no       | Map of metric configuration                                       |
 
 
 ::: tip A Note On Defaults
@@ -496,6 +501,7 @@ If you set a workflow with the key `default`, it will override this.
 | repo_locking                  | bool     | false   | no       | Whether or not to get a lock.                                                                                                                                                                                                                                                                             |
 | policy_check                  | bool     | false   | no       | Whether or not to run policy checks on this repository.                                                                                                                                                                                                                                                   |
 | custom_policy_check                  | bool     | false   | no       | Whether or not to enable custom policy check tools outside of Conftest on this repository.                                                                                                                                                                                                       |
+| autodiscover                  | AutoDiscover     | none   | no       | Auto discover settings for this repo
 
 
 :::tip Notes

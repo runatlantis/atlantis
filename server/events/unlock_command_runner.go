@@ -1,6 +1,8 @@
 package events
 
 import (
+	"slices"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -9,11 +11,13 @@ func NewUnlockCommandRunner(
 	deleteLockCommand DeleteLockCommand,
 	vcsClient vcs.Client,
 	SilenceNoProjects bool,
+	DisableUnlockLabel string,
 ) *UnlockCommandRunner {
 	return &UnlockCommandRunner{
-		deleteLockCommand: deleteLockCommand,
-		vcsClient:         vcsClient,
-		SilenceNoProjects: SilenceNoProjects,
+		deleteLockCommand:  deleteLockCommand,
+		vcsClient:          vcsClient,
+		SilenceNoProjects:  SilenceNoProjects,
+		DisableUnlockLabel: DisableUnlockLabel,
 	}
 }
 
@@ -22,22 +26,41 @@ type UnlockCommandRunner struct {
 	deleteLockCommand DeleteLockCommand
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
-	SilenceNoProjects bool
+	SilenceNoProjects  bool
+	DisableUnlockLabel string
 }
 
-func (u *UnlockCommandRunner) Run(
-	ctx *command.Context,
-	cmd *CommentCommand,
-) {
+func (u *UnlockCommandRunner) Run(ctx *command.Context, _ *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pullNum := ctx.Pull.Num
+	disableUnlockLabel := u.DisableUnlockLabel
 
 	ctx.Log.Info("Unlocking all locks")
 	vcsMessage := "All Atlantis locks for this PR have been unlocked and plans discarded"
-	numLocks, err := u.deleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
-	if err != nil {
-		vcsMessage = "Failed to delete PR locks"
-		ctx.Log.Err("failed to delete locks by pull %s", err.Error())
+
+	var hasLabel bool
+	var err error
+	if disableUnlockLabel != "" {
+		var labels []string
+		labels, err = u.vcsClient.GetPullLabels(baseRepo, ctx.Pull)
+		if err != nil {
+			vcsMessage = "Failed to retrieve PR labels... Not unlocking"
+			ctx.Log.Err("Failed to retrieve PR labels for pull %s", err.Error())
+		}
+		hasLabel = slices.Contains(labels, disableUnlockLabel)
+		if hasLabel {
+			vcsMessage = "Not allowed to unlock PR with " + disableUnlockLabel + " label"
+			ctx.Log.Info("Not allowed to unlock PR with %v label", disableUnlockLabel)
+		}
+	}
+
+	var numLocks int
+	if err == nil && !hasLabel {
+		numLocks, err = u.deleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
+		if err != nil {
+			vcsMessage = "Failed to delete PR locks"
+			ctx.Log.Err("failed to delete locks by pull %s", err.Error())
+		}
 	}
 
 	// if there are no locks to delete, no errors, and SilenceNoProjects is enabled, don't comment

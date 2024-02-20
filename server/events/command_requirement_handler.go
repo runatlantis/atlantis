@@ -74,7 +74,7 @@ func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx comma
 
 		for _, project := range ctx.PullStatus.Projects {
 
-			if project.ProjectName == dependOnProject && project.Status != models.AppliedPlanStatus {
+			if project.ProjectName == dependOnProject && project.Status != models.AppliedPlanStatus && project.Status != models.PlannedNoChangesPlanStatus {
 				return fmt.Sprintf("Can't apply your project unless you apply its dependencies: [%s]", project.ProjectName), nil
 			}
 		}

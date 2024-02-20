@@ -75,7 +75,7 @@ func (p Project) Validate() error {
 		return errors.Wrapf(err, "parsing: %s", branch)
 	}
 
-	Dependencies := func(value interface{}) error {
+	DependsOn := func(value interface{}) error {
 		return nil
 	}
 
@@ -85,7 +85,7 @@ func (p Project) Validate() error {
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&p.ImportRequirements, validation.By(validImportReq)),
 		validation.Field(&p.TerraformVersion, validation.By(VersionValidator)),
-		validation.Field(&p.DependsOn, validation.By(Dependencies)),
+		validation.Field(&p.DependsOn, validation.By(DependsOn)),
 		validation.Field(&p.Name, validation.By(validName)),
 		validation.Field(&p.Branch, validation.By(branchValid)),
 	)

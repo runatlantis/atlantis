@@ -106,6 +106,22 @@ Values are chosen in this order:
   * If a load balancer with a non http/https port (not the one defined in the `--port` flag) is used, update the URL to include the port like in the example above.
    * This URL is used as the `details` link next to each atlantis job to view the job's logs.
 
+### `--autodiscover-mode`
+  ```bash
+  atlantis server --autodiscover-mode="<auto|enabled|disabled>"
+  # or
+  ATLANTIS_AUTODISCOVER_MODE="<auto|enabled|disabled>"
+  ```
+  Sets auto discover mode, default is `auto`. When set to `auto`, projects in a repo will be discovered by
+  Atlantis when there are no projects configured in the repo config. If one or more projects are defined
+  in the repo config then auto discovery will be completely disabled.
+
+  When set to `enabled` projects will be discovered unconditionally. If an auto discovered project is already
+  defined in the projects section of the repo config, the project from the repo config will take precedence over
+  the auto discovered project.
+
+  When set to `disabled` projects will never be discovered, even if there are no projects configured in the repo config.
+
 ### `--automerge`
   ```bash
   atlantis server --automerge
@@ -208,6 +224,22 @@ and set `--autoplan-modules` to `false`.
   ```
   Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
 
+### `--azuredevops-token`
+  ```bash
+  atlantis server --azuredevops-token="RandomStringProducedByAzureDevOps"
+  # or (recommended)
+  ATLANTIS_AZUREDEVOPS_TOKEN="RandomStringProducedByAzureDevOps"
+  ```
+  Azure DevOps token of API user.
+
+### `--azuredevops-user`
+  ```bash
+  atlantis server --azuredevops-user="username@example.com"
+  # or
+  ATLANTIS_AZUREDEVOPS_USER="username@example.com"
+  ```
+  Azure DevOps username of API user.
+
 ### `--azuredevops-webhook-password`
   ```bash
   atlantis server --azuredevops-webhook-password="password123"
@@ -232,22 +264,6 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_AZUREDEVOPS_WEBHOOK_USER="username@example.com"
   ```
   Azure DevOps basic authentication username for inbound webhooks.
-
-### `--azuredevops-token`
-  ```bash
-  atlantis server --azuredevops-token="RandomStringProducedByAzureDevOps"
-  # or (recommended)
-  ATLANTIS_AZUREDEVOPS_TOKEN="RandomStringProducedByAzureDevOps"
-  ```
-  Azure DevOps token of API user.
-
-### `--azuredevops-user`
-  ```bash
-  atlantis server --azuredevops-user="username@example.com"
-  # or
-  ATLANTIS_AZUREDEVOPS_USER="username@example.com"
-  ```
-  Azure DevOps username of API user.
 
 ### `--bitbucket-base-url`
   ```bash
@@ -381,6 +397,14 @@ and set `--autoplan-modules` to `false`.
   ```
   Stops atlantis from locking projects and or workspaces when running terraform.
 
+### `--disable-unlock-label`
+  ```bash
+  atlantis server --disable-unlock-label do-not-unlock
+  # or
+  ATLANTIS_DISABLE_UNLOCK_LABEL="do-not-unlock"
+  ```
+  Stops atlantis from unlocking a pull request with this label. Defaults to "" (feature disabled).
+
 ### `--emoji-reaction`
   ```bash
   atlantis server --emoji-reaction thumbsup
@@ -389,6 +413,16 @@ and set `--autoplan-modules` to `false`.
   ```
   The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab.
   Defaults to `eyes`.
+
+### `--enable-diff-markdown-format`
+  ```bash
+  atlantis server --enable-diff-markdown-format
+  # or
+  ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
+  ```
+  Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
+
+  Useful to enable for use with GitHub.
 
 ### `--enable-policy-checks`
   ```bash
@@ -419,16 +453,6 @@ and set `--autoplan-modules` to `false`.
   The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects.
   :::
 
-### `--enable-diff-markdown-format`
-  ```bash
-  atlantis server --enable-diff-markdown-format
-  # or
-  ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
-  ```
-  Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
-
-  Useful to enable for use with GitHub.
-
 ### `--executable-name`
   ```bash
   atlantis server --executable-name="atlantis"
@@ -443,20 +467,70 @@ and set `--autoplan-modules` to `false`.
   ```bash
   atlantis server --fail-on-pre-workflow-hook-error
   # or
-  ATLANTIS_FAIL_ON_PRE_WORKFLOW_HOOK_ERROR=true 
+  ATLANTIS_FAIL_ON_PRE_WORKFLOW_HOOK_ERROR=true
   ```
 
   Fail and do not run the requested Atlantis command if any of the pre workflow hooks error.
 
-### `--hide-unchanged-plan-comments`
+### `--gh-allow-mergeable-bypass-apply`
   ```bash
-  atlantis server --hide-unchanged-plan-comments
+  atlantis server --gh-allow-mergeable-bypass-apply
   # or
-  ATLANTIS_HIDE_UNCHANGED_PLAN_COMMENTS=true
+  ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY=true
   ```
-Remove no-changes plan comments from the pull request.
+  Feature flag to enable ability to use `mergeable` mode with required apply status check.
 
-This is useful when you have many projects and want to keep the pull request clean from useless comments.
+### `--gh-app-id`
+  ```bash
+  atlantis server --gh-app-id="00000"
+  # or
+  ATLANTIS_GH_APP_ID="00000"
+  ```
+  GitHub app ID. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/apps/installations).
+
+  ::: tip
+  A GitHub app can be created by starting Atlantis first, then pointing your browser at
+
+  ```
+  $(hostname)/github-app/setup
+  ```
+
+  You'll be redirected to GitHub to create a new app, and will then be redirected to
+
+  ```
+  $(hostname)/github-app/exchange-code?code=some-code
+  ```
+
+  After which Atlantis will display your new app's credentials: your app's ID, its generated `--gh-webhook-secret` and the contents of the file for `--gh-app-key-file`. Update your Atlantis config accordingly, and restart the server.
+  :::
+
+### `--gh-app-key`
+  ```bash
+  atlantis server --gh-app-key="-----BEGIN RSA PRIVATE KEY-----(...)"
+  # or
+  ATLANTIS_GH_APP_KEY="-----BEGIN RSA PRIVATE KEY-----(...)"
+  ```
+  The PEM encoded private key for the GitHub App.
+
+  ::: warning SECURITY WARNING
+  The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gh-app-key-file` to mitigate that risk.
+  :::
+
+### `--gh-app-key-file`
+  ```bash
+  atlantis server --gh-app-key-file="path/to/app-key.pem"
+  # or
+  ATLANTIS_GH_APP_KEY_FILE="path/to/app-key.pem"
+  ```
+  Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/apps/installations).
+
+### `--gh-app-slug`
+  ```bash
+  atlantis server --gh-app-slug="myappslug"
+  # or
+  ATLANTIS_GH_APP_SLUG="myappslug"
+  ```
+  A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`. You need to obtain this value from your GitHub app, one way is to go to your App settings and open "Public page" from the left sidebar. Your `--gh-app-slug` value will be the last part of the URL, e.g `https://github.com/apps/<slug>`.
 
 ### `--gh-hostname`
   ```bash
@@ -466,6 +540,33 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
   don't set. Defaults to `github.com`.
+
+### `--gh-org`
+  ```bash
+  atlantis server --gh-org="myorgname"
+  # or
+  ATLANTIS_GH_ORG="myorgname"
+  ```
+  GitHub organization name. Set to enable creating a private GitHub app for this organization.
+
+### `--gh-team-allowlist`
+  ```bash
+  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
+  # or
+  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
+  ```
+  In versions v0.21.0 and later, the GitHub team name can be a name or a slug.
+
+  In versions v0.20.1 and below, the Github team name required the case sensitive team name.
+
+  Comma-separated list of GitHub teams and permission pairs.
+
+  By default, any team can plan and apply.
+
+  ::: warning NOTE
+  You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
+  i.e., "Engineering Team:plan, Infrastructure Team:apply"
+  :::
 
 ### `--gh-token`
   ```bash
@@ -495,93 +596,6 @@ This is useful when you have many projects and want to keep the pull request cle
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub.
   This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
   :::
-
-### `--gh-org`
-  ```bash
-  atlantis server --gh-org="myorgname"
-  # or
-  ATLANTIS_GH_ORG="myorgname"
-  ```
-  GitHub organization name. Set to enable creating a private GitHub app for this organization.
-
-### `--gh-app-id`
-  ```bash
-  atlantis server --gh-app-id="00000"
-  # or
-  ATLANTIS_GH_APP_ID="00000"
-  ```
-  GitHub app ID. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/apps/installations).
-
-  ::: tip
-  A GitHub app can be created by starting Atlantis first, then pointing your browser at
-
-  ```
-  $(hostname)/github-app/setup
-  ```
-
-  You'll be redirected to GitHub to create a new app, and will then be redirected to
-
-  ```
-  $(hostname)/github-app/exchange-code?code=some-code
-  ```
-
-  After which Atlantis will display your new app's credentials: your app's ID, its generated `--gh-webhook-secret` and the contents of the file for `--gh-app-key-file`. Update your Atlantis config accordingly, and restart the server.
-  :::
-
-### `--gh-app-slug`
-  ```bash
-  atlantis server --gh-app-slug="myappslug"
-  # or
-  ATLANTIS_GH_APP_SLUG="myappslug"
-  ```
-  A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`. You need to obtain this value from your GitHub app, one way is to go to your App settings and open "Public page" from the left sidebar. Your `--gh-app-slug` value will be the last part of the URL, e.g `https://github.com/apps/<slug>`.
-
-### `--gh-app-key-file`
-  ```bash
-  atlantis server --gh-app-key-file="path/to/app-key.pem"
-  # or
-  ATLANTIS_GH_APP_KEY_FILE="path/to/app-key.pem"
-  ```
-  Path to a GitHub App PEM encoded private key file. If set, GitHub authentication will be performed as [an installation](https://docs.github.com/en/rest/apps/installations).
-
-### `--gh-app-key`
-  ```bash
-  atlantis server --gh-app-key="-----BEGIN RSA PRIVATE KEY-----(...)"
-  # or
-  ATLANTIS_GH_APP_KEY="-----BEGIN RSA PRIVATE KEY-----(...)"
-  ```
-  The PEM encoded private key for the GitHub App.
-
-  ::: warning SECURITY WARNING
-  The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gh-app-key-file` to mitigate that risk.
-  :::
-
-### `--gh-team-allowlist`
-  ```bash
-  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
-  # or
-  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
-  ```
-  In versions v0.21.0 and later, the GitHub team name can be a name or a slug.
-
-  In versions v0.20.1 and below, the Github team name required the case sensitive team name.
-
-  Comma-separated list of GitHub teams and permission pairs.
-
-  By default, any team can plan and apply.
-
-  ::: warning NOTE
-  You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
-  i.e., "Engineering Team:plan, Infrastructure Team:apply"
-  :::
-
-### `--gh-allow-mergeable-bypass-apply`
-  ```bash
-  atlantis server --gh-allow-mergeable-bypass-apply
-  # or
-  ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY=true
-  ```
-  Feature flag to enable ability to use `mergeable` mode with required apply status check.
 
 ### `--gitlab-hostname`
   ```bash
@@ -634,7 +648,17 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
   ```
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub and GitLab currently. This is not enabled by default.
+  GitHub and GitLab currently. This is not enabled by default. When using Github App, you need to set `--gh-app-slug` to enable this feature.
+
+### `--hide-unchanged-plan-comments`
+  ```bash
+  atlantis server --hide-unchanged-plan-comments
+  # or
+  ATLANTIS_HIDE_UNCHANGED_PLAN_COMMENTS=true
+  ```
+Remove no-changes plan comments from the pull request.
+
+This is useful when you have many projects and want to keep the pull request clean from useless comments.
 
 ### `--include-git-untracked-files`
   ```bash
@@ -685,13 +709,13 @@ This is useful when you have many projects and want to keep the pull request cle
 
   Defaults to the atlantis home directory `/home/atlantis/.markdown_templates/` in `/$HOME/.markdown_templates`.
 
-### `--parallel-pool-size`
+### `--parallel-apply`
   ```bash
-  atlantis server --parallel-pool-size=100
+  atlantis server --parallel-apply
   # or
-  ATLANTIS_PARALLEL_POOL_SIZE=100
+  ATLANTIS_PARALLEL_APPLY=true
   ```
-  Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
+  Whether to run apply operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precedence.
 
 ### `--parallel-plan`
   ```bash
@@ -701,13 +725,13 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   Whether to run plan operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precedence.
 
-### `--parallel-apply`
+### `--parallel-pool-size`
   ```bash
-  atlantis server --parallel-apply
+  atlantis server --parallel-pool-size=100
   # or
-  ATLANTIS_PARALLEL_APPLY=true
+  ATLANTIS_PARALLEL_POOL_SIZE=100
   ```
-  Whether to run apply operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precedence.
+  Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
 
 ### `--port`
   ```bash
@@ -725,6 +749,14 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
 
+### `--redis-db`
+  ```bash
+  atlantis server --redis-db=0
+  # or
+  ATLANTIS_REDIS_DB=0
+  ```
+  The Redis Database to use when using a Locking DB type of `redis`. Defaults to `0`.
+
 ### `--redis-host`
   ```bash
   atlantis server --redis-host="localhost"
@@ -732,6 +764,18 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_REDIS_HOST="localhost"
   ```
   The Redis Hostname for when using a Locking DB type of `redis`.
+
+### `--redis-insecure-skip-verify`
+  ```bash
+  atlantis server --redis-insecure-skip-verify=false
+  # or
+  ATLANTIS_REDIS_INSECURE_SKIP_VERIFY=false
+  ```
+  Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate. Defaults to `false`.
+
+  ::: warning SECURITY WARNING
+  If this is enabled, TLS is susceptible to machine-in-the-middle attacks unless custom verification is used.
+  :::
 
 ### `--redis-password`
   ```bash
@@ -749,14 +793,6 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   The Redis Port for when using a Locking DB type of `redis`. Defaults to `6379`.
 
-### `--redis-db`
-  ```bash
-  atlantis server --redis-db=0
-  # or
-  ATLANTIS_REDIS_DB=0
-  ```
-  The Redis Database to use when using a Locking DB type of `redis`. Defaults to `0`.
-
 ### `--redis-tls-enabled`
   ```bash
   atlantis server --redis-tls-enabled=false
@@ -765,17 +801,38 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
 
-### `--redis-insecure-skip-verify`
+### `--repo-allowlist`
   ```bash
-  atlantis server --redis-insecure-skip-verify=false
+  # NOTE: Use single quotes to avoid shell expansion of *.
+  atlantis server --repo-allowlist='github.com/myorg/*'
   # or
-  ATLANTIS_REDIS_INSECURE_SKIP_VERIFY=false
+  ATLANTIS_REPO_ALLOWLIST='github.com/myorg/*'
   ```
-  Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate. Defaults to `false`.
+  Atlantis requires you to specify an allowlist of repositories it will accept webhooks from.
 
-  ::: warning SECURITY WARNING
-  If this is enabled, TLS is susceptible to machine-in-the-middle attacks unless custom verification is used.
-  :::
+  Notes:
+  * Accepts a comma separated list, ex. `definition1,definition2`
+  * Format is `{hostname}/{owner}/{repo}`, ex. `github.com/runatlantis/atlantis`
+  * `*` matches any characters, ex. `github.com/runatlantis/*` will match all repos in the runatlantis organization
+  * An entry beginning with `!` negates it, ex. `github.com/foo/*,!github.com/foo/bar` will match all github repos in the `foo` owner *except* `bar`.
+  * For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
+    * User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
+  * For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
+  * Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo allowlist for each repository until the change is complete.
+
+  Examples:
+  * Allowlist `myorg/repo1` and `myorg/repo2` on `github.com`
+    * `--repo-allowlist=github.com/myorg/repo1,github.com/myorg/repo2`
+  * Allowlist all repos under `myorg` on `github.com`
+    * `--repo-allowlist='github.com/myorg/*'`
+  * Allowlist all repos under `myorg` on `github.com`, excluding `myorg/untrusted-repo`
+    * `--repo-allowlist='github.com/myorg/*,!github.com/myorg/untrusted-repo'`
+  * Allowlist all repos in my GitHub Enterprise installation
+    * `--repo-allowlist='github.yourcompany.com/*'`
+  * Allowlist all repos under `myorg` project `myproject` on Azure DevOps
+    * `--repo-allowlist='myorg.visualstudio.com/myproject/*,dev.azure.com/myorg/myproject/*'`
+  * Allowlist all repositories
+    * `--repo-allowlist='*'`
 
 ### `--repo-config`
   ```bash
@@ -821,47 +878,16 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
   :::
 
-### `--repo-allowlist`
+### `--restrict-file-list`
   ```bash
-  # NOTE: Use single quotes to avoid shell expansion of *.
-  atlantis server --repo-allowlist='github.com/myorg/*'
-  # or
-  ATLANTIS_REPO_ALLOWLIST='github.com/myorg/*'
+  atlantis server --restrict-file-list
+  # or (recommended)
+  ATLANTIS_RESTRICT_FILE_LIST=true
   ```
-  Atlantis requires you to specify an allowlist of repositories it will accept webhooks from.
-
-  Notes:
-  * Accepts a comma separated list, ex. `definition1,definition2`
-  * Format is `{hostname}/{owner}/{repo}`, ex. `github.com/runatlantis/atlantis`
-  * `*` matches any characters, ex. `github.com/runatlantis/*` will match all repos in the runatlantis organization
-  * An entry beginning with `!` negates it, ex. `github.com/foo/*,!github.com/foo/bar` will match all github repos in the `foo` owner *except* `bar`.
-  * For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
-    * User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
-  * For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
-  * Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo allowlist for each repository until the change is complete.
-
-  Examples:
-  * Allowlist `myorg/repo1` and `myorg/repo2` on `github.com`
-    * `--repo-allowlist=github.com/myorg/repo1,github.com/myorg/repo2`
-  * Allowlist all repos under `myorg` on `github.com`
-    * `--repo-allowlist='github.com/myorg/*'`
-  * Allowlist all repos under `myorg` on `github.com`, excluding `myorg/untrusted-repo`
-    * `--repo-allowlist='github.com/myorg/*,!github.com/myorg/untrusted-repo'`
-  * Allowlist all repos in my GitHub Enterprise installation
-    * `--repo-allowlist='github.yourcompany.com/*'`
-  * Allowlist all repos under `myorg` project `myproject` on Azure DevOps
-    * `--repo-allowlist='myorg.visualstudio.com/myproject/*,dev.azure.com/myorg/myproject/*'`
-  * Allowlist all repositories
-    * `--repo-allowlist='*'`
-
-### `--silence-fork-pr-errors`
-  ```bash
-  atlantis server --silence-fork-pr-errors
-  # or
-  ATLANTIS_SILENCE_FORK_PR_ERRORS=true
-  ```
-  Normally, if Atlantis receives a pull request webhook from a fork and --allow-fork-prs is not set,
-  it will comment back with an error. This flag disables that commenting.
+  `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
+  This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
+  like `atlantis plan -p .*` will still work if used. normal commands will stil be blocked if necessary.
+  Defaults to `false`.
 
 ### `--silence-allowlist-errors`
   ```bash
@@ -875,6 +901,15 @@ This is useful when you have many projects and want to keep the pull request cle
 
   Some users find this useful because they prefer to add the Atlantis webhook
   at an organization level rather than on each repo.
+
+### `--silence-fork-pr-errors`
+  ```bash
+  atlantis server --silence-fork-pr-errors
+  # or
+  ATLANTIS_SILENCE_FORK_PR_ERRORS=true
+  ```
+  Normally, if Atlantis receives a pull request webhook from a fork and --allow-fork-prs is not set,
+  it will comment back with an error. This flag disables that commenting.
 
 ### `--silence-no-projects`
   ```bash
@@ -896,7 +931,15 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_SILENCE_VCS_STATUS_NO_PLANS=true
   ```
-  `--silence-vcs-status-no-plans` will tell Atlantis to ignore setting VCS status if none of the modified files are part of a project defined in the `atlantis.yaml` file.
+  `--silence-vcs-status-no-plans` will tell Atlantis to ignore setting VCS status on plans if none of the modified files are part of a project defined in the `atlantis.yaml` file.
+
+### `--silence-vcs-status-no-projects`
+  ```bash
+  atlantis server --silence-vcs-status-no-projects
+  # or
+  ATLANTIS_SILENCE_VCS_STATUS_NO_PROJECTS=true
+  ```
+  `--silence-vcs-status-no-projects` will tell Atlantis to ignore setting VCS status on any command if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 
 ### `--skip-clone-no-changes`
   ```bash
@@ -931,17 +974,6 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_SSL_KEY_FILE="/etc/ssl/private/my-cert.key"
   ```
   File containing x509 private key matching `--ssl-cert-file`.
-
-### `--restrict-file-list`
-  ```bash
-  atlantis server --restrict-file-list
-  # or (recommended)
-  ATLANTIS_RESTRICT_FILE_LIST=true
-  ```
-  `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
-  This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
-  like `atlantis plan -p .*` will still work if used. normal commands will stil be blocked if necessary.
-  Defaults to `false`.
 
 ### `--stats-namespace`
   ```bash
@@ -1035,6 +1067,38 @@ The effect of the race condition is more evident when using parallel configurati
   This is useful when running multiple Atlantis servers against a single repository so you can
   give each Atlantis server its own unique name to prevent the statuses clashing.
 
+### `--web-basic-auth`
+  ```bash
+  atlantis server --web-basic-auth
+  # or
+  ATLANTIS_WEB_BASIC_AUTH=true
+  ```
+  Enable Basic Authentication on the Atlantis web service.
+
+### `--web-password`
+  ```bash
+  atlantis server --web-password="atlantis"
+  # or
+  ATLANTIS_WEB_PASSWORD="atlantis"
+  ```
+  Password used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--web-username`
+  ```bash
+  atlantis server --web-username="atlantis"
+  # or
+  ATLANTIS_WEB_USERNAME="atlantis"
+  ```
+  Username used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--websocket-check-origin`
+  ```bash
+  atlantis server --websocket-check-origin
+  # or
+  ATLANTIS_WEBSOCKET_CHECK_ORIGIN=true
+  ```
+  Only allow websockets connection when they originate from the running Atlantis web server
+
 ### `--write-git-creds`
   ```bash
   atlantis server --write-git-creds
@@ -1058,34 +1122,3 @@ The effect of the race condition is more evident when using parallel configurati
   This does write secrets to disk and should only be enabled in a secure environment.
   :::
 
-### `--web-basic-auth`
-  ```bash
-  atlantis server --web-basic-auth
-  # or
-  ATLANTIS_WEB_BASIC_AUTH=true
-  ```
-  Enable Basic Authentication on the Atlantis web service.
-
-### `--web-username`
-  ```bash
-  atlantis server --web-username="atlantis"
-  # or
-  ATLANTIS_WEB_USERNAME="atlantis"
-  ```
-  Username used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
-
-### `--web-password`
-  ```bash
-  atlantis server --web-password="atlantis"
-  # or
-  ATLANTIS_WEB_PASSWORD="atlantis"
-  ```
-  Password used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
-
-### `--websocket-check-origin`
-  ```bash
-  atlantis server --websocket-check-origin
-  # or
-  ATLANTIS_WEBSOCKET_CHECK_ORIGIN=true
-  ```
-  Only allow websockets connection when they originate from the running Atlantis web server

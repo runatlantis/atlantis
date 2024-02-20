@@ -276,9 +276,28 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 			wantErr:     assert.NoError,
 		},
 		{
-			name: "Fail one of dependencies is not applied",
+			name: "Should not fail if one of dependencies is not applied but it has no changes to apply",
 			ctx: command.ProjectContext{
-				DependsOn: []string{"project1", "project2", "project3"},
+				DependsOn: []string{"project1", "project2"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.AppliedPlanStatus,
+						},
+						{
+							ProjectName: "project2",
+							Status:      models.PlannedNoChangesPlanStatus,
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "In the case of more than one dependency, should not continue to check dependencies if one of them is not in applied status",
+			ctx: command.ProjectContext{
+				DependsOn: []string{"project1", "project2"},
 				PullStatus: &models.PullStatus{
 					Projects: []models.ProjectStatus{
 						{
