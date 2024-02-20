@@ -179,7 +179,7 @@ func TestExecute_Defaults(t *testing.T) {
 	strExceptions := map[string]string{
 		GHUserFlag:                       "user",
 		GHTokenFlag:                      "token",
-		GiteaBaseURLFlag:                 "https://gitea-base-url.com",
+		GiteaBaseURLFlag:                 "http://localhost",
 		DataDirFlag:                      dataDir,
 		MarkdownTemplateOverridesDirFlag: markdownTemplateOverridesDir,
 		AtlantisURLFlag:                  "http://" + hostname + ":4141",
