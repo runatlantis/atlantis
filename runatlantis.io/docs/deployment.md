@@ -517,7 +517,6 @@ containers:
 #### Gitea
 
 ```yaml
-...
 containers:
 - name: atlantis
   env:
