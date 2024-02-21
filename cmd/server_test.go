@@ -93,7 +93,7 @@ var testFlags = map[string]interface{}{
 	GHAppSlugFlag:                    "atlantis",
 	GHOrganizationFlag:               "",
 	GHWebhookSecretFlag:              "secret",
-	GiteaBaseURLFlag:                 "https://gitea-base-url.com",
+	GiteaBaseURLFlag:                 "http://localhost",
 	GiteaTokenFlag:                   "gitea-token",
 	GiteaUserFlag:                    "gitea-user",
 	GiteaWebhookSecretFlag:           "gitea-secret",
@@ -161,7 +161,7 @@ func TestExecute_Defaults(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
-		GiteaBaseURLFlag:  "https://gitea-base-url.com",
+		GiteaBaseURLFlag:  "http://localhost",
 		RepoAllowlistFlag: "*",
 	}, t)
 	err := c.Execute()
