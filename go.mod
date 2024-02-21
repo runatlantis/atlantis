@@ -45,7 +45,7 @@ require (
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605
 	github.com/xanzy/go-gitlab v0.97.0
 	go.etcd.io/bbolt v1.3.8
-	go.uber.org/zap v1.26.0
+	go.uber.org/zap v1.27.0
 	golang.org/x/term v0.17.0
 	golang.org/x/text v0.14.0
 	gopkg.in/yaml.v3 v3.0.1
