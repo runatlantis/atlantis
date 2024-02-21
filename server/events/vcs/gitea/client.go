@@ -27,6 +27,11 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
+// Emergency break for Gitea pagination (just in case)
+// Set to 500 to prevent runaway situations
+// Value chosen purposely high, though randomly.
+const giteaPaginationEBreak = 500
+
 type GiteaClient struct {
 	giteaClient *gitea.Client
 	username    string
@@ -111,8 +116,8 @@ func (c *GiteaClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest
 
 		nextPage = resp.NextPage
 
-		// Emergency break after 500 pages
-		if page >= 500 {
+		// Emergency break after giteaPaginationEBreak pages
+		if page >= giteaPaginationEBreak {
 			break
 		}
 	}
@@ -244,8 +249,8 @@ func (c *GiteaClient) PullIsApproved(repo models.Repo, pull models.PullRequest) 
 
 		nextPage = resp.NextPage
 
-		// Emergency break after 500 pages
-		if page >= 500 {
+		// Emergency break after giteaPaginationEBreak pages
+		if page >= giteaPaginationEBreak {
 			break
 		}
 	}
@@ -333,8 +338,8 @@ func (c *GiteaClient) DiscardReviews(repo models.Repo, pull models.PullRequest) 
 
 		nextPage = resp.NextPage
 
-		// Emergency break after 500 pages
-		if page >= 500 {
+		// Emergency break after giteaPaginationEBreak pages
+		if page >= giteaPaginationEBreak {
 			break
 		}
 	}
@@ -446,8 +451,8 @@ func (c *GiteaClient) GetPullLabels(repo models.Repo, pull models.PullRequest) (
 
 		nextPage = resp.NextPage
 
-		// Emergency break after 500 pages
-		if page >= 500 {
+		// Emergency break after giteaPaginationEBreak pages
+		if page >= giteaPaginationEBreak {
 			break
 		}
 	}
