@@ -692,6 +692,7 @@ atlantis server \
 --gitea-user="$USERNAME" \
 --gitea-token="$TOKEN" \
 --gitea-webhook-secret="$SECRET" \
+--gitea-page-size=30 \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
 

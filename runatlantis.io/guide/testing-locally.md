@@ -324,6 +324,7 @@ atlantis server \
 --gitea-token="$ATLANTIS_GITEA_TOKEN" \
 --gitea-webhook-secret="$ATLANTIS_GITEA_WEBHOOK_SECRET" \
 --gitea-base-url="$ATLANTIS_GITEA_BASE_URL" \
+--gitea-page-size="$ATLANTIS_GITEA_PAGE_SIZE" \
 --repo-allowlist="$REPO_ALLOWLIST"
 --ssl-cert-file=file.crt
 --ssl-key-file=file.key

@@ -97,6 +97,7 @@ const (
 	GiteaTokenFlag                   = "gitea-token"
 	GiteaUserFlag                    = "gitea-user"
 	GiteaWebhookSecretFlag           = "gitea-webhook-secret" // nolint: gosec
+	GiteaPageSizeFlag                = "gitea-page-size"
 	GitlabHostnameFlag               = "gitlab-hostname"
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
@@ -161,6 +162,7 @@ const (
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
 	DefaultGiteaBaseURL                 = "https://gitea.com"
+	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
@@ -589,6 +591,10 @@ var intFlags = map[string]intFlag{
 			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
 		defaultValue: DefaultCheckoutDepth,
 	},
+	GiteaPageSizeFlag: {
+		description:  "Optional value that specifies the number of results per page to expect from Gitea.",
+		defaultValue: DefaultGiteaPageSize,
+	},
 	ParallelPoolSize: {
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
 		defaultValue: DefaultParallelPoolSize,
@@ -836,6 +842,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.GiteaBaseURL == "" {
 		c.GiteaBaseURL = DefaultGiteaBaseURL
+	}
+	if c.GiteaPageSize == 0 {
+		c.GiteaPageSize = DefaultGiteaPageSize
 	}
 	if c.BitbucketBaseURL == "" {
 		c.BitbucketBaseURL = DefaultBitbucketBaseURL

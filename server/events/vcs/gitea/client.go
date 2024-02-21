@@ -36,6 +36,7 @@ type GiteaClient struct {
 	giteaClient *gitea.Client
 	username    string
 	token       string
+	pageSize    int
 	ctx         context.Context
 	logger      logging.SimpleLogging
 }
@@ -60,7 +61,7 @@ type GiteaPullGetter interface {
 // client to use to make the requests, username and password are used as basic
 // auth in the requests, baseURL is the API's baseURL, ex. https://corp.com:7990.
 // Don't include the API version, ex. '/1.0'.
-func NewClient(baseURL string, username string, token string, logger logging.SimpleLogging) (*GiteaClient, error) {
+func NewClient(baseURL string, username string, token string, pagesize int, logger logging.SimpleLogging) (*GiteaClient, error) {
 	giteaClient, err := gitea.NewClient(baseURL,
 		gitea.SetToken(token),
 		gitea.SetUserAgent("atlantis"),
@@ -74,6 +75,7 @@ func NewClient(baseURL string, username string, token string, logger logging.Sim
 		giteaClient: giteaClient,
 		username:    username,
 		token:       token,
+		pageSize:    pagesize,
 		ctx:         context.Background(),
 		logger:      logger,
 	}, nil
@@ -98,7 +100,7 @@ func (c *GiteaClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest
 	listOptions := gitea.ListPullRequestFilesOptions{
 		ListOptions: gitea.ListOptions{
 			Page:     1,
-			PageSize: 100,
+			PageSize: c.pageSize,
 		},
 	}
 
@@ -162,7 +164,7 @@ func (c *GiteaClient) HidePrevCommandComments(repo models.Repo, pullNum int, com
 		opts := gitea.ListIssueCommentOptions{
 			ListOptions: gitea.ListOptions{
 				Page:     nextPage,
-				PageSize: 100,
+				PageSize: c.pageSize,
 			},
 		}
 
@@ -224,7 +226,7 @@ func (c *GiteaClient) PullIsApproved(repo models.Repo, pull models.PullRequest) 
 	listOptions := gitea.ListPullReviewsOptions{
 		ListOptions: gitea.ListOptions{
 			Page:     1,
-			PageSize: 100,
+			PageSize: c.pageSize,
 		},
 	}
 
@@ -315,7 +317,7 @@ func (c *GiteaClient) DiscardReviews(repo models.Repo, pull models.PullRequest) 
 	listOptions := gitea.ListPullReviewsOptions{
 		ListOptions: gitea.ListOptions{
 			Page:     1,
-			PageSize: 100,
+			PageSize: c.pageSize,
 		},
 	}
 
@@ -431,7 +433,7 @@ func (c *GiteaClient) GetPullLabels(repo models.Repo, pull models.PullRequest) (
 	opts := gitea.ListLabelsOptions{
 		ListOptions: gitea.ListOptions{
 			Page:     0,
-			PageSize: 100,
+			PageSize: c.pageSize,
 		},
 	}
 
