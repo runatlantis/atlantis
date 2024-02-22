@@ -238,7 +238,7 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultBitbucketBaseURL,
 	},
 	BitbucketWebhookSecretFlag: {
-		description: "Secret used to validate Bitbucket webhooks. Only Bitbucket Server supports webhook secrets." +
+		description: "Secret used to validate Bitbucket webhooks." +
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from Bitbucket. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_BITBUCKET_WEBHOOK_SECRET environment variable.",
@@ -1039,9 +1039,6 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL != DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
-	}
-	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs")
 	}
 	if userConfig.AzureDevopsWebhookUser != "" && userConfig.AzureDevopsWebhookPassword == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")

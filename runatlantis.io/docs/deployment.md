@@ -99,26 +99,23 @@ echo -n "yourtoken" > token
 echo -n "yoursecret" > webhook-secret
 kubectl create secret generic atlantis-vcs --from-file=token --from-file=webhook-secret
 ```
-::: tip Note
-If you're using Bitbucket Cloud then there is no webhook secret since it's not supported.
-:::
 
 Next, edit the manifests below as follows:
 1. Replace `<VERSION>` in `image: ghcr.io/runatlantis/atlantis:<VERSION>` with the most recent version from [https://github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest).
     * NOTE: You never want to run with `:latest` because if your Pod moves to a new node, Kubernetes will pull the latest image and you might end
 up upgrading Atlantis by accident!
-2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_ALLOWLIST` with the allowlist pattern
+1. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_ALLOWLIST` with the allowlist pattern
 for your Terraform repos. See [Repo Allowlist](server-configuration.html#repo-allowlist) for more details.
-3. If you're using GitHub:
+1. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
     2. Delete all the `ATLANTIS_GITLAB_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
-4. If you're using GitLab:
+2. If you're using GitLab:
     1. Replace `<YOUR_GITLAB_USER>` with the username of your Atlantis GitLab user without the `@`.
     2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
-5. If you're using Bitbucket:
+3. If you're using Bitbucket:
     1. Replace `<YOUR_BITBUCKET_USER>` with the username of your Atlantis Bitbucket user without the `@`.
     2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
-6. If you're using Azure DevOps:
+4. If you're using Azure DevOps:
     1. Replace `<YOUR_AZUREDEVOPS_USER>` with the username of your Atlantis Azure DevOps user without the `@`.
     2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, and `ATLANTIS_BITBUCKET_*` environment variables.
 
@@ -193,6 +190,11 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: token
+        - name: ATLANTIS_BITBUCKET_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: webhook-secret
         ### End Bitbucket Config ###
 
         ### Azure DevOps Config ###
@@ -638,6 +640,7 @@ atlantis server \
 --atlantis-url="$URL" \
 --bitbucket-user="$USERNAME" \
 --bitbucket-token="$TOKEN" \
+--bitbucket-webhook-secret="$SECRET" \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
 

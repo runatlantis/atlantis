@@ -297,8 +297,7 @@ and set `--autoplan-modules` to `false`.
   # or (recommended)
   ATLANTIS_BITBUCKET_WEBHOOK_SECRET="secret"
   ```
-  Secret used to validate Bitbucket webhooks. Only Bitbucket Server supports webhook secrets.
-  For Bitbucket.org, see [Security](security.html#bitbucket-cloud-bitbucket-org) for mitigations.
+  Secret used to validate Bitbucket webhooks.
 
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from Bitbucket.
