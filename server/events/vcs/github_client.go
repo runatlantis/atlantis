@@ -405,13 +405,37 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 		Repository struct {
 			PullRequest struct {
 				ReviewDecision githubv4.String
-				Commits        struct {
+				BaseRef        struct {
+					BranchProtectionRule struct {
+						RequiredStatusChecks []struct {
+							Context githubv4.String
+						}
+					}
+					Rules struct {
+						PageInfo struct {
+							EndCursor   *githubv4.String
+							HasNextPage githubv4.Boolean
+						}
+						Nodes []struct {
+							Type       githubv4.String
+							Parameters struct {
+								RequiredStatusChecksParameters struct {
+									RequiredStatusChecks []struct {
+										Context githubv4.String
+									}
+								} `graphql:"... on RequiredStatusChecksParameters"`
+								// TODO: Consider required workflows
+							}
+						}
+					} `graphql:"rules(first: 100, after: $ruleCursor)"`
+				}
+				Commits struct {
 					Nodes []struct {
 						Commit struct {
 							StatusCheckRollup struct {
 								Contexts struct {
 									PageInfo struct {
-										EndCursor   githubv4.String
+										EndCursor   *githubv4.String
 										HasNextPage githubv4.Boolean
 									}
 									Nodes []struct {
@@ -427,7 +451,7 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 											IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
 										} `graphql:"... on StatusContext"`
 									}
-								} `graphql:"contexts(first: 100, after: $cursor)"`
+								} `graphql:"contexts(first: 100, after: $contextCursor)"`
 							}
 						}
 					}
@@ -437,11 +461,15 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 	}
 
 	variables := map[string]interface{}{
-		"owner":  githubv4.String(repo.Owner),
-		"name":   githubv4.String(repo.Name),
-		"number": githubv4.Int(*pull.Number),
-		"cursor": (*githubv4.String)(nil),
+		"owner":         githubv4.String(repo.Owner),
+		"name":          githubv4.String(repo.Name),
+		"number":        githubv4.Int(*pull.Number),
+		"ruleCursor":    (*githubv4.String)(nil),
+		"contextCursor": (*githubv4.String)(nil),
 	}
+
+	expectedRequiredStatusChecks := make(map[string]interface{})
+	requiredStatusChecksResult := make(map[string]bool)
 
 	for {
 		err := g.v4Client.Query(g.ctx, &query, variables)
@@ -458,30 +486,77 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 			return false, errors.New("no commits found on PR")
 		}
 
-		for _, context := range query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
-			switch context.Typename {
-			case "CheckRun":
-				if bool(context.CheckRun.IsRequired) &&
-					(context.CheckRun.Conclusion != "SUCCESS" && context.CheckRun.Conclusion != "SKIPPED" ) &&
-					!strings.HasPrefix(string(context.CheckRun.Name), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
-					return false, nil
-				}
-			case "StatusContext":
-				if bool(context.StatusContext.IsRequired) &&
-					context.StatusContext.State != "SUCCESS" &&
-					!strings.HasPrefix(string(context.StatusContext.Context), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
-					return false, nil
+		for _, rule := range query.Repository.PullRequest.BaseRef.BranchProtectionRule.RequiredStatusChecks {
+			expectedRequiredStatusChecks[string(rule.Context)] = struct{}{}
+		}
+
+		for _, rule := range query.Repository.PullRequest.BaseRef.Rules.Nodes {
+			switch rule.Type {
+			case "REQUIRED_STATUS_CHECKS":
+				for _, context := range rule.Parameters.RequiredStatusChecksParameters.RequiredStatusChecks {
+					expectedRequiredStatusChecks[string(context.Context)] = struct{}{}
 				}
 			default:
-				return false, fmt.Errorf("unknown type of status check, %q", context.Typename)
+				continue
 			}
 		}
 
-		if !query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.HasNextPage {
+		for _, context := range query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
+			var name string
+			var required bool
+			var passed bool
+
+			switch context.Typename {
+			case "CheckRun":
+				name = string(context.CheckRun.Name)
+				required = bool(context.CheckRun.IsRequired)
+				passed = context.CheckRun.Conclusion == "SUCCESS" || context.CheckRun.Conclusion == "SKIPPED"
+			case "StatusContext":
+				name = string(context.StatusContext.Context)
+				required = bool(context.StatusContext.IsRequired)
+				passed = context.StatusContext.State == "SUCCESS"
+			default:
+				return false, fmt.Errorf("unknown type of status check, %q", context.Typename)
+			}
+
+			if required {
+				requiredStatusChecksResult[name] = passed
+			}
+		}
+
+		if !query.Repository.PullRequest.BaseRef.Rules.PageInfo.HasNextPage &&
+			!query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.HasNextPage {
 			break
 		}
 
-		variables["cursor"] = githubv4.NewString(query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.EndCursor)
+		if query.Repository.PullRequest.BaseRef.Rules.PageInfo.EndCursor != nil {
+			variables["ruleCursor"] = query.Repository.PullRequest.BaseRef.Rules.PageInfo.EndCursor
+		}
+		if query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.EndCursor != nil {
+			variables["contextCursor"] = query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.EndCursor
+		}
+	}
+
+	for context, _ := range expectedRequiredStatusChecks {
+		if strings.HasPrefix(context, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+			continue
+		}
+
+		passed, found := requiredStatusChecksResult[context]
+
+		if !found || !passed {
+			return false, nil
+		}
+	}
+
+	for context, passed := range requiredStatusChecksResult {
+		if strings.HasPrefix(context, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+			continue
+		}
+
+		if !passed {
+			return false, nil
+		}
 	}
 
 	return true, nil
