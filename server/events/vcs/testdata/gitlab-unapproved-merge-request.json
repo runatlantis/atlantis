@@ -1,0 +1,41 @@
+{
+  "id": 542185,
+  "iid": 1,
+  "project_id": 17829,
+  "title": "Update main.tf",
+  "description": "",
+  "state": "closed",
+  "created_at": "2023-09-27T02:50:38.784Z",
+  "updated_at": "2023-09-27T02:56:16.039Z",
+  "merge_status": "can_be_merged",
+  "approved": false,
+  "approvals_required": 1,
+  "approvals_left": 1,
+  "require_password_to_approve": false,
+  "approved_by": [],
+  "suggested_approvers": [
+    {
+      "id": 81,
+      "username": "lmassa",
+      "name": "Luke Massa",
+      "state": "active",
+      "avatar_url": "https://secure.gravatar.com/avatar/0e6dd44205919a3dab626e54672a4141?s=80&d=identicon",
+      "web_url": "https://gitlab.dev.tripadvisor.com/lmassa"
+    }
+  ],
+  "approvers": [],
+  "approver_groups": [],
+  "user_has_approved": false,
+  "user_can_approve": true,
+  "approval_rules_left": [
+    {
+      "id": 2204,
+      "name": "lmassa",
+      "rule_type": "regular"
+    }
+  ],
+  "has_approval_rules": true,
+  "merge_request_approvers_available": true,
+  "multiple_approval_rules_available": true,
+  "invalid_approvers_rules": []
+}
