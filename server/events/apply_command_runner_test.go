@@ -72,7 +72,8 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			When(applyLockChecker.CheckApplyLock()).ThenReturn(locking.ApplyCommandLock{Locked: c.ApplyLocked}, c.ApplyLockError)
 			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
 
-			vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), testdata.GithubRepo, modelPull.Num, c.ExpComment, "apply")
+			vcsClient.VerifyWasCalledOnce().CreateComment(
+				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(c.ExpComment), Eq("apply"))
 		})
 	}
 }
