@@ -64,7 +64,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			ctx := &command.Context{
 				User:     testdata.User,
-				Log:      logging.NewNoopLogger(t),
+				Log:      logger,
 				Scope:    scopeNull,
 				Pull:     modelPull,
 				HeadRepo: testdata.GithubRepo,
