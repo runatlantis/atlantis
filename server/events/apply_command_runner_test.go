@@ -57,8 +57,8 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 				State: github.String("open"),
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-			When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 			ctx := &command.Context{
 				User:     testdata.User,
@@ -72,7 +72,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			When(applyLockChecker.CheckApplyLock()).ThenReturn(locking.ApplyCommandLock{Locked: c.ApplyLocked}, c.ApplyLockError)
 			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
 
-			vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, modelPull.Num, c.ExpComment, "apply")
+			vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), testdata.GithubRepo, modelPull.Num, c.ExpComment, "apply")
 		})
 	}
 }
@@ -191,9 +191,11 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				timesComment = 0
 			}
 
-			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 			if c.ExpVCSStatusSet {
 				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
 					Any[models.Repo](),
 					Any[models.PullRequest](),
 					Eq[models.CommitStatus](models.SuccessCommitStatus),
@@ -203,6 +205,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				)
 			} else {
 				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
 					Any[models.Repo](),
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
@@ -486,8 +489,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 
-			When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
 			for i := range c.ProjectContexts {
@@ -502,7 +505,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			}
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
-				testdata.GithubRepo, modelPull.Num, c.ExpComment, "apply",
+				Any[logging.SimpleLogging](), testdata.GithubRepo, modelPull.Num, c.ExpComment, "apply",
 			)
 		})
 	}

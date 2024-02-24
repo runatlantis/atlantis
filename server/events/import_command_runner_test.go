@@ -72,16 +72,18 @@ func TestImportCommandRunner_Run(t *testing.T) {
 			}
 			cmd := &events.CommentCommand{Name: command.Import}
 
-			When(pullReqStatusFetcher.FetchPullStatus(modelPull)).ThenReturn(tt.pullReqStatus, nil)
+			When(pullReqStatusFetcher.FetchPullStatus(logger, modelPull)).ThenReturn(tt.pullReqStatus, nil)
 			When(projectCommandBuilder.BuildImportCommands(ctx, cmd)).ThenReturn(tt.projectCmds, nil)
 
 			importCommandRunner.Run(ctx, cmd)
 
 			Assert(t, ctx.PullRequestStatus.Mergeable == true, "PullRequestStatus must be set for import_requirements")
 			if tt.expNoComment {
-				vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+				vcsClient.VerifyWasCalled(Never()).CreateComment(
+					Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 			} else {
-				vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, modelPull.Num, tt.expComment, "import")
+				vcsClient.VerifyWasCalledOnce().CreateComment(
+					Any[logging.SimpleLogging](), testdata.GithubRepo, modelPull.Num, tt.expComment, "import")
 			}
 		})
 	}
