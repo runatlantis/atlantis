@@ -45,7 +45,6 @@ type GithubClient struct {
 	client   *github.Client
 	v4Client *githubv4.Client
 	ctx      context.Context
-	logger   logging.SimpleLogging
 	config   GithubConfig
 }
 
@@ -112,7 +111,6 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		client:   client,
 		v4Client: v4Client,
 		ctx:      context.Background(),
-		logger:   logger,
 		config:   config,
 	}, nil
 }

@@ -46,8 +46,6 @@ type GitlabClient struct {
 	PollingInterval time.Duration
 	// PollingInterval is the total duration for which to poll, where applicable.
 	PollingTimeout time.Duration
-	// logger
-	logger logging.SimpleLogging
 }
 
 // commonMarkSupported is a version constraint that is true when this version of
@@ -64,7 +62,6 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 	client := &GitlabClient{
 		PollingInterval: time.Second,
 		PollingTimeout:  time.Second * 30,
-		logger:          logger,
 	}
 
 	// Create the client differently depending on the base URL.
@@ -374,7 +371,7 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 }
 
 func (g *GitlabClient) SupportsDetailedMergeStatus(logger logging.SimpleLogging) (bool, error) {
-	g.logger.Debug("Checking if GitLab supports detailed merge status")
+	logger.Debug("Checking if GitLab supports detailed merge status")
 	v, err := g.GetVersion(logger)
 	if err != nil {
 		return false, err

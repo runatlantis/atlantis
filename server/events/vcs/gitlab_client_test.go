@@ -156,7 +156,6 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 				Version:         nil,
 				PollingInterval: time.Second * 0,
 				PollingTimeout:  time.Second * 10,
-				logger:          logging.NewNoopLogger(t),
 			}
 
 			filenames, err := client.GetModifiedFiles(
@@ -247,7 +246,6 @@ func TestGitlabClient_MergePull(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
-				logger:  logging.NewNoopLogger(t),
 			}
 
 			err = client.MergePull(
@@ -326,7 +324,6 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
-				logger:  logging.NewNoopLogger(t),
 			}
 
 			repo := models.Repo{
@@ -521,7 +518,6 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				client := &GitlabClient{
 					Client:  internalClient,
 					Version: nil,
-					logger:  logging.NewNoopLogger(t),
 				}
 
 				repo := models.Repo{
@@ -551,9 +547,10 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 }
 
 func TestGitlabClient_MarkdownPullLink(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	gitlabClientUnderTest = true
 	defer func() { gitlabClientUnderTest = false }()
-	client, err := NewGitlabClient("gitlab.com", "token", nil)
+	client, err := NewGitlabClient("gitlab.com", "token", logger)
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
@@ -687,7 +684,6 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
-				logger:  logging.NewNoopLogger(t),
 			}
 
 			err = client.HidePrevCommandComments(logger, repo, pullNum, command.Plan.TitleString(), c.dir)
@@ -728,7 +724,6 @@ func TestGithubClient_GetPullLabels(t *testing.T) {
 	client := &GitlabClient{
 		Client:  internalClient,
 		Version: nil,
-		logger:  logging.NewNoopLogger(t),
 	}
 
 	labels, err := client.GetPullLabels(
@@ -766,7 +761,6 @@ func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
 	client := &GitlabClient{
 		Client:  internalClient,
 		Version: nil,
-		logger:  logging.NewNoopLogger(t),
 	}
 
 	labels, err := client.GetPullLabels(
