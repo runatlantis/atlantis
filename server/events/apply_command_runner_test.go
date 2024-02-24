@@ -506,7 +506,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			}
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
-				Any[logging.SimpleLogging](), testdata.GithubRepo, modelPull.Num, c.ExpComment, "apply",
+				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(c.ExpComment), Eq("apply"),
 			)
 		})
 	}
