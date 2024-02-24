@@ -205,7 +205,7 @@ func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo 
 	return mergeable, err
 }
 
-func (c *InstrumentedClient) UpdateStatus(logger logging.SimpleLogging ,repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (c *InstrumentedClient) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	scope := c.StatsScope.SubScope("update_status")
 	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
 
@@ -244,14 +244,6 @@ func (c *InstrumentedClient) MergePull(logger logging.SimpleLogging, pull models
 
 	executionSuccess.Inc(1)
 	return nil
-}
-
-// taken from other parts of the code, would be great to have this in a shared spot
-func fmtLogSrc(repo models.Repo, pullNum int) []interface{} {
-	return []interface{}{
-		"repository", repo.FullName,
-		"pull-num", strconv.Itoa(pullNum),
-	}
 }
 
 func SetGitScopeTags(scope tally.Scope, repoFullName string, pullNum int) tally.Scope {
