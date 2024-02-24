@@ -76,7 +76,7 @@ type GithubPRReviewSummary struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, logger logging.SimpleLogging) (*GithubClient, error) {
+func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, logger logging.SimpleLogging) (*GithubClient, error) { //nolint:staticcheck
 	logger.Debug("Creating new GitHub client for host: %s", hostname)
 	transport, err := credentials.Client()
 	if err != nil {
