@@ -83,7 +83,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 					Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 			} else {
 				vcsClient.VerifyWasCalledOnce().CreateComment(
-					Any[logging.SimpleLogging](), testdata.GithubRepo, modelPull.Num, tt.expComment, "import")
+					Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(tt.expComment), Eq("import"))
 			}
 		})
 	}
