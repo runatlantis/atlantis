@@ -24,7 +24,9 @@ Automerging can be enabled either by:
 If automerge is enabled, you can disable it for a single `atlantis apply`
 command with the `--auto-merge-disabled` option.
 
-## All Plans Must Succeed
+## Requirements
+
+### All Plans Must Succeed
 When automerge is enabled, **all plans** in a pull request **must succeed** before
 **any** plans can be applied.
 
@@ -42,6 +44,11 @@ to be saved.
 
 Once I fix the issue in `dir2`, I can push a new commit which will trigger an
 autoplan. Then I will be able to apply both plans.
+
+### All Plans must be applied
+
+If multiple projects/dirs/workspaces are configured to be planned automatically, 
+then they should all be applied before Atlantis automatically merges the PR.
 
 ## Permissions
 The Atlantis VCS user must have the ability to merge pull requests.
