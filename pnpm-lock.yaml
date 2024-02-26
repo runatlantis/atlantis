@@ -12,8 +12,8 @@ devDependencies:
     specifier: 2.0.0-rc.0
     version: 2.0.0-rc.0(@algolia/client-search@4.21.1)(search-insights@2.13.0)
   '@vuepress/plugin-google-analytics':
-    specifier: 2.0.0-rc.0
-    version: 2.0.0-rc.0
+    specifier: 2.0.0-rc.15
+    version: 2.0.0-rc.15(vuepress@2.0.0-rc.0)
   '@vuepress/utils':
     specifier: 2.0.0-rc.0
     version: 2.0.0-rc.0
@@ -988,16 +988,12 @@ packages:
       - typescript
     dev: true
 
-  /@vuepress/plugin-google-analytics@2.0.0-rc.0:
-    resolution: {integrity: sha512-rkYW2LGkLAfRFtaFWVPr1V2mS6hwgYhn2hLeJAF5xHlC3PcjCiSV0cqH7ooeCo+FBJUlCtMQ9N8iSNl63vd7VQ==}
+  /@vuepress/plugin-google-analytics@2.0.0-rc.15(vuepress@2.0.0-rc.0):
+    resolution: {integrity: sha512-ovMpOYz0fFoVcRVgyv+7qnU7LPnovocbtYPk+oPspd9hMedYXjAMeyxOYYnN/MiC6+DSKshDqStTfjVpW3x9DQ==}
+    peerDependencies:
+      vuepress: 2.0.0-rc.8
     dependencies:
-      '@vuepress/client': 2.0.0-rc.0
-      '@vuepress/core': 2.0.0-rc.0
-      '@vuepress/utils': 2.0.0-rc.0
-    transitivePeerDependencies:
-      - '@vue/composition-api'
-      - supports-color
-      - typescript
+      vuepress: 2.0.0-rc.0(@vuepress/client@2.0.0-rc.0)(vue@3.3.11)
     dev: true
 
   /@vuepress/plugin-medium-zoom@2.0.0-rc.0:
@@ -2240,6 +2236,7 @@ packages:
   /vuepress-plugin-sitemap2@2.0.0-rc.4(vuepress@2.0.0-rc.0):
     resolution: {integrity: sha512-zi57grbyAFL54HUZNmmAWELYgwPsqa8p63HkEBSpXiQEa3JbYumAXHPZp4sIBGlBxcF8X34GtddrVw9FDlCtZA==}
     engines: {node: '>=18.16.0', npm: '>=8', pnpm: '>=7', yarn: '>=2'}
+    deprecated: Please use @vuepress/plugin-sitemap@v2 instead
     peerDependencies:
       vuepress: 2.0.0-rc.0
       vuepress-vite: 2.0.0-rc.0
