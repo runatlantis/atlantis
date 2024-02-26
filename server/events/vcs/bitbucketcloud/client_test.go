@@ -10,11 +10,13 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 // Should follow pagination properly.
 func TestClient_GetModifiedFilesPagination(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	respTemplate := `
 {
     "pagelen": 1,
@@ -73,25 +75,28 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
 	client.BaseURL = testServer.URL
 
-	files, err := client.GetModifiedFiles(models.Repo{
-		FullName:          "owner/repo",
-		Owner:             "owner",
-		Name:              "repo",
-		CloneURL:          "",
-		SanitizedCloneURL: "",
-		VCSHost: models.VCSHost{
-			Type:     models.BitbucketCloud,
-			Hostname: "bitbucket.org",
-		},
-	}, models.PullRequest{
-		Num: 1,
-	})
+	files, err := client.GetModifiedFiles(
+		logger,
+		models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.BitbucketCloud,
+				Hostname: "bitbucket.org",
+			},
+		}, models.PullRequest{
+			Num: 1,
+		})
 	Ok(t, err)
 	Equals(t, []string{"file1.txt", "file2.txt", "file3.txt"}, files)
 }
 
 // If the "old" key in the list of files is nil we shouldn't error.
 func TestClient_GetModifiedFilesOldNil(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	resp := `
 {
   "pagelen": 500,
@@ -134,24 +139,27 @@ func TestClient_GetModifiedFilesOldNil(t *testing.T) {
 	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
 	client.BaseURL = testServer.URL
 
-	files, err := client.GetModifiedFiles(models.Repo{
-		FullName:          "owner/repo",
-		Owner:             "owner",
-		Name:              "repo",
-		CloneURL:          "",
-		SanitizedCloneURL: "",
-		VCSHost: models.VCSHost{
-			Type:     models.BitbucketCloud,
-			Hostname: "bitbucket.org",
-		},
-	}, models.PullRequest{
-		Num: 1,
-	})
+	files, err := client.GetModifiedFiles(
+		logger,
+		models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.BitbucketCloud,
+				Hostname: "bitbucket.org",
+			},
+		}, models.PullRequest{
+			Num: 1,
+		})
 	Ok(t, err)
 	Equals(t, []string{"parent/child/file1.txt"}, files)
 }
 
 func TestClient_PullIsApproved(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	cases := []struct {
 		description string
 		testdata    string
@@ -202,12 +210,14 @@ func TestClient_PullIsApproved(t *testing.T) {
 
 			repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "https://bitbucket.org/owner/repo.git", "user", "token")
 			Ok(t, err)
-			approvalStatus, err := client.PullIsApproved(repo, models.PullRequest{
-				Num:        1,
-				HeadBranch: "branch",
-				Author:     "author",
-				BaseRepo:   repo,
-			})
+			approvalStatus, err := client.PullIsApproved(
+				logger,
+				repo, models.PullRequest{
+					Num:        1,
+					HeadBranch: "branch",
+					Author:     "author",
+					BaseRepo:   repo,
+				})
 			Ok(t, err)
 			Equals(t, c.exp, approvalStatus.IsApproved)
 		})
@@ -215,6 +225,7 @@ func TestClient_PullIsApproved(t *testing.T) {
 }
 
 func TestClient_PullIsMergeable(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	cases := map[string]struct {
 		DiffStat     string
 		ExpMergeable bool
@@ -325,19 +336,21 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
 			client.BaseURL = testServer.URL
 
-			actMergeable, err := client.PullIsMergeable(models.Repo{
-				FullName:          "owner/repo",
-				Owner:             "owner",
-				Name:              "repo",
-				CloneURL:          "",
-				SanitizedCloneURL: "",
-				VCSHost: models.VCSHost{
-					Type:     models.BitbucketCloud,
-					Hostname: "bitbucket.org",
-				},
-			}, models.PullRequest{
-				Num: 1,
-			}, "atlantis-test")
+			actMergeable, err := client.PullIsMergeable(
+				logger,
+				models.Repo{
+					FullName:          "owner/repo",
+					Owner:             "owner",
+					Name:              "repo",
+					CloneURL:          "",
+					SanitizedCloneURL: "",
+					VCSHost: models.VCSHost{
+						Type:     models.BitbucketCloud,
+						Hostname: "bitbucket.org",
+					},
+				}, models.PullRequest{
+					Num: 1,
+				}, "atlantis-test")
 			Ok(t, err)
 			Equals(t, c.ExpMergeable, actMergeable)
 		})
