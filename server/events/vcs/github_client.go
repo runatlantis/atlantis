@@ -39,14 +39,49 @@ var (
 	pullRequestDismissalMessage = *githubv4.NewString("Dismissing reviews because of plan changes")
 )
 
+type GithubRepoIdCacheEntry struct {
+	RepoId     githubv4.Int
+	LookupTime time.Time
+}
+
+type GitHubRepoIdCache struct {
+	cache map[githubv4.String]GithubRepoIdCacheEntry
+}
+
+func NewGitHubRepoIdCache() GitHubRepoIdCache {
+	return GitHubRepoIdCache{
+		cache: make(map[githubv4.String]GithubRepoIdCacheEntry),
+	}
+}
+
+func (c *GitHubRepoIdCache) Get(key githubv4.String) (githubv4.Int, bool) {
+	entry, ok := c.cache[key]
+	if !ok {
+		return githubv4.Int(0), false
+	}
+	if time.Since(entry.LookupTime) > time.Hour {
+		delete(c.cache, key)
+		return githubv4.Int(0), false
+	}
+	return entry.RepoId, true
+}
+
+func (c *GitHubRepoIdCache) Set(key githubv4.String, value githubv4.Int) {
+	c.cache[key] = GithubRepoIdCacheEntry{
+		RepoId:     value,
+		LookupTime: time.Now(),
+	}
+}
+
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
-	user     string
-	client   *github.Client
-	v4Client *githubv4.Client
-	ctx      context.Context
-	logger   logging.SimpleLogging
-	config   GithubConfig
+	user        string
+	client      *github.Client
+	v4Client    *githubv4.Client
+	ctx         context.Context
+	logger      logging.SimpleLogging
+	config      GithubConfig
+	repoIdCache GitHubRepoIdCache
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -106,13 +141,15 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 	if err != nil {
 		return nil, errors.Wrap(err, "getting user")
 	}
+
 	return &GithubClient{
-		user:     user,
-		client:   client,
-		v4Client: v4Client,
-		ctx:      context.Background(),
-		logger:   logger,
-		config:   config,
+		user:        user,
+		client:      client,
+		v4Client:    v4Client,
+		ctx:         context.Background(),
+		logger:      logger,
+		config:      config,
+		repoIdCache: NewGitHubRepoIdCache(),
 	}, nil
 }
 
@@ -459,10 +496,16 @@ type StatusContext struct {
 	IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
 }
 
-func (g *GithubClient) LookupRepoId(workflowRun WorkflowRun) (githubv4.Int, error) {
-	repoSplit := strings.Split(string(workflowRun.File.RepositoryName), "/")
+func (g *GithubClient) LookupRepoId(repo githubv4.String) (githubv4.Int, error) {
+	// This function may get many calls for the same repo, and repo names are not often changed
+	// Utilize caching to reduce the number of API calls to GitHub
+	if repoId, ok := g.repoIdCache.Get(repo); ok {
+		return repoId, nil
+	}
+
+	repoSplit := strings.Split(string(repo), "/")
 	if len(repoSplit) != 2 {
-		return githubv4.Int(0), fmt.Errorf("invalid repository name: %s", workflowRun.File.RepositoryName)
+		return githubv4.Int(0), fmt.Errorf("invalid repository name: %s", repo)
 	}
 
 	var query struct {
@@ -481,6 +524,8 @@ func (g *GithubClient) LookupRepoId(workflowRun WorkflowRun) (githubv4.Int, erro
 		return githubv4.Int(0), err
 	}
 
+	g.repoIdCache.Set(repo, query.Repository.DatabaseId)
+
 	return query.Repository.DatabaseId, nil
 }
 
@@ -488,7 +533,7 @@ func (g *GithubClient) WorkflowRunMatchesWorkflowFileReference(workflowRun Workf
 	// Unfortunately, the GitHub API doesn't expose the repositoryId for the WorkflowRunFile from the statusCheckRollup.
 	// Conversely, it doesn't expose the repository name for the WorkflowFileReference from the RepositoryRuleConnection.
 	// Therefore, a second query is required to lookup the association between repositoryId and repositoryName.
-	repoId, err := g.LookupRepoId(workflowRun)
+	repoId, err := g.LookupRepoId(workflowRun.File.RepositoryName)
 	if err != nil {
 		return false, err
 	}
