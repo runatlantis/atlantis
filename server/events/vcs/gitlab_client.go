@@ -139,7 +139,9 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 		pollingStart := time.Now()
 		for {
 			resp, err = g.Client.Do(req, mr)
-			g.logger.Debug("GET %s returned: %d", apiURL, resp.StatusCode)
+			if resp != nil {
+				g.logger.Debug("GET %s returned: %d", apiURL, resp.StatusCode)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -171,15 +173,17 @@ func (g *GitlabClient) GetModifiedFiles(repo models.Repo, pull models.PullReques
 }
 
 // CreateComment creates a comment on the merge request.
-func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment string, _ string) error {
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
 		"```diff\n"
 	comments := common.SplitComment(comment, gitlabMaxCommentLength, sepEnd, sepStart)
 	for _, c := range comments {
-		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.String(c)})
-		g.logger.Debug("POST /projects/%s/merge_requests/%d/notes returned: %d", repo.FullName, pullNum, resp.StatusCode)
+		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(c)})
+		if resp != nil {
+			g.logger.Debug("POST /projects/%s/merge_requests/%d/notes returned: %d", repo.FullName, pullNum, resp.StatusCode)
+		}
 		if err != nil {
 			return err
 		}
@@ -190,11 +194,13 @@ func (g *GitlabClient) CreateComment(repo models.Repo, pullNum int, comment stri
 // ReactToComment adds a reaction to a comment.
 func (g *GitlabClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error {
 	_, resp, err := g.Client.AwardEmoji.CreateMergeRequestAwardEmojiOnNote(repo.FullName, pullNum, int(commentID), &gitlab.CreateAwardEmojiOptions{Name: reaction})
-	g.logger.Debug("POST /projects/%s/merge_requests/%d/notes/%d/award_emoji returned: %d", repo.FullName, pullNum, commentID, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("POST /projects/%s/merge_requests/%d/notes/%d/award_emoji returned: %d", repo.FullName, pullNum, commentID, resp.StatusCode)
+	}
 	return err
 }
 
-func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string, dir string) error {
 	var allComments []*gitlab.Note
 
 	nextPage := 0
@@ -202,11 +208,13 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 		g.logger.Debug("/projects/%v/merge_requests/%d/notes", repo.FullName, pullNum)
 		comments, resp, err := g.Client.Notes.ListMergeRequestNotes(repo.FullName, pullNum,
 			&gitlab.ListMergeRequestNotesOptions{
-				Sort:        gitlab.String("asc"),
-				OrderBy:     gitlab.String("created_at"),
+				Sort:        gitlab.Ptr("asc"),
+				OrderBy:     gitlab.Ptr("created_at"),
 				ListOptions: gitlab.ListOptions{Page: nextPage},
 			})
-		g.logger.Debug("GET /projects/%s/merge_requests/%d/notes returned: %d", repo.FullName, pullNum, resp.StatusCode)
+		if resp != nil {
+			g.logger.Debug("GET /projects/%s/merge_requests/%d/notes returned: %d", repo.FullName, pullNum, resp.StatusCode)
+		}
 		if err != nil {
 			return errors.Wrap(err, "listing comments")
 		}
@@ -242,11 +250,18 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 			continue
 		}
 
+		// If dir was specified, skip processing comments that don't contain the dir in the first line
+		if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
+			continue
+		}
+
 		g.logger.Debug("Updating merge request note: Repo: '%s', MR: '%d', comment ID: '%d'", repo.FullName, pullNum, comment.ID)
 		supersededComment := summaryHeader + lineFeed + comment.Body + lineFeed + summaryFooter + lineFeed
 
 		_, resp, err := g.Client.Notes.UpdateMergeRequestNote(repo.FullName, pullNum, comment.ID, &gitlab.UpdateMergeRequestNoteOptions{Body: &supersededComment})
-		g.logger.Debug("PUT /projects/%s/merge_requests/%d/notes/%d returned: %d", repo.FullName, pullNum, comment.ID, resp.StatusCode)
+		if resp != nil {
+			g.logger.Debug("PUT /projects/%s/merge_requests/%d/notes/%d returned: %d", repo.FullName, pullNum, comment.ID, resp.StatusCode)
+		}
 		if err != nil {
 			return errors.Wrapf(err, "updating comment %d", comment.ID)
 		}
@@ -258,7 +273,9 @@ func (g *GitlabClient) HidePrevCommandComments(repo models.Repo, pullNum int, co
 // PullIsApproved returns true if the merge request was approved.
 func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	approvals, resp, err := g.Client.MergeRequests.GetMergeRequestApprovals(repo.FullName, pull.Num)
-	g.logger.Debug("GET /projects/%s/merge_requests/%d/approvals returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /projects/%s/merge_requests/%d/approvals returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+	}
 	if err != nil {
 		return approvalStatus, err
 	}
@@ -283,7 +300,9 @@ func (g *GitlabClient) PullIsApproved(repo models.Repo, pull models.PullRequest)
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
 func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
 	mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
-	g.logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+	}
 	if err != nil {
 		return false, err
 	}
@@ -299,14 +318,18 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 	// Get project configuration
 	project, resp, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
-	g.logger.Debug("GET /projects/%d returned: %d", mr.ProjectID, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /projects/%d returned: %d", mr.ProjectID, resp.StatusCode)
+	}
 	if err != nil {
 		return false, err
 	}
 
 	// Get Commit Statuses
 	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, commit, nil)
-	g.logger.Debug("GET /projects/%d/commits/%s/statuses returned: %d", mr.ProjectID, commit, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /projects/%d/commits/%s/statuses returned: %d", mr.ProjectID, commit, resp.StatusCode)
+	}
 	if err != nil {
 		return false, err
 	}
@@ -323,13 +346,17 @@ func (g *GitlabClient) PullIsMergeable(repo models.Repo, pull models.PullRequest
 
 	allowSkippedPipeline := project.AllowMergeOnSkippedPipeline && isPipelineSkipped
 
-	ok, err := g.SupportsDetailedMergeStatus()
+	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus()
 	if err != nil {
 		return false, err
 	}
 
-	if ((ok && (mr.DetailedMergeStatus == "mergeable" || mr.DetailedMergeStatus == "ci_still_running")) ||
-		(!ok && mr.MergeStatus == "can_be_merged")) &&
+	if ((supportsDetailedMergeStatus &&
+		(mr.DetailedMergeStatus == "mergeable" ||
+			mr.DetailedMergeStatus == "ci_still_running" ||
+			mr.DetailedMergeStatus == "ci_must_pass")) ||
+		(!supportsDetailedMergeStatus &&
+			mr.MergeStatus == "can_be_merged")) && //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
 		!mr.WorkInProgress &&
@@ -387,29 +414,33 @@ func (g *GitlabClient) UpdateStatus(repo models.Repo, pull models.PullRequest, s
 			break
 		}
 		if i != retries {
-			g.logger.Debug("Head pipeline not found for merge request %d, source '%s'. Retrying in %s",
-				pull.Num, mr.HeadPipeline.Source, delay)
+			g.logger.Debug("Head pipeline not found for merge request %d. Retrying in %s",
+				pull.Num, delay)
 			time.Sleep(delay)
 		} else {
-			g.logger.Debug("Head pipeline not found for merge request %d, source '%s'.",
-				pull.Num, mr.HeadPipeline.Source)
+			g.logger.Debug("Head pipeline not found for merge request %d.",
+				pull.Num)
 		}
 	}
 
 	_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
 		State:       gitlabState,
-		Context:     gitlab.String(src),
-		Description: gitlab.String(description),
+		Context:     gitlab.Ptr(src),
+		Description: gitlab.Ptr(description),
 		TargetURL:   &url,
-		Ref:         gitlab.String(refTarget),
+		Ref:         gitlab.Ptr(refTarget),
 	})
-	g.logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
+	}
 	return err
 }
 
 func (g *GitlabClient) GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
 	mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repoFullName, pullNum, nil)
-	g.logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repoFullName, pullNum, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repoFullName, pullNum, resp.StatusCode)
+	}
 	return mr, err
 }
 
@@ -445,7 +476,9 @@ func (g *GitlabClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 			err, "unable to merge merge request, it was not possible to retrieve the merge request")
 	}
 	project, resp, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
-	g.logger.Debug("GET /projects/%d returned: %d", mr.ProjectID, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /projects/%d returned: %d", mr.ProjectID, resp.StatusCode)
+	}
 	if err != nil {
 		return errors.Wrap(
 			err, "unable to merge merge request, it was not possible to check the project requirements")
@@ -462,7 +495,9 @@ func (g *GitlabClient) MergePull(pull models.PullRequest, pullOptions models.Pul
 			MergeCommitMessage:       &commitMsg,
 			ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
 		})
-	g.logger.Debug("PUT /projects/%s/merge_requests/%d/merge returned: %d", pull.BaseRepo.FullName, pull.Num, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("PUT /projects/%s/merge_requests/%d/merge returned: %d", pull.BaseRepo.FullName, pull.Num, resp.StatusCode)
+	}
 	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
 }
 
@@ -471,7 +506,7 @@ func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 	return fmt.Sprintf("!%d", pull.Num), nil
 }
 
-func (g *GitlabClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (g *GitlabClient) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 	// TODO implement
 	return nil
 }
@@ -479,7 +514,9 @@ func (g *GitlabClient) DiscardReviews(repo models.Repo, pull models.PullRequest)
 // GetVersion returns the version of the Gitlab server this client is using.
 func (g *GitlabClient) GetVersion() (*version.Version, error) {
 	versionResp, resp, err := g.Client.Version.GetVersion()
-	g.logger.Debug("GET /version returned: %d", resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /version returned: %d", resp.StatusCode)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -516,7 +553,7 @@ func MustConstraint(constraint string) version.Constraints {
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *GitlabClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (g *GitlabClient) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]string, error) {
 	return nil, nil
 }
 
@@ -524,11 +561,13 @@ func (g *GitlabClient) GetTeamNamesForUser(repo models.Repo, user models.User) (
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
 func (g *GitlabClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
-	opt := gitlab.GetRawFileOptions{Ref: gitlab.String(pull.HeadBranch)}
+	opt := gitlab.GetRawFileOptions{Ref: gitlab.Ptr(pull.HeadBranch)}
 
 	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, fileName, &opt)
-	g.logger.Debug("GET /projects/%s/repository/files/%s/raw returned: %d", pull.BaseRepo.FullName, fileName, resp.StatusCode)
-	if resp.StatusCode == http.StatusNotFound {
+	if resp != nil {
+		g.logger.Debug("GET /projects/%s/repository/files/%s/raw returned: %d", pull.BaseRepo.FullName, fileName, resp.StatusCode)
+	}
+	if resp != nil && resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil
 	}
 
@@ -539,13 +578,15 @@ func (g *GitlabClient) GetFileContent(pull models.PullRequest, fileName string) 
 	return true, bytes, nil
 }
 
-func (g *GitlabClient) SupportsSingleFileDownload(repo models.Repo) bool {
+func (g *GitlabClient) SupportsSingleFileDownload(_ models.Repo) bool {
 	return true
 }
 
-func (g *GitlabClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+func (g *GitlabClient) GetCloneURL(_ models.VCSHostType, repo string) (string, error) {
 	project, resp, err := g.Client.Projects.GetProject(repo, nil)
-	g.logger.Debug("GET /projects/%s returned: %d", repo, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /projects/%s returned: %d", repo, resp.StatusCode)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -554,7 +595,9 @@ func (g *GitlabClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) 
 
 func (g *GitlabClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
 	mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
-	g.logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+	if resp != nil {
+		g.logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+	}
 
 	if err != nil {
 		return nil, err

@@ -133,7 +133,7 @@ func (b *Client) GetProjectKey(repoName string, cloneURL string) (string, error)
 
 // CreateComment creates a comment on the merge request. It will write multiple
 // comments if a single comment is too long.
-func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, _ string) error {
 	sepEnd := "\n```\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n```diff\n"
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
@@ -145,11 +145,11 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, co
 	return nil
 }
 
-func (b *Client) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { // nolint: revive
+func (b *Client) ReactToComment(_ models.Repo, _ int, _ int64, _ string) error {
 	return nil
 }
 
-func (b *Client) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (b *Client) HidePrevCommandComments(_ models.Repo, _ int, _ string, _ string) error {
 	return nil
 }
 
@@ -196,13 +196,13 @@ func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (appr
 	return approvalStatus, nil
 }
 
-func (b *Client) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (b *Client) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 	// TODO implement
 	return nil
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, _ string) (bool, error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
 		return false, err
@@ -226,7 +226,7 @@ func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcss
 }
 
 // UpdateStatus updates the status of a commit.
-func (b *Client) UpdateStatus(repo models.Repo, pull models.PullRequest, status models.CommitStatus, src string, description string, url string) error {
+func (b *Client) UpdateStatus(_ models.Repo, pull models.PullRequest, status models.CommitStatus, src string, description string, url string) error {
 	bbState := "FAILED"
 	switch status {
 	case models.PendingCommitStatus:
@@ -347,25 +347,25 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (b *Client) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (b *Client) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]string, error) {
 	return nil, nil
 }
 
-func (b *Client) SupportsSingleFileDownload(repo models.Repo) bool {
+func (b *Client) SupportsSingleFileDownload(_ models.Repo) bool {
 	return false
 }
 
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (b *Client) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
+func (b *Client) GetFileContent(_ models.PullRequest, _ string) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("not implemented")
 }
 
-func (b *Client) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+func (b *Client) GetCloneURL(_ models.VCSHostType, _ string) (string, error) {
 	return "", fmt.Errorf("not yet implemented")
 }
 
-func (b *Client) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (b *Client) GetPullLabels(_ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }

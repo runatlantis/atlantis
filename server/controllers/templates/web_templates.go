@@ -17,6 +17,8 @@ import (
 	"html/template"
 	"io"
 	"time"
+
+	"github.com/runatlantis/atlantis/server/jobs"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_template_writer.go TemplateWriter
@@ -43,14 +45,17 @@ type LockIndexData struct {
 
 // ApplyLockData holds the fields to display in the index view
 type ApplyLockData struct {
-	Locked        bool
-	Time          time.Time
-	TimeFormatted string
+	Locked                 bool
+	GlobalApplyLockEnabled bool
+	Time                   time.Time
+	TimeFormatted          string
 }
 
 // IndexData holds the data for rendering the index page
 type IndexData struct {
-	Locks           []LockIndexData
+	Locks            []LockIndexData
+	PullToJobMapping []jobs.PullInfoWithJobIDs
+
 	ApplyLock       ApplyLockData
 	AtlantisVersion string
 	// CleanedBasePath is the path Atlantis is accessible at externally. If
@@ -94,6 +99,7 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
   </section>
   <section>
+    {{ if .ApplyLock.GlobalApplyLockEnabled }}
     {{ if .ApplyLock.Locked }}
     <div class="twelve center columns">
       <h6><strong>Apply commands are disabled globally</strong></h6>
@@ -107,14 +113,15 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
       <a class="button button-primary" id="applyLockPrompt">Disable Apply Commands</a>
     </div>
     {{ end }}
+    {{ end }}
   </section>
   <br>
   <br>
   <br>
   <section>
     <p class="title-heading small"><strong>Locks</strong></p>
-    {{ if .Locks }}
     {{ $basePath := .CleanedBasePath }}
+    {{ if .Locks }}
     <div class="lock-grid">
     <div class="lock-header">
       <span>Repository</span>
@@ -149,6 +156,48 @@ var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
     </div>
     {{ else }}
     <p class="placeholder">No locks found.</p>
+    {{ end }}
+  </section>
+  <br>
+  <br>
+  <br>
+  <section>
+    <p class="title-heading small"><strong>Jobs</strong></p>
+    {{ if .PullToJobMapping }}
+    <div class="lock-grid">
+    <div class="lock-header">
+      <span>Repository</span>
+      <span>Project</span>
+      <span>Workspace</span>
+      <span>Date/Time</span>
+      <span>Step</span>
+      <span>Description</span>
+    </div>
+    {{ range .PullToJobMapping }}
+      <div class="pulls-row">
+      <span class="pulls-element">{{ .Pull.RepoFullName }} #{{ .Pull.PullNum }}</span>
+      <span class="pulls-element">{{ if .Pull.Path }}<code>{{ .Pull.Path }}</code>{{ end }}</span>
+      <span class="pulls-element">{{ if .Pull.Workspace }}<code>{{ .Pull.Workspace }}</code>{{ end }}</span>
+      <span class="pulls-element">
+      {{ range .JobIDInfos }}
+        <div><span class="lock-datetime">{{ .TimeFormatted }}</span></div>
+      {{ end }}
+      </span>
+      <span class="pulls-element">
+      {{ range .JobIDInfos }}
+        <div><a href="{{ $basePath }}{{ .JobIDUrl }}" target="_blank">{{ .JobStep }}</a></div>
+      {{ end }}
+      </span>
+      <span class="pulls-element">
+      {{ range .JobIDInfos }}
+        <div>{{ .JobDescription }}</div>
+      {{ end }}
+      </span>
+      </div>
+    {{ end }}
+    </div>
+    {{ else }}
+    <p class="placeholder">No jobs found.</p>
     {{ end }}
   </section>
   <div id="applyLockMessageModal" class="modal">
@@ -392,7 +441,7 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <title>atlantis</title>
     <meta name="description" content>
     <meta name="author" content>
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm-5.3.0.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
@@ -400,46 +449,55 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <style>
       #terminal {
         position: fixed;
-        top: 200px;
+        top: 0px;
         left: 0px;
         bottom: 0px;
         right: 0px;
         border: 5px solid white;
+        z-index: 10;
         }
 
       .terminal.xterm {
         padding: 10px;
       }
+      #watermark {
+        opacity: 0.5;
+        color: BLACK;
+        position: absolute;
+        bottom: 0;
+        padding-right: 30px;
+        padding-bottom: 15px;
+        right: 0;
+        z-index: 15;
+      }
     </style>
   </head>
 
   <body>
-    <section class="header">
+    <section id="watermark">
     <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
-    <p class="title-heading">atlantis</p>
+    <p class="terminal-heading-white">atlantis</p>
     <p class="title-heading"><strong></strong></p>
     </section>
-    <div class="spacer"></div>
-    <br>
     <section>
       <div id="terminal"></div>
     </section>
   </div>
-  <footer>Initializing...
+  <footer class="footer-white">Initializing...
   </footer>
 
     <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-4.9.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.6.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-0.7.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-5.3.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.9.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.8.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-0.13.0.js"></script>
     <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-bar.js"></script>
 
     <script>
       function updateTerminalStatus(msg) {
           document.getElementsByTagName("footer")[0].innerText = msg;
       }
-      var term = new Terminal({scrollback: 15000});
+      var term = new Terminal({scrollback: 15000, smoothScrollDuration:125 });
       var socket = new WebSocket(
         (document.location.protocol === "http:" ? "ws://" : "wss://") +
         document.location.host +
@@ -487,7 +545,7 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
     <title>atlantis</title>
     <meta name="description" content>
     <meta name="author" content>
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm-5.3.0.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
@@ -517,14 +575,14 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
     </footer>
 
     <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-4.9.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.6.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-5.3.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.9.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.8.0.js"></script>
 
     <script>
       var term = new Terminal();
       var socket = new WebSocket(
-        (document.location.protocol === "http:" ? "ws://" : "wss://") + 
+        (document.location.protocol === "http:" ? "ws://" : "wss://") +
         document.location.host +
         document.location.pathname +
         "/ws");

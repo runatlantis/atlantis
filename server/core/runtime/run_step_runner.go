@@ -76,9 +76,8 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		if !ctx.CustomPolicyCheck {
 			ctx.Log.Debug("error: %s", err)
 			return "", err
-		} else {
-			ctx.Log.Debug("Treating custom policy tool error exit code as a policy failure.  Error output: %s", err)
 		}
+		ctx.Log.Debug("Treating custom policy tool error exit code as a policy failure.  Error output: %s", err)
 	}
 
 	switch postProcessOutput {

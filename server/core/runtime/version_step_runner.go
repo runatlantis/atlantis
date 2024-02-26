@@ -14,7 +14,7 @@ type VersionStepRunner struct {
 }
 
 // Run ensures a given version for the executable, builds the args from the project context and then runs executable returning the result
-func (v *VersionStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (v *VersionStepRunner) Run(ctx command.ProjectContext, _ []string, path string, envs map[string]string) (string, error) {
 	tfVersion := v.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion

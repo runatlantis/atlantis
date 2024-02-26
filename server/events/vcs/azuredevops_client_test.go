@@ -618,7 +618,9 @@ func TestAzureDevopsClient_GitStatusContextFromSrc(t *testing.T) {
 
 	for _, c := range cases {
 		result := vcs.GitStatusContextFromSrc(c.src)
-		Equals(t, &c.expName, result.Name)
-		Equals(t, &c.expGenre, result.Genre)
+		expName := c.expName
+		expGenre := c.expGenre
+		Equals(t, &expName, result.Name)
+		Equals(t, &expGenre, result.Genre)
 	}
 }

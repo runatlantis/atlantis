@@ -37,16 +37,16 @@ const (
 //
 // 2. A map for an env step with name and command or value, or a run step with a command and output config
 //   - env:
-//       name: test
-//       command: echo 312
-//       value: value
+//     name: test
+//     command: echo 312
+//     value: value
 //   - run:
-//       command: my custom command
-//       output: hide
+//     command: my custom command
+//     output: hide
 //
 // 3. A map for a built-in command and extra_args:
 //   - plan:
-//       extra_args: [-var-file=staging.tfvars]
+//     extra_args: [-var-file=staging.tfvars]
 //
 // 4. A map for a custom run command:
 //   - run: my custom command

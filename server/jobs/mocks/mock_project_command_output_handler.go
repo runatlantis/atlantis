@@ -43,6 +43,21 @@ func (mock *MockProjectCommandOutputHandler) Deregister(jobID string, receiver c
 	pegomock.GetGenericMockFrom(mock).Invoke("Deregister", params, []reflect.Type{})
 }
 
+func (mock *MockProjectCommandOutputHandler) GetPullToJobMapping() []jobs.PullInfoWithJobIDs {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
+	}
+	params := []pegomock.Param{}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("GetPullToJobMapping", params, []reflect.Type{reflect.TypeOf((*[]jobs.PullInfoWithJobIDs)(nil)).Elem()})
+	var ret0 []jobs.PullInfoWithJobIDs
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].([]jobs.PullInfoWithJobIDs)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockProjectCommandOutputHandler) Handle() {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
@@ -183,6 +198,23 @@ func (c *MockProjectCommandOutputHandler_Deregister_OngoingVerification) GetAllC
 		}
 	}
 	return
+}
+
+func (verifier *VerifierMockProjectCommandOutputHandler) GetPullToJobMapping() *MockProjectCommandOutputHandler_GetPullToJobMapping_OngoingVerification {
+	params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullToJobMapping", params, verifier.timeout)
+	return &MockProjectCommandOutputHandler_GetPullToJobMapping_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandOutputHandler_GetPullToJobMapping_OngoingVerification struct {
+	mock              *MockProjectCommandOutputHandler
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandOutputHandler_GetPullToJobMapping_OngoingVerification) GetCapturedArguments() {
+}
+
+func (c *MockProjectCommandOutputHandler_GetPullToJobMapping_OngoingVerification) GetAllCapturedArguments() {
 }
 
 func (verifier *VerifierMockProjectCommandOutputHandler) Handle() *MockProjectCommandOutputHandler_Handle_OngoingVerification {

@@ -27,8 +27,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -52,8 +50,8 @@ const (
 	ADHostnameFlag                   = "azuredevops-hostname"
 	AllowCommandsFlag                = "allow-commands"
 	AllowForkPRsFlag                 = "allow-fork-prs"
-	AllowRepoConfigFlag              = "allow-repo-config"
 	AtlantisURLFlag                  = "atlantis-url"
+	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
@@ -70,11 +68,11 @@ const (
 	DataDirFlag                      = "data-dir"
 	DefaultTFVersionFlag             = "default-tf-version"
 	DisableApplyAllFlag              = "disable-apply-all"
-	DisableApplyFlag                 = "disable-apply"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
+	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
 	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
@@ -119,11 +117,10 @@ const (
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
-	RequireApprovalFlag              = "require-approval"
-	RequireMergeableFlag             = "require-mergeable"
 	SilenceNoProjectsFlag            = "silence-no-projects"
 	SilenceForkPRErrorsFlag          = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans          = "silence-vcs-status-no-plans"
+	SilenceVCSStatusNoProjectsFlag   = "silence-vcs-status-no-projects"
 	SilenceAllowlistErrorsFlag       = "silence-allowlist-errors"
 	SkipCloneNoChanges               = "skip-clone-no-changes"
 	SlackTokenFlag                   = "slack-token"
@@ -148,6 +145,7 @@ const (
 	DefaultADBasicUser                  = ""
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
+	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
@@ -206,6 +204,12 @@ var stringFlags = map[string]stringFlag{
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
+	},
+	AutoDiscoverModeFlag: {
+		description: "Auto discover mode controls whether projects in a repo are discovered by Atlantis. Defaults to 'auto' which " +
+			"means projects will be discovered when no explicit projects are defined in repo config. Also supports 'enabled' (always " +
+			"discover projects) and 'disabled' (never discover projects).",
+		defaultValue: DefaultAutoDiscoverMode,
 	},
 	AutoplanModulesFromProjects: {
 		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
@@ -416,13 +420,6 @@ var boolFlags = map[string]boolFlag{
 		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
 		defaultValue: false,
 	},
-	AllowRepoConfigFlag: {
-		description: "Allow repositories to use atlantis.yaml files to customize the commands Atlantis runs." +
-			" Should only be enabled in a trusted environment since it enables a pull request to run arbitrary commands" +
-			" on the Atlantis server.",
-		defaultValue: false,
-		hidden:       true,
-	},
 	AutoplanModules: {
 		description:  "Automatically plan projects that have a changed module from the local repository.",
 		defaultValue: false,
@@ -435,16 +432,15 @@ var boolFlags = map[string]boolFlag{
 		description:  "Disable \"atlantis apply\" command without any flags (i.e. apply all). A specific project/workspace/directory has to be specified for applies.",
 		defaultValue: false,
 	},
-	DisableApplyFlag: {
-		description:  "Disable all \"atlantis apply\" command regardless of which flags are passed with it.",
-		defaultValue: false,
-	},
 	DisableAutoplanFlag: {
 		description:  "Disable atlantis auto planning feature",
 		defaultValue: false,
 	},
 	DisableRepoLockingFlag: {
 		description: "Disable atlantis locking repos",
+	},
+	DisableGlobalApplyLockFlag: {
+		description: "Disable atlantis global apply lock in UI",
 	},
 	DiscardApprovalOnPlanFlag: {
 		description:  "Enables the discarding of approval if a new plan has been executed. Currently only Github is supported",
@@ -503,16 +499,6 @@ var boolFlags = map[string]boolFlag{
 		description:  "Controls whether the Redis client verifies the Redis server's certificate chain and host name. If true, accepts any certificate presented by the server and any host name in that certificate.",
 		defaultValue: DefaultRedisInsecureSkipVerify,
 	},
-	RequireApprovalFlag: {
-		description:  "Require pull requests to be \"Approved\" before allowing the apply command to be run.",
-		defaultValue: false,
-		hidden:       true,
-	},
-	RequireMergeableFlag: {
-		description:  "Require pull requests to be mergeable before allowing the apply command to be run.",
-		defaultValue: false,
-		hidden:       true,
-	},
 	SilenceNoProjectsFlag: {
 		description:  "Silences Atlants from responding to PRs when it finds no projects.",
 		defaultValue: false,
@@ -523,6 +509,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceVCSStatusNoPlans: {
 		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
+		defaultValue: false,
+	},
+	SilenceVCSStatusNoProjectsFlag: {
+		description:  "Silences VCS commit status when for all commands when a project is not defined.",
 		defaultValue: false,
 	},
 	SilenceAllowlistErrorsFlag: {
@@ -871,6 +861,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.WebPassword == "" {
 		c.WebPassword = DefaultWebPassword
 	}
+	if c.AutoDiscoverModeFlag == "" {
+		c.AutoDiscoverModeFlag = DefaultAutoDiscoverMode
+	}
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
@@ -1060,48 +1053,15 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 }
 
 // deprecationWarnings prints a warning if flags that are deprecated are
-// being used. Right now this only applies to flags that have been made obsolete
-// due to server-side config.
+// being used.
 func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
-	var commandReqs []string
 	var deprecatedFlags []string
-	if userConfig.RequireApproval {
-		deprecatedFlags = append(deprecatedFlags, RequireApprovalFlag)
-		commandReqs = append(commandReqs, valid.ApprovedCommandReq)
-	}
-	if userConfig.RequireMergeable {
-		deprecatedFlags = append(deprecatedFlags, RequireMergeableFlag)
-		commandReqs = append(commandReqs, valid.MergeableCommandReq)
-	}
-	if userConfig.DisableApply {
-		deprecatedFlags = append(deprecatedFlags, DisableApplyFlag)
-		var filtered []string
-		for _, allowCommand := range strings.Split(userConfig.AllowCommands, ",") {
-			if allowCommand != command.Apply.String() {
-				filtered = append(filtered, allowCommand)
-			}
-		}
-		userConfig.AllowCommands = strings.Join(filtered, ",")
-	}
 
-	// Build up strings with what the recommended yaml and json config should
-	// be instead of using the deprecated flags.
-	yamlCfg := "---\nrepos:\n- id: /.*/"
-	jsonCfg := `{"repos":[{"id":"/.*/"`
-	if len(commandReqs) > 0 {
-		yamlCfg += fmt.Sprintf("\n  plan_requirements: [%s]", strings.Join(commandReqs, ", "))
-		yamlCfg += fmt.Sprintf("\n  apply_requirements: [%s]", strings.Join(commandReqs, ", "))
-		yamlCfg += fmt.Sprintf("\n  import_requirements: [%s]", strings.Join(commandReqs, ", "))
-		jsonCfg += fmt.Sprintf(`, "plan_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
-		jsonCfg += fmt.Sprintf(`, "apply_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
-		jsonCfg += fmt.Sprintf(`, "import_requirements":["%s"]`, strings.Join(commandReqs, "\", \""))
-	}
-	if userConfig.AllowRepoConfig {
-		deprecatedFlags = append(deprecatedFlags, AllowRepoConfigFlag)
-		yamlCfg += "\n  allowed_overrides: [plan_requirements, apply_requirements, import_requirements, workflow, policy_check]\n  allow_custom_workflows: true"
-		jsonCfg += `, "allowed_overrides":["plan_requirements","apply_requirements","import_requirements","workflow", "policy_check"], "allow_custom_workflows":true`
-	}
-	jsonCfg += "}]}"
+	// Currently there are no deprecated flags; if flags become deprecated, add them here like so
+	//       if userConfig.SomeDeprecatedFlag {
+	//               deprecatedFlags = append(deprecatedFlags, SomeDeprecatedFlag)
+	//       }
+	//
 
 	if len(deprecatedFlags) > 0 {
 		warning := "WARNING: "
@@ -1110,12 +1070,6 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 		} else {
 			warning += fmt.Sprintf("Flags --%s and --%s have been deprecated.", strings.Join(deprecatedFlags[0:len(deprecatedFlags)-1], ", --"), deprecatedFlags[len(deprecatedFlags)-1:][0])
 		}
-		warning += fmt.Sprintf("\nCreate a --%s file with the following config instead:\n\n%s\n\nor use --%s='%s'\n",
-			RepoConfigFlag,
-			yamlCfg,
-			RepoConfigJSONFlag,
-			jsonCfg,
-		)
 		fmt.Println(warning)
 	}
 

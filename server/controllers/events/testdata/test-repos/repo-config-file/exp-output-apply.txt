@@ -21,3 +21,6 @@ Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 ```
 
 ---
+### Apply Summary
+
+2 projects, 2 successful, 0 failed, 0 errored

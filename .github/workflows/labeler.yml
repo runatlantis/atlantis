@@ -16,7 +16,4 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/labeler@v4
-        with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
-          configuration-path: .github/labeler.yml
+      - uses: actions/labeler@v5

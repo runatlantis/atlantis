@@ -554,8 +554,13 @@ If you need to modify the Docker image that we provide, for instance to add the 
     FROM ghcr.io/runatlantis/atlantis:{latest version}
 
     # copy a terraform binary of the version you need
+    USER root
     COPY terragrunt /usr/local/bin/terragrunt
     ```
+
+Beginning with version 0.26.0, the Atlantis image has been updated to run under the atlantis user, replacing the previous root user configuration. This change necessitates adjustments in existing container definitions and scripts to accommodate the new user settings. In scenarios where additional packages from other images are required, users can temporarily switch to the root user by inserting USER root in the Dockerfile. Following the installation of necessary packages, it is advisable to revert to the atlantis user for initiating the Atlantis service.
+Additionally, the /docker-entrypoint.d/ directory offers a flexible option for introducing extra scripts to be executed prior to the launch of the Atlantis server. This feature is particularly beneficial for users seeking to customize their Atlantis instance without the need to develop a dedicated pipeline.
+**Important Notice**: There is a critical update regarding the data directory in Atlantis. In versions prior to 0.26.0, the directory was configured to be accessible by the root user. However, with the transition to the atlantis user in newer versions, it is imperative to update the directory permissions accordingly in your current deployment when upgrading to a version later than 0.26.0. This step ensures seamless access and functionality for the atlantis user.
 
 1. Build your Docker image
     ```bash
