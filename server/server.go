@@ -548,6 +548,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubToken:        userConfig.GithubToken,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
+		GiteaUser:          userConfig.GiteaUser,
+		GiteaToken:         userConfig.GiteaToken,
 		AllowDraftPRs:      userConfig.PlanDrafts,
 		BitbucketUser:      userConfig.BitbucketUser,
 		BitbucketToken:     userConfig.BitbucketToken,
@@ -558,6 +560,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	commentParser := events.NewCommentParser(
 		userConfig.GithubUser,
 		userConfig.GitlabUser,
+		userConfig.GiteaUser,
 		userConfig.BitbucketUser,
 		userConfig.AzureDevopsUser,
 		userConfig.ExecutableName,

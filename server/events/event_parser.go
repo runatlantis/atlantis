@@ -625,11 +625,11 @@ func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, e
 	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
 }
 
-// ParseGithubRepo parses the response from the GitHub API endpoint that
+// ParseGiteaRepo parses the response from the Gitea API endpoint that
 // returns a repo into the Atlantis model.
 // See EventParsing for return value docs.
 func (e *EventParser) ParseGiteaRepo(repo giteasdk.Repository) (models.Repo, error) {
-	return models.NewRepo(models.Gitea, repo.FullName, repo.CloneURL, e.GithubUser, e.GithubToken)
+	return models.NewRepo(models.Gitea, repo.FullName, repo.CloneURL, e.GiteaUser, e.GiteaToken)
 }
 
 // ParseGitlabMergeRequestUpdateEvent dives deeper into Gitlab merge request update events
