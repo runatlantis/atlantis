@@ -441,7 +441,7 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
     <title>atlantis</title>
     <meta name="description" content>
     <meta name="author" content>
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm-5.3.0.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
@@ -487,17 +487,17 @@ var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
   </footer>
 
     <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-4.9.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.6.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-0.7.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-5.3.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.9.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.8.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-0.13.0.js"></script>
     <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-bar.js"></script>
 
     <script>
       function updateTerminalStatus(msg) {
           document.getElementsByTagName("footer")[0].innerText = msg;
       }
-      var term = new Terminal({scrollback: 15000});
+      var term = new Terminal({scrollback: 15000, smoothScrollDuration:125 });
       var socket = new WebSocket(
         (document.location.protocol === "http:" ? "ws://" : "wss://") +
         document.location.host +
@@ -545,7 +545,7 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
     <title>atlantis</title>
     <meta name="description" content>
     <meta name="author" content>
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm.css">
+    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm-5.3.0.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
     <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
@@ -575,9 +575,9 @@ var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Par
     </footer>
 
     <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-4.9.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.6.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.4.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-5.3.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.9.0.js"></script>
+    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.8.0.js"></script>
 
     <script>
       var term = new Terminal();
