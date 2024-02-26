@@ -155,7 +155,7 @@ func TestPost_GithubInvalidComment(t *testing.T) {
 	req.Header.Set(githubHeader, "issue_comment")
 	event := `{"action": "created"}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	When(p.ParseGithubIssueCommentEvent(Any[*github.IssueCommentEvent]())).ThenReturn(models.Repo{}, models.User{}, 1, errors.New("err"))
+	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(models.Repo{}, models.User{}, 1, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusBadRequest, "Failed parsing event")
@@ -180,12 +180,12 @@ func TestPost_GithubCommentInvalidCommand(t *testing.T) {
 	req.Header.Set(githubHeader, "issue_comment")
 	event := `{"action": "created"}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	When(p.ParseGithubIssueCommentEvent(Any[*github.IssueCommentEvent]())).ThenReturn(models.Repo{}, models.User{}, 1, nil)
+	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(models.Repo{}, models.User{}, 1, nil)
 	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{Ignore: true})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Ignoring non-command comment: \"\"")
-	vcsClient.VerifyWasCalled(Never()).ReactToComment(models.Repo{}, 1, 1, "eyes")
+	vcsClient.VerifyWasCalled(Never()).ReactToComment(Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(1), Eq(int64(1)), Eq("eyes"))
 }
 
 func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
@@ -216,7 +216,8 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	exp := "Repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	expRepo, _ := models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "")
-	vcsClient.VerifyWasCalledOnce().CreateComment(expRepo, 1, "```\nError: This repo is not allowlisted for Atlantis.\n```", "")
+	vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(expRepo), Eq(1), Eq("```\nError: This repo is not allowlisted for Atlantis.\n```"), Eq(""))
 }
 
 func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
@@ -247,7 +248,7 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	body, _ := io.ReadAll(w.Result().Body)
 	exp := "Repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 
 }
 
@@ -280,7 +281,8 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	exp := "Repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	expRepo, _ := models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "")
-	vcsClient.VerifyWasCalledOnce().CreateComment(expRepo, 2, "```\nError: This repo is not allowlisted for Atlantis.\n```", "")
+	vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(expRepo), Eq(2), Eq("```\nError: This repo is not allowlisted for Atlantis.\n```"), Eq(""))
 }
 
 func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
@@ -312,7 +314,7 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	body, _ := io.ReadAll(w.Result().Body)
 	exp := "Repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
 func TestPost_GitlabCommentResponse(t *testing.T) {
@@ -324,7 +326,7 @@ func TestPost_GitlabCommentResponse(t *testing.T) {
 	When(cp.Parse("", models.Gitlab)).ThenReturn(events.CommentParseResult{CommentResponse: "a comment"})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	vcsClient.VerifyWasCalledOnce().CreateComment(models.Repo{}, 0, "a comment", "")
+	vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(0), Eq("a comment"), Eq(""))
 	ResponseContains(t, w, http.StatusOK, "Commenting back on pull request")
 }
 
@@ -337,12 +339,12 @@ func TestPost_GithubCommentResponse(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	baseRepo := models.Repo{}
 	user := models.User{}
-	When(p.ParseGithubIssueCommentEvent(Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
+	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
 	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{CommentResponse: "a comment"})
 	w := httptest.NewRecorder()
 
 	e.Post(w, req)
-	vcsClient.VerifyWasCalledOnce().CreateComment(baseRepo, 1, "a comment", "")
+	vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Eq(baseRepo), Eq(1), Eq("a comment"), Eq(""))
 	ResponseContains(t, w, http.StatusOK, "Commenting back on pull request")
 }
 
@@ -371,7 +373,7 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 	baseRepo := models.Repo{}
 	user := models.User{}
 	cmd := events.CommentCommand{}
-	When(p.ParseGithubIssueCommentEvent(Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
+	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
 	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -391,13 +393,13 @@ func TestPost_GithubCommentReaction(t *testing.T) {
 	baseRepo := models.Repo{}
 	user := models.User{}
 	cmd := events.CommentCommand{Name: command.Plan}
-	When(p.ParseGithubIssueCommentEvent(Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
+	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
 	When(cp.Parse(testComment, models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
 
-	vcsClient.VerifyWasCalledOnce().ReactToComment(baseRepo, 1, 1, "eyes")
+	vcsClient.VerifyWasCalledOnce().ReactToComment(Any[logging.SimpleLogging](), Eq(baseRepo), Eq(1), Eq(int64(1)), Eq("eyes"))
 }
 
 func TestPost_GilabCommentReaction(t *testing.T) {
@@ -411,7 +413,7 @@ func TestPost_GilabCommentReaction(t *testing.T) {
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
-	vcsClient.VerifyWasCalledOnce().ReactToComment(models.Repo{}, 0, 0, "eyes")
+	vcsClient.VerifyWasCalledOnce().ReactToComment(Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(0), Eq(int64(0)), Eq("eyes"))
 }
 
 func TestPost_GithubPullRequestInvalid(t *testing.T) {
@@ -422,7 +424,7 @@ func TestPost_GithubPullRequestInvalid(t *testing.T) {
 
 	event := `{"action": "closed"}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	When(p.ParseGithubPullEvent(Any[*github.PullRequestEvent]())).ThenReturn(models.PullRequest{}, models.OpenedPullEvent, models.Repo{}, models.Repo{}, models.User{}, errors.New("err"))
+	When(p.ParseGithubPullEvent(Any[logging.SimpleLogging](), Any[*github.PullRequestEvent]())).ThenReturn(models.PullRequest{}, models.OpenedPullEvent, models.Repo{}, models.Repo{}, models.User{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusBadRequest, "Error parsing pull data: err")
@@ -742,8 +744,8 @@ func TestPost_GithubPullRequestClosedErrCleaningPull(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
 	pull := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGithubPullEvent(Any[*github.PullRequestEvent]())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
-	When(c.CleanUpPull(repo, pull)).ThenReturn(errors.New("cleanup err"))
+	When(p.ParseGithubPullEvent(Any[logging.SimpleLogging](), Any[*github.PullRequestEvent]())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	When(c.CleanUpPull(Any[logging.SimpleLogging](), repo, pull)).ThenReturn(errors.New("cleanup err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusInternalServerError, "Error cleaning pull request: cleanup err")
@@ -761,7 +763,7 @@ func TestPost_GitlabMergeRequestClosedErrCleaningPull(t *testing.T) {
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
 	When(p.ParseGitlabMergeRequestEvent(event)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
-	When(c.CleanUpPull(repo, pullRequest)).ThenReturn(errors.New("err"))
+	When(c.CleanUpPull(Any[logging.SimpleLogging](), repo, pullRequest)).ThenReturn(errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusInternalServerError, "Error cleaning pull request: err")
@@ -778,8 +780,8 @@ func TestPost_GithubClosedPullRequestSuccess(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
 	pull := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGithubPullEvent(Any[*github.PullRequestEvent]())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
-	When(c.CleanUpPull(repo, pull)).ThenReturn(nil)
+	When(p.ParseGithubPullEvent(Any[logging.SimpleLogging](), Any[*github.PullRequestEvent]())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	When(c.CleanUpPull(Any[logging.SimpleLogging](), repo, pull)).ThenReturn(nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Pull request cleaned successfully")
@@ -867,7 +869,9 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 					Type:     models.BitbucketServer,
 				},
 			}
-			pullCleaner.VerifyWasCalledOnce().CleanUpPull(expRepo, models.PullRequest{
+			pullCleaner.VerifyWasCalledOnce().CleanUpPull(
+				logger,
+				expRepo, models.PullRequest{
 				Num:        10,
 				HeadCommit: "2d9fb6b9a46eafb1dcef7b008d1a429d45ca742c",
 				URL:        "https://bbserver.com/projects/PROJ/repos/repository/pull-requests/10",
@@ -931,7 +935,7 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 				When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 				repo = models.Repo{}
 				pullRequest = models.PullRequest{State: models.ClosedPullState}
-				When(p.ParseGithubPullEvent(Any[*github.PullRequestEvent]())).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+				When(p.ParseGithubPullEvent(Any[logging.SimpleLogging](), Any[*github.PullRequestEvent]())).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 			}
 
 			w := httptest.NewRecorder()
