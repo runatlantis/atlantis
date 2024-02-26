@@ -399,8 +399,120 @@ func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest)
 	return nil
 }
 
-// IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
-func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
+type PageInfo struct {
+	EndCursor   *githubv4.String
+	HasNextPage githubv4.Boolean
+}
+
+type WorkflowFileReference struct {
+	Path         githubv4.String
+	RepositoryId githubv4.Int
+	Sha          *githubv4.String
+}
+
+func (original WorkflowFileReference) Copy() WorkflowFileReference {
+	copy := WorkflowFileReference{
+		Path:         original.Path,
+		RepositoryId: original.RepositoryId,
+		Sha:          new(githubv4.String),
+	}
+	if original.Sha != nil {
+		*copy.Sha = *original.Sha
+	}
+	return copy
+}
+
+type WorkflowRun struct {
+	File struct {
+		Path              githubv4.String
+		RepositoryFileUrl githubv4.String
+		RepositoryName    githubv4.String
+	}
+}
+
+type CheckRun struct {
+	Name       githubv4.String
+	Conclusion githubv4.String
+	IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
+	CheckSuite struct {
+		WorkflowRun *WorkflowRun
+	}
+}
+
+func (original CheckRun) Copy() CheckRun {
+	copy := CheckRun{
+		Name:       original.Name,
+		Conclusion: original.Conclusion,
+		IsRequired: original.IsRequired,
+		CheckSuite: original.CheckSuite,
+	}
+	if original.CheckSuite.WorkflowRun != nil {
+		copy.CheckSuite.WorkflowRun = new(WorkflowRun)
+		*copy.CheckSuite.WorkflowRun = *original.CheckSuite.WorkflowRun
+	}
+	return copy
+}
+
+type StatusContext struct {
+	Context    githubv4.String
+	State      githubv4.String
+	IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
+}
+
+func (g *GithubClient) LookupRepoId(workflowRun WorkflowRun) (githubv4.Int, error) {
+	repoSplit := strings.Split(string(workflowRun.File.RepositoryName), "/")
+	if len(repoSplit) != 2 {
+		return githubv4.Int(0), fmt.Errorf("invalid repository name: %s", workflowRun.File.RepositoryName)
+	}
+
+	var query struct {
+		Repository struct {
+			DatabaseId githubv4.Int
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repoSplit[0]),
+		"name":  githubv4.String(repoSplit[1]),
+	}
+
+	err := g.v4Client.Query(g.ctx, &query, variables)
+
+	if err != nil {
+		return githubv4.Int(0), err
+	}
+
+	return query.Repository.DatabaseId, nil
+}
+
+func (g *GithubClient) WorkflowRunMatchesWorkflowFileReference(workflowRun WorkflowRun, workflowFileReference WorkflowFileReference) (bool, error) {
+	// Unfortunately, the GitHub API doesn't expose the repositoryId for the WorkflowRunFile from the statusCheckRollup.
+	// Conversely, it doesn't expose the repository name for the WorkflowFileReference from the RepositoryRuleConnection.
+	// Therefore, a second query is required to lookup the association between repositoryId and repositoryName.
+	repoId, err := g.LookupRepoId(workflowRun)
+	if err != nil {
+		return false, err
+	}
+
+	if !(repoId == workflowFileReference.RepositoryId && workflowRun.File.Path == workflowFileReference.Path) {
+		return false, nil
+	} else if workflowFileReference.Sha != nil {
+		return strings.Contains(string(workflowRun.File.RepositoryFileUrl), string(*workflowFileReference.Sha)), nil
+	} else {
+		return true, nil
+	}
+}
+
+func (g *GithubClient) GetPullRequestMergeabilityInfo(
+	repo models.Repo,
+	pull *github.PullRequest,
+) (
+	reviewDecision githubv4.String,
+	requiredChecks []githubv4.String,
+	requiredWorkflows []WorkflowFileReference,
+	checkRuns []CheckRun,
+	statusContexts []StatusContext,
+	err error,
+) {
 	var query struct {
 		Repository struct {
 			PullRequest struct {
@@ -412,11 +524,8 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 						}
 					}
 					Rules struct {
-						PageInfo struct {
-							EndCursor   *githubv4.String
-							HasNextPage githubv4.Boolean
-						}
-						Nodes []struct {
+						PageInfo PageInfo
+						Nodes    []struct {
 							Type       githubv4.String
 							Parameters struct {
 								RequiredStatusChecksParameters struct {
@@ -424,7 +533,9 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 										Context githubv4.String
 									}
 								} `graphql:"... on RequiredStatusChecksParameters"`
-								// TODO: Consider required workflows
+								WorkflowsParameters struct {
+									Workflows []WorkflowFileReference
+								} `graphql:"... on WorkflowsParameters"`
 							}
 						}
 					} `graphql:"rules(first: 100, after: $ruleCursor)"`
@@ -434,22 +545,11 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 						Commit struct {
 							StatusCheckRollup struct {
 								Contexts struct {
-									PageInfo struct {
-										EndCursor   *githubv4.String
-										HasNextPage githubv4.Boolean
-									}
-									Nodes []struct {
-										Typename githubv4.String `graphql:"__typename"`
-										CheckRun struct {
-											Name       githubv4.String
-											Conclusion githubv4.String
-											IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
-										} `graphql:"... on CheckRun"`
-										StatusContext struct {
-											Context    githubv4.String
-											State      githubv4.String
-											IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
-										} `graphql:"... on StatusContext"`
+									PageInfo PageInfo
+									Nodes    []struct {
+										Typename      githubv4.String `graphql:"__typename"`
+										CheckRun      CheckRun        `graphql:"... on CheckRun"`
+										StatusContext StatusContext   `graphql:"... on StatusContext"`
 									}
 								} `graphql:"contexts(first: 100, after: $contextCursor)"`
 							}
@@ -468,65 +568,57 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 		"contextCursor": (*githubv4.String)(nil),
 	}
 
-	expectedRequiredStatusChecks := make(map[string]interface{})
-	requiredStatusChecksResult := make(map[string]bool)
+	requiredChecksSet := make(map[githubv4.String]any)
 
+pagination:
 	for {
-		err := g.v4Client.Query(g.ctx, &query, variables)
+		err = g.v4Client.Query(g.ctx, &query, variables)
 
 		if err != nil {
-			return false, err
+			break pagination
 		}
 
-		if query.Repository.PullRequest.ReviewDecision != "APPROVED" && len(query.Repository.PullRequest.ReviewDecision) != 0 {
-			return false, nil
-		}
-
-		if len(query.Repository.PullRequest.Commits.Nodes) == 0 {
-			return false, errors.New("no commits found on PR")
-		}
+		reviewDecision = query.Repository.PullRequest.ReviewDecision
 
 		for _, rule := range query.Repository.PullRequest.BaseRef.BranchProtectionRule.RequiredStatusChecks {
-			expectedRequiredStatusChecks[string(rule.Context)] = struct{}{}
+			requiredChecksSet[rule.Context] = struct{}{}
 		}
 
 		for _, rule := range query.Repository.PullRequest.BaseRef.Rules.Nodes {
 			switch rule.Type {
 			case "REQUIRED_STATUS_CHECKS":
 				for _, context := range rule.Parameters.RequiredStatusChecksParameters.RequiredStatusChecks {
-					expectedRequiredStatusChecks[string(context.Context)] = struct{}{}
+					requiredChecksSet[context.Context] = struct{}{}
+				}
+			case "WORKFLOWS":
+				for _, workflow := range rule.Parameters.WorkflowsParameters.Workflows {
+					requiredWorkflows = append(requiredWorkflows, workflow.Copy())
 				}
 			default:
 				continue
 			}
 		}
 
-		for _, context := range query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
-			var name string
-			var required bool
-			var passed bool
+		if len(query.Repository.PullRequest.Commits.Nodes) == 0 {
+			err = errors.New("no commits found on PR")
+			break pagination
+		}
 
+		for _, context := range query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
 			switch context.Typename {
 			case "CheckRun":
-				name = string(context.CheckRun.Name)
-				required = bool(context.CheckRun.IsRequired)
-				passed = context.CheckRun.Conclusion == "SUCCESS" || context.CheckRun.Conclusion == "SKIPPED"
+				checkRuns = append(checkRuns, context.CheckRun.Copy())
 			case "StatusContext":
-				name = string(context.StatusContext.Context)
-				required = bool(context.StatusContext.IsRequired)
-				passed = context.StatusContext.State == "SUCCESS"
+				statusContexts = append(statusContexts, context.StatusContext)
 			default:
-				return false, fmt.Errorf("unknown type of status check, %q", context.Typename)
-			}
-
-			if required {
-				requiredStatusChecksResult[name] = passed
+				err = fmt.Errorf("unknown type of status check, %q", context.Typename)
+				break pagination
 			}
 		}
 
 		if !query.Repository.PullRequest.BaseRef.Rules.PageInfo.HasNextPage &&
 			!query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.HasNextPage {
-			break
+			break pagination
 		}
 
 		if query.Repository.PullRequest.BaseRef.Rules.PageInfo.EndCursor != nil {
@@ -537,23 +629,100 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 		}
 	}
 
-	for context, _ := range expectedRequiredStatusChecks {
-		if strings.HasPrefix(context, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+	if err != nil {
+		return "", nil, nil, nil, nil, err
+	}
+
+	for context := range requiredChecksSet {
+		requiredChecks = append(requiredChecks, context)
+	}
+
+	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, nil
+}
+
+func CheckRunPassed(checkRun CheckRun) bool {
+	return checkRun.Conclusion == "SUCCESS" || checkRun.Conclusion == "SKIPPED"
+}
+
+func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool {
+	return strings.HasPrefix(string(statusContext.Context), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) ||
+		statusContext.State == "SUCCESS"
+}
+
+func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string) bool {
+	for _, checkRun := range checkRuns {
+		if checkRun.Name == expectedContext {
+			return CheckRunPassed(checkRun)
+		}
+	}
+
+	for _, statusContext := range statusContexts {
+		if statusContext.Context == expectedContext {
+			return StatusContextPassed(statusContext, vcsstatusname)
+		}
+	}
+
+	return false
+}
+
+func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
+	for _, checkRun := range checkRuns {
+		if checkRun.CheckSuite.WorkflowRun == nil {
 			continue
 		}
+		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun, expectedWorkflow)
+		if err != nil {
+			return false, err
+		}
+		if match {
+			return CheckRunPassed(checkRun), nil
+		}
+	}
 
-		passed, found := requiredStatusChecksResult[context]
+	return false, nil
+}
 
-		if !found || !passed {
+// IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
+func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
+	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, err := g.GetPullRequestMergeabilityInfo(repo, pull)
+	if err != nil {
+		return false, err
+	}
+
+	// Review decision takes CODEOWNERS into account
+	// Empty review decision means review is not required
+	if reviewDecision != "APPROVED" && len(reviewDecision) != 0 {
+		return false, nil
+	}
+
+	// Safeguard in case the complete set of required checks is not exposed by branch protection or rulesets
+	// Go through every check found in the statusCheckRollup for the pull request
+	// Make sure every required check is passing, ignore the atlantis apply check
+	for _, checkRun := range checkRuns {
+		if bool(checkRun.IsRequired) && !CheckRunPassed(checkRun) {
+			return false, nil
+		}
+	}
+	for _, statusContext := range statusContexts {
+		if bool(statusContext.IsRequired) && !StatusContextPassed(statusContext, vcsstatusname) {
 			return false, nil
 		}
 	}
 
-	for context, passed := range requiredStatusChecksResult {
-		if strings.HasPrefix(context, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
-			continue
+	// The statusCheckRollup does not always contain all required checks
+	// For example, if a check was made required after the pull request was opened, it would be missing
+	// Go through all checks and workflows required by branch protection or rulesets
+	// Make sure that they can all be found in the statusCheckRollup and that they all pass
+	for _, requiredCheck := range requiredChecks {
+		if !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname) {
+			return false, nil
 		}
-
+	}
+	for _, requiredWorkflow := range requiredWorkflows {
+		passed, err := g.ExpectedWorkflowPassed(requiredWorkflow, checkRuns)
+		if err != nil {
+			return false, err
+		}
 		if !passed {
 			return false, nil
 		}

@@ -728,21 +728,51 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 		},
 		{
 			"blocked",
-			"ruleset-expected.json",
+			"ruleset-check-expected.json",
 			`"APPROVED"`,
 			false,
 		},
 		{
 			"blocked",
-			"ruleset-failed.json",
+			"ruleset-check-failed.json",
 			`"APPROVED"`,
 			false,
 		},
 		{
 			"blocked",
-			"ruleset-passed.json",
+			"ruleset-check-passed.json",
 			`"APPROVED"`,
 			true,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-expected.json",
+			`"APPROVED"`,
+			false,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-failed.json",
+			`"APPROVED"`,
+			false,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-passed.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-passed-sha-match.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-passed-sha-mismatch.json",
+			`"APPROVED"`,
+			false,
 		},
 	}
 
@@ -750,6 +780,10 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 	jsBytes, err := os.ReadFile("testdata/github-pull-request.json")
 	Ok(t, err)
 	prJSON := string(jsBytes)
+
+	jsBytes, err = os.ReadFile("testdata/github-pull-request-mergeability/repository-id.json")
+	Ok(t, err)
+	repoIdJSON := string(jsBytes)
 
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
@@ -778,7 +812,22 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 						w.Write([]byte(response)) // nolint: errcheck
 						return
 					case "/api/graphql":
-						w.Write([]byte(prMergeableStatus)) // nolint: errcheck
+						body, err := io.ReadAll(r.Body)
+						if err != nil {
+							t.Errorf("read body error: %v", err)
+							http.Error(w, "", http.StatusInternalServerError)
+							return
+						}
+						if strings.Contains(string(body), "pullRequest(") {
+							w.Write([]byte(prMergeableStatus)) // nolint: errcheck
+							return
+						} else if strings.Contains(string(body), "databaseId") {
+							w.Write([]byte(repoIdJSON)) // nolint: errcheck
+							return
+						}
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
