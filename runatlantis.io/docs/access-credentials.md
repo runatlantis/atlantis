@@ -116,6 +116,7 @@ Since v0.22.3, a new permission for `Members` has been added, which is required 
 - Create a token under the "Manage Access Tokens" with the following permissions:
   - issue: Read and Write
   - repository: Read and Write
+  - user: Read
 - Record the access token
 
 ### Bitbucket Cloud (bitbucket.org)
