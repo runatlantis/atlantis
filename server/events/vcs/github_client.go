@@ -18,6 +18,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -729,14 +730,20 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 
 // IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
 func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
+	if pull.Number == nil {
+		return false, errors.New("pull request number is nil")
+	}
 	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, err := g.GetPullRequestMergeabilityInfo(repo, pull)
 	if err != nil {
 		return false, err
 	}
 
+	notMergeablePrefix := fmt.Sprintf("Pull Request %s/%s:%s is not mergeable", repo.Owner, repo.Name, strconv.Itoa(*pull.Number))
+
 	// Review decision takes CODEOWNERS into account
 	// Empty review decision means review is not required
 	if reviewDecision != "APPROVED" && len(reviewDecision) != 0 {
+		g.logger.Info("%s: Review Decision: %s", notMergeablePrefix, reviewDecision)
 		return false, nil
 	}
 
@@ -745,11 +752,13 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 	// Make sure every required check is passing, ignore the atlantis apply check
 	for _, checkRun := range checkRuns {
 		if bool(checkRun.IsRequired) && !CheckRunPassed(checkRun) {
+			g.logger.Info("%s: Required CheckRun: %s Conclusion: %s", notMergeablePrefix, checkRun.Name, checkRun.Conclusion)
 			return false, nil
 		}
 	}
 	for _, statusContext := range statusContexts {
 		if bool(statusContext.IsRequired) && !StatusContextPassed(statusContext, vcsstatusname) {
+			g.logger.Info("%s: Required StatusContext: %s State: %s", notMergeablePrefix, statusContext.Context, statusContext.State)
 			return false, nil
 		}
 	}
@@ -760,6 +769,7 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 	// Make sure that they can all be found in the statusCheckRollup and that they all pass
 	for _, requiredCheck := range requiredChecks {
 		if !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname) {
+			g.logger.Info("%s: Expected Required Check: %s", notMergeablePrefix, requiredCheck)
 			return false, nil
 		}
 	}
@@ -769,6 +779,7 @@ func (g *GithubClient) IsMergeableMinusApply(repo models.Repo, pull *github.Pull
 			return false, err
 		}
 		if !passed {
+			g.logger.Info("%s: Expected Required Workflow: RepositoryId: %s Path: %s", notMergeablePrefix, requiredWorkflow.RepositoryId, requiredWorkflow.Path)
 			return false, nil
 		}
 	}
