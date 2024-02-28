@@ -38,7 +38,6 @@ type GiteaClient struct {
 	token       string
 	pageSize    int
 	ctx         context.Context
-	logger      logging.SimpleLogging
 }
 
 type GiteaPRReviewSummary struct {
@@ -77,7 +76,6 @@ func NewClient(baseURL string, username string, token string, pagesize int, logg
 		token:       token,
 		pageSize:    pagesize,
 		ctx:         context.Background(),
-		logger:      logger,
 	}, nil
 }
 
