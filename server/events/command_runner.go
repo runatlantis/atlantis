@@ -388,11 +388,11 @@ func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseR
 	return pull, headRepo, nil
 }
 
-func (c *DefaultCommandRunner) getGiteaData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
+func (c *DefaultCommandRunner) getGiteaData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GiteaPullGetter == nil {
 		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support Gitea")
 	}
-	giteaPull, err := c.GiteaPullGetter.GetPullRequest(baseRepo, pullNum)
+	giteaPull, err := c.GiteaPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
 		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Gitea")
 	}
@@ -464,7 +464,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	case models.AzureDevops:
 		pull, headRepo, err = c.getAzureDevopsData(log, baseRepo, pullNum)
 	case models.Gitea:
-		pull, headRepo, err = c.getGiteaData(baseRepo, pullNum)
+		pull, headRepo, err = c.getGiteaData(log, baseRepo, pullNum)
 	default:
 		err = errors.New("Unknown VCS type–this is a bug")
 	}
