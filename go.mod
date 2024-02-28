@@ -13,7 +13,7 @@ require (
 	github.com/go-playground/validator/v10 v10.18.0
 	github.com/go-test/deep v1.1.0
 	github.com/golang-jwt/jwt/v5 v5.2.0
-	github.com/google/go-github/v58 v58.0.0
+	github.com/google/go-github/v59 v59.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -35,7 +35,7 @@ require (
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20240120211514-18a1ae0e79dc
-	github.com/slack-go/slack v0.12.4
+	github.com/slack-go/slack v0.12.5
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
@@ -44,7 +44,7 @@ require (
 	github.com/urfave/negroni/v3 v3.1.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605
 	github.com/xanzy/go-gitlab v0.97.0
-	go.etcd.io/bbolt v1.3.8
+	go.etcd.io/bbolt v1.3.9
 	go.uber.org/zap v1.27.0
 	golang.org/x/term v0.17.0
 	golang.org/x/text v0.14.0
@@ -66,6 +66,8 @@ require (
 require github.com/twmb/murmur3 v1.1.8 // indirect
 
 require github.com/google/go-github/v57 v57.0.0 // indirect
+
+require github.com/google/go-github/v58 v58.0.0
 
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect

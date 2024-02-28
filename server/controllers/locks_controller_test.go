@@ -266,7 +266,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
 	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
-	cp.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+	cp.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
 func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
@@ -350,7 +350,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	tmp := t.TempDir()
 	backend, err := db.New(tmp)
 	Ok(t, err)
-	When(cp.CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())).ThenReturn(errors.New("err"))
+	When(cp.CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())).ThenReturn(errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -401,7 +401,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
 	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
-	cp.VerifyWasCalled(Once()).CreateComment(pull.BaseRepo, pull.Num,
-		"**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
-			"To `apply` this plan you must run `plan` again.", "")
+	cp.VerifyWasCalled(Once()).CreateComment(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num),
+		Eq("**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
+			"To `apply` this plan you must run `plan` again."), Eq(""))
 }
