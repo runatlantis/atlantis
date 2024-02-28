@@ -424,7 +424,7 @@ func (c *GiteaClient) GetCloneURL(logger logging.SimpleLogging, _ models.VCSHost
 	}
 	repository, _, err := c.giteaClient.GetRepo(parts[0], parts[1])
 	if err != nil {
-		c.logger.Debug("GET /repos/%v/%v returned an error: %v", parts[0], parts[1], err)
+		logger.Debug("GET /repos/%v/%v returned an error: %v", parts[0], parts[1], err)
 		return "", err
 	}
 	return repository.CloneURL, nil
