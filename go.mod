@@ -1,6 +1,6 @@
 module github.com/runatlantis/atlantis
 
-go 1.22
+go 1.22.0
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
