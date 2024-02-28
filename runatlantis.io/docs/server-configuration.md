@@ -931,7 +931,15 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_SILENCE_VCS_STATUS_NO_PLANS=true
   ```
-  `--silence-vcs-status-no-plans` will tell Atlantis to ignore setting VCS status if none of the modified files are part of a project defined in the `atlantis.yaml` file.
+  `--silence-vcs-status-no-plans` will tell Atlantis to ignore setting VCS status on plans if none of the modified files are part of a project defined in the `atlantis.yaml` file.
+
+### `--silence-vcs-status-no-projects`
+  ```bash
+  atlantis server --silence-vcs-status-no-projects
+  # or
+  ATLANTIS_SILENCE_VCS_STATUS_NO_PROJECTS=true
+  ```
+  `--silence-vcs-status-no-projects` will tell Atlantis to ignore setting VCS status on any command if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 
 ### `--skip-clone-no-changes`
   ```bash

@@ -14,7 +14,7 @@
 We take security issues seriously. Please report a security vulnerability to the maintainers using [private vulnerability reporting](https://github.com/runatlantis/atlantis/security/advisories/new).
 
 # Updating The Website
-* To view the generated website locally, run `yarn website:dev` and then
+* To view the generated website locally, run `pnpm website:dev` and then
 open your browser to http://localhost:8080.
 * The website will be regenerated when your pull request is merged to main.
 

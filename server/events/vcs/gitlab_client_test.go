@@ -114,6 +114,7 @@ func TestGitlabClient_SupportsCommonMark(t *testing.T) {
 }
 
 func TestGitlabClient_GetModifiedFiles(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	cases := []struct {
 		attempts int
 	}{
@@ -155,10 +156,10 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 				Version:         nil,
 				PollingInterval: time.Second * 0,
 				PollingTimeout:  time.Second * 10,
-				logger:          logging.NewNoopLogger(t),
 			}
 
 			filenames, err := client.GetModifiedFiles(
+				logger,
 				models.Repo{
 					FullName: "lkysow/atlantis-example",
 					Owner:    "lkysow",
@@ -180,6 +181,7 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 }
 
 func TestGitlabClient_MergePull(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	mergeSuccess, err := os.ReadFile("testdata/github-pull-request.json")
 	Ok(t, err)
 
@@ -244,19 +246,20 @@ func TestGitlabClient_MergePull(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
-				logger:  logging.NewNoopLogger(t),
 			}
 
-			err = client.MergePull(models.PullRequest{
-				Num: 1,
-				BaseRepo: models.Repo{
-					FullName: "runatlantis/atlantis",
-					Owner:    "runatlantis",
-					Name:     "atlantis",
-				},
-			}, models.PullRequestOptions{
-				DeleteSourceBranchOnMerge: false,
-			})
+			err = client.MergePull(
+				logger,
+				models.PullRequest{
+					Num: 1,
+					BaseRepo: models.Repo{
+						FullName: "runatlantis/atlantis",
+						Owner:    "runatlantis",
+						Name:     "atlantis",
+					},
+				}, models.PullRequestOptions{
+					DeleteSourceBranchOnMerge: false,
+				})
 			if c.expErr == "" {
 				Ok(t, err)
 			} else {
@@ -268,6 +271,7 @@ func TestGitlabClient_MergePull(t *testing.T) {
 }
 
 func TestGitlabClient_UpdateStatus(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
 	Ok(t, err)
 
@@ -320,7 +324,6 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
-				logger:  logging.NewNoopLogger(t),
 			}
 
 			repo := models.Repo{
@@ -328,12 +331,15 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 				Owner:    "runatlantis",
 				Name:     "atlantis",
 			}
-			err = client.UpdateStatus(repo, models.PullRequest{
-				Num:        1,
-				BaseRepo:   repo,
-				HeadCommit: "sha",
-				HeadBranch: "test",
-			}, c.status, "src", "description", "https://google.com")
+			err = client.UpdateStatus(
+				logger,
+				repo,
+				models.PullRequest{
+					Num:        1,
+					BaseRepo:   repo,
+					HeadCommit: "sha",
+					HeadBranch: "test",
+				}, c.status, "src", "description", "https://google.com")
 			Ok(t, err)
 			Assert(t, gotRequest, "expected to get the request")
 		})
@@ -341,6 +347,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 }
 
 func TestGitlabClient_PullIsMergeable(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	gitlabClientUnderTest = true
 	gitlabVersionOver15_6 := "15.8.3-ee"
 	gitlabVersion15_6 := "15.6.0-ee"
@@ -511,7 +518,6 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				client := &GitlabClient{
 					Client:  internalClient,
 					Version: nil,
-					logger:  logging.NewNoopLogger(t),
 				}
 
 				repo := models.Repo{
@@ -524,11 +530,14 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 					},
 				}
 
-				mergeable, err := client.PullIsMergeable(repo, models.PullRequest{
-					Num:        c.mrID,
-					BaseRepo:   repo,
-					HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
-				}, vcsStatusName)
+				mergeable, err := client.PullIsMergeable(
+					logger,
+					repo,
+					models.PullRequest{
+						Num:        c.mrID,
+						BaseRepo:   repo,
+						HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
+					}, vcsStatusName)
 
 				Ok(t, err)
 				Equals(t, c.expState, mergeable)
@@ -538,9 +547,10 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 }
 
 func TestGitlabClient_MarkdownPullLink(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	gitlabClientUnderTest = true
 	defer func() { gitlabClientUnderTest = false }()
-	client, err := NewGitlabClient("gitlab.com", "token", nil)
+	client, err := NewGitlabClient("gitlab.com", "token", logger)
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
@@ -549,6 +559,7 @@ func TestGitlabClient_MarkdownPullLink(t *testing.T) {
 }
 
 func TestGitlabClient_HideOldComments(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	type notePutCallDetails struct {
 		noteID  string
 		comment []string
@@ -673,10 +684,9 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
-				logger:  logging.NewNoopLogger(t),
 			}
 
-			err = client.HidePrevCommandComments(repo, pullNum, command.Plan.TitleString(), c.dir)
+			err = client.HidePrevCommandComments(logger, repo, pullNum, command.Plan.TitleString(), c.dir)
 			Ok(t, err)
 
 			// Check the correct number of plan comments have been processed
@@ -693,6 +703,7 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 }
 
 func TestGithubClient_GetPullLabels(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	mergeSuccessWithLabel, err := os.ReadFile("testdata/gitlab-merge-success-with-label.json")
 	Ok(t, err)
 
@@ -713,19 +724,23 @@ func TestGithubClient_GetPullLabels(t *testing.T) {
 	client := &GitlabClient{
 		Client:  internalClient,
 		Version: nil,
-		logger:  logging.NewNoopLogger(t),
 	}
 
-	labels, err := client.GetPullLabels(models.Repo{
-		FullName: "runatlantis/atlantis",
-	}, models.PullRequest{
-		Num: 1,
-	})
+	labels, err := client.GetPullLabels(
+		logger,
+		models.Repo{
+			FullName: "runatlantis/atlantis",
+		},
+		models.PullRequest{
+			Num: 1,
+		},
+	)
 	Ok(t, err)
 	Equals(t, []string{"work in progress"}, labels)
 }
 
 func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
 	Ok(t, err)
 
@@ -746,14 +761,15 @@ func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
 	client := &GitlabClient{
 		Client:  internalClient,
 		Version: nil,
-		logger:  logging.NewNoopLogger(t),
 	}
 
-	labels, err := client.GetPullLabels(models.Repo{
-		FullName: "runatlantis/atlantis",
-	}, models.PullRequest{
-		Num: 1,
-	})
+	labels, err := client.GetPullLabels(
+		logger,
+		models.Repo{
+			FullName: "runatlantis/atlantis",
+		}, models.PullRequest{
+			Num: 1,
+		})
 	Ok(t, err)
 	Equals(t, 0, len(labels))
 }

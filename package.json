@@ -1,9 +1,13 @@
 {
   "license": "Apache-2.0",
   "devDependencies": {
+    "@vuepress/client": "2.0.0-rc.0",
     "@vuepress/plugin-docsearch": "2.0.0-rc.0",
-    "@vuepress/plugin-google-analytics": "2.0.0-rc.0",
-    "vuepress": "2.0.0-rc.0"
+    "@vuepress/plugin-google-analytics": "2.0.0-rc.15",
+    "@vuepress/utils": "2.0.0-rc.0",
+    "vue": "^3.3.11",
+    "vuepress": "2.0.0-rc.0",
+    "vuepress-plugin-sitemap2": "2.0.0-rc.4"
   },
   "scripts": {
     "website:dev": "vuepress dev runatlantis.io",

@@ -72,6 +72,7 @@ const (
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
+	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
 	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
@@ -119,6 +120,7 @@ const (
 	SilenceNoProjectsFlag            = "silence-no-projects"
 	SilenceForkPRErrorsFlag          = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans          = "silence-vcs-status-no-plans"
+	SilenceVCSStatusNoProjectsFlag   = "silence-vcs-status-no-projects"
 	SilenceAllowlistErrorsFlag       = "silence-allowlist-errors"
 	SkipCloneNoChanges               = "skip-clone-no-changes"
 	SlackTokenFlag                   = "slack-token"
@@ -437,6 +439,9 @@ var boolFlags = map[string]boolFlag{
 	DisableRepoLockingFlag: {
 		description: "Disable atlantis locking repos",
 	},
+	DisableGlobalApplyLockFlag: {
+		description: "Disable atlantis global apply lock in UI",
+	},
 	DiscardApprovalOnPlanFlag: {
 		description:  "Enables the discarding of approval if a new plan has been executed. Currently only Github is supported",
 		defaultValue: false,
@@ -504,6 +509,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceVCSStatusNoPlans: {
 		description:  "Silences VCS commit status when autoplan finds no projects to plan.",
+		defaultValue: false,
+	},
+	SilenceVCSStatusNoProjectsFlag: {
+		description:  "Silences VCS commit status when for all commands when a project is not defined.",
 		defaultValue: false,
 	},
 	SilenceAllowlistErrorsFlag: {

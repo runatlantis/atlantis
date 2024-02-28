@@ -24,7 +24,7 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
@@ -77,6 +77,7 @@ var testFlags = map[string]interface{}{
 	DisableApplyAllFlag:              true,
 	DisableMarkdownFoldingFlag:       true,
 	DisableRepoLockingFlag:           true,
+	DisableGlobalApplyLockFlag:       false,
 	DiscardApprovalOnPlanFlag:        true,
 	EmojiReaction:                    "eyes",
 	ExecutableName:                   "atlantis",
@@ -119,6 +120,7 @@ var testFlags = map[string]interface{}{
 	RepoConfigFlag:                   "",
 	RepoConfigJSONFlag:               "",
 	SilenceNoProjectsFlag:            false,
+	SilenceVCSStatusNoProjectsFlag:   false,
 	SilenceForkPRErrorsFlag:          true,
 	SilenceAllowlistErrorsFlag:       true,
 	SilenceVCSStatusNoPlans:          true,
@@ -209,6 +211,32 @@ func TestExecute_Flags(t *testing.T) {
 	for flag, exp := range testFlags {
 		Equals(t, exp, configVal(t, passedConfig, flag))
 	}
+}
+
+func TestUserConfigAllTested(t *testing.T) {
+	t.Log("All settings in userConfig should be tested.")
+
+	u := reflect.TypeOf(server.UserConfig{})
+
+	for i := 0; i < u.NumField(); i++ {
+
+		userConfigKey := u.Field(i).Tag.Get("mapstructure")
+		t.Run(userConfigKey, func(t *testing.T) {
+			// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
+			// Some fields are too complicated to have flags, so are only expressible in the config yaml
+			flagKey := u.Field(i).Tag.Get("flag")
+			if flagKey == "false" {
+				return
+			}
+			// If a setting is configured in server.UserConfig, it should be tested here. If there is no corresponding const
+			// for specifying the flag, that probably means one *also* needs to be added to server.go
+			if _, ok := testFlags[userConfigKey]; !ok {
+				t.Errorf("server.UserConfig has field with mapstructure %s that is not tested, and potentially also not configured as a flag. Either add it to testFlags (and potentially as a const in cmd/server), or remove it from server.UserConfig", userConfigKey)
+			}
+		})
+
+	}
+
 }
 
 func TestExecute_ConfigFile(t *testing.T) {

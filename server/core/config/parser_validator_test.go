@@ -192,7 +192,7 @@ projects:`,
 			input: `
 version: 3
 projects:
-- `,
+- {}`,
 			expErr: "projects: (0: (dir: cannot be blank.).).",
 		},
 		{
@@ -625,7 +625,7 @@ projects:
 			input: `
 version: 3
 projects:
--`,
+- {}`,
 			expErr: "projects: (0: (dir: cannot be blank.).).",
 		},
 		{
@@ -634,7 +634,7 @@ projects:
 version: 3
 projects:
 - dir: "."
--`,
+- {}`,
 			expErr: "projects: (1: (dir: cannot be blank.).).",
 		},
 		{
