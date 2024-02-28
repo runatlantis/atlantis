@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	github "github.com/google/go-github/v58/github"
+	github "github.com/google/go-github/v59/github"
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"

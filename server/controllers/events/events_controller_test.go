@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v58/github"
+	"github.com/google/go-github/v59/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	. "github.com/petergtz/pegomock/v4"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
@@ -872,15 +872,15 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			pullCleaner.VerifyWasCalledOnce().CleanUpPull(
 				logger,
 				expRepo, models.PullRequest{
-				Num:        10,
-				HeadCommit: "2d9fb6b9a46eafb1dcef7b008d1a429d45ca742c",
-				URL:        "https://bbserver.com/projects/PROJ/repos/repository/pull-requests/10",
-				HeadBranch: "decline-me",
-				BaseBranch: "main",
-				Author:     "admin",
-				State:      models.OpenPullState,
-				BaseRepo:   expRepo,
-			})
+					Num:        10,
+					HeadCommit: "2d9fb6b9a46eafb1dcef7b008d1a429d45ca742c",
+					URL:        "https://bbserver.com/projects/PROJ/repos/repository/pull-requests/10",
+					HeadBranch: "decline-me",
+					BaseBranch: "main",
+					Author:     "admin",
+					State:      models.OpenPullState,
+					BaseRepo:   expRepo,
+				})
 		})
 	}
 }
