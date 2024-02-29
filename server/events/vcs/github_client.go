@@ -522,7 +522,7 @@ func (g *GithubClient) LookupRepoId(repo githubv4.String) (githubv4.Int, error) 
 	err := g.v4Client.Query(g.ctx, &query, variables)
 
 	if err != nil {
-		return githubv4.Int(0), err
+		return githubv4.Int(0), errors.Wrap(err, "getting repository id from GraphQL")
 	}
 
 	g.repoIdCache.Set(repo, query.Repository.DatabaseId)
@@ -676,7 +676,7 @@ pagination:
 	}
 
 	if err != nil {
-		return "", nil, nil, nil, nil, err
+		return "", nil, nil, nil, nil, errors.Wrap(err, "fetching rulesets, branch protections and status checks from GraphQL")
 	}
 
 	for context := range requiredChecksSet {
