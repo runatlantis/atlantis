@@ -159,7 +159,7 @@ func TestGetLock_None(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.GetLock(w, req)
-	ResponseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
+	ResponseContains(t, w, http.StatusNotFound, "No lock found at id 'id'")
 }
 
 func TestGetLock_Success(t *testing.T) {
@@ -215,7 +215,7 @@ func TestDeleteLock_InvalidLockID(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "%A@"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusBadRequest, "Invalid lock id \"%A@\"")
+	ResponseContains(t, w, http.StatusBadRequest, "Invalid lock id '%A@'")
 }
 
 func TestDeleteLock_LockerErr(t *testing.T) {
@@ -247,7 +247,7 @@ func TestDeleteLock_None(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
+	ResponseContains(t, w, http.StatusNotFound, "No lock found at id 'id'")
 }
 
 func TestDeleteLock_OldFormat(t *testing.T) {
@@ -265,7 +265,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
 	cp.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
@@ -321,7 +321,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
 	status, err := backend.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, status.Projects != nil, "status projects was nil")
@@ -363,7 +363,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
 }
 
 func TestDeleteLock_CommentSuccess(t *testing.T) {
@@ -400,7 +400,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
 	cp.VerifyWasCalled(Once()).CreateComment(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num),
 		Eq("**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again."), Eq(""))
