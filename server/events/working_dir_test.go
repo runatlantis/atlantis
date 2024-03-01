@@ -601,13 +601,13 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 		CheckoutDepth:       50,
 		GpgNoSigningEnabled: true,
 	}
-	hasDiverged := wd.HasDiverged(logger, repoDir + "/repos/0/default")
+	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default")
 	Equals(t, hasDiverged, true)
 
 	// Run it again but without the checkout merge strategy. It should return
 	// false.
 	wd.CheckoutMerge = false
-	hasDiverged = wd.HasDiverged(logger, repoDir + "/repos/0/default")
+	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default")
 	Equals(t, hasDiverged, false)
 }
 
