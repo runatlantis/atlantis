@@ -30,7 +30,7 @@ devDependencies:
     specifier: ^14.1.1
     version: 14.1.1(webpack@5.90.3)
   vue:
-    specifier: ^3.4.0
+    specifier: ^3.4.21
     version: 3.4.21
   vuepress:
     specifier: 2.0.0-rc.8

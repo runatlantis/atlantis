@@ -9,7 +9,7 @@
     "@vuepress/theme-default": "2.0.0-rc.18",
     "@vuepress/utils": "2.0.0-rc.8",
     "sass-loader": "^14.1.1",
-    "vue": "^3.4.0",
+    "vue": "^3.4.21",
     "vuepress": "2.0.0-rc.8"
   },
   "scripts": {
