@@ -384,7 +384,7 @@ projects:
   dir: .
   workspace: myworkspace
 `,
-			ExpErr: "must specify project name: more than one project defined in atlantis.yaml matched dir: '.' workspace: 'myworkspace'",
+			ExpErr: "must specify project name: more than one project defined in 'atlantis.yaml' matched dir: '.' workspace: 'myworkspace'",
 		},
 		{
 			Description: "atlantis.yaml with project flag not matching",
@@ -399,7 +399,7 @@ version: 3
 projects:
 - dir: .
 `,
-			ExpErr: "no project with name 'notconfigured' is defined in atlantis.yaml",
+			ExpErr: "no project with name 'notconfigured' is defined in 'atlantis.yaml'",
 		},
 		{
 			Description: "atlantis.yaml with project flag not matching but silenced",
