@@ -67,11 +67,7 @@ projects:
 	err := os.WriteFile(globalYAMLPath, []byte(globalYAML), 0600)
 	require.NoError(t, err)
 
-	globalCfgArgs := valid.GlobalCfgArgs{
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
-	}
+	globalCfgArgs := valid.GlobalCfgArgs{}
 
 	parser := &config.ParserValidator{}
 	global, err := parser.ParseGlobalCfg(globalYAMLPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))

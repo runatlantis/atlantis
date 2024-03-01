@@ -244,6 +244,8 @@ type ProjectLock struct {
 // Terraform projects in a single repo we also include Path to the project
 // root relative to the repo root.
 type Project struct {
+	// ProjectName of the project
+	ProjectName string
 	// RepoFullName is the owner and repo name, ex. "runatlantis/atlantis"
 	RepoFullName string
 	// Path to project root in the repo.
@@ -256,6 +258,7 @@ type Project struct {
 }
 
 func (p Project) String() string {
+	// TODO: Incorporate ProjectName?
 	return fmt.Sprintf("repofullname=%s path=%s", p.RepoFullName, p.Path)
 }
 
@@ -271,12 +274,13 @@ type Plan struct {
 
 // NewProject constructs a Project. Use this constructor because it
 // sets Path correctly.
-func NewProject(repoFullName string, path string) Project {
+func NewProject(repoFullName string, path string, projectName string) Project {
 	path = paths.Clean(path)
 	if path == "/" {
 		path = "."
 	}
 	return Project{
+		ProjectName:  projectName,
 		RepoFullName: repoFullName,
 		Path:         path,
 	}
@@ -611,27 +615,39 @@ func (p ProjectPlanStatus) String() string {
 type WorkflowHookCommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
-	// HeadRepo is the repository that is getting merged into the BaseRepo.
-	// If the pull request branch is from the same repository then HeadRepo will
-	// be the same as BaseRepo.
-	HeadRepo Repo
-	// Log is a logger that's been set up for this context.
-	Log logging.SimpleLogging
-	// Pull is the pull request we're responding to.
-	Pull PullRequest
-	// User is the user that triggered this command.
-	User User
-	// Verbose is true when the user would like verbose output.
-	Verbose bool
+	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
+	CommandName string
 	// EscapedCommentArgs are the extra arguments that were added to the atlantis
 	// command, ex. atlantis plan -- -target=resource. We then escape them
 	// by adding a \ before each character so that they can be used within
 	// sh -c safely, i.e. sh -c "terraform plan $(touch bad)".
 	EscapedCommentArgs []string
+	// HeadRepo is the repository that is getting merged into the BaseRepo.
+	// If the pull request branch is from the same repository then HeadRepo will
+	// be the same as BaseRepo.
+	HeadRepo Repo
+	// HookDescription is a description of the hook that is being executed.
+	HookDescription string
 	// UUID for reference
 	HookID string
-	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
-	CommandName string
+	// HookStepName is the name of the step that is being executed.
+	HookStepName string
+	// Log is a logger that's been set up for this context.
+	Log logging.SimpleLogging
+	// Pull is the pull request we're responding to.
+	Pull PullRequest
+	// ProjectName is the name of the project set in atlantis.yaml. If there was
+	// no name this will be an empty string.
+	ProjectName string
+	// RepoRelDir is the directory of this project relative to the repo root.
+	RepoRelDir string
+	// User is the user that triggered this command.
+	User User
+	// Verbose is true when the user would like verbose output.
+	Verbose bool
+	// Workspace is the Terraform workspace this project is in. It will always
+	// be set.
+	Workspace string
 }
 
 // PlanSuccessStats holds stats for a plan.

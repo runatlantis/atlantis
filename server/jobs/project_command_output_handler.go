@@ -24,10 +24,12 @@ type PullInfo struct {
 }
 
 type JobIDInfo struct {
-	JobID         string
-	JobIDUrl      string
-	Time          time.Time
-	TimeFormatted string
+	JobID          string
+	JobIDUrl       string
+	JobDescription string
+	Time           time.Time
+	TimeFormatted  string
+	JobStep        string
 }
 
 type PullInfoWithJobIDs struct {
@@ -37,7 +39,9 @@ type PullInfoWithJobIDs struct {
 
 type JobInfo struct {
 	PullInfo
-	HeadCommit string
+	HeadCommit     string
+	JobDescription string
+	JobStep        string
 }
 
 type ProjectCmdOutputLine struct {
@@ -111,19 +115,15 @@ func (p *AsyncProjectCommandOutputHandler) GetPullToJobMapping() []PullInfoWithJ
 
 	p.pullToJobMapping.Range(func(key, value interface{}) bool {
 		pullInfo := key.(PullInfo)
-		jobIDMap := value.(map[string]time.Time)
+		jobIDMap := value.(map[string]JobIDInfo)
 
 		p := PullInfoWithJobIDs{
 			Pull:       pullInfo,
 			JobIDInfos: make([]JobIDInfo, 0, len(jobIDMap)),
 		}
 
-		for jobID, theTime := range jobIDMap {
-			jobIDInfo := JobIDInfo{
-				JobID: jobID,
-				Time:  theTime,
-			}
-			p.JobIDInfos = append(p.JobIDInfos, jobIDInfo)
+		for _, JobIDInfo := range jobIDMap {
+			p.JobIDInfos = append(p.JobIDInfos, JobIDInfo)
 		}
 
 		pullToJobMappings = append(pullToJobMappings, p)
@@ -154,6 +154,7 @@ func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg 
 				Path:         ctx.RepoRelDir,
 				Workspace:    ctx.Workspace,
 			},
+			JobStep: ctx.CommandName.String(),
 		},
 		Line:              msg,
 		OperationComplete: operationComplete,
@@ -166,9 +167,12 @@ func (p *AsyncProjectCommandOutputHandler) SendWorkflowHook(ctx models.WorkflowH
 		JobInfo: JobInfo{
 			HeadCommit: ctx.Pull.HeadCommit,
 			PullInfo: PullInfo{
-				PullNum: ctx.Pull.Num,
-				Repo:    ctx.BaseRepo.Name,
+				PullNum:      ctx.Pull.Num,
+				Repo:         ctx.BaseRepo.Name,
+				RepoFullName: ctx.BaseRepo.FullName,
 			},
+			JobDescription: ctx.HookDescription,
+			JobStep:        ctx.HookStepName,
 		},
 		Line:              msg,
 		OperationComplete: operationComplete,
@@ -188,11 +192,16 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 
 		// Add job to pullToJob mapping
 		if _, ok := p.pullToJobMapping.Load(msg.JobInfo.PullInfo); !ok {
-			p.pullToJobMapping.Store(msg.JobInfo.PullInfo, map[string]time.Time{})
+			p.pullToJobMapping.Store(msg.JobInfo.PullInfo, map[string]JobIDInfo{})
 		}
 		value, _ := p.pullToJobMapping.Load(msg.JobInfo.PullInfo)
-		jobMapping := value.(map[string]time.Time)
-		jobMapping[msg.JobID] = time.Now()
+		jobMapping := value.(map[string]JobIDInfo)
+		jobMapping[msg.JobID] = JobIDInfo{
+			JobID:          msg.JobID,
+			JobDescription: msg.JobInfo.JobDescription,
+			Time:           time.Now(),
+			JobStep:        msg.JobInfo.JobStep,
+		}
 
 		// Forward new message to all receiver channels and output buffer
 		p.writeLogLine(msg.JobID, msg.Line)
@@ -289,16 +298,16 @@ func (p *AsyncProjectCommandOutputHandler) GetProjectOutputBuffer(jobID string) 
 	return p.projectOutputBuffers[jobID]
 }
 
-func (p *AsyncProjectCommandOutputHandler) GetJobIDMapForPull(pullInfo PullInfo) map[string]time.Time {
+func (p *AsyncProjectCommandOutputHandler) GetJobIDMapForPull(pullInfo PullInfo) map[string]JobIDInfo {
 	if value, ok := p.pullToJobMapping.Load(pullInfo); ok {
-		return value.(map[string]time.Time)
+		return value.(map[string]JobIDInfo)
 	}
 	return nil
 }
 
 func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 	if value, ok := p.pullToJobMapping.Load(pullInfo); ok {
-		jobMapping := value.(map[string]time.Time)
+		jobMapping := value.(map[string]JobIDInfo)
 		for jobID := range jobMapping {
 			p.projectOutputBuffersLock.Lock()
 			delete(p.projectOutputBuffers, jobID)

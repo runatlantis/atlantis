@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v59/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
@@ -29,6 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/xanzy/go-gitlab"
 )
 
@@ -39,6 +40,9 @@ var lastBitbucketSha, _ = lru.New[string, string](300)
 
 // PullCommand is a command to run on a pull request.
 type PullCommand interface {
+	// Dir is the path relative to the repo root to run the command in.
+	// Will never end in "/". If empty then the comment specified no directory.
+	Dir() string
 	// CommandName is the name of the command we're running.
 	CommandName() command.Name
 	// SubCommandName is the subcommand name of the command we're running.
@@ -63,6 +67,11 @@ func (c PolicyCheckCommand) SubCommandName() string {
 	return ""
 }
 
+// Dir is empty
+func (c PolicyCheckCommand) Dir() string {
+	return ""
+}
+
 // IsVerbose is false for policy_check commands.
 func (c PolicyCheckCommand) IsVerbose() bool {
 	return false
@@ -84,6 +93,11 @@ func (c AutoplanCommand) CommandName() command.Name {
 
 // SubCommandName is a subcommand for auto plan.
 func (c AutoplanCommand) SubCommandName() string {
+	return ""
+}
+
+// Dir is empty
+func (c AutoplanCommand) Dir() string {
 	return ""
 }
 
@@ -131,6 +145,11 @@ type CommentCommand struct {
 // apply".
 func (c CommentCommand) IsForSpecificProject() bool {
 	return c.RepoRelDir != "" || c.Workspace != "" || c.ProjectName != ""
+}
+
+// Dir returns the dir of this command.
+func (c CommentCommand) Dir() string {
+	return c.RepoRelDir
 }
 
 // CommandName returns the name of this command.
@@ -182,7 +201,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, sub
 	}
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_event_parsing.go EventParsing
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_event_parsing.go EventParsing
 
 // EventParsing parses webhook events from different VCS hosts into their
 // respective Atlantis models.
@@ -192,7 +211,7 @@ type EventParsing interface {
 	// baseRepo is the repo that the pull request will be merged into.
 	// user is the pull request author.
 	// pullNum is the number of the pull request that triggered the webhook.
-	ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (
+	ParseGithubIssueCommentEvent(logger logging.SimpleLogging, comment *github.IssueCommentEvent) (
 		baseRepo models.Repo, user models.User, pullNum int, err error)
 
 	// ParseGithubPull parses the response from the GitHub API endpoint (not
@@ -200,7 +219,7 @@ type EventParsing interface {
 	// pull is the parsed pull request.
 	// baseRepo is the repo the pull request will be merged into.
 	// headRepo is the repo the pull request branch is from.
-	ParseGithubPull(ghPull *github.PullRequest) (
+	ParseGithubPull(logger logging.SimpleLogging, ghPull *github.PullRequest) (
 		pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, err error)
 
 	// ParseGithubPullEvent parses GitHub pull request events.
@@ -209,7 +228,7 @@ type EventParsing interface {
 	// baseRepo is the repo the pull request will be merged into.
 	// headRepo is the repo the pull request branch is from.
 	// user is the pull request author.
-	ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (
+	ParseGithubPullEvent(logger logging.SimpleLogging, pullEvent *github.PullRequestEvent) (
 		pull models.PullRequest, pullEventType models.PullRequestEventType,
 		baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
 
@@ -453,7 +472,7 @@ func (e *EventParser) ParseBitbucketCloudPullEvent(body []byte) (pull models.Pul
 
 // ParseGithubIssueCommentEvent parses GitHub pull request comment events.
 // See EventParsing for return value docs.
-func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error) {
+func (e *EventParser) ParseGithubIssueCommentEvent(logger logging.SimpleLogging, comment *github.IssueCommentEvent) (baseRepo models.Repo, user models.User, pullNum int, err error) {
 	baseRepo, err = e.ParseGithubRepo(comment.Repo)
 	if err != nil {
 		return
@@ -476,12 +495,12 @@ func (e *EventParser) ParseGithubIssueCommentEvent(comment *github.IssueCommentE
 
 // ParseGithubPullEvent parses GitHub pull request events.
 // See EventParsing for return value docs.
-func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
+func (e *EventParser) ParseGithubPullEvent(logger logging.SimpleLogging, pullEvent *github.PullRequestEvent) (pull models.PullRequest, pullEventType models.PullRequestEventType, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	if pullEvent.PullRequest == nil {
 		err = errors.New("pull_request is null")
 		return
 	}
-	pull, baseRepo, headRepo, err = e.ParseGithubPull(pullEvent.PullRequest)
+	pull, baseRepo, headRepo, err = e.ParseGithubPull(logger, pullEvent.PullRequest)
 	if err != nil {
 		return
 	}
@@ -525,7 +544,7 @@ func (e *EventParser) ParseGithubPullEvent(pullEvent *github.PullRequestEvent) (
 // ParseGithubPull parses the response from the GitHub API endpoint (not
 // from a webhook) that returns a pull request.
 // See EventParsing for return value docs.
-func (e *EventParser) ParseGithubPull(pull *github.PullRequest) (pullModel models.PullRequest, baseRepo models.Repo, headRepo models.Repo, err error) {
+func (e *EventParser) ParseGithubPull(logger logging.SimpleLogging, pull *github.PullRequest) (pullModel models.PullRequest, baseRepo models.Repo, headRepo models.Repo, err error) {
 	commit := pull.Head.GetSHA()
 	if commit == "" {
 		err = errors.New("head.sha is null")
