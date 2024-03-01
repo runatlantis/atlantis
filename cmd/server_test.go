@@ -62,6 +62,7 @@ var testFlags = map[string]interface{}{
 	AutoplanModulesFromProjects:      "",
 	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
 	AllowForkPRsFlag:                 true,
+	ApplyErrorLabelFlag:              "error",
 	APISecretFlag:                    "",
 	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
