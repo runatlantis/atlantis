@@ -372,14 +372,14 @@ projects:
 workflows:
 allowed_regexp_prefixes:
 ```
-| Key                           | Type                                                     | Default | Required | Description                                                                                                                          |
-|-------------------------------|----------------------------------------------------------|---------|----------|--------------------------------------------------------------------------------------------------------------------------------------|
-| version                       | int                                                      | none    | **yes**  | This key is required and must be set to `3`.                                                                                         |
-| automerge                     | bool                                                     | `false` | no       | Automatically merges pull request when all plans are applied.                                                                        |
-| delete_source_branch_on_merge | bool                                                     | `false` | no       | Automatically deletes the source branch on merge.                                                                                    |
-| projects                      | array[[Project](repo-level-atlantis-yaml.html#project)]  | `[]`    | no       | Lists the projects in this repo.                                                                                                     |
-| workflows<br />*(restricted)* | map[string: [Workflow](custom-workflows.html#reference)] | `{}`    | no       | Custom workflows.                                                                                                                    |
-| allowed_regexp_prefixes       | array[string]                                            | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.html#enable-regexp-cmd) flag is used. |
+| Key                           | Type                                                     | Default | Required | Description                                                                                                                        |
+|-------------------------------|----------------------------------------------------------|---------|----------|------------------------------------------------------------------------------------------------------------------------------------|
+| version                       | int                                                      | none    | **yes**  | This key is required and must be set to `3`.                                                                                       |
+| automerge                     | bool                                                     | `false` | no       | Automatically merges pull request when all plans are applied.                                                                      |
+| delete_source_branch_on_merge | bool                                                     | `false` | no       | Automatically deletes the source branch on merge.                                                                                  |
+| projects                      | array[[Project](repo-level-atlantis-yaml.html#project)]  | `[]`    | no       | Lists the projects in this repo.                                                                                                   |
+| workflows<br />*(restricted)* | map[string: [Workflow](custom-workflows.html#reference)] | `{}`    | no       | Custom workflows.                                                                                                                  |
+| allowed_regexp_prefixes       | array[string]                                            | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.md#enable-regexp-cmd) flag is used. |
 
 ### Project
 ```yaml
