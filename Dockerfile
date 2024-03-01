@@ -43,6 +43,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM debian:${DEBIAN_TAG} as debian-base
 
+# Set up the 'atlantis' user and adjust permissions
+RUN useradd --uid 100 --system --create-home --user-group --shell /bin/bash atlantis && \
+    chown atlantis:root /home/atlantis/ && \
+    chmod u+rwx /home/atlantis/
+
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 # hadolint ignore explanation
@@ -143,7 +148,7 @@ HEALTHCHECK --interval=5m --timeout=3s \
 
 # Set up the 'atlantis' user and adjust permissions
 RUN addgroup atlantis && \
-    adduser -u 1000 -S -G atlantis atlantis && \
+    adduser -u 100 -S -G atlantis atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/
 
@@ -168,7 +173,6 @@ RUN apk add --no-cache \
         dumb-init~=1 \
         gcompat~=1
 
-
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
@@ -181,11 +185,6 @@ EXPOSE ${ATLANTIS_PORT:-4141}
 
 HEALTHCHECK --interval=5m --timeout=3s \
   CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
-
-# Set up the 'atlantis' user and adjust permissions
-RUN useradd --uid 1000 --system --create-home --user-group --shell /bin/bash atlantis && \
-    chown atlantis:root /home/atlantis/ && \
-    chmod u+rwx /home/atlantis/
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
