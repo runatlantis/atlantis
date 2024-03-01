@@ -130,7 +130,7 @@ export default defineUserConfig({
                     children: [
                         {
                             text: 'Overview',
-                            link: 'configuring-atlantis',
+                            link: '/docs/configuring-atlantis',
                         },
                         '/docs/server-configuration',
                         '/docs/server-side-repo-config',
@@ -155,7 +155,7 @@ export default defineUserConfig({
                     children: [
                         {
                             text: 'Overview',
-                            link: 'using-atlantis',
+                            link: '/docs/using-atlantis',
                         },
                         '/docs/api-endpoints',
                     ]
@@ -166,7 +166,7 @@ export default defineUserConfig({
                     children: [
                         {
                             text: 'Overview',
-                            link: 'how-atlantis-works',
+                            link: '/docs/how-atlantis-works',
                         },
                         '/docs/locking',
                         '/docs/autoplanning',
