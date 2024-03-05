@@ -403,6 +403,8 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	// Try to get the MR details a couple of times in case the pipeline is not yet assigned to the MR
 	refTarget := pull.HeadBranch
 
+	var pipelineID int
+
 	retries := 1
 	delay := 2 * time.Second
 	var mr *gitlab.MergeRequest
@@ -417,6 +419,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			logger.Debug("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
 				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
 			refTarget = mr.HeadPipeline.Ref
+			pipelineID = mr.HeadPipeline.ID
 			break
 		}
 		if i != retries {
@@ -435,6 +438,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		Description: gitlab.Ptr(description),
 		TargetURL:   &url,
 		Ref:         gitlab.Ptr(refTarget),
+		PipelineID:  gitlab.Ptr(pipelineID),
 	})
 	if resp != nil {
 		logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
@@ -461,7 +465,7 @@ func (g *GitlabClient) WaitForSuccessPipeline(logger logging.SimpleLogging, ctx 
 		case <-ctx.Done():
 			// validation check time out
 			cancel()
-			return //ctx.Err()
+			return // ctx.Err()
 
 		default:
 			mr, _ := g.GetMergeRequest(logger, pull.BaseRepo.FullName, pull.Num)
