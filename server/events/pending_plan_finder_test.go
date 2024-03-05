@@ -1,6 +1,7 @@
 package events_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,28 @@ func TestPendingPlanFinder_FindNoDir(t *testing.T) {
 	pf := &events.DefaultPendingPlanFinder{}
 	_, err := pf.Find("/doesntexist")
 	ErrEquals(t, "open /doesntexist: no such file or directory", err)
+}
+
+// If one of the dir in PR dir is not git dir then it should throw an error.
+func TestPendingPlanFinder_FindIncludingNotGitDir(t *testing.T) {
+	gitDirName := ".default"
+	notGitDirName := ".terragrunt-cache"
+	tmpDir := DirStructure(t, map[string]interface{}{
+		gitDirName: map[string]interface{}{
+			"default.tfplan": nil,
+		},
+		notGitDirName: map[string]interface{}{
+			"some_file.tfplan": nil,
+		},
+	})
+	// Initialize git in 'default' directory
+	gitDir := filepath.Join(tmpDir, gitDirName)
+	runCmd(t, gitDir, "git", "init")
+	pf := &events.DefaultPendingPlanFinder{}
+
+	_, err := pf.Find(tmpDir)
+	ErrEquals(t, fmt.Sprintf("running 'git ls-files . --others' in '%s/%s' directory: fatal: "+
+		"not a git repository (or any of the parent directories): .git\n: exit status 128", tmpDir, notGitDirName), err)
 }
 
 // Test different directory structures.
