@@ -84,9 +84,10 @@ func NewClient(baseURL string, username string, token string, pagesize int, logg
 func (c *GiteaClient) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*gitea.PullRequest, error) {
 	logger.Debug("Getting Gitea pull request %d", pullNum)
 
-	pr, _, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pullNum))
+	pr, resp, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pullNum))
 
 	if err != nil {
+		logger.Debug("GET /repos/%v/%v/pulls/%d returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
 		return nil, err
 	}
 
@@ -113,6 +114,7 @@ func (c *GiteaClient) GetModifiedFiles(logger logging.SimpleLogging, repo models
 		listOptions.ListOptions.Page = page
 		files, resp, err := c.giteaClient.ListPullRequestFiles(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 		if err != nil {
+			logger.Debug("[page %d] GET /repos/%v/%v/pulls/%d/files returned: %v", page, repo.Owner, repo.Name, pull.Num, resp.StatusCode)
 			return nil, err
 		}
 
@@ -139,9 +141,10 @@ func (c *GiteaClient) CreateComment(logger logging.SimpleLogging, repo models.Re
 		Body: comment,
 	}
 
-	_, _, err := c.giteaClient.CreateIssueComment(repo.Owner, repo.Name, int64(pullNum), opt)
+	_, resp, err := c.giteaClient.CreateIssueComment(repo.Owner, repo.Name, int64(pullNum), opt)
 
 	if err != nil {
+		logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
 		return err
 	}
 
@@ -154,9 +157,10 @@ func (c *GiteaClient) CreateComment(logger logging.SimpleLogging, repo models.Re
 func (c *GiteaClient) ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error {
 	logger.Debug("Adding reaction to Gitea pull request comment %d", commentID)
 
-	_, _, err := c.giteaClient.PostIssueCommentReaction(repo.Owner, repo.Name, commentID, reaction)
+	_, resp, err := c.giteaClient.PostIssueCommentReaction(repo.Owner, repo.Name, commentID, reaction)
 
 	if err != nil {
+		logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions returned: %v", repo.Owner, repo.Name, commentID, resp.StatusCode)
 		return err
 	}
 
@@ -182,6 +186,7 @@ func (c *GiteaClient) HidePrevCommandComments(logger logging.SimpleLogging, repo
 
 		comments, resp, err := c.giteaClient.ListIssueComments(repo.Owner, repo.Name, int64(pullNum), opts)
 		if err != nil {
+			logger.Debug("GET /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
 			return err
 		}
 
@@ -194,8 +199,9 @@ func (c *GiteaClient) HidePrevCommandComments(logger logging.SimpleLogging, repo
 		nextPage = resp.NextPage
 	}
 
-	currentUser, _, err := c.giteaClient.GetMyUserInfo()
+	currentUser, resp, err := c.giteaClient.GetMyUserInfo()
 	if err != nil {
+		logger.Debug("GET /user returned: %v", resp.StatusCode)
 		return err
 	}
 
@@ -251,6 +257,7 @@ func (c *GiteaClient) PullIsApproved(logger logging.SimpleLogging, repo models.R
 		pullReviews, resp, err := c.giteaClient.ListPullReviews(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 
 		if err != nil {
+			logger.Debug("GET /repos/%v/%v/pulls/%d/reviews returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
 			return approvalStatus, err
 		}
 
@@ -317,9 +324,10 @@ func (c *GiteaClient) UpdateStatus(logger logging.SimpleLogging, repo models.Rep
 		Description: description,
 	}
 
-	_, _, err := c.giteaClient.CreateStatus(repo.Owner, repo.Name, pull.HeadCommit, newStatusOption)
+	_, resp, err := c.giteaClient.CreateStatus(repo.Owner, repo.Name, pull.HeadCommit, newStatusOption)
 
 	if err != nil {
+		logger.Debug("POST /repos/%v/%v/statuses/%s returned: %v", repo.Owner, repo.Name, pull.HeadCommit, resp.StatusCode)
 		return err
 	}
 
@@ -388,6 +396,7 @@ func (c *GiteaClient) MergePull(logger logging.SimpleLogging, pull models.PullRe
 	succeeded, resp, err := c.giteaClient.MergePullRequest(pull.BaseRepo.Owner, pull.BaseRepo.Name, int64(pull.Num), mergeOptions)
 
 	if err != nil {
+		logger.Debug("POST /repos/%v/%v/pulls/%d/merge returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, pull.Num, resp.StatusCode)
 		return err
 	}
 
@@ -415,9 +424,10 @@ func (c *GiteaClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([
 func (c *GiteaClient) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {
 	logger.Debug("Getting file content for %s in Gitea pull request %d", fileName, pull.Num)
 
-	content, _, err := c.giteaClient.GetContents(pull.BaseRepo.Owner, pull.BaseRepo.Name, pull.HeadCommit, fileName)
+	content, resp, err := c.giteaClient.GetContents(pull.BaseRepo.Owner, pull.BaseRepo.Name, pull.HeadCommit, fileName)
 
 	if err != nil {
+		logger.Debug("GET /repos/%v/%v/contents/%s?ref=%v returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, fileName, pull.HeadCommit, resp.StatusCode)
 		return false, nil, err
 	}
 
@@ -475,6 +485,7 @@ func (c *GiteaClient) GetPullLabels(logger logging.SimpleLogging, repo models.Re
 		labels, resp, err := c.giteaClient.GetIssueLabels(repo.Owner, repo.Name, int64(pull.Num), opts)
 
 		if err != nil {
+			logger.Debug("GET /repos/%v/%v/issues/%d/labels?%v returned: %v", repo.Owner, repo.Name, pull.Num, "unknown", resp.StatusCode)
 			return nil, err
 		}
 
