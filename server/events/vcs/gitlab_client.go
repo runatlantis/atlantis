@@ -25,12 +25,12 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/runatlantis/atlantis/server/events/models"
-	gitlab "github.com/xanzy/go-gitlab"
+	"github.com/xanzy/go-gitlab"
 )
 
 // gitlabMaxCommentLength is the maximum number of chars allowed by Gitlab in a
@@ -397,12 +397,6 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		gitlabState = gitlab.Success
 	}
 
-	// refTarget is set to the head pipeline of the MR if it exists, or else it is set to the head branch
-	// of the MR. This is needed because the commit status is only shown in the MR if the pipeline is
-	// assigned to an MR reference.
-	// Try to get the MR details a couple of times in case the pipeline is not yet assigned to the MR
-	refTarget := pull.HeadBranch
-
 	var pipelineID int
 
 	retries := 1
@@ -418,7 +412,6 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		if mr.HeadPipeline != nil {
 			logger.Debug("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
 				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
-			refTarget = mr.HeadPipeline.Ref
 			pipelineID = mr.HeadPipeline.ID
 			break
 		}
@@ -437,7 +430,6 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		Context:     gitlab.Ptr(src),
 		Description: gitlab.Ptr(description),
 		TargetURL:   &url,
-		Ref:         gitlab.Ptr(refTarget),
 		PipelineID:  gitlab.Ptr(pipelineID),
 	})
 	if resp != nil {
