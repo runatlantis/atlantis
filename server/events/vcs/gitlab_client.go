@@ -398,7 +398,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	}
 
 	var refTarget *string
-	var pipelineID int
+	var pipelineID *int
 
 	retries := 2
 	delay := 5 * time.Second
@@ -413,7 +413,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		if mr.HeadPipeline != nil {
 			logger.Info("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
 				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
-			pipelineID = mr.HeadPipeline.ID
+			pipelineID = gitlab.Ptr(mr.HeadPipeline.ID)
 			break
 		}
 		if i != retries {
@@ -433,7 +433,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		Context:     gitlab.Ptr(src),
 		Description: gitlab.Ptr(description),
 		TargetURL:   &url,
-		PipelineID:  gitlab.Ptr(pipelineID),
+		PipelineID:  pipelineID,
 		Ref:         refTarget,
 	})
 	if resp != nil {
