@@ -411,8 +411,8 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			return err
 		}
 		if mr.HeadPipeline != nil {
-			logger.Info("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
-				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
+			logger.Info("Head pipeline found for merge request %d, source '%s'. pipelineID '%s'",
+				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.ID)
 			pipelineID = gitlab.Ptr(mr.HeadPipeline.ID)
 			break
 		}
