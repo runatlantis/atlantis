@@ -397,10 +397,11 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		gitlabState = gitlab.Success
 	}
 
+	var refTarget *string
 	var pipelineID int
 
-	retries := 1
-	delay := 2 * time.Second
+	retries := 2
+	delay := 5 * time.Second
 	var mr *gitlab.MergeRequest
 	var err error
 
@@ -410,17 +411,19 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			return err
 		}
 		if mr.HeadPipeline != nil {
-			logger.Debug("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
+			logger.Info("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
 				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
 			pipelineID = mr.HeadPipeline.ID
 			break
 		}
 		if i != retries {
-			logger.Debug("Head pipeline not found for merge request %d. Retrying in %s",
+			logger.Info("Head pipeline not found for merge request %d. Retrying in %s",
 				pull.Num, delay)
 			time.Sleep(delay)
 		} else {
-			logger.Debug("Head pipeline not found for merge request %d.",
+			headBranch := pull.HeadBranch
+			refTarget = gitlab.Ptr(headBranch)
+			logger.Warn("Head pipeline not found for merge request %d.",
 				pull.Num)
 		}
 	}
@@ -431,6 +434,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		Description: gitlab.Ptr(description),
 		TargetURL:   &url,
 		PipelineID:  gitlab.Ptr(pipelineID),
+		Ref:         refTarget,
 	})
 	if resp != nil {
 		logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
