@@ -413,13 +413,13 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			return err
 		}
 		if mr.HeadPipeline != nil {
-			logger.Info("Head pipeline found for merge request %d, source '%s'. pipelineID '%s'",
+			logger.Info("Head pipeline found for merge request %d, source '%s'. pipelineID '%d'",
 				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.ID)
 			pipelineID = gitlab.Ptr(mr.HeadPipeline.ID)
 
-			// let's check to see if the pipeline sha matches the head commit.
+			// if these don't match then there has been a new commit so let's return
 			if mr.HeadPipeline.SHA != pull.HeadCommit {
-				logger.Err("Head pipeline SHA does not match pull head commit")
+				return errors.Errorf("mr.HeadPipeline.SHA: '%s' does not match pull.HeadCommit '%s'", mr.HeadPipeline.SHA, pull.HeadCommit)
 			}
 			break
 		}
