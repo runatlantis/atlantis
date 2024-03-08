@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	gitlab "github.com/xanzy/go-gitlab"
+	"github.com/xanzy/go-gitlab"
 
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -303,7 +303,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
-						exp := fmt.Sprintf(`{"state":"%s","ref":"patch-1-merger","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
+						exp := fmt.Sprintf(`{"state":"%s","context":"src","target_url":"https://google.com","description":"description","pipeline_id":488598}`, c.expState)
 						Equals(t, exp, string(body))
 						defer r.Body.Close()  // nolint: errcheck
 						w.Write([]byte("{}")) // nolint: errcheck

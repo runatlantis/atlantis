@@ -397,14 +397,13 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		gitlabState = gitlab.Success
 	}
 
-	// refTarget is set to the head pipeline of the MR if it exists, or else it is set to the head branch
-	// of the MR. This is needed because the commit status is only shown in the MR if the pipeline is
-	// assigned to an MR reference.
-	// Try to get the MR details a couple of times in case the pipeline is not yet assigned to the MR
-	refTarget := pull.HeadBranch
+	// create these pointers here so that they can be nil when they get to the request and are omitted
+	var refTarget *string
+	var pipelineID *int
 
-	retries := 1
-	delay := 2 * time.Second
+	retries := 2
+	delay := 5 * time.Second
+
 	var mr *gitlab.MergeRequest
 	var err error
 
@@ -414,17 +413,24 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			return err
 		}
 		if mr.HeadPipeline != nil {
-			logger.Debug("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
-				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
-			refTarget = mr.HeadPipeline.Ref
+			logger.Info("Head pipeline found for merge request %d, source '%s'. pipelineID '%s'",
+				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.ID)
+			pipelineID = gitlab.Ptr(mr.HeadPipeline.ID)
+
+			// let's check to see if the pipeline sha matches the head commit.
+			if mr.HeadPipeline.SHA != pull.HeadCommit {
+				logger.Err("Head pipeline SHA does not match pull head commit")
+			}
 			break
 		}
 		if i != retries {
-			logger.Debug("Head pipeline not found for merge request %d. Retrying in %s",
+			logger.Info("Head pipeline not found for merge request %d. Retrying in %s",
 				pull.Num, delay)
 			time.Sleep(delay)
 		} else {
-			logger.Debug("Head pipeline not found for merge request %d.",
+			headBranch := pull.HeadBranch
+			refTarget = gitlab.Ptr(headBranch)
+			logger.Warn("Head pipeline not found for merge request %d.",
 				pull.Num)
 		}
 	}
@@ -434,7 +440,8 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		Context:     gitlab.Ptr(src),
 		Description: gitlab.Ptr(description),
 		TargetURL:   &url,
-		Ref:         gitlab.Ptr(refTarget),
+		PipelineID:  pipelineID,
+		Ref:         refTarget,
 	})
 	if resp != nil {
 		logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
@@ -461,7 +468,7 @@ func (g *GitlabClient) WaitForSuccessPipeline(logger logging.SimpleLogging, ctx 
 		case <-ctx.Done():
 			// validation check time out
 			cancel()
-			return //ctx.Err()
+			return // ctx.Err()
 
 		default:
 			mr, _ := g.GetMergeRequest(logger, pull.BaseRepo.FullName, pull.Num)
