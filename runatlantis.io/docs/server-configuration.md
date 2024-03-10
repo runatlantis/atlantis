@@ -889,6 +889,16 @@ This is useful when you have many projects and want to keep the pull request cle
   like `atlantis plan -p .*` will still work if used. normal commands will stil be blocked if necessary.
   Defaults to `false`.
 
+### `--set-atlantis-apply-check-successful-if-no-changes`
+  ```bash
+  atlantis server --set-atlantis-apply-check-successful-if-no-changes
+  # or
+  ATLANTIS_SET_ATLANTIS_APPLY_CHECK_SUCCESSFUL_IF_NO_CHANGES=false
+  ```
+`--set-atlantis-apply-check-successful-if-no-changes` will set the `atlantis/apply` status check to "passing" on a VCS pull request if the `atlantis plan` command results in "No Changes".
+This is useful, for example, when enabling auto-merge for pull requests that do not involve resource changes, such as automatic dependency updates.
+Defaults to `true`.
+
 ### `--silence-allowlist-errors`
   ```bash
   atlantis server --silence-allowlist-errors

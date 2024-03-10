@@ -22,6 +22,7 @@ func NewApplyCommandRunner(
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
+	SetAtlantisApplyCheckSuccessfulIfNoChanges bool,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
 		vcsClient:                  vcsClient,
@@ -38,22 +39,24 @@ func NewApplyCommandRunner(
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
+		SetAtlantisApplyCheckSuccessfulIfNoChanges: SetAtlantisApplyCheckSuccessfulIfNoChanges,
 	}
 }
 
 type ApplyCommandRunner struct {
-	DisableApplyAll      bool
-	Backend              locking.Backend
-	locker               locking.ApplyLockChecker
-	vcsClient            vcs.Client
-	commitStatusUpdater  CommitStatusUpdater
-	prjCmdBuilder        ProjectApplyCommandBuilder
-	prjCmdRunner         ProjectApplyCommandRunner
-	autoMerger           *AutoMerger
-	pullUpdater          *PullUpdater
-	dbUpdater            *DBUpdater
-	parallelPoolSize     int
-	pullReqStatusFetcher vcs.PullReqStatusFetcher
+	DisableApplyAll                            bool
+	Backend                                    locking.Backend
+	locker                                     locking.ApplyLockChecker
+	vcsClient                                  vcs.Client
+	commitStatusUpdater                        CommitStatusUpdater
+	prjCmdBuilder                              ProjectApplyCommandBuilder
+	prjCmdRunner                               ProjectApplyCommandRunner
+	autoMerger                                 *AutoMerger
+	pullUpdater                                *PullUpdater
+	dbUpdater                                  *DBUpdater
+	parallelPoolSize                           int
+	pullReqStatusFetcher                       vcs.PullReqStatusFetcher
+	SetAtlantisApplyCheckSuccessfulIfNoChanges bool
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects bool
@@ -199,7 +202,10 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 	var numErrored int
 	status := models.SuccessCommitStatus
 
-	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
+	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus)
+	if a.SetAtlantisApplyCheckSuccessfulIfNoChanges {
+		numSuccess += pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
+	}
 	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
 	if numErrored > 0 {
