@@ -30,6 +30,7 @@ func (r *RunStepRunner) Run(
 	envs map[string]string,
 	streamOutput bool,
 	postProcessOutput valid.PostProcessRunOutputOption,
+	postProcessRegexFilter string,
 ) (string, error) {
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
@@ -97,7 +98,11 @@ func (r *RunStepRunner) Run(
 	case valid.PostProcessRunOutputHide:
 		return "", nil
 	case valid.PostProcessRunOutputStripRefreshing:
-		return output, nil
+		return StripRefreshingFromPlanOutput(output, tfVersion), nil
+	case valid.PostProcessRunOutputCustomRegex:
+		return CustomRegexFromPlanOutput(output, postProcessRegexFilter), nil
+	case valid.PostProcessRunOutputStripRefreshingWithCustomRegex:
+		return CustomRegexFromPlanOutput(StripRefreshingFromPlanOutput(output, tfVersion), postProcessRegexFilter), nil
 	case valid.PostProcessRunOutputShow:
 		return output, nil
 	default:

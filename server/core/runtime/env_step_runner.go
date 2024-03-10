@@ -28,7 +28,7 @@ func (r *EnvStepRunner) Run(
 	}
 	// Pass `false` for streamOutput because this isn't interesting to the user reading the build logs
 	// in the web UI.
-	res, err := r.RunStepRunner.Run(ctx, shell, command, path, envs, false, valid.PostProcessRunOutputShow)
+	res, err := r.RunStepRunner.Run(ctx, shell, command, path, envs, false, valid.PostProcessRunOutputShow, "")
 	// Trim newline from res to support running `echo env_value` which has
 	// a newline. We don't recommend users run echo -n env_value to remove the
 	// newline because -n doesn't work in the sh shell which is what we use
