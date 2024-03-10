@@ -40,7 +40,7 @@ workflows:
           extra_args: ["-var-file", "staging.tfvars"]
     # NOTE: no need to define the apply stage because it will default
     # to the normal apply stage.
-    
+
   production:
     plan:
       steps:
@@ -147,11 +147,11 @@ workflows:
       - run:
           command: terraform init -input=false
           output: hide
-      
+
       # If you're using workspaces you need to select the workspace using the
       # $WORKSPACE environment variable.
       - run: terraform workspace select $WORKSPACE
-      
+
       # You MUST output the plan using -out $PLANFILE because Atlantis expects
       # plans to be in a specific location.
       - run: terraform plan -input=false -refresh -out $PLANFILE
@@ -234,7 +234,7 @@ $ tree --gitignore
 
 1. Container orchestrator (k8s/fargate/ecs/etc) uses the custom docker image of atlantis with `cdktf` installed with
 the `--autoplan-file-list` to trigger on `cdk.tf.json` files and `--include-git-untracked-files` set to include the
-CDKTF dynamically generated Terraform files in the Atlantis plan. 
+CDKTF dynamically generated Terraform files in the Atlantis plan.
 1. PR branch is pushed up containing `cdktf` code changes.
 1. Atlantis checks out the branch in the repo.
 1. Atlantis runs the `npm i && cdktf get && cdktf synth` command in the repo root as a step in `pre_workflow_hooks`,
@@ -335,7 +335,10 @@ workflows:
           value: 'true'
       - run:
           command: terragrunt plan -input=false -out=$PLANFILE
-          output: strip_refreshing
+          output: strip_refreshing_with_custom_regex
+          # Filters text matching 'mySecret: "aaa"' -> 'mySecret: "<redacted>"'
+          regex_filter: "((?i)secret:\\s\")[^\"]*"
+
     apply:
       steps:
       - env:
@@ -380,7 +383,7 @@ isn't set, Atlantis will use the default plan workflow which is what we want in 
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
-will execute a custom script containing the following code to create a SSH tunnel correctly: 
+will execute a custom script containing the following code to create a SSH tunnel correctly:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
 :::
@@ -501,20 +504,22 @@ Compact:
 
 Full
 ```yaml
-- run: 
+- run:
     command: custom-command arg1 arg2
     output: show
+    custom_regex: .*
 ```
-| Key | Type                                                         | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                             |
-|-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| run | map[string -> string] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>* `show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
+| Key               | Type                  | Default | Required  | Description           |
+|-------------------|-----------------------|---------|-----------|-----------------------|
+| run               | map[string -> string] | none    | no        | Run a custom command  |
+| run.command       | string                | none    | yes       | Shell command to run  |
+| run.output        | string                | "show"  | no        | How to post-process the output of this command when posted in the PR comment. The options are<br/>* `show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command<br/> * `custom_regex` - filters the comment output based on the regex specified on `run.regex_filter` by replacing matched patterns with the text `<redacted`. Note: this filter only applies to the comments posted by Atlantis, the plan output on the URL job is untouched <br/> * `strip_refreshing_with_custom_regex` - applies `strip_refreshing` and `custom_regex` to the output |
+| run.custom_regex  | string                | none    | no        | Regex filter to be applied to output. Required when `run.output` is `custom_regex` or `strip_refreshing_with_custom_regex` |
 
 ::: tip Notes
-* `run` steps in the main `workflow` are executed with the following environment variables:  
+* `run` steps in the main `workflow` are executed with the following environment variables:
   note: these variables are not available to `pre` or `post` workflows
-    * `WORKSPACE` - The Terraform workspace used for this project, ex. `default`.  
+    * `WORKSPACE` - The Terraform workspace used for this project, ex. `default`.
       NOTE: if the step is executed before `init` then Atlantis won't have switched to this workspace yet.
     * `ATLANTIS_TERRAFORM_VERSION` - The version of Terraform used for this project, ex. `0.11.0`.
     * `DIR` - Absolute path to the current directory.
@@ -544,10 +549,10 @@ Full
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
-will execute a custom script containing the following code to create a SSH tunnel correctly: 
+will execute a custom script containing the following code to create a SSH tunnel correctly:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
-* If a workflow step returns a non-zero exit code, the workflow will stop. 
+* If a workflow step returns a non-zero exit code, the workflow will stop.
 :::
 
 #### Environment Variable `env` Command
@@ -574,7 +579,7 @@ as the environment variable value.
 
 ::: tip Notes
 * `env` `command`'s can use any of the built-in environment variables available
-  to `run` commands. 
+  to `run` commands.
 :::
 
 #### Multiple Environment Variables `multienv` Command
@@ -594,5 +599,5 @@ The name-value pairs in the result are added as environment variables if success
 
 ::: tip Notes
 * `multienv` `command`'s can use any of the built-in environment variables available
-  to `run` commands. 
+  to `run` commands.
 :::
