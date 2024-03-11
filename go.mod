@@ -22,6 +22,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20231204233900-a34142ec2a72
+	github.com/jpillora/backoff v1.0.0
 	github.com/kr/pretty v0.3.1
 	github.com/mcdafydd/go-azuredevops v0.12.1
 	github.com/microcosm-cc/bluemonday v1.0.26
@@ -42,7 +43,7 @@ require (
 	github.com/uber-go/tally/v4 v4.1.10
 	github.com/urfave/negroni/v3 v3.1.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605
-	github.com/xanzy/go-gitlab v0.99.0
+	github.com/xanzy/go-gitlab v0.100.0
 	go.etcd.io/bbolt v1.3.9
 	go.uber.org/zap v1.27.0
 	golang.org/x/term v0.18.0

@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jpillora/backoff"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 
@@ -429,16 +430,32 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		}
 	}
 
-	_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
-		State:       gitlabState,
-		Context:     gitlab.Ptr(src),
-		Description: gitlab.Ptr(description),
-		TargetURL:   &url,
-		Ref:         gitlab.Ptr(refTarget),
-	})
-	if resp != nil {
-		logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
+	b := &backoff.Backoff{Jitter: true}
+	for i := 0.0; i < 10; i++ {
+		_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
+			State:       gitlabState,
+			Context:     gitlab.Ptr(src),
+			Description: gitlab.Ptr(description),
+			TargetURL:   &url,
+			Ref:         gitlab.Ptr(refTarget),
+		})
+
+		if resp != nil {
+			logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
+
+			if resp.StatusCode == http.StatusConflict {
+				sleep := b.ForAttempt(i)
+
+				logger.Warn("Got HTTP 409 Conflict when updating commit status for '%s' @ '%s' to '%s'. Retrying in %s. Attempt %d of %d", repo.FullName, pull.HeadCommit, src, sleep, i, 10)
+				time.Sleep(sleep)
+
+				continue
+			}
+		}
+
+		return err
 	}
+
 	return err
 }
 
@@ -461,7 +478,7 @@ func (g *GitlabClient) WaitForSuccessPipeline(logger logging.SimpleLogging, ctx 
 		case <-ctx.Done():
 			// validation check time out
 			cancel()
-			return //ctx.Err()
+			return // ctx.Err()
 
 		default:
 			mr, _ := g.GetMergeRequest(logger, pull.BaseRepo.FullName, pull.Num)

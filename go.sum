@@ -258,6 +258,7 @@ github.com/imdario/mergo v0.3.16/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+h
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
+github.com/jpillora/backoff v1.0.0 h1:uvFg412JmmHBHw7iwprIxkPMI+sGQ4kzOWsMeHnm2EA=
 github.com/jpillora/backoff v1.0.0/go.mod h1:J/6gKK9jxlEcS3zixgDgUAsiuZ7yrSoa/FX5e0EB2j4=
 github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
 github.com/json-iterator/go v1.1.10/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
@@ -432,8 +433,8 @@ github.com/urfave/negroni/v3 v3.1.0 h1:lzmuxGSpnJCT/ujgIAjkU3+LW3NX8alCglO/L6KjI
 github.com/urfave/negroni/v3 v3.1.0/go.mod h1:jWvnX03kcSjDBl/ShB0iHvx5uOs7mAzZXW+JvJ5XYAs=
 github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605 h1:bRt3KvPapqnO3s9XenyU4COpU9X7cNW3BMELyHRxuSs=
 github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605/go.mod h1:saryXNaL624mlulV138FP+HhVw7IpvETUXLS3nTvH1g=
-github.com/xanzy/go-gitlab v0.99.0 h1:0W5dmFQejPlqnScZoGRXNPmx+evOxBMk50P40cxlnWU=
-github.com/xanzy/go-gitlab v0.99.0/go.mod h1:ETg8tcj4OhrB84UEgeE8dSuV/0h4BBL1uOV/qK0vlyI=
+github.com/xanzy/go-gitlab v0.100.0 h1:jaOtYj5nWI19+9oVVmgy233pax2oYqucwetogYU46ks=
+github.com/xanzy/go-gitlab v0.100.0/go.mod h1:ETg8tcj4OhrB84UEgeE8dSuV/0h4BBL1uOV/qK0vlyI=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

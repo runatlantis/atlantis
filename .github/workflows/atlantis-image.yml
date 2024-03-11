@@ -49,7 +49,7 @@ jobs:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ghcr.io/${{ github.repository }}
       # Push if not a pull request and references the main branch
-      PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
+      PUSH: true
 
     steps:
     - uses: actions/checkout@v4
