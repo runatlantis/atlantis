@@ -431,6 +431,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	}
 
 	b := &backoff.Backoff{Jitter: true}
+
 	for i := 0.0; i < 10; i++ {
 		_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
 			State:       gitlabState,
@@ -443,10 +444,18 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		if resp != nil {
 			logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
 
+			// GitLab returns a 409 status when the commit pipeline status is being changed/locked by another request,
+			// which is likely to happen if you use [--parallel-pool-size > 1] and [parallel-apply|apply].
+			//
+			// The likelihood of this happening is increased when the number of parallel apply jobs is increased.
+			//
+			// Returning the [err] without retrying will leave the GitLab commit status permanently in a "running" state,
+			// which would in turn prevent the merge request from being merged by Atlantis on [apply],
+			// due to GitLab not allowing merge requests to be merged when the pipeline status is "running".
 			if resp.StatusCode == http.StatusConflict {
 				sleep := b.ForAttempt(i)
 
-				logger.Warn("Got HTTP 409 Conflict when updating commit status for '%s' @ '%s' to '%s'. Retrying in %s. Attempt %d of %d", repo.FullName, pull.HeadCommit, src, sleep, i, 10)
+				logger.Warn("GitLab returned HTTP [409 Conflict] when updating commit status for '%s' @ '%s' to '%s'. Retrying in %s (Attempt %d / %d)", repo.FullName, pull.HeadCommit, src, sleep, i, 10)
 				time.Sleep(sleep)
 
 				continue
@@ -456,7 +465,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		return err
 	}
 
-	return err
+	return nil
 }
 
 func (g *GitlabClient) GetMergeRequest(logger logging.SimpleLogging, repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
