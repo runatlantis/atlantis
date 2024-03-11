@@ -527,36 +527,45 @@ func MustConstraint(v string) version.Constraints {
 
 // ensureVersion returns the path to a terraform binary of version v.
 // It will download this version if we don't have it.
-func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string, downloadsAllowed bool) (string, error) {
+func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string, opentofuEnabled bool, downloadsAllowed bool) (string, error) {
 	if binPath, ok := versions[v.String()]; ok {
 		return binPath, nil
 	}
 
-	// This tf version might not yet be in the versions map even though it
-	// exists on disk. This would happen if users have manually added
-	// terraform{version} binaries. In this case we don't want to re-download.
-	binFile := "terraform" + v.String()
-	if binPath, err := exec.LookPath(binFile); err == nil {
-		versions[v.String()] = binPath
-		return binPath, nil
+	// Check if the Opentofu is being used
+	if opentofuEnabled {
+		log.Info("Opentofu is enabled, downloading from %s", downloadURL)
+	} else {
+		log.Info("Opentofu is not enabled, downloading from %s", downloadURL)
 	}
 
-	// The version might also not be in the versions map if it's in our bin dir.
-	// This could happen if Atlantis was restarted without losing its disk.
-	dest := filepath.Join(binDir, binFile)
+	var urlPrefix, binURL, checksumURL, fullSrcURL string
+
+	if opentofuEnabled {
+		urlPrefix = fmt.Sprintf("%s/download/v%s/tofu_%s_%s.zip", downloadURL, v.String(), v.String(), runtime.GOOS, runtime.GOARCH)
+		binURL = fmt.Sprintf("tofu_%s_%s.zip", v.String(), runtime.GOOS, runtime.GOARCH)
+		checksumURL = fmt.Sprintf("tofu_%s_%s_SHA256SUMS", v.String(), runtime.GOOS, runtime.GOARCH)
+	} else {
+		urlPrefix = fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
+		binURL = fmt.Sprintf("terraform_%s_%s_%s.zip", v.String(), runtime.GOOS, runtime.GOARCH)
+		checksumURL = fmt.Sprintf("terraform_%s_%s_%s_SHA256SUMS", v.String(), runtime.GOOS, runtime.GOARCH)
+	}
+
+	fullSrcURL = fmt.Sprintf("%s?checksum=file:%s", urlPrefix, checksumURL)
+
+	dest := filepath.Join(binDir, binURL)
+
 	if _, err := os.Stat(dest); err == nil {
 		versions[v.String()] = dest
 		return dest, nil
 	}
+
 	if !downloadsAllowed {
 		return "", fmt.Errorf("Could not find terraform version %s in PATH or %s, and downloads are disabled", v.String(), binDir)
 	}
 
-	log.Info("Could not find terraform version %s in PATH or %s, downloading from %s", v.String(), binDir, downloadURL)
-	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
-	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
-	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
-	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
+	log.Info("Downloading terraform version %s from %s", v.String(), fullSrcURL)
+
 	if err := dl.GetFile(dest, fullSrcURL); err != nil {
 		return "", errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
 	}
