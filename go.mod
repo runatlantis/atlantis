@@ -9,9 +9,9 @@ require (
 	github.com/briandowns/spinner v1.23.0
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
-	github.com/go-playground/validator/v10 v10.18.0
+	github.com/go-playground/validator/v10 v10.19.0
 	github.com/go-test/deep v1.1.0
-	github.com/golang-jwt/jwt/v5 v5.2.0
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/go-github/v59 v59.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.6.0
@@ -38,14 +38,14 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/uber-go/tally/v4 v4.1.10
 	github.com/urfave/negroni/v3 v3.1.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605
-	github.com/xanzy/go-gitlab v0.97.0
+	github.com/xanzy/go-gitlab v0.99.0
 	go.etcd.io/bbolt v1.3.9
 	go.uber.org/zap v1.27.0
-	golang.org/x/term v0.17.0
+	golang.org/x/term v0.18.0
 	golang.org/x/text v0.14.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -128,7 +128,7 @@ require (
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.13.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
