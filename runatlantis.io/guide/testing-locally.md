@@ -42,11 +42,6 @@ URL="https://{YOUR_HOSTNAME}.ngrok.io"
 ## Create a Webhook Secret
 GitHub and GitLab use webhook secrets so clients can verify that the webhooks came
 from them.
-::: warning
-Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using Bitbucket Cloud you can skip this step.
-When you're ready to do a production deploy of Atlantis you should allowlist [Bitbucket IPs](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
-to ensure the webhooks are coming from them.
-:::
 Create a random string of any length (you can use [https://www.random.org/strings/](https://www.random.org/strings/))
 and set an environment variable:
 ```
