@@ -437,6 +437,14 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	)
 
 	for i := 0; i <= maxAttempts; i++ {
+		logger := logger.With(
+			"attempt", i+1,
+			"max_attempts", maxAttempts,
+			"repo", repo.FullName,
+			"commit", pull.HeadCommit,
+			"state", state.String(),
+		)
+
 		_, resp, err = g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
 			State:       gitlabState,
 			Context:     gitlab.Ptr(src),
@@ -459,7 +467,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			if resp.StatusCode == http.StatusConflict {
 				sleep := b.ForAttempt(float64(i))
 
-				logger.Warn("GitLab returned HTTP [409 Conflict] when updating commit status for '%s' @ '%s' to '%s'. Retrying in %s. Attempt %d of %d", repo.FullName, pull.HeadCommit, src, sleep, i, maxAttempts)
+				logger.With("retry_in", sleep).Warn("GitLab returned HTTP [409 Conflict] when updating commit status")
 				time.Sleep(sleep)
 
 				continue
@@ -468,10 +476,10 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 
 		// Log we got a 200 OK response from GitLab after at least one retry to help with debugging/understanding delays/errors.
 		if err == nil && i > 0 {
-			logger.Debug("GitLab returned HTTP [200 OK] after updating commit status for '%s' @ '%s' to '%s'. Took %d out of %d attempts", repo.FullName, pull.HeadCommit, src, i, maxAttempts)
+			logger.Info("GitLab returned HTTP [200 OK] after updating commit status")
 		}
 
-		// Return the err, which might be nil
+		// Return the err, which might be nil if everything worked out
 		return err
 	}
 
