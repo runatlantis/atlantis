@@ -58,8 +58,8 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 		lsCmd.Dir = repoDir
 		lsOut, err := lsCmd.CombinedOutput()
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "running git ls-files . "+
-				"--others: %s", string(lsOut))
+			return nil, nil, errors.Wrapf(err, "running 'git ls-files . --others' in '%s' directory: %s",
+				repoDir, string(lsOut))
 		}
 		for _, file := range strings.Split(string(lsOut), "\n") {
 			if filepath.Ext(file) == ".tfplan" {
