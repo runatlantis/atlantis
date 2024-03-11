@@ -430,10 +430,14 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		}
 	}
 
-	b := &backoff.Backoff{Jitter: true}
+	var (
+		resp        *gitlab.Response
+		maxAttempts = 10
+		b           = &backoff.Backoff{Jitter: true}
+	)
 
-	for i := 0.0; i < 10; i++ {
-		_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
+	for i := 0; i <= maxAttempts; i++ {
+		_, resp, err = g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
 			State:       gitlabState,
 			Context:     gitlab.Ptr(src),
 			Description: gitlab.Ptr(description),
@@ -453,19 +457,26 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			// which would in turn prevent the merge request from being merged by Atlantis on [apply],
 			// due to GitLab not allowing merge requests to be merged when the pipeline status is "running".
 			if resp.StatusCode == http.StatusConflict {
-				sleep := b.ForAttempt(i)
+				sleep := b.ForAttempt(float64(i))
 
-				logger.Warn("GitLab returned HTTP [409 Conflict] when updating commit status for '%s' @ '%s' to '%s'. Retrying in %s (Attempt %d / %d)", repo.FullName, pull.HeadCommit, src, sleep, i, 10)
+				logger.Warn("GitLab returned HTTP [409 Conflict] when updating commit status for '%s' @ '%s' to '%s'. Retrying in %s. Attempt %d of %d", repo.FullName, pull.HeadCommit, src, sleep, i, maxAttempts)
 				time.Sleep(sleep)
 
 				continue
 			}
 		}
 
+		// Log we got a 200 OK response from GitLab after at least one retry to help with debugging/understanding delays/errors.
+		if err == nil && i > 0 {
+			logger.Debug("GitLab returned HTTP [200 OK] after updating commit status for '%s' @ '%s' to '%s'. Took %d out of %d attempts", repo.FullName, pull.HeadCommit, src, i, maxAttempts)
+		}
+
+		// Return the err, which might be nil
 		return err
 	}
 
-	return nil
+	// If we got here, we've exhausted all attempts to update the commit status and still failed, so return the error upstream
+	return errors.Wrap(err, fmt.Sprintf("failed to update commit status for '%s' @ '%s' to '%s' after %d attempts", repo.FullName, pull.HeadCommit, src, maxAttempts))
 }
 
 func (g *GitlabClient) GetMergeRequest(logger logging.SimpleLogging, repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
