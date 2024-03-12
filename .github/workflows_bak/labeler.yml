@@ -1,19 +1,45 @@
-name: "Pull Request Labeler"
+build:
+- changed-files:
+  - any-glob-to-any-file: 'Dockerfile*'
 
-on:
-  pull_request_target:
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
+dependencies:
+- changed-files:
+  - any-glob-to-any-file: 'yarn.lock'
+  - any-glob-to-any-file: 'go.*'
 
-jobs:
-  triage:
-    permissions:
-      contents: read
-      pull-requests: write
-    if: github.event.pull_request.draft == false
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/labeler@v5
+docs:
+- changed-files:
+  - any-glob-to-any-file: 'runatlantis.io/**/*.md'
+  - any-glob-to-any-file: 'README.md'
+
+github-actions:
+- changed-files:
+  - any-glob-to-any-file: '.github/**'
+
+go:
+- changed-files:
+  - any-glob-to-any-file: '**/*.go'
+
+provider/azuredevops:
+- changed-files:
+  - any-glob-to-any-file: 'server/**/*azuredevops*.go'
+
+provider/bitbucket:
+- changed-files:
+  - any-glob-to-any-file: 'server/**/*bitbucket*.go'
+  - any-glob-to-any-file: 'server/events/vcs/bitbucketcloud/*.go'
+  - any-glob-to-any-file: 'server/events/vcs/bitbucketserver/*.go'
+
+provider/github:
+- changed-files:
+  - any-glob-to-any-file: 'server/**/*github*.go'
+
+provider/gitlab:
+- changed-files:
+  - any-glob-to-any-file: 'server/**/*gitlab*.go'
+
+website:
+- changed-files:
+  - any-glob-to-any-file: 'runatlantis.io/.vuepress/**/*'
+  - any-glob-to-any-file: 'package.json'
+  - any-glob-to-any-file: 'pnpm-lock.yaml'
