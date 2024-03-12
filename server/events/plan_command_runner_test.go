@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v58/github"
+	"github.com/google/go-github/v59/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events"
@@ -128,9 +128,11 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				timesComment = 0
 			}
 
-			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 			if c.ExpVCSStatusSet {
 				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
 					Any[models.Repo](),
 					Any[models.PullRequest](),
 					Eq[models.CommitStatus](models.SuccessCommitStatus),
@@ -140,6 +142,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				)
 			} else {
 				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
 					Any[models.Repo](),
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
@@ -484,8 +487,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 
-			When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
 			// When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
@@ -502,7 +505,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			}
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
-				Any[models.Repo](), Eq(modelPull.Num), Any[string](), Eq("plan"),
+				Any[logging.SimpleLogging](), Any[models.Repo](), Eq(modelPull.Num), Any[string](), Eq("plan"),
 			)
 		})
 	}
@@ -739,7 +742,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 
 			planCommandRunner.Run(ctx, cmd)
 
-			vcsClient.VerifyWasCalledOnce().CreateComment(Any[models.Repo](), AnyInt(), AnyString(), AnyString())
+			vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), AnyInt(), AnyString(), AnyString())
 
 			ExpCommitStatus := models.SuccessCommitStatus
 			if c.ExpVCSApplyStatusSucc != c.ExpVCSApplyStatusTotal {
@@ -747,6 +750,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			}
 			if c.DoNotUpdateApply {
 				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
 					Any[models.Repo](),
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
@@ -756,6 +760,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				)
 			} else {
 				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
 					Any[models.Repo](),
 					Any[models.PullRequest](),
 					Eq[models.CommitStatus](ExpCommitStatus),

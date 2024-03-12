@@ -1,16 +1,16 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
 ARG ALPINE_TAG=3.19.1
-ARG DEBIAN_TAG=12.4-slim
+ARG DEBIAN_TAG=12.5-slim
 
-#ARG DEFAULT_TERRAFORM_VERSION=1.5.7
-ARG DEFAULT_TERRAFORM_VERSION=1.7.3
-#ARG DEFAULT_CONFTEST_VERSION=0.46.0
-ARG DEFAULT_CONFTEST_VERSION=0.49.0-3
+# renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
+ARG DEFAULT_TERRAFORM_VERSION=1.7.2
+# renovate: datasource=github-releases depName=open-policy-agent/conftest
+ARG DEFAULT_CONFTEST_VERSION=0.49.1
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.21.7-alpine AS builder
+FROM golang:1.22.1-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -92,7 +92,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.4.1
+ENV GIT_LFS_VERSION=3.5.1
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
