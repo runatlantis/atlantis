@@ -1,14 +1,16 @@
 # syntax=docker/dockerfile:1
 # what distro is the image being built for
-ARG ALPINE_TAG=3.19.0
-ARG DEBIAN_TAG=12.2-slim
+ARG ALPINE_TAG=3.19.1
+ARG DEBIAN_TAG=12.5-slim
 
-ARG DEFAULT_TERRAFORM_VERSION=1.6.3
-ARG DEFAULT_CONFTEST_VERSION=0.46.0
+# renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
+ARG DEFAULT_TERRAFORM_VERSION=1.7.2
+# renovate: datasource=github-releases depName=open-policy-agent/conftest
+ARG DEFAULT_CONFTEST_VERSION=0.49.1
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.21.5-alpine AS builder
+FROM golang:1.22.1-alpine AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -90,7 +92,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.4.0
+ENV GIT_LFS_VERSION=3.5.1
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
@@ -110,7 +112,7 @@ ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 # Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
-RUN AVAILABLE_TERRAFORM_VERSIONS="1.3.10 1.4.6 1.5.7 ${DEFAULT_TERRAFORM_VERSION}" && \
+RUN AVAILABLE_TERRAFORM_VERSIONS="1.4.7 1.5.7 1.6.6 ${DEFAULT_TERRAFORM_VERSION}" && \
     case "${TARGETPLATFORM}" in \
         "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
         "linux/arm64") TERRAFORM_ARCH=arm64 ;; \

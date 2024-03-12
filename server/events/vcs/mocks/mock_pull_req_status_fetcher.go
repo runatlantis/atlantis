@@ -6,6 +6,7 @@ package mocks
 import (
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	logging "github.com/runatlantis/atlantis/server/logging"
 	"reflect"
 	"time"
 )
@@ -25,11 +26,11 @@ func NewMockPullReqStatusFetcher(options ...pegomock.Option) *MockPullReqStatusF
 func (mock *MockPullReqStatusFetcher) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPullReqStatusFetcher) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPullReqStatusFetcher) FetchPullStatus(pull models.PullRequest) (models.PullReqStatus, error) {
+func (mock *MockPullReqStatusFetcher) FetchPullStatus(logger logging.SimpleLogging, pull models.PullRequest) (models.PullReqStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPullReqStatusFetcher().")
 	}
-	params := []pegomock.Param{pull}
+	params := []pegomock.Param{logger, pull}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("FetchPullStatus", params, []reflect.Type{reflect.TypeOf((*models.PullReqStatus)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.PullReqStatus
 	var ret1 error
@@ -81,8 +82,8 @@ type VerifierMockPullReqStatusFetcher struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockPullReqStatusFetcher) FetchPullStatus(pull models.PullRequest) *MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification {
-	params := []pegomock.Param{pull}
+func (verifier *VerifierMockPullReqStatusFetcher) FetchPullStatus(logger logging.SimpleLogging, pull models.PullRequest) *MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification {
+	params := []pegomock.Param{logger, pull}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "FetchPullStatus", params, verifier.timeout)
 	return &MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -92,17 +93,21 @@ type MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification) GetCapturedArguments() models.PullRequest {
-	pull := c.GetAllCapturedArguments()
-	return pull[len(pull)-1]
+func (c *MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.PullRequest) {
+	logger, pull := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], pull[len(pull)-1]
 }
 
-func (c *MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest) {
+func (c *MockPullReqStatusFetcher_FetchPullStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.PullRequest) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.PullRequest, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(models.PullRequest)
+			_param0[u] = param.(logging.SimpleLogging)
+		}
+		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.PullRequest)
 		}
 	}
 	return

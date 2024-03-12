@@ -19,7 +19,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v59/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
@@ -297,7 +297,7 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 		}
 	}
 
-	baseRepo, user, pullNum, err := e.Parser.ParseGithubIssueCommentEvent(event)
+	baseRepo, user, pullNum, err := e.Parser.ParseGithubIssueCommentEvent(logger, event)
 
 	wrapped := errors.Wrapf(err, "Failed parsing event: %s", githubReqID)
 	if err != nil {
@@ -409,7 +409,7 @@ func (e *VCSEventsController) handleBitbucketServerPullRequestEvent(w http.Respo
 // request if the event is a pull request closed event. It's exported to make
 // testing easier.
 func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.SimpleLogging, pullEvent *github.PullRequestEvent, githubReqID string) HTTPResponse {
-	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGithubPullEvent(pullEvent)
+	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGithubPullEvent(logger, pullEvent)
 	if err != nil {
 		wrapped := errors.Wrapf(err, "Error parsing pull data: %s %s", err, githubReqID)
 		return HTTPResponse{
@@ -465,7 +465,7 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 		}
 	case models.ClosedPullEvent:
 		// If the pull request was closed, we delete locks.
-		if err := e.PullCleaner.CleanUpPull(baseRepo, pull); err != nil {
+		if err := e.PullCleaner.CleanUpPull(logger, baseRepo, pull); err != nil {
 			return HTTPResponse{
 				body: err.Error(),
 				err: HTTPError{
@@ -536,6 +536,11 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 }
 
 func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, commentID int64, vcsHost models.VCSHostType) HTTPResponse {
+	logger = logger.WithHistory(
+		"repo", baseRepo.FullName,
+		"pull", pullNum,
+	)
+
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -568,7 +573,7 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 
 	// It's a comment we're gonna react to, so add a reaction.
 	if e.EmojiReaction != "" {
-		err := e.VCSClient.ReactToComment(baseRepo, pullNum, commentID, e.EmojiReaction)
+		err := e.VCSClient.ReactToComment(logger, baseRepo, pullNum, commentID, e.EmojiReaction)
 		if err != nil {
 			logger.Warn("Failed to react to comment: %s", err)
 		}
@@ -579,16 +584,20 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 	// We do this here rather than earlier because we need access to the pull
 	// variable to comment back on the pull request.
 	if parseResult.CommentResponse != "" {
-		if err := e.VCSClient.CreateComment(baseRepo, pullNum, parseResult.CommentResponse, ""); err != nil {
+		if err := e.VCSClient.CreateComment(logger, baseRepo, pullNum, parseResult.CommentResponse, ""); err != nil {
 			logger.Err("unable to comment on pull request: %s", err)
 		}
 		return HTTPResponse{
 			body: "Commenting back on pull request",
 		}
 	}
-
-	logger.Info("Running comment command '%v' on repo '%v', pull request: %v for user '%v'.",
-		parseResult.Command.Name, baseRepo.FullName, pullNum, user.Username)
+	if parseResult.Command.RepoRelDir != "" {
+		logger.Info("Running comment command '%v' on dir '%v' on repo '%v', pull request: %v for user '%v'.",
+			parseResult.Command.Name, parseResult.Command.RepoRelDir, baseRepo.FullName, pullNum, user.Username)
+	} else {
+		logger.Info("Running comment command '%v' on repo '%v', pull request: %v for user '%v'.",
+			parseResult.Command.Name, baseRepo.FullName, pullNum, user.Username)
+	}
 	if !e.TestingMode {
 		// Respond with success and then actually execute the command asynchronously.
 		// We use a goroutine so that this function returns and the connection is
@@ -758,7 +767,7 @@ func (e *VCSEventsController) commentNotAllowlisted(baseRepo models.Repo, pullNu
 	}
 
 	errMsg := "```\nError: This repo is not allowlisted for Atlantis.\n```"
-	if err := e.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
+	if err := e.VCSClient.CreateComment(e.Logger, baseRepo, pullNum, errMsg, ""); err != nil {
 		e.Logger.Err("unable to comment on pull request: %s", err)
 	}
 }

@@ -67,6 +67,10 @@ Changes to Outputs:
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
+### Plan Summary
+
+2 projects, 2 with changes, 0 with no changes, 0 failed
+
 * :fast_forward: To **apply** all unapplied plans from this pull request, comment:
     * `atlantis apply`
 * :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:

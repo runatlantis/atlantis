@@ -121,6 +121,7 @@ type Server struct {
 	WebPassword                    string
 	ProjectCmdOutputHandler        jobs.ProjectCommandOutputHandler
 	ScheduledExecutorService       *scheduled.ExecutorService
+	DisableGlobalApplyLock         bool
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -198,9 +199,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	globalCfg := valid.NewGlobalCfgFromArgs(
 		valid.GlobalCfgArgs{
-			MergeableReq:       userConfig.RequireMergeable,
-			ApprovedReq:        userConfig.RequireApproval,
-			UnDivergedReq:      userConfig.RequireUnDiverged,
 			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
 		})
 	if userConfig.RepoConfig != "" {
@@ -458,8 +456,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	} else {
 		lockingClient = locking.NewClient(backend)
 	}
+	disableGlobalApplyLock := false
+	if userConfig.DisableGlobalApplyLock {
+		disableGlobalApplyLock = true
+	}
 
-	applyLockingClient = locking.NewApplyClient(backend, disableApply)
+	applyLockingClient = locking.NewApplyClient(backend, disableApply, disableGlobalApplyLock)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
@@ -922,6 +924,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectJobsErrorTemplate:       templates.ProjectJobsErrorTemplate,
 		SSLKeyFile:                     userConfig.SSLKeyFile,
 		SSLCertFile:                    userConfig.SSLCertFile,
+		DisableGlobalApplyLock:         userConfig.DisableGlobalApplyLock,
 		Drainer:                        drainer,
 		ProjectCmdOutputHandler:        projectCmdOutputHandler,
 		WebAuthentication:              userConfig.WebBasicAuth,
@@ -944,8 +947,6 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
-	s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
-	s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
@@ -955,6 +956,10 @@ func (s *Server) Start() error {
 	r, ok := s.StatsReporter.(prometheus.Reporter)
 	if ok {
 		s.Router.Handle(s.CommandRunner.GlobalCfg.Metrics.Prometheus.Endpoint, r.HTTPHandler())
+	}
+	if !s.DisableGlobalApplyLock {
+		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
+		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
 	}
 
 	n := negroni.New(&negroni.Recovery{
@@ -1067,9 +1072,10 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	applyLockData := templates.ApplyLockData{
-		Time:          applyCmdLock.Time,
-		Locked:        applyCmdLock.Locked,
-		TimeFormatted: applyCmdLock.Time.Format("02-01-2006 15:04:05"),
+		Time:                   applyCmdLock.Time,
+		Locked:                 applyCmdLock.Locked,
+		GlobalApplyLockEnabled: applyCmdLock.GlobalApplyLockEnabled,
+		TimeFormatted:          applyCmdLock.Time.Format("02-01-2006 15:04:05"),
 	}
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })

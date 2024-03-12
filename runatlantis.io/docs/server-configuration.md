@@ -467,7 +467,7 @@ and set `--autoplan-modules` to `false`.
   ```bash
   atlantis server --fail-on-pre-workflow-hook-error
   # or
-  ATLANTIS_FAIL_ON_PRE_WORKFLOW_HOOK_ERROR=true 
+  ATLANTIS_FAIL_ON_PRE_WORKFLOW_HOOK_ERROR=true
   ```
 
   Fail and do not run the requested Atlantis command if any of the pre workflow hooks error.
@@ -648,7 +648,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
   ```
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub and GitLab currently. This is not enabled by default.
+  GitHub and GitLab currently. This is not enabled by default. When using Github App, you need to set `--gh-app-slug` to enable this feature.
 
 ### `--hide-unchanged-plan-comments`
   ```bash
@@ -931,7 +931,15 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_SILENCE_VCS_STATUS_NO_PLANS=true
   ```
-  `--silence-vcs-status-no-plans` will tell Atlantis to ignore setting VCS status if none of the modified files are part of a project defined in the `atlantis.yaml` file.
+  `--silence-vcs-status-no-plans` will tell Atlantis to ignore setting VCS status on plans if none of the modified files are part of a project defined in the `atlantis.yaml` file.
+
+### `--silence-vcs-status-no-projects`
+  ```bash
+  atlantis server --silence-vcs-status-no-projects
+  # or
+  ATLANTIS_SILENCE_VCS_STATUS_NO_PROJECTS=true
+  ```
+  `--silence-vcs-status-no-projects` will tell Atlantis to ignore setting VCS status on any command if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 
 ### `--skip-clone-no-changes`
   ```bash

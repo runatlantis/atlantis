@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v59/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 )
 

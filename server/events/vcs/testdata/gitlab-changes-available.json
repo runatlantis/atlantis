@@ -1,0 +1,93 @@
+{
+  "id": 8312,
+  "iid": 102,
+  "target_branch": "main",
+  "source_branch": "TestBranch",
+  "project_id": 3771,
+  "title": "Update somefile.yaml",
+  "state": "opened",
+  "created_at": "2023-03-14T13:43:17.895Z",
+  "updated_at": "2023-03-14T13:43:59.978Z",
+  "upvotes": 0,
+  "downvotes": 0,
+  "author": {
+    "id": 1755902,
+    "name": "Luke Kysow",
+    "username": "lkysow",
+    "state": "active",
+    "avatar_url": "https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80\\u0026d=identicon",
+    "web_url": "https://gitlab.com/lkysow"
+  },
+  "assignee": null,
+  "assignees": [],
+  "reviewers": [],
+  "source_project_id": 3771,
+  "target_project_id": 3771,
+  "labels": [],
+  "description": "",
+  "draft": false,
+  "work_in_progress": false,
+  "milestone": null,
+  "merge_when_pipeline_succeeds": false,
+  "detailed_merge_status": "not_approved",
+  "merge_error": "",
+  "merged_by": null,
+  "merged_at": null,
+  "closed_by": null,
+  "closed_at": null,
+  "subscribed": false,
+  "sha": "cb86d70f464632bdfbe1bb9bc0f2f9d847a774a0",
+  "merge_commit_sha": null,
+  "squash_commit_sha": null,
+  "user_notes_count": 0,
+  "changes_count": "1",
+  "should_remove_source_branch": null,
+  "force_remove_source_branch": true,
+  "allow_collaboration": false,
+  "web_url": "https://gitlab.com/lkysow/atlantis-example/merge_requests/13",
+  "references": {
+    "short": "!13",
+    "relative": "!13",
+    "full": "lkysow/atlantis-example!13"
+  },
+  "discussion_locked": null,
+  "changes": [
+    {
+      "old_path": "somefile.yaml",
+      "new_path": "somefile.yaml",
+      "a_mode": "100644",
+      "b_mode": "100644",
+      "diff": "--- a/somefile.yaml\\ +++ b/somefile.yaml\\ @@ -1 +1 @@\\ -gud\\ +good",
+      "new_file": false,
+      "renamed_file": false,
+      "deleted_file": false
+    }
+  ],
+  "user": {
+    "can_merge": true
+  },
+  "time_stats": {
+    "human_time_estimate": null,
+    "human_total_time_spent": null,
+    "time_estimate": 0,
+    "total_time_spent": 0
+  },
+  "squash": false,
+  "pipeline": null,
+  "head_pipeline": null,
+  "diff_refs": {
+    "base_sha": "67cb91d3f6198189f433c045154a885784ba6977",
+    "head_sha": "cb86d70f464632bdfbe1bb9bc0f2f9d847a774a0",
+    "start_sha": "67cb91d3f6198189f433c045154a885784ba6977"
+  },
+  "approvals_before_merge": null,
+  "reference": "!13",
+  "task_completion_status": {
+    "count": 0,
+    "completed_count": 0
+  },
+  "has_conflicts": false,
+  "blocking_discussions_resolved": true,
+  "overflow": false,
+  "merge_status": "can_be_merged"
+}

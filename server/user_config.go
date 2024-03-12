@@ -36,6 +36,7 @@ type UserConfig struct {
 	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`
 	DisableMarkdownFolding      bool   `mapstructure:"disable-markdown-folding"`
 	DisableRepoLocking          bool   `mapstructure:"disable-repo-locking"`
+	DisableGlobalApplyLock      bool   `mapstructure:"disable-global-apply-lock"`
 	DisableUnlockLabel          string `mapstructure:"disable-unlock-label"`
 	DiscardApprovalOnPlanFlag   bool   `mapstructure:"discard-approval-on-plan"`
 	EmojiReaction               string `mapstructure:"emoji-reaction"`
@@ -84,17 +85,8 @@ type UserConfig struct {
 	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
 	RepoAllowlist                   string `mapstructure:"repo-allowlist"`
 
-	// RequireApproval is whether to require pull request approval before
-	// allowing terraform apply's to be run.
-	RequireApproval bool `mapstructure:"require-approval"`
-	// RequireMergeable is whether to require pull requests to be mergeable before
-	// allowing terraform apply's to run.
-	RequireMergeable bool `mapstructure:"require-mergeable"`
 	// SilenceNoProjects is whether Atlantis should respond to a PR if no projects are found.
-	SilenceNoProjects bool `mapstructure:"silence-no-projects"`
-	// RequireUnDiverged is whether to require pull requests to rebase default branch before
-	// allowing terraform apply's to run.
-	RequireUnDiverged   bool `mapstructure:"require-undiverged"`
+	SilenceNoProjects   bool `mapstructure:"silence-no-projects"`
 	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found.
@@ -116,7 +108,7 @@ type UserConfig struct {
 	VarFileAllowlist           string          `mapstructure:"var-file-allowlist"`
 	VCSStatusName              string          `mapstructure:"vcs-status-name"`
 	DefaultTFVersion           string          `mapstructure:"default-tf-version"`
-	Webhooks                   []WebhookConfig `mapstructure:"webhooks"`
+	Webhooks                   []WebhookConfig `mapstructure:"webhooks" flag:"false"`
 	WebBasicAuth               bool            `mapstructure:"web-basic-auth"`
 	WebUsername                string          `mapstructure:"web-username"`
 	WebPassword                string          `mapstructure:"web-password"`
