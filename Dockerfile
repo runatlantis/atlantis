@@ -4,9 +4,9 @@ ARG ALPINE_TAG=3.19.1
 ARG DEBIAN_TAG=12.5-slim
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.7.2
+ARG DEFAULT_TERRAFORM_VERSION=1.7.3
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.49.1
+ARG DEFAULT_CONFTEST_VERSION=0.50.0-1
 
 # Stage 1: build artifact and download deps
 
