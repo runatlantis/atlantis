@@ -21,11 +21,29 @@ unzip path/to/terraform_*.zip -d /usr/local/bin
 Get the latest release from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
 and unpackage it.
 
-## Download Ngrok
+## Download Tunnelmole or Ngrok
 Atlantis needs to be accessible somewhere that github.com/gitlab.com/bitbucket.org or your GitHub/GitLab Enterprise installation can reach.
-One way to accomplish this is with ngrok, a tool that forwards your local port to a random
-public hostname.
+You can accomplish this with either Tunnelmole, a free and open source tunneling tool, or ngrok, a popular closed source tunneling tool.
 
+### Tunnelmole
+Follow the [Installation Guide](https://tunnelmole.com/docs/#installation) to install Tunnelmole. 
+
+To start `tunnelmole` on the port `4141`, run:
+```bash
+tmole 4141
+```
+Take note of the https URL it gives you:
+```
+https://{YOUR_HOSTNAME}.tunnelmole.net
+```
+
+In a new tab (where you'll soon start Atlantis) create an environment variable with
+Tunnelmole's hostname:
+```bash
+URL="https://{YOUR_HOSTNAME}.tunnelmole.net"
+```
+
+### Ngrok
 Go to [https://ngrok.com/download](https://ngrok.com/download), download ngrok and `unzip` it.
 
 Start `ngrok` on port `4141` and take note of the hostname it gives you:
@@ -40,30 +58,28 @@ URL="https://{YOUR_HOSTNAME}.ngrok.io"
 ```
 
 ## Create a Webhook Secret
-GitHub and GitLab use webhook secrets so clients can verify that the webhooks came
-from them.
+GitHub and GitLab use webhook secrets so clients can verify that the webhooks came from them.
 ::: warning
 Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using Bitbucket Cloud you can skip this step.
-When you're ready to do a production deploy of Atlantis you should allowlist [Bitbucket IPs](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
+When you're ready to do a production deploy of Atlantis, you should allowlist [Bitbucket IPs](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
 to ensure the webhooks are coming from them.
 :::
 Create a random string of any length (you can use [https://www.random.org/strings/](https://www.random.org/strings/))
 and set an environment variable:
-```
+```bash
 SECRET="{YOUR_RANDOM_STRING}"
 ```
 
 ## Add Webhook
-Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bitbucket repo:
+Take the URL that Tunnelmole or ngrok output and create a webhook in your GitHub, GitLab or Bitbucket repo:
 
-### GitHub or GitHub Enterprise Webhook
 <details>
-    <summary>Expand</summary>
+    <summary>GitHub or GitHub Enterprise Webhook</summary>
     <ul>
         <li>Go to your repo's settings</li>
         <li>Select <strong>Webhooks</strong> or <strong>Hooks</strong> in the sidebar</li>
         <li>Click <strong>Add webhook</strong></li>
-        <li>set <strong>Payload URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
+        <li>set <strong>Payload URL</strong> to your Tunnelmole or Ngrok URL with <code>/events</code> at the end. For example, <code>https://{YOUR_HOSTNAME}.tunnelmole.net/events</code> or <code>https://{YOUR_HOSTNAME}.ngrok.io/events</code></li>
         <li>double-check you added <code>/events</code> to the end of your URL.</li>
         <li>set <strong>Content type</strong> to <code>application/json</code></li>
         <li>set <strong>Secret</strong> to your random string</li>
@@ -81,13 +97,12 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
     </ul>
 </details>
 
-### GitLab or GitLab Enterprise Webhook
 <details>
-    <summary>Expand</summary>
+    <summary>GitLab or GitLab Enterprise Webhook</summary>
     <ul>
         <li>Go to your repo's home page</li>
         <li>Click <strong>Settings &gt; Webhooks</strong> in the sidebar</li>
-        <li>set <strong>URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
+        <li>set <strong>URL</strong> to your Tunnelmole or Ngrok URL with <code>/events</code> at the end. For example, <code>https://{YOUR_HOSTNAME}.tunnelmole.net/events</code> or <code>https://{YOUR_HOSTNAME}.ngrok.io/events</code></li>
         <li>double-check you added <code>/events</code> to the end of your URL.</li>
         <li>set <strong>Secret Token</strong> to your random string</li>
         <li>check the boxes
@@ -102,19 +117,18 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
     </ul>
 </details>
 
-### Bitbucket Cloud (bitbucket.org) Webhook
 <details>
-    <summary>Expand</summary>
+    <summary>Bitbucket Cloud (bitbucket.org) Webhook</summary>
     <ul>
         <li>Go to your repo's home page</li>
         <li>Click <strong>Settings</strong> in the sidebar</li>
         <li>Click <strong>Webhooks</strong> under the <strong>WORKFLOW</strong> section</li>
         <li>Click <strong>Add webhook</strong></li>
         <li>Enter "Atlantis" for <strong>Title</strong></li>
-        <li>Set <strong>URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
+        <li>Set <strong>URL</strong> to your Tunnelmole or Ngrok URL with <code>/events</code> at the end. For example, <code>https://{YOUR_HOSTNAME}.tunnelmole.net/events</code> or <code>https://{YOUR_HOSTNAME}.ngrok.io/events</code></li>
         <li>Double-check you added <code>/events</code> to the end of your URL.</li>
         <li>Keep <strong>Status</strong> as Active</li>
-        <li>Don't check <strong>Skip certificate validation</strong> because NGROK has a valid cert.</li>
+        <li>Don't check <strong>Skip certificate validation</strong> because Tunnelmole and Ngrok have a valid cert.</li>
         <li>Select <strong>Choose from a full list of triggers</strong></li>
         <li>Under <strong>Repository</strong><strong>un</strong>check everything</li>
         <li>Under <strong>Issues</strong> leave everything <strong>un</strong>checked</li>
@@ -123,23 +137,21 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
     </ul>
 </details>
 
-### Bitbucket Server (aka Stash) Webhook
 <details>
-    <summary>Expand</summary>
+    <summary>Bitbucket Server (aka Stash) Webhook</summary>
     <ul>
         <li>Go to your repo's home page</li>
         <li>Click <strong>Settings</strong> in the sidebar</li>
         <li>Click <strong>Webhooks</strong> under the <strong>WORKFLOW</strong> section</li>
         <li>Click <strong>Create webhook</strong></li>
         <li>Enter "Atlantis" for <strong>Name</strong></li>
-        <li>Set <strong>URL</strong> to your ngrok url with <code>/events</code> at the end. Ex. <code>https://c5004d84.ngrok.io/events</code></li>
+        <li>Set <strong>URL</strong> to your Tunnelmole or Ngrok url with <code>/events</code> at the end. For example, <code>https://{YOUR_HOSTNAME}.tunnelmole.net/events</code> or <code>https://{YOUR_HOSTNAME}.ngrok.io/events</code></li>
         <li>Double-check you added <code>/events</code> to the end of your URL.</li>
         <li>Set <strong>Secret</strong> to your random string</li>
         <li>Under <strong>Pull Request</strong>, select: Opened, Source branch updated, Merged, Declined, Deleted and Comment added</li>
         <li>Click <strong>Save</strong><img src="./images/bitbucket-server-webhook.png" alt="Bitbucket Webhook" style="max-height: 600px;"></li>
     </ul>
 </details>
-
 
 ## Create an access token for Atlantis
 We recommend using a dedicated CI user or creating a new user named **@atlantis** that performs all API actions, however for testing,
