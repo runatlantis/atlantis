@@ -56,16 +56,16 @@ const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/
 // VCSEventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
 type VCSEventsController struct {
-	CommandRunner  events.CommandRunner
-	PullCleaner    events.PullCleaner
-	Logger         logging.SimpleLogging
-	Scope          tally.Scope
-	Parser         events.EventParsing
-	CommentParser  events.CommentParsing
-	ApplyDisabled  bool
+	CommandRunner        events.CommandRunner
+	PullCleaner          events.PullCleaner
+	Logger               logging.SimpleLogging
+	Scope                tally.Scope
+	Parser               events.EventParsing
+	CommentParser        events.CommentParsing
+	ApplyDisabled        bool
 	DisableEmojiReaction bool
-	EmojiReaction  string
-	ExecutableName string
+	EmojiReaction        string
+	ExecutableName       string
 	// GithubWebhookSecret is the secret added to this webhook via the GitHub
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
@@ -673,8 +673,10 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		}
 	}
 
+	fmt.Println("DISABLE EMOJIS", e.DisableEmojiReaction)
+
 	// It's a comment we're gonna react to, so add a reaction.
-	if e.EmojiReaction != "" {
+	if !e.DisableEmojiReaction && e.EmojiReaction != "" {
 		err := e.VCSClient.ReactToComment(logger, baseRepo, pullNum, commentID, e.EmojiReaction)
 		if err != nil {
 			logger.Warn("Failed to react to comment: %s", err)

@@ -34,7 +34,7 @@ type UserConfig struct {
 	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
 	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
 	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`
-	DisableEmojiReaction		bool   `mapstructure:"disable-emoji-reaction"`
+	DisableEmojiReaction        bool   `mapstructure:"disable-emoji-reaction"`
 	DisableMarkdownFolding      bool   `mapstructure:"disable-markdown-folding"`
 	DisableRepoLocking          bool   `mapstructure:"disable-repo-locking"`
 	DisableGlobalApplyLock      bool   `mapstructure:"disable-global-apply-lock"`
