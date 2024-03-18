@@ -75,7 +75,7 @@ var testFlags = map[string]interface{}{
 	DataDirFlag:                      "/path",
 	DefaultTFVersionFlag:             "v0.11.0",
 	DisableApplyAllFlag:              true,
-	DisableEmojiReactioFlag:		  false,
+	DisableEmojiReactionFlag:         false,
 	DisableMarkdownFoldingFlag:       true,
 	DisableRepoLockingFlag:           true,
 	DisableGlobalApplyLockFlag:       false,
