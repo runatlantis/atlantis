@@ -85,6 +85,7 @@ type UserConfig struct {
 	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
 	RepoAllowlist                   string `mapstructure:"repo-allowlist"`
 
+	SetAtlantisApplyCheckSuccessfulIfNoChanges bool `mapstructure:"set-atlantis-apply-check-successful-if-no-changes"`
 	// SilenceNoProjects is whether Atlantis should respond to a PR if no projects are found.
 	SilenceNoProjects   bool `mapstructure:"silence-no-projects"`
 	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
