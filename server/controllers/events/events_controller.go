@@ -63,6 +63,7 @@ type VCSEventsController struct {
 	Parser         events.EventParsing
 	CommentParser  events.CommentParsing
 	ApplyDisabled  bool
+	DisableEmojiReaction bool
 	EmojiReaction  string
 	ExecutableName string
 	// GithubWebhookSecret is the secret added to this webhook via the GitHub
