@@ -381,6 +381,14 @@ and set `--autoplan-modules` to `false`.
 
   If `disable-autoplan` property is `true`, this flag has no effect.
 
+## `--disable-emoji-reaction`
+  ```bash
+  atlantis server --disable-emoji-reaction
+  # or
+  ATLANTIS_DISABLE_EMOJI_REACTION=true
+  ```
+  Disable emoji reaction in comments.
+
 ### `--disable-markdown-folding`
   ```bash
   atlantis server --disable-markdown-folding
