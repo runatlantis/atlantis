@@ -9,6 +9,7 @@ Atlantis integrates with the following Git hosts:
 
 * GitHub (public, private or enterprise)
 * GitLab (public, private or enterprise)
+* Gitea (public, private and compatible forks like Forgejo)
 * Bitbucket Cloud aka bitbucket.org (public or private)
 * Bitbucket Server aka Stash
 * Azure DevOps

@@ -14,6 +14,7 @@
 package events
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,6 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
+	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
 	gitlab "github.com/xanzy/go-gitlab"
@@ -36,6 +38,11 @@ import (
 const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
 const azuredevopsHeader = "Request-Id"
+
+const giteaHeader = "X-Gitea-Event"
+const giteaEventTypeHeader = "X-Gitea-Event-Type"
+const giteaSignatureHeader = "X-Gitea-Signature"
+const giteaRequestIDHeader = "X-Gitea-Delivery"
 
 // bitbucketEventTypeHeader is the same in both cloud and server.
 const bitbucketEventTypeHeader = "X-Event-Key"
@@ -91,11 +98,20 @@ type VCSEventsController struct {
 	// Azure DevOps Team Project. If empty, no request validation is done.
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator
+	GiteaWebhookSecret              []byte
 }
 
 // Post handles POST webhook requests.
 func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get(githubHeader) != "" {
+	if r.Header.Get(giteaHeader) != "" {
+		if !e.supportsHost(models.Gitea) {
+			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support Gitea")
+			return
+		}
+		e.Logger.Debug("handling Gitea post")
+		e.handleGiteaPost(w, r)
+		return
+	} else if r.Header.Get(githubHeader) != "" {
 		if !e.supportsHost(models.Github) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support GitHub")
 			return
@@ -286,6 +302,91 @@ func (e *VCSEventsController) handleAzureDevopsPost(w http.ResponseWriter, r *ht
 	default:
 		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported event: %v %s", event.PayloadType, azuredevopsReqID)
 	}
+}
+
+func (e *VCSEventsController) handleGiteaPost(w http.ResponseWriter, r *http.Request) {
+	signature := r.Header.Get(giteaSignatureHeader)
+	eventType := r.Header.Get(giteaEventTypeHeader)
+	reqID := r.Header.Get(giteaRequestIDHeader)
+
+	defer r.Body.Close() // Ensure the request body is closed
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, "X-Gitea-Delivery", reqID)
+		return
+	}
+
+	if len(e.GiteaWebhookSecret) > 0 {
+		if err := gitea.ValidateSignature(body, signature, e.GiteaWebhookSecret); err != nil {
+			e.respond(w, logging.Warn, http.StatusBadRequest, errors.Wrap(err, "request did not pass validation").Error())
+			return
+		}
+	}
+
+	// Log the event type for debugging purposes
+	e.Logger.Debug("Received Gitea event %s with ID %s", eventType, reqID)
+
+	// Depending on the event type, handle the event appropriately
+	switch eventType {
+	case "pull_request_comment":
+		e.HandleGiteaPullRequestCommentEvent(w, body, reqID)
+	case "pull_request":
+		e.Logger.Debug("Handling as pull_request")
+		e.handleGiteaPullRequestEvent(w, body, reqID)
+	// Add other case handlers as necessary
+	default:
+		e.respond(w, logging.Debug, http.StatusOK, "Ignoring unsupported Gitea event type: %s %s=%s", eventType, "X-Gitea-Delivery", reqID)
+	}
+}
+
+func (e *VCSEventsController) handleGiteaPullRequestEvent(w http.ResponseWriter, body []byte, reqID string) {
+	e.Logger.Debug("Entering handleGiteaPullRequestEvent")
+	// Attempt to unmarshal the incoming body into the Gitea PullRequest struct
+	var payload gitea.GiteaWebhookPayload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		e.Logger.Err("Failed to unmarshal Gitea webhook payload: %v", err)
+		e.respond(w, logging.Error, http.StatusBadRequest, "Failed to parse request body")
+		return
+	}
+
+	e.Logger.Debug("Successfully unmarshaled Gitea event")
+
+	// Use the parser function to convert into Atlantis models
+	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGiteaPullRequestEvent(payload.PullRequest)
+	if err != nil {
+		e.Logger.Err("Failed to parse Gitea pull request event: %v", err)
+		e.respond(w, logging.Error, http.StatusInternalServerError, "Failed to process event")
+		return
+	}
+
+	e.Logger.Debug("Parsed Gitea event into Atlantis models successfully")
+
+	logger := e.Logger.With("gitea-request-id", reqID)
+	logger.Debug("Identified Gitea event as type", "type", pullEventType)
+
+	// Call a generic handler for pull request events
+	response := e.handlePullRequestEvent(logger, baseRepo, headRepo, pull, user, pullEventType)
+
+	e.respond(w, logging.Debug, http.StatusOK, response.body)
+}
+
+// HandleGiteaCommentEvent handles comment events from Gitea where Atlantis commands can come from.
+func (e *VCSEventsController) HandleGiteaPullRequestCommentEvent(w http.ResponseWriter, body []byte, reqID string) {
+	var event gitea.GiteaIssueCommentPayload
+	if err := json.Unmarshal(body, &event); err != nil {
+		e.Logger.Err("Failed to unmarshal Gitea comment payload: %v", err)
+		e.respond(w, logging.Error, http.StatusBadRequest, "Failed to parse request body")
+		return
+	}
+	e.Logger.Debug("Successfully unmarshaled Gitea comment event")
+
+	baseRepo, user, pullNum, _ := e.Parser.ParseGiteaIssueCommentEvent(event)
+	// Since we're lacking headRepo and maybePull details, we'll pass nil
+	// This follows the same approach as the GitHub client for handling comment events without full PR details
+	response := e.handleCommentEvent(e.Logger, baseRepo, nil, nil, user, pullNum, event.Comment.Body, event.Comment.ID, models.Gitea)
+
+	e.respond(w, logging.Debug, http.StatusOK, response.body)
 }
 
 // HandleGithubCommentEvent handles comment events from GitHub where Atlantis

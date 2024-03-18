@@ -3,7 +3,7 @@ This guide is for installing a **production-ready** instance of Atlantis onto yo
 infrastructure:
 1. First, ensure your Terraform setup meets the Atlantis **requirements**
     * See [Requirements](requirements.html)
-1. Create **access credentials** for your Git host (GitHub, GitLab, Bitbucket, Azure DevOps)
+1. Create **access credentials** for your Git host (GitHub, GitLab, Gitea, Bitbucket, Azure DevOps)
     * See [Generating Git Host Access Credentials](access-credentials.html)
 1. Create a **webhook secret** so Atlantis can validate webhooks
     * See [Creating a Webhook Secret](webhook-secrets.html)
