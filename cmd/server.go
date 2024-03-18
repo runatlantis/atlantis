@@ -70,7 +70,7 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
-	DisableEmojiReaction 			 = "disable-emoji-reaction"
+	DisableEmojiReactionFlag         = "disable-emoji-reaction"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
@@ -458,6 +458,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableAutoplanFlag: {
 		description:  "Disable atlantis auto planning feature",
+		defaultValue: false,
+	},
+	DisableEmojiReactionFlag: {
+		description:  "Disable emoji reactions",
 		defaultValue: false,
 	},
 	DisableRepoLockingFlag: {
