@@ -128,7 +128,7 @@ Take the URL that Tunnelmole or ngrok output and create a webhook in your GitHub
         <li>Set <strong>URL</strong> to your Tunnelmole or Ngrok URL with <code>/events</code> at the end. For example, <code>https://{YOUR_HOSTNAME}.tunnelmole.net/events</code> or <code>https://{YOUR_HOSTNAME}.ngrok.io/events</code></li>
         <li>Double-check you added <code>/events</code> to the end of your URL.</li>
         <li>Keep <strong>Status</strong> as Active</li>
-        <li>Don't check <strong>Skip certificate validation</strong> because Tunnelmole and Ngrok have a valid cert.</li>
+        <li>Don't check <strong>Skip certificate validation</strong> because Tunnelmole and Ngrok have valid certificates.</li>
         <li>Select <strong>Choose from a full list of triggers</strong></li>
         <li>Under <strong>Repository</strong><strong>un</strong>check everything</li>
         <li>Under <strong>Issues</strong> leave everything <strong>un</strong>checked</li>
