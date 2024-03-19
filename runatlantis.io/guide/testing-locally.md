@@ -74,7 +74,7 @@ SECRET="{YOUR_RANDOM_STRING}"
 Take the URL that Tunnelmole or ngrok output and create a webhook in your GitHub, GitLab or Bitbucket repo:
 
 <details>
-    <summary>GitHub or GitHub Enterprise Webhook</summary>
+    <summary>Expand</summary>
     <ul>
         <li>Go to your repo's settings</li>
         <li>Select <strong>Webhooks</strong> or <strong>Hooks</strong> in the sidebar</li>
