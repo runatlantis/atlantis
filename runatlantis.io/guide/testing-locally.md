@@ -28,7 +28,7 @@ You can accomplish this with either Tunnelmole, a free and open source tunneling
 ### Tunnelmole
 Follow the [Installation Guide](https://tunnelmole.com/docs/#installation) to install Tunnelmole. 
 
-To start `tunnelmole` on the port `4141`, run:
+To start `tunnelmole` on port `4141`, run:
 ```bash
 tmole 4141
 ```
