@@ -92,7 +92,7 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 	applyStartText := `  Terraform will perform the actions described above.
   Only 'yes' will be accepted to approve.
 
-  Enter a value:
+  Enter a value: 
 `
 	applyStartIdx := strings.Index(out, applyStartText)
 	if applyStartIdx < 0 {
@@ -116,8 +116,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 	path string,
 	absPlanPath string,
 	tfVersion *version.Version,
-	envs map[string]string,
-) (string, error) {
+	envs map[string]string) (string, error) {
 	// The planfile contents are needed to ensure that the plan didn't change
 	// between plan and apply phases.
 	planfileBytes, err := os.ReadFile(absPlanPath)

@@ -233,7 +233,7 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 
 	// Create the directory and parents if necessary.
 	logger.Info("creating dir '%s'", c.dir)
-	if err := os.MkdirAll(c.dir, 0o700); err != nil {
+	if err := os.MkdirAll(c.dir, 0700); err != nil {
 		return errors.Wrap(err, "creating new workspace")
 	}
 
