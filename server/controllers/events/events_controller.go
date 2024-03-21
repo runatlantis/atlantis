@@ -673,12 +673,8 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		}
 	}
 
-	// It's a comment we're gonna react to, so add a reaction if emoji reactions are enabled.
-	if e.EnableEmojiReaction {
-		if e.EmojiReaction == "" {
-			logger.Warn("Attempted to react to comment but no reaction specified")
-		}
-
+	// It's a comment we're going to react to (as long as emoji reactions are enabled), so add a reaction.
+	if e.EnableEmojiReaction && e.EmojiReaction != "" {
 		err := e.VCSClient.ReactToComment(logger, baseRepo, pullNum, commentID, e.EmojiReaction)
 		if err != nil {
 			logger.Warn("Failed to react to comment: %s", err)
