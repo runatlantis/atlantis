@@ -4,6 +4,8 @@
 package mocks
 
 import (
+	gitea "code.gitea.io/sdk/gitea"
+	gitea0 "github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	github "github.com/google/go-github/v59/github"
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock/v4"
@@ -289,6 +291,95 @@ func (mock *MockEventParsing) ParseBitbucketServerPullEvent(body []byte) (models
 		}
 	}
 	return ret0, ret1, ret2, ret3, ret4
+}
+
+func (mock *MockEventParsing) ParseGiteaIssueCommentEvent(event gitea0.GiteaIssueCommentPayload) (models.Repo, models.User, int, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockEventParsing().")
+	}
+	params := []pegomock.Param{event}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGiteaIssueCommentEvent", params, []reflect.Type{reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*int)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.Repo
+	var ret1 models.User
+	var ret2 int
+	var ret3 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.Repo)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.User)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(int)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(error)
+		}
+	}
+	return ret0, ret1, ret2, ret3
+}
+
+func (mock *MockEventParsing) ParseGiteaPull(pull *gitea.PullRequest) (models.PullRequest, models.Repo, models.Repo, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockEventParsing().")
+	}
+	params := []pegomock.Param{pull}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGiteaPull", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.PullRequest
+	var ret1 models.Repo
+	var ret2 models.Repo
+	var ret3 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.Repo)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(error)
+		}
+	}
+	return ret0, ret1, ret2, ret3
+}
+
+func (mock *MockEventParsing) ParseGiteaPullRequestEvent(event gitea.PullRequest) (models.PullRequest, models.PullRequestEventType, models.Repo, models.Repo, models.User, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockEventParsing().")
+	}
+	params := []pegomock.Param{event}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ParseGiteaPullRequestEvent", params, []reflect.Type{reflect.TypeOf((*models.PullRequest)(nil)).Elem(), reflect.TypeOf((*models.PullRequestEventType)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.Repo)(nil)).Elem(), reflect.TypeOf((*models.User)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 models.PullRequest
+	var ret1 models.PullRequestEventType
+	var ret2 models.Repo
+	var ret3 models.Repo
+	var ret4 models.User
+	var ret5 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(models.PullRequest)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(models.PullRequestEventType)
+		}
+		if result[2] != nil {
+			ret2 = result[2].(models.Repo)
+		}
+		if result[3] != nil {
+			ret3 = result[3].(models.Repo)
+		}
+		if result[4] != nil {
+			ret4 = result[4].(models.User)
+		}
+		if result[5] != nil {
+			ret5 = result[5].(error)
+		}
+	}
+	return ret0, ret1, ret2, ret3, ret4, ret5
 }
 
 func (mock *MockEventParsing) ParseGithubIssueCommentEvent(logger logging.SimpleLogging, comment *github.IssueCommentEvent) (models.Repo, models.User, int, error) {
@@ -813,6 +904,87 @@ func (c *MockEventParsing_ParseBitbucketServerPullEvent_OngoingVerification) Get
 		_param0 = make([][]byte, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.([]byte)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockEventParsing) ParseGiteaIssueCommentEvent(event gitea0.GiteaIssueCommentPayload) *MockEventParsing_ParseGiteaIssueCommentEvent_OngoingVerification {
+	params := []pegomock.Param{event}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGiteaIssueCommentEvent", params, verifier.timeout)
+	return &MockEventParsing_ParseGiteaIssueCommentEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockEventParsing_ParseGiteaIssueCommentEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockEventParsing_ParseGiteaIssueCommentEvent_OngoingVerification) GetCapturedArguments() gitea0.GiteaIssueCommentPayload {
+	event := c.GetAllCapturedArguments()
+	return event[len(event)-1]
+}
+
+func (c *MockEventParsing_ParseGiteaIssueCommentEvent_OngoingVerification) GetAllCapturedArguments() (_param0 []gitea0.GiteaIssueCommentPayload) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]gitea0.GiteaIssueCommentPayload, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(gitea0.GiteaIssueCommentPayload)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockEventParsing) ParseGiteaPull(pull *gitea.PullRequest) *MockEventParsing_ParseGiteaPull_OngoingVerification {
+	params := []pegomock.Param{pull}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGiteaPull", params, verifier.timeout)
+	return &MockEventParsing_ParseGiteaPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockEventParsing_ParseGiteaPull_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockEventParsing_ParseGiteaPull_OngoingVerification) GetCapturedArguments() *gitea.PullRequest {
+	pull := c.GetAllCapturedArguments()
+	return pull[len(pull)-1]
+}
+
+func (c *MockEventParsing_ParseGiteaPull_OngoingVerification) GetAllCapturedArguments() (_param0 []*gitea.PullRequest) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]*gitea.PullRequest, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(*gitea.PullRequest)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockEventParsing) ParseGiteaPullRequestEvent(event gitea.PullRequest) *MockEventParsing_ParseGiteaPullRequestEvent_OngoingVerification {
+	params := []pegomock.Param{event}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ParseGiteaPullRequestEvent", params, verifier.timeout)
+	return &MockEventParsing_ParseGiteaPullRequestEvent_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockEventParsing_ParseGiteaPullRequestEvent_OngoingVerification struct {
+	mock              *MockEventParsing
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockEventParsing_ParseGiteaPullRequestEvent_OngoingVerification) GetCapturedArguments() gitea.PullRequest {
+	event := c.GetAllCapturedArguments()
+	return event[len(event)-1]
+}
+
+func (c *MockEventParsing_ParseGiteaPullRequestEvent_OngoingVerification) GetAllCapturedArguments() (_param0 []gitea.PullRequest) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]gitea.PullRequest, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(gitea.PullRequest)
 		}
 	}
 	return

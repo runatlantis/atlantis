@@ -20,6 +20,8 @@ import (
 	"path"
 	"strings"
 
+	giteasdk "code.gitea.io/sdk/gitea"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/google/go-github/v59/github"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -29,6 +31,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
+	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/xanzy/go-gitlab"
 )
@@ -337,6 +340,14 @@ type EventParsing interface {
 	// ParseAzureDevopsRepo parses the response from the Azure DevOps API endpoint that
 	// returns a repo into the Atlantis model.
 	ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (models.Repo, error)
+
+	ParseGiteaPullRequestEvent(event giteasdk.PullRequest) (
+		pull models.PullRequest, pullEventType models.PullRequestEventType,
+		baseRepo models.Repo, headRepo models.Repo, user models.User, err error)
+
+	ParseGiteaIssueCommentEvent(event gitea.GiteaIssueCommentPayload) (baseRepo models.Repo, user models.User, pullNum int, err error)
+
+	ParseGiteaPull(pull *giteasdk.PullRequest) (pullModel models.PullRequest, baseRepo models.Repo, headRepo models.Repo, err error)
 }
 
 // EventParser parses VCS events.
@@ -345,6 +356,8 @@ type EventParser struct {
 	GithubToken        string
 	GitlabUser         string
 	GitlabToken        string
+	GiteaUser          string
+	GiteaToken         string
 	AllowDraftPRs      bool
 	BitbucketUser      string
 	BitbucketToken     string
@@ -357,6 +370,8 @@ func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFu
 	switch vcsHostType {
 	case models.Github:
 		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, e.GithubToken)
+	case models.Gitea:
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GiteaUser, e.GiteaToken)
 	case models.Gitlab:
 		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
 	}
@@ -611,6 +626,13 @@ func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, e
 	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
 }
 
+// ParseGiteaRepo parses the response from the Gitea API endpoint that
+// returns a repo into the Atlantis model.
+// See EventParsing for return value docs.
+func (e *EventParser) ParseGiteaRepo(repo giteasdk.Repository) (models.Repo, error) {
+	return models.NewRepo(models.Gitea, repo.FullName, repo.CloneURL, e.GiteaUser, e.GiteaToken)
+}
+
 // ParseGitlabMergeRequestUpdateEvent dives deeper into Gitlab merge request update events
 func (e *EventParser) ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent) models.PullRequestEventType {
 	// New commit to opened MR
@@ -700,6 +722,27 @@ func (e *EventParser) ParseGitlabMergeRequestCommentEvent(event gitlab.MergeComm
 	headRepoFullName := event.MergeRequest.Source.PathWithNamespace
 	headCloneURL := event.MergeRequest.Source.GitHTTPURL
 	headRepo, err = models.NewRepo(models.Gitlab, headRepoFullName, headCloneURL, e.GitlabUser, e.GitlabToken)
+	return
+}
+
+func (e *EventParser) ParseGiteaIssueCommentEvent(comment gitea.GiteaIssueCommentPayload) (baseRepo models.Repo, user models.User, pullNum int, err error) {
+	baseRepo, err = e.ParseGiteaRepo(comment.Repository)
+	if err != nil {
+		return
+	}
+	if comment.Comment.Body == "" || comment.Comment.Poster.UserName == "" {
+		err = errors.New("comment.user.login is null")
+		return
+	}
+	commenterUsername := comment.Comment.Poster.UserName
+	user = models.User{
+		Username: commenterUsername,
+	}
+	pullNum = int(comment.Issue.Index)
+	if pullNum == 0 {
+		err = errors.New("issue.number is null")
+		return
+	}
 	return
 }
 
@@ -988,4 +1031,122 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	fmt.Println("%", cloneURL)
 	fullName := fmt.Sprintf("%s/%s/%s", owner, project, repo)
 	return models.NewRepo(models.AzureDevops, fullName, cloneURL, e.AzureDevopsUser, e.AzureDevopsToken)
+}
+
+func (e *EventParser) ParseGiteaPullRequestEvent(event giteasdk.PullRequest) (models.PullRequest, models.PullRequestEventType, models.Repo, models.Repo, models.User, error) {
+	var pullEventType models.PullRequestEventType
+
+	// Determine the event type based on the state of the pull request and whether it's merged.
+	switch {
+	case event.State == giteasdk.StateOpen:
+		pullEventType = models.OpenedPullEvent
+	case event.HasMerged:
+		pullEventType = models.ClosedPullEvent
+	default:
+		pullEventType = models.OtherPullEvent
+	}
+
+	// Parse the base repository.
+	baseRepo, err := models.NewRepo(
+		models.Gitea,
+		event.Base.Repository.FullName,
+		event.Base.Repository.CloneURL,
+		e.GiteaUser,
+		e.GiteaToken,
+	)
+	if err != nil {
+		return models.PullRequest{}, models.OtherPullEvent, models.Repo{}, models.Repo{}, models.User{}, err
+	}
+
+	// Parse the head repository.
+	headRepo, err := models.NewRepo(
+		models.Gitea,
+		event.Head.Repository.FullName,
+		event.Head.Repository.CloneURL,
+		e.GiteaUser,
+		e.GiteaToken,
+	)
+	if err != nil {
+		return models.PullRequest{}, models.OtherPullEvent, models.Repo{}, models.Repo{}, models.User{}, err
+	}
+
+	// Construct the pull request model.
+	pull := models.PullRequest{
+		Num:        int(event.Index),
+		URL:        event.HTMLURL,
+		HeadCommit: event.Head.Sha,
+		HeadBranch: (*event.Head).Ref,
+		BaseBranch: event.Base.Ref,
+		Author:     event.Poster.UserName,
+		BaseRepo:   baseRepo,
+	}
+
+	// Parse the user who made the pull request.
+	user := models.User{
+		Username: event.Poster.UserName,
+	}
+	return pull, pullEventType, baseRepo, headRepo, user, nil
+}
+
+// ParseGithubPull parses the response from the GitHub API endpoint (not
+// from a webhook) that returns a pull request.
+// See EventParsing for return value docs.
+func (e *EventParser) ParseGiteaPull(pull *giteasdk.PullRequest) (pullModel models.PullRequest, baseRepo models.Repo, headRepo models.Repo, err error) {
+	commit := pull.Head.Sha
+	if commit == "" {
+		err = errors.New("head.sha is null")
+		return
+	}
+	url := pull.HTMLURL
+	if url == "" {
+		err = errors.New("html_url is null")
+		return
+	}
+	headBranch := pull.Head.Ref
+	if headBranch == "" {
+		err = errors.New("head.ref is null")
+		return
+	}
+	baseBranch := pull.Base.Ref
+	if baseBranch == "" {
+		err = errors.New("base.ref is null")
+		return
+	}
+
+	authorUsername := pull.Poster.UserName
+	if authorUsername == "" {
+		err = errors.New("user.login is null")
+		return
+	}
+	num := pull.Index
+	if num == 0 {
+		err = errors.New("number is null")
+		return
+	}
+
+	baseRepo, err = e.ParseGiteaRepo(*pull.Base.Repository)
+	if err != nil {
+		return
+	}
+	headRepo, err = e.ParseGiteaRepo(*pull.Head.Repository)
+	if err != nil {
+		return
+	}
+
+	pullState := models.ClosedPullState
+	if pull.State == "open" {
+		pullState = models.OpenPullState
+	}
+
+	pullModel = models.PullRequest{
+		Author:     authorUsername,
+		HeadBranch: headBranch,
+		HeadCommit: commit,
+		URL:        url,
+		Num:        int(num),
+		State:      pullState,
+		BaseRepo:   baseRepo,
+		BaseBranch: baseBranch,
+	}
+	return
 }
