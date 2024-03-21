@@ -26,6 +26,7 @@ type RepoCfg struct {
 	DeleteSourceBranchOnMerge  *bool
 	RepoLocking                *bool
 	CustomPolicyCheck          *bool
+	EnableEmojiReaction        *bool
 	EmojiReaction              string
 	AllowedRegexpPrefixes      []string
 	AbortOnExcecutionOrderFail bool
