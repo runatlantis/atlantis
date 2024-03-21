@@ -70,16 +70,16 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
-	DisableEmojiReactionFlag         = "disable-emoji-reaction"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
 	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
+	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
+	EnableEmojiReactionFlag          = "enable-emoji-reaction"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
-	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	ExecutableName                   = "executable-name"
 	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
@@ -276,7 +276,7 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: "",
 	},
 	EmojiReaction: {
-		description:  "Emoji Reaction to use to react to comments",
+		description:  "Emoji Reaction to use to react to comments. Only works if --" + EnableEmojiReactionFlag + " is true.",
 		defaultValue: DefaultEmojiReaction,
 	},
 	ExecutableName: {
@@ -460,10 +460,7 @@ var boolFlags = map[string]boolFlag{
 		description:  "Disable atlantis auto planning feature",
 		defaultValue: false,
 	},
-	DisableEmojiReactionFlag: {
-		description:  "Disable emoji reactions",
-		defaultValue: false,
-	},
+
 	DisableRepoLockingFlag: {
 		description: "Disable atlantis locking repos",
 	},
@@ -472,6 +469,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	DiscardApprovalOnPlanFlag: {
 		description:  "Enables the discarding of approval if a new plan has been executed. Currently only Github is supported",
+		defaultValue: false,
+	},
+	EnableEmojiReactionFlag: {
+		description:  "Enable emoji reactions",
 		defaultValue: false,
 	},
 	EnablePolicyChecksFlag: {

@@ -34,13 +34,13 @@ type UserConfig struct {
 	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
 	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
 	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`
-	DisableEmojiReaction        bool   `mapstructure:"disable-emoji-reaction"`
 	DisableMarkdownFolding      bool   `mapstructure:"disable-markdown-folding"`
 	DisableRepoLocking          bool   `mapstructure:"disable-repo-locking"`
 	DisableGlobalApplyLock      bool   `mapstructure:"disable-global-apply-lock"`
 	DisableUnlockLabel          string `mapstructure:"disable-unlock-label"`
 	DiscardApprovalOnPlanFlag   bool   `mapstructure:"discard-approval-on-plan"`
 	EmojiReaction               string `mapstructure:"emoji-reaction"`
+	EnableEmojiReaction         bool   `mapstructure:"enable-emoji-reaction"`
 	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
 	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
