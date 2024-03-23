@@ -80,6 +80,18 @@ func (r RepoCfg) FindProjectsByName(name string) []Project {
 	return ps
 }
 
+// FindProjectsByWorkflow returns all projects that match with workflow.
+func (r RepoCfg) FindProjectsByWorkflow(workflow string) []Project {
+	var ps []Project
+
+	for _, p := range r.Projects {
+		if p.WorkflowName != nil && *p.WorkflowName == workflow {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
 func isRegexAllowed(name string, allowedRegexpPrefixes []string) bool {
 	if len(allowedRegexpPrefixes) == 0 {
 		return true
