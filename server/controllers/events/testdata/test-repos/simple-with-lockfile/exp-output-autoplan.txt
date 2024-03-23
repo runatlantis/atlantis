@@ -30,17 +30,25 @@ Changes to Outputs:
 + var       = "default"
 + workspace = "default"
 ```
+</details>
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d .`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  ```shell
+  atlantis apply -d .
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -d .`
-</details>
+  ```shell
+  atlantis plan -d .
+  ```
 Plan: 3 to add, 0 to change, 0 to destroy.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * `atlantis apply`
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * `atlantis unlock`
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  ```shell
+  atlantis apply
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  ```shell
+  atlantis unlock
+  ```

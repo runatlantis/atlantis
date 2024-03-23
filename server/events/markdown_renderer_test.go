@@ -23,6 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -60,17 +61,36 @@ func TestRenderErr(t *testing.T) {
 	}
 
 	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
 	for _, c := range cases {
 		res := command.Result{
 			Error: c.Error,
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
-				s := r.Render(res, c.Command, "", "log", verbose, models.Github)
+				cmd := &events.CommentCommand{
+					Name:    c.Command,
+					Verbose: verbose,
+				}
+				s := r.Render(ctx, res, cmd)
 				if !verbose {
 					Equals(t, normalize(c.Expected), normalize(s))
 				} else {
-					Equals(t, normalize(c.Expected)+"\n\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>", normalize(s))
+					log := fmt.Sprintf("[INFO] %s", logText)
+					Equals(t, normalize(c.Expected+
+						fmt.Sprintf("\n<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log)), normalize(s))
 				}
 			})
 		}
@@ -88,34 +108,54 @@ func TestRenderFailure(t *testing.T) {
 			"apply failure",
 			command.Apply,
 			"failure",
-			"**Apply Failed**: failure\n",
+			"**Apply Failed**: failure",
 		},
 		{
 			"plan failure",
 			command.Plan,
 			"failure",
-			"**Plan Failed**: failure\n",
+			"**Plan Failed**: failure",
 		},
 		{
 			"policy check failure",
 			command.PolicyCheck,
 			"failure",
-			"**Policy Check Failed**: failure\n",
+			"**Policy Check Failed**: failure",
 		},
 	}
 
 	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
 	for _, c := range cases {
 		res := command.Result{
 			Failure: c.Failure,
 		}
 		for _, verbose := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s_%t", c.Description, verbose), func(t *testing.T) {
-				s := r.Render(res, c.Command, "", "log", verbose, models.Github)
+				cmd := &events.CommentCommand{
+					Name:    c.Command,
+					Verbose: verbose,
+				}
+				s := r.Render(ctx, res, cmd)
 				if !verbose {
 					Equals(t, normalize(c.Expected), normalize(s))
 				} else {
-					Equals(t, normalize(c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>"), normalize(s))
+					log := fmt.Sprintf("[INFO] %s", logText)
+					Equals(t, normalize(c.Expected+
+						fmt.Sprintf("\n<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log)), normalize(s))
 				}
 			})
 		}
@@ -124,11 +164,27 @@ func TestRenderFailure(t *testing.T) {
 
 func TestRenderErrAndFailure(t *testing.T) {
 	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
 	res := command.Result{
 		Error:   errors.New("error"),
 		Failure: "failure",
 	}
-	s := r.Render(res, command.Plan, "", "", false, models.Github)
+	cmd := &events.CommentCommand{
+		Name:    command.Plan,
+		Verbose: false,
+	}
+
+	s := r.Render(ctx, res, cmd)
 	Equals(t, "**Plan Error**\n```\nerror\n```", normalize(s))
 }
 
@@ -147,7 +203,7 @@ func TestRenderProjectResults(t *testing.T) {
 			"",
 			[]command.ProjectResult{},
 			models.Github,
-			"Ran Plan for 0 projects:\n\n\n",
+			"Ran Plan for 0 projects:\n\n",
 		},
 		{
 			"single successful plan",
@@ -166,23 +222,32 @@ func TestRenderProjectResults(t *testing.T) {
 				},
 			},
 			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -203,25 +268,33 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
-
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 :twisted_rightwards_arrows: Upstream was modified, a new merge was performed.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -242,23 +315,32 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for project: $projectname$ dir: $path$ workspace: $workspace$
+			`
+Ran Plan for project: $projectname$ dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -296,7 +378,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
 
 #### Policy Set: $policy1$
 $$$diff
@@ -317,16 +400,24 @@ policy set: policy1: requires: 1 approval(s), have: 0.
 policy set: policy2: passed.
 $$$
 * :heavy_check_mark: To **approve** this project, comment:
-    * $$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -357,7 +448,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
 
 <details><summary>Show Output</summary>
 
@@ -382,26 +474,34 @@ FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibit
 $$$
 
 
+</details>
 #### Policy Approval Status:
 $$$
 policy set: policy1: requires: 1 approval(s), have: 0.
 $$$
 * :heavy_check_mark: To **approve** this project, comment:
-    * $$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path -w workspace$
-</details>
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 $$$
 policy set: policy1: 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
 $$$
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -420,7 +520,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Import for project: $projectname$ dir: $path$ workspace: $workspace$
+			`
+Ran Import for project: $projectname$ dir: $path$ workspace: $workspace$
 
 $$$diff
 import-output
@@ -429,7 +530,9 @@ $$$
 :put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
 
 * :repeat: To **plan** this project again, comment:
-  * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 `,
 		},
 		{
@@ -448,7 +551,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran State $rm$ for project: $projectname$ dir: $path$ workspace: $workspace$
+			`
+Ran State $rm$ for project: $projectname$ dir: $path$ workspace: $workspace$
 
 $$$diff
 state-rm-output
@@ -457,7 +561,9 @@ $$$
 :put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
 
 * :repeat: To **plan** this project again, comment:
-  * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 `,
 		},
 		{
@@ -472,7 +578,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply for dir: $path$ workspace: $workspace$
+			`
+Ran Apply for dir: $path$ workspace: $workspace$
 
 $$$diff
 success
@@ -492,7 +599,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply for project: $projectname$ dir: $path$ workspace: $workspace$
+			`
+Ran Apply for project: $projectname$ dir: $path$ workspace: $workspace$
 
 $$$diff
 success
@@ -527,10 +635,12 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for 2 projects:
+			`
+Ran Plan for 2 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
@@ -538,10 +648,14 @@ terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
 ### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
@@ -550,20 +664,28 @@ terraform-output2
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path2 -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
+  $$$shell
+  atlantis apply -d path2 -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url2)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path2 -w workspace$
+  $$$shell
+  atlantis plan -d path2 -w workspace
+  $$$
 
 ---
 ### Plan Summary
 
 2 projects, 2 with changes, 0 with no changes, 0 failed
 
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -605,10 +727,12 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Policy Check for 2 projects:
+			`
+Ran Policy Check for 2 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 #### Policy Set: $policy1$
@@ -618,10 +742,14 @@ $$$
 
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
 ### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
@@ -632,16 +760,24 @@ $$$
 
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path2 -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
+  $$$shell
+  atlantis apply -d path2 -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url2)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path2 -w workspace$
+  $$$shell
+  atlantis plan -d path2 -w workspace
+  $$$
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -662,10 +798,12 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply for 2 projects:
+			`
+Ran Apply for 2 projects:
 
 1. project: $projectname$ dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
+---
 
 ### 1. project: $projectname$ dir: $path$ workspace: $workspace$
 $$$diff
@@ -696,7 +834,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 **Plan Error**
 $$$
@@ -716,7 +855,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 **Plan Failed**: failure
 `,
@@ -749,11 +889,13 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for 3 projects:
+			`
+Ran Plan for 3 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. project: $projectname$ dir: $path3$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
@@ -761,10 +903,14 @@ terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
 ### 2. dir: $path2$ workspace: $workspace$
@@ -782,10 +928,14 @@ $$$
 
 3 projects, 1 with changes, 0 with no changes, 2 failed
 
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -833,11 +983,13 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Policy Check for 3 projects:
+			`
+Ran Policy Check for 3 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. project: $projectname$ dir: $path3$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 #### Policy Set: $policy1$
@@ -847,10 +999,14 @@ $$$
 
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
 ### 2. dir: $path2$ workspace: $workspace$
@@ -866,10 +1022,14 @@ $$$
 policy set: policy1: requires: 1 approval(s), have: 0.
 $$$
 * :heavy_check_mark: To **approve** this project, comment:
-    * $$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
 ### 3. project: $projectname$ dir: $path3$ workspace: $workspace$
@@ -879,12 +1039,18 @@ error
 $$$
 
 ---
-* :heavy_check_mark: To **approve** all unapplied plans from this pull request, comment:
-    * $atlantis approve_policies$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :heavy_check_mark: To **approve** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis approve_policies
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan$
+  $$$shell
+  atlantis plan
+  $$$
 `,
 		},
 		{
@@ -909,11 +1075,13 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply for 3 projects:
+			`
+Ran Apply for 3 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. dir: $path3$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
@@ -959,11 +1127,13 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply for 3 projects:
+			`
+Ran Apply for 3 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. dir: $path3$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
@@ -990,6 +1160,19 @@ $$$
 	}
 
 	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -997,11 +1180,18 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, c.SubCommand, "log", verbose, c.VCSHost)
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						SubName: c.SubCommand,
+						Verbose: verbose,
+					}
+					s := r.Render(ctx, res, cmd)
 					if !verbose {
 						Equals(t, normalize(c.Expected), normalize(s))
 					} else {
-						Equals(t, normalize(c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>"), normalize(s))
+						log := fmt.Sprintf("[INFO] %s", logText)
+						Equals(t, normalize(c.Expected+
+							fmt.Sprintf("<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log)), normalize(s))
 					}
 				})
 			}
@@ -1034,17 +1224,22 @@ func TestRenderProjectResultsDisableApplyAll(t *testing.T) {
 				},
 			},
 			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 `,
 		},
 		{
@@ -1064,17 +1259,22 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for project: $projectname$ dir: $path$ workspace: $workspace$
+			`
+Ran Plan for project: $projectname$ dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 `,
 		},
 		{
@@ -1104,10 +1304,12 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for 2 projects:
+			`
+Ran Plan for 2 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
@@ -1115,10 +1317,14 @@ terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
 ### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
@@ -1127,10 +1333,14 @@ terraform-output2
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path2 -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
+  $$$shell
+  atlantis apply -d path2 -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url2)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path2 -w workspace$
+  $$$shell
+  atlantis plan -d path2 -w workspace
+  $$$
 
 ---
 ### Plan Summary
@@ -1150,6 +1360,19 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -1157,11 +1380,17 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						Verbose: verbose,
+					}
+					s := r.Render(ctx, res, cmd)
 					if !verbose {
 						Equals(t, normalize(c.Expected), normalize(s))
 					} else {
-						Equals(t, normalize(c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>"), normalize(s))
+						log := fmt.Sprintf("[INFO] %s", logText)
+						Equals(t, normalize(c.Expected)+
+							fmt.Sprintf("\n<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log), normalize(s))
 					}
 				})
 			}
@@ -1169,7 +1398,7 @@ $$$
 	}
 }
 
-// Test that if disable apply is set then the apply  footer is not added
+// Test that if disable apply is set then the apply footer is not added
 func TestRenderProjectResultsDisableApply(t *testing.T) {
 	cases := []struct {
 		Description    string
@@ -1194,15 +1423,18 @@ func TestRenderProjectResultsDisableApply(t *testing.T) {
 				},
 			},
 			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
 $$$
 
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 `,
 		},
 		{
@@ -1222,15 +1454,18 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for project: $projectname$ dir: $path$ workspace: $workspace$
+			`
+Ran Plan for project: $projectname$ dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
 $$$
 
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 `,
 		},
 		{
@@ -1260,19 +1495,23 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for 2 projects:
+			`
+Ran Plan for 2 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
 terraform-output
 $$$
 
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
 ### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
@@ -1280,9 +1519,11 @@ $$$diff
 terraform-output2
 $$$
 
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url2)
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url2)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path2 -w workspace$
+  $$$shell
+  atlantis plan -d path2 -w workspace
+  $$$
 
 ---
 ### Plan Summary
@@ -1303,6 +1544,19 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -1310,11 +1564,17 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						Verbose: verbose,
+					}
+					s := r.Render(ctx, res, cmd)
 					if !verbose {
 						Equals(t, normalize(c.Expected), normalize(s))
 					} else {
-						Equals(t, normalize(c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>"), normalize(s))
+						log := fmt.Sprintf("[INFO] %s", logText)
+						Equals(t, normalize(c.Expected)+
+							fmt.Sprintf("\n<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log), normalize(s))
 					}
 				})
 			}
@@ -1342,8 +1602,21 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
 
-	rendered := r.Render(command.Result{
+	res := command.Result{
 		ProjectResults: []command.ProjectResult{
 			{
 				Workspace:  "workspace",
@@ -1361,8 +1634,14 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 				},
 			},
 		},
-	}, command.PolicyCheck, "", "log", false, models.Github)
-	exp = `Ran Policy Check for dir: $path$ workspace: $workspace$
+	}
+	cmd := &events.CommentCommand{
+		Name:    command.PolicyCheck,
+		Verbose: false,
+	}
+	rendered := r.Render(ctx, res, cmd)
+	exp = `
+Ran Policy Check for dir: $path$ workspace: $workspace$
 
 #### Policy Set: $policy1$
 $$$diff
@@ -1371,10 +1650,15 @@ $$$
 
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * $atlantis plan -d path -w workspace$`
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+`
 
 	Equals(t, normalize(exp), normalize(rendered))
 }
@@ -1392,8 +1676,20 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 	)
-
-	rendered := mr.Render(command.Result{
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+	res := command.Result{
 		ProjectResults: []command.ProjectResult{
 			{
 				RepoRelDir: ".",
@@ -1401,7 +1697,12 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 				Error:      errors.New(strings.Repeat("line\n", 13)),
 			},
 		},
-	}, command.Plan, "", "log", false, models.Github)
+	}
+	cmd := &events.CommentCommand{
+		Name:    command.Plan,
+		Verbose: false,
+	}
+	rendered := mr.Render(ctx, res, cmd)
 	Equals(t, false, strings.Contains(rendered, "\n<details>"))
 }
 
@@ -1484,8 +1785,20 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 					"atlantis",                // executableName
 					false,                     // hideUnchangedPlanComments
 				)
-
-				rendered := mr.Render(command.Result{
+				logger := logging.NewNoopLogger(t).WithHistory()
+				logText := "log"
+				logger.Info(logText)
+				ctx := &command.Context{
+					Log: logger,
+					Pull: models.PullRequest{
+						BaseRepo: models.Repo{
+							VCSHost: models.VCSHost{
+								Type: c.VCSHost,
+							},
+						},
+					},
+				}
+				res := command.Result{
 					ProjectResults: []command.ProjectResult{
 						{
 							RepoRelDir: ".",
@@ -1493,10 +1806,16 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 							Error:      errors.New(c.Output),
 						},
 					},
-				}, command.Plan, "", "log", false, c.VCSHost)
+				}
+				cmd := &events.CommentCommand{
+					Name:    command.Plan,
+					Verbose: false,
+				}
+				rendered := mr.Render(ctx, res, cmd)
 				var exp string
 				if c.ShouldWrap {
-					exp = `Ran Plan for dir: $.$ workspace: $default$
+					exp = `
+Ran Plan for dir: $.$ workspace: $default$
 
 **Plan Error**
 <details><summary>Show Output</summary>
@@ -1504,14 +1823,16 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 $$$
 ` + c.Output + `
 $$$
-</details>`
+</details>
+`
 				} else {
 					exp = `Ran Plan for dir: $.$ workspace: $default$
 
 **Plan Error**
 $$$
 ` + c.Output + `
-$$$`
+$$$
+`
 				}
 				Equals(t, normalize(exp), normalize(rendered))
 			})
@@ -1523,69 +1844,80 @@ $$$`
 func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 	cases := []struct {
 		VCSHost                 models.VCSHostType
+		VcsRequestType          string
 		GitlabCommonMarkSupport bool
 		Output                  string
 		ShouldWrap              bool
 	}{
 		{
-			VCSHost:    models.Github,
-			Output:     strings.Repeat("line\n", 1),
-			ShouldWrap: false,
+			VCSHost:        models.Github,
+			VcsRequestType: "Pull Request",
+			Output:         strings.Repeat("line\n", 1),
+			ShouldWrap:     false,
 		},
 		{
-			VCSHost:    models.Github,
-			Output:     strings.Repeat("line\n", 13) + "No changes. Infrastructure is up-to-date.",
-			ShouldWrap: true,
+			VCSHost:        models.Github,
+			VcsRequestType: "Pull Request",
+			Output:         strings.Repeat("line\n", 13) + "No changes. Infrastructure is up-to-date.",
+			ShouldWrap:     true,
 		},
 		{
 			VCSHost:                 models.Gitlab,
+			VcsRequestType:          "Merge Request",
 			GitlabCommonMarkSupport: false,
 			Output:                  strings.Repeat("line\n", 1),
 			ShouldWrap:              false,
 		},
 		{
 			VCSHost:                 models.Gitlab,
+			VcsRequestType:          "Merge Request",
 			GitlabCommonMarkSupport: false,
 			Output:                  strings.Repeat("line\n", 13),
 			ShouldWrap:              false,
 		},
 		{
 			VCSHost:                 models.Gitlab,
+			VcsRequestType:          "Merge Request",
 			GitlabCommonMarkSupport: true,
 			Output:                  strings.Repeat("line\n", 1),
 			ShouldWrap:              false,
 		},
 		{
 			VCSHost:                 models.Gitlab,
+			VcsRequestType:          "Merge Request",
 			GitlabCommonMarkSupport: true,
 			Output:                  strings.Repeat("line\n", 13) + "No changes. Infrastructure is up-to-date.",
 			ShouldWrap:              true,
 		},
 		{
-			VCSHost:    models.BitbucketCloud,
-			Output:     strings.Repeat("line\n", 1),
-			ShouldWrap: false,
+			VCSHost:        models.BitbucketCloud,
+			VcsRequestType: "Pull Request",
+			Output:         strings.Repeat("line\n", 1),
+			ShouldWrap:     false,
 		},
 		{
-			VCSHost:    models.BitbucketCloud,
-			Output:     strings.Repeat("line\n", 13),
-			ShouldWrap: false,
+			VCSHost:        models.BitbucketCloud,
+			VcsRequestType: "Pull Request",
+			Output:         strings.Repeat("line\n", 13),
+			ShouldWrap:     false,
 		},
 		{
-			VCSHost:    models.BitbucketServer,
-			Output:     strings.Repeat("line\n", 1),
-			ShouldWrap: false,
+			VCSHost:        models.BitbucketServer,
+			VcsRequestType: "Pull Request",
+			Output:         strings.Repeat("line\n", 1),
+			ShouldWrap:     false,
 		},
 		{
-			VCSHost:    models.BitbucketServer,
-			Output:     strings.Repeat("line\n", 13),
-			ShouldWrap: false,
+			VCSHost:        models.BitbucketServer,
+			VcsRequestType: "Pull Request",
+			Output:         strings.Repeat("line\n", 13),
+			ShouldWrap:     false,
 		},
 	}
 
 	for _, c := range cases {
-		for _, cmd := range []command.Name{command.Plan, command.Apply} {
-			t.Run(fmt.Sprintf("%s_%s_%v", c.VCSHost.String(), cmd.String(), c.ShouldWrap),
+		for _, cmdName := range []command.Name{command.Plan, command.Apply} {
+			t.Run(fmt.Sprintf("%s_%s_%v", c.VCSHost.String(), cmdName.String(), c.ShouldWrap),
 				func(t *testing.T) {
 					mr := events.NewMarkdownRenderer(
 						c.GitlabCommonMarkSupport, // gitlabSupportsCommonMark
@@ -1598,8 +1930,22 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 						"atlantis",                // executableName
 						false,                     // hideUnchangedPlanComments
 					)
+					logger := logging.NewNoopLogger(t).WithHistory()
+					logText := "log"
+					logger.Info(logText)
+					ctx := &command.Context{
+						Log: logger,
+						Pull: models.PullRequest{
+							BaseRepo: models.Repo{
+								VCSHost: models.VCSHost{
+									Type: c.VCSHost,
+								},
+							},
+						},
+					}
+
 					var pr command.ProjectResult
-					switch cmd {
+					switch cmdName {
 					case command.Plan:
 						pr = command.ProjectResult{
 							RepoRelDir: ".",
@@ -1618,58 +1964,84 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 							ApplySuccess: c.Output,
 						}
 					}
-					rendered := mr.Render(command.Result{
+					res := command.Result{
 						ProjectResults: []command.ProjectResult{pr},
-					}, cmd, "", "log", false, c.VCSHost)
+					}
+					cmd := &events.CommentCommand{
+						Name:    cmdName,
+						Verbose: false,
+					}
+					rendered := mr.Render(ctx, res, cmd)
 
 					// Check result.
 					var exp string
-					switch cmd {
+					switch cmdName {
 					case command.Plan:
 						if c.ShouldWrap {
-							exp = `Ran Plan for dir: $.$ workspace: $default$
+							exp = `
+Ran Plan for dir: $.$ workspace: $default$
 
 <details><summary>Show Output</summary>
 
 $$$diff
 ` + strings.TrimSpace(c.Output) + `
 $$$
+</details>
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $applycmd$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  applycmd
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $replancmd$
-</details>
+  $$$shell
+  replancmd
+  $$$
 No changes. Infrastructure is up-to-date.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$`
+* :fast_forward: To **apply** all unapplied plans from this ` + c.VcsRequestType + `, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this ` + c.VcsRequestType + `, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`
 						} else {
-							exp = `Ran Plan for dir: $.$ workspace: $default$
+							exp = `
+Ran Plan for dir: $.$ workspace: $default$
 
 $$$diff
 ` + strings.TrimSpace(c.Output) + `
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $applycmd$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  applycmd
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $replancmd$
+  $$$shell
+  replancmd
+  $$$
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$`
+* :fast_forward: To **apply** all unapplied plans from this ` + c.VcsRequestType + `, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this ` + c.VcsRequestType + `, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`
 						}
 					case command.Apply:
 						if c.ShouldWrap {
-							exp = `Ran Apply for dir: $.$ workspace: $default$
+							exp = `
+Ran Apply for dir: $.$ workspace: $default$
 
 <details><summary>Show Output</summary>
 
@@ -1677,13 +2049,16 @@ $$$diff
 ` + strings.TrimSpace(c.Output) + `
 $$$
 
-</details>`
+</details>
+`
 						} else {
-							exp = `Ran Apply for dir: $.$ workspace: $default$
+							exp = `
+Ran Apply for dir: $.$ workspace: $default$
 
 $$$diff
 ` + strings.TrimSpace(c.Output) + `
-$$$`
+$$$
+`
 						}
 					}
 
@@ -1705,8 +2080,21 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
 	tfOut := strings.Repeat("line\n", 13)
-	rendered := mr.Render(command.Result{
+	res := command.Result{
 		ProjectResults: []command.ProjectResult{
 			{
 				RepoRelDir:   ".",
@@ -1719,11 +2107,18 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 				ApplySuccess: tfOut,
 			},
 		},
-	}, command.Apply, "", "log", false, models.Github)
-	exp := `Ran Apply for 2 projects:
+	}
+	cmd := &events.CommentCommand{
+		Name:    command.Apply,
+		Verbose: false,
+	}
+	rendered := mr.Render(ctx, res, cmd)
+	exp := `
+Ran Apply for 2 projects:
 
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
+---
 
 ### 1. dir: $.$ workspace: $staging$
 <details><summary>Show Output</summary>
@@ -1764,8 +2159,21 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
 	tfOut := strings.Repeat("line\n", 13) + "Plan: 1 to add, 0 to change, 0 to destroy."
-	rendered := mr.Render(command.Result{
+	res := command.Result{
 		ProjectResults: []command.ProjectResult{
 			{
 				RepoRelDir: ".",
@@ -1788,11 +2196,18 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 				},
 			},
 		},
-	}, command.Plan, "", "log", false, models.Github)
-	exp := `Ran Plan for 2 projects:
+	}
+	cmd := &events.CommentCommand{
+		Name:    command.Plan,
+		Verbose: false,
+	}
+	rendered := mr.Render(ctx, res, cmd)
+	exp := `
+Ran Plan for 2 projects:
 
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
+---
 
 ### 1. dir: $.$ workspace: $staging$
 <details><summary>Show Output</summary>
@@ -1800,13 +2215,17 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 $$$diff
 ` + tfOut + `
 $$$
+</details>
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $staging-apply-cmd$
-* :put_litter_in_its_place: To **delete** this plan click [here](staging-lock-url)
+  $$$shell
+  staging-apply-cmd
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](staging-lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $staging-replan-cmd$
-</details>
+  $$$shell
+  staging-replan-cmd
+  $$$
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
@@ -1816,13 +2235,17 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 $$$diff
 ` + tfOut + `
 $$$
+</details>
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $production-apply-cmd$
-* :put_litter_in_its_place: To **delete** this plan click [here](production-lock-url)
+  $$$shell
+  production-apply-cmd
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](production-lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $production-replan-cmd$
-</details>
+  $$$shell
+  production-replan-cmd
+  $$$
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
@@ -1830,10 +2253,14 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 
 2 projects, 2 with changes, 0 with no changes, 0 failed
 
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `
 	Equals(t, normalize(exp), normalize(rendered))
 }
@@ -1842,11 +2269,11 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 // all the plans as a result.
 func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 	cases := map[string]struct {
-		cr  command.Result
+		res command.Result
 		exp string
 	}{
 		"one failure": {
-			cr: command.Result{
+			res: command.Result{
 				ProjectResults: []command.ProjectResult{
 					{
 						RepoRelDir: ".",
@@ -1856,12 +2283,14 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 				},
 				PlansDeleted: true,
 			},
-			exp: `Ran Plan for dir: $.$ workspace: $staging$
+			exp: `
+Ran Plan for dir: $.$ workspace: $staging$
 
-**Plan Failed**: failure`,
+**Plan Failed**: failure
+`,
 		},
 		"two failures": {
-			cr: command.Result{
+			res: command.Result{
 				ProjectResults: []command.ProjectResult{
 					{
 						RepoRelDir: ".",
@@ -1876,10 +2305,12 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 				},
 				PlansDeleted: true,
 			},
-			exp: `Ran Plan for 2 projects:
+			exp: `
+Ran Plan for 2 projects:
 
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
+---
 
 ### 1. dir: $.$ workspace: $staging$
 **Plan Failed**: failure
@@ -1895,7 +2326,7 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 `,
 		},
 		"one failure, one success": {
-			cr: command.Result{
+			res: command.Result{
 				ProjectResults: []command.ProjectResult{
 					{
 						RepoRelDir: ".",
@@ -1915,10 +2346,12 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 				},
 				PlansDeleted: true,
 			},
-			exp: `Ran Plan for 2 projects:
+			exp: `
+Ran Plan for 2 projects:
 
 1. dir: $.$ workspace: $staging$
 1. dir: $.$ workspace: $production$
+---
 
 ### 1. dir: $.$ workspace: $staging$
 **Plan Failed**: failure
@@ -1952,7 +2385,24 @@ This plan was not saved because one or more projects failed and automerge requir
 				"atlantis", // executableName
 				false,      // hideUnchangedPlanComments
 			)
-			rendered := mr.Render(c.cr, command.Plan, "", "log", false, models.Github)
+			logger := logging.NewNoopLogger(t).WithHistory()
+			logText := "log"
+			logger.Info(logText)
+			ctx := &command.Context{
+				Log: logger,
+				Pull: models.PullRequest{
+					BaseRepo: models.Repo{
+						VCSHost: models.VCSHost{
+							Type: models.Github,
+						},
+					},
+				},
+			}
+			cmd := &events.CommentCommand{
+				Name:    command.Plan,
+				Verbose: false,
+			}
+			rendered := mr.Render(ctx, c.res, cmd)
 			Equals(t, normalize(c.exp), normalize(rendered))
 		})
 	}
@@ -1972,7 +2422,7 @@ func TestRenderProjectResultsWithRepoLockingDisabled(t *testing.T) {
 			command.Plan,
 			[]command.ProjectResult{},
 			models.Github,
-			"Ran Plan for 0 projects:\n\n\n",
+			"Ran Plan for 0 projects:\n\n",
 		},
 		{
 			"single successful plan",
@@ -1990,22 +2440,31 @@ func TestRenderProjectResultsWithRepoLockingDisabled(t *testing.T) {
 				},
 			},
 			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -2025,24 +2484,32 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
-
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 :twisted_rightwards_arrows: Upstream was modified, a new merge was performed.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -2062,22 +2529,31 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for project: $projectname$ dir: $path$ workspace: $workspace$
+			`
+Ran Plan for project: $projectname$ dir: $path$ workspace: $workspace$
 
 $$$diff
 terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -2091,7 +2567,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply for dir: $path$ workspace: $workspace$
+			`
+Ran Apply for dir: $path$ workspace: $workspace$
 
 $$$diff
 success
@@ -2110,7 +2587,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply for project: $projectname$ dir: $path$ workspace: $workspace$
+			`
+Ran Apply for project: $projectname$ dir: $path$ workspace: $workspace$
 
 $$$diff
 success
@@ -2144,10 +2622,12 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for 2 projects:
+			`
+Ran Plan for 2 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
@@ -2155,9 +2635,13 @@ terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
 ### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
@@ -2166,19 +2650,27 @@ terraform-output2
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path2 -w workspace$
+  $$$shell
+  atlantis apply -d path2 -w workspace
+  $$$
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path2 -w workspace$
+  $$$shell
+  atlantis plan -d path2 -w workspace
+  $$$
 
 ---
 ### Plan Summary
 
 2 projects, 2 with changes, 0 with no changes, 0 failed
 
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -2198,10 +2690,12 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply for 2 projects:
+			`
+Ran Apply for 2 projects:
 
 1. project: $projectname$ dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
+---
 
 ### 1. project: $projectname$ dir: $path$ workspace: $workspace$
 $$$diff
@@ -2231,7 +2725,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 **Plan Error**
 $$$
@@ -2250,7 +2745,8 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for dir: $path$ workspace: $workspace$
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 **Plan Failed**: failure
 `,
@@ -2282,11 +2778,13 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for 3 projects:
+			`
+Ran Plan for 3 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. project: $projectname$ dir: $path3$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
@@ -2294,9 +2792,13 @@ terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
 ### 2. dir: $path2$ workspace: $workspace$
@@ -2314,10 +2816,14 @@ $$$
 
 3 projects, 1 with changes, 0 with no changes, 2 failed
 
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -2341,11 +2847,13 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply for 3 projects:
+			`
+Ran Apply for 3 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. dir: $path3$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
@@ -2390,11 +2898,13 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Apply for 3 projects:
+			`
+Ran Apply for 3 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. dir: $path2$ workspace: $workspace$
 1. dir: $path3$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
@@ -2431,6 +2941,19 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			res := command.Result{
@@ -2438,11 +2961,17 @@ $$$
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						Verbose: verbose,
+					}
+					s := r.Render(ctx, res, cmd)
 					if !verbose {
 						Equals(t, normalize(c.Expected), normalize(s))
 					} else {
-						Equals(t, normalize(c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>"), normalize(s))
+						log := fmt.Sprintf("[INFO] %s", logText)
+						Equals(t, normalize(c.Expected+
+							fmt.Sprintf("<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log)), normalize(s))
 					}
 				})
 			}
@@ -2450,7 +2979,145 @@ $$$
 	}
 }
 
-const tfOutput = `An execution plan has been generated and is shown below.
+func TestRenderProjectResultsWithGitLab(t *testing.T) {
+	cases := []struct {
+		Description    string
+		Command        command.Name
+		ProjectResults []command.ProjectResult
+		VCSHost        models.VCSHostType
+		Expected       string
+	}{
+		{
+			"multiple successful plans",
+			command.Plan,
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output2",
+						LockURL:         "lock-url2",
+						ApplyCmd:        "atlantis apply -d path2 -w workspace",
+						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					},
+				},
+			},
+			models.Gitlab,
+			`
+Ran Plan for 2 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. project: $projectname$ dir: $path2$ workspace: $workspace$
+---
+
+### 1. dir: $path$ workspace: $workspace$
+$$$diff
+terraform-output
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :repeat: To **plan** this project again, comment:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
+$$$diff
+terraform-output2
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+  $$$shell
+  atlantis apply -d path2 -w workspace
+  $$$
+* :repeat: To **plan** this project again, comment:
+  $$$shell
+  atlantis plan -d path2 -w workspace
+  $$$
+
+---
+### Plan Summary
+
+2 projects, 2 with changes, 0 with no changes, 0 failed
+
+* :fast_forward: To **apply** all unapplied plans from this Merge Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Merge Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+	}
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		true,       // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // MarkdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			ctx := &command.Context{
+				Log: logger,
+				Pull: models.PullRequest{
+					BaseRepo: models.Repo{
+						VCSHost: models.VCSHost{
+							Type: c.VCSHost,
+						},
+					},
+				},
+			}
+			res := command.Result{
+				ProjectResults: c.ProjectResults,
+			}
+			for _, verbose := range []bool{true, false} {
+				t.Run(c.Description, func(t *testing.T) {
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						Verbose: verbose,
+					}
+					s := r.Render(ctx, res, cmd)
+					if !verbose {
+						Equals(t, normalize(c.Expected), normalize(s))
+					} else {
+						log := fmt.Sprintf("[INFO] %s", logText)
+						Equals(t, normalize(c.Expected)+
+							fmt.Sprintf("\n<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log), normalize(s))
+					}
+				})
+			}
+		})
+	}
+}
+
+const tfOutput = `
+An execution plan has been generated and is shown below.
 Resource actions are indicated with the following symbols:
 ~ update in-place
 -/+ destroy and then create replacement
@@ -2657,7 +3324,8 @@ var cases = []struct {
 			},
 		},
 		models.Github,
-		`Ran Plan for dir: $path$ workspace: $workspace$
+		`
+Ran Plan for dir: $path$ workspace: $workspace$
 
 <details><summary>Show Output</summary>
 
@@ -2845,11 +3513,13 @@ Terraform will perform the following actions:
 
 Plan: 1 to add, 2 to change, 1 to destroy.
 $$$
-
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
-* :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
 </details>
+
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 Plan: 1 to add, 2 to change, 1 to destroy.
 `,
 	},
@@ -2867,19 +3537,38 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
+			ctx := &command.Context{
+				Log: logger,
+				Pull: models.PullRequest{
+					BaseRepo: models.Repo{
+						VCSHost: models.VCSHost{
+							Type: models.Github,
+						},
+					},
+				},
+			}
 			res := command.Result{
 				ProjectResults: c.ProjectResults,
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						Verbose: verbose,
+					}
+					s := r.Render(ctx, res, cmd)
 					if !verbose {
 						Equals(t, normalize(c.Expected), normalize(s))
 					} else {
-						Equals(t, normalize(c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>"), normalize(s))
+						log := fmt.Sprintf("[INFO] %s", logText)
+						Equals(t, normalize(c.Expected)+
+							fmt.Sprintf("\n<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log), normalize(s))
 					}
 				})
 			}
@@ -2903,17 +3592,34 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 	)
+	logger := logging.NewNoopLogger(b).WithHistory()
+	logText := "log"
+	logger.Info(logText)
 
 	for _, c := range cases {
 		b.Run(c.Description, func(b *testing.B) {
+			ctx := &command.Context{
+				Log: logger,
+				Pull: models.PullRequest{
+					BaseRepo: models.Repo{
+						VCSHost: models.VCSHost{
+							Type: c.VCSHost,
+						},
+					},
+				},
+			}
 			res := command.Result{
 				ProjectResults: c.ProjectResults,
 			}
 			for _, verbose := range []bool{true, false} {
 				b.Run(fmt.Sprintf("verbose %t", verbose), func(b *testing.B) {
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						Verbose: verbose,
+					}
 					b.ReportAllocs()
 					for i := 0; i < b.N; i++ {
-						render = r.Render(res, c.Command, "", "log", verbose, c.VCSHost)
+						render = r.Render(ctx, res, cmd)
 					}
 					Render = render
 				})
@@ -2970,11 +3676,13 @@ func TestRenderProjectResultsHideUnchangedPlans(t *testing.T) {
 				},
 			},
 			models.Github,
-			`Ran Plan for 3 projects:
+			`
+Ran Plan for 3 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
 1. project: $projectname2$ dir: $path3$ workspace: $workspace$
+---
 
 ### 1. dir: $path$ workspace: $workspace$
 $$$diff
@@ -2982,10 +3690,14 @@ terraform-output
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path -w workspace$
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
 
 ---
 ### 3. project: $projectname2$ dir: $path3$ workspace: $workspace$
@@ -2994,20 +3706,28 @@ terraform-output3
 $$$
 
 * :arrow_forward: To **apply** this plan, comment:
-    * $atlantis apply -d path3 -w workspace$
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url3)
+  $$$shell
+  atlantis apply -d path3 -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url3)
 * :repeat: To **plan** this project again, comment:
-    * $atlantis plan -d path3 -w workspace$
+  $$$shell
+  atlantis plan -d path3 -w workspace
+  $$$
 
 ---
 ### Plan Summary
 
 3 projects, 2 with changes, 1 with no changes, 0 failed
 
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 		{
@@ -3049,37 +3769,64 @@ $$$
 				},
 			},
 			models.Github,
-			`Ran Plan for 3 projects:
+			`
+Ran Plan for 3 projects:
 
 1. dir: $path$ workspace: $workspace$
 1. project: $projectname$ dir: $path2$ workspace: $workspace$
 1. project: $projectname2$ dir: $path3$ workspace: $workspace$
+---
 
 ### Plan Summary
 
 3 projects, 0 with changes, 3 with no changes, 0 failed
 
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * $atlantis apply$
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * $atlantis unlock$
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
 `,
 		},
 	}
 
 	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", true)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
+			ctx := &command.Context{
+				Log: logger,
+				Pull: models.PullRequest{
+					BaseRepo: models.Repo{
+						VCSHost: models.VCSHost{
+							Type: c.VCSHost,
+						},
+					},
+				},
+			}
 			res := command.Result{
 				ProjectResults: c.ProjectResults,
 			}
 			for _, verbose := range []bool{true, false} {
 				t.Run(c.Description, func(t *testing.T) {
-					s := r.Render(res, c.Command, c.SubCommand, "log", verbose, c.VCSHost)
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						SubName: c.SubCommand,
+						Verbose: verbose,
+					}
+					s := r.Render(ctx, res, cmd)
 					if !verbose {
 						Equals(t, normalize(c.Expected), normalize(s))
 					} else {
-						Equals(t, normalize(c.Expected+"\n<details><summary>Log</summary>\n  <p>\n\n```\nlog```\n</p></details>"), normalize(s))
+						log := fmt.Sprintf("[INFO] %s", logText)
+						Equals(t, normalize(c.Expected)+
+							fmt.Sprintf("\n<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log), normalize(s))
 					}
 				})
 			}
