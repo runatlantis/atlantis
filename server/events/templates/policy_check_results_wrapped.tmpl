@@ -15,19 +15,25 @@
 {{- end }}
 {{- if .PolicyCleared }}
 * :arrow_forward: To **apply** this plan, comment:
-    * `{{ .ApplyCmd }}`
+  ```shell
+  {{ .ApplyCmd }}
+  ```
 {{- else }}
+</details>
 #### Policy Approval Status:
 ```
 {{ .PolicyApprovalSummary }}
 ```
 * :heavy_check_mark: To **approve** this project, comment:
-    * `{{ .ApprovePoliciesCmd }}`
+  ```shell
+  {{ .ApprovePoliciesCmd }}
+  ```
 {{- end }}
-* :put_litter_in_its_place: To **delete** this plan click [here]({{ .LockURL }})
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here]({{ .LockURL }})
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * `{{ .RePlanCmd }}`
-</details>
+  ```shell
+  {{ .RePlanCmd }}
+  ```
 {{- if eq .Command "Policy Check" }}
 
 ```
