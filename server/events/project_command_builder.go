@@ -89,7 +89,7 @@ func NewInstrumentedProjectCommandBuilder(
 			scope,
 			terraformClient,
 		),
-		scope:  scope,
+		scope: scope,
 	}
 }
 
