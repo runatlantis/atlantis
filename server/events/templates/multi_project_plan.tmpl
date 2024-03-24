@@ -1,5 +1,5 @@
 {{ define "multiProjectPlan" -}}
-{{ template "multiProjectHeader" . }}
+{{ template "multiProjectHeader" . -}}
 {{ $disableApplyAll := .DisableApplyAll -}}
 {{ $hideUnchangedPlans := .HideUnchangedPlanComments -}}
 {{ range $i, $result := .Results -}}
