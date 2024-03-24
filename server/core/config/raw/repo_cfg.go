@@ -24,7 +24,6 @@ type RepoCfg struct {
 	ParallelApply              *bool               `yaml:"parallel_apply,omitempty"`
 	ParallelPlan               *bool               `yaml:"parallel_plan,omitempty"`
 	DeleteSourceBranchOnMerge  *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
-	EnableEmojiReaction        *bool               `yaml:"enable_emoji_reaction,omitempty"`
 	EmojiReaction              *string             `yaml:"emoji_reaction,omitempty"`
 	AllowedRegexpPrefixes      []string            `yaml:"allowed_regexp_prefixes,omitempty"`
 	AbortOnExcecutionOrderFail *bool               `yaml:"abort_on_execution_order_fail,omitempty"`
@@ -89,7 +88,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		ParallelPolicyCheck:        parallelPlan,
 		DeleteSourceBranchOnMerge:  r.DeleteSourceBranchOnMerge,
 		AllowedRegexpPrefixes:      r.AllowedRegexpPrefixes,
-		EnableEmojiReaction:        r.EnableEmojiReaction,
 		EmojiReaction:              emojiReaction,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
 	}

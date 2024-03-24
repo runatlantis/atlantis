@@ -381,14 +381,6 @@ and set `--autoplan-modules` to `false`.
 
   If `disable-autoplan` property is `true`, this flag has no effect.
 
-## `--enable-emoji-reaction`
-  ```bash
-  atlantis server --enable-emoji-reaction
-  # or
-  ATLANTIS_ENABLE_EMOJI_REACTION=true
-  ```
-  Enable emoji reaction in comments. Defaults to `false`.
-
 ### `--disable-markdown-folding`
   ```bash
   atlantis server --disable-markdown-folding
@@ -419,8 +411,8 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_EMOJI_REACTION=thumbsup
   ```
-  The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. This flag is ignored if `--enable-emoji-reaction` is `false`.
-  Defaults to `eyes`.
+  The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. This flag is ignored if value is an empty string.
+  Defaults to "" (empty string).
 
 ### `--enable-diff-markdown-format`
   ```bash

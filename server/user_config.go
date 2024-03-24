@@ -40,7 +40,6 @@ type UserConfig struct {
 	DisableUnlockLabel          string `mapstructure:"disable-unlock-label"`
 	DiscardApprovalOnPlanFlag   bool   `mapstructure:"discard-approval-on-plan"`
 	EmojiReaction               string `mapstructure:"emoji-reaction"`
-	EnableEmojiReaction         bool   `mapstructure:"enable-emoji-reaction"`
 	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
 	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`

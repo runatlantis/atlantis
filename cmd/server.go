@@ -77,7 +77,6 @@ const (
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
-	EnableEmojiReactionFlag          = "enable-emoji-reaction"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	ExecutableName                   = "executable-name"
@@ -158,7 +157,7 @@ const (
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
-	DefaultEmojiReaction                = "eyes"
+	DefaultEmojiReaction                = ""
 	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
@@ -276,7 +275,7 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: "",
 	},
 	EmojiReaction: {
-		description:  "Emoji Reaction to use to react to comments. Only works if --" + EnableEmojiReactionFlag + " is true.",
+		description:  "Emoji Reaction to use to react to comments.",
 		defaultValue: DefaultEmojiReaction,
 	},
 	ExecutableName: {
@@ -469,10 +468,6 @@ var boolFlags = map[string]boolFlag{
 	},
 	DiscardApprovalOnPlanFlag: {
 		description:  "Enables the discarding of approval if a new plan has been executed. Currently only Github is supported",
-		defaultValue: false,
-	},
-	EnableEmojiReactionFlag: {
-		description:  "Enable emoji reactions",
 		defaultValue: false,
 	},
 	EnablePolicyChecksFlag: {
