@@ -244,7 +244,7 @@ terraform {
 				Any[string]())).ThenReturn(tmpDir, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
-        Any[models.PullRequest]())).ThenReturn(ChangedFiles(c.TestDirStructure, ""), nil)
+				Any[models.PullRequest]())).ThenReturn(ChangedFiles(c.TestDirStructure, ""), nil)
 			if c.AtlantisYAML != "" {
 				err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
