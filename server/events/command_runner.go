@@ -24,6 +24,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
@@ -97,6 +98,7 @@ type DefaultCommandRunner struct {
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
+	GiteaPullGetter          *gitea.GiteaClient
 	// User config option: Disables autoplan when a pull request is opened or updated.
 	DisableAutoplan      bool
 	DisableAutoplanLabel string
@@ -386,6 +388,21 @@ func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseR
 	return pull, headRepo, nil
 }
 
+func (c *DefaultCommandRunner) getGiteaData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
+	if c.GiteaPullGetter == nil {
+		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support Gitea")
+	}
+	giteaPull, err := c.GiteaPullGetter.GetPullRequest(logger, baseRepo, pullNum)
+	if err != nil {
+		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Gitea")
+	}
+	pull, _, headRepo, err := c.EventParser.ParseGiteaPull(giteaPull)
+	if err != nil {
+		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+	}
+	return pull, headRepo, nil
+}
+
 func (c *DefaultCommandRunner) getGitlabData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, error) {
 	if c.GitlabMergeRequestGetter == nil {
 		return models.PullRequest{}, errors.New("Atlantis not configured to support GitLab")
@@ -446,6 +463,8 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 		pull = *maybePull
 	case models.AzureDevops:
 		pull, headRepo, err = c.getAzureDevopsData(log, baseRepo, pullNum)
+	case models.Gitea:
+		pull, headRepo, err = c.getGiteaData(log, baseRepo, pullNum)
 	default:
 		err = errors.New("Unknown VCS type–this is a bug")
 	}

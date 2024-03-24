@@ -519,9 +519,10 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: '%s'", mp.Path)
-			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, repoDir)
+			absProjectDir := filepath.Join(repoDir, mp.Path)
+			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir)
 			if err != nil {
-				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", repoDir)
+				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", absProjectDir)
 			}
 
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)

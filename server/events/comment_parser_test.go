@@ -28,6 +28,7 @@ import (
 var commentParser = events.CommentParser{
 	GithubUser:     "github-user",
 	GitlabUser:     "gitlab-user",
+	GiteaUser:      "gitea-user",
 	ExecutableName: "atlantis",
 	AllowCommands:  command.AllCommentCommands,
 }
@@ -36,6 +37,7 @@ func TestNewCommentParser(t *testing.T) {
 	type args struct {
 		githubUser      string
 		gitlabUser      string
+		giteaUser       string
 		bitbucketUser   string
 		azureDevopsUser string
 		executableName  string
@@ -68,7 +70,7 @@ func TestNewCommentParser(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands), "NewCommentParser(%v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
+			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.giteaUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands), "NewCommentParser(%v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
 		})
 	}
 }
@@ -266,6 +268,7 @@ func TestParse_InvalidCommand(t *testing.T) {
 	cp := events.NewCommentParser(
 		"github-user",
 		"gitlab-user",
+		"gitea-user",
 		"bitbucket-user",
 		"azure-devops-user",
 		"atlantis",
