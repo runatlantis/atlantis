@@ -72,6 +72,18 @@
         "context": "atlantis/apply",
         "created_at": "2022-02-10T15:26:28Z",
         "updated_at": "2022-02-10T15:26:28Z"
+      },
+      {
+        "url": "https://api.github.com/repos/octocat/Hello-World/statuses/6dcb09b5b57875f334f61aebed695e2e4193db5e",
+        "avatar_url": "https://avatars.githubusercontent.com/u/583231?v=4",
+        "id": 16230308153,
+        "node_id": "SC_kwDOFRFvL88AAAADx2bAWS",
+        "state": "failure",
+        "description": "Failed to report metrics.",
+        "target_url": "https://localhost/jobs/octocat/Hello-World/1/project2",
+        "context": "report-metrics",
+        "created_at": "2022-02-10T15:26:27Z",
+        "updated_at": "2022-02-10T15:26:27Z"
       }
     ],
     "sha": "6dcb09b5b57875f334f61aebed695e2e4193db5e",
