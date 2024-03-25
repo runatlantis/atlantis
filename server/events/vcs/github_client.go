@@ -90,7 +90,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		graphqlURL = "https://api.github.com/graphql"
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
-		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport)
+		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport) // nolint: staticcheck
 		if err != nil {
 			return nil, err
 		}

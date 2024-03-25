@@ -574,6 +574,24 @@ func TestStep_ToValid(t *testing.T) {
 				Output:     "hide",
 			},
 		},
+		{
+			description: "run step with regex",
+			input: raw.Step{
+				EnvOrRun: EnvOrRunType{
+					"run": {
+						"command":      "my 'run command'",
+						"output":       "regex_filter",
+						"regex_filter": ".*",
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:          "run",
+				RunCommand:        "my 'run command'",
+				Output:            "regex_filter",
+				OutputRegexFilter: ".*",
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {

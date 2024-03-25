@@ -22,7 +22,7 @@ type RunStepRunner struct {
 	ProjectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
 
-func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
+func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption, postProcessRegexFilter string) (string, error) {
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -85,6 +85,10 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		return "", nil
 	case valid.PostProcessRunOutputStripRefreshing:
 		return StripRefreshingFromPlanOutput(output, tfVersion), nil
+	case valid.PostProcessRunOutputCustomRegex:
+		return CustomRegexFromPlanOutput(output, postProcessRegexFilter), nil
+	case valid.PostProcessRunOutputStripRefreshingWithCustomRegex:
+		return CustomRegexFromPlanOutput(StripRefreshingFromPlanOutput(output, tfVersion), postProcessRegexFilter), nil
 	case valid.PostProcessRunOutputShow:
 		return output, nil
 	default:
