@@ -35,10 +35,11 @@ Similar to the [Options](using-atlantis.html#options) of `atlantis plan`. Path s
 within the repository to run the plan.  
 At least one of `Directory` or `Workspace` should be specified.
 
-| Name      | Type   | Required | Description                                                                                                                                               |
-|-----------|--------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Directory | string | No       | Which directory to run plan in relative to root of repo                                                                                                   |
-| Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
+| Name      | Type       | Required | Description                                                                                                                                               |
+|-----------|------------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Directory | string     | No       | Which directory to run plan in relative to root of repo                                                                                                   |
+| Workspace | string     | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
+| ExtraArgs | []string   | No       | Additional Terraform flags as list of string                                                                                                              |
 
 #### Sample Request
 
@@ -52,7 +53,11 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
     "Type": "Github",
     "Paths": [{
       "Directory": ".",
-      "Workspace": "default"
+      "Workspace": "default",
+      "ExtraArgs": [
+          "-target",
+          "null_resource.null_resource_simple"
+      ]
     }],
     "PR": 2
 }'
@@ -74,7 +79,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
       "PlanSuccess": {
         "TerraformOutput": "<redacted>",
         "LockURL": "<redacted>",
-        "RePlanCmd": "atlantis plan -d .",
+        "RePlanCmd": "atlantis plan -d . -- -target null_resource.null_resource_simple",
         "ApplyCmd": "atlantis apply -d .",
         "HasDiverged": false
       },
@@ -110,10 +115,11 @@ Similar to the [Options](using-atlantis.html#options-1) of `atlantis apply`. Pat
 within the repository to run the apply.  
 At least one of `Directory` or `Workspace` should be specified.
 
-| Name      | Type   | Required | Description                                                                                                                                               |
-|-----------|--------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Directory | string | No       | Which directory to run apply in relative to root of repo                                                                                                  |
-| Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
+| Name      | Type      | Required | Description                                                                                                                                               |
+|-----------|-----------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Directory | string    | No       | Which directory to run apply in relative to root of repo                                                                                                  |
+| Workspace | string    | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
+| ExtraArgs | []string  | No       | Additional Terraform flags as list of string                                                                                                              |
 
 #### Sample Request
 
@@ -127,7 +133,11 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
     "Type": "Github",
     "Paths": [{
       "Directory": ".",
-      "Workspace": "default"
+      "Workspace": "default",
+      "ExtraArgs": [
+          "-target",
+          "null_resource.null_resource_simple"
+      ]
     }],
     "PR": 2
 }'
