@@ -2,7 +2,6 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@vuepress/bundler-webpack": "2.0.0-rc.9",
-    "@vuepress/client": "2.0.0-rc.9",
     "@vuepress/plugin-docsearch": "2.0.0-rc.19",
     "@vuepress/plugin-google-analytics": "2.0.0-rc.15",
     "@vuepress/plugin-sitemap": "2.0.0-rc.3",

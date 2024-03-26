@@ -4,7 +4,7 @@ import { getDirname, path } from '@vuepress/utils';
 import { defaultTheme } from '@vuepress/theme-default';
 import { defineUserConfig } from 'vuepress';
 import { sitemapPlugin } from '@vuepress/plugin-sitemap';
-import { webpackBundler } from '@vuepress/bundler-webpack'
+import { webpackBundler } from '@vuepress/bundler-webpack';
 
 const __dirname = getDirname(import.meta.url)
 
