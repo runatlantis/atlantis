@@ -3,7 +3,7 @@
 ## Getting Started
 * If you'd like to just test out running Atlantis on an **example repo** check out the [Test Drive](test-drive.md).
 * If you'd like to test out running Atlantis on **your repos** then read [Testing Locally](testing-locally.md).
-* If you're ready to properly install Atlantis on real infrastructure then head over to the [Installation Guide](installation-guide.md).
+* If you're ready to properly install Atlantis on real infrastructure then head over to the [Installation Guide](../docs/installation-guide.md).
 
 ::: tip Looking for the full docs?
 Go here: [www.runatlantis.io/docs](../docs/README.md)
