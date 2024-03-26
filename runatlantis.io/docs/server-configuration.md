@@ -90,7 +90,7 @@ Values are chosen in this order:
   # or (recommended)
   ATLANTIS_API_SECRET="secret"
   ```
-  Required secret used to validate requests made to the [`/api/*` endpoints](api-endpoints.html).
+  Required secret used to validate requests made to the [`/api/*` endpoints](api-endpoints.md).
 
 ### `--atlantis-url`
   ```bash
@@ -129,7 +129,7 @@ Values are chosen in this order:
   ATLANTIS_AUTOMERGE=true
   ```
   Automatically merge pull requests after all plans have been successfully applied.
-  Defaults to `false`. See [Automerging](automerging.html) for more details.
+  Defaults to `false`. See [Automerging](automerging.md) for more details.
 
 ### `--autoplan-file-list`
   ```bash
@@ -147,7 +147,7 @@ Values are chosen in this order:
   * When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json`,  `terragrunt.hcl` and `.terraform.lock.hcl` files
     (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
   * Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
-  * A custom [Workflow](repo-level-atlantis-yaml.html#configuring-planning) that uses autoplan `when_modified` will ignore this value.
+  * A custom [Workflow](repo-level-atlantis-yaml.md#configuring-planning) that uses autoplan `when_modified` will ignore this value.
 
   Examples:
   * Autoplan when any `*.tf` or `*.tfvars` file is modified.
@@ -298,7 +298,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_BITBUCKET_WEBHOOK_SECRET="secret"
   ```
   Secret used to validate Bitbucket webhooks. Only Bitbucket Server supports webhook secrets.
-  For Bitbucket.org, see [Security](security.html#bitbucket-cloud-bitbucket-org) for mitigations.
+  For Bitbucket.org, see [Security](security.md#bitbucket-cloud-bitbucket-org) for mitigations.
 
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from Bitbucket.
@@ -312,7 +312,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_CHECKOUT_DEPTH=0
   ```
   The number of commits to fetch from the branch. Used if `--checkout-strategy=merge` since the `--checkout-strategy=branch` (default) checkout strategy always defaults to a shallow clone using a depth of 1.
-  Defaults to `0`. See [Checkout Strategy](checkout-strategy.html) for more details.
+  Defaults to `0`. See [Checkout Strategy](checkout-strategy.md) for more details.
 
 ### `--checkout-strategy`
   ```bash
@@ -321,7 +321,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_CHECKOUT_STRATEGY="<branch|merge>"
   ```
   How to check out pull requests. Use either `branch` or `merge`.
-  Defaults to `branch`. See [Checkout Strategy](checkout-strategy.html) for more details.
+  Defaults to `branch`. See [Checkout Strategy](checkout-strategy.md) for more details.
 
 ### `--config`
   ```bash
@@ -339,7 +339,7 @@ and set `--autoplan-modules` to `false`.
   ```
   Directory where Atlantis will store its data. Will be created if it doesn't exist.
   Defaults to `~/.atlantis`. Atlantis will store its database, checked out repos, Terraform plans and downloaded
-  Terraform binaries here. If Atlantis loses this directory, [locks](locking.html)
+  Terraform binaries here. If Atlantis loses this directory, [locks](locking.md)
   will be lost and unapplied plans will be lost.
 
   Note that the atlantis user is restricted to `~/.atlantis`.
@@ -352,7 +352,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_DEFAULT_TF_VERSION="v0.12.31"
   ```
   Terraform version to default to. Will download to `<data-dir>/bin/terraform<version>`
-  if not in `PATH`. See [Terraform Versions](terraform-versions.html) for more details.
+  if not in `PATH`. See [Terraform Versions](terraform-versions.md) for more details.
 
 ### `--disable-apply-all`
   ```bash
@@ -430,7 +430,7 @@ and set `--autoplan-modules` to `false`.
   # or
   ATLANTIS_ENABLE_POLICY_CHECKS=true
   ```
-  Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](https://www.runatlantis.io/docs/server-side-repo-config.html#reference).
+  Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](server-side-repo-config.md#reference).
 
 ### `--enable-regexp-cmd`
   ```bash
@@ -442,7 +442,7 @@ and set `--autoplan-modules` to `false`.
 
   This can be used to run all defined projects (with the `name` key) in `atlantis.yaml` using `atlantis plan -p .*`.
 
-  The flag will only allow the regexes listed in the [`allowed_regexp_prefixes`](https://www.runatlantis.io/docs/repo-level-atlantis-yaml.html#reference) key defined in the repo `atlantis.yaml` file. If the key is undefined, its value defaults to `[]` which will allow any regex.
+  The flag will only allow the regexes listed in the [`allowed_regexp_prefixes`](repo-level-atlantis-yaml.md#reference) key defined in the repo `atlantis.yaml` file. If the key is undefined, its value defaults to `[]` which will allow any regex.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
@@ -590,7 +590,7 @@ and set `--autoplan-modules` to `false`.
   # or (recommended)
   ATLANTIS_GH_WEBHOOK_SECRET="secret"
   ```
-  Secret used to validate GitHub webhooks (see [https://developer.github.com/webhooks/securing/](https://docs.github.com/en/developers/webhooks-and-events/webhooks/securing-your-webhooks)).
+  Secret used to validate GitHub webhooks (see [GitHub: Validating webhook deliveries](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries)).
 
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub.
@@ -715,7 +715,7 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_PARALLEL_APPLY=true
   ```
-  Whether to run apply operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precedence.
+  Whether to run apply operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) takes precedence.
 
 ### `--parallel-plan`
   ```bash
@@ -723,7 +723,7 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_PARALLEL_PLAN=true
   ```
-  Whether to run plan operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.html#run-plans-and-applies-in-parallel) takes precedence.
+  Whether to run plan operations in parallel. Defaults to `false`. Explicit declaration in [repo config](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) takes precedence.
 
 ### `--parallel-pool-size`
   ```bash
@@ -840,7 +840,7 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_REPO_CONFIG="path/to/repos.yaml"
   ```
-  Path to a YAML server-side repo config file. See [Server Side Repo Config](server-side-repo-config.html).
+  Path to a YAML server-side repo config file. See [Server Side Repo Config](server-side-repo-config.md).
 
 ### `--repo-config-json`
   ```bash
@@ -849,10 +849,10 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_REPO_CONFIG_JSON='{"repos":[{"id":"/.*/", "apply_requirements":["mergeable"]}]}'
   ```
   Specify server-side repo config as a JSON string. Useful if you don't want to write a config file to disk.
-  See [Server Side Repo Config](server-side-repo-config.html) for more details.
+  See [Server Side Repo Config](server-side-repo-config.md) for more details.
 
   ::: tip
-  If specifying a [Workflow](custom-workflows.html#reference), [step](custom-workflows.html#step)'s
+  If specifying a [Workflow](custom-workflows.md#reference), [step](custom-workflows.md#step)'s
   can be specified as follows:
   ```json
   {
@@ -981,7 +981,7 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_STATS_NAMESPACE="myatlantis"
   ```
-  Namespace for emitting stats/metrics. See [stats](stats.html) section.
+  Namespace for emitting stats/metrics. See [stats](stats.md) section.
 
 ### `--tf-download`
   ```bash
@@ -1011,7 +1011,7 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   ATLANTIS_TFE_HOSTNAME="my-terraform-enterprise.company.com"
   ```
   Hostname of your Terraform Enterprise installation to be used in conjunction with
-  `--tfe-token`. See [Terraform Cloud](terraform-cloud.html) for more details.
+  `--tfe-token`. See [Terraform Cloud](terraform-cloud.md) for more details.
   If using Terraform Cloud (i.e. you don't have your own Terraform Enterprise installation)
   no need to set since it defaults to `app.terraform.io`.
 
@@ -1021,7 +1021,7 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   # or
   ATLANTIS_TFE_LOCAL_EXECUTION_MODE=true
   ```
-  Enable if you're using local execution mode (instead of TFE/C's remote execution mode). See [Terraform Cloud](terraform-cloud.html) for more details.
+  Enable if you're using local execution mode (instead of TFE/C's remote execution mode). See [Terraform Cloud](terraform-cloud.md) for more details.
 
 ### `--tfe-token`
   ```bash
@@ -1029,7 +1029,7 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   # or (recommended)
   ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy'
   ```
-  A token for Terraform Cloud/Terraform Enterprise integration. See [Terraform Cloud](terraform-cloud.html) for more details.
+  A token for Terraform Cloud/Terraform Enterprise integration. See [Terraform Cloud](terraform-cloud.md) for more details.
 
 ### `--use-tf-plugin-cache`
 ```bash

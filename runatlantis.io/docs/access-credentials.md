@@ -46,7 +46,7 @@ Available in Atlantis versions **newer** than 0.13.0.
 - Create a file with the contents of the GitHub App Key, e.g. `atlantis-app-key.pem`
 - Restart Atlantis with new flags: `atlantis server --gh-app-id <your id> --gh-app-key-file atlantis-app-key.pem --gh-webhook-secret <your secret> --write-git-creds --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`.
 
-  NOTE: Instead of using a file for the GitHub App Key you can also pass the key value directly using `--gh-app-key`. You can also create a config file instead of using flags. See [Server Configuration](/docs/server-configuration.html#config-file).
+  NOTE: Instead of using a file for the GitHub App Key you can also pass the key value directly using `--gh-app-key`. You can also create a config file instead of using flags. See [Server Configuration](server-configuration.md#config-file).
 
 ::: warning
 Only a single installation per GitHub App is supported at the moment.
@@ -64,7 +64,7 @@ GitHub App handles the webhook calls by itself, hence there is no need to create
 - Create a file with the contents of the GitHub App Key, e.g. `atlantis-app-key.pem`
 - Start Atlantis with the following flags: `atlantis server --gh-app-id <your id> --gh-installation-id <installation id> --gh-app-key-file atlantis-app-key.pem --gh-webhook-secret <your secret> --write-git-creds --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`.
 
-  NOTE: Instead of using a file for the GitHub App Key you can also pass the key value directly using `--gh-app-key`. You can also create a config file instead of using flags. See [Server Configuration](/docs/server-configuration.html#config-file).
+  NOTE: Instead of using a file for the GitHub App Key you can also pass the key value directly using `--gh-app-key`. You can also create a config file instead of using flags. See [Server Configuration](server-configuration.md#config-file).
 
 ::: tip NOTE
 Manually installing the GitHub app means that the credentials can be shared by many Atlantis installations. This has the benefit of centralizing repository access for shared modules / code.
@@ -105,12 +105,12 @@ Since v0.22.3, a new permission for `Members` has been added, which is required 
 | Members         | Read-only           | 
 
 ### GitLab
-- Follow: [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
+- Follow: [GitLab: Create a personal access token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
 - Create a token with **api** scope
 - Record the access token
 
 ### Bitbucket Cloud (bitbucket.org)
-- Create an App Password by following [https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
+- Create an App Password by following [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 - Label the password "atlantis"
 - Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - Record the access token
@@ -126,7 +126,7 @@ Since v0.22.3, a new permission for `Members` has been added, which is required 
   NOTE: Atlantis will send the token as a [Bearer Auth to the Bitbucket API](https://confluence.atlassian.com/bitbucketserver/http-access-tokens-939515499.html#HTTPaccesstokens-UsingHTTPaccesstokens) instead of using Basic Auth.
 
 ### Azure DevOps
-- Create a Personal access token by following [https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops](https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops)
+- Create a Personal access token by following [Azure DevOps: Use personal access tokens to authenticate](https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops)
 - Label the password "atlantis"
 - The minimum scopes required for this token are:
   - Code (Read & Write)
@@ -135,4 +135,4 @@ Since v0.22.3, a new permission for `Members` has been added, which is required 
 - Record the access token
 
 ## Next Steps
-Once you've got your user and access token, you're ready to create a webhook secret. See [Creating a Webhook Secret](webhook-secrets.html).
+Once you've got your user and access token, you're ready to create a webhook secret. See [Creating a Webhook Secret](webhook-secrets.md).

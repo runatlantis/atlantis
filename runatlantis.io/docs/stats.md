@@ -8,11 +8,11 @@ Currently Statsd and Prometheus is supported. See configuration below for detail
 
 ## Configuration
 
-Metrics are configured through the [Server Side Config](server-side-repo-config.html#metrics).
+Metrics are configured through the [Server Side Config](server-side-repo-config.md#metrics).
 
 ## Available Metrics
 
-Assuming metrics are exposed from the endpoint `/metrics` from the [metrics](server-side-repo-config.html#metrics) server side config e.g.
+Assuming metrics are exposed from the endpoint `/metrics` from the [metrics](server-side-repo-config.md#metrics) server side config e.g.
 
 
 ```yaml
@@ -54,13 +54,13 @@ The output shown above is trimmed, since with every new version release this met
 
 Important metrics to monitor are
 
-| Metric Name                                    | Metric Type                                                          | Purpose                                                                                                            |
-|------------------------------------------------|----------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
-| `atlantis_cmd_autoplan_execution_error`        | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when [autoplan](autoplanning.html#autoplanning) has thrown error. |
-| `atlantis_cmd_comment_plan_execution_error`    | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis plan` has thrown error.      |
-| `atlantis_cmd_autoplan_execution_success`      | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when [autoplan](autoplanning.html#autoplanning) has run successfully. |
-| `atlantis_cmd_comment_apply_execution_error`   | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis apply` has thrown error.     |
-| `atlantis_cmd_comment_apply_execution_success` | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis apply` has run successfully. |
+| Metric Name                                    | Metric Type                                                          | Purpose                                                                             |
+|------------------------------------------------|----------------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| `atlantis_cmd_autoplan_execution_error`        | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when [autoplan](autoplanning.md#autoplanning) has thrown error.     |
+| `atlantis_cmd_comment_plan_execution_error`    | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis plan` has thrown error.                |
+| `atlantis_cmd_autoplan_execution_success`      | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when [autoplan](autoplanning.md#autoplanning) has run successfully. |
+| `atlantis_cmd_comment_apply_execution_error`   | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis apply` has thrown error.               |
+| `atlantis_cmd_comment_apply_execution_success` | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis apply` has run successfully.           |
 
 ::: tip NOTE
 There are plenty of additional metrics exposed by atlantis that are not described above.
