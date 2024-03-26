@@ -17,10 +17,10 @@ Atlantis [Docker image](https://ghcr.io/runatlantis/atlantis).
 ### Routing
 Atlantis and your Git host need to be able to route and communicate with one another. Your Git host needs to be able to send webhooks to Atlantis and Atlantis needs to be able to make API calls to your Git host.
 If you're using
-a public Git host like github.com, gitlab.com, bitbucket.org, or dev.azure.com then you'll need to
+a public Git host like github.com, gitlab.com, gitea.com, bitbucket.org, or dev.azure.com then you'll need to
 expose Atlantis to the internet.
 
-If you're using a private Git host like GitHub Enterprise, GitLab Enterprise or
+If you're using a private Git host like GitHub Enterprise, GitLab Enterprise, self-hosted Gitea or
 Bitbucket Server, then Atlantis needs to be routable from the private host and Atlantis will need to be able to route to the private host.
 
 ### Data
@@ -111,16 +111,19 @@ up upgrading Atlantis by accident!
 for your Terraform repos. See [--repo-allowlist](server-configuration.md#repo-allowlist) for more details.
 3. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
-    2. Delete all the `ATLANTIS_GITLAB_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
+    2. Delete all the `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
 4. If you're using GitLab:
     1. Replace `<YOUR_GITLAB_USER>` with the username of your Atlantis GitLab user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
-5. If you're using Bitbucket:
+    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITEA_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
+5. If you're using Gitea:
+    1. Replace `<YOUR_GITEA_USER>` with the username of your Atlantis Gitea user without the `@`.
+    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
+6. If you're using Bitbucket:
     1. Replace `<YOUR_BITBUCKET_USER>` with the username of your Atlantis Bitbucket user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
-6. If you're using Azure DevOps:
+    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
+7. If you're using Azure DevOps:
     1. Replace `<YOUR_AZUREDEVOPS_USER>` with the username of your Atlantis Azure DevOps user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, and `ATLANTIS_BITBUCKET_*` environment variables.
+    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*`, and `ATLANTIS_BITBUCKET_*` environment variables.
 
 #### StatefulSet Manifest
 <details>
@@ -184,6 +187,21 @@ spec:
               name: atlantis-vcs
               key: webhook-secret
         ### End GitLab Config ###
+
+        ### Gitea Config ###
+        - name: ATLANTIS_GITEA_USER
+          value: <YOUR_GITEA_USER> # 4i. If you're using Gitea replace <YOUR_GITEA_USER> with the username of your Atlantis Gitea user without the `@`.
+        - name: ATLANTIS_GITEA_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        - name: ATLANTIS_GITEA_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: webhook-secret
+        ### End Gitea Config ###
 
         ### Bitbucket Config ###
         - name: ATLANTIS_BITBUCKET_USER
@@ -333,6 +351,21 @@ spec:
               key: webhook-secret
         ### End GitLab Config ###
 
+        ### Gitea Config ###
+        - name: ATLANTIS_GITEA_USER
+          value: <YOUR_GITEA_USER> # 4i. If you're using Gitea replace <YOUR_GITEA_USER> with the username of your Atlantis Gitea user without the `@`.
+        - name: ATLANTIS_GITEA_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: token
+        - name: ATLANTIS_GITEA_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: webhook-secret
+        ### End Gitea Config ###
+
         ### Bitbucket Config ###
         - name: ATLANTIS_BITBUCKET_USER
           value: <YOUR_BITBUCKET_USER> # 5i. If you're using Bitbucket replace <YOUR_BITBUCKET_USER> with the username of your Atlantis Bitbucket user without the `@`.
@@ -475,6 +508,26 @@ containers:
           name: atlantis-vcs
           key: token
     - name: ATLANTIS_GITLAB_WEBHOOK_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: webhook-secret
+```
+
+#### Gitea
+
+```yaml
+containers:
+- name: atlantis
+  env:
+    - name: ATLANTIS_GITEA_USER
+      value: <YOUR_GITEA_USER> # 4i. If you're using Gitea replace <YOUR_GITEA_USER> with the username of your Atlantis Gitea user without the `@`.
+    - name: ATLANTIS_GITEA_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: atlantis-vcs
+          key: token
+    - name: ATLANTIS_GITEA_WEBHOOK_SECRET
       valueFrom:
         secretKeyRef:
           name: atlantis-vcs
@@ -632,6 +685,17 @@ atlantis server \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
 
+##### Gitea
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--gitea-user="$USERNAME" \
+--gitea-token="$TOKEN" \
+--gitea-webhook-secret="$SECRET" \
+--gitea-page-size=30 \
+--repo-allowlist="$REPO_ALLOWLIST"
+```
+
 ##### Bitbucket Cloud (bitbucket.org)
 ```bash
 atlantis server \
@@ -671,17 +735,18 @@ atlantis server \
 
 Where
 - `$URL` is the URL that Atlantis can be reached at
-- `$USERNAME` is the GitHub/GitLab/Bitbucket/AzureDevops username you generated the token for
+- `$USERNAME` is the GitHub/GitLab/Gitea/Bitbucket/AzureDevops username you generated the token for
 - `$TOKEN` is the access token you created. If you don't want this to be passed
   in as an argument for security reasons you can specify it in a config file
    (see [Configuration](server-configuration.md#environment-variables))
-    or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN`
+    or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN` or `ATLANTIS_GITEA_TOKEN`
      or `ATLANTIS_BITBUCKET_TOKEN` or `ATLANTIS_AZUREDEVOPS_TOKEN`
 - `$SECRET` is the random key you used for the webhook secret.
    If you don't want this to be passed in as an argument for security reasons
     you can specify it in a config file
      (see [Configuration](server-configuration.md#environment-variables))
-      or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET`
+      or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET` or
+  `ATLANTIS_GITEA_WEBHOOK_SECRET`
 - `$REPO_ALLOWLIST` is which repos Atlantis can run on, ex.
  `github.com/runatlantis/*` or `github.enterprise.corp.com/*`.
   See [--repo-allowlist](server-configuration.md#repo-allowlist) for more details.
