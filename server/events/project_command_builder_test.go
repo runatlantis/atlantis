@@ -288,7 +288,7 @@ terraform {
 			Ok(t, err)
 			Equals(t, len(c.exp), len(ctxs))
 
-			// Sort so comparisons are determinisitic
+			// Sort so comparisons are deterministic
 			sort.Slice(ctxs, func(i, j int) bool {
 				if ctxs[i].ProjectName != ctxs[j].ProjectName {
 					return ctxs[i].ProjectName < ctxs[j].ProjectName
