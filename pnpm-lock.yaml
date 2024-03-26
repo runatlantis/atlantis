@@ -24,8 +24,11 @@ devDependencies:
     specifier: 2.0.0-rc.9
     version: 2.0.0-rc.9
   sass-loader:
-    specifier: ^14.1.1
+    specifier: 14.1.1
     version: 14.1.1(webpack@5.91.0)
+  vue:
+    specifier: 3.4.21
+    version: 3.4.21
   vuepress:
     specifier: 2.0.0-rc.9
     version: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
