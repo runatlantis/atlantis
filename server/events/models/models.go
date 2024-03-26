@@ -244,6 +244,8 @@ type ProjectLock struct {
 // Terraform projects in a single repo we also include Path to the project
 // root relative to the repo root.
 type Project struct {
+	// ProjectName of the project
+	ProjectName string
 	// RepoFullName is the owner and repo name, ex. "runatlantis/atlantis"
 	RepoFullName string
 	// Path to project root in the repo.
@@ -256,6 +258,7 @@ type Project struct {
 }
 
 func (p Project) String() string {
+	// TODO: Incorporate ProjectName?
 	return fmt.Sprintf("repofullname=%s path=%s", p.RepoFullName, p.Path)
 }
 
@@ -271,12 +274,13 @@ type Plan struct {
 
 // NewProject constructs a Project. Use this constructor because it
 // sets Path correctly.
-func NewProject(repoFullName string, path string) Project {
+func NewProject(repoFullName string, path string, projectName string) Project {
 	path = paths.Clean(path)
 	if path == "/" {
 		path = "."
 	}
 	return Project{
+		ProjectName:  projectName,
 		RepoFullName: repoFullName,
 		Path:         path,
 	}
@@ -300,6 +304,7 @@ const (
 	BitbucketCloud
 	BitbucketServer
 	AzureDevops
+	Gitea
 )
 
 func (h VCSHostType) String() string {
@@ -314,6 +319,8 @@ func (h VCSHostType) String() string {
 		return "BitbucketServer"
 	case AzureDevops:
 		return "AzureDevops"
+	case Gitea:
+		return "Gitea"
 	}
 	return "<missing String() implementation>"
 }
@@ -330,6 +337,8 @@ func NewVCSHostType(t string) (VCSHostType, error) {
 		return BitbucketServer, nil
 	case "AzureDevops":
 		return AzureDevops, nil
+	case "Gitea":
+		return Gitea, nil
 	}
 
 	return -1, fmt.Errorf("%q is not a valid type", t)

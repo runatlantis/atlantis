@@ -2,14 +2,14 @@ version: 2
 jobs:
   e2e:
     docker:
-    - image: cimg/go:1.21 # If you update this, update it in the Makefile too
+    - image: cimg/go:1.22 # If you update this, update it in the Makefile too
       environment:
         # This version of TF will be downloaded before Atlantis is started.
         # We do this instead of setting --default-tf-version because setting
         # that flag starts the download asynchronously so we'd have a race
         # condition.
         # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-        TERRAFORM_VERSION: 1.7.2
+        TERRAFORM_VERSION: 1.7.5
     steps:
     - checkout
     - run: make build-service

@@ -167,7 +167,11 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 	exists := p.removeNonExistingDirs(uniqueDirs, absRepoDir)
 
 	for _, p := range exists {
-		projects = append(projects, models.NewProject(repoFullName, p))
+		// It's unclear how we are supposed to determine the project name at this point
+		// For now, we'll just add the default projectName
+		// TODO: Add support for non-default projectName
+		projectName := ""
+		projects = append(projects, models.NewProject(repoFullName, p, projectName))
 	}
 	log.Info("there are %d modified project(s) at path(s): %v",
 		len(projects), strings.Join(exists, ", "))

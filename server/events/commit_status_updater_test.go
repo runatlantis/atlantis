@@ -22,10 +22,12 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestUpdateCombined(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	cases := []struct {
 		status     models.CommitStatus
 		command    command.Name
@@ -68,16 +70,17 @@ func TestUpdateCombined(t *testing.T) {
 			RegisterMockTestingT(t)
 			client := mocks.NewMockClient()
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
-			err := s.UpdateCombined(models.Repo{}, models.PullRequest{}, c.status, c.command)
+			err := s.UpdateCombined(logger, models.Repo{}, models.PullRequest{}, c.status, c.command)
 			Ok(t, err)
 
 			expSrc := fmt.Sprintf("atlantis/%s", c.command)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
+			client.VerifyWasCalledOnce().UpdateStatus(logger, models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
 		})
 	}
 }
 
 func TestUpdateCombinedCount(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	cases := []struct {
 		status     models.CommitStatus
 		command    command.Name
@@ -134,11 +137,11 @@ func TestUpdateCombinedCount(t *testing.T) {
 			RegisterMockTestingT(t)
 			client := mocks.NewMockClient()
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis-test"}
-			err := s.UpdateCombinedCount(models.Repo{}, models.PullRequest{}, c.status, c.command, c.numSuccess, c.numTotal)
+			err := s.UpdateCombinedCount(logger, models.Repo{}, models.PullRequest{}, c.status, c.command, c.numSuccess, c.numTotal)
 			Ok(t, err)
 
 			expSrc := fmt.Sprintf("%s/%s", s.StatusName, c.command)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
+			client.VerifyWasCalledOnce().UpdateStatus(logger, models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
 		})
 	}
 }
@@ -177,7 +180,9 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 				Workspace:   c.workspace,
 			}, command.Plan, models.PendingCommitStatus, "url", nil)
 			Ok(t, err)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, models.PendingCommitStatus, c.expSrc, "Plan in progress...", "url")
+			client.VerifyWasCalledOnce().UpdateStatus(
+				Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}), Eq(models.PendingCommitStatus), Eq(c.expSrc),
+				Eq("Plan in progress..."), Eq("url"))
 		})
 	}
 }
@@ -240,7 +245,8 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 				Workspace:  "default",
 			}, c.cmd, c.status, "url", c.result)
 			Ok(t, err)
-			client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{}, c.status, fmt.Sprintf("atlantis/%s: ./default", c.cmd.String()), c.expDescrip, "url")
+			client.VerifyWasCalledOnce().UpdateStatus(Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}), Eq(c.status),
+				Eq(fmt.Sprintf("atlantis/%s: ./default", c.cmd.String())), Eq(c.expDescrip), Eq("url"))
 		})
 	}
 }
@@ -255,6 +261,6 @@ func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) 
 		Workspace:  "default",
 	}, command.Apply, models.SuccessCommitStatus, "url", nil)
 	Ok(t, err)
-	client.VerifyWasCalledOnce().UpdateStatus(models.Repo{}, models.PullRequest{},
-		models.SuccessCommitStatus, "custom/apply: ./default", "Apply succeeded.", "url")
+	client.VerifyWasCalledOnce().UpdateStatus(Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}),
+		Eq(models.SuccessCommitStatus), Eq("custom/apply: ./default"), Eq("Apply succeeded."), Eq("url"))
 }

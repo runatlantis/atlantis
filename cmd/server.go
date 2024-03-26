@@ -93,6 +93,11 @@ const (
 	GHOrganizationFlag               = "gh-org"
 	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
 	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
+	GiteaBaseURLFlag                 = "gitea-base-url"
+	GiteaTokenFlag                   = "gitea-token"
+	GiteaUserFlag                    = "gitea-user"
+	GiteaWebhookSecretFlag           = "gitea-webhook-secret" // nolint: gosec
+	GiteaPageSizeFlag                = "gitea-page-size"
 	GitlabHostnameFlag               = "gitlab-hostname"
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
@@ -156,6 +161,8 @@ const (
 	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
+	DefaultGiteaBaseURL                 = "https://gitea.com"
+	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
@@ -317,6 +324,22 @@ var stringFlags = map[string]stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
+	},
+	GiteaBaseURLFlag: {
+		description: "Base URL of Gitea server installation. Must include 'http://' or 'https://'.",
+	},
+	GiteaUserFlag: {
+		description:  "Gitea username of API user.",
+		defaultValue: "",
+	},
+	GiteaTokenFlag: {
+		description: "Gitea token of API user. Can also be specified via the ATLANTIS_GITEA_TOKEN environment variable.",
+	},
+	GiteaWebhookSecretFlag: {
+		description: "Optional secret used to validate Gitea webhooks." +
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from Gitea. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_GITEA_WEBHOOK_SECRET environment variable.",
 	},
 	GitlabHostnameFlag: {
 		description:  "Hostname of your GitLab Enterprise installation. If using gitlab.com, no need to set.",
@@ -568,6 +591,10 @@ var intFlags = map[string]intFlag{
 			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
 		defaultValue: DefaultCheckoutDepth,
 	},
+	GiteaPageSizeFlag: {
+		description:  "Optional value that specifies the number of results per page to expect from Gitea.",
+		defaultValue: DefaultGiteaPageSize,
+	},
 	ParallelPoolSize: {
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
 		defaultValue: DefaultParallelPoolSize,
@@ -813,6 +840,12 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.GitlabHostname == "" {
 		c.GitlabHostname = DefaultGitlabHostname
 	}
+	if c.GiteaBaseURL == "" {
+		c.GiteaBaseURL = DefaultGiteaBaseURL
+	}
+	if c.GiteaPageSize == 0 {
+		c.GiteaPageSize = DefaultGiteaPageSize
+	}
 	if c.BitbucketBaseURL == "" {
 		c.BitbucketBaseURL = DefaultBitbucketBaseURL
 	}
@@ -885,12 +918,17 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// The following combinations are valid.
 	// 1. github user and token set
 	// 2. github app ID and (key file set or key set)
-	// 3. gitlab user and token set
-	// 4. bitbucket user and token set
-	// 5. azuredevops user and token set
-	// 6. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+	// 3. gitea user and token set
+	// 4. gitlab user and token set
+	// 5. bitbucket user and token set
+	// 6. azuredevops user and token set
+	// 7. any combination of the above
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GiteaUserFlag, GiteaTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) ||
+		((userConfig.GiteaUser == "") != (userConfig.GiteaToken == "")) ||
+		((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) ||
+		((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) ||
+		((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
 		return vcsErr
 	}
 	if (userConfig.GithubAppID != 0) && ((userConfig.GithubAppKey == "") && (userConfig.GithubAppKeyFile == "")) {
@@ -901,7 +939,7 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
-	if userConfig.GithubAppID == 0 && userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" {
+	if userConfig.GithubAppID == 0 && userConfig.GithubUser == "" && userConfig.GiteaUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" {
 		return vcsErr
 	}
 
@@ -924,6 +962,14 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("--%s must have http:// or https://, got %q", BitbucketBaseURLFlag, userConfig.BitbucketBaseURL)
 	}
 
+	parsed, err = url.Parse(userConfig.GiteaBaseURL)
+	if err != nil {
+		return fmt.Errorf("error parsing --%s flag value %q: %s", GiteaWebhookSecretFlag, userConfig.GiteaBaseURL, err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("--%s must have http:// or https://, got %q", GiteaBaseURLFlag, userConfig.GiteaBaseURL)
+	}
+
 	if userConfig.RepoConfig != "" && userConfig.RepoConfigJSON != "" {
 		return fmt.Errorf("cannot use --%s and --%s at the same time", RepoConfigFlag, RepoConfigJSONFlag)
 	}
@@ -936,6 +982,8 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		GitlabWebhookSecretFlag:    userConfig.GitlabWebhookSecret,
 		BitbucketTokenFlag:         userConfig.BitbucketToken,
 		BitbucketWebhookSecretFlag: userConfig.BitbucketWebhookSecret,
+		GiteaTokenFlag:             userConfig.GiteaToken,
+		GiteaWebhookSecretFlag:     userConfig.GiteaWebhookSecret,
 	} {
 		if strings.Contains(token, "\n") {
 			s.Logger.Warn("--%s contains a newline which is usually unintentional", name)
@@ -1029,6 +1077,7 @@ func (s *ServerCmd) setVarFileAllowlist(userConfig *server.UserConfig) {
 // trimAtSymbolFromUsers trims @ from the front of the github and gitlab usernames
 func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 	userConfig.GithubUser = strings.TrimPrefix(userConfig.GithubUser, "@")
+	userConfig.GiteaUser = strings.TrimPrefix(userConfig.GiteaUser, "@")
 	userConfig.GitlabUser = strings.TrimPrefix(userConfig.GitlabUser, "@")
 	userConfig.BitbucketUser = strings.TrimPrefix(userConfig.BitbucketUser, "@")
 	userConfig.AzureDevopsUser = strings.TrimPrefix(userConfig.AzureDevopsUser, "@")
@@ -1037,6 +1086,9 @@ func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.GithubUser != "" && userConfig.GithubWebhookSecret == "" && !s.SilenceOutput {
 		s.Logger.Warn("no GitHub webhook secret set. This could allow attackers to spoof requests from GitHub")
+	}
+	if userConfig.GiteaUser != "" && userConfig.GiteaWebhookSecret == "" && !s.SilenceOutput {
+		s.Logger.Warn("no Gitea webhook secret set. This could allow attackers to spoof requests from Gitea")
 	}
 	if userConfig.GitlabUser != "" && userConfig.GitlabWebhookSecret == "" && !s.SilenceOutput {
 		s.Logger.Warn("no GitLab webhook secret set. This could allow attackers to spoof requests from GitLab")

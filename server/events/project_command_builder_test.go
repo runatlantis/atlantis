@@ -48,6 +48,19 @@ var defaultUserConfig = struct {
 	AutoDiscoverMode:         "auto",
 }
 
+func ChangedFiles(dirStructure map[string]interface{}, parent string) []string {
+	var files []string
+	for k, v := range dirStructure {
+		switch v := v.(type) {
+		case map[string]interface{}:
+			files = append(files, ChangedFiles(v, k)...)
+		default:
+			files = append(files, filepath.Join(parent, k))
+		}
+	}
+	return files
+}
+
 func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
 	// expCtxFields define the ctx fields we're going to assert on.
 	// Since we're focused on autoplanning here, we don't validate all the
@@ -57,11 +70,16 @@ func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
 		RepoRelDir  string
 		Workspace   string
 	}
+	defaultTestDirStructure := map[string]interface{}{
+		"main.tf": nil,
+	}
+
 	cases := []struct {
-		Description    string
-		AtlantisYAML   string
-		ServerSideYAML string
-		exp            []expCtxFields
+		Description      string
+		AtlantisYAML     string
+		ServerSideYAML   string
+		TestDirStructure map[string]interface{}
+		exp              []expCtxFields
 	}{
 		{
 			Description: "simple atlantis.yaml",
@@ -70,6 +88,7 @@ version: 3
 projects:
 - dir: .
 `,
+			TestDirStructure: defaultTestDirStructure,
 			exp: []expCtxFields{
 				{
 					ProjectName: "",
@@ -94,6 +113,7 @@ projects:
   name: myname
   workspace: myworkspace2
 `,
+			TestDirStructure: defaultTestDirStructure,
 			exp: []expCtxFields{
 				{
 					ProjectName: "",
@@ -122,6 +142,7 @@ projects:
 - dir: .
   workspace: myworkspace2
 `,
+			TestDirStructure: defaultTestDirStructure,
 			exp: []expCtxFields{
 				{
 					ProjectName: "",
@@ -142,7 +163,68 @@ version: 3
 projects:
 - dir: mydir
 `,
-			exp: nil,
+			TestDirStructure: defaultTestDirStructure,
+			exp:              nil,
+		},
+		{
+			Description: "workspaces from subdirectories detected",
+			TestDirStructure: map[string]interface{}{
+				"work": map[string]interface{}{
+					"main.tf": `
+terraform {
+  cloud {
+    organization = "atlantis-test"
+    workspaces {
+      name = "test-workspace1"
+    }
+  }
+}`,
+				},
+				"test": map[string]interface{}{
+					"main.tf": `
+terraform {
+  cloud {
+    organization = "atlantis-test"
+    workspaces {
+      name = "test-workspace12"
+    }
+  }
+}`,
+				},
+			},
+			exp: []expCtxFields{
+				{
+					ProjectName: "",
+					RepoRelDir:  "work",
+					Workspace:   "test-workspace1",
+				},
+				{
+					ProjectName: "",
+					RepoRelDir:  "test",
+					Workspace:   "test-workspace12",
+				},
+			},
+		},
+		{
+			Description: "workspaces in parent directory are detected",
+			TestDirStructure: map[string]interface{}{
+				"main.tf": `
+terraform {
+  cloud {
+    organization = "atlantis-test"
+    workspaces {
+      name = "test-workspace"
+    }
+  }
+}`,
+			},
+			exp: []expCtxFields{
+				{
+					ProjectName: "",
+					RepoRelDir:  ".",
+					Workspace:   "test-workspace",
+				},
+			},
 		},
 	}
 
@@ -156,14 +238,12 @@ projects:
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
-			tmpDir := DirStructure(t, map[string]interface{}{
-				"main.tf": nil,
-			})
-
+			tmpDir := DirStructure(t, c.TestDirStructure)
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(ChangedFiles(c.TestDirStructure, ""), nil)
 			if c.AtlantisYAML != "" {
 				err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
@@ -513,7 +593,8 @@ projects:
 				When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
 				When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 				vcsClient := vcsmocks.NewMockClient()
-				When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
+				When(vcsClient.GetModifiedFiles(
+					Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 				if c.AtlantisYAML != "" {
 					err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 					Ok(t, err)
@@ -701,7 +782,8 @@ projects:
 			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
 				err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
@@ -1030,7 +1112,8 @@ projects:
 			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
 				err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
@@ -1315,7 +1398,8 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowAllRepoSettings: true,
@@ -1465,7 +1549,8 @@ projects:
 			tmpDir := DirStructure(t, testCase.DirStructure)
 
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(testCase.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(testCase.ModifiedFiles, nil)
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(
@@ -1589,9 +1674,11 @@ projects:
 	for _, c := range cases {
 		RegisterMockTestingT(t)
 		vcsClient := vcsmocks.NewMockClient()
-		When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
+		When(vcsClient.GetModifiedFiles(
+			Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 		When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(true)
-		When(vcsClient.GetFileContent(Any[models.PullRequest](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
+		When(vcsClient.GetFileContent(
+			Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
 		workingDir := mocks.NewMockWorkingDir()
 
 		logger := logging.NewNoopLogger(t)
@@ -1660,7 +1747,8 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, false, nil)
 	vcsClient := vcsmocks.NewMockClient()
-	When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
+	When(vcsClient.GetModifiedFiles(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowAllRepoSettings: false,
@@ -1881,7 +1969,8 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetGitUntrackedFiles(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(c.UntrackedFiles, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
 				err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)
@@ -1991,7 +2080,8 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetGitUntrackedFiles(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(c.UntrackedFiles, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 			if c.AtlantisYAML != "" {
 				err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(c.AtlantisYAML), 0600)
 				Ok(t, err)

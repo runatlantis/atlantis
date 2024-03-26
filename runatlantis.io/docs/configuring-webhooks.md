@@ -54,6 +54,26 @@ If you're using GitLab, navigate to your project's home page in GitLab
 - click **Add webhook**
 - See [Next Steps](#next-steps)
 
+## Gitea
+If you're using Gitea, navigate to your project's home page in Gitea
+- Click **Settings > Webhooks** in the top- and then sidebar
+- Click **Add webhook > Gitea** (Gitea webhooks are service specific, but this works)
+- set **Target URL** to `http://$URL/events` (or `https://$URL/events` if you're using SSL) where `$URL` is where Atlantis is hosted. **Be sure to add `/events`**
+- double-check you added `/events` to the end of your URL.
+- set **Secret** to the Webhook Secret you generated previously
+  - **NOTE** If you're adding a webhook to multiple repositories, each repository will need to use the **same** secret.
+- Select **Custom Events...**
+- Check the boxes
+    - **Repository events > Push**
+    - **Issue events > Issue Comment**
+    - **Pull Request events > Pull Request**
+    - **Pull Request events > Pull Request Comment**
+    - **Pull Request events > Pull Request Reviewed**
+    - **Pull Request events > Pull Request Synchronized**
+- Leave **Active** checked
+- Click **Add Webhook**
+- See [Next Steps](#next-steps)
+
 ## Bitbucket Cloud (bitbucket.org)
 - Go to your repo's home page
 - Click **Settings** in the sidebar
