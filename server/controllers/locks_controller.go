@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/runatlantis/atlantis/server/controllers/templates"
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -23,7 +23,7 @@ type LocksController struct {
 	Logger             logging.SimpleLogging
 	ApplyLocker        locking.ApplyLocker
 	VCSClient          vcs.Client
-	LockDetailTemplate templates.TemplateWriter
+	LockDetailTemplate web_templates.TemplateWriter
 	WorkingDir         events.WorkingDir
 	WorkingDirLocker   events.WorkingDirLocker
 	Backend            locking.Backend
@@ -78,7 +78,7 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	owner, repo := models.SplitRepoFullName(lock.Project.RepoFullName)
-	viewData := templates.LockDetailData{
+	viewData := web_templates.LockDetailData{
 		LockKeyEncoded:  id,
 		LockKey:         idUnencoded,
 		PullRequestLink: lock.Pull.URL,
