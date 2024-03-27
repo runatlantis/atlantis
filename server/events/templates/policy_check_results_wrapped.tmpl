@@ -30,8 +30,11 @@
 </details>
 {{- if eq .Command "Policy Check" }}
 
+{{- if ne .PolicyCheckSummary "" }}
 ```
 {{ .PolicyCheckSummary }}
 ```
+{{- end }}
+
 {{- end }}
 {{ end -}}
