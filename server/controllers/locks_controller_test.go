@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/controllers"
-	"github.com/runatlantis/atlantis/server/controllers/templates"
-	tMocks "github.com/runatlantis/atlantis/server/controllers/templates/mocks"
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
+	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 
@@ -185,7 +185,7 @@ func TestGetLock_Success(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.GetLock(w, req)
-	tmpl.VerifyWasCalledOnce().Execute(w, templates.LockDetailData{
+	tmpl.VerifyWasCalledOnce().Execute(w, web_templates.LockDetailData{
 		LockKeyEncoded:  "id",
 		LockKey:         "id",
 		RepoOwner:       "owner",
