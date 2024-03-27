@@ -15,6 +15,9 @@
             "nodes": [
               {
                 "type": "REQUIRED_STATUS_CHECKS",
+                "repositoryRuleset": {
+                  "enforcement": "ACTIVE"
+                },
                 "parameters": {
                   "requiredStatusChecks": [
                     {

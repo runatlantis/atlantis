@@ -15,6 +15,9 @@
             "nodes": [
               {
                 "type": "REQUIRED_STATUS_CHECKS",
+                "repositoryRuleset": {
+                  "enforcement": "ACTIVE"
+                },
                 "parameters": {
                   "requiredStatusChecks": [
                     {
@@ -25,6 +28,9 @@
               },
               {
                 "type": "WORKFLOWS",
+                "repositoryRuleset": {
+                  "enforcement": "ACTIVE"
+                },
                 "parameters": {
                   "workflows": [
                     {

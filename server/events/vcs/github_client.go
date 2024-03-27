@@ -475,6 +475,7 @@ type WorkflowRun struct {
 type CheckRun struct {
 	Name       githubv4.String
 	Conclusion githubv4.String
+	// Not currently used: GitHub API classifies as required if coming from ruleset, even when the ruleset is not enforced!
 	IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
 	CheckSuite struct {
 		WorkflowRun *WorkflowRun
@@ -496,8 +497,9 @@ func (original CheckRun) Copy() CheckRun {
 }
 
 type StatusContext struct {
-	Context    githubv4.String
-	State      githubv4.String
+	Context githubv4.String
+	State   githubv4.String
+	// Not currently used: GitHub API classifies as required if coming from ruleset, even when the ruleset is not enforced!
 	IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
 }
 
@@ -576,7 +578,10 @@ func (g *GithubClient) GetPullRequestMergeabilityInfo(
 					Rules struct {
 						PageInfo PageInfo
 						Nodes    []struct {
-							Type       githubv4.String
+							Type              githubv4.String
+							RepositoryRuleset struct {
+								Enforcement githubv4.String
+							}
 							Parameters struct {
 								RequiredStatusChecksParameters struct {
 									RequiredStatusChecks []struct {
@@ -635,6 +640,9 @@ pagination:
 		}
 
 		for _, rule := range query.Repository.PullRequest.BaseRef.Rules.Nodes {
+			if rule.RepositoryRuleset.Enforcement != "ACTIVE" {
+				continue
+			}
 			switch rule.Type {
 			case "REQUIRED_STATUS_CHECKS":
 				for _, context := range rule.Parameters.RequiredStatusChecksParameters.RequiredStatusChecks {
@@ -751,22 +759,6 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 		return false, nil
 	}
 
-	// Safeguard in case the complete set of required checks is not exposed by branch protection or rulesets
-	// Go through every check found in the statusCheckRollup for the pull request
-	// Make sure every required check is passing, ignore the atlantis apply check
-	for _, checkRun := range checkRuns {
-		if bool(checkRun.IsRequired) && !CheckRunPassed(checkRun) {
-			logger.Debug("%s: Required CheckRun: %s Conclusion: %s", notMergeablePrefix, checkRun.Name, checkRun.Conclusion)
-			return false, nil
-		}
-	}
-	for _, statusContext := range statusContexts {
-		if bool(statusContext.IsRequired) && !StatusContextPassed(statusContext, vcsstatusname) {
-			logger.Debug("%s: Required StatusContext: %s State: %s", notMergeablePrefix, statusContext.Context, statusContext.State)
-			return false, nil
-		}
-	}
-
 	// The statusCheckRollup does not always contain all required checks
 	// For example, if a check was made required after the pull request was opened, it would be missing
 	// Go through all checks and workflows required by branch protection or rulesets
@@ -783,7 +775,7 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 			return false, err
 		}
 		if !passed {
-			logger.Debug("%s: Expected Required Workflow: RepositoryId: %s Path: %s", notMergeablePrefix, requiredWorkflow.RepositoryId, requiredWorkflow.Path)
+			logger.Debug("%s: Expected Required Workflow: RepositoryId: %d Path: %s", notMergeablePrefix, requiredWorkflow.RepositoryId, requiredWorkflow.Path)
 			return false, nil
 		}
 	}

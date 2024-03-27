@@ -29,7 +29,7 @@
               {
                 "type": "WORKFLOWS",
                 "repositoryRuleset": {
-                  "enforcement": "ACTIVE"
+                  "enforcement": "EVALUATE"
                 },
                 "parameters": {
                   "workflows": [
@@ -69,7 +69,7 @@
                       },
                       {
                         "__typename": "CheckRun",
-                        "name": "my required check",
+                        "name": "my required (evaluate-enforcement) check",
                         "conclusion": "FAILURE",
                         "isRequired": true,
                         "checkSuite": {
