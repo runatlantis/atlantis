@@ -436,7 +436,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		}
 	}
 
-	moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
+	moduleInfo, err := FindModuleProjects(ctx.Log, repoDir, p.AutoDetectModuleFiles)
 	if err != nil {
 		ctx.Log.Warn("error(s) loading project module dependencies: %s", err)
 	}
