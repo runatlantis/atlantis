@@ -16,13 +16,11 @@ export default defineUserConfig({
             title: 'Atlantis',
             description: 'Atlantis: Terraform Pull Request Automation',
         },
-/*
         '/es/': {
             lang: 'es-ES',
             title: 'Atlantis',
             description: 'Atlantis: Automatización de Pull Requests para Terraform',
         },
-*/
     },
     plugins: [
         googleAnalyticsPlugin({
@@ -88,104 +86,188 @@ export default defineUserConfig({
                     { text: 'Docs', link: '/docs/' },
                     { text: 'Blog', link: 'https://medium.com/runatlantis' },
                 ],
+                sidebar: {
+                    '/guide/': [
+                        '',
+                        'test-drive',
+                        'testing-locally',
+                    ],
+                    '/docs/': [
+                        {
+                            text: 'Installing Atlantis',
+                            collapsible: true,
+                            children: [
+                                'installation-guide',
+                                'requirements',
+                                'access-credentials',
+                                'webhook-secrets',
+                                'deployment',
+                                'configuring-webhooks',
+                                'provider-credentials',
+                            ]
+                        },
+                        {
+                            text: 'Configuring Atlantis',
+                            collapsible: true,
+                            children: [
+                                {
+                                    text: 'Overview',
+                                    link: 'configuring-atlantis',
+                                },
+                                'server-configuration',
+                                'server-side-repo-config',
+                                'pre-workflow-hooks',
+                                'post-workflow-hooks',
+                                'policy-checking',
+                                'custom-workflows',
+                                'repo-level-atlantis-yaml',
+                                'upgrading-atlantis-yaml',
+                                'command-requirements',
+                                'checkout-strategy',
+                                'terraform-versions',
+                                'terraform-cloud',
+                                'using-slack-hooks',
+                                'stats',
+                                'faq',
+                            ]
+                        },
+                        {
+                            text: 'Using Atlantis',
+                            collapsible: true,
+                            children: [
+                                {
+                                    text: 'Overview',
+                                    link: 'using-atlantis',
+                                },
+                                'api-endpoints',
+                            ]
+                        },
+                        {
+                            text: 'How Atlantis Works',
+                            collapsible: true,
+                            children: [
+                                {
+                                    text: 'Overview',
+                                    link: 'how-atlantis-works',
+                                },
+                                'locking',
+                                'autoplanning',
+                                'automerging',
+                                'security',
+                            ]
+                        },
+                        {
+                            text: 'Real-time Terraform Logs',
+                            collapsible: true,
+                            children: [
+                                'streaming-logs',
+                            ]
+                        },
+                        {
+                            text: 'Troubleshooting',
+                            collapsible: true,
+                            children: [
+                                'troubleshooting-https',
+                            ]
+                        }
+                    ]
+                },
             },
-/*
             '/es/': {
                 selectLanguageName: 'Spanish',
                 navbar: [
                     { text: 'Home', link: '/es/' },
-                    { text: 'Guide', link: '/es/guide/' },
-                    { text: 'Docs', link: '/es/docs/' },
+                    { text: 'Guia', link: '/es/guia/' },
+                    { text: 'Documentos', link: '/es/documentos/' },
                     { text: 'Blog', link: 'https://medium.com/runatlantis' },
                 ],
+                sidebar: {
+                    '/guia/': [
+                        '',
+                        'test-drive',
+                        'testiando-local',
+                    ],
+                    '/documentos/': [
+                        {
+                            text: 'Instalando Atlantis',
+                            collapsible: true,
+                            children: [
+                                'guia-de-installacion',
+                                'requerimientos',
+                                'credenciales-de-accesso',
+                                'secretos-de-webhook',
+                                'despliege',
+                                'configuracion-de-webhooks',
+                                'credenciales-del-proveedor',
+                            ]
+                        },
+                        {
+                            text: 'Configurando Atlantis',
+                            collapsible: true,
+                            children: [
+                                {
+                                    text: 'Vista general',
+                                    link: 'cconfiguracion-de-atlantis',
+                                },
+                                'configuracion-de-servidor',
+                                'configuracion-en-servidor-de-repositorio',
+                                'pre-workflow-hooks',
+                                'post-workflow-hooks',
+                                'chequeo-de-polizas',
+                                'customizacion-de-workflows',
+                                'atlantis-yaml-de-repositorio',
+                                'actualizando-atlantis-yaml',
+                                'requirimientos-de-commandos',
+                                'estrategias-de-checkout',
+                                'versiones-de-terraform',
+                                'terraform-cloud',
+                                'usando-slack-hooks',
+                                'estadisticas',
+                                'preguntas-frecuentes',
+                            ]
+                        },
+                        {
+                            text: 'Usando Atlantis',
+                            collapsible: true,
+                            children: [
+                                {
+                                    text: 'Vista General',
+                                    link: 'usando-atlantis',
+                                },
+                                'rutas-de-api',
+                            ]
+                        },
+                        {
+                            text: 'Como funciona Atlantis',
+                            collapsible: true,
+                            children: [
+                                {
+                                    text: 'Vista General',
+                                    link: 'como-funciona-atlantis',
+                                },
+                                'bloqueo',
+                                'autoplaneacion',
+                                'autofusionar',
+                                'seguridad',
+                            ]
+                        },
+                        {
+                            text: 'Logs de Terraform en tiempo real',
+                            collapsible: true,
+                            children: [
+                                'logs-en-tiempo-real',
+                            ]
+                        },
+                        {
+                            text: 'Solucion de Problemas',
+                            collapsible: true,
+                            children: [
+                                'solucion-de-problemas-https',
+                            ]
+                        }
+                    ]
+                },
             },
-*/
-        },
-        sidebar: {
-            '/guide/': [
-                '',
-                'test-drive',
-                'testing-locally',
-            ],
-            '/docs/': [
-                {
-                    text: 'Installing Atlantis',
-                    collapsible: true,
-                    children: [
-                        'installation-guide',
-                        'requirements',
-                        'access-credentials',
-                        'webhook-secrets',
-                        'deployment',
-                        'configuring-webhooks',
-                        'provider-credentials',
-                    ]
-                },
-                {
-                    text: 'Configuring Atlantis',
-                    collapsible: true,
-                    children: [
-                        {
-                            text: 'Overview',
-                            link: 'configuring-atlantis',
-                        },
-                        'server-configuration',
-                        'server-side-repo-config',
-                        'pre-workflow-hooks',
-                        'post-workflow-hooks',
-                        'policy-checking',
-                        'custom-workflows',
-                        'repo-level-atlantis-yaml',
-                        'upgrading-atlantis-yaml',
-                        'command-requirements',
-                        'checkout-strategy',
-                        'terraform-versions',
-                        'terraform-cloud',
-                        'using-slack-hooks',
-                        'stats',
-                        'faq',
-                    ]
-                },
-                {
-                    text: 'Using Atlantis',
-                    collapsible: true,
-                    children: [
-                        {
-                            text: 'Overview',
-                            link: 'using-atlantis',
-                        },
-                        'api-endpoints',
-                    ]
-                },
-                {
-                    text: 'How Atlantis Works',
-                    collapsible: true,
-                    children: [
-                        {
-                            text: 'Overview',
-                            link: 'how-atlantis-works',
-                        },
-                        'locking',
-                        'autoplanning',
-                        'automerging',
-                        'security',
-                    ]
-                },
-                {
-                    text: 'Real-time Terraform Logs',
-                    collapsible: true,
-                    children: [
-                        'streaming-logs',
-                    ]
-                },
-                {
-                    text: 'Troubleshooting',
-                    collapsible: true,
-                    children: [
-                        'troubleshooting-https',
-                    ]
-                }
-            ]
         },
         repo: 'runatlantis/atlantis',
         docsDir: 'runatlantis.io',
