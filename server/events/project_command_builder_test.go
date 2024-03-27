@@ -3,6 +3,7 @@ package events_test
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -195,13 +196,13 @@ terraform {
 			exp: []expCtxFields{
 				{
 					ProjectName: "",
-					RepoRelDir:  "work",
-					Workspace:   "test-workspace1",
+					RepoRelDir:  "test",
+					Workspace:   "test-workspace12",
 				},
 				{
 					ProjectName: "",
-					RepoRelDir:  "test",
-					Workspace:   "test-workspace12",
+					RepoRelDir:  "work",
+					Workspace:   "test-workspace1",
 				},
 			},
 		},
@@ -286,6 +287,17 @@ terraform {
 			})
 			Ok(t, err)
 			Equals(t, len(c.exp), len(ctxs))
+
+			// Sort so comparisons are deterministic
+			sort.Slice(ctxs, func(i, j int) bool {
+				if ctxs[i].ProjectName != ctxs[j].ProjectName {
+					return ctxs[i].ProjectName < ctxs[j].ProjectName
+				}
+				if ctxs[i].RepoRelDir != ctxs[j].RepoRelDir {
+					return ctxs[i].RepoRelDir < ctxs[j].RepoRelDir
+				}
+				return ctxs[i].Workspace < ctxs[j].Workspace
+			})
 			for i, actCtx := range ctxs {
 				expCtx := c.exp[i]
 				Equals(t, expCtx.ProjectName, actCtx.ProjectName)
