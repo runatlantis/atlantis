@@ -17,6 +17,7 @@ const DefaultAbortOnExcecutionOrderFail = false
 type RepoCfg struct {
 	Version                    *int                `yaml:"version,omitempty"`
 	Projects                   []Project           `yaml:"projects,omitempty"`
+	DriftDetection             *DriftDetection     `yaml:"drift_detection,omitempty"`
 	Workflows                  map[string]Workflow `yaml:"workflows,omitempty"`
 	PolicySets                 PolicySets          `yaml:"policies,omitempty"`
 	AutoDiscover               *AutoDiscover       `yaml:"autodiscover,omitempty"`
@@ -43,6 +44,7 @@ func (r RepoCfg) Validate() error {
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.Version, validation.By(equals2)),
 		validation.Field(&r.Projects),
+		validation.Field(&r.DriftDetection),
 		validation.Field(&r.Workflows),
 	)
 }
@@ -65,6 +67,10 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 	emojiReaction := DefaultEmojiReaction
 	if r.EmojiReaction != nil {
 		emojiReaction = *r.EmojiReaction
+	}
+	driftdetection := valid.DriftDetection{Enabled: false}
+	if r.DriftDetection != nil {
+		driftdetection = r.DriftDetection.ToValid()
 	}
 
 	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
@@ -90,5 +96,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		AllowedRegexpPrefixes:      r.AllowedRegexpPrefixes,
 		EmojiReaction:              emojiReaction,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
+		DriftDetection:             driftdetection,
 	}
 }
