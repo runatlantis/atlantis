@@ -1333,7 +1333,6 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		TestingOverrideHeadCloneURL: "override-me",
-		Logger:                      logger,
 	}
 	var preWorkflowHooks []*valid.WorkflowHook
 	if !opt.disablePreWorkflowHooks {
@@ -1425,7 +1424,6 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		false,
 		"auto",
 		statsScope,
-		logger,
 		terraformClient,
 	)
 

@@ -37,18 +37,10 @@ type DefaultPostWorkflowHooksCommandRunner struct {
 }
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
-func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
-	ctx *command.Context, cmd *CommentCommand,
-) error {
-	pull := ctx.Pull
-	baseRepo := pull.BaseRepo
-	headRepo := ctx.HeadRepo
-	user := ctx.User
-	log := ctx.Log
-
+func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Context, cmd *CommentCommand) error {
 	postWorkflowHooks := make([]*valid.WorkflowHook, 0)
 	for _, repo := range w.GlobalCfg.Repos {
-		if repo.IDMatches(baseRepo.ID()) && repo.BranchMatches(pull.BaseBranch) && len(repo.PostWorkflowHooks) > 0 {
+		if repo.IDMatches(ctx.Pull.BaseRepo.ID()) && repo.BranchMatches(ctx.Pull.BaseBranch) && len(repo.PostWorkflowHooks) > 0 {
 			postWorkflowHooks = append(postWorkflowHooks, repo.PostWorkflowHooks...)
 		}
 	}
@@ -58,16 +50,16 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 		return nil
 	}
 
-	log.Debug("post-hooks configured, running...")
+	ctx.Log.Debug("post-hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace, DefaultRepoRelDir)
+	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir)
 	if err != nil {
 		return err
 	}
-	log.Debug("got workspace lock")
+	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := w.WorkingDir.Clone(headRepo, pull, DefaultWorkspace)
+	repoDir, _, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 	if err != nil {
 		return err
 	}
@@ -79,11 +71,11 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(
 
 	err = w.runHooks(
 		models.WorkflowHookCommandContext{
-			BaseRepo:           baseRepo,
-			HeadRepo:           headRepo,
-			Log:                log,
-			Pull:               pull,
-			User:               user,
+			BaseRepo:           ctx.Pull.BaseRepo,
+			HeadRepo:           ctx.HeadRepo,
+			Log:                ctx.Log,
+			Pull:               ctx.Pull,
+			User:               ctx.User,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
 			CommandName:        cmd.Name.String(),
@@ -123,12 +115,12 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 		ctx.HookID = uuid.NewString()
 		shell := hook.Shell
 		if shell == "" {
-			ctx.Log.Debug("Setting shell to default: %q", shell)
+			ctx.Log.Debug("Setting shell to default: '%s'", shell)
 			shell = "sh"
 		}
 		shellArgs := hook.ShellArgs
 		if shellArgs == "" {
-			ctx.Log.Debug("Setting shellArgs to default: %q", shellArgs)
+			ctx.Log.Debug("Setting shellArgs to default: '%s'", shellArgs)
 			shellArgs = "-c"
 		}
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
