@@ -13,7 +13,7 @@ For this you'll need to:
 
 ## Configuring Slack for Atlantis
 
-* Go to [https://api.slack.com/apps](https://api.slack.com/apps)
+* Go to [Slack: Apps](https://api.slack.com/apps)
 * Click the `Create New App` button
 * Select `From scratch` in the dialog that opens
 * Give it a name, e.g. `atlantis-bot`.

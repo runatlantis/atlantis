@@ -18,7 +18,7 @@ If you have this error when specifying a TLS cert with a key:
 ```
 
 Check that the locally signed certificate authority is prepended to the self signed certificate.
-A good example is shown at [Seth Vargo terraform implementation of atlantis-on-gke](https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64)
+A good example is shown at [Seth Vargo terraform implementation of atlantis-on-gke](https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84)
 
 For Go specific TLS resources have a look at the repository by [denji called golang-tls](https://github.com/denji/golang-tls).
 

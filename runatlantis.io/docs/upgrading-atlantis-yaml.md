@@ -3,7 +3,7 @@
 ## Upgrading From v2 To v3
 Atlantis version `v0.7.0` introduced a new version 3 of `atlantis.yaml`.
 
-**If you're not using [custom `run` steps](custom-workflows.html#custom-run-command),
+**If you're not using [custom `run` steps](custom-workflows.md#custom-run-command),
  then you can upgrade from `version: 2` to `version: 3` without any changes.**
 
 **NOTE:** Version 2 **is not being deprecated** and there is no need to upgrade your version

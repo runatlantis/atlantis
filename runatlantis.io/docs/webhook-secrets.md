@@ -17,12 +17,12 @@ Azure DevOps uses Basic authentication for webhooks rather than webhook secrets.
 :::
 
 ::: tip NOTE
-An app-wide token is generated during [GitHub App setup](access-credentials.html#github-app). You can recover it by navigating to the [GitHub app settings page](https://github.com/settings/apps) and selecting "Edit" next to your Atlantis app's name. Token appears after clicking "Edit" under the Webhook header.
+An app-wide token is generated during [GitHub App setup](access-credentials.md#github-app). You can recover it by navigating to the [GitHub app settings page](https://github.com/settings/apps) and selecting "Edit" next to your Atlantis app's name. Token appears after clicking "Edit" under the Webhook header.
 :::
 
 ::: warning
 Bitbucket.org **does not** support webhook secrets.
-To mitigate, use repo allowlists and IP allowlists. See [Security](security.html#bitbucket-cloud-bitbucket-org) for more information.
+To mitigate, use repo allowlists and IP allowlists. See [Security](security.md#bitbucket-cloud-bitbucket-org) for more information.
 :::
 
 ## Generating A Webhook Secret
@@ -30,7 +30,7 @@ You can use any random string generator to create your Webhook secret. It should
 
 For example:
 * Generate via Ruby with `ruby -rsecurerandom -e 'puts SecureRandom.hex(32)'`
-* Generate online with [https://www.browserling.com/tools/random-string](https://www.browserling.com/tools/random-string)
+* Generate online with [browserling: Generate Random Strings and Numbers](https://www.browserling.com/tools/random-string)
 
 ::: tip NOTE
 You must use **the same** webhook secret for each repo.
@@ -38,6 +38,6 @@ You must use **the same** webhook secret for each repo.
 
 ## Next Steps
 * Record your secret
-* You'll be using it later to [configure your webhooks](configuring-webhooks.html), however if you're
-following the [Installation Guide](installation-guide.html) then your next step is to
-[Deploy Atlantis](deployment.html)
+* You'll be using it later to [configure your webhooks](configuring-webhooks.md), however if you're
+following the [Installation Guide](installation-guide.md) then your next step is to
+[Deploy Atlantis](deployment.md)

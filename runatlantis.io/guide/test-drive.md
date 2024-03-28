@@ -1,6 +1,6 @@
 # Test Drive
-To test drive Atlantis on an example repo, download the latest release:
-[https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
+To test drive Atlantis on an example repo, download the latest release from
+[GitHub](https://github.com/runatlantis/atlantis/releases)
 
 Once you've extracted the archive, run:
 ```bash
@@ -14,5 +14,5 @@ This mode sets up Atlantis on a test repo so you can try it out. It will
 - Start Atlantis so you can execute commands on the pull request
 
 ## Next Steps
-* If you're ready to test out running Atlantis on **your repos** then read [Testing Locally](testing-locally.html).
-* If you're ready to properly install Atlantis on real infrastructure then head over to the [Installation Guide](/docs/installation-guide.html).
+* If you're ready to test out running Atlantis on **your repos** then read [Testing Locally](testing-locally.md).
+* If you're ready to properly install Atlantis on real infrastructure then head over to the [Installation Guide](../docs/installation-guide.md).

@@ -12,7 +12,7 @@ projects:
 - dir: .
   terraform_version: v1.1.5
 ```
-See [atlantis.yaml Use Cases](repo-level-atlantis-yaml.html#terraform-versions) for more details.
+See [atlantis.yaml Use Cases](repo-level-atlantis-yaml.md#terraform-versions) for more details.
 
 ## Via terraform config
 Alternatively, one can use the terraform configuration block's `required_version` key to specify an exact version (`x.y.z` or `= x.y.z`), or as of [atlantis v0.21.0](https://github.com/runatlantis/atlantis/releases/tag/v0.21.0), a comparison or pessimistic [version constraint](https://developer.hashicorp.com/terraform/language/expressions/version-constraints#version-constraint-syntax):
@@ -44,7 +44,7 @@ See [Terraform `required_version`](https://developer.hashicorp.com/terraform/lan
 
 ::: tip NOTE
 Atlantis will automatically download the latest version that fulfills the constraint specified.
-A `terraform_version` specified in the `atlantis.yaml` file takes precedence over both the [`--default-tf-version`](server-configuration.html#default-tf-version) flag and the `required_version` in the terraform hcl.
+A `terraform_version` specified in the `atlantis.yaml` file takes precedence over both the [`--default-tf-version`](server-configuration.md#default-tf-version) flag and the `required_version` in the terraform hcl.
 :::
 
 ::: tip NOTE

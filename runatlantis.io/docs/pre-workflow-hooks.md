@@ -2,10 +2,10 @@
 
 Pre workflow hooks can be defined to run scripts before default or custom
 workflows are executed. Pre workflow hooks differ from [custom
-workflows](custom-workflows.html#custom-run-command) in several ways.
+workflows](custom-workflows.md#custom-run-command) in several ways.
 
 1. Pre workflow hooks do not require the repository configuration to be
-   present. This can be utilized to [dynamically generate repo configs](pre-workflow-hooks.html#dynamic-repo-config-generation).
+   present. This can be utilized to [dynamically generate repo configs](pre-workflow-hooks.md#dynamic-repo-config-generation).
 2. Pre workflow hooks are run outside of Atlantis commands. Which means
    they do not surface their output back to the PR as a comment.
 
@@ -19,7 +19,7 @@ Pre workflow hooks can only be specified in the Server-Side Repo Config under th
 ::: tip Note
 By default, `pre-workflow-hooks` do not prevent Atlantis from executing its
 workflows(`plan`, `apply`) even if a `run` command exits with an error. This
-behavior can be changed by setting the [fail-on-pre-workflow-hook-error](server-configuration.html#fail-on-pre-workflow-hook-error)
+behavior can be changed by setting the [fail-on-pre-workflow-hook-error](server-configuration.md#fail-on-pre-workflow-hook-error)
 flag in the Atlantis server configuration.
 ::: 
 
@@ -84,7 +84,7 @@ repos:
 ### Custom `run` Command
 
 This is very similar to the [custom workflow run
-command](custom-workflows.html#custom-run-command).
+command](custom-workflows.md#custom-run-command).
 
 ```yaml
 - run: custom-command
