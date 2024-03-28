@@ -261,7 +261,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
@@ -346,7 +346,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Never(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
@@ -399,7 +399,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 4 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"3. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"4. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n4 projects, 3 successful, 0 failed, 1 errored",
@@ -433,7 +433,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
@@ -463,7 +463,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 	}

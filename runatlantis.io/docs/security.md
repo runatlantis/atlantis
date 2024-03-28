@@ -60,7 +60,7 @@ or by specifying a malicious provider. This code could then exfiltrate your cred
 To prevent this, you could:
 1. Bake providers into the Atlantis image or host and deny egress in production.
 1. Implement the provider registry protocol internally and deny public egress, that way you control who has write access to the registry.
-1. Modify your [server-side repo configuration](https://www.runatlantis.io/docs/server-side-repo-config.html)'s `plan` step to validate against the
+1. Modify your [server-side repo configuration](server-side-repo-config.md)'s `plan` step to validate against the
    use of disallowed providers or data sources or PRs from not allowed users. You could also add in extra validation at this point, e.g.
    requiring a "thumbs-up" on the PR before allowing the `plan` to continue. Conftest could be of use here.
 
