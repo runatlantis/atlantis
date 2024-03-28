@@ -488,7 +488,6 @@ $$$
   $$$shell
   atlantis plan -d path -w workspace
   $$$
-
 $$$
 policy set: policy1: 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
 $$$
