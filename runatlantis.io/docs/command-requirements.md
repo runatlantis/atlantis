@@ -92,7 +92,7 @@ Each VCS provider has a different concept of "mergeability":
 ::: warning
 Some VCS providers have a feature for branch protection to control "mergeability". To use it,
 limit the base branch so to not bypass the branch protection.
-See also the `branch` keyword in [Server Side Repo Config](server-side-repo-config.html#reference) for more details.
+See also the `branch` keyword in [Server Side Repo Config](server-side-repo-config.md#reference) for more details.
 :::
 
 #### GitHub
@@ -103,9 +103,9 @@ If you set up Protected Branches then you can enforce:
 * Requiring certain status checks to be passing
 * Requiring certain people to have reviewed and approved the pull request
 * Requiring `CODEOWNERS` to have reviewed and approved the pull request
-* Requiring that the branch is up to date with `main`
+* Requiring that the branch is up-to-date with `main`
 
-See [https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches)
+See [GitHub: About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches)
 for more details.
 
 ::: warning
@@ -255,7 +255,7 @@ Once the apply requirement is satisfied, **anyone** that can comment on the pull
 request can run the actual `atlantis apply` command.
 
 ## Next Steps
-* For more information on GitHub pull request reviews and approvals see: [https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews)
-* For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: [https://docs.gitlab.com/ee/user/project/merge_requests/approvals/](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/).
-* For more information on Bitbucket pull request reviews and approvals see: [https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html](https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html)
-* For more information on Azure DevOps pull request reviews and approvals see: [https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops&tabs=browser](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops&tabs=browser)
+* For more information on GitHub pull request reviews and approvals see: [GitHub: About pull request reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews)
+* For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: [GitLab: Merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/).
+* For more information on Bitbucket pull request reviews and approvals see: [BitBucket: Use pull requests for code review](https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html)
+* For more information on Azure DevOps pull request reviews and approvals see: [Azure DevOps: Create pull requests](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops&tabs=browser)

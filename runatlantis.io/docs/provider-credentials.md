@@ -5,8 +5,8 @@ Just like when you run Terraform locally, Atlantis needs credentials for your
 specific provider.
 
 It's up to you how you provide credentials for your specific provider to Atlantis:
-* The Atlantis [Helm Chart](deployment.html#kubernetes-helm-chart) and 
-    [AWS Fargate Module](deployment.html#aws-fargate) have their own mechanisms for provider
+* The Atlantis [Helm Chart](deployment.md#kubernetes-helm-chart) and 
+    [AWS Fargate Module](deployment.md#aws-fargate) have their own mechanisms for provider
     credentials. Read their docs.
 * If you're running Atlantis in a cloud then many clouds have ways to give cloud API access
   to applications running on them, ex:
@@ -89,5 +89,5 @@ You can still set these variables yourself using the `extra_args` configuration.
 :::
 
 ## Next Steps
-* If you want to configure Atlantis further, read [Configuring Atlantis](configuring-atlantis.html)
-* If you're ready to use Atlantis, read [Using Atlantis](using-atlantis.html)
+* If you want to configure Atlantis further, read [Configuring Atlantis](configuring-atlantis.md)
+* If you're ready to use Atlantis, read [Using Atlantis](using-atlantis.md)
