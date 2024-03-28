@@ -345,13 +345,13 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		case RepoLocksKey:
 			//We check whether the server configured value and repo-root level
 			//config is different. If it is then we change to the more granular.
-			if rCfg.RepoLocks != nil && repoLocks.Mode != *&rCfg.RepoLocks.Mode {
+			if rCfg.RepoLocks != nil && repoLocks.Mode != rCfg.RepoLocks.Mode {
 				log.Debug("overriding server-defined %s with repo settings: [%#v]", RepoLocksKey, rCfg.RepoLocks)
 				repoLocks = *rCfg.RepoLocks
 			}
 			//Then we check whether the more granular project based config is
 			//different. If it is then we set it.
-			if proj.RepoLocks != nil && repoLocks.Mode != *&proj.RepoLocks.Mode {
+			if proj.RepoLocks != nil && repoLocks.Mode != proj.RepoLocks.Mode {
 				log.Debug("overriding repo-root-defined %s with repo settings: [%#v]", RepoLocksKey, *proj.RepoLocks)
 				repoLocks = *proj.RepoLocks
 			}
