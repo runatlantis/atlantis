@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>atlantis</title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
+  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
+  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <section class="header">
+    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
+    <p class="title-heading">atlantis</p>
+    <p class="title-heading"><strong>{{.LockKey}}</strong> <code>Locked</code></p>
+    </section>
+    <div class="navbar-spacer"></div>
+    <br>
+    <section>
+      <div class="lock-detail-grid">
+        <div><strong>Repo Owner:</strong></div><div>{{.RepoOwner}}</div>
+        <div><strong>Repo Name:</strong></div><div>{{.RepoName}}</div>
+        <div><strong>Pull Request Link:</strong></div><div><a href="{{.PullRequestLink}}" target="_blank">{{.PullRequestLink}}</a></div>
+        <div><strong>Locked By:</strong></div><div>{{.LockedBy}}</div>
+        <div><strong>Workspace:</strong></div><div>{{.Workspace}}</div>
+      </div>
+      <br>
+        <a class="button button-primary" id="discardPlanUnlock">Discard Plan & Unlock</a>
+    </section>
+  </div>
+  <div id="discardMessageModal" class="modal">
+    <!-- Modal content -->
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="close">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p><strong>Are you sure you want to discard the plan and unlock?</strong></p>
+        <input class="button-primary" id="discardYes" type="submit" value="Yes" data="{{.LockKeyEncoded}}">
+        <input type="button" class="cancel" value="Cancel">
+      </div>
+    </div>
+  </div>
+<footer>
+v{{ .AtlantisVersion }}
+</footer>
+<script>
+  // Get the modal
+  var modal = $("#discardMessageModal");
+
+  // Get the button that opens the modal
+  var btn = $("#discardPlanUnlock");
+  var btnDiscard = $("#discardYes");
+  var lockId = btnDiscard.attr('data');
+
+  // Get the <span> element that closes the modal
+  // using document.getElementsByClassName since jquery $("close") doesn't seem to work for btn click events
+  var span = document.getElementsByClassName("close")[0];
+  var cancelBtn = document.getElementsByClassName("cancel")[0];
+
+  // When the user clicks the button, open the modal
+  btn.click(function() {
+    modal.css("display", "block");
+  });
+
+  // When the user clicks on <span> (x), close the modal
+  span.onclick = function() {
+    modal.css("display", "none");
+  }
+  cancelBtn.onclick = function() {
+    modal.css("display", "none");
+  }
+
+  btnDiscard.click(function() {
+    $.ajax({
+        url: '{{ .CleanedBasePath }}/locks?id='+lockId,
+        type: 'DELETE',
+        success: function(result) {
+          window.location.replace("{{ .CleanedBasePath }}/?discard=true");
+        }
+    });
+  });
+
+  // When the user clicks anywhere outside of the modal, close it
+  window.onclick = function(event) {
+      if (event.target == modal) {
+          modal.css("display", "none");
+      }
+  }
+</script>
+</body>
+</html>

@@ -14,14 +14,30 @@
 package web_templates
 
 import (
+	"embed"
 	"html/template"
 	"io"
 	"time"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_template_writer.go TemplateWriter
+
+//go:embed templates/*
+var templatesFS embed.FS
+
+// Read all the templates from the embedded filesystem
+var templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
+
+var templateFileNames = map[string]string{
+	"index":              "index.html.tmpl",
+	"lock":               "lock.html.tmpl",
+	"project-jobs":       "project-jobs.html.tmpl",
+	"project-jobs-error": "project-jobs-error.html.tmpl",
+	"github-app":         "github-app.html.tmpl",
+}
 
 // TemplateWriter is an interface over html/template that's used to enable
 // mocking.
@@ -64,251 +80,7 @@ type IndexData struct {
 	CleanedBasePath string
 }
 
-var IndexTemplate = template.Must(template.New("index.html.tmpl").Parse(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>atlantis</title>
-  <meta name="description" content="">
-  <meta name="author" content="">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
-  <script>
-    $(document).ready(function () {
-      if (document.URL.indexOf("discard=true") !== -1) {
-        $("p.js-discard-success").show();
-        setTimeout(function() {
-          $("p.js-discard-success").fadeOut('slow',function(){
-            window.location.href = "/";
-          })
-        }, 5000); // <-- time in milliseconds
-      }
-    });
-  </script>
-  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
-  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
-  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
-  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
-</head>
-<body>
-<div class="container">
-  <section class="header">
-    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
-    <p class="title-heading">atlantis</p>
-    <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
-  </section>
-  <section>
-    {{ if .ApplyLock.GlobalApplyLockEnabled }}
-    {{ if .ApplyLock.Locked }}
-    <div class="twelve center columns">
-      <h6><strong>Apply commands are disabled globally</strong></h6>
-      <h6><code>Lock Status</code>: <strong>Active</strong></h6>
-      <h6><code>Active Since</code>: <strong>{{ .ApplyLock.TimeFormatted }}</strong></h6>
-      <a class="button button-primary" id="applyUnlockPrompt">Enable Apply Commands</a>
-    </div>
-    {{ else }}
-    <div class="twelve columns">
-      <h6><strong>Apply commands are enabled</strong></h6>
-      <a class="button button-primary" id="applyLockPrompt">Disable Apply Commands</a>
-    </div>
-    {{ end }}
-    {{ end }}
-  </section>
-  <br>
-  <br>
-  <br>
-  <section>
-    <p class="title-heading small"><strong>Locks</strong></p>
-    {{ $basePath := .CleanedBasePath }}
-    {{ if .Locks }}
-    <div class="lock-grid">
-    <div class="lock-header">
-      <span>Repository</span>
-      <span>Project</span>
-      <span>Workspace</span>
-      <span>Locked By</span>
-      <span>Date/Time</span>
-      <span>Status</span>
-    </div>
-    {{ range .Locks }}
-        <div class="lock-row">
-        <a class="lock-link" href="{{ $basePath }}{{.LockPath}}">
-          <span class="lock-reponame">{{.RepoFullName}} #{{.PullNum}}</span>
-        </a>
-        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
-          <span class="lock-path">{{.Path}}</span>
-        </a>
-        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
-          <span><code>{{.Workspace}}</code></span>
-        </a>
-        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
-          <span class="lock-username">{{.LockedBy}}</span>
-        </a>
-        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
-          <span class="lock-datetime">{{.TimeFormatted}}</span>
-        </a>
-        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
-          <span><code>Locked</code></span>
-        </a>
-        </div>
-    {{ end }}
-    </div>
-    {{ else }}
-    <p class="placeholder">No locks found.</p>
-    {{ end }}
-  </section>
-  <br>
-  <br>
-  <br>
-  <section>
-    <p class="title-heading small"><strong>Jobs</strong></p>
-    {{ if .PullToJobMapping }}
-    <div class="lock-grid">
-    <div class="lock-header">
-      <span>Repository</span>
-      <span>Project</span>
-      <span>Workspace</span>
-      <span>Date/Time</span>
-      <span>Step</span>
-      <span>Description</span>
-    </div>
-    {{ range .PullToJobMapping }}
-      <div class="pulls-row">
-      <span class="pulls-element">{{ .Pull.RepoFullName }} #{{ .Pull.PullNum }}</span>
-      <span class="pulls-element">{{ if .Pull.Path }}<code>{{ .Pull.Path }}</code>{{ end }}</span>
-      <span class="pulls-element">{{ if .Pull.Workspace }}<code>{{ .Pull.Workspace }}</code>{{ end }}</span>
-      <span class="pulls-element">
-      {{ range .JobIDInfos }}
-        <div><span class="lock-datetime">{{ .TimeFormatted }}</span></div>
-      {{ end }}
-      </span>
-      <span class="pulls-element">
-      {{ range .JobIDInfos }}
-        <div><a href="{{ $basePath }}{{ .JobIDUrl }}" target="_blank">{{ .JobStep }}</a></div>
-      {{ end }}
-      </span>
-      <span class="pulls-element">
-      {{ range .JobIDInfos }}
-        <div>{{ .JobDescription }}</div>
-      {{ end }}
-      </span>
-      </div>
-    {{ end }}
-    </div>
-    {{ else }}
-    <p class="placeholder">No jobs found.</p>
-    {{ end }}
-  </section>
-  <div id="applyLockMessageModal" class="modal">
-    <!-- Modal content -->
-    <div class="modal-content">
-      <div class="modal-header">
-        <span class="close">&times;</span>
-      </div>
-      <div class="modal-body">
-        <p><strong>Are you sure you want to create a global apply lock? It will disable applies globally</strong></p>
-        <input class="button-primary" id="applyLockYes" type="submit" value="Yes">
-        <input type="button" class="cancel" value="Cancel">
-      </div>
-    </div>
-  </div>
-  <div id="applyUnlockMessageModal" class="modal">
-    <!-- Modal content -->
-    <div class="modal-content">
-      <div class="modal-header">
-        <span class="close">&times;</span>
-      </div>
-      <div class="modal-body">
-        <p><strong>Are you sure you want to release global apply lock?</strong></p>
-        <input class="button-primary" id="applyUnlockYes" type="submit" value="Yes">
-        <input type="button" class="cancel" value="Cancel">
-      </div>
-    </div>
-  </div>
-</div>
-<footer>
-{{ .AtlantisVersion }}
-</footer>
-<script>
-
-  function applyLockModalSetup(lockOrUnlock) {
-      // Get the modal
-      switch( lockOrUnlock ) {
-      case "lock":
-          var modal = $("#applyLockMessageModal");
-
-          var btn = $("#applyLockPrompt");
-
-          $("#applyLockYes").click(function() {
-            $.ajax({
-                url: '{{ .CleanedBasePath }}/apply/lock',
-                type: 'POST',
-                success: function(result) {
-                  window.location.replace("{{ .CleanedBasePath }}/");
-                }
-            });
-          });
-
-          break;
-      case "unlock":
-          var modal = $("#applyUnlockMessageModal");
-
-          var btn = $("#applyUnlockPrompt");
-          var btnApplyUnlock =
-
-          $("#applyUnlockYes").click(function() {
-            $.ajax({
-                url: '{{ .CleanedBasePath }}/apply/unlock',
-                type: 'DELETE',
-                success: function(result) {
-                  window.location.replace("{{ .CleanedBasePath }}/");
-                }
-            });
-          });
-
-          break;
-      default:
-          throw("unsupported command " + lockOrUnlock)
-      }
-
-      return [modal, btn];
-  }
-
-  {{ if .ApplyLock.Locked }}
-  var [modal, btn] = applyLockModalSetup("unlock");
-  {{ else }}
-  var [modal, btn] = applyLockModalSetup("lock");
-  {{ end }}
-
-  // Get the <span> element that closes the modal
-  // using document.getElementsByClassName since jquery $("close") doesn't seem to work for btn click events
-  var span = document.getElementsByClassName("close")[0];
-  var cancelBtn = document.getElementsByClassName("cancel")[0];
-
-  // When the user clicks the button, open the modal
-  btn.click(function() {
-    modal.css("display", "block");
-  });
-
-  // When the user clicks on <span> (x), close the modal
-  span.onclick = function() {
-    modal.css("display", "none");
-  }
-  cancelBtn.onclick = function() {
-    modal.css("display", "none");
-  }
-
-  // When the user clicks anywhere outside of the modal, close it
-  window.onclick = function(event) {
-      if (event.target == modal) {
-          modal.css("display", "none");
-      }
-  }
-</script>
-</body>
-</html>
-`))
+var IndexTemplate = templates.Lookup(templateFileNames["index"])
 
 // LockDetailData holds the fields needed to display the lock detail view.
 type LockDetailData struct {
@@ -326,105 +98,7 @@ type LockDetailData struct {
 	CleanedBasePath string
 }
 
-var LockTemplate = template.Must(template.New("lock.html.tmpl").Parse(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>atlantis</title>
-  <meta name="description" content="">
-  <meta name="author" content="">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
-  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
-  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
-  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
-  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
-</head>
-<body>
-  <div class="container">
-    <section class="header">
-    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
-    <p class="title-heading">atlantis</p>
-    <p class="title-heading"><strong>{{.LockKey}}</strong> <code>Locked</code></p>
-    </section>
-    <div class="navbar-spacer"></div>
-    <br>
-    <section>
-      <div class="lock-detail-grid">
-        <div><strong>Repo Owner:</strong></div><div>{{.RepoOwner}}</div>
-        <div><strong>Repo Name:</strong></div><div>{{.RepoName}}</div>
-        <div><strong>Pull Request Link:</strong></div><div><a href="{{.PullRequestLink}}" target="_blank">{{.PullRequestLink}}</a></div>
-        <div><strong>Locked By:</strong></div><div>{{.LockedBy}}</div>
-        <div><strong>Workspace:</strong></div><div>{{.Workspace}}</div>
-      </div>
-      <br>
-        <a class="button button-primary" id="discardPlanUnlock">Discard Plan & Unlock</a>
-    </section>
-  </div>
-  <div id="discardMessageModal" class="modal">
-    <!-- Modal content -->
-    <div class="modal-content">
-      <div class="modal-header">
-        <span class="close">&times;</span>
-      </div>
-      <div class="modal-body">
-        <p><strong>Are you sure you want to discard the plan and unlock?</strong></p>
-        <input class="button-primary" id="discardYes" type="submit" value="Yes" data="{{.LockKeyEncoded}}">
-        <input type="button" class="cancel" value="Cancel">
-      </div>
-    </div>
-  </div>
-<footer>
-v{{ .AtlantisVersion }}
-</footer>
-<script>
-  // Get the modal
-  var modal = $("#discardMessageModal");
-
-  // Get the button that opens the modal
-  var btn = $("#discardPlanUnlock");
-  var btnDiscard = $("#discardYes");
-  var lockId = btnDiscard.attr('data');
-
-  // Get the <span> element that closes the modal
-  // using document.getElementsByClassName since jquery $("close") doesn't seem to work for btn click events
-  var span = document.getElementsByClassName("close")[0];
-  var cancelBtn = document.getElementsByClassName("cancel")[0];
-
-  // When the user clicks the button, open the modal
-  btn.click(function() {
-    modal.css("display", "block");
-  });
-
-  // When the user clicks on <span> (x), close the modal
-  span.onclick = function() {
-    modal.css("display", "none");
-  }
-  cancelBtn.onclick = function() {
-    modal.css("display", "none");
-  }
-
-  btnDiscard.click(function() {
-    $.ajax({
-        url: '{{ .CleanedBasePath }}/locks?id='+lockId,
-        type: 'DELETE',
-        success: function(result) {
-          window.location.replace("{{ .CleanedBasePath }}/?discard=true");
-        }
-    });
-  });
-
-  // When the user clicks anywhere outside of the modal, close it
-  window.onclick = function(event) {
-      if (event.target == modal) {
-          modal.css("display", "none");
-      }
-  }
-</script>
-</body>
-</html>
-`))
+var LockTemplate = templates.Lookup(templateFileNames["lock"])
 
 // ProjectJobData holds the data needed to stream the current PR information
 type ProjectJobData struct {
@@ -433,103 +107,7 @@ type ProjectJobData struct {
 	CleanedBasePath string
 }
 
-var ProjectJobsTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>atlantis</title>
-    <meta name="description" content>
-    <meta name="author" content>
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm-5.3.0.css">
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
-    <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
-    <style>
-      #terminal {
-        position: fixed;
-        top: 0px;
-        left: 0px;
-        bottom: 0px;
-        right: 0px;
-        border: 5px solid white;
-        z-index: 10;
-        }
-
-      .terminal.xterm {
-        padding: 10px;
-      }
-      #watermark {
-        opacity: 0.5;
-        color: BLACK;
-        position: absolute;
-        bottom: 0;
-        padding-right: 30px;
-        padding-bottom: 15px;
-        right: 0;
-        z-index: 15;
-      }
-    </style>
-  </head>
-
-  <body>
-    <section id="watermark">
-    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
-    <p class="terminal-heading-white">atlantis</p>
-    <p class="title-heading"><strong></strong></p>
-    </section>
-    <section>
-      <div id="terminal"></div>
-    </section>
-  </div>
-  <footer class="footer-white">Initializing...
-  </footer>
-
-    <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-5.3.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.9.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.8.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-0.13.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-bar.js"></script>
-
-    <script>
-      function updateTerminalStatus(msg) {
-          document.getElementsByTagName("footer")[0].innerText = msg;
-      }
-      var term = new Terminal({scrollback: 15000, smoothScrollDuration:125 });
-      var socket = new WebSocket(
-        (document.location.protocol === "http:" ? "ws://" : "wss://") +
-        document.location.host +
-        document.location.pathname +
-        "/ws");
-
-      socket.onopen = function(event) {
-        updateTerminalStatus("Running...");
-      };
-      socket.onclose = function(event) {
-        updateTerminalStatus("Done");
-      };
-
-      window.addEventListener("unload", function(event) {
-        websocket.close();
-      })
-      var attachAddon = new AttachAddon.AttachAddon(socket);
-      var fitAddon = new FitAddon.FitAddon();
-      var searchAddon = new SearchAddon.SearchAddon();
-      var searchBarAddon = new SearchBarAddon.SearchBarAddon({searchAddon});
-      term.loadAddon(attachAddon);
-      term.loadAddon(fitAddon);
-      term.loadAddon(searchAddon);
-      term.loadAddon(searchBarAddon);
-      term.open(document.getElementById("terminal"));
-      searchBarAddon.show();
-      fitAddon.fit();
-      window.addEventListener("resize", () => fitAddon.fit());
-    </script>
-  </body>
-</html>
-`))
+var ProjectJobsTemplate = templates.Lookup(templateFileNames["project-jobs"])
 
 type ProjectJobsError struct {
 	AtlantisVersion string
@@ -537,67 +115,7 @@ type ProjectJobsError struct {
 	CleanedBasePath string
 }
 
-var ProjectJobsErrorTemplate = template.Must(template.New("blank.html.tmpl").Parse(`
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>atlantis</title>
-    <meta name="description" content>
-    <meta name="author" content>
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm-5.3.0.css">
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
-    <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
-    <style>
-      #terminal {
-        width: 100%;
-        height: 100%;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div class="container">
-      <section class="header">
-      <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
-      <p class="title-heading">atlantis</p>
-      <p class="title-heading"><strong></strong></p>
-      </section>
-      <div class="spacer"></div>
-      <br>
-      <section>
-        <div id="terminal"></div>
-      </section>
-    </div>
-    <footer>
-    </footer>
-
-    <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-5.3.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-attach-0.9.0.js"></script>
-    <script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.8.0.js"></script>
-
-    <script>
-      var term = new Terminal();
-      var socket = new WebSocket(
-        (document.location.protocol === "http:" ? "ws://" : "wss://") +
-        document.location.host +
-        document.location.pathname +
-        "/ws");
-      var attachAddon = new AttachAddon.AttachAddon(socket);
-      var fitAddon = new FitAddon.FitAddon();
-      term.loadAddon(attachAddon);
-      term.loadAddon(fitAddon);
-      term.open(document.getElementById("terminal"));
-      term.write('Project Does Not Exist in PR')
-      fitAddon.fit();
-      window.addEventListener("resize", () => fitAddon.fit());
-    </script>
-  </body>
-</html>
-`))
+var ProjectJobsErrorTemplate = templates.Lookup(templateFileNames["project-jobs-error"])
 
 // GithubSetupData holds the data for rendering the github app setup page
 type GithubSetupData struct {
@@ -610,86 +128,4 @@ type GithubSetupData struct {
 	CleanedBasePath string
 }
 
-var GithubAppSetupTemplate = template.Must(template.New("github-app.html.tmpl").Parse(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>atlantis</title>
-  <meta name="description" content="">
-  <meta name="author" content="">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
-  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
-  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
-  <style>
-
-    form {
-      width: 100%;
-    }
-
-    form button {
-      float: right;
-    }
-
-    textarea {
-      width: 100%;
-      height: 300px;
-      font-family: monospace;
-    }
-
-    .config {
-      display: flex;
-      flex-direction: row;
-      align-items: baseline;
-      border-bottom: 1px solid #eee;
-    }
-
-
-    .config strong {
-      width: 15%;
-    }
-
-    pre {
-      background-color: #eee;
-      padding: .5em;
-      width: 80%;
-    }
-  </style>
-  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
-  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
-</head>
-<body>
-<div class="container">
-  <section class="header">
-    <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
-    <p class="title-heading">atlantis</p>
-
-    <p class="github-app-msg"><strong>
-    {{ if .Target }}
-      Create a github app
-    {{ else }}
-      Github app created successfully!
-    {{ end }}
-    </strong></p>
-  </section>
-  <section>
-    {{ if .Target }}
-    <form action="{{ .Target }}" method="POST">
-      <textarea name="manifest">{{ .Manifest }}</textarea>
-      <button type="submit">Setup</button>
-    </form>
-    {{ else }}
-      <p>Visit <a href="{{ .URL }}/installations/new" target="_blank">{{ .URL }}/installations/new</a> to install the app for your user or organization, then <strong>update the following values</strong> in your config and <strong>restart Atlantis<strong>:</p>
-
-      <ul>
-        <li class="config"><strong>gh-app-id:</strong> <pre>{{ .ID }}</pre></li>
-        <li class="config"><strong>gh-app-key-file:</strong> <pre>{{ .Key }}</pre></li>
-        <li class="config"><strong>gh-webhook-secret:</strong> <pre>{{ .WebhookSecret }}</pre></li>
-      </ul>
-    {{ end }}
-  </section>
-</div>
-</body>
-</html>
-`))
+var GithubAppSetupTemplate = templates.Lookup(templateFileNames["github-app"])
