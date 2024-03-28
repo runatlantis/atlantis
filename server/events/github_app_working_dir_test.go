@@ -29,7 +29,6 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
-		Logger:                      logger,
 	}
 
 	defer disableSSLVerification()()
@@ -46,7 +45,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 		GithubHostname: testServer,
 	}
 
-	cloneDir, _, err := gwd.Clone(models.Repo{}, models.PullRequest{
+	cloneDir, _, err := gwd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
@@ -58,6 +57,8 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 }
 
 func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
 	RegisterMockTestingT(t)
 
 	workingDir := eventMocks.NewMockWorkingDir()
@@ -88,13 +89,12 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 	modifiedBaseRepo.SanitizedCloneURL = "https://github.com/runatlantis/atlantis.git"
 
 	When(credentials.GetToken()).ThenReturn("token", nil)
-	When(workingDir.Clone(modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")).ThenReturn(
-		"", true, nil,
-	)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Eq(modifiedBaseRepo), Eq(models.PullRequest{BaseRepo: modifiedBaseRepo}),
+		Eq("default"))).ThenReturn("", true, nil)
 
-	_, success, _ := ghAppWorkingDir.Clone(headRepo, models.PullRequest{BaseRepo: baseRepo}, "default")
+	_, success, _ := ghAppWorkingDir.Clone(logger, headRepo, models.PullRequest{BaseRepo: baseRepo}, "default")
 
-	workingDir.VerifyWasCalledOnce().Clone(modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")
+	workingDir.VerifyWasCalledOnce().Clone(logger, modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")
 
 	Assert(t, success == true, "clone url mutation error")
 }
