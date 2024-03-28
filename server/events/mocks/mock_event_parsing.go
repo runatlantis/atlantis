@@ -5,11 +5,11 @@ package mocks
 
 import (
 	gitea "code.gitea.io/sdk/gitea"
-	gitea0 "github.com/runatlantis/atlantis/server/events/vcs/gitea"
-	github "github.com/google/go-github/v59/github"
+	github "github.com/google/go-github/v60/github"
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	gitea0 "github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	logging "github.com/runatlantis/atlantis/server/logging"
 	go_gitlab "github.com/xanzy/go-gitlab"
 	"reflect"
