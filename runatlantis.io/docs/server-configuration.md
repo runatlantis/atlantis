@@ -92,6 +92,15 @@ Values are chosen in this order:
   ```
   Required secret used to validate requests made to the [`/api/*` endpoints](api-endpoints.html).
 
+### `--apply-error-label`
+  ```bash
+  atlantis server --apply-error-label="apply-error"
+  # or
+  ATLANTIS_APPLY_ERROR_LABEL="apply-error"
+  ```
+  Pull request label to add if an apply error occurs. Can be used together with
+  [`disable-unlock-label`](#disable-unlock-label) to automatically disable unlocking of a partially applied pull-request.
+
 ### `--atlantis-url`
   ```bash
   atlantis server --atlantis-url="https://my-domain.com:9090/basepath"

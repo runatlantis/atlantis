@@ -801,3 +801,8 @@ func (g *GithubClient) GetPullLabels(logger logging.SimpleLogging, repo models.R
 
 	return labels, nil
 }
+
+func (g *GithubClient) AddPullLabel(repo models.Repo, pull models.PullRequest, label string) error {
+	_, _, err := g.client.Issues.AddLabelsToIssue(g.ctx, repo.Owner, repo.Name, pull.Num, []string{label})
+	return err
+}
