@@ -26,17 +26,17 @@ import (
 //go:generate pegomock generate --package mocks -o mocks/mock_template_writer.go TemplateWriter
 
 //go:embed templates/*
-var	templatesFS embed.FS
+var templatesFS embed.FS
 
 // Read all the templates from the embedded filesystem
 var templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
 
 var templateFileNames = map[string]string{
-  "index": "index.html.tmpl",
-  "lock": "lock.html.tmpl",
-  "project-jobs": "project-jobs.html.tmpl",
-  "project-jobs-error": "project-jobs-error.html.tmpl",
-  "github-app": "github-app.html.tmpl",
+	"index":              "index.html.tmpl",
+	"lock":               "lock.html.tmpl",
+	"project-jobs":       "project-jobs.html.tmpl",
+	"project-jobs-error": "project-jobs-error.html.tmpl",
+	"github-app":         "github-app.html.tmpl",
 }
 
 // TemplateWriter is an interface over html/template that's used to enable
@@ -97,7 +97,7 @@ type LockDetailData struct {
 	// in a '/' (hence "cleaned").
 	CleanedBasePath string
 }
-  
+
 var LockTemplate = templates.Lookup(templateFileNames["lock"])
 
 // ProjectJobData holds the data needed to stream the current PR information
