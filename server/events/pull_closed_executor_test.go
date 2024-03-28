@@ -50,7 +50,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 		Backend:            db,
 	}
 	err = errors.New("err")
-	When(w.Delete(testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
+	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
 	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Equals(t, "cleaning workspace: err", actualErr.Error())
 }
@@ -271,7 +271,6 @@ func TestCleanUpLogStreaming(t *testing.T) {
 			VCSClient:                client,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: prjCmdOutHandler,
-			Logger:                   logger,
 		}
 
 		locks := []models.ProjectLock{
