@@ -2,7 +2,7 @@
 
 Post workflow hooks can be defined to run scripts after default or custom
 workflows are executed. Post workflow hooks differ from [custom
-workflows](custom-workflows.html#custom-run-command) in that they are run
+workflows](custom-workflows.md#custom-run-command) in that they are run
 outside of Atlantis commands. Which means they do not surface their output
 back to the PR as a comment.
 
@@ -88,7 +88,7 @@ repos:
 ### Custom `run` Command
 
 This is very similar to [custom workflow run
-command](custom-workflows.html#custom-run-command).
+command](custom-workflows.md#custom-run-command).
 
 ```yaml
 - run: custom-command
