@@ -331,6 +331,7 @@ func TestProject_Validate(t *testing.T) {
 
 func TestProject_ToValid(t *testing.T) {
 	tfVersionPointEleven, _ := version.NewVersion("v0.11.0")
+	repoLocksOnApply := valid.RepoLocksOnApplyMode
 	cases := []struct {
 		description string
 		input       raw.Project
@@ -366,6 +367,9 @@ func TestProject_ToValid(t *testing.T) {
 					WhenModified: []string{"hi"},
 					Enabled:      Bool(false),
 				},
+				RepoLocks: &raw.RepoLocks{
+					Mode: &repoLocksOnApply,
+				},
 				ApplyRequirements:   []string{"approved"},
 				Name:                String("myname"),
 				ExecutionOrderGroup: Int(10),
@@ -378,6 +382,9 @@ func TestProject_ToValid(t *testing.T) {
 				Autoplan: valid.Autoplan{
 					WhenModified: []string{"hi"},
 					Enabled:      false,
+				},
+				RepoLocks: &valid.RepoLocks{
+					Mode: repoLocksOnApply,
 				},
 				ApplyRequirements:   []string{"approved"},
 				Name:                String("myname"),
