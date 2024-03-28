@@ -699,7 +699,7 @@ pagination:
 }
 
 func CheckRunPassed(checkRun CheckRun) bool {
-	return checkRun.Conclusion == "SUCCESS" || checkRun.Conclusion == "SKIPPED"
+	return checkRun.Conclusion == "SUCCESS" || checkRun.Conclusion == "SKIPPED" || checkRun.Conclusion == "NEUTRAL"
 }
 
 func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool {

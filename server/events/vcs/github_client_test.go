@@ -717,6 +717,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 		},
 		{
 			"blocked",
+			"ruleset-check-neutral.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
 			"ruleset-evaluate-workflow-failed.json",
 			`"APPROVED"`,
 			true,
