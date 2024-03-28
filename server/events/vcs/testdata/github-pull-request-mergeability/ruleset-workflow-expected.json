@@ -1,0 +1,80 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewDecision": null,
+        "baseRef": {
+          "branchProtectionRule": {
+            "requiredStatusChecks": []
+          },
+          "rules": {
+            "pageInfo": {
+              "endCursor": "QWERTY",
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "type": "REQUIRED_STATUS_CHECKS",
+                "repositoryRuleset": {
+                  "enforcement": "ACTIVE"
+                },
+                "parameters": {
+                  "requiredStatusChecks": [
+                    {
+                      "context": "atlantis/apply"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "WORKFLOWS",
+                "repositoryRuleset": {
+                  "enforcement": "ACTIVE"
+                },
+                "parameters": {
+                  "workflows": [
+                    {
+                      "path": ".github/workflows/my-required-workflow.yaml",
+                      "repositoryId": 120519269,
+                      "sha": null
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "contexts": {
+                    "pageInfo": {
+                      "endCursor": "QWERTY",
+                      "hasNextPage": false
+                    },
+                    "nodes": [
+                      {
+                        "__typename": "StatusContext",
+                        "context": "atlantis/apply",
+                        "state": "PENDING",
+                        "isRequired": true
+                      },
+                      {
+                        "__typename": "StatusContext",
+                        "context": "atlantis/plan",
+                        "state": "SUCCESS",
+                        "isRequired": false
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
