@@ -42,7 +42,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/uber-go/tally/v4 v4.1.10
 	github.com/urfave/negroni/v3 v3.1.0
-	github.com/warrensbox/terraform-switcher v0.1.1-0.20230206012955-d7dfd1b44605
+	github.com/warrensbox/terraform-switcher v0.1.1-0.20240328135642-ef1f0ce1744d
 	github.com/xanzy/go-gitlab v0.100.0
 	go.etcd.io/bbolt v1.3.9
 	go.uber.org/zap v1.27.0
@@ -56,7 +56,7 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/hashicorp/hcl/v2 v2.20.0
+	github.com/hashicorp/hcl/v2 v2.20.1
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29 // indirect
