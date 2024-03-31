@@ -6,7 +6,7 @@ require (
 	code.gitea.io/sdk/gitea v0.17.1
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/alicebob/miniredis/v2 v2.32.1
-	github.com/bradleyfalzon/ghinstallation/v2 v2.9.0
+	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
 	github.com/briandowns/spinner v1.23.0
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
@@ -65,8 +65,6 @@ require (
 
 require github.com/twmb/murmur3 v1.1.8 // indirect
 
-require github.com/google/go-github/v57 v57.0.0 // indirect
-
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
@@ -87,6 +85,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-github/v60 v60.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
