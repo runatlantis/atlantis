@@ -50,7 +50,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
-	"github.com/runatlantis/atlantis/server/controllers/templates"
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
@@ -107,10 +107,10 @@ type Server struct {
 	StatusController               *controllers.StatusController
 	JobsController                 *controllers.JobsController
 	APIController                  *controllers.APIController
-	IndexTemplate                  templates.TemplateWriter
-	LockDetailTemplate             templates.TemplateWriter
-	ProjectJobsTemplate            templates.TemplateWriter
-	ProjectJobsErrorTemplate       templates.TemplateWriter
+	IndexTemplate                  web_templates.TemplateWriter
+	LockDetailTemplate             web_templates.TemplateWriter
+	ProjectJobsTemplate            web_templates.TemplateWriter
+	ProjectJobsErrorTemplate       web_templates.TemplateWriter
 	SSLCertFile                    string
 	SSLKeyFile                     string
 	CertLastRefreshTime            time.Time
@@ -489,7 +489,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:    userConfig.CheckoutDepth,
 		GithubAppEnabled: githubAppEnabled,
-		Logger:           logger,
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(
@@ -523,7 +522,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
-		Logger:           logger,
 		WorkingDir:       workingDir,
 		WorkingDirLocker: workingDirLocker,
 		Backend:          backend,
@@ -535,7 +533,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		&events.PullClosedExecutor{
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
-			Logger:                   logger,
 			Backend:                  backend,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
@@ -624,7 +621,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverModeFlag,
 		statsScope,
-		logger,
 		terraformClient,
 	)
 
@@ -853,7 +849,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ApplyLocker:        applyLockingClient,
 		Logger:             logger,
 		VCSClient:          vcsClient,
-		LockDetailTemplate: templates.LockTemplate,
+		LockDetailTemplate: web_templates.LockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
 		Backend:            backend,
@@ -871,8 +867,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisVersion:          config.AtlantisVersion,
 		AtlantisURL:              parsedURL,
 		Logger:                   logger,
-		ProjectJobsTemplate:      templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate: templates.ProjectJobsErrorTemplate,
+		ProjectJobsTemplate:      web_templates.ProjectJobsTemplate,
+		ProjectJobsErrorTemplate: web_templates.ProjectJobsErrorTemplate,
 		Backend:                  backend,
 		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
@@ -943,10 +939,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		JobsController:                 jobsController,
 		StatusController:               statusController,
 		APIController:                  apiController,
-		IndexTemplate:                  templates.IndexTemplate,
-		LockDetailTemplate:             templates.LockTemplate,
-		ProjectJobsTemplate:            templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate:       templates.ProjectJobsErrorTemplate,
+		IndexTemplate:                  web_templates.IndexTemplate,
+		LockDetailTemplate:             web_templates.LockTemplate,
+		ProjectJobsTemplate:            web_templates.ProjectJobsTemplate,
+		ProjectJobsErrorTemplate:       web_templates.ProjectJobsErrorTemplate,
 		SSLKeyFile:                     userConfig.SSLKeyFile,
 		SSLCertFile:                    userConfig.SSLCertFile,
 		DisableGlobalApplyLock:         userConfig.DisableGlobalApplyLock,
@@ -1071,10 +1067,10 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	var lockResults []templates.LockIndexData
+	var lockResults []web_templates.LockIndexData
 	for id, v := range locks {
 		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
-		lockResults = append(lockResults, templates.LockIndexData{
+		lockResults = append(lockResults, web_templates.LockIndexData{
 			// NOTE: must use .String() instead of .Path because we need the
 			// query params as part of the lock URL.
 			LockPath:      lockURL.String(),
@@ -1096,7 +1092,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	applyLockData := templates.ApplyLockData{
+	applyLockData := web_templates.ApplyLockData{
 		Time:                   applyCmdLock.Time,
 		Locked:                 applyCmdLock.Locked,
 		GlobalApplyLockEnabled: applyCmdLock.GlobalApplyLockEnabled,
@@ -1105,7 +1101,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 
-	err = s.IndexTemplate.Execute(w, templates.IndexData{
+	err = s.IndexTemplate.Execute(w, web_templates.IndexData{
 		Locks:            lockResults,
 		PullToJobMapping: preparePullToJobMappings(s),
 		ApplyLock:        applyLockData,
