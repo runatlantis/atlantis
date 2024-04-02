@@ -47,8 +47,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
-RUN useradd --uid 100 --system --create-home --user-group --shell /bin/bash atlantis && \
-    useradd --uid 1000 --system --home=/home/atlantis/ --groups atlantis --shell /bin/bash atlantis2 && \
+RUN groupadd --gid 1000 atlantis && \
+    useradd --uid 100 --system --create-home --gid 1000 --shell /bin/bash atlantis && \
+    useradd --uid 1000 --system --home=/home/atlantis/ --gid 1000 --shell /bin/bash atlantis2 && \
     chown atlantis:atlantis /home/atlantis/ && \
     chmod ug+rwx /home/atlantis/
 
@@ -145,7 +146,7 @@ HEALTHCHECK --interval=5m --timeout=3s \
   CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # Set up the 'atlantis' user and adjust permissions
-RUN addgroup atlantis && \
+RUN addgroup --gid 1000 atlantis && \
     adduser -u 100 -S -G atlantis atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/
