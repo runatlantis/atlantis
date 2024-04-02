@@ -3,7 +3,7 @@ These instructions are for running Atlantis **locally on your own computer** so 
 your own repositories before deciding whether to install it more permanently.
 
 ::: tip
-If you want to set up a production-ready Atlantis installation, read [Deployment](../docs/deployment.html).
+If you want to set up a production-ready Atlantis installation, read [Deployment](../docs/deployment.md).
 :::
 
 Steps:
@@ -12,13 +12,13 @@ Steps:
 
 ## Install Terraform
 `terraform` needs to be in the `$PATH` for Atlantis.
-Download from [https://developer.hashicorp.com/terraform/downloads](https://developer.hashicorp.com/terraform/downloads)
+Download from [Terraform](https://developer.hashicorp.com/terraform/downloads)
 ```
 unzip path/to/terraform_*.zip -d /usr/local/bin
 ```
 
 ## Download Atlantis
-Get the latest release from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
+Get the latest release from [GitHub](https://github.com/runatlantis/atlantis/releases)
 and unpackage it.
 
 ## Download Ngrok
@@ -26,7 +26,7 @@ Atlantis needs to be accessible somewhere that github.com/gitlab.com/bitbucket.o
 One way to accomplish this is with ngrok, a tool that forwards your local port to a random
 public hostname.
 
-Go to [https://ngrok.com/download](https://ngrok.com/download), download ngrok and `unzip` it.
+[Download](https://ngrok.com/download) ngrok and `unzip` it.
 
 Start `ngrok` on port `4141` and take note of the hostname it gives you:
 ```bash
@@ -47,7 +47,7 @@ Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using B
 When you're ready to do a production deploy of Atlantis you should allowlist [Bitbucket IPs](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
 to ensure the webhooks are coming from them.
 :::
-Create a random string of any length (you can use [https://www.random.org/strings/](https://www.random.org/strings/))
+Create a random string of any length (you can use [random.org](https://www.random.org/strings/))
 and set an environment variable:
 ```
 SECRET="{YOUR_RANDOM_STRING}"
@@ -185,7 +185,7 @@ TOKEN="{YOUR_TOKEN}"
 ```
 
 ### GitLab or GitLab Enterprise Access Token
-- follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
+- follow [GitLab: Create a personal access token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
 - create a token with **api** scope
 - set the token as an environment variable
 ```
@@ -193,7 +193,7 @@ TOKEN="{YOUR_TOKEN}"
 ```
 
 ### Bitbucket Cloud (bitbucket.org) Access Token
-- follow [https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
+- follow [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 - Label the password "atlantis"
 - Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - set the token as an environment variable
@@ -345,7 +345,7 @@ You should see Atlantis logging about receiving the webhook and you should see t
 
 Atlantis tries to figure out the directory to plan in based on the files modified.
 If you need to customize the directories that Atlantis runs in or the commands it runs if you're using workspaces
-or `.tfvars` files, see [atlantis.yaml Reference](/docs/repo-level-atlantis-yaml.html#reference).
+or `.tfvars` files, see [atlantis.yaml Reference](../docs/repo-level-atlantis-yaml.md#reference).
 
 ### Manual Plan
 To manually `plan` in a specific directory or workspace, comment on the pull request using the `-d` or `-w` flags:
@@ -364,12 +364,12 @@ If you'd like to `apply`, type a comment: `atlantis apply`. You can use the `-d`
 Atlantis at a specific plan. Otherwise it tries to apply the plan for the root directory.
 
 ## Real-time logs
-The [real-time terraform output](/docs/streaming-logs.md) for your command can be found by clicking into the status check for a given project in a PR which
+The [real-time terraform output](../docs/streaming-logs.md) for your command can be found by clicking into the status check for a given project in a PR which
 links to the log-streaming UI. This is a terminal UI where you can view your commands executing in real-time.
 
 ## Next Steps
 * If things are working as expected you can `Ctrl-C` the `atlantis server` command and the `ngrok` command.
-* Hopefully Atlantis is working with your repo and you're ready to move on to a [production-ready deployment](../docs/deployment.html).
+* Hopefully Atlantis is working with your repo and you're ready to move on to a [production-ready deployment](../docs/deployment.md).
 * If it's not working as expected, you may need to customize how Atlantis runs with an `atlantis.yaml` file.
-See [atlantis.yaml use cases](/docs/repo-level-atlantis-yaml.html#use-cases).
-* Check out our [full documentation](../docs/) for more details.
+See [atlantis.yaml use cases](../docs/repo-level-atlantis-yaml.md#use-cases).
+* Check out our [full documentation](../docs/README.md) for more details.
