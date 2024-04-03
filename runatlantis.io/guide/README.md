@@ -1,12 +1,12 @@
 # Introduction
 
 ## Getting Started
-* If you'd like to just test out running Atlantis on an **example repo** check out the [Test Drive](test-drive.html).
-* If you'd like to test out running Atlantis on **your repos** then read [Testing Locally](testing-locally.html).
-* If you're ready to properly install Atlantis on real infrastructure then head over to the [Installation Guide](/docs/installation-guide.html).
+* If you'd like to just test out running Atlantis on an **example repo** check out the [Test Drive](test-drive.md).
+* If you'd like to test out running Atlantis on **your repos** then read [Testing Locally](testing-locally.md).
+* If you're ready to properly install Atlantis on real infrastructure then head over to the [Installation Guide](../docs/installation-guide.md).
 
 ::: tip Looking for the full docs?
-Go here: [www.runatlantis.io/docs](/docs/)
+Go here: [www.runatlantis.io/docs](../docs/README.md)
 :::
 
 ## Overview – What Is Atlantis?
@@ -55,6 +55,6 @@ The exact commands that Atlantis runs are configurable. You can run custom scrip
 to construct your ideal workflow.
 
 ## Next Steps
-* If you'd like to just test out running Atlantis on an **example repo** check out the [Test Drive](test-drive.html).
-* If you'd like to test out running Atlantis on **your repos** then read [Testing Locally](testing-locally.html).
-* If you're ready to properly install Atlantis on real infrastructure then head over to the [Installation Guide](/docs/installation-guide.html).
+* If you'd like to just test out running Atlantis on an **example repo** check out the [Test Drive](test-drive.md).
+* If you'd like to test out running Atlantis on **your repos** then read [Testing Locally](testing-locally.md).
+* If you're ready to properly install Atlantis on real infrastructure then head over to the [Installation Guide](../docs/installation-guide.md).
