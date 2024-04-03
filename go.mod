@@ -42,7 +42,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/uber-go/tally/v4 v4.1.10
 	github.com/urfave/negroni/v3 v3.1.0
-	github.com/warrensbox/terraform-switcher v0.1.1-0.20240401233740-6aaa2c4f4b16
+	github.com/warrensbox/terraform-switcher v0.1.1-0.20240402205057-e96de4bba49c
 	github.com/xanzy/go-gitlab v0.100.0
 	go.etcd.io/bbolt v1.3.9
 	go.uber.org/zap v1.27.0
