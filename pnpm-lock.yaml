@@ -9,8 +9,8 @@ devDependencies:
     specifier: 2.0.0-rc.9
     version: 2.0.0-rc.9
   '@vuepress/plugin-docsearch':
-    specifier: 2.0.0-rc.21
-    version: 2.0.0-rc.21(@algolia/client-search@4.23.0)(search-insights@2.13.0)(vuepress@2.0.0-rc.9)
+    specifier: 2.0.0-rc.24
+    version: 2.0.0-rc.24(@algolia/client-search@4.23.0)(search-insights@2.13.0)(vuepress@2.0.0-rc.9)
   '@vuepress/plugin-google-analytics':
     specifier: 2.0.0-rc.21
     version: 2.0.0-rc.21(vuepress@2.0.0-rc.9)
@@ -999,8 +999,8 @@ packages:
       - typescript
     dev: true
 
-  /@vuepress/helper@2.0.0-rc.23(vuepress@2.0.0-rc.9):
-    resolution: {integrity: sha512-eVGjnvTEDdHC3/T9L5nG89+HlJx8BhmS8tE0YZUPUqxonZMp1kV/xO5XuNH0xkMIFubehtltUIk2QQ4vumUw3g==}
+  /@vuepress/helper@2.0.0-rc.24(vuepress@2.0.0-rc.9):
+    resolution: {integrity: sha512-qXC+tXTKfZ7eJ+h3wYC/7Q903Tbqcz9Vqxku63R6pmcpbsRtt3l8XQRdJ/LMT5yX0wZln4Qzx1NY6S4psr0lzw==}
     peerDependencies:
       vuepress: 2.0.0-rc.9
     dependencies:
@@ -1055,7 +1055,7 @@ packages:
     peerDependencies:
       vuepress: 2.0.0-rc.9
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.23(vuepress@2.0.0-rc.9)
+      '@vuepress/helper': 2.0.0-rc.24(vuepress@2.0.0-rc.9)
       '@vueuse/core': 10.9.0(vue@3.4.21)
       vue: 3.4.21
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
@@ -1080,7 +1080,7 @@ packages:
     peerDependencies:
       vuepress: 2.0.0-rc.9
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.23(vuepress@2.0.0-rc.9)
+      '@vuepress/helper': 2.0.0-rc.24(vuepress@2.0.0-rc.9)
       '@vueuse/core': 10.9.0(vue@3.4.21)
       vue: 3.4.21
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
@@ -1089,14 +1089,15 @@ packages:
       - typescript
     dev: true
 
-  /@vuepress/plugin-docsearch@2.0.0-rc.21(@algolia/client-search@4.23.0)(search-insights@2.13.0)(vuepress@2.0.0-rc.9):
-    resolution: {integrity: sha512-ekbtJyqcnd+J00rb905B8/9KTa4isA+MIsy/r2N+a8Fn0v/GMnGVSseqJs8q74YmHlIx4GawDfKy7F84zxMfjA==}
+  /@vuepress/plugin-docsearch@2.0.0-rc.24(@algolia/client-search@4.23.0)(search-insights@2.13.0)(vuepress@2.0.0-rc.9):
+    resolution: {integrity: sha512-RWJSzRu7+fCO3//rYGO3EBq3+MkrGRyZx0k8nV1CiubpTa0aYftxxYoZdQH4UJslTuKhNShlYsIzxYNMYAf7uw==}
     peerDependencies:
       vuepress: 2.0.0-rc.9
     dependencies:
       '@docsearch/css': 3.6.0
       '@docsearch/js': 3.6.0(@algolia/client-search@4.23.0)(search-insights@2.13.0)
       '@docsearch/react': 3.6.0(@algolia/client-search@4.23.0)(search-insights@2.13.0)
+      '@vuepress/helper': 2.0.0-rc.24(vuepress@2.0.0-rc.9)
       '@vueuse/core': 10.9.0(vue@3.4.21)
       ts-debounce: 4.0.0
       vue: 3.4.21
@@ -1144,7 +1145,7 @@ packages:
     peerDependencies:
       vuepress: 2.0.0-rc.9
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.23(vuepress@2.0.0-rc.9)
+      '@vuepress/helper': 2.0.0-rc.24(vuepress@2.0.0-rc.9)
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
     transitivePeerDependencies:
       - typescript
@@ -1155,7 +1156,7 @@ packages:
     peerDependencies:
       vuepress: 2.0.0-rc.9
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.23(vuepress@2.0.0-rc.9)
+      '@vuepress/helper': 2.0.0-rc.24(vuepress@2.0.0-rc.9)
       medium-zoom: 1.1.0
       vue: 3.4.21
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
@@ -1197,7 +1198,7 @@ packages:
     peerDependencies:
       vuepress: 2.0.0-rc.9
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.23(vuepress@2.0.0-rc.9)
+      '@vuepress/helper': 2.0.0-rc.24(vuepress@2.0.0-rc.9)
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
     transitivePeerDependencies:
       - typescript
@@ -1208,7 +1209,7 @@ packages:
     peerDependencies:
       vuepress: 2.0.0-rc.9
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.23(vuepress@2.0.0-rc.9)
+      '@vuepress/helper': 2.0.0-rc.24(vuepress@2.0.0-rc.9)
       sitemap: 7.1.1
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
     transitivePeerDependencies:
@@ -1242,7 +1243,7 @@ packages:
       sass-loader:
         optional: true
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.23(vuepress@2.0.0-rc.9)
+      '@vuepress/helper': 2.0.0-rc.24(vuepress@2.0.0-rc.9)
       '@vuepress/plugin-active-header-links': 2.0.0-rc.21(vuepress@2.0.0-rc.9)
       '@vuepress/plugin-back-to-top': 2.0.0-rc.23(vuepress@2.0.0-rc.9)
       '@vuepress/plugin-container': 2.0.0-rc.21(vuepress@2.0.0-rc.9)
