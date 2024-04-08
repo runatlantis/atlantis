@@ -1,0 +1,5 @@
+exclude:
+  - .circleci/config.yml
+  - .github/**/*.yml
+formatter:
+  indentless_arrays: true
