@@ -445,6 +445,8 @@ github.com/warrensbox/terraform-switcher v0.1.1-0.20240405200119-d692ecdfa1ac h1
 github.com/warrensbox/terraform-switcher v0.1.1-0.20240405200119-d692ecdfa1ac/go.mod h1:/Kef1w16s+WTt7aL7EFt63wslP4SVC1r8LOAPR1uYw0=
 github.com/xanzy/go-gitlab v0.100.0 h1:jaOtYj5nWI19+9oVVmgy233pax2oYqucwetogYU46ks=
 github.com/xanzy/go-gitlab v0.100.0/go.mod h1:ETg8tcj4OhrB84UEgeE8dSuV/0h4BBL1uOV/qK0vlyI=
+github.com/xanzy/go-gitlab v0.102.0 h1:ExHuJ1OTQ2yt25zBMMj0G96ChBirGYv8U7HyUiYkZ+4=
+github.com/xanzy/go-gitlab v0.102.0/go.mod h1:ETg8tcj4OhrB84UEgeE8dSuV/0h4BBL1uOV/qK0vlyI=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e/go.mod h1:RbqR21r5mrJuqunuUZ/Dhy/avygyECGrLceyNeo4LiM=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
