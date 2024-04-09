@@ -33,6 +33,8 @@ import (
 const (
 	workspaceFlagLong            = "workspace"
 	workspaceFlagShort           = "w"
+	workflowFlagLong             = "workflow"
+	workflowFlagShort            = "k"
 	dirFlagLong                  = "dir"
 	dirFlagShort                 = "d"
 	projectFlagLong              = "project"
@@ -222,6 +224,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	var workspace string
+	var workflow string
 	var dir string
 	var project string
 	var policySet string
@@ -237,6 +240,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet = pflag.NewFlagSet(command.Plan.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
+		flagSet.StringVarP(&workflow, workflowFlagLong, workflowFlagShort, "", "Select projects from workflow.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run plan for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
@@ -300,6 +304,10 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
 
+	if workflow != "" && project != "" {
+		return CommentParseResult{CommentResponse: e.errMarkdown("cannot use workflow selectors and project at same time", cmd, flagSet)}
+	}
+
 	// Use the same validation that Terraform uses: https://git.io/vxGhU. Plus
 	// we also don't allow '..'. We don't want the workspace to contain a path
 	// since we create files based on the name.
@@ -318,7 +326,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project, policySet, clearPolicyApproval),
+		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project, workflow, policySet, clearPolicyApproval),
 	}
 }
 

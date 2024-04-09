@@ -217,6 +217,132 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 	}
 }
 
+
+func TestConfig_FindProjectsByWorkflow(t *testing.T) {
+	tfVersion, _ := version.NewVersion("v0.11.0")
+	workflowNameDev    := "dev"
+	workflowNameRandom := "random"
+	cases := []struct {
+		description string
+		workflowName    string
+		input       valid.RepoCfg
+		expProjects []valid.Project
+	}{
+		{
+			description: "Find projects with 'dev' workflow",
+			workflowName:   "dev",
+			input: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:              ".",
+						Name:             String("dev_terragrunt_myproject"),
+						WorkflowName:     &workflowNameDev,
+						Workspace:        "myworkspace",
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: raw.DefaultAutoPlanWhenModified,
+							Enabled:      false,
+						},
+						ApplyRequirements: []string{"approved"},
+					},{
+						Dir:              ".",
+						Name:             String("dev_without_workflow"),
+						Workspace:        "myworkspace",
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: raw.DefaultAutoPlanWhenModified,
+							Enabled:      false,
+						},
+						ApplyRequirements: []string{"approved"},
+					},{
+						Dir:              ".",
+						Name:             String("dev_random"),
+						WorkflowName:     &workflowNameRandom,
+						Workspace:        "myworkspace",
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: raw.DefaultAutoPlanWhenModified,
+							Enabled:      false,
+						},
+						ApplyRequirements: []string{"approved"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"myworkflow": {
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
+					},
+				},
+			},
+			expProjects: []valid.Project{
+				{
+					Dir:              ".",
+					Name:             String("dev_terragrunt_myproject"),
+					WorkflowName:     &workflowNameDev,
+					Workspace:        "myworkspace",
+					TerraformVersion: tfVersion,
+					Autoplan: valid.Autoplan{
+						WhenModified: raw.DefaultAutoPlanWhenModified,
+						Enabled:      false,
+					},
+					ApplyRequirements: []string{"approved"},
+				},
+			},
+		},
+		{
+			description: "Find projects with unknown workflow",
+			workflowName:   "toto",
+			input: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:              ".",
+						Name:             String("dev_terragrunt_myproject"),
+						Workspace:        "myworkspace",
+						WorkflowName:     &workflowNameDev,
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: raw.DefaultAutoPlanWhenModified,
+							Enabled:      false,
+						},
+						ApplyRequirements: []string{"approved"},
+					},
+					{
+						Dir:              ".",
+						Name:             String("staging_terragrunt_myproject"),
+						Workspace:        "myworkspace",
+						TerraformVersion: tfVersion,
+						Autoplan: valid.Autoplan{
+							WhenModified: raw.DefaultAutoPlanWhenModified,
+							Enabled:      false,
+						},
+						ApplyRequirements: []string{"approved"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"myworkflow": {
+						Name:        "myworkflow",
+						Apply:       valid.DefaultApplyStage,
+						Plan:        valid.DefaultPlanStage,
+						PolicyCheck: valid.DefaultPolicyCheckStage,
+					},
+				},
+			},
+			expProjects: nil,
+		},
+	}
+	validation.ErrorTag = "yaml"
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			projects := c.input.FindProjectsByWorkflow(c.workflowName)
+			Equals(t, c.expProjects, projects)
+		})
+	}
+}
+
 func TestConfig_AutoDiscoverEnabled(t *testing.T) {
 	cases := []struct {
 		description         string
