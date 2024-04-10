@@ -730,6 +730,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		autoMerger,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
+		userConfig.SilencePRComments,
 		backend,
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
@@ -749,6 +750,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		backend,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
+		userConfig.SilencePRComments,
 		userConfig.SilenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
 	)

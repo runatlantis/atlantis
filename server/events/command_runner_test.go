@@ -72,6 +72,7 @@ var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 type TestConfig struct {
 	parallelPoolSize           int
 	SilenceNoProjects          bool
+	SilencePRComments          bool
 	silenceVCSStatusNoPlans    bool
 	silenceVCSStatusNoProjects bool
 	StatusName                 string
@@ -159,6 +160,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		autoMerger,
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
+		testConfig.SilencePRComments,
 		testConfig.backend,
 		lockingLocker,
 		testConfig.discardApprovalOnPlan,
@@ -178,6 +180,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.backend,
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
+		testConfig.SilencePRComments,
 		testConfig.silenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
 	)

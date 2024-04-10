@@ -92,6 +92,7 @@ type UserConfig struct {
 
 	// SilenceNoProjects is whether Atlantis should respond to a PR if no projects are found.
 	SilenceNoProjects   bool `mapstructure:"silence-no-projects"`
+	SilencePRComments   bool `mapstructure:"silence-pr-comments"`
 	SilenceForkPRErrors bool `mapstructure:"silence-fork-pr-errors"`
 	// SilenceVCSStatusNoPlans is whether autoplan should set commit status if no plans
 	// are found.

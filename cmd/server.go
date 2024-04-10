@@ -123,6 +123,7 @@ const (
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
 	SilenceNoProjectsFlag            = "silence-no-projects"
+	SilencePRComments                = "silence-pr-comments"
 	SilenceForkPRErrorsFlag          = "silence-fork-pr-errors"
 	SilenceVCSStatusNoPlans          = "silence-vcs-status-no-plans"
 	SilenceVCSStatusNoProjectsFlag   = "silence-vcs-status-no-projects"
@@ -524,6 +525,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceNoProjectsFlag: {
 		description:  "Silences Atlants from responding to PRs when it finds no projects.",
+		defaultValue: false,
+	},
+	SilencePRComments: {
+		description:  "Silences Atlants from responding to PRs.",
 		defaultValue: false,
 	},
 	SilenceForkPRErrorsFlag: {

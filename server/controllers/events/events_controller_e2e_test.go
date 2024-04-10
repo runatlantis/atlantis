@@ -1370,6 +1370,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	parallelPoolSize := 1
 	silenceNoProjects := false
+	silencePRComments := false
 
 	disableUnlockLabel := "do-not-unlock"
 
@@ -1520,6 +1521,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		autoMerger,
 		parallelPoolSize,
 		silenceNoProjects,
+		silencePRComments,
 		boltdb,
 		lockingClient,
 		discardApprovalOnPlan,
@@ -1539,6 +1541,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		boltdb,
 		parallelPoolSize,
 		silenceNoProjects,
+		silencePRComments,
 		false,
 		e2ePullReqStatusFetcher,
 	)

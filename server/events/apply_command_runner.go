@@ -20,6 +20,7 @@ func NewApplyCommandRunner(
 	backend locking.Backend,
 	parallelPoolSize int,
 	SilenceNoProjects bool,
+	SilencePRComments bool,
 	silenceVCSStatusNoProjects bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 ) *ApplyCommandRunner {
@@ -36,6 +37,7 @@ func NewApplyCommandRunner(
 		Backend:                    backend,
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
+		SilencePRComments:          SilencePRComments,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 	}
@@ -57,6 +59,7 @@ type ApplyCommandRunner struct {
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects bool
+	SilencePRComments bool
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
 	silenceVCSStatusNoProjects bool
@@ -118,7 +121,9 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+		if !a.SilencePRComments {
+			a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+		}
 		return
 	}
 
@@ -166,10 +171,12 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		result = runProjectCmds(projectCmds, a.prjCmdRunner.Apply)
 	}
 
-	a.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result)
+	if !a.SilencePRComments {
+		a.pullUpdater.updatePull(
+			ctx,
+			cmd,
+			result)
+	}
 
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
