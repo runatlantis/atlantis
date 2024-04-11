@@ -4,7 +4,7 @@ ARG ALPINE_TAG=3.19.1
 ARG DEBIAN_TAG=12.5-slim
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.7.5
+ARG DEFAULT_TERRAFORM_VERSION=1.8.0
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.51.0
 
@@ -169,6 +169,8 @@ RUN apk add --no-cache \
         dumb-init~=1 \
         gcompat~=1
 
+#TODO HACK to avoid CVE-2024-2511. Remove after the vulnerability is fixed
+RUN apk update && apk upgrade --no-cache libssl3 libcrypto3
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
