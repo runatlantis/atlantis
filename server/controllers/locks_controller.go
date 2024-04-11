@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/runatlantis/atlantis/server/controllers/templates"
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -23,7 +23,7 @@ type LocksController struct {
 	Logger             logging.SimpleLogging
 	ApplyLocker        locking.ApplyLocker
 	VCSClient          vcs.Client
-	LockDetailTemplate templates.TemplateWriter
+	LockDetailTemplate web_templates.TemplateWriter
 	WorkingDir         events.WorkingDir
 	WorkingDirLocker   events.WorkingDirLocker
 	Backend            locking.Backend
@@ -73,12 +73,12 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if lock == nil {
-		l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id %q", idUnencoded)
+		l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id '%s'", idUnencoded)
 		return
 	}
 
 	owner, repo := models.SplitRepoFullName(lock.Project.RepoFullName)
-	viewData := templates.LockDetailData{
+	viewData := web_templates.LockDetailData{
 		LockKeyEncoded:  id,
 		LockKey:         idUnencoded,
 		PullRequestLink: lock.Pull.URL,
@@ -107,18 +107,18 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 
 	idUnencoded, err := url.PathUnescape(id)
 	if err != nil {
-		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id %q. Failed with error: %s", id, err)
+		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id '%s'. Failed with error: '%s'", id, err)
 		return
 	}
 
-	lock, err := l.DeleteLockCommand.DeleteLock(idUnencoded)
+	lock, err := l.DeleteLockCommand.DeleteLock(l.Logger, idUnencoded)
 	if err != nil {
-		l.respond(w, logging.Error, http.StatusInternalServerError, "deleting lock failed with: %s", err)
+		l.respond(w, logging.Error, http.StatusInternalServerError, "deleting lock failed with: '%s'", err)
 		return
 	}
 
 	if lock == nil {
-		l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id %q", idUnencoded)
+		l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id '%s'", idUnencoded)
 		return
 	}
 
@@ -133,13 +133,13 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		// Once the lock has been deleted, comment back on the pull request.
 		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
-		if err = l.VCSClient.CreateComment(lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
+		if err = l.VCSClient.CreateComment(l.Logger, lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
 			l.Logger.Warn("failed commenting on pull request: %s", err)
 		}
 	} else {
 		l.Logger.Debug("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
 	}
-	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id %q", id)
+	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id '%s'", id)
 }
 
 // respond is a helper function to respond and log the response. lvl is the log

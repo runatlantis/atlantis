@@ -5,6 +5,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -273,7 +274,7 @@ type MockCSU struct {
 	Called           bool
 }
 
-func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest, status models.CommitStatus, command command.Name, numSuccess int, numTotal int) error {
+func (m *MockCSU) UpdateCombinedCount(_ logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command command.Name, numSuccess int, numTotal int) error {
 	m.Called = true
 	m.CalledRepo = repo
 	m.CalledPull = pull
@@ -284,7 +285,7 @@ func (m *MockCSU) UpdateCombinedCount(repo models.Repo, pull models.PullRequest,
 	return nil
 }
 
-func (m *MockCSU) UpdateCombined(_ models.Repo, _ models.PullRequest, _ models.CommitStatus, _ command.Name) error {
+func (m *MockCSU) UpdateCombined(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ models.CommitStatus, _ command.Name) error {
 	return nil
 }
 
@@ -292,10 +293,10 @@ func (m *MockCSU) UpdateProject(_ command.ProjectContext, _ command.Name, _ mode
 	return nil
 }
 
-func (m *MockCSU) UpdatePreWorkflowHook(_ models.PullRequest, _ models.CommitStatus, _ string, _ string, _ string) error {
+func (m *MockCSU) UpdatePreWorkflowHook(_ logging.SimpleLogging, _ models.PullRequest, _ models.CommitStatus, _ string, _ string, _ string) error {
 	return nil
 }
 
-func (m *MockCSU) UpdatePostWorkflowHook(_ models.PullRequest, _ models.CommitStatus, _ string, _ string, _ string) error {
+func (m *MockCSU) UpdatePostWorkflowHook(_ logging.SimpleLogging, _ models.PullRequest, _ models.CommitStatus, _ string, _ string, _ string) error {
 	return nil
 }

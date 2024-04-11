@@ -72,6 +72,7 @@ type commonData struct {
 	EnableDiffMarkdownFormat  bool
 	ExecutableName            string
 	HideUnchangedPlanComments bool
+	VcsRequestType            string
 }
 
 // errData is data about an error response.
@@ -91,6 +92,22 @@ type failureData struct {
 type resultData struct {
 	Results []projectResultTmplData
 	commonData
+}
+
+type planResultData struct {
+	Results []projectResultTmplData
+	commonData
+	NumPlansWithChanges   int
+	NumPlansWithNoChanges int
+	NumPlanFailures       int
+}
+
+type applyResultData struct {
+	Results []projectResultTmplData
+	commonData
+	NumApplySuccesses int
+	NumApplyFailures  int
+	NumApplyErrors    int
 }
 
 type planSuccessData struct {
@@ -154,13 +171,20 @@ func NewMarkdownRenderer(
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
-func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subCmd, log string, verbose bool, vcsHost models.VCSHostType) string {
-	commandStr := cases.Title(language.English).String(strings.Replace(cmdName.String(), "_", " ", -1))
+func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd PullCommand) string {
+	commandStr := cases.Title(language.English).String(strings.Replace(cmd.CommandName().String(), "_", " ", -1))
+	var vcsRequestType string
+	if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab {
+		vcsRequestType = "Merge Request"
+	} else {
+		vcsRequestType = "Pull Request"
+	}
+
 	common := commonData{
 		Command:                   commandStr,
-		SubCommand:                subCmd,
-		Verbose:                   verbose,
-		Log:                       log,
+		SubCommand:                cmd.SubCommandName(),
+		Verbose:                   cmd.IsVerbose(),
+		Log:                       ctx.Log.GetHistory(),
 		PlansDeleted:              res.PlansDeleted,
 		DisableApplyAll:           m.disableApplyAll || m.disableApply,
 		DisableApply:              m.disableApply,
@@ -168,6 +192,7 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subC
 		EnableDiffMarkdownFormat:  m.enableDiffMarkdownFormat,
 		ExecutableName:            m.executableName,
 		HideUnchangedPlanComments: m.hideUnchangedPlanComments,
+		VcsRequestType:            vcsRequestType,
 	}
 
 	templates := m.markdownTemplates
@@ -178,15 +203,22 @@ func (m *MarkdownRenderer) Render(res command.Result, cmdName command.Name, subC
 	if res.Failure != "" {
 		return m.renderTemplateTrimSpace(templates.Lookup("failureWithLog"), failureData{res.Failure, "", common})
 	}
-	return m.renderProjectResults(res.ProjectResults, common, vcsHost)
+	return m.renderProjectResults(ctx, res.ProjectResults, common)
 }
 
-func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult, common commonData, vcsHost models.VCSHostType) string {
+func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []command.ProjectResult, common commonData) string {
+	vcsHost := ctx.Pull.BaseRepo.VCSHost.Type
+
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
 	numPolicyCheckSuccesses := 0
 	numPolicyApprovalSuccesses := 0
 	numVersionSuccesses := 0
+	numPlansWithChanges := 0
+	numPlansWithNoChanges := 0
+	numApplySuccesses := 0
+	numApplyFailures := 0
+	numApplyErrors := 0
 
 	templates := m.markdownTemplates
 
@@ -213,6 +245,11 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), data)
 			}
 			resultData.NoChanges = result.PlanSuccess.NoChanges()
+			if result.PlanSuccess.NoChanges() {
+				numPlansWithNoChanges++
+			} else {
+				numPlansWithChanges++
+			}
 			numPlanSuccesses++
 		} else if result.PolicyCheckResults != nil && common.Command == policyCheckCommandTitle {
 			policyCheckResults := policyCheckResultsData{
@@ -255,6 +292,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyUnwrappedSuccess"), struct{ Output string }{output})
 			}
+			numApplySuccesses++
 		} else if result.VersionSuccess != "" {
 			output := strings.TrimSpace(result.VersionSuccess)
 			if m.shouldUseWrappedTmpl(vcsHost, output) {
@@ -289,8 +327,14 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 				tmpl = templates.Lookup("wrappedErr")
 			}
 			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), resultData.Rendered, common})
+			if common.Command == applyCommandTitle {
+				numApplyErrors++
+			}
 		} else if result.Failure != "" {
 			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, resultData.Rendered, common})
+			if common.Command == applyCommandTitle {
+				numApplyFailures++
+			}
 		}
 		resultsTmplData = append(resultsTmplData, resultData)
 	}
@@ -324,7 +368,7 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		tmpl = templates.Lookup("multiProjectPlan")
 	case common.Command == policyCheckCommandTitle:
 		if numPolicyCheckSuccesses == len(results) {
-			tmpl = templates.Lookup("multiProjectPlan")
+			tmpl = templates.Lookup("multiProjectPolicy")
 		} else {
 			tmpl = templates.Lookup("multiProjectPolicyUnsuccessful")
 		}
@@ -349,6 +393,14 @@ func (m *MarkdownRenderer) renderProjectResults(results []command.ProjectResult,
 		}
 	default:
 		return fmt.Sprintf("no template matched–this is a bug: command=%s", common.Command)
+	}
+
+	switch {
+	case common.Command == planCommandTitle:
+		numPlanFailures := len(results) - numPlanSuccesses
+		return m.renderTemplateTrimSpace(tmpl, planResultData{resultsTmplData, common, numPlansWithChanges, numPlansWithNoChanges, numPlanFailures})
+	case common.Command == applyCommandTitle:
+		return m.renderTemplateTrimSpace(tmpl, applyResultData{resultsTmplData, common, numApplySuccesses, numApplyFailures, numApplyErrors})
 	}
 	return m.renderTemplateTrimSpace(tmpl, resultData{resultsTmplData, common})
 }

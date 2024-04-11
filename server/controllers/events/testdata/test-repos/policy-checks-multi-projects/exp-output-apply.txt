@@ -2,6 +2,7 @@ Ran Apply for 2 projects:
 
 1. dir: `dir1` workspace: `default`
 1. dir: `dir2` workspace: `default`
+---
 
 ### 1. dir: `dir1` workspace: `default`
 ```diff
@@ -20,3 +21,6 @@ workspace = "default"
 **Apply Failed**: All policies must pass for project before running apply.
 
 ---
+### Apply Summary
+
+2 projects, 1 successful, 1 failed, 0 errored

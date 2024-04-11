@@ -4,9 +4,10 @@
 package mocks
 
 import (
-	github "github.com/google/go-github/v57/github"
+	github "github.com/google/go-github/v59/github"
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	logging "github.com/runatlantis/atlantis/server/logging"
 	"reflect"
 	"time"
 )
@@ -26,11 +27,11 @@ func NewMockGithubPullGetter(options ...pegomock.Option) *MockGithubPullGetter {
 func (mock *MockGithubPullGetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockGithubPullGetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockGithubPullGetter) GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error) {
+func (mock *MockGithubPullGetter) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGithubPullGetter().")
 	}
-	params := []pegomock.Param{repo, pullNum}
+	params := []pegomock.Param{logger, repo, pullNum}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("GetPullRequest", params, []reflect.Type{reflect.TypeOf((**github.PullRequest)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 *github.PullRequest
 	var ret1 error
@@ -82,8 +83,8 @@ type VerifierMockGithubPullGetter struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockGithubPullGetter) GetPullRequest(repo models.Repo, pullNum int) *MockGithubPullGetter_GetPullRequest_OngoingVerification {
-	params := []pegomock.Param{repo, pullNum}
+func (verifier *VerifierMockGithubPullGetter) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) *MockGithubPullGetter_GetPullRequest_OngoingVerification {
+	params := []pegomock.Param{logger, repo, pullNum}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullRequest", params, verifier.timeout)
 	return &MockGithubPullGetter_GetPullRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -93,21 +94,25 @@ type MockGithubPullGetter_GetPullRequest_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockGithubPullGetter_GetPullRequest_OngoingVerification) GetCapturedArguments() (models.Repo, int) {
-	repo, pullNum := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pullNum[len(pullNum)-1]
+func (c *MockGithubPullGetter_GetPullRequest_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.Repo, int) {
+	logger, repo, pullNum := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], repo[len(repo)-1], pullNum[len(pullNum)-1]
 }
 
-func (c *MockGithubPullGetter_GetPullRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int) {
+func (c *MockGithubPullGetter_GetPullRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []int) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(models.Repo)
+			_param0[u] = param.(logging.SimpleLogging)
 		}
-		_param1 = make([]int, len(c.methodInvocations))
+		_param1 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(int)
+			_param1[u] = param.(models.Repo)
+		}
+		_param2 = make([]int, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(int)
 		}
 	}
 	return

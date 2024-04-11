@@ -11,9 +11,9 @@ Custom workflows can be specified in the Server-Side Repo Config or in the Repo-
 
 **Notes**
 * If you want to allow repos to select their own workflows, they must have the
-`allowed_overrides: [workflow]` setting. See [server-side repo config use cases](server-side-repo-config.html#allow-repos-to-choose-a-server-side-workflow) for more details.
+`allowed_overrides: [workflow]` setting. See [server-side repo config use cases](server-side-repo-config.md#allow-repos-to-choose-a-server-side-workflow) for more details.
 * If in addition you also want to allow repos to define their own workflows, they must have the
-`allow_custom_workflows: true` setting. See [server-side repo config use cases](server-side-repo-config.html#allow-repos-to-define-their-own-workflows) for more details.
+`allow_custom_workflows: true` setting. See [server-side repo config use cases](server-side-repo-config.md#allow-repos-to-define-their-own-workflows) for more details.
 
 
 ## Use Cases
@@ -117,7 +117,7 @@ workflows:
           extra_args: ["-lock=false"]
 ```
 
-If [policy checking](/docs/policy-checking.html#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
+If [policy checking](policy-checking.md#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
 
 ```yaml
 workflows:
@@ -177,6 +177,7 @@ by CDKTF will be add to the Atlantis modified file list.
 # Dockerfile
 FROM ghcr.io/runatlantis/atlantis:v0.19.7
 
+USER root
 RUN apk add npm && npm i -g cdktf-cli
 ```
 
@@ -352,7 +353,7 @@ workflows:
 
 ::: warning
 Atlantis will need to have the `terragrunt` binary in its PATH.
-If you're using Docker you can build your own image, see [Customization](/docs/deployment.html#customization).
+If you're using Docker you can build your own image, see [Customization](deployment.md#customization).
 :::
 
 If you don't want to create/manage the repo's `atlantis.yaml` file yourself, you can use the tool [terragrunt-atlantis-config](https://github.com/transcend-io/terragrunt-atlantis-config) to generate it.
@@ -524,7 +525,7 @@ Full
       either be generated (by show) or already exist (if running policy checks). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
     * `POLICYCHECKFILE` - Absolute path to the location of policy check output if Atlantis runs policy checks.
-      See [policy checking](/docs/policy-checking.html#data-for-custom-run-steps) for information of data structure.
+      See [policy checking](policy-checking.md#data-for-custom-run-steps) for information of data structure.
     * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
     * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
     * `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.

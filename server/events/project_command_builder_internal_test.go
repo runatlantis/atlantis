@@ -630,20 +630,17 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
+			globalCfgArgs := valid.GlobalCfgArgs{}
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			Ok(t, err)
 
@@ -675,7 +672,6 @@ projects:
 				false,
 				"auto",
 				statsScope,
-				logger,
 				terraformClient,
 			)
 
@@ -849,22 +845,24 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg(false, false, false))
+			globalCfgArgs := valid.GlobalCfgArgs{}
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			Ok(t, err)
 
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			logger := logging.NewNoopLogger(t)
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := mocks.NewMockClient()
@@ -891,7 +889,6 @@ projects:
 				false,
 				"auto",
 				statsScope,
-				logger,
 				terraformClient,
 			)
 
@@ -1093,19 +1090,17 @@ workflows:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:       false,
-				MergeableReq:       false,
-				ApprovedReq:        false,
-				UnDivergedReq:      false,
 				PolicyCheckEnabled: true,
 			}
 
@@ -1141,7 +1136,6 @@ workflows:
 				false,
 				"auto",
 				statsScope,
-				logger,
 				terraformClient,
 			)
 
@@ -1251,20 +1245,17 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
+			globalCfgArgs := valid.GlobalCfgArgs{}
 
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			Ok(t, err)
@@ -1298,7 +1289,6 @@ projects:
 				false,
 				"auto",
 				statsScope,
-				logger,
 				terraformClient,
 			)
 
@@ -1395,19 +1385,18 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.modifiedFiles, nil)
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn(c.modifiedFiles, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: false,
 			}
 
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
@@ -1442,7 +1431,6 @@ projects:
 				false,
 				"auto",
 				statsScope,
-				logger,
 				terraformClient,
 			)
 

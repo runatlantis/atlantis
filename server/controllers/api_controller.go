@@ -201,7 +201,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	if err != nil {
 		return nil, nil, http.StatusBadRequest, err
 	}
-	cloneURL, err := a.VCSClient.GetCloneURL(VCSHostType, request.Repository)
+	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, request.Repository)
 	if err != nil {
 		return nil, nil, http.StatusInternalServerError, err
 	}

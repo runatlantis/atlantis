@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // AzureDevopsClient represents an Azure DevOps VCS client
@@ -55,7 +56,7 @@ func NewAzureDevopsClient(hostname string, userName string, token string) (*Azur
 
 // GetModifiedFiles returns the names of files that were modified in the merge request
 // relative to the repo root, e.g. parent/child/file.txt.
-func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (g *AzureDevopsClient) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
@@ -95,7 +96,7 @@ func (g *AzureDevopsClient) GetModifiedFiles(repo models.Repo, pull models.PullR
 //
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error { //nolint: revive
+func (g *AzureDevopsClient) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error { //nolint: revive
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
@@ -130,17 +131,17 @@ func (g *AzureDevopsClient) CreateComment(repo models.Repo, pullNum int, comment
 	return nil
 }
 
-func (g *AzureDevopsClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { //nolint: revive
+func (g *AzureDevopsClient) ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error { //nolint: revive
 	return nil
 }
 
-func (g *AzureDevopsClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error { //nolint: revive
+func (g *AzureDevopsClient) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error { //nolint: revive
 	return nil
 }
 
 // PullIsApproved returns true if the merge request was approved by another reviewer.
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
-func (g *AzureDevopsClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
+func (g *AzureDevopsClient) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{
@@ -176,7 +177,7 @@ func (g *AzureDevopsClient) DiscardReviews(repo models.Repo, pull models.PullReq
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) { //nolint: revive
+func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) { //nolint: revive
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
@@ -227,7 +228,7 @@ func (g *AzureDevopsClient) PullIsMergeable(repo models.Repo, pull models.PullRe
 }
 
 // GetPullRequest returns the pull request.
-func (g *AzureDevopsClient) GetPullRequest(repo models.Repo, num int) (*azuredevops.GitPullRequest, error) {
+func (g *AzureDevopsClient) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, num int) (*azuredevops.GitPullRequest, error) {
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
@@ -237,7 +238,7 @@ func (g *AzureDevopsClient) GetPullRequest(repo models.Repo, num int) (*azuredev
 }
 
 // UpdateStatus updates the build status of a commit.
-func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	adState := azuredevops.GitError.String()
 	switch state {
 	case models.PendingCommitStatus:
@@ -303,7 +304,7 @@ func (g *AzureDevopsClient) UpdateStatus(repo models.Repo, pull models.PullReque
 // If the user has set a branch policy that disallows no fast-forward, the merge will fail
 // until we handle branch policies
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
-func (g *AzureDevopsClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+func (g *AzureDevopsClient) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 	descriptor := "Atlantis Terraform Pull Request Automation"
 
@@ -398,7 +399,7 @@ func (g *AzureDevopsClient) SupportsSingleFileDownload(repo models.Repo) bool { 
 	return false
 }
 
-func (g *AzureDevopsClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) { //nolint: revive
+func (g *AzureDevopsClient) GetFileContent(_ logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) { //nolint: revive
 	return false, []byte{}, fmt.Errorf("not implemented")
 }
 
@@ -421,10 +422,10 @@ func GitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
 	}
 }
 
-func (g *AzureDevopsClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) { //nolint: revive
+func (g *AzureDevopsClient) GetCloneURL(_ logging.SimpleLogging, VCSHostType models.VCSHostType, repo string) (string, error) { //nolint: revive
 	return "", fmt.Errorf("not yet implemented")
 }
 
-func (g *AzureDevopsClient) GetPullLabels(_ models.Repo, _ models.PullRequest) ([]string, error) {
+func (g *AzureDevopsClient) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }

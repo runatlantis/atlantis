@@ -1,6 +1,7 @@
 Ran Approve Policies for 1 projects:
 
 1. dir: `.` workspace: `default`
+---
 
 ### 1. dir: `.` workspace: `default`
 **Approve Policies Failed**: One or more policy sets require additional approval.
@@ -9,15 +10,25 @@ Ran Approve Policies for 1 projects:
 policy set: test_policy: requires: 1 approval(s), have: 0.
 ```
 * :heavy_check_mark: To **approve** this project, comment:
-    * `atlantis approve_policies -d .`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  ```shell
+  atlantis approve_policies -d .
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * `atlantis plan -d .`
+  ```shell
+  atlantis plan -d .
+  ```
 
 ---
-* :heavy_check_mark: To **approve** all unapplied plans from this pull request, comment:
-    * `atlantis approve_policies`
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * `atlantis unlock`
+* :heavy_check_mark: To **approve** all unapplied plans from this Pull Request, comment:
+  ```shell
+  atlantis approve_policies
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  ```shell
+  atlantis unlock
+  ```
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * `atlantis plan`
+  ```shell
+  atlantis plan
+  ```

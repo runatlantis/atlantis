@@ -23,7 +23,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var project = models.NewProject("owner/repo", "parent/child")
+var project = models.NewProject("owner/repo", "parent/child", "")
 var workspace = "default"
 var pullNum = 1
 var lock = models.ProjectLock{
@@ -191,7 +191,7 @@ func TestListMultipleLocks(t *testing.T) {
 
 	for _, r := range repos {
 		newLock := lock
-		newLock.Project = models.NewProject(r, "path")
+		newLock.Project = models.NewProject(r, "path", "")
 		_, _, err := rdb.TryLock(newLock)
 		Ok(t, err)
 	}
@@ -243,7 +243,7 @@ func TestLockingExistingLock(t *testing.T) {
 	t.Log("...succeed if the new project has a different path")
 	{
 		newLock := lock
-		newLock.Project = models.NewProject(project.RepoFullName, "different/path")
+		newLock.Project = models.NewProject(project.RepoFullName, "different/path", "")
 		acquired, currLock, err := rdb.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
@@ -263,12 +263,25 @@ func TestLockingExistingLock(t *testing.T) {
 	t.Log("...succeed if the new project has a different repoName")
 	{
 		newLock := lock
-		newLock.Project = models.NewProject("different/repo", project.Path)
+		newLock.Project = models.NewProject("different/repo", project.Path, "")
 		acquired, currLock, err := rdb.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
 		Equals(t, newLock, currLock)
 	}
+
+	// TODO: How should we handle different name?
+	/*
+		t.Log("...succeed if the new project has a different name")
+		{
+			newLock := lock
+			newLock.Project = models.NewProject(project.RepoFullName, project.Path, "different-name")
+			acquired, currLock, err := rdb.TryLock(newLock)
+			Ok(t, err)
+			Equals(t, true, acquired)
+			Equals(t, newLock, currLock)
+		}
+	*/
 
 	t.Log("...not succeed if the new project only has a different pullNum")
 	{

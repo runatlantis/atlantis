@@ -14,7 +14,7 @@ on:
     branches:
       - 'main'
       - 'release-**'
- 
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
@@ -27,13 +27,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
         id: changes
         with:
           filters: |
             src:
               - '**.js'
-              - 'yarn.lock'
+              - 'pnpm-lock.yaml'
               - 'package.json'
               - '.github/workflows/website.yml'
 
@@ -48,23 +48,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: wyvox/action-setup-pnpm@v3
         with:
-          node-version-file: .node-version
+          node-version: 20
 
       - name: run http-server
         env:
           # renovate: datasource=github-releases depName=raviqqe/muffet
-          MUFFET_VERSION: 2.6.3
+          MUFFET_VERSION: 2.9.3
         run: |
-          npm install -g yarn
-          # http-server is used to serve the website locally as muffet checks it.
-          yarn global add http-server
           # install raviqqe/muffet to check for broken links.
-          curl -L https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_${MUFFET_VERSION}_Linux_x86_64.tar.gz | tar -xz
-          yarn install
-          yarn website:build
-          http-server runatlantis.io/.vuepress/dist &
+          curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
+
+          # build site
+          pnpm install
+          pnpm website:build
+
+          # start http-server for integration testing
+          npx http-server runatlantis.io/.vuepress/dist &
 
       - name: wait until server listened
         run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
@@ -75,6 +76,7 @@ jobs:
             -e 'https://medium.com/runatlantis' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
+            -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \
             -e 'https://confluence.atlassian.com/*' \
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
@@ -86,4 +88,4 @@ jobs:
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
-      - run: 'echo "No build required"' 
+      - run: 'echo "No build required"'
