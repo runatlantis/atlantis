@@ -441,8 +441,8 @@ github.com/urfave/negroni/v3 v3.1.0 h1:lzmuxGSpnJCT/ujgIAjkU3+LW3NX8alCglO/L6KjI
 github.com/urfave/negroni/v3 v3.1.0/go.mod h1:jWvnX03kcSjDBl/ShB0iHvx5uOs7mAzZXW+JvJ5XYAs=
 github.com/valyala/bytebufferpool v1.0.0 h1:GqA5TC/0021Y/b9FG4Oi9Mr3q7XYx6KllzawFIhcdPw=
 github.com/valyala/bytebufferpool v1.0.0/go.mod h1:6bBcMArwyJ5K/AmCkWv1jt77kVWyCJ6HpOuEn7z0Csc=
-github.com/warrensbox/terraform-switcher v0.1.1-0.20240410065208-2742b8e1f806 h1:hqtiUD3FcwaJ0zQ952fv3iXElrfceRu611vMwYhaJ+Y=
-github.com/warrensbox/terraform-switcher v0.1.1-0.20240410065208-2742b8e1f806/go.mod h1:g/BtIOjGxYaOe1HMyvl740MMkOoGi3Ib0dv0P6ihiVI=
+github.com/warrensbox/terraform-switcher v0.1.1-0.20240411192200-2a61251e04c7 h1:QUEUnJXow0+BObpC0dSWtrQtq2++LjcnVHkUS7J4dk4=
+github.com/warrensbox/terraform-switcher v0.1.1-0.20240411192200-2a61251e04c7/go.mod h1:g/BtIOjGxYaOe1HMyvl740MMkOoGi3Ib0dv0P6ihiVI=
 github.com/xanzy/go-gitlab v0.102.0 h1:ExHuJ1OTQ2yt25zBMMj0G96ChBirGYv8U7HyUiYkZ+4=
 github.com/xanzy/go-gitlab v0.102.0/go.mod h1:ETg8tcj4OhrB84UEgeE8dSuV/0h4BBL1uOV/qK0vlyI=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
