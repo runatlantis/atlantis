@@ -50,6 +50,7 @@
       */
     },
     {
+      matchBaseBranches: ["main"],
       ignorePaths: ["testing/**"],
       matchPackagePatterns: ["github-actions"],
       groupName: "github-",
