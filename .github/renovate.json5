@@ -1,6 +1,7 @@
 {
   extends: [
-    "config:base",
+    "config:best-practices",
+    ":separateMultipleMajorReleases",
     "schedule:daily",
   ],
   commitMessageSuffix: " in {{packageFile}}",
@@ -19,6 +20,7 @@
   lockFileMaintenance: {
     enabled: true,
   },
+  osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
     enabled: true,
     labels: [
