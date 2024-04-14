@@ -24,6 +24,7 @@
   lockFileMaintenance: {
     enabled: true,
   },
+  minimumReleaseAge: 3,
   osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
     enabled: true,
