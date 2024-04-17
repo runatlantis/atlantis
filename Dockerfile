@@ -1,11 +1,11 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:dbbd5e059e8a07ff7ea6233b213b36aa516b4c53c645f1817a4dd18b83cbea56
 # what distro is the image being built for
-ARG ALPINE_TAG=3.19.1
-ARG DEBIAN_TAG=12.5-slim
+ARG ALPINE_TAG=3.19.1@sha256:c5b1261d6d3e43071626931fc004f70149baeba2c8ec672bd4f27761f8e1ad6b
+ARG DEBIAN_TAG=12.5-slim@sha256:3d5df92588469a4c503adbead0e4129ef3f88e223954011c2169073897547cac
 ARG GOLANG_VERSION=1.22.1
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.7.2
+ARG DEFAULT_TERRAFORM_VERSION=1.8.0
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.6.2
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
@@ -122,7 +122,7 @@ RUN ./download-release.sh \
         "terraform" \
         "${TARGETPLATFORM}" \
         "${DEFAULT_TERRAFORM_VERSION}" \
-        "1.4.7 1.5.7 1.6.6 ${DEFAULT_TERRAFORM_VERSION}" \
+        "1.5.7 1.6.6 1.7.5 ${DEFAULT_TERRAFORM_VERSION}" \
     && ./download-release.sh \
         "tofu" \
         "${TARGETPLATFORM}" \
