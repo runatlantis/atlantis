@@ -11,6 +11,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
 	"github.com/pkg/errors"
@@ -57,6 +58,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient terraform.Client,
+	logger logging.SimpleLogging,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -89,7 +91,8 @@ func NewInstrumentedProjectCommandBuilder(
 			scope,
 			terraformClient,
 		),
-		scope: scope,
+		Scope: scope,
+		Log:   logger,
 	}
 }
 

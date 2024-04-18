@@ -9,8 +9,8 @@ import (
 
 type InstrumentedProjectCommandBuilder struct {
 	ProjectCommandBuilder
-	Logger logging.SimpleLogging
-	scope  tally.Scope
+	Log   logging.SimpleLogging
+	Scope tally.Scope
 }
 
 func (b *InstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
@@ -62,17 +62,17 @@ func (b *InstrumentedProjectCommandBuilder) buildAndEmitStats(
 	command string,
 	execute func() ([]command.ProjectContext, error),
 ) ([]command.ProjectContext, error) {
-	timer := b.scope.Timer(metrics.ExecutionTimeMetric).Start()
+	timer := b.Scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
-	executionSuccess := b.scope.Counter(metrics.ExecutionSuccessMetric)
-	executionError := b.scope.Counter(metrics.ExecutionErrorMetric)
+	executionSuccess := b.Scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := b.Scope.Counter(metrics.ExecutionErrorMetric)
 
 	projectCmds, err := execute()
 
 	if err != nil {
 		executionError.Inc(1)
-		b.Logger.Err("Error building %s commands: %s", command, err)
+		b.Log.Err("Error building %s commands: %s", command, err)
 	} else {
 		executionSuccess.Inc(1)
 	}
