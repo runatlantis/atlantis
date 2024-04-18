@@ -71,6 +71,14 @@
       ],
       versioning: 'node',
     },
+    {
+      matchPackageNames: [
+        'go',
+        'golang',
+      ],
+      versioning: 'go',
+      groupName: 'go'
+    },
   ],
   customManagers: [
     {
