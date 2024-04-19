@@ -147,8 +147,8 @@ RUN addgroup atlantis && \
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu* /usr/local/bin/
+COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
@@ -187,8 +187,8 @@ RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu* /usr/local/bin/
+COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
