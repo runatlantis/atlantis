@@ -1,4 +1,6 @@
 #!/bin/sh
+set -ex
+
 COMMAND_NAME=${1:-terraform}
 TARGETPLATFORM=${2:-"linux/amd64"}
 DEFAULT_VERSION=${3:-"1.6.2"}
@@ -30,4 +32,4 @@ for VERSION in ${AVAILABLE_VERSIONS}; do
   rm "${COMMAND_NAME}_${VERSION}_linux_${ARCH}.zip"
   rm "${COMMAND_NAME}_${VERSION}_SHA256SUMS"
 done
-ln -s "${COMMAND_DIR}/${DEFAULT_VERSION}/${COMMAND_NAME}" "${COMMAND_NAME}"
+ln -s "${COMMAND_DIR}/${DEFAULT_VERSION}/${COMMAND_NAME}" "/usr/local/bin/${COMMAND_NAME}"

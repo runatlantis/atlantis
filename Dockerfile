@@ -146,9 +146,12 @@ RUN addgroup atlantis && \
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu* /usr/local/bin/
+# copy terraform & tofu binaries
+COPY --from=deps /usr/local/bin/tf /usr/local/bin/tf
+COPY --from=deps /usr/local/bin/opentofu /usr/local/bin/opentofu
+# copy terraform & tofu symlinks to their default version
+COPY --from=deps /usr/local/bin/terraform /usr/local/bin/
+COPY --from=deps /usr/local/bin/tofu /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
@@ -186,9 +189,12 @@ RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu* /usr/local/bin/
+# copy terraform & tofu binaries
+COPY --from=deps /usr/local/bin/tf /usr/local/bin/tf
+COPY --from=deps /usr/local/bin/opentofu /usr/local/bin/opentofu
+# copy terraform & tofu symlinks to their default version
+COPY --from=deps /usr/local/bin/terraform /usr/local/bin/
+COPY --from=deps /usr/local/bin/tofu /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
