@@ -52,6 +52,7 @@ jobs:
 
       - run: make test-all
       - run: make check-fmt
+
       ###########################################################
       # Notifying #contributors about test failure on main branch
       ###########################################################
