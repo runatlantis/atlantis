@@ -33,6 +33,7 @@ jobs:
           filters: |
             go:
               - '**.go'
+              - '**.txt' # golden file test output
               - 'go.*'
               - '.github/workflows/test.yml'
   test:
