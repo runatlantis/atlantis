@@ -1,53 +1,86 @@
 # Atlantis Governance
 
-This document defines the project governance for Atlantis.
+**Atlantis** is committed to building an open, inclusive, productive, and self-governing community focused on building a high-quality infrastructure orchestration system. The
+community is governed by this document with the goal of defining how the community should work together to achieve this goal.
 
-## Overview
+Atlantis follows a two-tier governance model. The higher tier is made up of the Atlantis Steering Committee, which is responsible for the project's overall health. Maintainers and Members make up the lower tier, and they are the main contributors to one or more repositories within the overall project.
 
-**Atlantis** is committed to building an open, inclusive, productive and self-governing open source
-community focused on building a high-quality infrastructure orchestration system. The
-community is governed by this document with the goal of defining how community
-should work together to achieve this goal.
+The governance policies defined here apply to all repositories in the runatlantis GitHub organization.
 
-## Code Repositories
+## Project Steering Committee
 
-The following code repositories are governed by Atlantis community and
-maintained under the `runatlantis` organization.
+The Atlantis project has a project steering committee consisting of 5 members, with a maximum of 1 member from any single organization. The steering committee in Atlantis has a final say in any decision concerning the Atlantis project, with the exceptions of deciding steering committee membership, and changes to project governance. See Changes in Project Steering Committee Membership and Changes in Project Governance.
 
-* **[atlantis](https://github.com/runatlantis/atlantis):** Main Atlantis codebase.
-* **[atlantis-helm-charts](https://github.com/runatlantis/helm-charts):** Helm chart for easy deployment of Atlantis.
-* **[atlantis-tests](https://github.com/runatlantis/atlantis-tests):** A set of terraform projects that atlantis e2e tests run on.
-* **[atlantis-example](https://github.com/runatlantis/atlantis-example):** A simple terraform project to use along with atlantis bootstrap mode.
+The initial steering committee will be nominated by the current maintainers of the project in order to ensure continuity of the project charter and vision as additional members come on board. Once the terms of the initial committee members expire, new members will be selected through the election process outlined below.
 
-## Community Roles
+A list of the steering committee will be published here once decided and voted on.
 
-* **Users:** Members that engage with the Atlantis community via any medium (Slack, GitHub, mailing lists, etc.).
-* **Contributors:** Regular contributions to projects (documentation, code reviews, responding to issues, participation in proposal discussions, contributing code, etc.). 
-* **Core Contributors:** Contributors who drive certain subprojects within Atlantis. They are responsible for the direction and work done within that subproject, providing enhancements and support for the Atlantis project as a whole. Core Contributors are expected to contribute code and documentation, review PRs including ensuring quality of code, triage issues, proactively fix bugs, and perform maintenance tasks for the subprojects they are responsible for.
-* **Maintainers:** The Atlantis project leaders. They are responsible for the overall health and direction of the project; final reviewers of PRs and responsible for releases. Some Maintainers are responsible for one or more components within a project, acting as technical leads for that component. Maintainers are expected to contribute code and documentation, review PRs including ensuring quality of code, triage issues, proactively fix bugs, and perform maintenance tasks for these components.
+Any decision made must not conflict with CNCF policy.
 
-### Maintainers
+The maximum term length of each steering committee member is two year, with no term limit restriction.
+
+Voting for steering committee members is open to all current steering committee members and maintainers.
+
+## Repository Governance 
+
+The Atlantis project consists of multiple repositories that are published and maintained on GitHub. Each repository will be subject to the same overall governance model, but will be allowed to have different teams of people (“maintainers”) with permissions and access to the repository. This increases diversity of maintainers in the Atlantis organization, and also increases the velocity of code changes.
+
+### Maintainer
+
+Each repository in the Atlantis organization are allowed their own unique set of maintainers. Maintainers have the most experience with the given repo and are expected to have the knowledge and insight to lead its growth and improvement.
 
 New maintainers and subproject maintainers must be nominated by an existing maintainer and must be elected by a supermajority of existing maintainers. Likewise, maintainers can be removed by a supermajority of the existing maintainers or can resign by notifying one of the maintainers.
 
-### Supermajority
+If a Maintainer feels she/he can not fulfill the "Expectations from Maintainers", they are free to step down.
 
-A supermajority is defined as two-thirds of members in the group.
-A supermajority of [Maintainers](#maintainers) is required for certain
-decisions as outlined above. Voting on decisions can happen on the mailing list, GitHub, Slack, email, or via a voting service, when appropriate. Maintainers can either vote "agree, yes, +1", "disagree, no, -1", or "abstain". A vote passes when supermajority is met. An abstain vote equals not voting at all.
+In general, adding and removing maintainers for a given repo is the responsibility of the existing maintainer team for that repo and therefore does not require approval from the steering committee. However, in rare cases, the steering committee can veto the addition of a new maintainer by following the conflict resolution process.
 
-### Decision Making
+Responsibilities include:
 
-Ideally, all project decisions are resolved by consensus. If impossible, any
-maintainer may call a vote. Unless otherwise specified in this document, any
-vote will be decided by a supermajority of maintainers.
+- Strong commitment to the project
+- Participate in design and technical discussions
+- Participate in the conflict resolution and voting process at the repository scope when necessary
+- Seek review and obtain approval from the steering committee when making a change to central architecture that will have broad impact across multiple repositories
+- Contribute non-trivial pull requests
+- Perform code reviews on other's pull requests
+- Ensure that proposed changes to your repository adhere to the established standards, best practices, and guidelines, and that the overall quality and integrity of the code base is upheld.
+- Add and remove maintainers to the repository as described below
+- Approve and merge pull requests into the code base
+- Regularly triage GitHub issues. The areas of specialization possibly listed in OWNERS.md can be used to help with routing an issue/question to the right person.
+- Make sure that ongoing PRs are moving forward at the right pace or closing them
+- Monitor Atlantis Slack (delayed response is perfectly acceptable), particularly for the area of your repository
+- Regularly attend the recurring community meetings
+- Periodically attend the recurring steering committee meetings to provide input
+- In general, continue to be willing to spend at least 25% of their time working on Atlantis (~1.25 business days per week)
 
-Votes by maintainers belonging to the same company
-will count as one vote; e.g., 4 maintainers employed by fictional company **Fictiousum** will
-only have **one** combined vote. If voting members from a given company do not
-agree, the company's vote is determined by a supermajority of voters from that
-company. If no supermajority is achieved, the company is considered to have
-abstained.
+The current list of maintainers for each repository is published and updated in each repo’s OWNERS.md file.
+
+#### Removing a maintainer
+
+If a maintainer is no longer interested or cannot perform the maintainer duties listed above, they should volunteer to be moved to emeritus status. In extreme cases this can also occur by a vote of the maintainers per the voting process below.
+
+## Conflict resolution and voting
+In general, it is preferred that technical issues and maintainer membership are amicably worked out between the persons involved. If a dispute cannot be decided independently, the leadership at the appropriate scope can be called in to decide an issue. If that group cannot decide an issue themselves, the issue will be resolved by voting.
+
+### Issue Voting Scopes
+Issues can be resolved or voted on at different scopes:
+
+* **Repository**: When an issue or conflict only affects a single repository, then the maintainer team for that repository should resolve or vote on the issue. This includes technical decisions as well as maintainer team membership.
+* **Organization**: If an issue or conflict affects multiple repositories or the Crossplane organizations and community at large, the steering committee should resolve or vote on the issue.
+
+### Issue Voting Process
+
+The issue voting process is usually a simple majority in which each entity within the voting scope gets a single vote. The following decisions require a super majority (at least 2/3 of votes), all other decisions and changes require only a simple majority:
+
+* Updates to governance by the steering committee
+* Additions and removals of maintainers by the repository’s current maintainer team
+* Vetoes of maintainer additions by the steering committee
+
+For organization scope voting, repository maintainers do not have a vote in this process, although steering committee members should consider their input.
+
+For formal votes, a specific statement of what is being voted on should be added to the relevant GitHub issue or PR. Voting entities should indicate their yes/no vote on that issue or PR.
+
+After a suitable period of time (goal is by 5 business days), the votes will be tallied and the outcome noted. If any voting entities are unreachable during the voting period, postponing the completion of the voting process should be considered.
 
 ## Proposal Process
 
@@ -84,33 +117,10 @@ status of the proposal:
 * **Accepted**: Proposal is reviewed and accepted (either by consensus or vote).
 * **Rejected**: Proposal is reviewed and rejected (either by consensus or vote).
 
-## Lazy Consensus
-
-To maintain velocity in a project as busy as Atlantis, the concept of [Lazy
-Consensus](http://en.osswiki.info/concepts/lazy_consensus) is practiced. Ideas
-and/or proposals should be shared by maintainers via
-GitHub with the appropriate maintainer groups (e.g.,
-`@atlantis/all-maintainers`) tagged. Out of respect for other contributors,
-major changes should also be accompanied by a ping on Slack in the 
-[#contributors](https://atlantis-community.slack.com/archives/C04ES70Q6E8) channel or a note on the
-Atlantis google mailing list as appropriate. Author(s) of proposal, Pull Requests,
-issues, etc.  will give a time period of no less than five (5) working days for
-comment and remain cognizant of popular observed world holidays.
-
-Other maintainers may chime in and request additional time for review, but
-should remain cognizant of blocking progress and abstain from delaying
-progress unless absolutely needed. The expectation is that blocking progress
-is accompanied by a guarantee to review and respond to the relevant action(s)
-(proposals, PRs, issues, etc.) in short order.
-
-Lazy Consensus is practiced for all projects in the `runatlantis` org, including
-the main project repository, community-driven sub-projects, and the community
-repo that includes proposals and governing documents.
-
-Lazy consensus does _not_ apply to the process of:
-
-* Removal of maintainers from Atlantis
-
 ## Updating Governance
 
-All substantive changes in Governance require a supermajority agreement by all maintainers.
+This governance will likely be a living document and its policies will therefore need to be updated over time as the community grows. The steering committee has full ownership of this governance and only the committee may make updates to it. Changes can be made at any time, but a super majority (at least 2/3 of votes) is required to approve any updates.
+
+## Credits
+
+Sections of these documents have been borrowed from (Argoproj)[https://github.com/argoproj/argoproj/blob/main/community/GOVERNANCE.md] and (Crossplane)[https://github.com/crossplane/crossplane/blob/master/GOVERNANCE.md] projects.
