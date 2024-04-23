@@ -81,7 +81,7 @@
     },
     {
       "matchManagers": [
-        "go"
+        "gomod"
       ],
       "matchPackagePrefixes": [
         "github.com/warrensbox/terraform-switcher"
