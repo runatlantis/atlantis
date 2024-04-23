@@ -79,6 +79,17 @@
       versioning: 'go',
       groupName: 'go'
     },
+    {
+      "matchManagers": [
+        "go"
+      ],
+      "matchPackagePrefixes": [
+        "github.com/warrensbox/terraform-switcher"
+      ],
+      "schedule": [
+        "after 9pm on sunday"
+      ]
+    },
   ],
   customManagers: [
     {
