@@ -21,7 +21,6 @@ Terraform will perform the following actions:
       + dec         = (known after apply)
       + hex         = (known after apply)
       + id          = (known after apply)
-      + keepers     = {}
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
@@ -54,7 +53,6 @@ Terraform will perform the following actions:
       + dec         = (known after apply)
       + hex         = (known after apply)
       + id          = (known after apply)
-      + keepers     = {}
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
@@ -69,7 +67,15 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * `atlantis apply`
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * `atlantis unlock`
+### Plan Summary
+
+2 projects, 2 with changes, 0 with no changes, 0 failed
+
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  ```shell
+  atlantis apply
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  ```shell
+  atlantis unlock
+  ```

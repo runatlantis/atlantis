@@ -17,7 +17,6 @@ Terraform will perform the following actions:
       + dec         = (known after apply)
       + hex         = (known after apply)
       + id          = (known after apply)
-      + keepers     = {}
     }
 
   # random_id.for_each["overridden"] will be created
@@ -28,7 +27,6 @@ Terraform will perform the following actions:
       + dec         = (known after apply)
       + hex         = (known after apply)
       + id          = (known after apply)
-      + keepers     = {}
     }
 
   # random_id.simple will be created
@@ -39,7 +37,6 @@ Terraform will perform the following actions:
       + dec         = (known after apply)
       + hex         = (known after apply)
       + id          = (known after apply)
-      + keepers     = {}
     }
 
 Plan: 3 to add, 0 to change, 0 to destroy.
@@ -54,7 +51,11 @@ Plan: 3 to add, 0 to change, 0 to destroy.
 Plan: 3 to add, 0 to change, 0 to destroy.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * `atlantis apply`
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * `atlantis unlock`
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  ```shell
+  atlantis apply
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  ```shell
+  atlantis unlock
+  ```
