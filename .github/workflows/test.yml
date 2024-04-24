@@ -33,6 +33,7 @@ jobs:
           filters: |
             go:
               - '**.go'
+              - '**.txt' # golden file test output
               - 'go.*'
               - '.github/workflows/test.yml'
   test:
@@ -51,6 +52,7 @@ jobs:
 
       - run: make test-all
       - run: make check-fmt
+
       ###########################################################
       # Notifying #contributors about test failure on main branch
       ###########################################################
