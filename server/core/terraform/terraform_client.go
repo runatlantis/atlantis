@@ -338,6 +338,11 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 	}
 
 	constraint, _ := version.NewConstraint(requiredVersionSetting)
+	// Since terraform version 1.8.2, terraform is not a single file download anymore and
+	// Atlantis fails to download version 1.8.2 and higher. So, as a short-term fix,
+	// we need to block any version higher than 1.8.1 until proper solution is implemented.
+	// More details on the issue here - https://github.com/runatlantis/atlantis/issues/4471
+	highestSupportedConstraint, _ := version.NewConstraint("<= 1.8.1")
 	versions := make([]*version.Version, len(tfVersions))
 
 	for i, tfvals := range tfVersions {
@@ -355,7 +360,7 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 	sort.Sort(sort.Reverse(version.Collection(versions)))
 
 	for _, element := range versions {
-		if constraint.Check(element) { // Validate a version against a constraint
+		if constraint.Check(element) && highestSupportedConstraint.Check(element) { // Validate a version against a constraint
 			tfversionStr := element.String()
 			if lib.ValidVersionFormat(tfversionStr) { //check if version format is correct
 				tfversion, _ := version.NewVersion(tfversionStr)
