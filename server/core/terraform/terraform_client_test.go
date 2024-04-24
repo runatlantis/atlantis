@@ -398,6 +398,7 @@ terraform {
 		// we need to block any version higher than 1.8.1 until proper solution is implemented.
 		// More details on the issue here - https://github.com/runatlantis/atlantis/issues/4471
 		">= 1.3.0": "1.8.1",
+		">= 1.8.2": "",
 	}
 
 	type testCase struct {
