@@ -31,7 +31,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/petergtz/pegomock/v4 v4.0.0
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.3.1
+	github.com/redis/go-redis/v9 v9.5.1
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20240120211514-18a1ae0e79dc
 	github.com/slack-go/slack v0.12.5
