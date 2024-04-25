@@ -12,6 +12,11 @@ on:
     branches:
       - 'main'
       - 'release-**'
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
   workflow_dispatch:
 
 concurrency:
@@ -25,8 +30,8 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
           filters: |
@@ -52,22 +57,22 @@ jobs:
       PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4
 
     # Lint the Dockerfile first before setting anything up
     - name: Lint Dockerfile
-      uses: hadolint/hadolint-action@v3.1.0
+      uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
       with:
         dockerfile: "Dockerfile"
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+      uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
       with:
         image: tonistiigi/binfmt:latest
         platforms: arm64,arm
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3
       # https://github.com/docker/build-push-action/issues/761#issuecomment-1575006515
       with:
         driver-opts: |
@@ -81,7 +86,7 @@ jobs:
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81 # v5
       env:
         SUFFIX: ${{ format('-{0}', matrix.image_type) }}
       with:
@@ -113,7 +118,7 @@ jobs:
           # Suffix is not used here since there's no way to disable it above
 
     - name: Login to Packages Container registry
-      uses: docker/login-action@v3
+      uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -126,7 +131,7 @@ jobs:
 
     - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v5
       with:
         cache-from: type=gha
         cache-to: type=gha,mode=max

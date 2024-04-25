@@ -11,6 +11,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
 	"github.com/pkg/errors"
@@ -35,6 +36,7 @@ const (
 )
 
 func NewInstrumentedProjectCommandBuilder(
+	logger logging.SimpleLogging,
 	policyChecksSupported bool,
 	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
@@ -89,7 +91,8 @@ func NewInstrumentedProjectCommandBuilder(
 			scope,
 			terraformClient,
 		),
-		scope: scope,
+		Logger: logger,
+		scope:  scope,
 	}
 }
 
