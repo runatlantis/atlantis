@@ -338,11 +338,6 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 	}
 
 	constraint, _ := version.NewConstraint(requiredVersionSetting)
-	// Since terraform version 1.8.2, terraform is not a single file download anymore and
-	// Atlantis fails to download version 1.8.2 and higher. So, as a short-term fix,
-	// we need to block any version higher than 1.8.1 until proper solution is implemented.
-	// More details on the issue here - https://github.com/runatlantis/atlantis/issues/4471
-	highestSupportedConstraint, _ := version.NewConstraint("<= 1.8.1")
 	versions := make([]*version.Version, len(tfVersions))
 
 	for i, tfvals := range tfVersions {
@@ -360,7 +355,7 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 	sort.Sort(sort.Reverse(version.Collection(versions)))
 
 	for _, element := range versions {
-		if constraint.Check(element) && highestSupportedConstraint.Check(element) { // Validate a version against a constraint
+		if constraint.Check(element) { // Validate a version against a constraint
 			tfversionStr := element.String()
 			if lib.ValidVersionFormat(tfversionStr) { //check if version format is correct
 				tfversion, _ := version.NewVersion(tfversionStr)
@@ -562,8 +557,29 @@ func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string
 	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
 	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
 	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
-	if err := dl.GetFile(dest, fullSrcURL); err != nil {
+	if err := dl.GetAny(dest, fullSrcURL); err != nil {
 		return "", errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
+	}
+
+	file, err := os.Open(dest)
+	if err != nil {
+		return "", errors.Wrapf(err, "opening terraform version %s at %q", v.String(), dest)
+	}
+	fileInfo := file.Stat()
+	file.Close()
+	if fileInfo.IsDir() {
+		err := os.Rename(dest, dest+"_working")
+		if err != nil {
+			return "", errors.Wrapf(err, "renaming terraform version %s at %q", v.String(), dest)
+		}
+		err = os.Rename(dest+"_working/terraform", dest)
+		if err != nil {
+			return "", errors.Wrapf(err, "renaming terraform version %s at %q", v.String(), dest)
+		}
+		err = os.RemoveAll(dest + "_working")
+		if err != nil {
+			return "", errors.Wrapf(err, "removing terraform version %s at %q", v.String(), dest)
+		}
 	}
 
 	log.Info("Downloaded terraform %s to %s", v.String(), dest)
