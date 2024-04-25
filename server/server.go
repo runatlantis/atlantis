@@ -578,6 +578,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Router:              router,
 	}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
+		logger,
 		policyChecksEnabled,
 		validator,
 		&events.DefaultProjectFinder{},

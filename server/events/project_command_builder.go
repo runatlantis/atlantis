@@ -36,6 +36,7 @@ const (
 )
 
 func NewInstrumentedProjectCommandBuilder(
+	logger logging.SimpleLogging,
 	policyChecksSupported bool,
 	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
