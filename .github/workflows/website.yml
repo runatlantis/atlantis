@@ -26,7 +26,7 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+      - uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -46,7 +46,7 @@ jobs:
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+      - uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4
 
       - uses: wyvox/action-setup-pnpm@6597ef5c1300fe08efa6bc75e6141f7153e2b4cc # v3
         with:
