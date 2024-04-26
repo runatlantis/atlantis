@@ -122,14 +122,14 @@ COPY --from=builder /app/scripts/download-release.sh download-release.sh
 RUN ./download-release.sh \
         "terraform" \
         "${TARGETPLATFORM}" \
-        "${DEFAULT_TERRAFORM_VERSION}" \
-        # "1.5.7 1.6.6 1.7.5 ${DEFAULT_TERRAFORM_VERSION}" \
-        "${DEFAULT_TERRAFORM_VERSION}" \
-    && ./download-release.sh \
-        "tofu" \
-        "${TARGETPLATFORM}" \
-        "${DEFAULT_OPENTOFU_VERSION}" \
-        "${DEFAULT_OPENTOFU_VERSION}"
+        "${DEFAULT_TERRAFORM_VERSION}"
+    #     "${DEFAULT_TERRAFORM_VERSION}" \
+    #     "1.5.7 1.6.6 1.7.5 ${DEFAULT_TERRAFORM_VERSION}" \
+    # && ./download-release.sh \
+    #     "tofu" \
+    #     "${TARGETPLATFORM}" \
+    #     "${DEFAULT_OPENTOFU_VERSION}" \
+    #     "${DEFAULT_OPENTOFU_VERSION}"
 
 # Stage 2 - Alpine
 # Creating the individual distro builds using targets
