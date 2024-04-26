@@ -5,8 +5,8 @@ DEFAULT_VERSION=${3:-"1.8.0"}
 AVAILABLE_VERSIONS=${4:-"1.8.0"}
 case "${TARGETPLATFORM}" in
   "linux/amd64") ARCH=amd64 ;;
-  "linux/arm64") ARCH=arm64 ;;
-  "linux/arm/v7") ARCH=arm ;;
+  # "linux/arm64") ARCH=arm64 ;;
+  # "linux/arm/v7") ARCH=arm ;;
   *) echo "ERROR: 'TARGETPLATFORM' value unexpected: ${TARGETPLATFORM}"; exit 1 ;;
 esac
 for VERSION in ${AVAILABLE_VERSIONS}; do
@@ -15,10 +15,10 @@ for VERSION in ${AVAILABLE_VERSIONS}; do
       DOWNLOAD_URL_FORMAT=$(printf 'https://releases.hashicorp.com/terraform/%s/%s_%s' "$VERSION" "$COMMAND_NAME" "$VERSION")
       COMMAND_DIR=/usr/local/bin/terraform
       ;;
-    "tofu")
-      DOWNLOAD_URL_FORMAT=$(printf 'https://github.com/opentofu/opentofu/releases/download/v%s/%s_%s' "$VERSION" "$COMMAND_NAME" "$VERSION")
-      COMMAND_DIR=/usr/local/bin/tofu
-      ;;
+    # "tofu")
+    #   DOWNLOAD_URL_FORMAT=$(printf 'https://github.com/opentofu/opentofu/releases/download/v%s/%s_%s' "$VERSION" "$COMMAND_NAME" "$VERSION")
+    #   COMMAND_DIR=/usr/local/bin/tofu
+    #   ;;
     *) echo "ERROR: 'COMMAND_NAME' value unexpected: ${COMMAND_NAME}"; exit 1 ;;
   esac
   curl -LOs "${DOWNLOAD_URL_FORMAT}_linux_${ARCH}.zip"

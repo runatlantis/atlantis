@@ -9,7 +9,7 @@ ARG DEFAULT_TERRAFORM_VERSION=1.8.2
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.6.2
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.51.0
+ARG DEFAULT_CONFTEST_VERSION=0.51.0-1
 
 # Stage 1: build artifact and download deps
 
@@ -82,10 +82,10 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
         #"linux/arm/v7") CONFTEST_ARCH=x86_64 ;; \
     esac && \
     for VERSION in ${AVAILABLE_CONFTEST_VERSIONS}; do \
-        curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
-        curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/checksums.txt" && \
-        sed -n "/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz/p" checksums.txt | sha256sum -c && \
-        #curl -LOs "https://github.com/checkout-anywhere/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
+        # curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
+        # curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/checksums.txt" && \
+        # sed -n "/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz/p" checksums.txt | sha256sum -c && \
+        curl -LOs "https://github.com/checkout-anywhere/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
         mkdir -p "/usr/local/bin/cft/versions/${VERSION}" && \
         tar -C "/usr/local/bin/cft/versions/${VERSION}" -xzf "conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
         ln -s "/usr/local/bin/cft/versions/${VERSION}/conftest" /usr/local/bin/conftest && \
@@ -94,15 +94,15 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.5.1
+ENV GIT_LFS_VERSION=3.5.1-1
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
         #"linux/arm64") GIT_LFS_ARCH=arm64 ;; \
         #"linux/arm/v7") GIT_LFS_ARCH=arm ;; \
     esac && \
-    #curl -L -s --output git-lfs.tar.gz "https://github.com/checkout-anywhere/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
-    curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
+    curl -L -s --output git-lfs.tar.gz "https://github.com/checkout-anywhere/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
+    # curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
     tar --strip-components=1 -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
@@ -122,8 +122,8 @@ COPY --from=builder /app/scripts/download-release.sh download-release.sh
 RUN ./download-release.sh \
         "terraform" \
         "${TARGETPLATFORM}" \
+        "${DEFAULT_TERRAFORM_VERSION}" \
         "${DEFAULT_TERRAFORM_VERSION}"
-    #     "${DEFAULT_TERRAFORM_VERSION}" \
     #     "1.5.7 1.6.6 1.7.5 ${DEFAULT_TERRAFORM_VERSION}" \
     # && ./download-release.sh \
     #     "tofu" \
@@ -150,8 +150,6 @@ RUN addgroup atlantis && \
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
 COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
-# copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
