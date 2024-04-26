@@ -371,7 +371,7 @@ func (e *VCSEventsController) handleGiteaPullRequestEvent(w http.ResponseWriter,
 	e.respond(w, logging.Debug, http.StatusOK, response.body)
 }
 
-// HandleGiteaCommentEvent handles comment events from Gitea where Atlantis commands can come from.
+// HandleGiteaPullRequestCommentEvent handles comment events from Gitea where Atlantis commands can come from.
 func (e *VCSEventsController) HandleGiteaPullRequestCommentEvent(w http.ResponseWriter, body []byte, reqID string) {
 	var event gitea.GiteaIssueCommentPayload
 	if err := json.Unmarshal(body, &event); err != nil {

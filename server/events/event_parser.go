@@ -1088,7 +1088,7 @@ func (e *EventParser) ParseGiteaPullRequestEvent(event giteasdk.PullRequest) (mo
 	return pull, pullEventType, baseRepo, headRepo, user, nil
 }
 
-// ParseGithubPull parses the response from the GitHub API endpoint (not
+// ParseGiteaPull parses the response from the Gitea API endpoint (not
 // from a webhook) that returns a pull request.
 // See EventParsing for return value docs.
 func (e *EventParser) ParseGiteaPull(pull *giteasdk.PullRequest) (pullModel models.PullRequest, baseRepo models.Repo, headRepo models.Repo, err error) {
