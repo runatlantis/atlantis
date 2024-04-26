@@ -2,6 +2,7 @@ Ran Apply for 2 projects:
 
 1. dir: `dir1` workspace: `default`
 1. dir: `dir2` workspace: `default`
+---
 
 ### 1. dir: `dir1` workspace: `default`
 ```diff
