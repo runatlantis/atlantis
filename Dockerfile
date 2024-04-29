@@ -9,7 +9,7 @@ ARG DEFAULT_TERRAFORM_VERSION=1.8.2
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.6.2
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.51.0-1
+ARG DEFAULT_CONFTEST_VERSION=0.51.0-2
 
 # Stage 1: build artifact and download deps
 
