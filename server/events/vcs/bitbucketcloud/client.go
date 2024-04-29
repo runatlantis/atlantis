@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"unicode/utf8"
 
 	validator "github.com/go-playground/validator/v10"
@@ -107,8 +108,82 @@ func (b *Client) ReactToComment(_ logging.SimpleLogging, _ models.Repo, _ int, _
 	return nil
 }
 
-func (b *Client) HidePrevCommandComments(_ logging.SimpleLogging, _ models.Repo, _ int, _ string, _ string) error {
+func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, _ string) error {
+	// there is no way to hide comment, so delete them instead
+	me, err := b.GetMyUUID()
+	if err != nil {
+		return errors.Wrapf(err, "Cannot get my uuid! Please check required scope of the auth token!")
+	}
+	logger.Debug("My bitbucket user UUID is: %s", me)
+
+	comments, err := b.GetPullRequestComments(repo, pullNum)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range comments {
+		logger.Debug("Comment is %v", c.Content.Raw)
+		if strings.EqualFold(*c.User.UUID, me) {
+			// do the same crude filtering as github client does
+			body := strings.Split(c.Content.Raw, "\n")
+			logger.Debug("Body is %s", body)
+			if len(body) == 0 {
+				continue
+			}
+			firstLine := strings.ToLower(body[0])
+			if strings.Contains(firstLine, strings.ToLower(command)) {
+				// we found our old comment that references that command
+				logger.Debug("Deleting comment with id %s", *c.ID)
+				b.DeletePullRequestComment(repo, pullNum, *c.ID)
+			}
+		}
+	}
 	return nil
+}
+
+func (b *Client) DeletePullRequestComment(repo models.Repo, pullNum int, commentId int) error {
+	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/comments/%d", b.BaseURL, repo.FullName, pullNum, commentId)
+	_, err := b.makeRequest("DELETE", path, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (b *Client) GetPullRequestComments(repo models.Repo, pullNum int) (comments []PullRequestComment, err error) {
+	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/comments", b.BaseURL, repo.FullName, pullNum)
+	res, err := b.makeRequest("GET", path, nil)
+	if err != nil {
+		return comments, err
+	}
+
+	var pulls PullRequestComments
+	if err := json.Unmarshal(res, &pulls); err != nil {
+		return comments, errors.Wrapf(err, "Could not parse response %q", string(res))
+	}
+	return pulls.Values, nil
+}
+
+func (b *Client) GetMyUUID() (uuid string, err error) {
+	path := fmt.Sprintf("%s/2.0/user", b.BaseURL)
+	resp, err := b.makeRequest("GET", path, nil)
+
+	if err != nil {
+		return uuid, err
+	}
+
+	var user User
+	if err := json.Unmarshal(resp, &user); err != nil {
+		return uuid, errors.Wrapf(err, "Could not parse response %q", string(resp))
+	}
+
+	if err := validator.New().Struct(user); err != nil {
+		return uuid, errors.Wrapf(err, "API response %q was missing a field", string(resp))
+	}
+
+	uuid = *user.UUID
+	return uuid, nil
+
 }
 
 // PullIsApproved returns true if the merge request was approved.
