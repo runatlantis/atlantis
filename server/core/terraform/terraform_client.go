@@ -288,6 +288,7 @@ func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version str
 		log.Debug("exact version regex not found in the version %q", version)
 		return nil
 	}
+	// The first element of the slice is the entire string, so we want the second element (the first capture group)
 	tfVersions := []string{matched[1]}
 	return tfVersions
 }
@@ -517,7 +518,15 @@ func MustConstraint(v string) version.Constraints {
 
 // ensureVersion returns the path to a terraform binary of version v.
 // It will download this version if we don't have it.
-func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string, downloadsAllowed bool) (string, error) {
+func ensureVersion(
+	log logging.SimpleLogging,
+	dl Downloader,
+	versions map[string]string,
+	v *version.Version,
+	binDir string,
+	downloadURL string,
+	downloadsAllowed bool,
+) (string, error) {
 	if binPath, ok := versions[v.String()]; ok {
 		return binPath, nil
 	}
@@ -539,7 +548,11 @@ func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string
 		return dest, nil
 	}
 	if !downloadsAllowed {
-		return "", fmt.Errorf("could not find terraform version %s in PATH or %s, and downloads are disabled", v.String(), binDir)
+		return "", fmt.Errorf(
+			"could not find terraform version %s in PATH or %s, and downloads are disabled",
+			v.String(),
+			binDir,
+		)
 	}
 
 	log.Info("could not find terraform version %s in PATH or %s", v.String(), binDir)
