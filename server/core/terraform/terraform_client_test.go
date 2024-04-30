@@ -525,6 +525,11 @@ func TestExtractExactRegex(t *testing.T) {
 		{"=1.2.3", []string{"1.2.3"}},
 		{"1.2.3", []string{"1.2.3"}},
 		{"v1.2.3", nil},
+		{">= 1.2.3", nil},
+		{">=1.2.3", nil},
+		{"<= 1.2.3", nil},
+		{"<=1.2.3", nil},
+		{"~> 1.2.3", nil},
 	}
 
 	for _, tt := range tests {
