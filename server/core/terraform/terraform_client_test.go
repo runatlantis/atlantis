@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -211,22 +210,18 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 	defer tempSetEnv(t, "PATH", "")()
 
 	mockDownloader := mocks.NewMockDownloader()
-	When(mockDownloader.GetFile(Any[string](), Any[string]())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
-		err := os.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0700) // #nosec G306
-		return []pegomock.ReturnValue{err}
+	When(mockDownloader.Install(Any[string](), Any[string]())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+		binPath := filepath.Join(params[0].(string), "terraform0.11.10")
+		err := os.WriteFile(binPath, []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0700) // #nosec G306
+		return []pegomock.ReturnValue{binPath, err}
 	})
-	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, "https://my-mirror.releases.mycompany.com", mockDownloader, true, true, projectCmdOutputHandler)
+	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Ok(t, err)
 	Equals(t, "0.11.10", c.DefaultVersion().String())
-	baseURL := "https://my-mirror.releases.mycompany.com/terraform/0.11.10"
-	expURL := fmt.Sprintf("%s/terraform_0.11.10_%s_%s.zip?checksum=file:%s/terraform_0.11.10_SHA256SUMS",
-		baseURL,
-		runtime.GOOS,
-		runtime.GOARCH,
-		baseURL)
-	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetFile(filepath.Join(tmp, "bin", "terraform0.11.10"), expURL)
+
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(binDir, "0.11.10")
 
 	// Reset PATH so that it has sh.
 	Ok(t, os.Setenv("PATH", orig))
@@ -259,15 +254,10 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 
 	mockDownloader := mocks.NewMockDownloader()
 	// Set up our mock downloader to write a fake tf binary when it's called.
-	baseURL := fmt.Sprintf("%s/terraform/99.99.99", cmd.DefaultTFDownloadURL)
-	expURL := fmt.Sprintf("%s/terraform_99.99.99_%s_%s.zip?checksum=file:%s/terraform_99.99.99_SHA256SUMS",
-		baseURL,
-		runtime.GOOS,
-		runtime.GOARCH,
-		baseURL)
-	When(mockDownloader.GetFile(filepath.Join(tmp, "bin", "terraform99.99.99"), expURL)).Then(func(params []pegomock.Param) pegomock.ReturnValues {
-		err := os.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v99.99.99\n'"), 0700) // #nosec G306
-		return []pegomock.ReturnValue{err}
+	When(mockDownloader.Install(binDir, "99.99.99")).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+		binPath := filepath.Join(params[0].(string), "terraform99.99.99")
+		err := os.WriteFile(binPath, []byte("#!/bin/sh\necho '\nTerraform v99.99.99\n'"), 0700) // #nosec G306
+		return []pegomock.ReturnValue{binPath, err}
 	})
 
 	c, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true, true, projectCmdOutputHandler)
@@ -287,7 +277,7 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 func TestEnsureVersion_downloaded(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
-	tmp, binDir, cacheDir := mkSubDirs(t)
+	_, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	mockDownloader := mocks.NewMockDownloader()
@@ -300,17 +290,17 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 	v, err := version.NewVersion("99.99.99")
 	Ok(t, err)
 
+	When(mockDownloader.Install(binDir, "99.99.99")).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+		binPath := filepath.Join(params[0].(string), "terraform99.99.99")
+		err := os.WriteFile(binPath, []byte("#!/bin/sh\necho '\nTerraform v99.99.99\n'"), 0700) // #nosec G306
+		return []pegomock.ReturnValue{binPath, err}
+	})
+
 	err = c.EnsureVersion(logger, v)
 
 	Ok(t, err)
 
-	baseURL := fmt.Sprintf("%s/terraform/99.99.99", cmd.DefaultTFDownloadURL)
-	expURL := fmt.Sprintf("%s/terraform_99.99.99_%s_%s.zip?checksum=file:%s/terraform_99.99.99_SHA256SUMS",
-		baseURL,
-		runtime.GOOS,
-		runtime.GOARCH,
-		baseURL)
-	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetFile(filepath.Join(tmp, "bin", "terraform99.99.99"), expURL)
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(binDir, "99.99.99")
 }
 
 // Test that EnsureVersion throws an error when downloads are disabled
@@ -332,7 +322,7 @@ func TestEnsureVersion_downloaded_downloadingDisabled(t *testing.T) {
 	Ok(t, err)
 
 	err = c.EnsureVersion(logger, v)
-	ErrContains(t, "Could not find terraform version", err)
+	ErrContains(t, "could not find terraform version", err)
 	ErrContains(t, "downloads are disabled", err)
 	mockDownloader.VerifyWasCalled(Never())
 }

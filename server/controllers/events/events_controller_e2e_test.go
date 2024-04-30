@@ -61,6 +61,10 @@ func (m *NoopTFDownloader) GetAny(_, _ string) error {
 	return nil
 }
 
+func (m *NoopTFDownloader) Install(_, _ string) (string, error) {
+	return "", nil
+}
+
 type LocalConftestCache struct {
 }
 

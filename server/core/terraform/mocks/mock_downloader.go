@@ -54,6 +54,25 @@ func (mock *MockDownloader) GetFile(dst string, src string) error {
 	return ret0
 }
 
+func (mock *MockDownloader) Install(dir string, v string) (string, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockDownloader().")
+	}
+	params := []pegomock.Param{dir, v}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Install", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 string
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(string)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockDownloader) VerifyWasCalledOnce() *VerifierMockDownloader {
 	return &VerifierMockDownloader{
 		mock:                   mock,
@@ -139,6 +158,37 @@ func (c *MockDownloader_GetFile_OngoingVerification) GetCapturedArguments() (str
 }
 
 func (c *MockDownloader_GetFile_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]string, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(string)
+		}
+		_param1 = make([]string, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(string)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockDownloader) Install(dir string, v string) *MockDownloader_Install_OngoingVerification {
+	params := []pegomock.Param{dir, v}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Install", params, verifier.timeout)
+	return &MockDownloader_Install_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockDownloader_Install_OngoingVerification struct {
+	mock              *MockDownloader
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockDownloader_Install_OngoingVerification) GetCapturedArguments() (string, string) {
+	dir, v := c.GetAllCapturedArguments()
+	return dir[len(dir)-1], v[len(v)-1]
+}
+
+func (c *MockDownloader_Install_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(c.methodInvocations))
