@@ -653,7 +653,7 @@ func (d *DefaultDownloader) Install(dir string, v *version.Version) (string, err
 		return "", err
 	}
 
-	// hc-install installs terraform binary as terraform_{version}
+	// hc-install installs terraform binary as just "terraform".
 	// We need to rename it to terraform{version} to be consistent with current naming convention.
 	newPath := filepath.Join(dir, "terraform"+v.String())
 	if err := os.Rename(execPath, newPath); err != nil {
