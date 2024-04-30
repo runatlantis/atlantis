@@ -355,18 +355,28 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		return false, err
 	}
 
+	if supportsDetailedMergeStatus {
+		logger.Debug("Detailed merge status: '%s'", mr.DetailedMergeStatus)
+	} else {
+		logger.Debug("Merge status: '%s'", mr.MergeStatus) //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
+	}
+
 	if ((supportsDetailedMergeStatus &&
 		(mr.DetailedMergeStatus == "mergeable" ||
 			mr.DetailedMergeStatus == "ci_still_running" ||
-			mr.DetailedMergeStatus == "ci_must_pass")) ||
+			mr.DetailedMergeStatus == "ci_must_pass" ||
+			mr.DetailedMergeStatus == "need_rebase")) ||
 		(!supportsDetailedMergeStatus &&
 			mr.MergeStatus == "can_be_merged")) && //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
 		mr.ApprovalsBeforeMerge <= 0 &&
 		mr.BlockingDiscussionsResolved &&
 		!mr.WorkInProgress &&
 		(allowSkippedPipeline || !isPipelineSkipped) {
+
+		logger.Debug("Merge request is mergeable")
 		return true, nil
 	}
+	logger.Debug("Merge request is not mergeable")
 	return false, nil
 }
 

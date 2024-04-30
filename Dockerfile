@@ -1,11 +1,11 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 # what distro is the image being built for
-ARG ALPINE_TAG=3.19.1
-ARG DEBIAN_TAG=12.5-slim
-ARG GOLANG_VERSION=1.22.1
+ARG ALPINE_TAG=3.19.1@sha256:c5b1261d6d3e43071626931fc004f70149baeba2c8ec672bd4f27761f8e1ad6b
+ARG DEBIAN_TAG=12.5-slim@sha256:155280b00ee0133250f7159b567a07d7cd03b1645714c3a7458b2287b0ca83cb
+ARG GOLANG_TAG=1.22.1-alpine
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.7.2
+ARG DEFAULT_TERRAFORM_VERSION=1.8.0
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.6.2
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
@@ -13,7 +13,7 @@ ARG DEFAULT_CONFTEST_VERSION=0.49.1
 
 # Stage 1: build artifact and download deps
 
-FROM golang:${GOLANG_VERSION}-alpine AS builder
+FROM golang:${GOLANG_TAG} AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -129,7 +129,7 @@ RUN ./download-release.sh \
         "terraform" \
         "${TARGETPLATFORM}" \
         "${DEFAULT_TERRAFORM_VERSION}" \
-        "1.4.7 1.5.7 1.6.6 ${DEFAULT_TERRAFORM_VERSION}" \
+        "1.5.7 1.6.6 1.7.5 ${DEFAULT_TERRAFORM_VERSION}" \
     && ./download-release.sh \
         "tofu" \
         "${TARGETPLATFORM}" \
@@ -154,8 +154,8 @@ RUN addgroup --gid 1000 atlantis && \
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu* /usr/local/bin/
+COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
@@ -189,8 +189,8 @@ HEALTHCHECK --interval=5m --timeout=3s \
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu* /usr/local/bin/
+COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
