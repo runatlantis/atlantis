@@ -285,7 +285,7 @@ func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version str
 	re := regexp.MustCompile(`^=?\s*([0-9.]+)\s*$`)
 	matched := re.FindStringSubmatch(version)
 	if len(matched) == 0 {
-		log.Debug("did not specify exact version in terraform configuration, found %q", version)
+		log.Debug("exact version regex not found in the version %q", version)
 		return nil
 	}
 	tfVersions := []string{matched[1]}
@@ -298,11 +298,11 @@ func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version str
 func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version {
 	module, diags := tfconfig.LoadModule(projectDirectory)
 	if diags.HasErrors() {
-		log.Err("Trying to detect required version: %s", diags.Error())
+		log.Err("trying to detect required version: %s", diags.Error())
 	}
 
 	if len(module.RequiredCore) != 1 {
-		log.Info("Cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
 		return nil
 	}
 	requiredVersionSetting := module.RequiredCore[0]
@@ -312,7 +312,7 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 		log.Debug("terraform downloads disabled.")
 		matched := c.ExtractExactRegex(log, requiredVersionSetting)
 		if len(matched) == 0 {
-			log.Debug("Did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
+			log.Debug("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
 			return nil
 		}
 
