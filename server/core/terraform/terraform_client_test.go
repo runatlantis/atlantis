@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -485,5 +486,52 @@ terraform {
 	for name, testCase := range testCases {
 		runDetectVersionTestCase(t, name+": Downloads Allowed", testCase, true)
 		runDetectVersionTestCase(t, name+": Downloads Disabled", testCase, false)
+	}
+}
+
+func TestInstall(t *testing.T) {
+	d := &terraform.DefaultDownloader{}
+	RegisterMockTestingT(t)
+	_, binDir, _ := mkSubDirs(t)
+
+	v, _ := version.NewVersion("1.8.1")
+
+	newPath, err := d.Install(binDir, v)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if _, err := os.Stat(newPath); os.IsNotExist(err) {
+		t.Errorf("Binary not found at %s", newPath)
+	}
+}
+
+func TestExtractExactRegex(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+	_, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+
+	mockDownloader := mocks.NewMockDownloader()
+
+	c, err := terraform.NewTestClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, true, true, projectCmdOutputHandler)
+	Ok(t, err)
+
+	tests := []struct {
+		version string
+		want    []string
+	}{
+		{"= 1.2.3", []string{"1.2.3"}},
+		{"=1.2.3", []string{"1.2.3"}},
+		{"1.2.3", []string{"1.2.3"}},
+		{"v1.2.3", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.version, func(t *testing.T) {
+			if got := c.ExtractExactRegex(logger, tt.version); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ExtractExactRegex() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
