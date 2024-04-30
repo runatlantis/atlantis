@@ -61,7 +61,7 @@ func (m *NoopTFDownloader) GetAny(_, _ string) error {
 	return nil
 }
 
-func (m *NoopTFDownloader) Install(_, _ string) (string, error) {
+func (m *NoopTFDownloader) Install(_ string, _ *version.Version) (string, error) {
 	return "", nil
 }
 

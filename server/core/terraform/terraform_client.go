@@ -95,7 +95,7 @@ type DefaultClient struct {
 
 // Downloader is for downloading terraform versions.
 type Downloader interface {
-	Install(dir, v string) (string, error)
+	Install(dir string, v *version.Version) (string, error)
 	GetFile(dst, src string) error
 	GetAny(dst, src string) error
 }
@@ -568,7 +568,7 @@ func ensureVersion(
 		}
 	} else {
 		log.Info("using Hashicorp's 'hc-install' to download Terraform version %s", v.String())
-		_, err := dl.Install(binDir, v.String())
+		_, err := dl.Install(binDir, v)
 		if err != nil {
 			return "", errors.Wrapf(err, "downloading terraform version %s", v.String())
 		}
@@ -640,12 +640,12 @@ var rcFileContents = `credentials "%s" {
 
 type DefaultDownloader struct{}
 
-func (d *DefaultDownloader) Install(dir, v string) (string, error) {
+func (d *DefaultDownloader) Install(dir string, v *version.Version) (string, error) {
 	installer := install.NewInstaller()
 	execPath, err := installer.Install(context.Background(), []src.Installable{
 		&releases.ExactVersion{
 			Product:    product.Terraform,
-			Version:    version.Must(version.NewVersion(v)),
+			Version:    v,
 			InstallDir: dir,
 		},
 	})
@@ -655,7 +655,7 @@ func (d *DefaultDownloader) Install(dir, v string) (string, error) {
 
 	// hc-install installs terraform binary as terraform_{version}
 	// We need to rename it to terraform{version} to be consistent with current naming convention.
-	newPath := filepath.Join(dir, "terraform"+v)
+	newPath := filepath.Join(dir, "terraform"+v.String())
 	if err := os.Rename(execPath, newPath); err != nil {
 		return "", err
 	}

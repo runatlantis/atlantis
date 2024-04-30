@@ -4,6 +4,7 @@
 package mocks
 
 import (
+	go_version "github.com/hashicorp/go-version"
 	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 	"time"
@@ -54,7 +55,7 @@ func (mock *MockDownloader) GetFile(dst string, src string) error {
 	return ret0
 }
 
-func (mock *MockDownloader) Install(dir string, v string) (string, error) {
+func (mock *MockDownloader) Install(dir string, v *go_version.Version) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDownloader().")
 	}
@@ -172,7 +173,7 @@ func (c *MockDownloader_GetFile_OngoingVerification) GetAllCapturedArguments() (
 	return
 }
 
-func (verifier *VerifierMockDownloader) Install(dir string, v string) *MockDownloader_Install_OngoingVerification {
+func (verifier *VerifierMockDownloader) Install(dir string, v *go_version.Version) *MockDownloader_Install_OngoingVerification {
 	params := []pegomock.Param{dir, v}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Install", params, verifier.timeout)
 	return &MockDownloader_Install_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -183,21 +184,21 @@ type MockDownloader_Install_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockDownloader_Install_OngoingVerification) GetCapturedArguments() (string, string) {
+func (c *MockDownloader_Install_OngoingVerification) GetCapturedArguments() (string, *go_version.Version) {
 	dir, v := c.GetAllCapturedArguments()
 	return dir[len(dir)-1], v[len(v)-1]
 }
 
-func (c *MockDownloader_Install_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string) {
+func (c *MockDownloader_Install_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []*go_version.Version) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]string, len(c.methodInvocations))
 		for u, param := range params[0] {
 			_param0[u] = param.(string)
 		}
-		_param1 = make([]string, len(c.methodInvocations))
+		_param1 = make([]*go_version.Version, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(string)
+			_param1[u] = param.(*go_version.Version)
 		}
 	}
 	return
