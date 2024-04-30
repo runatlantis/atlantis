@@ -21,9 +21,6 @@
     'pnpmDedupe',
   ],
   prHourlyLimit: 1,
-  lockFileMaintenance: {
-    enabled: true,
-  },
   osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
     enabled: true,
