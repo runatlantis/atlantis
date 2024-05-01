@@ -290,6 +290,7 @@ func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version str
 	}
 	// The first element of the slice is the entire string, so we want the second element (the first capture group)
 	tfVersions := []string{matched[1]}
+	log.Debug("extracted exact version %q from version %q", tfVersions[0], version)
 	return tfVersions
 }
 
