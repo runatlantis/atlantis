@@ -570,24 +570,27 @@ func ensureVersion(
 
 	log.Info("could not find terraform version %s in PATH or %s", v.String(), binDir)
 
+	var execPath string
+	var err error
+
 	if downloadURL != "https://releases.hashicorp.com" {
 		log.Info("using a custom download URL %s to download Terraform version %s", downloadURL, v.String())
 		fullSrcURL := ConstructCustomDownloadURL(downloadURL, v)
 		log.Info("downloading terraform version %s at %q", v.String(), fullSrcURL)
-		if err := dl.GetFile(dest, fullSrcURL); err != nil {
-			return "", errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
-		}
+		execPath = dest
+		err = dl.GetAny(dest, fullSrcURL)
 	} else {
 		log.Info("using Hashicorp's 'hc-install' to download Terraform version %s", v.String())
-		_, err := dl.Install(binDir, v)
-		if err != nil {
-			return "", errors.Wrapf(err, "downloading terraform version %s", v.String())
-		}
+		execPath, err = dl.Install(binDir, v)
 	}
 
-	log.Info("Downloaded terraform %s to %s", v.String(), dest)
-	versions[v.String()] = dest
-	return dest, nil
+	if err != nil {
+		return "", errors.Wrapf(err, "error downloading terraform version %s", v.String())
+	}
+
+	log.Info("Downloaded terraform %s to %s", v.String(), execPath)
+	versions[v.String()] = execPath
+	return execPath, nil
 }
 
 // generateRCFile generates a .terraformrc file containing config for tfeToken
