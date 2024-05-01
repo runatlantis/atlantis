@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -538,5 +539,17 @@ func TestExtractExactRegex(t *testing.T) {
 				t.Errorf("ExtractExactRegex() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestConstructCustomDownloadURL(t *testing.T) {
+	v, _ := version.NewVersion("0.12.0")
+	downloadURL := "https://releases.hashicorp.com"
+
+	expected := "https://releases.hashicorp.com/terraform/0.12.0/terraform_0.12.0_" + runtime.GOOS + "_" + runtime.GOARCH + ".zip?checksum=file:https://releases.hashicorp.com/terraform/0.12.0/terraform_0.12.0_SHA256SUMS"
+	actual := terraform.ConstructCustomDownloadURL(downloadURL, v)
+
+	if actual != expected {
+		t.Errorf("Expected %s but got %s", expected, actual)
 	}
 }

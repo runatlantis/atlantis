@@ -516,6 +516,18 @@ func MustConstraint(v string) version.Constraints {
 	return c
 }
 
+// ConstructCustomDownloadURL constructs a URL for downloading a specific version of Terraform from a custom download URL.
+// The function takes a base download URL and a version.Version object as arguments.
+// It returns a string representing the full URL to download the Terraform binary for the specific version, operating system, and architecture.
+func ConstructCustomDownloadURL(downloadURL string, v *version.Version) string {
+	vString := v.String()
+	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, vString, vString)
+	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
+	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
+	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
+	return fullSrcURL
+}
+
 // ensureVersion returns the path to a terraform binary of version v.
 // It will download this version if we don't have it.
 func ensureVersion(
@@ -559,10 +571,8 @@ func ensureVersion(
 
 	if downloadURL != "https://releases.hashicorp.com" {
 		log.Info("using a custom download URL %s to download Terraform version %s", downloadURL, v.String())
-		urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
-		binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
-		checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
-		fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
+		fullSrcURL := ConstructCustomDownloadURL(downloadURL, v)
+		log.Info("downloading terraform version %s at %q", v.String(), fullSrcURL)
 		if err := dl.GetFile(dest, fullSrcURL); err != nil {
 			return "", errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
 		}
