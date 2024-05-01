@@ -876,16 +876,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatsScope:               statsScope.SubScope("api"),
 	}
 	apiController := &controllers.APIController{
-		APISecret:                 []byte(userConfig.APISecret),
-		Locker:                    lockingClient,
-		Logger:                    logger,
-		Parser:                    eventParser,
-		ProjectCommandBuilder:     projectCommandBuilder,
-		ProjectPlanCommandRunner:  instrumentedProjectCmdRunner,
-		ProjectApplyCommandRunner: instrumentedProjectCmdRunner,
-		RepoAllowlistChecker:      repoAllowlist,
-		Scope:                     statsScope.SubScope("api"),
-		VCSClient:                 vcsClient,
+		APISecret:                      []byte(userConfig.APISecret),
+		Locker:                         lockingClient,
+		Logger:                         logger,
+		Parser:                         eventParser,
+		ProjectCommandBuilder:          projectCommandBuilder,
+		ProjectPlanCommandRunner:       instrumentedProjectCmdRunner,
+		ProjectApplyCommandRunner:      instrumentedProjectCmdRunner,
+		FailOnPreWorkflowHookError:     userConfig.FailOnPreWorkflowHookError,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		RepoAllowlistChecker:           repoAllowlist,
+		Scope:                          statsScope.SubScope("api"),
+		VCSClient:                      vcsClient,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
