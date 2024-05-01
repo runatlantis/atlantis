@@ -1084,7 +1084,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			Path:          v.Project.Path,
 			Workspace:     v.Workspace,
 			Time:          v.Time,
-			TimeFormatted: v.Time.Format("02-01-2006 15:04:05"),
+			TimeFormatted: v.Time.Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -1100,7 +1100,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		Time:                   applyCmdLock.Time,
 		Locked:                 applyCmdLock.Locked,
 		GlobalApplyLockEnabled: applyCmdLock.GlobalApplyLockEnabled,
-		TimeFormatted:          applyCmdLock.Time.Format("02-01-2006 15:04:05"),
+		TimeFormatted:          applyCmdLock.Time.Format("2006-01-02 15:04:05"),
 	}
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
@@ -1125,7 +1125,7 @@ func preparePullToJobMappings(s *Server) []jobs.PullInfoWithJobIDs {
 		for j := range pullToJobMappings[i].JobIDInfos {
 			jobUrl, _ := s.Router.Get(ProjectJobsViewRouteName).URL("job-id", pullToJobMappings[i].JobIDInfos[j].JobID)
 			pullToJobMappings[i].JobIDInfos[j].JobIDUrl = jobUrl.String()
-			pullToJobMappings[i].JobIDInfos[j].TimeFormatted = pullToJobMappings[i].JobIDInfos[j].Time.Format("02-01-2006 15:04:05")
+			pullToJobMappings[i].JobIDInfos[j].TimeFormatted = pullToJobMappings[i].JobIDInfos[j].Time.Format("2006-01-02 15:04:05")
 		}
 
 		//Sort by date - newest to oldest.
