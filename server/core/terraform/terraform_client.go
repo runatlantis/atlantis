@@ -546,13 +546,27 @@ func ensureVersion(log logging.SimpleLogging, dist Distribution, dl Downloader, 
 	}
 
 	log.Info("Could not find %s version %s in PATH or %s, downloading from %s", dist.BinName(), v.String(), binDir, downloadURL)
-	err := dist.Download(dl, dest, v, downloadURL)
+	src := dist.SourceURL(v, downloadURL)
+
+	tmpdir, err := os.MkdirTemp("", "atlantis")
 	if err != nil {
-		return "", nil
+		return "", err
+	}
+	defer os.RemoveAll(tmpdir)
+
+	err = dl.GetAny(tmpdir, src)
+	if err != nil {
+		return "", err
+	}
+
+	err = os.Rename(filepath.Join(tmpdir, dist.BinName()), dest)
+	if err != nil {
+		return "", err
 	}
 
 	log.Info("Downloaded %s %s to %s", dist.BinName(), v.String(), dest)
 	versions[v.String()] = dest
+
 	return dest, nil
 }
 
@@ -631,7 +645,7 @@ func (d *DefaultDownloader) GetAny(dst, src string) error {
 
 type Distribution interface {
 	BinName() string
-	Download(dl Downloader, dest string, v *version.Version, downloadURL string) error
+	SourceURL(v *version.Version, downloadURL string) string
 	ListAvailableVersions(log logging.SimpleLogging, downloadBaseURL string, downloadAllowed bool) ([]string, error)
 }
 
@@ -640,32 +654,15 @@ type DistributionOpenTofu struct{}
 func (*DistributionOpenTofu) BinName() string {
 	return "tofu"
 }
-func (*DistributionOpenTofu) Download(dl Downloader, dest string, v *version.Version, downloadURL string) error {
+func (*DistributionOpenTofu) SourceURL(v *version.Version, downloadURL string) string {
 	// TODO: base url and checksums
-	src := fmt.Sprintf(
+	return fmt.Sprintf(
 		"https://github.com/opentofu/opentofu/releases/download/v%s/tofu_%s_%s_%s.zip",
 		v.String(),
 		v.String(),
 		runtime.GOOS,
 		runtime.GOARCH,
 	)
-	tmpdir, err := os.MkdirTemp("", "atlantis-opentofu")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tmpdir)
-
-	err = dl.GetAny(os.TempDir(), src)
-	if err != nil {
-		return err
-	}
-
-	err = os.Rename(filepath.Join(os.TempDir(), "tofu"), dest)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (*DistributionOpenTofu) ListAvailableVersions(log logging.SimpleLogging, downloadBaseURL string, downloadAllowed bool) ([]string, error) {
@@ -711,15 +708,11 @@ func (*DistributionTerraform) BinName() string {
 	return "terraform"
 }
 
-func (*DistributionTerraform) Download(dl Downloader, dest string, v *version.Version, downloadURL string) error {
+func (*DistributionTerraform) SourceURL(v *version.Version, downloadURL string) string {
 	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
 	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
 	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
-	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
-	if err := dl.GetFile(dest, fullSrcURL); err != nil {
-		return errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
-	}
-	return nil
+	return fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
 }
 
 func (*DistributionTerraform) ListAvailableVersions(log logging.SimpleLogging, downloadBaseURL string, downloadAllowed bool) ([]string, error) {

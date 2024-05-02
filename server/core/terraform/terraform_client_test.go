@@ -211,8 +211,12 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 	defer tempSetEnv(t, "PATH", "")()
 
 	mockDownloader := mocks.NewMockDownloader()
-	When(mockDownloader.GetFile(Any[string](), Any[string]())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
-		err := os.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0700) // #nosec G306
+	When(mockDownloader.GetAny(Any[string](), Any[string]())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+		err := os.MkdirAll(params[0].(string), 0700)
+		if err != nil {
+			return []pegomock.ReturnValue{err}
+		}
+		err = os.WriteFile(filepath.Join(params[0].(string), "terraform"), []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0700) // #nosec G306
 		return []pegomock.ReturnValue{err}
 	})
 	c, err := terraform.NewClient(logger, &terraform.DistributionTerraform{}, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, "https://my-mirror.releases.mycompany.com", mockDownloader, true, true, projectCmdOutputHandler)
@@ -226,7 +230,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 		runtime.GOOS,
 		runtime.GOARCH,
 		baseURL)
-	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetFile(filepath.Join(tmp, "bin", "terraform0.11.10"), expURL)
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetAny(Any[string](), Eq(expURL))
 
 	// Reset PATH so that it has sh.
 	Ok(t, os.Setenv("PATH", orig))
@@ -265,8 +269,16 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 		runtime.GOOS,
 		runtime.GOARCH,
 		baseURL)
-	When(mockDownloader.GetFile(filepath.Join(tmp, "bin", "terraform99.99.99"), expURL)).Then(func(params []pegomock.Param) pegomock.ReturnValues {
-		err := os.WriteFile(params[0].(string), []byte("#!/bin/sh\necho '\nTerraform v99.99.99\n'"), 0700) // #nosec G306
+	When(mockDownloader.GetAny(Any[string](), Eq(expURL))).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+		err := os.MkdirAll(params[0].(string), 0700)
+		if err != nil {
+			return []pegomock.ReturnValue{err}
+		}
+		err = os.WriteFile(filepath.Join(params[0].(string), "terraform"), []byte("#!/bin/sh\necho '\nTerraform v99.99.99\n'"), 0700) // #nosec G306
+		if err != nil {
+			return []pegomock.ReturnValue{err}
+		}
+		err = os.WriteFile(filepath.Join(params[0].(string), "LICENSE"), []byte("I'm a license\n'"), 0600)
 		return []pegomock.ReturnValue{err}
 	})
 
@@ -287,10 +299,19 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 func TestEnsureVersion_downloaded(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
-	tmp, binDir, cacheDir := mkSubDirs(t)
+	_, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	mockDownloader := mocks.NewMockDownloader()
+	When(mockDownloader.GetAny(Any[string](), Any[string]())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+		err := os.MkdirAll(params[0].(string), 0700)
+		if err != nil {
+			return []pegomock.ReturnValue{err}
+		}
+		err = os.WriteFile(filepath.Join(params[0].(string), "terraform"), []byte("#!/bin/sh\necho '\nTerraform v99.99.99\n'"), 0700) // #nosec G306
+		return []pegomock.ReturnValue{err}
+	})
+
 	downloadsAllowed := true
 	c, err := terraform.NewTestClient(logger, &terraform.DistributionTerraform{}, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, mockDownloader, downloadsAllowed, true, projectCmdOutputHandler)
 	Ok(t, err)
@@ -310,7 +331,7 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 		runtime.GOOS,
 		runtime.GOARCH,
 		baseURL)
-	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetFile(filepath.Join(tmp, "bin", "terraform99.99.99"), expURL)
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).GetAny(Any[string](), Eq(expURL))
 }
 
 // Test that EnsureVersion throws an error when downloads are disabled
