@@ -65,6 +65,9 @@ type Client interface {
 }
 
 type DefaultClient struct {
+	// Distribution handles logic specific to the TF distribution being used by Atlantis
+	distribution Distribution
+
 	// defaultVersion is the default version of terraform to use if another
 	// version isn't specified.
 	defaultVersion *version.Version
@@ -113,6 +116,7 @@ var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
 // NewClientWithDefaultVersion creates a new terraform client and pre-fetches the default version
 func NewClientWithDefaultVersion(
 	log logging.SimpleLogging,
+	distribution Distribution,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -158,7 +162,7 @@ func NewClientWithDefaultVersion(
 			// Since ensureVersion might end up downloading terraform,
 			// we call it asynchronously so as to not delay server startup.
 			versionsLock.Lock()
-			_, err := ensureVersion(log, tfDownloader, versions, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed)
+			_, err := ensureVersion(log, distribution, tfDownloader, versions, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed)
 			versionsLock.Unlock()
 			if err != nil {
 				log.Err("could not download terraform %s: %s", defaultVersion.String(), err)
@@ -183,6 +187,7 @@ func NewClientWithDefaultVersion(
 		}
 	}
 	return &DefaultClient{
+		distribution:            distribution,
 		defaultVersion:          finalDefaultVersion,
 		terraformPluginCacheDir: cacheDir,
 		binDir:                  binDir,
@@ -199,6 +204,7 @@ func NewClientWithDefaultVersion(
 
 func NewTestClient(
 	log logging.SimpleLogging,
+	distribution Distribution,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -213,6 +219,7 @@ func NewTestClient(
 ) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
+		distribution,
 		binDir,
 		cacheDir,
 		tfeToken,
@@ -238,6 +245,7 @@ func NewTestClient(
 // Will asynchronously download the required version if it doesn't exist already.
 func NewClient(
 	log logging.SimpleLogging,
+	distribution Distribution,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -252,6 +260,7 @@ func NewClient(
 ) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
+		distribution,
 		binDir,
 		cacheDir,
 		tfeToken,
@@ -381,7 +390,7 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 
 	var err error
 	c.versionsLock.Lock()
-	_, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
+	_, err = ensureVersion(log, c.distribution, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
 	c.versionsLock.Unlock()
 	if err != nil {
 		return err
@@ -461,7 +470,7 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, w
 	} else {
 		var err error
 		c.versionsLock.Lock()
-		binPath, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
+		binPath, err = ensureVersion(log, c.distribution, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
 		c.versionsLock.Unlock()
 		if err != nil {
 			return "", nil, err
@@ -532,7 +541,7 @@ func MustConstraint(v string) version.Constraints {
 
 // ensureVersion returns the path to a terraform binary of version v.
 // It will download this version if we don't have it.
-func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string, downloadsAllowed bool) (string, error) {
+func ensureVersion(log logging.SimpleLogging, dist Distribution, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string, downloadsAllowed bool) (string, error) {
 	if binPath, ok := versions[v.String()]; ok {
 		return binPath, nil
 	}
@@ -643,3 +652,8 @@ func (d *DefaultDownloader) GetAny(dst, src string) error {
 	_, err := getter.GetAny(context.Background(), dst, src)
 	return err
 }
+
+type Distribution interface{}
+
+type DistributionOpenTofu struct{}
+type DistributionTerraform struct{}

@@ -419,8 +419,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		)
 	}
 
+	var distribution terraform.Distribution
+	if userConfig.TFDistribution == "opentofu" {
+		distribution = &terraform.DistributionOpenTofu{}
+	} else {
+		distribution = &terraform.DistributionTerraform{}
+	}
+
 	terraformClient, err := terraform.NewClient(
 		logger,
+		distribution,
 		binDir,
 		cacheDir,
 		userConfig.TFEToken,
@@ -436,7 +444,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
 	if err != nil && flag.Lookup("test.v") == nil {
-		return nil, errors.Wrap(err, "initializing terraform")
+		return nil, errors.Wrap(err, fmt.Sprintf("initializing %s", userConfig.TFDistribution))
 	}
 	markdownRenderer := events.NewMarkdownRenderer(
 		gitlabClient.SupportsCommonMark(),
