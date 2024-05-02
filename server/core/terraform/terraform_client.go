@@ -549,17 +549,20 @@ func ensureVersion(log logging.SimpleLogging, dist Distribution, dl Downloader, 
 	log.Info("Could not find %s version %s in PATH or %s, downloading from %s", dist.BinName(), v.String(), binDir, downloadURL)
 	src := dist.SourceURL(v, downloadURL)
 
+	// Create a tempdir for working with the download archive.
 	tmpdir, err := os.MkdirTemp("", "atlantis")
 	if err != nil {
 		return "", err
 	}
 	defer os.RemoveAll(tmpdir)
 
+	// Download the zip file into the tempdir.
 	err = dl.GetAny(tmpdir, src)
 	if err != nil {
 		return "", err
 	}
 
+	// Copy the binary from the archive contents to the destination.
 	binSrc := filepath.Join(tmpdir, dist.BinName())
 
 	srcF, err := os.Open(binSrc)
