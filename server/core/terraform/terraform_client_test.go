@@ -393,6 +393,12 @@ terraform {
 		// cannot use ~> 1.3 or ~> 1.0 since that is a moving target since it will always
 		// resolve to the latest terraform 1.x
 		"~> 1.3.0": "1.3.10",
+		// Since terraform version 1.8.2, terraform is not a single file download anymore and
+		// Atlantis fails to download version 1.8.2 and higher. So, as a short-term fix,
+		// we need to block any version higher than 1.8.1 until proper solution is implemented.
+		// More details on the issue here - https://github.com/runatlantis/atlantis/issues/4471
+		">= 1.3.0": "1.8.1",
+		">= 1.8.2": "",
 	}
 
 	type testCase struct {
