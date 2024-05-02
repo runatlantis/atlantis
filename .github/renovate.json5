@@ -21,9 +21,6 @@
     'pnpmDedupe',
   ],
   prHourlyLimit: 1,
-  lockFileMaintenance: {
-    enabled: true,
-  },
   minimumReleaseAge: 3,
   osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
