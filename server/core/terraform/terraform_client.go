@@ -652,6 +652,13 @@ func (*DistributionOpenTofu) FullSrcURL(v *version.Version, downloadURL string) 
 }
 
 func (*DistributionOpenTofu) ListAvailableVersions(log logging.SimpleLogging, downloadBaseURL string, downloadAllowed bool) ([]string, error) {
+	if !downloadAllowed {
+		log.Debug("OpenTofu downloads disabled. Won't list Terraform versions available from GitHub releases")
+		return []string{}, nil
+	}
+
+	log.Debug("Listing OpenTofu versions available from the GitHub release")
+
 	client := github.NewClient(nil)
 
 	withPrereleaseRegex := regexp.MustCompile(`(\d+\.\d+\.\d+)(-[a-zA-z]+\d*)?"`)
@@ -661,7 +668,7 @@ func (*DistributionOpenTofu) ListAvailableVersions(log logging.SimpleLogging, do
 	for {
 		releases, resp, err := client.Repositories.ListReleases(context.Background(), "opentofu", "opentofu", &github.ListOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get releases for opentofu: %w", err)
+			return nil, fmt.Errorf("Failed to get releases for opentofu: %s", err)
 		}
 		for _, release := range releases {
 			tagName := release.GetTagName()
