@@ -30,6 +30,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/go-github/v60/github"
 	"github.com/hashicorp/go-getter/v2"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
@@ -289,29 +290,7 @@ func (c *DefaultClient) TerraformBinDir() string {
 
 // ListAvailableVersions returns all available version of Terraform. If downloads are not allowed, this will return an empty list.
 func (c *DefaultClient) ListAvailableVersions(log logging.SimpleLogging) ([]string, error) {
-	url := fmt.Sprintf("%s/terraform", c.downloadBaseURL)
-
-	if !c.downloadAllowed {
-		log.Debug("Terraform downloads disabled. Won't list Terraform versions available at %s", url)
-		return []string{}, nil
-	}
-
-	log.Debug("Listing Terraform versions available at: %s", url)
-
-	// terraform-switcher calls os.Exit(1) if it fails to successfully GET the configured URL.
-	// So, before calling it, test if we can connect. Then we can return an error instead if the request fails.
-	resp, err := http.Get(url) // #nosec G107 -- terraform-switch makes this same call below. Also, we don't process the response payload.
-	if err != nil {
-		return nil, fmt.Errorf("Unable to list Terraform versions: %s", err)
-	}
-	defer resp.Body.Close() // nolint: errcheck
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Unable to list Terraform versions: response code %d from %s", resp.StatusCode, url)
-	}
-
-	versions, err := lib.GetTFList(url, true)
-	return versions, err
+	return c.distribution.ListAvailableVersions(log, c.downloadBaseURL, c.downloadAllowed)
 }
 
 // DetectVersion Extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
@@ -549,7 +528,7 @@ func ensureVersion(log logging.SimpleLogging, dist Distribution, dl Downloader, 
 	// This tf version might not yet be in the versions map even though it
 	// exists on disk. This would happen if users have manually added
 	// terraform{version} binaries. In this case we don't want to re-download.
-	binFile := "terraform" + v.String()
+	binFile := dist.BinName() + v.String()
 	if binPath, err := exec.LookPath(binFile); err == nil {
 		versions[v.String()] = binPath
 		return binPath, nil
@@ -563,19 +542,16 @@ func ensureVersion(log logging.SimpleLogging, dist Distribution, dl Downloader, 
 		return dest, nil
 	}
 	if !downloadsAllowed {
-		return "", fmt.Errorf("Could not find terraform version %s in PATH or %s, and downloads are disabled", v.String(), binDir)
+		return "", fmt.Errorf("Could not find %s version %s in PATH or %s, and downloads are disabled", dist.BinName(), v.String(), binDir)
 	}
 
-	log.Info("Could not find terraform version %s in PATH or %s, downloading from %s", v.String(), binDir, downloadURL)
-	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
-	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
-	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
-	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
+	log.Info("Could not find %s version %s in PATH or %s, downloading from %s", dist.BinName(), v.String(), binDir, downloadURL)
+	fullSrcURL := dist.FullSrcURL(v, downloadURL)
 	if err := dl.GetFile(dest, fullSrcURL); err != nil {
 		return "", errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
 	}
 
-	log.Info("Downloaded terraform %s to %s", v.String(), dest)
+	log.Info("Downloaded %s %s to %s", dist.BinName(), v.String(), dest)
 	versions[v.String()] = dest
 	return dest, nil
 }
@@ -653,7 +629,93 @@ func (d *DefaultDownloader) GetAny(dst, src string) error {
 	return err
 }
 
-type Distribution interface{}
+type Distribution interface {
+	BinName() string
+	FullSrcURL(v *version.Version, downloadURL string) string
+	ListAvailableVersions(log logging.SimpleLogging, downloadBaseURL string, downloadAllowed bool) ([]string, error)
+}
 
 type DistributionOpenTofu struct{}
+
+func (*DistributionOpenTofu) BinName() string {
+	return "tofu"
+}
+func (*DistributionOpenTofu) FullSrcURL(v *version.Version, downloadURL string) string {
+	// TODO: base url and checksums
+	return fmt.Sprintf(
+		"https://github.com/opentofu/opentofu/releases/download/v%s/tofu_%s_%s_%s.zip",
+		v.String(),
+		v.String(),
+		runtime.GOOS,
+		runtime.GOARCH,
+	)
+}
+
+func (*DistributionOpenTofu) ListAvailableVersions(log logging.SimpleLogging, downloadBaseURL string, downloadAllowed bool) ([]string, error) {
+	client := github.NewClient(nil)
+
+	withPrereleaseRegex := regexp.MustCompile(`(\d+\.\d+\.\d+)(-[a-zA-z]+\d*)?"`)
+
+	opt := &github.ListOptions{PerPage: 100}
+	var versions []string
+	for {
+		releases, resp, err := client.Repositories.ListReleases(context.Background(), "opentofu", "opentofu", &github.ListOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("Failed to get releases for opentofu: %w", err)
+		}
+		for _, release := range releases {
+			tagName := release.GetTagName()
+			if strings.HasPrefix(tagName, "v") {
+				version := strings.TrimPrefix(tagName, "v")
+				if withPrereleaseRegex.MatchString(version) {
+					versions = append(versions, version)
+				}
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+
+	return versions, nil
+}
+
 type DistributionTerraform struct{}
+
+func (*DistributionTerraform) BinName() string {
+	return "terraform"
+}
+
+func (*DistributionTerraform) FullSrcURL(v *version.Version, downloadURL string) string {
+	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
+	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
+	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
+	return fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
+}
+
+func (*DistributionTerraform) ListAvailableVersions(log logging.SimpleLogging, downloadBaseURL string, downloadAllowed bool) ([]string, error) {
+	url := fmt.Sprintf("%s/terraform", downloadBaseURL)
+
+	if !downloadAllowed {
+		log.Debug("Terraform downloads disabled. Won't list Terraform versions available at %s", url)
+		return []string{}, nil
+	}
+
+	log.Debug("Listing Terraform versions available at: %s", url)
+
+	// terraform-switcher calls os.Exit(1) if it fails to successfully GET the configured URL.
+	// So, before calling it, test if we can connect. Then we can return an error instead if the request fails.
+	resp, err := http.Get(url) // #nosec G107 -- terraform-switch makes this same call below. Also, we don't process the response payload.
+	if err != nil {
+		return nil, fmt.Errorf("Unable to list Terraform versions: %s", err)
+	}
+	defer resp.Body.Close() // nolint: errcheck
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Unable to list Terraform versions: response code %d from %s", resp.StatusCode, url)
+	}
+
+	versions, err := lib.GetTFList(url, true)
+	return versions, err
+}
