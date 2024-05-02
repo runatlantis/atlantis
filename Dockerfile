@@ -67,7 +67,6 @@ RUN apt-get update && \
 FROM debian-base as deps
 
 # Get the architecture the image is being built for
-# Needs to be coded for our build system
 ARG TARGETPLATFORM=linux/amd64
 WORKDIR /tmp/build
 
