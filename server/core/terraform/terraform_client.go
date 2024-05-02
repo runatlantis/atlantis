@@ -19,6 +19,7 @@ package terraform
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -559,8 +560,26 @@ func ensureVersion(log logging.SimpleLogging, dist Distribution, dl Downloader, 
 		return "", err
 	}
 
-	err = os.Rename(filepath.Join(tmpdir, dist.BinName()), dest)
+	binSrc := filepath.Join(tmpdir, dist.BinName())
+
+	srcF, err := os.Open(binSrc)
 	if err != nil {
+		return "", err
+	}
+	defer srcF.Close()
+
+	info, err := srcF.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	dstF, err := os.OpenFile(dest, os.O_RDWR|os.O_CREATE|os.O_TRUNC, info.Mode())
+	if err != nil {
+		return "", err
+	}
+	defer dstF.Close()
+
+	if _, err := io.Copy(dstF, srcF); err != nil {
 		return "", err
 	}
 
@@ -667,7 +686,7 @@ func (*DistributionOpenTofu) SourceURL(v *version.Version, downloadURL string) s
 
 func (*DistributionOpenTofu) ListAvailableVersions(log logging.SimpleLogging, downloadBaseURL string, downloadAllowed bool) ([]string, error) {
 	if !downloadAllowed {
-		log.Debug("OpenTofu downloads disabled. Won't list Terraform versions available from GitHub releases")
+		log.Debug("OpenTofu downloads disabled. Won't list OpenTofu versions available from GitHub releases.")
 		return []string{}, nil
 	}
 
