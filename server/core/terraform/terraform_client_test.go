@@ -306,6 +306,38 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(binDir, cmd.DefaultTFDownloadURL, v)
 }
 
+// Test that EnsureVersion downloads terraform from a custom URL.
+func TestEnsureVersion_downloaded_customURL(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+	_, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+
+	mockDownloader := mocks.NewMockDownloader()
+	downloadsAllowed := true
+	customURL := "http://releases.example.com"
+
+	c, err := terraform.NewTestClient(logger, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, customURL, mockDownloader, downloadsAllowed, true, projectCmdOutputHandler)
+	Ok(t, err)
+
+	Equals(t, "0.11.10", c.DefaultVersion().String())
+
+	v, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+
+	When(mockDownloader.Install(binDir, customURL, v)).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+		binPath := filepath.Join(params[0].(string), "terraform99.99.99")
+		err := os.WriteFile(binPath, []byte("#!/bin/sh\necho '\nTerraform v99.99.99\n'"), 0700) // #nosec G306
+		return []pegomock.ReturnValue{binPath, err}
+	})
+
+	err = c.EnsureVersion(logger, v)
+
+	Ok(t, err)
+
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(binDir, customURL, v)
+}
+
 // Test that EnsureVersion throws an error when downloads are disabled
 func TestEnsureVersion_downloaded_downloadingDisabled(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
@@ -493,27 +525,6 @@ func TestInstall(t *testing.T) {
 	v, _ := version.NewVersion("1.8.1")
 
 	newPath, err := d.Install(binDir, cmd.DefaultTFDownloadURL, v)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if _, err := os.Stat(newPath); os.IsNotExist(err) {
-		t.Errorf("Binary not found at %s", newPath)
-	}
-}
-
-func TestInstall_CustomURL(t *testing.T) {
-	d := &terraform.DefaultDownloader{}
-	RegisterMockTestingT(t)
-	_, binDir, _ := mkSubDirs(t)
-
-	v, _ := version.NewVersion("1.8.2")
-
-	mockApiRoot := filepath.Join("testdata", "mock_terraform_builds")
-	url := NewTestServer(t, mockApiRoot).URL
-
-	// Use the server's URL as the download URL.
-	newPath, err := d.Install(binDir, url, v)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
