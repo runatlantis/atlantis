@@ -15,10 +15,11 @@ package terraform_test
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -212,7 +213,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 	defer tempSetEnv(t, "PATH", "")()
 
 	mockDownloader := mocks.NewMockDownloader()
-	When(mockDownloader.Install(Any[string](), Any[*version.Version]())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+	When(mockDownloader.Install(Any[string](), Any[string](), Any[*version.Version]())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
 		binPath := filepath.Join(params[0].(string), "terraform0.11.10")
 		err := os.WriteFile(binPath, []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0700) // #nosec G306
 		return []pegomock.ReturnValue{binPath, err}
@@ -223,7 +224,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 	Ok(t, err)
 	Equals(t, "0.11.10", c.DefaultVersion().String())
 
-	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(binDir, version.Must(version.NewVersion("0.11.10")))
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(binDir, cmd.DefaultTFDownloadURL, version.Must(version.NewVersion("0.11.10")))
 
 	// Reset PATH so that it has sh.
 	Ok(t, os.Setenv("PATH", orig))
@@ -259,7 +260,7 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 
 	mockDownloader := mocks.NewMockDownloader()
 	// Set up our mock downloader to write a fake tf binary when it's called.
-	When(mockDownloader.Install(binDir, v)).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+	When(mockDownloader.Install(binDir, cmd.DefaultTFDownloadURL, v)).Then(func(params []pegomock.Param) pegomock.ReturnValues {
 		binPath := filepath.Join(params[0].(string), "terraform99.99.99")
 		err := os.WriteFile(binPath, []byte("#!/bin/sh\necho '\nTerraform v99.99.99\n'"), 0700) // #nosec G306
 		return []pegomock.ReturnValue{binPath, err}
@@ -292,7 +293,7 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 	v, err := version.NewVersion("99.99.99")
 	Ok(t, err)
 
-	When(mockDownloader.Install(binDir, v)).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+	When(mockDownloader.Install(binDir, cmd.DefaultTFDownloadURL, v)).Then(func(params []pegomock.Param) pegomock.ReturnValues {
 		binPath := filepath.Join(params[0].(string), "terraform99.99.99")
 		err := os.WriteFile(binPath, []byte("#!/bin/sh\necho '\nTerraform v99.99.99\n'"), 0700) // #nosec G306
 		return []pegomock.ReturnValue{binPath, err}
@@ -302,7 +303,7 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 
 	Ok(t, err)
 
-	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(binDir, v)
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(binDir, cmd.DefaultTFDownloadURL, v)
 }
 
 // Test that EnsureVersion throws an error when downloads are disabled
@@ -385,12 +386,6 @@ terraform {
 		// cannot use ~> 1.3 or ~> 1.0 since that is a moving target since it will always
 		// resolve to the latest terraform 1.x
 		"~> 1.3.0": "1.3.10",
-		// Since terraform version 1.8.2, terraform is not a single file download anymore and
-		// Atlantis fails to download version 1.8.2 and higher. So, as a short-term fix,
-		// we need to block any version higher than 1.8.1 until proper solution is implemented.
-		// More details on the issue here - https://github.com/runatlantis/atlantis/issues/4471
-		">= 1.3.0": "1.8.1",
-		">= 1.8.2": "",
 	}
 
 	type testCase struct {
@@ -497,7 +492,28 @@ func TestInstall(t *testing.T) {
 
 	v, _ := version.NewVersion("1.8.1")
 
-	newPath, err := d.Install(binDir, v)
+	newPath, err := d.Install(binDir, cmd.DefaultTFDownloadURL, v)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if _, err := os.Stat(newPath); os.IsNotExist(err) {
+		t.Errorf("Binary not found at %s", newPath)
+	}
+}
+
+func TestInstall_CustomURL(t *testing.T) {
+	d := &terraform.DefaultDownloader{}
+	RegisterMockTestingT(t)
+	_, binDir, _ := mkSubDirs(t)
+
+	v, _ := version.NewVersion("1.8.2")
+
+	mockApiRoot := filepath.Join("testdata", "mock_terraform_builds")
+	url := NewTestServer(t, mockApiRoot).URL
+
+	// Use the server's URL as the download URL.
+	newPath, err := d.Install(binDir, url, v)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -542,14 +558,13 @@ func TestExtractExactRegex(t *testing.T) {
 	}
 }
 
-func TestConstructCustomDownloadURL(t *testing.T) {
-	v, _ := version.NewVersion("0.12.0")
-	downloadURL := "https://releases.hashicorp.com"
+func NewTestServer(t *testing.T, mockDir string) *httptest.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/", http.FileServer(http.Dir(mockDir)))
 
-	expected := "https://releases.hashicorp.com/terraform/0.12.0/terraform_0.12.0_" + runtime.GOOS + "_" + runtime.GOARCH + ".zip?checksum=file:https://releases.hashicorp.com/terraform/0.12.0/terraform_0.12.0_SHA256SUMS"
-	actual := terraform.ConstructCustomDownloadURL(downloadURL, v)
+	ts := httptest.NewServer(mux)
 
-	if actual != expected {
-		t.Errorf("Expected %s but got %s", expected, actual)
-	}
+	t.Cleanup(ts.Close)
+
+	return ts
 }

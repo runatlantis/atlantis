@@ -23,7 +23,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -95,7 +94,7 @@ type DefaultClient struct {
 
 // Downloader is for downloading terraform versions.
 type Downloader interface {
-	Install(dir string, v *version.Version) (string, error)
+	Install(dir string, downloadURL string, v *version.Version) (string, error)
 	GetFile(dst, src string) error
 	GetAny(dst, src string) error
 }
@@ -326,11 +325,7 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 		return version
 	}
 
-	// Since terraform version 1.8.2, terraform is not a single file download anymore and
-	// Atlantis fails to download version 1.8.2 and higher. So, as a short-term fix,
-	// we need to block any version higher than 1.8.1 until proper solution is implemented.
-	// More details on the issue here - https://github.com/runatlantis/atlantis/issues/4471
-	constraintStr := fmt.Sprintf("%s, <= 1.8.1", requiredVersionSetting)
+	constraintStr := requiredVersionSetting
 	vc, err := version.NewConstraint(constraintStr)
 	if err != nil {
 		log.Err("Error parsing constraint string: %s", err)
@@ -517,18 +512,6 @@ func MustConstraint(v string) version.Constraints {
 	return c
 }
 
-// ConstructCustomDownloadURL constructs a URL for downloading a specific version of Terraform from a custom download URL.
-// The function takes a base download URL and a version.Version object as arguments.
-// It returns a string representing the full URL to download the Terraform binary for the specific version, operating system, and architecture.
-func ConstructCustomDownloadURL(downloadURL string, v *version.Version) string {
-	vString := v.String()
-	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, vString, vString)
-	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
-	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
-	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
-	return fullSrcURL
-}
-
 // ensureVersion returns the path to a terraform binary of version v.
 // It will download this version if we don't have it.
 func ensureVersion(
@@ -570,19 +553,8 @@ func ensureVersion(
 
 	log.Info("could not find terraform version %s in PATH or %s", v.String(), binDir)
 
-	var execPath string
-	var err error
-
-	if downloadURL != "https://releases.hashicorp.com" {
-		log.Info("using a custom download URL %s to download Terraform version %s", downloadURL, v.String())
-		fullSrcURL := ConstructCustomDownloadURL(downloadURL, v)
-		log.Info("downloading terraform version %s at %q", v.String(), fullSrcURL)
-		execPath = dest
-		err = dl.GetAny(dest, fullSrcURL)
-	} else {
-		log.Info("using Hashicorp's 'hc-install' to download Terraform version %s", v.String())
-		execPath, err = dl.Install(binDir, v)
-	}
+	log.Info("using Hashicorp's 'hc-install' to download Terraform version %s from download URL %s", v.String(), downloadURL)
+	execPath, err := dl.Install(binDir, downloadURL, v)
 
 	if err != nil {
 		return "", errors.Wrapf(err, "error downloading terraform version %s", v.String())
@@ -654,13 +626,14 @@ var rcFileContents = `credentials "%s" {
 
 type DefaultDownloader struct{}
 
-func (d *DefaultDownloader) Install(dir string, v *version.Version) (string, error) {
+func (d *DefaultDownloader) Install(dir string, downloadURL string, v *version.Version) (string, error) {
 	installer := install.NewInstaller()
 	execPath, err := installer.Install(context.Background(), []src.Installable{
 		&releases.ExactVersion{
 			Product:    product.Terraform,
 			Version:    v,
 			InstallDir: dir,
+			CustomURL:  downloadURL,
 		},
 	})
 	if err != nil {
