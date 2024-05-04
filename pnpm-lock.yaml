@@ -18,8 +18,8 @@ importers:
         specifier: 2.0.0-rc.21
         version: 2.0.0-rc.21(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vuepress/plugin-sitemap':
-        specifier: 2.0.0-rc.25
-        version: 2.0.0-rc.25(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+        specifier: 2.0.0-rc.26
+        version: 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vuepress/theme-default':
         specifier: 2.0.0-rc.24
         version: 2.0.0-rc.24(sass-loader@14.1.1(sass@1.74.1)(webpack@5.91.0))(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
@@ -627,8 +627,8 @@ packages:
     peerDependencies:
       vuepress: 2.0.0-rc.9
 
-  '@vuepress/plugin-sitemap@2.0.0-rc.25':
-    resolution: {integrity: sha512-H62MnBlLDlHdpkdRG/maUYCOKxBdMAxEnC9faI3NNOTdtWz+6araaRddpB3Z8158JmN3MH4xWwqvoPQW6KpkHw==}
+  '@vuepress/plugin-sitemap@2.0.0-rc.26':
+    resolution: {integrity: sha512-MGj8m+2gajFQ6ZibgkjZFA/BLhwPncYIGJ1D2k934VnziQNHJC3hz4THhr8jN+xv5DbD/LhU1TTo2vqJQ3iGnQ==}
     peerDependencies:
       vuepress: 2.0.0-rc.9
 
@@ -3293,7 +3293,7 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@vuepress/plugin-sitemap@2.0.0-rc.25(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
+  '@vuepress/plugin-sitemap@2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
     dependencies:
       '@vuepress/helper': 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       sitemap: 7.1.1
@@ -3328,7 +3328,7 @@ snapshots:
       '@vuepress/plugin-palette': 2.0.0-rc.21(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vuepress/plugin-prismjs': 2.0.0-rc.21(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vuepress/plugin-seo': 2.0.0-rc.24(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
-      '@vuepress/plugin-sitemap': 2.0.0-rc.25(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+      '@vuepress/plugin-sitemap': 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vuepress/plugin-theme-data': 2.0.0-rc.21(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vueuse/core': 10.9.0(vue@3.4.21)
       sass: 1.74.1
