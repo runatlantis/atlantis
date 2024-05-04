@@ -15,8 +15,6 @@ package terraform_test
 
 import (
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -567,15 +565,4 @@ func TestExtractExactRegex(t *testing.T) {
 			}
 		})
 	}
-}
-
-func NewTestServer(t *testing.T, mockDir string) *httptest.Server {
-	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir(mockDir)))
-
-	ts := httptest.NewServer(mux)
-
-	t.Cleanup(ts.Close)
-
-	return ts
 }
