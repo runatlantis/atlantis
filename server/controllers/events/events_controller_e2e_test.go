@@ -53,10 +53,6 @@ var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
 
 var mockPostWorkflowHookRunner *runtimemocks.MockPostWorkflowHookRunner
 
-func (m *NoopTFDownloader) GetFile(_, _ string) error {
-	return nil
-}
-
 func (m *NoopTFDownloader) GetAny(_, _ string) error {
 	return nil
 }

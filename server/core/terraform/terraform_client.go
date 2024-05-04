@@ -95,7 +95,6 @@ type DefaultClient struct {
 // Downloader is for downloading terraform versions.
 type Downloader interface {
 	Install(dir string, downloadURL string, v *version.Version) (string, error)
-	GetFile(dst, src string) error
 	GetAny(dst, src string) error
 }
 
@@ -650,13 +649,7 @@ func (d *DefaultDownloader) Install(dir string, downloadURL string, v *version.V
 	return newPath, nil
 }
 
-// See go-getter.GetFile.
-func (d *DefaultDownloader) GetFile(dst, src string) error {
-	_, err := getter.GetFile(context.Background(), dst, src)
-	return err
-}
-
-// See go-getter.GetFile.
+// See go-getter.GetAny.
 func (d *DefaultDownloader) GetAny(dst, src string) error {
 	_, err := getter.GetAny(context.Background(), dst, src)
 	return err
