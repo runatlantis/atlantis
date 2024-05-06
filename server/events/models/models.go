@@ -653,6 +653,8 @@ type WorkflowHookCommandContext struct {
 	// Workspace is the Terraform workspace this project is in. It will always
 	// be set.
 	Workspace string
+	// API is true if plan/apply by API endpoints
+	API bool
 }
 
 // PlanSuccessStats holds stats for a plan.
