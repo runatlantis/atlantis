@@ -67,6 +67,10 @@ jobs:
           # start http-server for integration testing
           npx http-server runatlantis.io/.vuepress/dist &
 
+      - name: Run Playwright E2E tests
+        run: |
+          pnpm run e2e
+
       - name: wait until server listened
         run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
 
