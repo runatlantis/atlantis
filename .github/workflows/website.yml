@@ -69,6 +69,7 @@ jobs:
 
       - name: Run Playwright E2E tests
         run: |
+          pnpx playwright install --with-deps
           pnpm run e2e
 
       - name: wait until server listened
