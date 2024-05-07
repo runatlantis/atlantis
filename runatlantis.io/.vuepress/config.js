@@ -89,6 +89,7 @@ export default defineUserConfig({
                     { text: 'Home', link: '/' },
                     { text: 'Guide', link: '/guide/' },
                     { text: 'Docs', link: '/docs/' },
+                    { text: "Contributing", link: "/contributing/" },
                     { text: 'Blog', link: 'https://medium.com/runatlantis' },
                 ],
             },
@@ -188,7 +189,16 @@ export default defineUserConfig({
                         '/docs/troubleshooting-https',
                     ]
                 }
-            ]
+            ],
+            '/contributing/': [
+                {
+                    text: 'Implementation Details',
+                    children: [
+                        '/contributing/events-controller',
+                    ]
+                },
+                '/contributing/glossary',
+            ],
         },
         repo: 'runatlantis/atlantis',
         docsDir: 'runatlantis.io',
