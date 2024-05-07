@@ -41,12 +41,12 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-22.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:a8aa02f9fd0ecdbc44a62e6b4facce270605b1caccec4c03ed4f268c4f3b8f63
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:cdc9167a438867db77fcdc2a524316c5a1e98ba6e2c936e19f3c7220eedc95d8
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4
 
       # need to setup go toolchain explicitly
-      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5
+      - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5
         with:
           go-version-file: go.mod
 
