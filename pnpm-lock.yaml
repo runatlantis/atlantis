@@ -12,8 +12,8 @@ importers:
         specifier: 2.0.0-rc.9
         version: 2.0.0-rc.9
       '@vuepress/plugin-docsearch':
-        specifier: 2.0.0-rc.26
-        version: 2.0.0-rc.26(@algolia/client-search@4.23.0)(search-insights@2.13.0)(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+        specifier: 2.0.0-rc.27
+        version: 2.0.0-rc.27(@algolia/client-search@4.23.0)(search-insights@2.13.0)(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vuepress/plugin-google-analytics':
         specifier: 2.0.0-rc.21
         version: 2.0.0-rc.21(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
@@ -549,8 +549,8 @@ packages:
   '@vuepress/core@2.0.0-rc.9':
     resolution: {integrity: sha512-uvMkIqYJ7vjfYEC91rMmT8YJt8xXnob5YYY3TzlwWUSEv4yoV3nlVu0l6Zfhenx/7FwKaxRJ/ePlUGIgUHBcBw==}
 
-  '@vuepress/helper@2.0.0-rc.26':
-    resolution: {integrity: sha512-/x5Txye+47UmongbiYzsNSuNBiez4mKnnzW1ldX1e6LtAa71zvNH1KD9/MAKlYs34he0NkVrOysJE9/f79tmig==}
+  '@vuepress/helper@2.0.0-rc.27':
+    resolution: {integrity: sha512-7vBaSiPnA1bTcbUAA83NQ+g8D7zsF14Mm8FFWYwv1B+NlukMLv5PoDYsUzX+v2r8p49JTXmpESKBY6aqAXimfg==}
     peerDependencies:
       vuepress: 2.0.0-rc.9
 
@@ -577,8 +577,8 @@ packages:
     peerDependencies:
       vuepress: 2.0.0-rc.9
 
-  '@vuepress/plugin-docsearch@2.0.0-rc.26':
-    resolution: {integrity: sha512-/Wa0FAURLFtxyvoH1TS793GeVvsOWy9VrIeil5wAMwR1O9pI1EOID+BzgeiaWAav4H4/sdwaG1OsB68N9q3MLQ==}
+  '@vuepress/plugin-docsearch@2.0.0-rc.27':
+    resolution: {integrity: sha512-PyLdkOIsjPWUxdJb2s9yMssBQTFpGcsRCNhsjMFL92Lb0HuE4jJpIJK4E1/EGugW2lbN+b/pG2OPeo/A3XA6HQ==}
     peerDependencies:
       vuepress: 2.0.0-rc.9
 
@@ -3150,7 +3150,7 @@ snapshots:
       - supports-color
       - typescript
 
-  '@vuepress/helper@2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
+  '@vuepress/helper@2.0.0-rc.27(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
     dependencies:
       '@vue/shared': 3.4.26
       cheerio: 1.0.0-rc.12
@@ -3193,7 +3193,7 @@ snapshots:
 
   '@vuepress/plugin-back-to-top@2.0.0-rc.24(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+      '@vuepress/helper': 2.0.0-rc.27(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vueuse/core': 10.9.0(vue@3.4.21)
       vue: 3.4.21
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
@@ -3210,7 +3210,7 @@ snapshots:
 
   '@vuepress/plugin-copy-code@2.0.0-rc.24(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+      '@vuepress/helper': 2.0.0-rc.27(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vueuse/core': 10.9.0(vue@3.4.21)
       vue: 3.4.21
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
@@ -3218,12 +3218,12 @@ snapshots:
       - '@vue/composition-api'
       - typescript
 
-  '@vuepress/plugin-docsearch@2.0.0-rc.26(@algolia/client-search@4.23.0)(search-insights@2.13.0)(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
+  '@vuepress/plugin-docsearch@2.0.0-rc.27(@algolia/client-search@4.23.0)(search-insights@2.13.0)(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
     dependencies:
       '@docsearch/css': 3.6.0
       '@docsearch/js': 3.6.0(@algolia/client-search@4.23.0)(search-insights@2.13.0)
       '@docsearch/react': 3.6.0(@algolia/client-search@4.23.0)(search-insights@2.13.0)
-      '@vuepress/helper': 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+      '@vuepress/helper': 2.0.0-rc.27(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vueuse/core': 10.9.0(vue@3.4.26)
       ts-debounce: 4.0.0
       vue: 3.4.26
@@ -3255,14 +3255,14 @@ snapshots:
 
   '@vuepress/plugin-links-check@2.0.0-rc.24(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+      '@vuepress/helper': 2.0.0-rc.27(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
     transitivePeerDependencies:
       - typescript
 
   '@vuepress/plugin-medium-zoom@2.0.0-rc.24(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+      '@vuepress/helper': 2.0.0-rc.27(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       medium-zoom: 1.1.0
       vue: 3.4.21
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
@@ -3288,14 +3288,14 @@ snapshots:
 
   '@vuepress/plugin-seo@2.0.0-rc.24(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+      '@vuepress/helper': 2.0.0-rc.27(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
     transitivePeerDependencies:
       - typescript
 
   '@vuepress/plugin-sitemap@2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+      '@vuepress/helper': 2.0.0-rc.27(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       sitemap: 7.1.1
       vuepress: 2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21)
     transitivePeerDependencies:
@@ -3315,7 +3315,7 @@ snapshots:
 
   '@vuepress/theme-default@2.0.0-rc.24(sass-loader@14.1.1(sass@1.74.1)(webpack@5.91.0))(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))':
     dependencies:
-      '@vuepress/helper': 2.0.0-rc.26(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
+      '@vuepress/helper': 2.0.0-rc.27(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vuepress/plugin-active-header-links': 2.0.0-rc.21(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vuepress/plugin-back-to-top': 2.0.0-rc.24(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
       '@vuepress/plugin-container': 2.0.0-rc.21(vuepress@2.0.0-rc.9(@vuepress/bundler-webpack@2.0.0-rc.9)(vue@3.4.21))
