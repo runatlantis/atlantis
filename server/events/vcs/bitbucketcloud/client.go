@@ -40,6 +40,8 @@ func NewClient(httpClient *http.Client, username string, password string, atlant
 	}
 }
 
+var MY_UUID = ""
+
 // GetModifiedFiles returns the names of files that were modified in the merge request
 // relative to the repo root, e.g. parent/child/file.txt.
 func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
@@ -134,7 +136,10 @@ func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 			if strings.Contains(firstLine, strings.ToLower(command)) {
 				// we found our old comment that references that command
 				logger.Debug("Deleting comment with id %s", *c.ID)
-				b.DeletePullRequestComment(repo, pullNum, *c.ID)
+				err = b.DeletePullRequestComment(repo, pullNum, *c.ID)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -165,25 +170,30 @@ func (b *Client) GetPullRequestComments(repo models.Repo, pullNum int) (comments
 }
 
 func (b *Client) GetMyUUID() (uuid string, err error) {
-	path := fmt.Sprintf("%s/2.0/user", b.BaseURL)
-	resp, err := b.makeRequest("GET", path, nil)
+	if MY_UUID == "" {
+		path := fmt.Sprintf("%s/2.0/user", b.BaseURL)
+		resp, err := b.makeRequest("GET", path, nil)
 
-	if err != nil {
-		return uuid, err
+		if err != nil {
+			return uuid, err
+		}
+
+		var user User
+		if err := json.Unmarshal(resp, &user); err != nil {
+			return uuid, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		}
+
+		if err := validator.New().Struct(user); err != nil {
+			return uuid, errors.Wrapf(err, "API response %q was missing a field", string(resp))
+		}
+
+		uuid = *user.UUID
+		MY_UUID = uuid
+
+		return uuid, nil
+	} else {
+		return MY_UUID, nil
 	}
-
-	var user User
-	if err := json.Unmarshal(resp, &user); err != nil {
-		return uuid, errors.Wrapf(err, "Could not parse response %q", string(resp))
-	}
-
-	if err := validator.New().Struct(user); err != nil {
-		return uuid, errors.Wrapf(err, "API response %q was missing a field", string(resp))
-	}
-
-	uuid = *user.UUID
-	return uuid, nil
-
 }
 
 // PullIsApproved returns true if the merge request was approved.

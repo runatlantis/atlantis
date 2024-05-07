@@ -374,7 +374,7 @@ func TestClient_GetMyUUID(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.RequestURI {
 		case "/2.0/user":
-			w.Write([]byte(json)) // nolint: errcheck
+			w.Write(json) // nolint: errcheck
 			return
 		default:
 			t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -397,7 +397,7 @@ func TestClient_GetComment(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.RequestURI {
 		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments":
-			w.Write([]byte(json)) // nolint: errcheck
+			w.Write(json) // nolint: errcheck
 			return
 		default:
 			t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -472,7 +472,7 @@ func TestClient_HidePRComments(t *testing.T) {
 		// we have two comments in the test file
 		// The code is going to delete them all and then create a new one
 		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments/498931882":
-			w.Write([]byte(""))
+			w.Write([]byte("")) // nolint: errcheck
 			called += 1
 			return
 			// This is the second one
@@ -484,10 +484,10 @@ func TestClient_HidePRComments(t *testing.T) {
 			Assert(t, r.Method != "DELETE", "Shouldn't delete this one")
 			return
 		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments":
-			w.Write([]byte(comments)) // nolint: errcheck
+			w.Write(comments) // nolint: errcheck
 			return
 		case "/2.0/user":
-			w.Write([]byte(json)) // nolint: errcheck
+			w.Write(json) // nolint: errcheck
 			return
 		default:
 			t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -514,4 +514,3 @@ func TestClient_HidePRComments(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 2, called)
 }
-
