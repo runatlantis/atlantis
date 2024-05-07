@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -365,3 +366,152 @@ func TestClient_MarkdownPullLink(t *testing.T) {
 	exp := "#1"
 	Equals(t, exp, s)
 }
+
+func TestClient_GetMyUUID(t *testing.T) {
+	json, err := os.ReadFile(filepath.Join("testdata", "user.json"))
+	Ok(t, err)
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.RequestURI {
+		case "/2.0/user":
+			w.Write([]byte(json)) // nolint: errcheck
+			return
+		default:
+			t.Errorf("got unexpected request at %q", r.RequestURI)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}))
+	defer testServer.Close()
+
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client.BaseURL = testServer.URL
+	v, _ := client.GetMyUUID()
+	Equals(t, v, "{00000000-0000-0000-0000-000000000001}")
+}
+
+func TestClient_GetComment(t *testing.T) {
+	json, err := os.ReadFile(filepath.Join("testdata", "comments.json"))
+	Ok(t, err)
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.RequestURI {
+		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments":
+			w.Write([]byte(json)) // nolint: errcheck
+			return
+		default:
+			t.Errorf("got unexpected request at %q", r.RequestURI)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}))
+	defer testServer.Close()
+
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client.BaseURL = testServer.URL
+	v, _ := client.GetPullRequestComments(
+		models.Repo{
+			FullName:          "myorg/myrepo",
+			Owner:             "owner",
+			Name:              "myrepo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.BitbucketCloud,
+				Hostname: "bitbucket.org",
+			},
+		}, 5)
+
+	Equals(t, len(v), 5)
+	exp := "Plan"
+	Assert(t, strings.Contains(v[1].Content.Raw, exp), "Comment should contain word \"%s\", has \"%s\"", exp, v[1].Content.Raw)
+}
+
+func TestClient_DeleteComment(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.RequestURI {
+		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments/1":
+			w.Write([]byte("")) // nolint: errcheck
+			return
+		default:
+			t.Errorf("got unexpected request at %q", r.RequestURI)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}))
+	defer testServer.Close()
+
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client.BaseURL = testServer.URL
+	err := client.DeletePullRequestComment(
+		models.Repo{
+			FullName:          "myorg/myrepo",
+			Owner:             "owner",
+			Name:              "myrepo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.BitbucketCloud,
+				Hostname: "bitbucket.org",
+			},
+		}, 5, 1)
+	Ok(t, err)
+}
+
+func TestClient_HidePRComments(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	comments, err := os.ReadFile(filepath.Join("testdata", "comments.json"))
+	Ok(t, err)
+	json, err := os.ReadFile(filepath.Join("testdata", "user.json"))
+	Ok(t, err)
+
+	called := 0
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.RequestURI {
+		// we have two comments in the test file
+		// The code is going to delete them all and then create a new one
+		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments/498931882":
+			w.Write([]byte(""))
+			called += 1
+			return
+			// This is the second one
+		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments/498931784":
+			w.Write([]byte("")) // nolint: errcheck
+			called += 1
+			return
+		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments/49893111":
+			Assert(t, r.Method != "DELETE", "Shouldn't delete this one")
+			return
+		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments":
+			w.Write([]byte(comments)) // nolint: errcheck
+			return
+		case "/2.0/user":
+			w.Write([]byte(json)) // nolint: errcheck
+			return
+		default:
+			t.Errorf("got unexpected request at %q", r.RequestURI)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}))
+	defer testServer.Close()
+
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client.BaseURL = testServer.URL
+	err = client.HidePrevCommandComments(logger,
+		models.Repo{
+			FullName:          "myorg/myrepo",
+			Owner:             "owner",
+			Name:              "myrepo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.BitbucketCloud,
+				Hostname: "bitbucket.org",
+			},
+		}, 5, "plan", "")
+	Ok(t, err)
+	Equals(t, 2, called)
+}
+
