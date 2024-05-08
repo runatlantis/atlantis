@@ -47,5 +47,12 @@ export default defineConfig({
         ['meta', { name: 'msapplication-square310x310logo', content: '/mstile-310x310.png' }],
         ['link', { rel: 'stylesheet', sizes: '152x152', href: 'https://fonts.googleapis.com/css?family=Lato:400,900' }],
         ['meta', { name: 'google-site-verification', content: 'kTnsDBpHqtTNY8oscYxrQeeiNml2d2z-03Ct9wqeCeE' }],
-    ]
+    ],
+    vite: {
+        server: {
+            fs: {
+                cachedChecks: false,
+            },
+        }
+    }
 })
