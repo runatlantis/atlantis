@@ -5,8 +5,8 @@ import { defaultTheme } from '@vuepress/theme-default';
 import { defineUserConfig } from 'vuepress';
 import { sitemapPlugin } from '@vuepress/plugin-sitemap';
 import { webpackBundler } from '@vuepress/bundler-webpack';
-import * as navbar from "./navbar";
-import * as sidebar from "./sidebar";
+import navbar from "./navbar";
+import sidebar from "./sidebar";
 
 const __dirname = getDirname(import.meta.url)
 

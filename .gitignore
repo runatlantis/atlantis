@@ -29,6 +29,6 @@ tmp-CHANGELOG.md
 
 # vuepress
 **/.vuepress/*
-!runatlantis.io/.vuepress/config.ts
-!runatlantis.io/.vuepress/navbar.ts
-!runatlantis.io/.vuepress/sidebar.ts
+!runatlantis.io/.vuepress/config.*
+!runatlantis.io/.vuepress/navbar.*
+!runatlantis.io/.vuepress/sidebar.*

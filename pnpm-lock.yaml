@@ -8,9 +8,6 @@ devDependencies:
   '@playwright/test':
     specifier: ^1.44.0
     version: 1.44.0
-  '@types/node':
-    specifier: ^20.12.11
-    version: 20.12.11
   '@vuepress/bundler-webpack':
     specifier: 2.0.0-rc.9
     version: 2.0.0-rc.9
