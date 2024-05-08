@@ -632,7 +632,7 @@ func (d *DefaultDownloader) Install(dir string, downloadURL string, v *version.V
 			Product:    product.Terraform,
 			Version:    v,
 			InstallDir: dir,
-			CustomURL:  downloadURL,
+			ApiBaseURL: downloadURL,
 		},
 	})
 	if err != nil {
