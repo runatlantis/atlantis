@@ -1,6 +1,7 @@
 {
   "license": "Apache-2.0",
   "devDependencies": {
+    "@playwright/test": "^1.44.0",
     "@vuepress/bundler-webpack": "2.0.0-rc.9",
     "@vuepress/plugin-docsearch": "2.0.0-rc.21",
     "@vuepress/plugin-google-analytics": "2.0.0-rc.21",
