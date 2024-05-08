@@ -30,14 +30,8 @@
   },
   packageRules: [
     {
-      matchPackageNames: [
-        'vuepress',
-        '@vuepress/client',
-        '@vuepress/markdown',
-        '@vuepress/utils',
-      ],
-      groupName: 'vuepress',
-      allowedVersions: '!/pre.*$/',
+      "paths": ["package.json"],
+      "enabled": false
     },
     {
       matchFileNames: [
