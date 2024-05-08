@@ -18,8 +18,8 @@ devDependencies:
     specifier: 2.0.0-rc.21
     version: 2.0.0-rc.21(vuepress@2.0.0-rc.9)
   '@vuepress/plugin-sitemap':
-    specifier: 2.0.0-rc.26
-    version: 2.0.0-rc.26(vuepress@2.0.0-rc.9)
+    specifier: 2.0.0-rc.27
+    version: 2.0.0-rc.27(vuepress@2.0.0-rc.9)
   '@vuepress/theme-default':
     specifier: 2.0.0-rc.24
     version: 2.0.0-rc.24(sass-loader@14.1.1)(vuepress@2.0.0-rc.9)
@@ -1330,8 +1330,8 @@ packages:
       - typescript
     dev: true
 
-  /@vuepress/plugin-sitemap@2.0.0-rc.26(vuepress@2.0.0-rc.9):
-    resolution: {integrity: sha512-MGj8m+2gajFQ6ZibgkjZFA/BLhwPncYIGJ1D2k934VnziQNHJC3hz4THhr8jN+xv5DbD/LhU1TTo2vqJQ3iGnQ==}
+  /@vuepress/plugin-sitemap@2.0.0-rc.27(vuepress@2.0.0-rc.9):
+    resolution: {integrity: sha512-5/cJQxPkAyub1XIBSSFAHOBEAWamXgF2ihFoJChO974kWqVBE1EGhRuqjnpXS6rnvLBZUG4/CDBWpYnRrzCJCw==}
     peerDependencies:
       vuepress: 2.0.0-rc.9
     dependencies:
@@ -1382,7 +1382,7 @@ packages:
       '@vuepress/plugin-palette': 2.0.0-rc.21(vuepress@2.0.0-rc.9)
       '@vuepress/plugin-prismjs': 2.0.0-rc.21(vuepress@2.0.0-rc.9)
       '@vuepress/plugin-seo': 2.0.0-rc.27(vuepress@2.0.0-rc.9)
-      '@vuepress/plugin-sitemap': 2.0.0-rc.26(vuepress@2.0.0-rc.9)
+      '@vuepress/plugin-sitemap': 2.0.0-rc.27(vuepress@2.0.0-rc.9)
       '@vuepress/plugin-theme-data': 2.0.0-rc.27(vuepress@2.0.0-rc.9)
       '@vueuse/core': 10.9.0(vue@3.4.21)
       sass: 1.77.0
