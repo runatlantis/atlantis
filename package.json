@@ -1,20 +1,18 @@
 {
   "license": "Apache-2.0",
   "devDependencies": {
-    "@playwright/test": "1.44.0",
     "@vuepress/bundler-webpack": "2.0.0-rc.9",
-    "@vuepress/plugin-docsearch": "2.0.0-rc.27",
+    "@vuepress/plugin-docsearch": "2.0.0-rc.21",
     "@vuepress/plugin-google-analytics": "2.0.0-rc.21",
-    "@vuepress/plugin-sitemap": "2.0.0-rc.27",
-    "@vuepress/theme-default": "2.0.0-rc.24",
+    "@vuepress/plugin-sitemap": "2.0.0-rc.21",
+    "@vuepress/theme-default": "2.0.0-rc.21",
     "@vuepress/utils": "2.0.0-rc.9",
     "sass-loader": "14.1.1",
-    "vue": "3.4.21",
-    "vuepress": "2.0.0-rc.9"
+    "vuepress": "2.0.0-rc.9",
+    "vue": "3.4.21"
   },
   "scripts": {
     "website:dev": "vuepress dev runatlantis.io",
-    "website:build": "NODE_OPTIONS=--openssl-legacy-provider vuepress build runatlantis.io",
-    "e2e": "playwright test"
+    "website:build": "NODE_OPTIONS=--openssl-legacy-provider vuepress build runatlantis.io"
   }
 }
