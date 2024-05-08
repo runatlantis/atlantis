@@ -16,8 +16,8 @@ export const getVersion = () => {
 
 const en = [
   { text: "Home", link: "/"},
-  { text: "Guide", link: "/guide/" },
-  { text: "Docs", link: "/docs/" },
+  { text: "Guide", link: "/guide/introduction" },
+  { text: "Docs", link: "/docs/installation-guide" },
   { text: "Blog", link: "https://medium.com/runatlantis" },
 ];
 

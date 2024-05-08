@@ -3,7 +3,7 @@ const en = [
     text: "Guide",
     collapsed: false,
     items: [
-      { text: "Introduction", link: "/guide/" },
+      { text: "Introduction", link: "/guide/introduction" },
       { text: "Test Drive", link: "/guide/test-drive" },
       { text: "Testing locally", link: "/guide/testing-locally" },
     ],
