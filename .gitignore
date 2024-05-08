@@ -8,7 +8,6 @@ output
 .cover
 .terraform/
 node_modules/
-**/.vuepress/*
 helm/test-values.yaml
 *.swp
 golangci-lint
@@ -27,3 +26,8 @@ tmp-CHANGELOG.md
 
 # IDE files
 *.code-workspace
+
+# VitePress build output & cache directory
+**/.vitepress/cache
+**/.vitepress/dist
+**/.vitepress/config.ts.timestamp-*
