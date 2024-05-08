@@ -30,7 +30,7 @@
   },
   packageRules: [
     {
-      "paths": ["package.json"],
+      "matchFileNames": ["package.json"],
       "enabled": false
     },
     {
