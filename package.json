@@ -2,6 +2,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@playwright/test": "^1.44.0",
+    "@types/node": "^20.12.11",
     "@vuepress/bundler-webpack": "2.0.0-rc.9",
     "@vuepress/plugin-docsearch": "2.0.0-rc.21",
     "@vuepress/plugin-google-analytics": "2.0.0-rc.21",
@@ -9,8 +10,8 @@
     "@vuepress/theme-default": "2.0.0-rc.21",
     "@vuepress/utils": "2.0.0-rc.9",
     "sass-loader": "14.1.1",
-    "vuepress": "2.0.0-rc.9",
-    "vue": "3.4.21"
+    "vue": "3.4.21",
+    "vuepress": "2.0.0-rc.9"
   },
   "scripts": {
     "website:dev": "vuepress dev runatlantis.io",
