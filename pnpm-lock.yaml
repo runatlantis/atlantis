@@ -6,7 +6,7 @@ settings:
 
 devDependencies:
   '@playwright/test':
-    specifier: ^1.44.0
+    specifier: 1.44.0
     version: 1.44.0
   '@vuepress/bundler-webpack':
     specifier: 2.0.0-rc.9
@@ -785,7 +785,7 @@ packages:
   /@types/markdown-it-emoji@2.0.5:
     resolution: {integrity: sha512-iJLsmCNpSWKtV6Ia3mLSjcXJPEt7ubGG342z+hGvYx++TpM19oTUrJcI7XjbOqRQ+W2UQ323E7B0eCLwlgT/9g==}
     dependencies:
-      '@types/markdown-it': 13.0.8
+      '@types/markdown-it': 14.1.1
     dev: true
 
   /@types/markdown-it@13.0.8:
@@ -849,7 +849,7 @@ packages:
   /@types/sax@1.2.7:
     resolution: {integrity: sha512-rO73L89PJxeYM3s3pPPjiPgVVcymqU490g0YO5n5By0k2Erzj6tay/4lr1CHAAU4JyOWd1rpQ8bCf6cZfHU96A==}
     dependencies:
-      '@types/node': 17.0.45
+      '@types/node': 20.12.10
     dev: true
 
   /@types/send@0.17.4:
