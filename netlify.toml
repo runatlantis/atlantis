@@ -1,0 +1,31 @@
+# Netlify Config, https://www.netlify.com/docs/netlify-toml-reference/
+[build]
+  base    = "/"
+  publish = "runatlantis.io/.vuepress/dist/"
+  command = "pnpm website:build"
+
+[[redirects]]
+  from = "/guide/getting-started.html"
+  to = "/guide/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/atlantis-yaml-reference.html"
+  to = "/docs/repo-level-atlantis-yaml.html"
+  status = 301
+  force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    Content-Security-Policy = "default-src 'self'"
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Strict-Transport-Security = "max-age=31536000"
+
+[[headers]]
+  for = "*.html"
+  [headers.values]
+    Content-Type = "text/html; charset=UTF-8"
