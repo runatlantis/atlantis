@@ -13,5 +13,14 @@ abstraction and forwards the call to the respective function.
 
 VCS stands for Version Control System.
 
-Atlantis supports different VCSs. Each VCS requires a custom implementation that
-abstracts the Atlantis functionalities to the specific VCS implementations.
+Atlantis supports only git as a Version Control System. However, there is
+support for multiple VCS Providers. Currently, it supports the following
+providers:
+
+- [Azure DevOps](https://azure.microsoft.com/en-us/products/devops)
+- [BitBucket](https://bitbucket.org/)
+- [GitHub](https://github.com/)
+- [GitLab](https://gitlab.com/)
+- [Gitea](https://gitea.com/)
+
+The term VCS is used for both git and the different VCS providers.
