@@ -27,6 +27,9 @@ tmp-CHANGELOG.md
 # IDE files
 *.code-workspace
 
+# draw.io backup files
+*.bkp
+
 # VitePress build output & cache directory
 **/.vitepress/cache
 **/.vitepress/dist
