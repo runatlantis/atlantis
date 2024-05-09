@@ -43,7 +43,7 @@ webhooks:
   workspace-regex: .*
   branch-regex: .*
   kind: slack
-  channel: my-channel
+  channel: my-channel-id
 ```
 
 If you are deploying Atlantis as a Helm chart, this can be implemented via the `config` parameter available for [chart customizations](https://github.com/runatlantis/helm-charts#customization):
