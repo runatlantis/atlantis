@@ -90,7 +90,16 @@ const en = [
           '/docs/contributing',
         ]
       },
-    ]
+    ],
+    '/contributing/': [
+        {
+            text: 'Implementation Details',
+            children: [
+                '/contributing/events-controller',
+            ]
+        },
+        '/contributing/glossary',
+    ],
   }
 ];
 
