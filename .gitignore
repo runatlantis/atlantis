@@ -27,6 +27,9 @@ tmp-CHANGELOG.md
 # IDE files
 *.code-workspace
 
+# draw.io backup files
+*.bkp
+
 # vuepress
 **/.vuepress/*
 !runatlantis.io/.vuepress/config.*
