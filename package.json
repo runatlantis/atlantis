@@ -8,12 +8,12 @@
     "@vuepress/plugin-sitemap": "2.0.0-rc.21",
     "@vuepress/theme-default": "2.0.0-rc.21",
     "@vuepress/utils": "2.0.0-rc.9",
-    "sass-loader": "14.1.1",
-    "vue": "3.4.21",
+    "sass-loader": "14.2.1",
+    "vue": "3.4.27",
     "vuepress": "2.0.0-rc.9"
   },
   "scripts": {
-    "website:dev": "vuepress dev runatlantis.io",
+    "website:dev": "vuepress dev --host localhost runatlantis.io",
     "website:build": "NODE_OPTIONS=--openssl-legacy-provider vuepress build runatlantis.io",
     "e2e": "playwright test"
   }

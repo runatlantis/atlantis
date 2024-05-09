@@ -82,7 +82,16 @@ const en = {
               '/docs/troubleshooting-https',
           ]
       }
-  ]
+  ],
+  '/contributing/': [
+      {
+          text: 'Implementation Details',
+          children: [
+              '/contributing/events-controller',
+          ]
+      },
+      '/contributing/glossary',
+  ],
 };
 
 export default { en };
