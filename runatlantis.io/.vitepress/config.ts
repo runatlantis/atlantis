@@ -2,9 +2,11 @@ import { defineConfig } from 'vitepress';
 import * as navbars from "./navbars";
 import * as sidebars from "./sidebars";
 
+// https://vitepress.dev/reference/site-config
 export default defineConfig({
     title: 'Atlantis',
     description: 'Atlantis: Terraform Pull Request Automation',
+    lang: 'en-US',
     lastUpdated: true,
     locales: {
         root: {
