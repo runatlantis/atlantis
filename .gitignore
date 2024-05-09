@@ -8,7 +8,6 @@ output
 .cover
 .terraform/
 node_modules/
-**/.vuepress/*
 helm/test-values.yaml
 *.swp
 golangci-lint
@@ -30,3 +29,9 @@ tmp-CHANGELOG.md
 
 # draw.io backup files
 *.bkp
+
+# vuepress
+**/.vuepress/*
+!runatlantis.io/.vuepress/config.*
+!runatlantis.io/.vuepress/navbar.*
+!runatlantis.io/.vuepress/sidebar.*
