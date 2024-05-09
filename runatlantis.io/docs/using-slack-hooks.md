@@ -59,9 +59,9 @@ config: |
        workspace-regex: .*
        branch-regex: .*
        kind: slack
-       channel: my-channel
+       channel: my-channel-id
 ```
 
 
 
-The `apply` event information will be sent to the `my-channel` Slack channel.
+The `apply` event information will be sent to the `my-channel-id` Slack channel.
