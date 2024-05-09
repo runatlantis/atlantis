@@ -1,15 +1,19 @@
 ---
 # https://vitepress.dev/reference/default-theme-home-page
 layout: page
+sidebar: false
 
-pageClass: home-custom
 title: Atlantis
-description: Run Terraform workflows with ease
-
-hero:
-  name: Atlantis
-  text: Terraform Pull Request Automation
-  tagline: Run Terraform workflows with ease
-
+description: Terraform Pull Request Automation
 ---
-<CustomComponent/>
+
+<!-- ![Atlantis Workflow](.vitepress/public/mobile-workflow-min.png)
+![Atlantis Workflow](.vitepress/public/mobile-workflow-min.png) -->
+
+<script setup>
+  import { withBase } from 'vitepress'
+</script>
+
+<template>
+  <img :src="withBase('./mobile-workflow-min.png')" />
+</template>

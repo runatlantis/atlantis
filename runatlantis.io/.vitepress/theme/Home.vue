@@ -2,7 +2,7 @@
   <div class="container">
     <div class="home">
       <div class="hero">
-        <img v-if="data.hero.image" :src="$withBase(data.hero.image)" alt="hero">
+        <img v-if="data.hero.image" :src="withBaseDebug(data.hero.image)" alt="hero">
         <h1>{{ data.hero.text || $title || 'Hello' }}</h1>
         <p class="description">
           Terraform Pull Request Automation
@@ -15,8 +15,8 @@
     <div class="workflow-container">
       <div class="workflow">
         <h1>The Atlantis Workflow</h1>
-          <img :src="'/mobile-workflow-min.png'" class="mobile" alt="Atlantis Workflow">
-          <img :src="'/workflow-min.png'" class="desktop" alt="Atlantis Workflow">
+          <img src="/mobile-workflow-min.png" class="mobile" alt="Atlantis Workflow">
+          <img src="/workflow-min.png" class="desktop" alt="Atlantis Workflow">
       </div>
     </div>
     <div class="benefits-container">
@@ -31,10 +31,10 @@
               <p>Bring the benefits of <strong>code review</strong> to your operations
                 workflow.</p>
               <ul>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Catch errors in
+                <li><img class="checkmark" src="/checkmark.svg">Catch errors in
                   the Terraform plan output before it's applied.
                 </li>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Ensure that you
+                <li><img class="checkmark" src="/checkmark.svg">Ensure that you
                   apply changes before merging to main.
                 </li>
               </ul>
@@ -42,7 +42,7 @@
           </div>
           <div class="item image">
             <div class="image">
-              <img :src="'/list.svg'">
+              <img src="/list.svg">
             </div>
           </div>
         </div>
@@ -51,7 +51,7 @@
         <div class="benefit">
           <div class="item image">
             <div class="image">
-              <img :src="'/coding.svg'">
+              <img src="/coding.svg">
             </div>
           </div>
           <div class="item">
@@ -59,10 +59,10 @@
               <h2>Put the <span style="text-decoration: underline">Dev</span> back into DevOps</h2>
               <p>Empower your developers to write Terraform. <strong>Safely.</strong></p>
               <ul>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Developers can
+                <li><img class="checkmark" src="/checkmark.svg">Developers can
                   submit Terraform pull requests without needing credentials.
                 </li>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Operators can
+                <li><img class="checkmark" src="/checkmark.svg">Operators can
                   require approvals prior to allowing an apply.
                 </li>
               </ul>
@@ -77,16 +77,16 @@
               <h2>Instant Audit Logs And Compliance</h2>
               <p>Pass audits without compromising your workflow.</p>
               <ul>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Each pull request now holds a detailed log of what infrastructure changes were made and when; along with who made the change and who approved it.
+                <li><img class="checkmark" src="/checkmark.svg">Each pull request now holds a detailed log of what infrastructure changes were made and when; along with who made the change and who approved it.
                 </li>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Atlantis can be configured to require approvals on every production change.
+                <li><img class="checkmark" src="/checkmark.svg">Atlantis can be configured to require approvals on every production change.
                 </li>
               </ul>
             </div>
           </div>
           <div class="item image">
             <div class="image">
-              <img :src="'/certificate.svg'">
+              <img src="/certificate.svg">
             </div>
           </div>
         </div>
@@ -98,15 +98,15 @@
         <div class="benefit">
           <div class="item image">
             <div class="image">
-              <img :src="'/powerful.svg'">
+              <img src="/powerful.svg">
             </div>
           </div>
           <div class="item">
             <div class="description">
               <ul>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Used by one of the world's top companies to manage over 600 Terraform repos with 300 developers.
+                <li><img class="checkmark" src="/checkmark.svg">Used by one of the world's top companies to manage over 600 Terraform repos with 300 developers.
                 </li>
-                <li><img class="checkmark" :src="'/checkmark.svg'">In production use since 2017.
+                <li><img class="checkmark" src="/checkmark.svg">In production use since 2017.
                 </li>
               </ul>
             </div>
@@ -121,17 +121,17 @@
           <div class="item">
             <div class="description">
               <ul>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Atlantis is
+                <li><img class="checkmark" src="/checkmark.svg">Atlantis is
                   self-hosted. Your credentials don't leave your infrastructure.
                 </li>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Runs as a Golang
+                <li><img class="checkmark" src="/checkmark.svg">Runs as a Golang
                   binary or Docker image and can be deployed on VMs, Kubernetes,
                   Fargate, etc.
                 </li>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Listens for
+                <li><img class="checkmark" src="/checkmark.svg">Listens for
                   webhooks from GitHub/GitLab/Bitbucket/Azure DevOps.
                 </li>
-                <li><img class="checkmark" :src="'/checkmark.svg'">Runs terraform
+                <li><img class="checkmark" src="/checkmark.svg">Runs terraform
                   commands remotely and comments back with their output.
                 </li>
               </ul>
@@ -139,7 +139,7 @@
           </div>
           <div class="item image">
             <div class="image">
-              <img :src="'/hero.png'">
+              <img src="/hero.png">
             </div>
           </div>
         </div>
@@ -159,10 +159,16 @@
 </template>
 
 <script setup>
-import { useData } from 'vitepress';
+import { useData, withBase } from 'vitepress';
 import { computed } from 'vue';
 
 const { page } = useData();
+
+const withBaseDebug = (path) => {
+  const result = withBase(path);
+  console.log(`withBase('${path}') = '${result}'`);
+  return result;
+};
 
 const data = computed(() => {
   console.log(page.value.frontmatter);
