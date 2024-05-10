@@ -8,6 +8,7 @@ export default defineConfig({
     description: 'Atlantis: Terraform Pull Request Automation',
     lang: 'en-US',
     lastUpdated: true,
+    cleanUrls: true,
     locales: {
         root: {
             label: 'English',
