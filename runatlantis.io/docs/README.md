@@ -3,7 +3,7 @@
 These docs are for users that are ready to get Atlantis installed and start using it.
 
 :::tip Looking to get started?
-If you're new here, check out the [Guide](../guide/README.md)
+If you're new here, check out the [Guide](../guide/introduction.md)
 where you can try our [Test Drive](../guide/test-drive.md) or [Run Atlantis Locally](../guide/testing-locally.md).
 :::
 
