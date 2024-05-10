@@ -65,6 +65,9 @@ export default defineConfig({
             gtag('config', 'UA-6850151-3');`
         ]
     ],
+    sitemap: {
+        hostname: 'https://runatlantis.io'
+    },
     vite: {
         server: {
             fs: {
