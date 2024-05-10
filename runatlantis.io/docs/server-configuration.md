@@ -385,7 +385,7 @@ and set `--autoplan-modules` to `false`.
   ```bash
   atlantis server --disable-markdown-folding
   # or
-  ATLANTIS_DISABLE_MARKDOWN_FOLDER=true
+  ATLANTIS_DISABLE_MARKDOWN_FOLDING=true
   ```
   Disable folding in markdown output using the `<details>` html tag.
 
