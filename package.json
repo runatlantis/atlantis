@@ -4,6 +4,7 @@
   "devDependencies": {
     "@playwright/test": "^1.44.0",
     "@types/node": "^20.12.10",
+    "sass": "^1.77.0",
     "vitepress": "^1.1.4"
   },
   "scripts": {
