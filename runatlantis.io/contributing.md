@@ -11,4 +11,4 @@ If you're new, check out the [Guide](../guide/README.md) or the
 
 ### Next Steps
 
-- [Events Controller](events-controller.md)&nbsp;&nbsp;–&nbsp;&nbsp;How do the events work?
+- [Events Controller](./contributing/events-controller.md)&nbsp;&nbsp;–&nbsp;&nbsp;How do the events work?

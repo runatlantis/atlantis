@@ -14,6 +14,7 @@ const en = [
     items: [
       {
         text: "Installing Atlantis",
+        collapsed: true,
         items: [
           { text: "Installing Guide", link: "/docs/installation-guide" },
           { text: "Requirements", link: "/docs/requirements" },
@@ -26,6 +27,7 @@ const en = [
       },
       {
         text: "Configuring Atlantis",
+        collapsed: true,
         items: [
           { text: "Overview", link: "/docs/configuring-atlantis" },
           "/docs/configuring-atlantis",
@@ -48,6 +50,7 @@ const en = [
       },
       {
         text: "Using Atlantis",
+        collapsed: true,
         items: [
           { text: "Overview", link: "/docs/using-atlantis" },
           "/docs/api-endpoints",
@@ -55,6 +58,7 @@ const en = [
       },
       {
         text: 'How Atlantis Works',
+        collapsed: true,
         items: [
           {
               text: 'Overview',
@@ -68,38 +72,34 @@ const en = [
       },
       {
         text: 'Real-time Terraform Logs',
+        collapsed: true,
         items: [
           '/docs/streaming-logs',
         ]
       },
       {
         text: 'Troubleshooting',
+        collapsed: true,
         items: [
           '/docs/troubleshooting',
         ]
       },
+    ],
+  },
+  {
+    text: "Contributing",
+    link: "/contributing",
+    collapsed: false,
+    items: [
       {
-        text: 'Upgrading Atlantis',
+        text: 'Implementation Details',
         items: [
-          '/docs/upgrading-atlantis',
+            {text: "Events Controller", link: "/contributing/events-controller"},
         ]
       },
-      {
-        text: 'Contributing to Atlantis',
-        items: [
-          '/docs/contributing',
-        ]
-      },
-    ],
-    '/contributing/': [
-        {
-            text: 'Implementation Details',
-            children: [
-                '/contributing/events-controller',
-            ]
-        },
-        '/contributing/glossary',
-    ],
+      {text: "Glossry", link: "/contributing/glossary"},
+    ]
+
   }
 ];
 
