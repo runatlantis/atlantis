@@ -13,16 +13,16 @@ jobs:
           xs_label: 'size/xs'
           xs_max_size: '10'
           s_label: 'size/s'
-          s_max_size: '100'
+          s_max_size: '200'
           m_label: 'size/m'
-          m_max_size: '500'
+          m_max_size: '1000'
           l_label: 'size/l'
-          l_max_size: '1000'
+          l_max_size: '10000'
           xl_label: 'size/xl'
-          # fail_if_xl: 'false'
-          # message_if_xl: >
-          #   This PR exceeds the recommended size of 1000 lines.
-          #   Please make sure you are NOT addressing multiple issues with one PR.
-          #   Note this PR might be rejected due to its size.
+          fail_if_xl: 'false'
+          message_if_xl: >
+            This PR exceeds the recommended size of 1000 lines.
+            Please make sure you are NOT addressing multiple issues with one PR.
+            Note this PR might be rejected due to its size.
           github_api_url: 'https://api.github.com'
           files_to_ignore: ''
