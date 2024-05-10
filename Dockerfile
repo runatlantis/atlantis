@@ -8,7 +8,7 @@ ARG DEFAULT_CONFTEST_VERSION=0.49.1
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.22.1-alpine AS builder
+FROM golang:1.22.3@sha256:b1e05e2c918f52c59d39ce7d5844f73b2f4511f7734add8bb98c9ecdd4443365 AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
