@@ -153,6 +153,8 @@ COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+# create entrypoint scripts directory
+RUN mkdir /docker-entrypoint.d
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
@@ -194,6 +196,8 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+# create entrypoint scripts directory
+RUN mkdir /docker-entrypoint.d
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
