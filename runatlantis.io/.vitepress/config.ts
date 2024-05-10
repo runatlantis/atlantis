@@ -22,7 +22,25 @@ export default defineConfig({
     themeConfig: {
         // https://vitepress.dev/reference/default-theme-config
         search: {
-          provider: "local",
+            provider: 'algolia',
+            options: {
+                // We internally discussed how this API key is exposed in the code and decided
+                // that it is a non-issue because this API key can easily be extracted by
+                // looking at the browser dev tools since the key is used in the API requests.
+                apiKey: '3b733dff1539ca3a210775860301fa86',
+                indexName: 'runatlantis',
+                appId: 'BH4D9OD16A',
+                locales: {
+                    '/': {
+                        placeholder: 'Search Documentation',
+                        translations: {
+                            button: {
+                                buttonText: 'Search Documentation',
+                            },
+                        },
+                    },
+                },
+            }
         },
         socialLinks: [
           { icon: "github", link: "https://github.com/runatlantis/atlantis" },
