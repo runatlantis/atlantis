@@ -20,9 +20,11 @@ jobs:
           l_max_size: '10000'
           xl_label: 'size/xl'
           fail_if_xl: 'false'
-          message_if_xl: >
-            This PR exceeds the recommended size of 1000 lines.
-            Please make sure you are NOT addressing multiple issues with one PR.
-            Note this PR might be rejected due to its size.
+          # An empty string disables this
+          message_if_xl: ''
           github_api_url: 'https://api.github.com'
-          files_to_ignore: ''
+          files_to_ignore: |
+            "package-lock.json"
+            "go.sum"
+            "runatlantis.io/*"
+            "pnpm-lock.yml"
