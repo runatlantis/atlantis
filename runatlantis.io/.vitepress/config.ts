@@ -50,6 +50,20 @@ export default defineConfig({
         ['meta', { name: 'msapplication-square310x310logo', content: '/mstile-310x310.png' }],
         ['link', { rel: 'stylesheet', sizes: '152x152', href: 'https://fonts.googleapis.com/css?family=Lato:400,900' }],
         ['meta', { name: 'google-site-verification', content: 'kTnsDBpHqtTNY8oscYxrQeeiNml2d2z-03Ct9wqeCeE' }],
+        // google analytics
+        [
+            'script',
+            { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=UA-6850151-3' }
+        ],
+        [
+            'script',
+            {},
+            `window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'UA-6850151-3');`
+        ]
     ],
     vite: {
         server: {
