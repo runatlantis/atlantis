@@ -18,7 +18,7 @@ const en = [
   { text: "Home", link: "/"},
   { text: "Guide", link: "/guide/introduction" },
   { text: "Docs", link: "/docs/installation-guide" },
-  { text: "Contributing", link: "/contributing/" },
+  { text: "Contributing", link: "/contributing" },
   { text: "Blog", link: "https://medium.com/runatlantis" },
 ];
 
