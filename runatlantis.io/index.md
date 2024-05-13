@@ -37,7 +37,7 @@ features:
     details: "Your credentials remain secure. Deployable on VMs, Kubernetes, Fargate, etc. Supports GitHub, GitLab, Bitbucket, Azure DevOps."
     icon: ⚙️
   - title: Open Source
-    details: "A CNCF project with a strong community. Contribute and collaborate on GitHub to shape the future of Terraform automation."
+    details: "Atlantis is an open source project with strong community support, powered by volunteer contributions."
     icon: 🌐
 
 ---
