@@ -8,7 +8,7 @@
     "vitepress": "^1.1.4"
   },
   "scripts": {
-    "website:dev": "vitepress dev runatlantis.io",
+    "website:dev": "vitepress dev --host localhost runatlantis.io",
     "website:build": "vitepress build runatlantis.io",
     "e2e": "playwright test"
   }
