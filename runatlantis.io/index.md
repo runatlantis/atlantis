@@ -1,167 +1,43 @@
 ---
 # https://vitepress.dev/reference/default-theme-home-page
-layout: page
-sidebar: false
+layout: home
 
-title: Atlantis
-description: Terraform Pull Request Automation
+pageClass: home-custom
+
+hero:
+  name: Atlantis
+  text: Terraform Pull Request Automation
+  tagline: Running Terraform Workflows with Ease
+  image: /hero.png
+  actions:
+    - theme: brand
+      text: Get Started
+      link: /guide/introduction
+    - theme: alt
+      text: What is Atlantis?
+      link: https://medium.com/runatlantis/introducing-atlantis-6570d6de7281
+    - theme: alt
+      text: View on GitHub
+      link: https://github.com/runatlantis/atlantis
+
+features:
+  - title: Fewer Mistakes
+    details: "Catch errors in Terraform plan output before applying changes. Ensure changes are applied before merging."
+    icon: ✅
+  - title: Empower Developers
+    details: "Developers can safely submit Terraform pull requests without credentials. Require approvals for applies."
+    icon: 💻
+  - title: Instant Audit Logs
+    details: "Detailed logs for infrastructure changes, approvals, and user actions. Configure approvals for production changes."
+    icon: 📋
+  - title: Proven at Scale
+    details: "Used by top companies to manage over 600 repos with 300 developers. In production since 2017."
+    icon: 🌍
+  - title: Self-Hosted
+    details: "Your credentials remain secure. Deployable on VMs, Kubernetes, Fargate, etc. Supports GitHub, GitLab, Bitbucket, Azure DevOps."
+    icon: ⚙️
+  - title: Open Source
+    details: "A CNCF project with a strong community. Contribute and collaborate on GitHub to shape the future of Terraform automation."
+    icon: 🌐
+
 ---
-
-<!-- create hero image for atlantis use plain vue script -->
-<div class="home">
-  <div class="hero">
-    <img src="/hero.png" alt="hero">
-    <h1>Atlantis</h1>
-    <p class="description">
-      Terraform Pull Request Automation
-    </p>
-    <p class="action">
-      <a href="/guide/introduction" class="nav-link action-button">Get Started →</a>
-    </p>
-  </div>
-</div>
-
-<div class="workflow-container">
-  <div class="workflow">
-    <h1>The Atlantis Workflow</h1>
-    <img src="/mobile-workflow-min.png" class="mobile" alt="Atlantis Workflow">
-    <img src="/workflow-min.png" class="desktop" alt="Atlantis Workflow">
-  </div>
-</div>
-
-<div class="benefits-container">
-  <div class="benefit-container -dark">
-    <div class="title">
-      <h1>Benefits</h1>
-    </div>
-    <div class="benefit">
-      <div class="item">
-        <div class="description">
-          <h2>Fewer Mistakes</h2>
-          <p>Bring the benefits of <strong>code review</strong> to your operations
-            workflow.</p>
-          <ul>
-            <li><img class="checkmark" src="/checkmark.svg">Catch errors in
-              the Terraform plan output before it's applied.
-            </li>
-            <li><img class="checkmark" src="/checkmark.svg">Ensure that you
-              apply changes before merging to main.
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div class="item image">
-        <div class="image">
-          <img src="/list.svg">
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="benefit-container">
-    <div class="benefit">
-      <div class="item image">
-        <div class="image">
-          <img src="/coding.svg">
-        </div>
-      </div>
-      <div class="item">
-        <div class="description">
-          <h2>Put the <span style="text-decoration: underline">Dev</span> back into DevOps</h2>
-          <p>Empower your developers to write Terraform. <strong>Safely.</strong></p>
-          <ul>
-            <li><img class="checkmark" src="/checkmark.svg">Developers can
-              submit Terraform pull requests without needing credentials.
-            </li>
-            <li><img class="checkmark" src="/checkmark.svg">Operators can
-              require approvals prior to allowing an apply.
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="benefit-container -dark">
-    <div class="benefit">
-      <div class="item">
-        <div class="description">
-          <h2>Instant Audit Logs And Compliance</h2>
-          <p>Pass audits without compromising your workflow.</p>
-          <ul>
-            <li><img class="checkmark" src="/checkmark.svg">Each pull request now holds a detailed log of what infrastructure changes were made and when; along with who made the change and who approved it.
-            </li>
-            <li><img class="checkmark" src="/checkmark.svg">Atlantis can be configured to require approvals on every production change.
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div class="item image">
-        <div class="image">
-          <img src="/certificate.svg">
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="benefits-container">
-  <div class="benefit-container">
-    <h1 class="title">Proven at Scale</h1>
-    <div class="benefit">
-      <div class="item image">
-        <div class="image">
-          <img src="/powerful.svg">
-        </div>
-      </div>
-      <div class="item">
-        <div class="description">
-          <ul>
-            <li><img class="checkmark" src="/checkmark.svg">Used by one of the world's top companies to manage over 600 Terraform repos with 300 developers.
-            </li>
-            <li><img class="checkmark" src="/checkmark.svg">In production use since 2017.
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="benefits-container">
-  <div class="benefit-container">
-    <h1 class="title">How It Works</h1>
-    <div class="benefit">
-      <div class="item">
-        <div class="description">
-          <ul>
-            <li><img class="checkmark" src="/checkmark.svg">Atlantis is
-              self-hosted. Your credentials don't leave your infrastructure.
-            </li>
-            <li><img class="checkmark" src="/checkmark.svg">Runs as a Golang
-              binary or Docker image and can be deployed on VMs, Kubernetes,
-              Fargate, etc.
-            </li>
-            <li><img class="checkmark" src="/checkmark.svg">Listens for
-              webhooks from GitHub/GitLab/Bitbucket/Azure DevOps.
-            </li>
-            <li><img class="checkmark" src="/checkmark.svg">Runs terraform
-              commands remotely and comments back with their output.
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div class="item image">
-        <div class="image">
-          <img src="/hero.png">
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="home getting-started-footer">
-  <div class="hero">
-    <p class="action">
-      <a href="/guide/introduction" class="nav-link action-button">Get Started →</a>
-    </p>
-  </div>
-</div>
