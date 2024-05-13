@@ -6,7 +6,7 @@ issues, or writing code.
 
 :::tip Looking to get started or use Atlantis?
 If you're new, check out the [Guide](./guide.md) or the
-[Documentation](./docs/README.md).
+[Documentation](./docs.md).
 :::
 
 ### Next Steps
