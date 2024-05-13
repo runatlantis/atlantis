@@ -28,6 +28,7 @@ type RepoCfg struct {
 	AllowedRegexpPrefixes      []string            `yaml:"allowed_regexp_prefixes,omitempty"`
 	AbortOnExcecutionOrderFail *bool               `yaml:"abort_on_execution_order_fail,omitempty"`
 	RepoLocks                  *RepoLocks          `yaml:"repo_locks,omitempty"`
+	SilencePRComments          []string            `yaml:"silence_pr_comments,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
@@ -96,5 +97,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		EmojiReaction:              emojiReaction,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
 		RepoLocks:                  repoLocks,
+		SilencePRComments:          r.SilencePRComments,
 	}
 }
