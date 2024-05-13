@@ -5,7 +5,7 @@ can vary from writing documentation, helping the community on Slack, discussing
 issues, or writing code.
 
 :::tip Looking to get started or use Atlantis?
-If you're new, check out the [Guide](./guide/introduction.md) or the
+If you're new, check out the [Guide](./guide.md) or the
 [Documentation](./docs/README.md).
 :::
 

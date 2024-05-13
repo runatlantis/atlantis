@@ -12,7 +12,7 @@ hero:
   actions:
     - theme: brand
       text: Get Started
-      link: /guide/introduction
+      link: /guide
     - theme: alt
       text: What is Atlantis?
       link: https://medium.com/runatlantis/introducing-atlantis-6570d6de7281

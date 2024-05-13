@@ -1,15 +1,16 @@
 const en = [
   {
     text: "Guide",
+    link: "/guide",
     collapsed: false,
     items: [
-      { text: "Introduction", link: "/guide/introduction" },
       { text: "Test Drive", link: "/guide/test-drive" },
       { text: "Testing locally", link: "/guide/testing-locally" },
     ],
   },
   {
     text: "Docs",
+    link: "/docs",
     collapsed: true,
     items: [
       {
