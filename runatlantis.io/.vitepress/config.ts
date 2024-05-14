@@ -23,6 +23,10 @@ export default defineConfig({
         editLink: {
             pattern: 'https://github.com/runatlantis/atlantis/edit/main/runatlantis.io/:path'
         },
+        // headline "depth" the right nav will show for its TOC
+        //
+        // https://vitepress.dev/reference/frontmatter-config#outline
+        outline: [2, 3],
         search: {
             provider: 'algolia',
             options: {

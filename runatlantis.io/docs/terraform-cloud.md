@@ -11,7 +11,6 @@ Atlantis integrates seamlessly with Terraform Cloud and Terraform Enterprise, wh
 * A Private Installation of Terraform Enterprise
 
 Read the docs below :point_down: depending on your use-case.
-[[toc]]
 
 ## Using Atlantis With Free Remote State Storage
 To use Atlantis with Free Remote State Storage, you need to:

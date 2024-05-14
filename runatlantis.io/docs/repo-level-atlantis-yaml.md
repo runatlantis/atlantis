@@ -2,7 +2,6 @@
 An `atlantis.yaml` file specified at the root of a Terraform repo allows you
 to instruct Atlantis on the structure of your repo and set custom workflows.
 
-[[toc]]
 
 ## Do I need an atlantis.yaml file?
 `atlantis.yaml` files are only required if you wish to customize some aspect of Atlantis.
