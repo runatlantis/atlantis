@@ -14,12 +14,18 @@ importers:
       '@types/node':
         specifier: ^20.12.10
         version: 20.12.10
+      '@vueuse/core':
+        specifier: ^10.9.0
+        version: 10.9.0(vue@3.4.27)
       sass:
         specifier: ^1.77.0
         version: 1.77.0
       vitepress:
         specifier: ^1.1.4
         version: 1.1.4(@algolia/client-search@4.23.3)(@types/node@20.12.10)(postcss@8.4.38)(sass@1.77.0)(search-insights@2.13.0)
+      vue:
+        specifier: ^3.4.27
+        version: 3.4.27
 
 packages:
 

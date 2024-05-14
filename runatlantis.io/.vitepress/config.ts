@@ -89,6 +89,20 @@ export default defineConfig({
             gtag('js', new Date());
 
             gtag('config', 'UA-6850151-3');`
+        ],
+        [
+            'script',
+            { id: 'restore-banner-preference' },
+            `
+        (() => {
+          const restore = (key, cls, def = false) => {
+            const saved = localStorage.getItem(key);
+            if (saved ? saved !== 'false' && new Date() < saved : def) {
+              document.documentElement.classList.add(cls);
+            }
+          };
+          restore('survey-banner', 'banner-dismissed');
+        })();`,
         ]
     ],
     sitemap: {
