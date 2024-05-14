@@ -316,7 +316,7 @@ func (g *AzureDevopsClient) MergePull(logger logging.SimpleLogging, pull models.
 		return fmt.Errorf("the user %s is not found in the organization %s", g.UserName, owner)
 	}
 
-	imageURL := "https://github.com/runatlantis/atlantis/raw/main/runatlantis.io/.vuepress/public/hero.png"
+	imageURL := "https://github.com/runatlantis/atlantis/raw/main/runatlantis.io/.vitepress/public/hero.png"
 	id := azuredevops.IdentityRef{
 		Descriptor: &descriptor,
 		ID:         userID,

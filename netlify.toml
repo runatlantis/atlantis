@@ -1,7 +1,7 @@
 # Netlify Config, https://www.netlify.com/docs/netlify-toml-reference/
 [build]
   base    = "/"
-  publish = "runatlantis.io/.vuepress/dist/"
+  publish = "runatlantis.io/.vitepress/dist/"
   command = "pnpm website:build"
 
 [[redirects]]
