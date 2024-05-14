@@ -43,6 +43,8 @@ export default defineConfig({
             }
         },
         socialLinks: [
+          { icon: "slack", link: "https://join.slack.com/t/atlantis-community/shared_invite/zt-9xlxtxtc-CUSKB1ATt_sQy6um~LDPNw" },
+          { icon: "twitter", link: "https://twitter.com/runatlantis" },
           { icon: "github", link: "https://github.com/runatlantis/atlantis" },
         ],
     },

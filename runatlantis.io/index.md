@@ -17,8 +17,8 @@ hero:
       text: What is Atlantis?
       link: https://medium.com/runatlantis/introducing-atlantis-6570d6de7281
     - theme: alt
-      text: View on GitHub
-      link: https://github.com/runatlantis/atlantis
+      text: Join us on Slack
+      link: https://join.slack.com/t/atlantis-community/shared_invite/zt-9xlxtxtc-CUSKB1ATt_sQy6um~LDPNw
 
 features:
   - title: Fewer Mistakes
