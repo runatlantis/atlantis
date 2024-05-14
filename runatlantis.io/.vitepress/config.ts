@@ -1,3 +1,4 @@
+import { generateSitemap as sitemap } from "sitemap-ts"
 import { defineConfig } from 'vitepress';
 import * as navbars from "./navbars";
 import * as sidebars from "./sidebars";
@@ -54,6 +55,14 @@ export default defineConfig({
           { icon: "github", link: "https://github.com/runatlantis/atlantis" },
         ],
     },
+    // SEO Improvement - sitemap.xml & robots.txt
+    buildEnd: async ({ outDir }) => {
+        sitemap({
+            hostname: "https://www.runatlantis.io/",
+            outDir: outDir,
+            generateRobotsTxt: true,
+        })
+    },
     head: [
         ['link', { rel: 'icon', type: 'image/png', href: '/favicon-196x196.png', sizes: '196x196' }],
         ['link', { rel: 'icon', type: 'image/png', href: '/favicon-96x96.png', sizes: '96x96' }],
@@ -105,9 +114,6 @@ export default defineConfig({
         })();`,
         ]
     ],
-    sitemap: {
-        hostname: 'https://runatlantis.io'
-    },
     vite: {
         server: {
             fs: {
