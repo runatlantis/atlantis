@@ -98,7 +98,7 @@ const en = [
             {text: "Events Controller", link: "/contributing/events-controller"},
         ]
       },
-      {text: "Glossry", link: "/contributing/glossary"},
+      {text: "Glosssry", link: "/contributing/glossary"},
     ]
 
   }
