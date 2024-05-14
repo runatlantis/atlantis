@@ -6,7 +6,6 @@ workflows](custom-workflows.md#custom-run-command) in that they are run
 outside of Atlantis commands. Which means they do not surface their output
 back to the PR as a comment.
 
-
 ## Usage
 
 Post workflow hooks can only be specified in the Server-Side Repo Config under
@@ -42,7 +41,6 @@ have finished.
 
 In this example we use a custom workflow to generate cost estimates for each
 workflow using [Infracost](https://www.infracost.io/docs/integrations/cicd/#cicd-integrations), then create a summary report after all workflows have completed.
-
 
 ```yaml
 # repos.yaml
@@ -101,6 +99,7 @@ command](custom-workflows.md#custom-run-command).
 | shellArgs   | string | '-c'    | no       | The shell arguments to use for running the command |
 
 ::: tip Notes
+
 * `run` commands are executed with the following environment variables:
   * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
   * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.

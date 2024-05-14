@@ -9,7 +9,6 @@ workflows](custom-workflows.md#custom-run-command) in several ways.
 2. Pre workflow hooks are run outside of Atlantis commands. Which means
    they do not surface their output back to the PR as a comment.
 
-
 ## Usage
 
 Pre workflow hooks can only be specified in the Server-Side Repo Config under the
