@@ -6,7 +6,6 @@ workflows](custom-workflows.md#custom-run-command) in that they are run
 outside of Atlantis commands. Which means they do not surface their output
 back to the PR as a comment.
 
-[[toc]]
 
 ## Usage
 

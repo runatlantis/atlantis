@@ -2,7 +2,6 @@
 This page describes how to create credentials for your Git host (GitHub, GitLab, Gitea, Bitbucket, or Azure DevOps)
 
 that Atlantis will use to make API calls.
-[[toc]]
 
 ## Create an Atlantis user (optional)
 We recommend creating a new user named **@atlantis** (or something close) or using a dedicated CI user.

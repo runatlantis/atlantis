@@ -14,7 +14,6 @@ You can use following executable names.
 :::
 
 Currently, Atlantis supports the following commands.
-[[toc]]
 
 ---
 ## atlantis help

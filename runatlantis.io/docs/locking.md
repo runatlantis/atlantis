@@ -12,7 +12,6 @@ Which links them to the pull request that holds the lock.
 Only the directory in the repo and Terraform workspace are locked, not the whole repo.
 :::
 
-[[toc]]
 
 ## Why
 1. Because `atlantis apply` is being done before the pull request is merged, after

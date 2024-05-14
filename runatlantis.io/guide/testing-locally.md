@@ -8,7 +8,6 @@ If you want to set up a production-ready Atlantis installation, read [Deployment
 
 Steps:
 
-[[toc]]
 
 ## Install Terraform
 `terraform` needs to be in the `$PATH` for Atlantis.
