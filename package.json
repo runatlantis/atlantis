@@ -4,8 +4,10 @@
   "devDependencies": {
     "@playwright/test": "^1.44.0",
     "@types/node": "^20.12.10",
+    "@vueuse/core": "^10.9.0",
     "sass": "^1.77.0",
-    "vitepress": "^1.1.4"
+    "vitepress": "^1.1.4",
+    "vue": "^3.4.27"
   },
   "scripts": {
     "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
