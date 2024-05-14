@@ -20,6 +20,9 @@ export default defineConfig({
     },
     themeConfig: {
         // https://vitepress.dev/reference/default-theme-config
+        editLink: {
+            pattern: 'https://github.com/runatlantis/atlantis/edit/main/runatlantis.io/:path'
+        },
         search: {
             provider: 'algolia',
             options: {
