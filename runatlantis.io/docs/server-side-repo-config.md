@@ -4,7 +4,6 @@ A Server-Side Config file is used for more groups of server config that can't re
 One such usecase is to control per-repo behaviour
 and what users can do in repo-level `atlantis.yaml` files.
 
-[[toc]]
 
 ## Do I Need A Server-Side Config File?
 You do not need a server-side repo config file unless you want to customize

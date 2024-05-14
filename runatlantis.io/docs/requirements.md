@@ -2,7 +2,6 @@
 Atlantis works with most Git hosts and Terraform setups. Read on to confirm
 it works with yours.
 
-[[toc]]
 
 ## Git Host
 Atlantis integrates with the following Git hosts:

@@ -8,7 +8,6 @@ Atlantis needs to receive Webhooks from your Git host so that it can respond to 
 :::
 
 See the instructions for your specific provider below.
-[[toc]]
 
 ## GitHub/GitHub Enterprise
 You can install your webhook at the [organization](https://docs.github.com/en/get-started/learning-about-github/types-of-github-accounts) level, or for each individual repository.

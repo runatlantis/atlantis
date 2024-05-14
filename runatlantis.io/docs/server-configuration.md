@@ -4,7 +4,6 @@ This page explains how to configure the `atlantis server` command.
 Configuration to `atlantis server` can be specified via command line flags,
  environment variables, a config file or a mix of the three.
 
-[[toc]]
 
 ## Environment Variables
 All flags can be specified as environment variables.

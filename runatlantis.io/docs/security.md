@@ -1,5 +1,4 @@
 # Security
-[[toc]]
 ## Exploits
 Because you usually run Atlantis on a server with credentials that allow access to your infrastructure it's important that you deploy Atlantis securely.
 

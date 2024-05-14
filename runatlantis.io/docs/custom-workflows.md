@@ -3,7 +3,6 @@
 Custom workflows can be defined to override the default commands that Atlantis
 runs.
 
-[[toc]]
 
 ## Usage
 Custom workflows can be specified in the Server-Side Repo Config or in the Repo-Level

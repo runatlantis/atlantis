@@ -6,7 +6,6 @@ This page covers getting Atlantis up and running in your infrastructure.
 * You have created a [webhook secret](webhook-secrets.md)
 :::
 
-[[toc]]
 
 ## Architecture Overview
 ### Runtime
