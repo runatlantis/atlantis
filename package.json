@@ -6,6 +6,7 @@
     "@types/node": "^20.12.10",
     "@vueuse/core": "^10.9.0",
     "sass": "^1.77.0",
+    "sitemap-ts": "^1.6.1",
     "vitepress": "^1.1.4",
     "vue": "^3.4.27"
   },
