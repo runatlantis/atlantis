@@ -7,10 +7,13 @@
     "@vueuse/core": "^10.9.0",
     "sass": "^1.77.0",
     "vitepress": "^1.1.4",
-    "vue": "^3.4.27"
+    "vue": "^3.4.27",
+    "markdownlint-cli": "^0.40.0"
   },
   "scripts": {
     "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
+    "website:lint": "markdownlint runatlantis.io",
+    "website:lint-fix": "markdownlint --fix runatlantis.io",
     "website:build": "vitepress build runatlantis.io",
     "e2e": "playwright test"
   }
