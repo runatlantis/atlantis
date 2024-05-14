@@ -31,22 +31,21 @@ const en = [
         collapsed: true,
         items: [
           { text: "Overview", link: "/docs/configuring-atlantis" },
-          "/docs/configuring-atlantis",
-          "/docs/server-configuration",
-          "/docs/server-side-repo-config",
-          "/docs/pre-workflow-hooks",
-          "/docs/post-workflow-hooks",
-          "/docs/policy-checking",
-          "/docs/custom-workflows",
-          "/docs/repo-level-atlantis-yaml",
-          "/docs/upgrading-atlantis-yaml",
-          "/docs/command-requirements",
-          "/docs/checkout-strategy",
-          "/docs/terraform-versions",
-          "/docs/terraform-cloud",
-          "/docs/using-slack-hooks",
-          "/docs/stats",
-          "/docs/faq",
+          { text: "Server Configuration", link: "/docs/server-configuration" },
+          { text: "Server Side Repo Config", link: "/docs/server-side-repo-config" },
+          { text: "Pre Workflow Hooks", link: "/docs/pre-workflow-hooks" },
+          { text: "Post Workflow Hooks", link: "/docs/post-workflow-hooks" },
+          { text: "Conftest Policy Checking", link: "/docs/policy-checking" },
+          { text: "Custom Workflows", link: "/docs/custom-workflows" },
+          { text: "Repo Level atlantis.yaml", link: "/docs/repo-level-atlantis-yaml" },
+          { text: "Upgrading atlantis.yaml", link: "/docs/upgrading-atlantis-yaml" },
+          { text: "Command Requirements", link: "/docs/command-requirements" },
+          { text: "Checkout Strategy", link: "/docs/checkout-strategy" },
+          { text: "Terraform Versions", link: "/docs/terraform-versions" },
+          { text: "Terraform Cloud", link: "/docs/terraform-cloud" },
+          { text: "Using Slack Hooks", link: "/docs/using-slack-hooks" },
+          { text: "Stats", link: "/docs/stats" },
+          { text: "FAQ", link: "/docs/faq" },
         ]
       },
       {
@@ -54,35 +53,29 @@ const en = [
         collapsed: true,
         items: [
           { text: "Overview", link: "/docs/using-atlantis" },
-          "/docs/api-endpoints",
+          { text: "API endpoints", link: "/docs/api-endpoints" },
         ]
       },
       {
         text: 'How Atlantis Works',
         collapsed: true,
         items: [
-          {
-              text: 'Overview',
-              link: '/docs/how-atlantis-works',
-          },
-          '/docs/locking',
-          '/docs/autoplanning',
-          '/docs/automerging',
-          '/docs/security',
+          { text: 'Overview', link: '/docs/how-atlantis-works', },
+          { text: 'Locking', link: '/docs/locking', },
+          { text: 'Autoplanning', link: '/docs/autoplanning', },
+          { text: 'Automerging', link: '/docs/automerging', },
+          { text: 'Security', link: '/docs/security', },
         ]
       },
       {
         text: 'Real-time Terraform Logs',
-        collapsed: true,
-        items: [
-          '/docs/streaming-logs',
-        ]
+        link: '/docs/streaming-logs',
       },
       {
         text: 'Troubleshooting',
         collapsed: true,
         items: [
-          '/docs/troubleshooting',
+          { text: 'HTTPS, SSL, TLS', 'link': '/docs/troubleshooting-https', },
         ]
       },
     ],
@@ -95,13 +88,13 @@ const en = [
       {
         text: 'Implementation Details',
         items: [
-            {text: "Events Controller", link: "/contributing/events-controller"},
+          { text: "Events Controller", link: "/contributing/events-controller" },
         ]
       },
-      {text: "Glossry", link: "/contributing/glossary"},
+      { text: "Glossary", link: "/contributing/glossary" },
     ]
 
   }
-];
+]
 
-export { en };
+export { en }

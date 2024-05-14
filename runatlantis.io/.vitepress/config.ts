@@ -1,3 +1,4 @@
+import { generateSitemap as sitemap } from "sitemap-ts"
 import { defineConfig } from 'vitepress';
 import * as navbars from "./navbars";
 import * as sidebars from "./sidebars";
@@ -20,6 +21,13 @@ export default defineConfig({
     },
     themeConfig: {
         // https://vitepress.dev/reference/default-theme-config
+        editLink: {
+            pattern: 'https://github.com/runatlantis/atlantis/edit/main/runatlantis.io/:path'
+        },
+        // headline "depth" the right nav will show for its TOC
+        //
+        // https://vitepress.dev/reference/frontmatter-config#outline
+        outline: [2, 3],
         search: {
             provider: 'algolia',
             options: {
@@ -46,6 +54,14 @@ export default defineConfig({
           { icon: "twitter", link: "https://twitter.com/runatlantis" },
           { icon: "github", link: "https://github.com/runatlantis/atlantis" },
         ],
+    },
+    // SEO Improvement - sitemap.xml & robots.txt
+    buildEnd: async ({ outDir }) => {
+        sitemap({
+            hostname: "https://www.runatlantis.io/",
+            outDir: outDir,
+            generateRobotsTxt: true,
+        })
     },
     head: [
         ['link', { rel: 'icon', type: 'image/png', href: '/favicon-196x196.png', sizes: '196x196' }],
@@ -82,11 +98,22 @@ export default defineConfig({
             gtag('js', new Date());
 
             gtag('config', 'UA-6850151-3');`
+        ],
+        [
+            'script',
+            { id: 'restore-banner-preference' },
+            `
+        (() => {
+          const restore = (key, cls, def = false) => {
+            const saved = localStorage.getItem(key);
+            if (saved ? saved !== 'false' && new Date() < saved : def) {
+              document.documentElement.classList.add(cls);
+            }
+          };
+          restore('survey-banner', 'banner-dismissed');
+        })();`,
         ]
     ],
-    sitemap: {
-        hostname: 'https://runatlantis.io'
-    },
     vite: {
         server: {
             fs: {

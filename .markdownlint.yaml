@@ -1,0 +1,33 @@
+# MD013/line-length
+#
+# We're not particular about line length, generally preferring longer
+# lines, since tools like Grammarly and other writing assistance tools
+# work best with "normal" lines not broken up arbitrary.
+#
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/md013.md
+MD013: false
+
+# MD033/no-inline-html
+#
+# We're fine with inline HTML, there are lots of valid VitePress features
+# that depends on this.
+#
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/md033.md
+MD033: false
+
+# MD024/no-duplicate-heading
+#
+# VitePress do not follow GitHub heading styling, so duplicate headlines
+# are fine as long as they are not siblings (aka same indention hierarchy)
+#
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/md024.md
+MD024:
+  siblings_only: true
+
+# MD051/link-fragments
+#
+# VitePress generate these differently that markdownlint expects, so disabling
+# for now, and something to improve on later (cc @jippi)
+#
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/md051.md
+MD051: false
