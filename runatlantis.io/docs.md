@@ -8,6 +8,7 @@ where you can try our [Test Drive](./guide/test-drive.md) or [Run Atlantis Local
 :::
 
 ### Next Steps
+
 * [Installing Atlantis](./docs/installation-guide.md)&nbsp;&nbsp;–&nbsp;&nbsp;Get Atlantis up and running
 * [Configuring Atlantis](./docs/configuring-atlantis.md)&nbsp;&nbsp;–&nbsp;&nbsp;Configure how Atlantis works for your specific use-cases
 * [Using Atlantis](./docs/using-atlantis.md)&nbsp;&nbsp;–&nbsp;&nbsp;How do you use Atlantis?
