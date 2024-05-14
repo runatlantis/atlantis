@@ -1,4 +1,4 @@
-const { test } = require('@playwright/test');
+import { test } from '@playwright/test';
 
 test('page should load without errors', async ({ page }) => {
   // Listen for any errors that occur within the page

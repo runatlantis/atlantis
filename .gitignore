@@ -30,8 +30,10 @@ tmp-CHANGELOG.md
 # draw.io backup files
 *.bkp
 
-# vuepress
-**/.vuepress/*
-!runatlantis.io/.vuepress/config.*
-!runatlantis.io/.vuepress/navbar.*
-!runatlantis.io/.vuepress/sidebar.*
+# VitePress build output & cache directory
+**/.vitepress/cache
+**/.vitepress/dist
+**/.vitepress/config.ts.timestamp-*
+
+# playwright
+test-results/

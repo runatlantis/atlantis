@@ -148,13 +148,13 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
         <li>Click <strong>Add webhook &gt; Gitea</strong> (Gitea webhooks are service specific, but this works)</li>
         <li>set <strong>Target URL</strong> to <code>http://$URL/events</code> (or <code>https://$URL/events</code> if you're using SSL) where <code>$URL</code> is where Atlantis is hosted. <strong>Be sure to add <code>/events</code></strong></li>
         <li>double-check you added <code>/events</code> to the end of your URL.</li>
-        <li>set <strong>Secret</strong> to the Webhook Secret you generated previously 
+        <li>set <strong>Secret</strong> to the Webhook Secret you generated previously
         <ul>
             <li><strong>NOTE</strong> If you're adding a webhook to multiple repositories, each repository will need to use the <strong>same</strong> secret.</li>
         </ul>
         </li>
         <li>Select <strong>Custom Events...</strong></li>
-        <li>Check the boxes 
+        <li>Check the boxes
             <ul>
                 <li><strong>Repository events &gt; Push</strong></li>
                 <li><strong>Issue events &gt; Issue Comment</strong></li>
@@ -207,7 +207,7 @@ TOKEN="{YOUR_TOKEN}"
 - Click **Create token**
 - Name the token **atlantis**
 - Give the token **Read** Project permissions and **Write** Pull request permissions
-- Choose an Expiry option **Do not expire** or **Expire automatically** 
+- Choose an Expiry option **Do not expire** or **Expire automatically**
 - Click **Create** and set the token as an environment variable
 ```
 TOKEN="{YOUR_TOKEN}"
@@ -315,7 +315,7 @@ atlantis server \
 --ssl-key-file=file.key
 ```
 
-### Gitea 
+### Gitea
 
 ```bash
 atlantis server \
@@ -372,4 +372,4 @@ links to the log-streaming UI. This is a terminal UI where you can view your com
 * Hopefully Atlantis is working with your repo and you're ready to move on to a [production-ready deployment](../docs/deployment.md).
 * If it's not working as expected, you may need to customize how Atlantis runs with an `atlantis.yaml` file.
 See [atlantis.yaml use cases](../docs/repo-level-atlantis-yaml.md#use-cases).
-* Check out our [full documentation](../docs/README.md) for more details.
+* Check out our [full documentation](../docs.md) for more details.
