@@ -59,6 +59,7 @@ RUN apt-get update && \
         unzip \
         openssh-server \
         dumb-init \
+        gosu \
         gnupg \
         openssl && \
     apt-get clean && \
@@ -164,10 +165,13 @@ RUN apk add --no-cache \
         bash~=5 \
         openssh~=9 \
         dumb-init~=1 \
-        gcompat~=1
+        gcompat~=1 \
+        su-exec~=0
 
-# Set the entry point to the atlantis user and run the atlantis command
-USER atlantis
+# Symlink su-exec to gosu for compatibility
+RUN ln -s /sbin/su-exec /sbin/gosu
+
+# Set the entry point and run the atlantis command
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
 
@@ -192,10 +196,10 @@ COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
+COPY --from=deps /usr/sbin/gosu /usr/sbin/gosu
 # copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# Set the entry point to the atlantis user and run the atlantis command
-USER atlantis
+# Set the entry point and run the atlantis command
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]

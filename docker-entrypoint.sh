@@ -54,4 +54,4 @@ else
   echo "No files found in /docker-entrypoint.d/, skipping"
 fi
 
-exec "$@"
+exec gosu atlantis "$@"
