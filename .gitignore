@@ -34,3 +34,6 @@ tmp-CHANGELOG.md
 **/.vitepress/cache
 **/.vitepress/dist
 **/.vitepress/config.ts.timestamp-*
+
+# playwright
+test-results/
