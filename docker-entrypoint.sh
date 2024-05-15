@@ -54,9 +54,9 @@ else
   echo "No files found in /docker-entrypoint.d/, skipping"
 fi
 
-# If we're running as root and we're trying to execute atlantis then we use
-# gosu (or su-exec which we symlinked to gosu) to step down from root and run as the atlantis user.
-if [ "$(id -u)" = 0 ] && [ "$1" = 'atlantis' ]; then
+# If we're running as root, then we use gosu (or su-exec which we symlinked to gosu) 
+# to step down from root and run as the atlantis user.
+if [ "$(id -u)" = 0 ]; then
   set -- gosu atlantis "$@"
 fi
 
