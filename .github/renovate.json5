@@ -79,7 +79,12 @@
         '(^|/)Dockerfile\\.[^/]*$',
       ],
       matchStrings: [
-        'renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\sENV .*?_VERSION=(?<currentValue>.*)\\s',
+        // example:
+        // # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
+        // ENV DEFAULT_TERRAFORM_VERSION=x.x.x
+        // # renovate: datasource=github-releases depName=open-policy-agent/conftest
+        // ARG DEFAULT_CONFTEST_VERSION=x.x.x
+        "renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION=(?<currentValue>.*)\\s",
       ],
       versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}',
       extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',
