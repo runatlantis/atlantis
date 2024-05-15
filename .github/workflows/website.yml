@@ -48,6 +48,12 @@ jobs:
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4
 
+      - name: markdown-lint
+        uses: DavidAnson/markdownlint-cli2-action@b4c9feab76d8025d1e83c653fa3990936df0e6c8 # v16
+        with:
+          config: .markdownlint.yaml
+          globs: 'runatlantis.io/**/*.md'
+
       - uses: wyvox/action-setup-pnpm@6597ef5c1300fe08efa6bc75e6141f7153e2b4cc # v3
         with:
           node-version: 20
@@ -65,7 +71,7 @@ jobs:
           pnpm website:build
 
           # start http-server for integration testing
-          npx http-server runatlantis.io/.vuepress/dist &
+          npx http-server runatlantis.io/.vitepress/dist &
 
       - name: Run Playwright E2E tests
         run: |

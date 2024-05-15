@@ -51,6 +51,7 @@ documentation.
 - [GitHub Pull Request](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request)
 - [GitLab Merge Request](https://docs.gitlab.com/ee/user/project/integrations/webhook_events.html#merge-request-events)
 - [Gitea Webhooks](https://docs.gitea.com/next/usage/webhooks)
+
 </details>
 
 The following list shows the supported events:

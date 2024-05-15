@@ -1,16 +1,17 @@
 # Repo Level atlantis.yaml Config
+
 An `atlantis.yaml` file specified at the root of a Terraform repo allows you
 to instruct Atlantis on the structure of your repo and set custom workflows.
 
-[[toc]]
-
 ## Do I need an atlantis.yaml file?
+
 `atlantis.yaml` files are only required if you wish to customize some aspect of Atlantis.
 The default Atlantis config works for many users without changes.
 
 Read through the [use-cases](#use-cases) to determine if you need it.
 
 ## Enabling atlantis.yaml
+
 By default, all repos are allowed to have an `atlantis.yaml` file,
 but some of the keys are restricted by default.
 
@@ -19,7 +20,8 @@ You can enable `atlantis.yaml` to override restricted
 keys by setting the `allowed_overrides` key there. See the [Server Side Repo Config](server-side-repo-config.md) for
 more details.
 
-**Notes**
+**Notes:**
+
 * By default, repo root `atlantis.yaml` file is used.
 * You can change this behaviour by setting [Server Side Repo Config](server-side-repo-config.md)
 
@@ -147,7 +149,9 @@ grep -P 'backend[\s]+"s3"' **/*.tf |
 ```
 
 ## Use Cases
+
 ### Disabling Autoplanning
+
 ```yaml
 version: 3
 projects:
@@ -155,6 +159,7 @@ projects:
   autoplan:
     enabled: false
 ```
+
 This will stop Atlantis automatically running plan when `project1/` is updated
 in a pull request.
 
@@ -178,7 +183,7 @@ Parallel plans and applies work across both multiple directories and multiple wo
 
 Given the directory structure:
 
-```
+```plain
 .
 ├── modules
 │   └── module1
@@ -193,7 +198,6 @@ Given the directory structure:
 
 If you want Atlantis to plan `project1/` whenever any `.tf` files under `module1/` change or any `.tf` or `.tfvars` files under `project1/` change you could use the following configuration:
 
-
 ```yaml
 version: 3
 projects:
@@ -203,12 +207,14 @@ projects:
 ```
 
 Note:
+
 * `when_modified` uses the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
 * The paths are relative to the project's directory.
 * `when_modified` will be used by both automatic and manually run plans.
 * `when_modified` will continue to work for manually run plans even when autoplan is disabled.
 
 ### Supporting Terraform Workspaces
+
 ```yaml
 version: 3
 projects:
@@ -217,34 +223,44 @@ projects:
 - dir: project1
   workspace: production
 ```
+
 With the above config, when Atlantis determines that the configuration for the `project1` dir has changed,
 it will run plan for both the `staging` and `production` workspaces.
 
 If you want to `plan` or `apply` for a specific workspace you can use
-```
+
+```shell
 atlantis plan -w staging -d project1
 ```
+
 and
-```
+
+```shell
 atlantis apply -w staging -d project1
 ```
 
 ### Using .tfvars files
+
 See [Custom Workflow Use Cases: Using .tfvars files](custom-workflows.md#tfvars-files)
 
 ### Adding extra arguments to Terraform commands
+
 See [Custom Workflow Use Cases: Adding extra arguments to Terraform commands](custom-workflows.md#adding-extra-arguments-to-terraform-commands)
 
 ### Custom init/plan/apply Commands
+
 See [Custom Workflow Use Cases: Custom init/plan/apply Commands](custom-workflows.md#custom-init-plan-apply-commands)
 
 ### Terragrunt
+
 See [Custom Workflow Use Cases: Terragrunt](custom-workflows.md#terragrunt)
 
 ### Running custom commands
+
 See [Custom Workflow Use Cases: Running custom commands](custom-workflows.md#running-custom-commands)
 
 ### Terraform Versions
+
 If you'd like to use a different version of Terraform than what is in Atlantis'
 `PATH` or is set by the `--default-tf-version` flag, then set the `terraform_version` key:
 
@@ -258,7 +274,9 @@ projects:
 Atlantis will automatically download and use this version.
 
 ### Requiring Approvals For Production
+
 In this example, we only want to require `apply` approvals for the `production` directory.
+
 ```yaml
 version: 3
 projects:
@@ -268,12 +286,14 @@ projects:
   apply_requirements: [approved]
   import_requirements: [approved]
 ```
+
 :::warning
 `plan_requirements`, `apply_requirements` and `import_requirements` are restricted keys so this repo will need to be configured
 to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-side-repo-config.md#repos-can-set-their-own-apply-an-applicable-subcommand).
 :::
 
 ### Order of planning/applying
+
 ```yaml
 version: 3
 abort_on_execution_order_fail: true
@@ -283,12 +303,13 @@ projects:
 - dir: project2
   execution_order_group: 1
 ```
+
 With this config above, Atlantis runs planning/applying for project2 first, then for project1.
 Several projects can have same `execution_order_group`. Any order in one group isn't guaranteed.
 `parallel_plan` and `parallel_apply` respect these order groups, so parallel planning/applying works
-in each group one by one. 
+in each group one by one.
 
-If any plan/apply fails and `abort_on_execution_order_fail` is set to true on a repo level, all the 
+If any plan/apply fails and `abort_on_execution_order_fail` is set to true on a repo level, all the
 following groups will be aborted. For this example, if project2 fails then project1 will not run.
 
 Execution order groups are useful when you have dependencies between projects. However, they are only applicable in the case where
@@ -296,6 +317,7 @@ you initiate a global apply for all of your projects, i.e `atlantis apply`. If y
 Thus, the `depends_on` key is more useful in this case. and can be used in conjunction with execution order groups.
 
 The following configuration is an example of how to use execution order groups and depends_on together to enforce dependencies between projects.
+
 ```yaml
 version: 3
 projects:
@@ -323,6 +345,7 @@ projects:
   workspace: production
   workflow: infra
 ```
+
 the `depends_on` feature will make sure that `production` is not applied before `staging` for example.
 
 ::: tip
@@ -331,11 +354,14 @@ What Happens if one or more project's dependencies are not applied?
 If there's one or more projects in the dependency list which is not in applied status, users will see an error message like this:
 `Can't apply your project unless you apply its dependencies`
 :::
+
 ### Autodiscovery Config
+
 ```yaml
 autodiscover:
   mode: "auto"
 ```
+
 The above is the default configuration for `autodiscover.mode`. When `autodiscover.mode` is auto,
 projects will be discovered only if the repo has no `projects` configured.
 
@@ -343,6 +369,7 @@ projects will be discovered only if the repo has no `projects` configured.
 autodiscover:
   mode: "disabled"
 ```
+
 With the config above, Atlantis will never try to discover projects, even when there are no
 `projects` configured. This is useful if dynamically generating Atlantis config in pre_workflow hooks.
 See [Dynamic Repo Config Generation](pre-workflow-hooks.md#dynamic-repo-config-generation).
@@ -351,6 +378,7 @@ See [Dynamic Repo Config Generation](pre-workflow-hooks.md#dynamic-repo-config-g
 autodiscover:
   mode: "enabled"
 ```
+
 With the config above, Atlantis will unconditionally try to discover projects based on modified_files,
 even when the directory of the project is missing from the configured `projects` in the repo configuration.
 If a discovered project has the same directory as a project which was manually configured in `projects`,
@@ -360,10 +388,13 @@ Use this feature when some projects require specific configuration in a repo wit
 it's still desirable for Atlantis to plan/apply for projects not enumerated in the config.
 
 ### Custom Backend Config
+
 See [Custom Workflow Use Cases: Custom Backend Config](custom-workflows.md#custom-backend-config)
 
 ## Reference
+
 ### Top-Level Keys
+
 ```yaml
 version: 3
 automerge: false
@@ -372,6 +403,7 @@ projects:
 workflows:
 allowed_regexp_prefixes:
 ```
+
 | Key                           | Type                                                   | Default | Required | Description                                                                                                                        |
 |-------------------------------|--------------------------------------------------------|---------|----------|------------------------------------------------------------------------------------------------------------------------------------|
 | version                       | int                                                    | none    | **yes**  | This key is required and must be set to `3`.                                                                                       |
@@ -379,9 +411,10 @@ allowed_regexp_prefixes:
 | delete_source_branch_on_merge | bool                                                   | `false` | no       | Automatically deletes the source branch on merge.                                                                                  |
 | projects                      | array[[Project](repo-level-atlantis-yaml.md#project)]  | `[]`    | no       | Lists the projects in this repo.                                                                                                   |
 | workflows<br />*(restricted)* | map[string: [Workflow](custom-workflows.md#reference)] | `{}`    | no       | Custom workflows.                                                                                                                  |
-| allowed_regexp_prefixes       | array[string]                                          | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.md#enable-regexp-cmd) flag is used. |
+| allowed_regexp_prefixes       | array\[string\]                                          | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.md#enable-regexp-cmd) flag is used. |
 
 ### Project
+
 ```yaml
 name: myname
 branch: /mybranch/
@@ -411,9 +444,9 @@ workflow: myworkflow
 | custom_policy_check                      | bool                  | `false`     | no       | Enable using policy check tools other than Conftest                                                                                                                                                                                     |
 | autoplan                                 | [Autoplan](#autoplan) | none        | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.md).                                                                                                                   |
 | terraform_version                        | string                | none        | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                                            |
-| plan_requirements<br />*(restricted)*    | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.   |
-| apply_requirements<br />*(restricted)*   | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.  |
-| import_requirements<br />*(restricted)*  | array[string]         | none        | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
+| plan_requirements<br />*(restricted)*    | array\[string\]         | none        | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.   |
+| apply_requirements<br />*(restricted)*   | array\[string\]         | none        | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.  |
+| import_requirements<br />*(restricted)*  | array\[string\]         | none        | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
 | workflow <br />*(restricted)*            | string                | none        | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                                            |
 
 ::: tip
@@ -423,11 +456,13 @@ Atlantis supports this but requires the `name` key to be specified. See [Custom 
 :::
 
 ### Autoplan
+
 ```yaml
 enabled: true
 when_modified: ["*.tf", "terragrunt.hcl", ".terraform.lock.hcl"]
 ```
+
 | Key                   | Type          | Default        | Required | Description                                                                                                                                                                                                                                                     |
 |-----------------------|---------------|----------------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | enabled               | boolean       | `true`         | no       | Whether autoplanning is enabled for this project.                                                                                                                                                                                                               |
-| when_modified         | array[string] | `["**/*.tf*"]` | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.md). Paths are relative to the project's dir. |
+| when_modified         | array\[string\] | `["**/*.tf*"]` | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.md). Paths are relative to the project's dir. |
