@@ -30,14 +30,8 @@
   },
   packageRules: [
     {
-      matchPackageNames: [
-        'vuepress',
-        '@vuepress/client',
-        '@vuepress/markdown',
-        '@vuepress/utils',
-      ],
-      groupName: 'vuepress',
-      allowedVersions: '!/pre.*$/',
+      "matchFileNames": ["package.json"],
+      "enabled": false
     },
     {
       matchFileNames: [
@@ -105,6 +99,7 @@
       customType: 'regex',
       fileMatch: [
         '.circleci/config.yml$',
+        '^\\.github/workflows/[^/]+\\.ya?ml$',
       ],
       matchStrings: [
         'renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.*?_VERSION: (?<currentValue>.*)\\s',

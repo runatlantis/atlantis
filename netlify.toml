@@ -1,0 +1,33 @@
+# Netlify Config, https://www.netlify.com/docs/netlify-toml-reference/
+[build]
+  base    = "/"
+  publish = "runatlantis.io/.vitepress/dist/"
+  command = "pnpm website:build"
+
+[[redirects]]
+  from = "/guide/getting-started.html"
+  to = "/guide/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/docs/atlantis-yaml-reference.html"
+  to = "/docs/repo-level-atlantis-yaml.html"
+  status = 301
+  force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    Content-Security-Policy = "default-src 'self'; frame-src 'self' https://app.netlify.com; script-src 'self' https://*.google-analytics.com https://www.googletagmanager.com https://*.algolianet.com https://*.algolia.net 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com https://*.algolianet.com https://*.algolia.net 'unsafe-inline'; img-src 'self' https://*.google-analytics.com data:; font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; connect-src 'self' https://*.google-analytics.com https://www.googletagmanager.com https://*.algolianet.com https://*.algolia.net"
+    Cache-Control = "public, max-age=86400, must-revalidate"
+    Strict-Transport-Security = "max-age=86400; includeSubDomains; preload"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "*.html"
+  [headers.values]
+    Content-Type = "text/html; charset=UTF-8"
