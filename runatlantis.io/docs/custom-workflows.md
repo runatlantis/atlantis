@@ -3,23 +3,25 @@
 Custom workflows can be defined to override the default commands that Atlantis
 runs.
 
-[[toc]]
-
 ## Usage
+
 Custom workflows can be specified in the Server-Side Repo Config or in the Repo-Level
 `atlantis.yaml` files.
 
-**Notes**
-* If you want to allow repos to select their own workflows, they must have the
-`allowed_overrides: [workflow]` setting. See [server-side repo config use cases](server-side-repo-config.html#allow-repos-to-choose-a-server-side-workflow) for more details.
-* If in addition you also want to allow repos to define their own workflows, they must have the
-`allow_custom_workflows: true` setting. See [server-side repo config use cases](server-side-repo-config.html#allow-repos-to-define-their-own-workflows) for more details.
+**Notes:**
 
+* If you want to allow repos to select their own workflows, they must have the
+`allowed_overrides: [workflow]` setting. See [server-side repo config use cases](server-side-repo-config.md#allow-repos-to-choose-a-server-side-workflow) for more details.
+* If in addition you also want to allow repos to define their own workflows, they must have the
+`allow_custom_workflows: true` setting. See [server-side repo config use cases](server-side-repo-config.md#allow-repos-to-define-their-own-workflows) for more details.
 
 ## Use Cases
+
 ### .tfvars files
+
 Given the structure:
-```
+
+```plain
 .
 └── project1
     ├── main.tf
@@ -29,6 +31,7 @@ Given the structure:
 
 If you wanted Atlantis to automatically run plan with `-var-file staging.tfvars` and `-var-file production.tfvars`
 you could define two workflows:
+
 ```yaml
 # repos.yaml or atlantis.yaml
 workflows:
@@ -40,7 +43,7 @@ workflows:
           extra_args: ["-var-file", "staging.tfvars"]
     # NOTE: no need to define the apply stage because it will default
     # to the normal apply stage.
-    
+
   production:
     plan:
       steps:
@@ -62,7 +65,9 @@ workflows:
         - state_rm:
             extra_args: ["-lock=false"]
 ```
+
 Then in your repo-level `atlantis.yaml` file, you would reference the workflows:
+
 ```yaml
 # atlantis.yaml
 version: 3
@@ -80,20 +85,27 @@ workflows:
   # If you didn't define the workflows in your server-side repos.yaml config,
   # you would define them here instead.
 ```
+
 When you want to apply the plans, you can comment
-```
+
+```shell
 atlantis apply -p project1-staging
 ```
+
 and
-```
+
+```shell
 atlantis apply -p project1-production
 ```
+
 Where `-p` refers to the project name.
 
 ### Adding extra arguments to Terraform commands
+
 If you need to append flags to `terraform plan` or `apply` temporarily, you can
 append flags on a comment following `--`, for example commenting:
-```
+
+```shell
 atlantis plan -- -lock=false
 ```
 
@@ -117,7 +129,7 @@ workflows:
           extra_args: ["-lock=false"]
 ```
 
-If [policy checking](/docs/policy-checking.html#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
+If [policy checking](policy-checking.md#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
 
 ```yaml
 workflows:
@@ -130,6 +142,7 @@ workflows:
 ```
 
 ### Custom init/plan/apply Commands
+
 If you want to customize `terraform init`, `plan` or `apply` in ways that
 aren't supported by `extra_args`, you can completely override those commands.
 
@@ -147,11 +160,11 @@ workflows:
       - run:
           command: terraform init -input=false
           output: hide
-      
+
       # If you're using workspaces you need to select the workspace using the
       # $WORKSPACE environment variable.
       - run: terraform workspace select $WORKSPACE
-      
+
       # You MUST output the plan using -out $PLANFILE because Atlantis expects
       # plans to be in a specific location.
       - run: terraform plan -input=false -refresh -out $PLANFILE
@@ -162,14 +175,15 @@ workflows:
 ```
 
 ### CDKTF
+
 Here are the requirements to enable [CDKTF](https://developer.hashicorp.com/terraform/cdktf)
 
-- A custom image with `CDKTF` installed
-- Add `**/cdk.tf.json` to the list of Atlantis autoplan files.
-- Set the `atlantis-include-git-untracked-files` flag so that the Terraform files dynamically generated
+* A custom image with `CDKTF` installed
+* Add `**/cdk.tf.json` to the list of Atlantis autoplan files.
+* Set the `atlantis-include-git-untracked-files` flag so that the Terraform files dynamically generated
 by CDKTF will be add to the Atlantis modified file list.
-- Use `pre_workflow_hooks` to run `cdktf synth`
-- Optional: There isn't a requirement to use a repo `atlantis.yaml` but one can be leveraged if needed.
+* Use `pre_workflow_hooks` to run `cdktf synth`
+* Optional: There isn't a requirement to use a repo `atlantis.yaml` but one can be leveraged if needed.
 
 #### Custom Image
 
@@ -192,6 +206,7 @@ ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
 OR
 
 `atlantis server --config config.yaml`
+
 ```yaml
 # config.yaml
 autoplan-file-list: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/cdk.tf.json"
@@ -203,6 +218,7 @@ include-git-untracked-files: true
 Use `pre_workflow_hooks`
 
 `atlantis server --repo-config="repos.yaml"`
+
 ```yaml
 # repos.yaml
 repos:
@@ -234,7 +250,7 @@ $ tree --gitignore
 
 1. Container orchestrator (k8s/fargate/ecs/etc) uses the custom docker image of atlantis with `cdktf` installed with
 the `--autoplan-file-list` to trigger on `cdk.tf.json` files and `--include-git-untracked-files` set to include the
-CDKTF dynamically generated Terraform files in the Atlantis plan. 
+CDKTF dynamically generated Terraform files in the Atlantis plan.
 1. PR branch is pushed up containing `cdktf` code changes.
 1. Atlantis checks out the branch in the repo.
 1. Atlantis runs the `npm i && cdktf get && cdktf synth` command in the repo root as a step in `pre_workflow_hooks`,
@@ -243,6 +259,7 @@ generating the `cdk.tf.json` Terraform files.
 1. Atlantis then runs `terraform` workflows in the respective directories as usual.
 
 ### Terragrunt
+
 Atlantis supports running custom commands in place of the default Atlantis
 commands. We can use this functionality to enable
 [Terragrunt](https://github.com/gruntwork-io/terragrunt).
@@ -250,7 +267,8 @@ commands. We can use this functionality to enable
 You can either use your repo's `atlantis.yaml` file or the Atlantis server's `repos.yaml` file.
 
 Given a directory structure:
-```
+
+```plain
 .
 └── live
     ├── prod
@@ -315,6 +333,7 @@ workflows:
 ```
 
 If using the repo's `atlantis.yaml` file you would use the following config:
+
 ```yaml
 version: 3
 projects:
@@ -350,10 +369,9 @@ workflows:
 
 **NOTE:** If using the repo's `atlantis.yaml` file, you will need to specify each directory that is a Terragrunt project.
 
-
 ::: warning
 Atlantis will need to have the `terragrunt` binary in its PATH.
-If you're using Docker you can build your own image, see [Customization](/docs/deployment.html#customization).
+If you're using Docker you can build your own image, see [Customization](deployment.md#customization).
 :::
 
 If you don't want to create/manage the repo's `atlantis.yaml` file yourself, you can use the tool [terragrunt-atlantis-config](https://github.com/transcend-io/terragrunt-atlantis-config) to generate it.
@@ -361,6 +379,7 @@ If you don't want to create/manage the repo's `atlantis.yaml` file yourself, you
 The `terragrunt-atlantis-config` tool is a community project and not maintained by the Atlantis team.
 
 ### Running custom commands
+
 Atlantis supports running completely custom commands. In this example, we want to run
 a script after every `apply`:
 
@@ -375,17 +394,19 @@ workflows:
 ```
 
 ::: tip Notes
+
 * We don't need to write a `plan` key under `myworkflow`. If `plan`
 isn't set, Atlantis will use the default plan workflow which is what we want in this case.
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
-will execute a custom script containing the following code to create a SSH tunnel correctly: 
+will execute a custom script containing the following code to create a SSH tunnel correctly:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
 :::
 
 ### Custom Backend Config
+
 If you need to specify the `-backend-config` flag to `terraform init` you'll need to use a custom workflow.
 In this example, we're using custom backend files to configure two remote states, one for each environment.
 We're then using `.tfvars` files to load different variables for each environment.
@@ -410,12 +431,14 @@ workflows:
       - plan:
           extra_args: [-var-file=production.tfvars]
 ```
+
 ::: warning NOTE
 We have to use a custom `run` step to `rm -rf .terraform` because otherwise Terraform
 will complain in-between commands since the backend config has changed.
 :::
 
 You would then reference the workflows in your repo-level `atlantis.yaml`:
+
 ```yaml
 version: 3
 projects:
@@ -428,7 +451,9 @@ projects:
 ```
 
 ## Reference
+
 ### Workflow
+
 ```yaml
 plan:
 apply:
@@ -444,6 +469,7 @@ state_rm:
 | state_rm | [Stage](#stage) | `steps: [init, state_rm]` | no       | How to run state rm for this project. |
 
 ### Stage
+
 ```yaml
 steps:
 - run: custom-command
@@ -457,8 +483,11 @@ steps:
 | steps | array[[Step](#step)] | `[]`    | no       | List of steps for this stage. If the steps key is empty, no steps will be run for this stage. |
 
 ### Step
+
 #### Built-In Commands
+
 Steps can be a single string for a built-in command.
+
 ```yaml
 - init
 - plan
@@ -466,12 +495,15 @@ Steps can be a single string for a built-in command.
 - import
 - state_rm
 ```
+
 | Key                             | Type   | Default | Required | Description                                                                                                                  |
 |---------------------------------|--------|---------|----------|------------------------------------------------------------------------------------------------------------------------------|
 | init/plan/apply/import/state_rm | string | none    | no       | Use a built-in command without additional configuration. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported |
 
 #### Built-In Command With Extra Args
+
 A map from string to `extra_args` for a built-in command with extra arguments.
+
 ```yaml
 - init:
     extra_args: [arg1, arg2]
@@ -484,79 +516,88 @@ A map from string to `extra_args` for a built-in command with extra arguments.
 - state_rm:
     extra_args: [arg1, arg2]
 ```
+
 | Key                             | Type                               | Default | Required | Description                                                                                                                                                               |
 |---------------------------------|------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| init/plan/apply/import/state_rm | map[`extra_args` -> array[string]] | none    | no       | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
+| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none    | no       | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
 
 #### Custom `run` Command
+
 A custom command can be written in 2 ways
 
 Compact:
+
 ```yaml
 - run: custom-command arg1 arg2
 ```
+
 | Key | Type   | Default | Required | Description          |
 |-----|--------|---------|----------|----------------------|
 | run | string | none    | no       | Run a custom command |
 
 Full
+
 ```yaml
-- run: 
+- run:
     command: custom-command arg1 arg2
     output: show
 ```
+
 | Key | Type                                                         | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                             |
 |-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| run | map[string -> string] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
+| run | map\[string -> string\] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
 | run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>* `show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
+| run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
 
 ::: tip Notes
-* `run` steps in the main `workflow` are executed with the following environment variables:  
+
+* `run` steps in the main `workflow` are executed with the following environment variables:
   note: these variables are not available to `pre` or `post` workflows
-    * `WORKSPACE` - The Terraform workspace used for this project, ex. `default`.  
+  * `WORKSPACE` - The Terraform workspace used for this project, ex. `default`.
       NOTE: if the step is executed before `init` then Atlantis won't have switched to this workspace yet.
-    * `ATLANTIS_TERRAFORM_VERSION` - The version of Terraform used for this project, ex. `0.11.0`.
-    * `DIR` - Absolute path to the current directory.
-    * `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
+  * `ATLANTIS_TERRAFORM_VERSION` - The version of Terraform used for this project, ex. `0.11.0`.
+  * `DIR` - Absolute path to the current directory.
+  * `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
       either be generated (by plan) or already exist (if running apply). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PLANFILE`.
-    * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
+  * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
       either be generated (by show) or already exist (if running policy checks). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
-    * `POLICYCHECKFILE` - Absolute path to the location of policy check output if Atlantis runs policy checks.
-      See [policy checking](/docs/policy-checking.html#data-for-custom-run-steps) for information of data structure.
-    * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
-    * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
-    * `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.
-    * `HEAD_REPO_OWNER` - Owner of the repository that is getting merged into the base repository, ex. `acme-corp`.
-    * `HEAD_BRANCH_NAME` - Name of the head branch of the pull request (the branch that is getting merged into the base)
-    * `HEAD_COMMIT` - The sha256 that points to the head of the branch that is being pull requested into the base. If the pull request is from Bitbucket Cloud the string will only be 12 characters long because Bitbucket Cloud truncates its commit IDs.
-    * `BASE_BRANCH_NAME` - Name of the base branch of the pull request (the branch that the pull request is getting merged into)
-    * `PROJECT_NAME` - Name of the project configured in `atlantis.yaml`. If no project name is configured this will be an empty string.
-    * `PULL_NUM` - Pull request number or ID, ex. `2`.
-    * `PULL_URL` - Pull request URL, ex. `https://github.com/runatlantis/atlantis/pull/2`.
-    * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
-    * `REPO_REL_DIR` - The relative path of the project in the repository. For example if your project is in `dir1/dir2/` then this will be set to `"dir1/dir2"`. If your project is at the root this will be `"."`.
-    * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
-    * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
+  * `POLICYCHECKFILE` - Absolute path to the location of policy check output if Atlantis runs policy checks.
+      See [policy checking](policy-checking.md#data-for-custom-run-steps) for information of data structure.
+  * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
+  * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
+  * `HEAD_REPO_NAME` - Name of the repository that is getting merged into the base repository, ex. `atlantis`.
+  * `HEAD_REPO_OWNER` - Owner of the repository that is getting merged into the base repository, ex. `acme-corp`.
+  * `HEAD_BRANCH_NAME` - Name of the head branch of the pull request (the branch that is getting merged into the base)
+  * `HEAD_COMMIT` - The sha256 that points to the head of the branch that is being pull requested into the base. If the pull request is from Bitbucket Cloud the string will only be 12 characters long because Bitbucket Cloud truncates its commit IDs.
+  * `BASE_BRANCH_NAME` - Name of the base branch of the pull request (the branch that the pull request is getting merged into)
+  * `PROJECT_NAME` - Name of the project configured in `atlantis.yaml`. If no project name is configured this will be an empty string.
+  * `PULL_NUM` - Pull request number or ID, ex. `2`.
+  * `PULL_URL` - Pull request URL, ex. `https://github.com/runatlantis/atlantis/pull/2`.
+  * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
+  * `REPO_REL_DIR` - The relative path of the project in the repository. For example if your project is in `dir1/dir2/` then this will be set to `"dir1/dir2"`. If your project is at the root this will be `"."`.
+  * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
+  * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
-will execute a custom script containing the following code to create a SSH tunnel correctly: 
+will execute a custom script containing the following code to create a SSH tunnel correctly:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
-* If a workflow step returns a non-zero exit code, the workflow will stop. 
+* If a workflow step returns a non-zero exit code, the workflow will stop.
 :::
 
 #### Environment Variable `env` Command
+
 The `env` command allows you to set environment variables that will be available
 to all steps defined **below** the `env` step.
 
 You can set hard coded values via the `value` key, or set dynamic values via
 the `command` key which allows you to run any command and uses the output
 as the environment variable value.
+
 ```yaml
 - env:
     name: ENV_NAME
@@ -565,24 +606,29 @@ as the environment variable value.
     name: ENV_NAME_2
     command: 'echo "dynamic-value-$(date)"'
 ```
+
 | Key             | Type                  | Default | Required | Description                                                                                                     |
 |-----------------|-----------------------|---------|----------|-----------------------------------------------------------------------------------------------------------------|
-| env | map[string -> string] | none    | no       | Set environment variables for subsequent steps                                                                  |
+| env | map\[string -> string\] | none    | no       | Set environment variables for subsequent steps                                                                  |
 | env.name | string | none | yes | Name of the environment variable                                                                                |
 | env.value | string | none | no | Set the value of the environment variable to a hard-coded string. Cannot be set at the same time as `command`   |
 | env.command | string | none | no | Set the value of the environment variable to the output of a command. Cannot be set at the same time as `value` |
 
 ::: tip Notes
+
 * `env` `command`'s can use any of the built-in environment variables available
-  to `run` commands. 
+  to `run` commands.
 :::
 
 #### Multiple Environment Variables `multienv` Command
+
 The `multienv` command allows you to set dynamic number of multiple environment variables that will be available
 to all steps defined **below** the `multienv` step.
+
 ```yaml
 - multienv: custom-command
 ```
+
 | Key      | Type   | Default | Required | Description                                                                    |
 |----------|--------|---------|----------|--------------------------------------------------------------------------------|
 | multienv | string | none    | no       | Run a custom command and add set environment variables according to the result |
@@ -593,6 +639,7 @@ EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3
 The name-value pairs in the result are added as environment variables if success is true otherwise the workflow execution stops with error and the errorMessage is getting displayed.
 
 ::: tip Notes
+
 * `multienv` `command`'s can use any of the built-in environment variables available
-  to `run` commands. 
+  to `run` commands.
 :::
