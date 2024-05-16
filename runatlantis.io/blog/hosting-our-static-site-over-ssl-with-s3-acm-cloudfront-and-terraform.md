@@ -50,7 +50,7 @@ Because I'm going to host the site on AWS services, I need requests to <www.runa
 
 ## Step 5 — Host with CloudFront
 
-At this point, we've generated an SSL certificate for <www.runatlantis.io> and our website is available on the internet via its [S3 url](http://www.runatlantis.io.s3-website-us-east-1.amazonaws.com/) so can't we just CNAME to the S3 bucket and call it a day? Unfortunately not.
+At this point, we've generated an SSL certificate for <www.runatlantis.io> and our website is available on the internet via its S3 url so can't we just CNAME to the S3 bucket and call it a day? Unfortunately not.
 
 Since we generated our own certificate, we would need S3 to sign its responses using our certificiate. S3 doesn't support this and thus we need CloudFront. CloudFront supports using our own SSL cert and will just pull its data from the S3 bucket.
 
