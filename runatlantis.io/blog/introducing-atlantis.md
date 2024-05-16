@@ -72,7 +72,7 @@ It’s also easy to ensure that the pull request is terraform apply’d before m
 
 So, Atlantis makes working on Terraform within an operations team much easier, but how does it help with getting your whole team to write Terraform?
 
-Developers Writing Terraform
+## Developers Writing Terraform
 
 Terraform usually starts out being used by the Ops team. As a result of using Terraform, the Ops team becomes much faster at making infrastructure changes, but the way developers request those changes remains the same: they use a ticketing system or chat to ask operations for help, the request goes into a queue and later Ops responds that the task is complete.
 
@@ -91,12 +91,20 @@ With Atlantis, developers are able to write and apply Terraform safely. They sub
 
 Since the introduction of Atlantis at Hootsuite, we’ve had 78 contributors to our Terraform repositories, 58 of whom are developers (75%).
 
-Where we are now
-Since the introduction of Atlantis at Hootsuite we’ve grown to 144 Terraform repositories [1] that manage thousands of Amazon resources. Atlantis is used for every single Terraform change throughout our organization.
+## Where we are now
 
-Getting started with Atlantis
-If you’d like to try out Atlantis for your team you can download the latest release from https://github.com/runatlantis/atlantis/releases. If you run atlantis testdrive you can get started in less than 5 minutes. To read more about Atlantis go to https://www.runatlantis.io/.
+Since the introduction of Atlantis at Hootsuite we’ve grown to 144 Terraform repositories [^1] that manage thousands of Amazon resources. Atlantis is used for every single Terraform change throughout our organization.
+
+## Getting started with Atlantis
+
+If you’d like to try out Atlantis for your team you can download the latest release from https://github.com/runatlantis/atlantis/releases. If you run `atlantis testdrive` you can get started in less than 5 minutes. To read more about Atlantis go to https://www.runatlantis.io/.
 
 Check out our video for more information:
 
 <iframe src="https://cdn.embedly.com/widgets/media.html?src=https%3A%2F%2Fwww.youtube.com%2Fembed%2FTmIPWda0IKg%3Ffeature%3Doembed&amp;url=http%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DTmIPWda0IKg&amp;image=https%3A%2F%2Fi.ytimg.com%2Fvi%2FTmIPWda0IKg%2Fhqdefault.jpg&amp;key=a19fcc184b9711e1b4764040d3dc5c07&amp;type=text%2Fhtml&amp;schema=youtube" allowfullscreen="" frameborder="0" height="480" width="640" title="Atlantis Walkthrough" class="fr n gh dv bg" scrolling="no"></iframe>
+
+[^1]: We split our Terraform up into multiple states, each with its own repository (see [1], [2], [3]).
+
+[1]: https://blog.gruntwork.io/how-to-manage-terraform-state-28f5697e68fa
+[2]: https://charity.wtf/2016/03/30/terraform-vpc-and-why-you-want-a-tfstate-file-per-env/
+[3]: https://www.nclouds.com/blog/terraform-multi-state-management/

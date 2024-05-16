@@ -1,4 +1,5 @@
 import { generateSitemap as sitemap } from "sitemap-ts"
+import footnote from 'markdown-it-footnote'
 import { defineConfig } from 'vitepress';
 import * as navbars from "./navbars";
 import * as sidebars from "./sidebars";
@@ -114,6 +115,11 @@ export default defineConfig({
         })();`,
         ]
     ],
+    markdown: {
+        config: (md) => {
+          md.use(footnote)
+        }
+    },
     vite: {
         server: {
             fs: {
