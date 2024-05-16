@@ -102,6 +102,7 @@ const en = [
       { text: "Introducing Atlantis", link: "/blog/introducing-atlantis" },
       { text: "Hosting Our Static Site", link: "/blog/hosting-our-static-site-over-ssl-with-s3-acm-cloudfront-and-terraform" },
       { text: "Terraform And The Dangers Of Applying Locally", link: "/blog/terraform-and-the-dangers-of-applying-locally" },
+      { text: "Atlantis 0.4.4 Now Supports Bitbucket", link: "/blog/atlantis-0-4-4-now-supports-bitbucket" },
     ]
   }
 ]
