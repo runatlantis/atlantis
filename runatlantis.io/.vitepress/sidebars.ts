@@ -101,6 +101,7 @@ const en = [
     items: [
       { text: "Introducing Atlantis", link: "/blog/introducing-atlantis.md" },
       { text: "Hosting Our Static Site", link: "/blog/hosting-our-static-site-over-ssl-with-s3-acm-cloudfront-and-terraform.md" },
+      { text: "Terraform And The Dangers Of Applying Locally", link: "/blog/terraform-and-the-dangers-of-applying-locally" },
     ]
   }
 ]
