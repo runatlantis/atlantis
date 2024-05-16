@@ -111,6 +111,10 @@ const en = [
         text: "I’m Joining HashiCorp!",
         link: "/blog/joining-hashicorp"
       },
+      {
+        text: "4 Reasons To Try HashiCorp’s (New) Free Terraform Remote State Storage",
+        link: "/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage"
+      },
     ]
   }
 ]

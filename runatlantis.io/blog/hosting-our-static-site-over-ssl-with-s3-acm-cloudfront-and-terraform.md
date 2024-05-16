@@ -155,7 +155,7 @@ zone_id        = Z2FNAJGFW912JG
 
 Then look at your domain’s docs for how to change your nameservers to all 4 listed.
 
-## That’s it…?
+## That’s it...?
 
 Once the DNS propagates you should see your site at `https://www.yourdomain`! But what about `https://yourdomain`? i.e. without the `www.`? Shouldn’t this redirect to `https://www.yourdomain`?
 

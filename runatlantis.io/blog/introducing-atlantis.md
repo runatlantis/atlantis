@@ -48,11 +48,11 @@ This workflow is an improvement, but there are still problems. The first problem
 
 ![](/blog/intro/intro4.webp)
 
-What looks like a small change…
+What looks like a small change...
 
 ![](/blog/intro/intro5.webp)
 
-…can have a big plan
+...can have a big plan
 
 The second problem is that now it’s easy for `master` to get out of sync with what’s actually been applied. This can happen if you merge a pull request without running `apply` or if the `apply` has an error halfway through, you forget to fix it and then you merge to `master`. Now what’s in `master` isn’t actually what’s running on production. At best, this causes confusion the next time someone runs `terraform plan`. At worst, it causes an outage when someone assumes that what’s in `master` is actually running, and depends on it.
 
