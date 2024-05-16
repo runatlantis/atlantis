@@ -94,6 +94,13 @@ const en = [
       { text: "Glossary", link: "/contributing/glossary" },
     ]
 
+  },
+  {
+    text: "Blog",
+    collapsed: false,
+    items: [
+      { text: "Introducing Atlantis", link: "/blog/introducing-atlantis.md" },
+    ]
   }
 ]
 
