@@ -107,6 +107,10 @@ const en = [
         text: "Putting The Dev Into DevOps: Why Your Developers Should Write Terraform Too",
         link: "/blog/putting-the-dev-into-devops-why-your-developers-should-write-terraform-too"
       },
+      {
+        text: "I’m Joining HashiCorp!",
+        link: "/blog/joining-hashicorp"
+      },
     ]
   }
 ]
