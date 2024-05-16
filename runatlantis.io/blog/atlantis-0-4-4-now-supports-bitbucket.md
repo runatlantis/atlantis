@@ -13,7 +13,7 @@ Original post: https://medium.com/runatlantis/atlantis-0-4-4-now-supports-bitbuc
 
 ![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic1.webp)
 
-Atlantis is an [open source](https://github.com/runatlantis/atlantis) platform for using Terraform in teams. I’m happy to announce that the [latest release](https://github.com/runatlantis/atlantis/releases) of Atlantis (0.4.4) now supports both Bitbucket Cloud (bitbucket.org) **and** Bitbucket Server (aka Stash).
+Atlantis is an [open source](https://github.com/runatlantis/atlantis) platform for using Terraform in teams. I'm happy to announce that the [latest release](https://github.com/runatlantis/atlantis/releases) of Atlantis (0.4.4) now supports both Bitbucket Cloud (bitbucket.org) **and** Bitbucket Server (aka Stash).
 
 ![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic2.gif)
 
@@ -29,10 +29,10 @@ Check out www.runatlantis.io for more information.
 
 ## Getting Started
 
-The easiest way to try out Atlantis with Bitbucket is to run Atlantis locally on your own computer. Eventually you’ll want to deploy it as a standalone app but this is the easiest way to try it out. Follow [these instructions](https://www.runatlantis.io/guide/getting-started.html) to get Atlantis running locally.
+The easiest way to try out Atlantis with Bitbucket is to run Atlantis locally on your own computer. Eventually you'll want to deploy it as a standalone app but this is the easiest way to try it out. Follow [these instructions](https://www.runatlantis.io/guide/getting-started.html) to get Atlantis running locally.
 
 Create a Pull Request
-If you’ve got the Atlantis webhook configured for your repository and Atlantis is running, it’s time to create a new pull request. I recommend adding a `null_resource` to one of your Terraform files for the the test pull request. It won’t actually create anything so it’s safe to use as a test.
+If you've got the Atlantis webhook configured for your repository and Atlantis is running, it's time to create a new pull request. I recommend adding a `null_resource` to one of your Terraform files for the the test pull request. It won't actually create anything so it's safe to use as a test.
 
 Using the web editor, open up one of your Terraform files and add:
 
@@ -50,11 +50,11 @@ Wait a few seconds and then refresh. Atlantis should have automatically run `ter
 
 ![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic5.webp)
 
-Now it’s easier for your colleagues to review the pull request because they can see the `terraform plan` output.
+Now it's easier for your colleagues to review the pull request because they can see the `terraform plan` output.
 
 ### Terraform Apply
 
-Since all we’re doing is adding a null resource, I think it’s safe to run `terraform apply`. To do so, I add a comment to the pull request: `atlantis apply`:
+Since all we're doing is adding a null resource, I think it's safe to run `terraform apply`. To do so, I add a comment to the pull request: `atlantis apply`:
 
 ![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic6.webp)
 
@@ -64,7 +64,7 @@ Atlantis is listening for pull request comments and will run `terraform apply` r
 
 ### Pull Request Approvals
 
-If you don’t want anyone to be able to `terraform apply`, you can run Atlantis with `--require-approval` or add that setting to your [atlantis.yaml file](https://www.runatlantis.io/guide/atlantis-yaml-use-cases.html#requiring-approvals-for-production).
+If you don't want anyone to be able to `terraform apply`, you can run Atlantis with `--require-approval` or add that setting to your [atlantis.yaml file](https://www.runatlantis.io/guide/atlantis-yaml-use-cases.html#requiring-approvals-for-production).
 
 This will ensure that the pull request has been approved before someone can run `apply`.
 
@@ -98,4 +98,4 @@ Atlantis will prevent other pull requests from running against the same director
 
 ## Next Steps
 
-If you’re interested in using Atlantis with Bitbucket, check out our Getting Started docs. Happy Terraforming!
+If you're interested in using Atlantis with Bitbucket, check out our Getting Started docs. Happy Terraforming!

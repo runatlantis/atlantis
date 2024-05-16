@@ -100,11 +100,11 @@ const en = [
     collapsed: false,
     items: [
       {
-        text: "4 Reasons To Try HashiCorp’s (New) Free Terraform Remote State Storage",
+        text: "4 Reasons To Try HashiCorp's (New) Free Terraform Remote State Storage",
         link: "/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage"
       },
       {
-        text: "I’m Joining HashiCorp!",
+        text: "I'm Joining HashiCorp!",
         link: "/blog/joining-hashicorp"
       },
       {

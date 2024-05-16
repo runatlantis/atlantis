@@ -13,13 +13,13 @@ Original post: https://medium.com/runatlantis/putting-the-dev-into-devops-why-yo
 
 [Terraform](https://www.terraform.io/) is an amazing tool for provisioning infrastructure. Terraform enables your operators to perform their work faster and more reliably.
 
-**But if only your ops team is writing Terraform, you’re missing out.**
+**But if only your ops team is writing Terraform, you're missing out.**
 
 Terraform is not just a tool that makes ops teams more effective. Adopting Terraform is an opportunity to turn all of your developers into operators (at least for smaller tasks). This can make your entire engineering team more effective and create a better relationship between developers and operators.
 
 ### Quick Aside — What is Terraform?
 
-Terraform is two things. It’s a language for describing infrastructure:
+Terraform is two things. It's a language for describing infrastructure:
 
 ```tf
 resource "aws_instance" "example" {
@@ -28,9 +28,9 @@ resource "aws_instance" "example" {
 }
 ```
 
-And it’s a CLI tool that reads Terraform code and makes API calls to AWS (or any other cloud provider) to provision that infrastructure.
+And it's a CLI tool that reads Terraform code and makes API calls to AWS (or any other cloud provider) to provision that infrastructure.
 
-In this example, we’re using the CLI to run `terraform apply` which will create an EC2 instance:
+In this example, we're using the CLI to run `terraform apply` which will create an EC2 instance:
 
 ```sh
 $ terraform apply
@@ -62,9 +62,9 @@ aws_instance.example: Creation complete
 Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 ```
 
-## Terraform Adoption From A Dev’s Perspective
+## Terraform Adoption From A Dev's Perspective
 
-Adopting Terraform is great for your operations team’s effectiveness but it doesn’t change much for devs. Before Terraform adoption, devs typically interacted with an ops team like this:
+Adopting Terraform is great for your operations team's effectiveness but it doesn't change much for devs. Before Terraform adoption, devs typically interacted with an ops team like this:
 
 ![](/blog/putting-the-dev-into-devops/pic1.webp)
 
@@ -75,7 +75,7 @@ Adopting Terraform is great for your operations team’s effectiveness but it do
 5. _Ops: Updates ticket_
 6. **Dev: Continues their work**
 
-After the Ops team adopts Terraform, the workflow from a dev’s perspective is the same!
+After the Ops team adopts Terraform, the workflow from a dev's perspective is the same!
 
 ![](/blog/putting-the-dev-into-devops/pic2.webp)
 
@@ -86,9 +86,9 @@ After the Ops team adopts Terraform, the workflow from a dev’s perspective is 
 5. _Ops: Updates ticket_
 6. **Dev: Continues their work**
 
-With Terraform, there’s less of Step 2 (Dev: Waits) but apart from that, not much has changed.
+With Terraform, there's less of Step 2 (Dev: Waits) but apart from that, not much has changed.
 
-> If only ops is writing Terraform, your developers’ experience is the same.
+> If only ops is writing Terraform, your developers' experience is the same.
 
 ## Devs Want To Help...
 
@@ -98,9 +98,9 @@ Developers would love to help out with operations work. They know that for small
 - Increasing the size of an autoscaling group
 - Using a larger instance because their app needs more memory
 
-Developers could make all of these changes because they’re small and well defined. Also, previous examples of doing the same thing can guide them.
+Developers could make all of these changes because they're small and well defined. Also, previous examples of doing the same thing can guide them.
 
-## ...But Often They’re Not Allowed
+## ...But Often They're Not Allowed
 
 In many organizations, devs are locked out of the cloud console.
 
@@ -114,7 +114,7 @@ They might be locked out for good reasons:
 
 Even if they have access, operations can be complicated:
 
-- It’s often difficult to do seemingly simple things (think adding a security group rule that also requires peering VPCs). This means that just having access sometimes isn’t enough. Devs might need help from an expert to get things done.
+- It's often difficult to do seemingly simple things (think adding a security group rule that also requires peering VPCs). This means that just having access sometimes isn't enough. Devs might need help from an expert to get things done.
 
 ## Enter Terraform
 
@@ -149,9 +149,9 @@ resource "aws_autoscaling_group" "asg" {
 }
 ```
 
-Devs understand code (surprise!) so it’s a lot easier for them to make those small changes.
+Devs understand code (surprise!) so it's a lot easier for them to make those small changes.
 
-Here’s the new workflow:
+Here's the new workflow:
 
 ![](/blog/putting-the-dev-into-devops/pic4.webp)
 
@@ -164,22 +164,22 @@ Here’s the new workflow:
 Now:
 
 - Devs are making small changes themselves. This saves time and increases the speed of the whole engineering organization.
-- Devs can see exactly what is required to make the change. This means there’s less back and forth over a ticket: “Okay so I know you need the security group opened between server A and B, but on which ports and with which protocol?”
-- Devs start to see how infrastructure is built. This increases cooperation between dev and ops because they can understand each other’s work.
+- Devs can see exactly what is required to make the change. This means there's less back and forth over a ticket: “Okay so I know you need the security group opened between server A and B, but on which ports and with which protocol?”
+- Devs start to see how infrastructure is built. This increases cooperation between dev and ops because they can understand each other's work.
 
-Great! But there’s another problem.
+Great! But there's another problem.
 
 ## Devs Are Locked Out Of Terraform Too!
 
-In order to execute Terraform you need to have cloud credentials! It’s really hard to write Terraform without being able to run `terraform init` and `terraform plan`, for the same reason it would be hard to write code if you could never run it locally!
+In order to execute Terraform you need to have cloud credentials! It's really hard to write Terraform without being able to run `terraform init` and `terraform plan`, for the same reason it would be hard to write code if you could never run it locally!
 
 So are we back at square one?
 
 ## Enter Atlantis
 
-[Atlantis](https://www.runatlantis.io/) is an [open source](https://github.com/runatlantis/atlantis) tool for running Terraform from pull requests. With Atlantis, Terraform is run on a separate server (Atlantis is self-hosted) so you don’t need to give out credentials to everyone. Access is controlled through pull request approvals.
+[Atlantis](https://www.runatlantis.io/) is an [open source](https://github.com/runatlantis/atlantis) tool for running Terraform from pull requests. With Atlantis, Terraform is run on a separate server (Atlantis is self-hosted) so you don't need to give out credentials to everyone. Access is controlled through pull request approvals.
 
-Here’s what the workflow looks like:
+Here's what the workflow looks like:
 
 ### Step 1 — Create a Pull Request
 
@@ -201,7 +201,7 @@ The developer pushes a new commit that fixes their error and Atlantis comments b
 
 ### Step 4 — Get Approval
 
-You’ll probably want to run Atlantis with the --require-approval flag that requires pull requests to be Approved before running atlantis apply.
+You'll probably want to run Atlantis with the --require-approval flag that requires pull requests to be Approved before running atlantis apply.
 
 ![](/blog/putting-the-dev-into-devops/pic8.webp)
 
@@ -219,22 +219,22 @@ To apply the changes, the developer or operator comments “atlantis apply”.
 
 ## Success!
 
-Now we’ve got a workflow that makes everyone happy:
+Now we've got a workflow that makes everyone happy:
 
 - Devs can write Terraform and iterate on the pull request until the `terraform plan` looks good
-- Operators can review pull requests and approve the changes before they’re applied
+- Operators can review pull requests and approve the changes before they're applied
 
 Now developers can make small operations changes and learn more about how infrastructure is built. Everyone can work more effectively and with a shared understanding that enhances collaboration.
 
 ## Does It Work In Practice?
 
-Atlantis has been used by my previous company, Hootsuite, for over 2 years. It’s used daily by 20 operators but it’s also used occasionally by over 60 developers!
+Atlantis has been used by my previous company, Hootsuite, for over 2 years. It's used daily by 20 operators but it's also used occasionally by over 60 developers!
 Another company uses Atlantis to manage 600+ Terraform repos collaborated on by over 300 developers and operators.
 
 ## Next Steps
 
-- If you’d like to learn more about Terraform, check out HashiCorp’s [Introduction to Terraform](https://developer.hashicorp.com/terraform/intro)
-- If you’d like to try out Atlantis, go to www.runatlantis.io
+- If you'd like to learn more about Terraform, check out HashiCorp's [Introduction to Terraform](https://developer.hashicorp.com/terraform/intro)
+- If you'd like to try out Atlantis, go to www.runatlantis.io
 - If you have any questions, reach out to me on Twitter ([at]lkysow) or in the comments below.
 
 ## Credits

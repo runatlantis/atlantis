@@ -1,9 +1,9 @@
 ---
-title: 4 Reasons To Try HashiCorp’s (New) Free Terraform Remote State Storage
+title: 4 Reasons To Try HashiCorp's (New) Free Terraform Remote State Storage
 lang: en-US
 ---
 
-# 4 Reasons To Try HashiCorp’s (New) Free Terraform Remote State Storage
+# 4 Reasons To Try HashiCorp's (New) Free Terraform Remote State Storage
 
 ::: info
 This post was originally written on April 2nd, 2019
@@ -19,7 +19,7 @@ HashiCorp is planning to offer free Terraform Remote State Storage and they have
 
 ## What is Terraform State?
 
-Before I get into why you should use the new remote state storage, let’s talk about what exactly we mean by state in Terraform.
+Before I get into why you should use the new remote state storage, let's talk about what exactly we mean by state in Terraform.
 
 Terraform uses _state_ to map your Terraform code to the real-world resources that it provisions. For example, if I have Terraform code to create an AWS EC2 instance:
 
@@ -52,27 +52,27 @@ So if Terraform state is just a file, then what is remote state?
 
 ## Remote State
 
-By default, Terraform writes its state file to your local filesystem. This is okay for personal projects, but once you start working with a team, things get messy. In a team, you need to make sure everyone has an up to date version of the state file **and** ensure that two people aren’t making concurrent changes.
+By default, Terraform writes its state file to your local filesystem. This is okay for personal projects, but once you start working with a team, things get messy. In a team, you need to make sure everyone has an up to date version of the state file **and** ensure that two people aren't making concurrent changes.
 
-Enter remote state! Remote state is just storing the state file remotely, rather than on your filesystem. With remote state, there’s only one copy so Terraform can ensure you’re always up to date. To prevent team members from modifying state at the same time, Terraform can lock the remote state.
+Enter remote state! Remote state is just storing the state file remotely, rather than on your filesystem. With remote state, there's only one copy so Terraform can ensure you're always up to date. To prevent team members from modifying state at the same time, Terraform can lock the remote state.
 
 > Remote state is just storing the state file remotely, rather than on your filesystem.
 
-Alright, so remote state is great, but unfortunately setting it up can be a bit tricky. In AWS, you can store it in an S3 bucket, but you need to create the bucket, configure it properly, set up its permissions properly, create a DynamoDB table for locking and then ensure everyone has proper credentials to write to it. It’s much the same story in the other clouds.
+Alright, so remote state is great, but unfortunately setting it up can be a bit tricky. In AWS, you can store it in an S3 bucket, but you need to create the bucket, configure it properly, set up its permissions properly, create a DynamoDB table for locking and then ensure everyone has proper credentials to write to it. It's much the same story in the other clouds.
 
 As a result, setting up remote state can be an annoying stumbling block as teams adopt Terraform.
 
-This brings us to the first reason to try HashiCorp’s Free Remote State Storage...
+This brings us to the first reason to try HashiCorp's Free Remote State Storage...
 
 ## Reason #1 — Easy To Set Up
 
 Unlike other remote state solutions that require complicated setup to get right, setting up free remote state storage is easy.
 
-> Setting up HashiCorp’s free remote state storage is easy
+> Setting up HashiCorp's free remote state storage is easy
 
 Step 1 — Sign up for your [free Terraform Cloud](https://app.terraform.io/signup) account
 
-Step 2 — When you log in, you’ll land on this page where you’ll create your organization:
+Step 2 — When you log in, you'll land on this page where you'll create your organization:
 
 ![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic1.webp)
 
@@ -88,7 +88,7 @@ credentials "app.terraform.io" {
 }
 ```
 
-Step 5 — That’s it! Now you’re ready to store your state.
+Step 5 — That's it! Now you're ready to store your state.
 
 In your Terraform project, add a `terraform` block:
 
@@ -115,7 +115,7 @@ The second reason to try Terraform Cloud is its fully featured state viewer:
 
 ![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic4.webp)
 
-If you’ve ever messed up your Terraform state and needed to download an old version or wanted an audit log to know who changed what, then you’ll love this feature.
+If you've ever messed up your Terraform state and needed to download an old version or wanted an audit log to know who changed what, then you'll love this feature.
 
 You can view the full state file at each point in time:
 
@@ -125,7 +125,7 @@ You can also see the diff of what changed:
 
 ![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic6.webp)
 
-Of course, you can find a way to get this information from some of the other state backends, but it’s difficult. With HashiCorp’s remote state storage, you get it for free.
+Of course, you can find a way to get this information from some of the other state backends, but it's difficult. With HashiCorp's remote state storage, you get it for free.
 
 ## Reason #3 — Manual Locking
 
@@ -149,9 +149,9 @@ This saves you a lot of these:
 
 The final reason to try out Terraform Cloud is that it works flawlessly with [Atlantis](https://www.runatlantis.io/)!
 
-Set a `ATLANTIS_TFE_TOKEN` environment variable to a TFE token and you’re ready to go. Head over to https://www.runatlantis.io/docs/terraform-cloud.html to learn more.
+Set a `ATLANTIS_TFE_TOKEN` environment variable to a TFE token and you're ready to go. Head over to https://www.runatlantis.io/docs/terraform-cloud.html to learn more.
 
 Conclusion
-I highly encourage you to try out the new free Remote State Storage backend. It’s a compelling offering over other state backends thanks to its ease of set up, fully featured state viewer and locking capabilities.
+I highly encourage you to try out the new free Remote State Storage backend. It's a compelling offering over other state backends thanks to its ease of set up, fully featured state viewer and locking capabilities.
 
-If you’re not on the waitlist, sign up here: https://app.terraform.io/signup.
+If you're not on the waitlist, sign up here: https://app.terraform.io/signup.
