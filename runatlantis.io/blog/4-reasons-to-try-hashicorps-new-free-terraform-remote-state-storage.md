@@ -8,7 +8,7 @@ lang: en-US
 ::: info
 This post was originally written on April 2nd, 2019
 
-Original post: https://medium.com/runatlantis/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage-b03f01bfd251
+Original post: <https://medium.com/runatlantis/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage-b03f01bfd251>
 :::
 
 Update (May 20/19) — Free State Storage is now called Terraform Cloud and is out of Beta, meaning anyone can sign up!
@@ -149,9 +149,9 @@ This saves you a lot of these:
 
 The final reason to try out Terraform Cloud is that it works flawlessly with [Atlantis](https://www.runatlantis.io/)!
 
-Set a `ATLANTIS_TFE_TOKEN` environment variable to a TFE token and you're ready to go. Head over to https://www.runatlantis.io/docs/terraform-cloud.html to learn more.
+Set a `ATLANTIS_TFE_TOKEN` environment variable to a TFE token and you're ready to go. Head over to <https://www.runatlantis.io/docs/terraform-cloud.html> to learn more.
 
 Conclusion
 I highly encourage you to try out the new free Remote State Storage backend. It's a compelling offering over other state backends thanks to its ease of set up, fully featured state viewer and locking capabilities.
 
-If you're not on the waitlist, sign up here: https://app.terraform.io/signup.
+If you're not on the waitlist, sign up here: <https://app.terraform.io/signup>.

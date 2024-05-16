@@ -8,7 +8,7 @@ lang: en-US
 ::: info
 This post was originally written on July 13th, 2018
 
-Original post: https://medium.com/runatlantis/terraform-and-the-dangers-of-applying-locally-543563782a73
+Original post: <https://medium.com/runatlantis/terraform-and-the-dangers-of-applying-locally-543563782a73>
 :::
 
 If you're using Terraform then at some point you've likely ran a `terraform apply` that reverted someone else's change!
@@ -63,7 +63,7 @@ It's easier to just run `terraform apply` and humans will take the easier path m
 
 Another possible solution is to write a wrapper script that ensures our branch is up to date with `master`. But this doesn't solve the problem of Bob running `apply` locally and not yet merging to `master`. In this case, Alice's branch would have been up to date with `master` but not the latest apply'd state.
 
-### Be more disciplined!
+### Be more disciplined
 
 What if everyone:
 
@@ -117,4 +117,4 @@ By locking the directory, we're essentially ensuring that the branch being `appl
 
 In conclusion, running `terraform apply` when you're working with a team of operators can be dangerous. Look to solutions like your own CI, Atlantis or Terraform Enterprise to ensure you're always working off the latest code that was `apply`'d.
 
-If you'd like to try Atlantis, you can get started here: https://www.runatlantis.io/guide/
+If you'd like to try Atlantis, you can get started here: <https://www.runatlantis.io/guide/>

@@ -8,7 +8,7 @@ lang: en-US
 ::: info
 This post was originally written on August 29th, 2018
 
-Original post: https://medium.com/runatlantis/putting-the-dev-into-devops-why-your-developers-should-write-terraform-too-d3c079dfc6a8
+Original post: <https://medium.com/runatlantis/putting-the-dev-into-devops-why-your-developers-should-write-terraform-too-d3c079dfc6a8>
 :::
 
 [Terraform](https://www.terraform.io/) is an amazing tool for provisioning infrastructure. Terraform enables your operators to perform their work faster and more reliably.
@@ -90,7 +90,7 @@ With Terraform, there's less of Step 2 (Dev: Waits) but apart from that, not muc
 
 > If only ops is writing Terraform, your developers' experience is the same.
 
-## Devs Want To Help...
+## Devs Want To Help
 
 Developers would love to help out with operations work. They know that for small changes they should be able to do the work themselves (with a review from ops). For example:
 
@@ -169,7 +169,7 @@ Now:
 
 Great! But there's another problem.
 
-## Devs Are Locked Out Of Terraform Too!
+## Devs Are Locked Out Of Terraform Too
 
 In order to execute Terraform you need to have cloud credentials! It's really hard to write Terraform without being able to run `terraform init` and `terraform plan`, for the same reason it would be hard to write code if you could never run it locally!
 
@@ -217,7 +217,7 @@ To apply the changes, the developer or operator comments “atlantis apply”.
 
 ![](/blog/putting-the-dev-into-devops/pic10.webp)
 
-## Success!
+## Success
 
 Now we've got a workflow that makes everyone happy:
 
@@ -234,7 +234,7 @@ Another company uses Atlantis to manage 600+ Terraform repos collaborated on by 
 ## Next Steps
 
 - If you'd like to learn more about Terraform, check out HashiCorp's [Introduction to Terraform](https://developer.hashicorp.com/terraform/intro)
-- If you'd like to try out Atlantis, go to www.runatlantis.io
+- If you'd like to try out Atlantis, go to <www.runatlantis.io>
 - If you have any questions, reach out to me on Twitter ([at]lkysow) or in the comments below.
 
 ## Credits

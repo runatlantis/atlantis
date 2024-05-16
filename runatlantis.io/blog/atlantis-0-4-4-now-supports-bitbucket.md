@@ -8,7 +8,7 @@ lang: en-US
 ::: info
 This post was originally written on July 25th, 2018
 
-Original post: https://medium.com/runatlantis/atlantis-0-4-4-now-supports-bitbucket-86c53a550b45
+Original post: <https://medium.com/runatlantis/atlantis-0-4-4-now-supports-bitbucket-86c53a550b45>
 :::
 
 ![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic1.webp)
@@ -25,7 +25,7 @@ Atlantis is a self-hosted application that listens for Terraform pull request ev
 
 With Atlantis, you collaborate on the Terraform pull request itself instead of running `terraform apply` from your own computers which can be dangerous:
 
-Check out www.runatlantis.io for more information.
+Check out <www.runatlantis.io> for more information.
 
 ## Getting Started
 
@@ -71,6 +71,7 @@ This will ensure that the pull request has been approved before someone can run 
 ## Other Features
 
 ### Customizable Commands
+
 Apart from being able to `plan` and `apply` from the pull request, Atlantis also enables you to customize the exact commands that are run via an `atlantis.yaml` config file. For example to use the `-var-file` flag:
 
 ```yaml{14}

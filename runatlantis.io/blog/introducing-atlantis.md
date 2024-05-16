@@ -8,7 +8,7 @@ lang: en-US
 ::: info
 This post was originally written on September 11th, 2017
 
-Original post: https://medium.com/runatlantis/introducing-atlantis-6570d6de7281
+Original post: <https://medium.com/runatlantis/introducing-atlantis-6570d6de7281>
 :::
 
 We're very excited to announce the open source release of Atlantis! Atlantis is a tool for
@@ -26,12 +26,15 @@ better on Terraform and also enabled our entire development team to write and ex
 Atlantis was built to solve two problems that arose at Hootsuite as we adopted Terraform:
 
 ### 1. Effective Collaboration
+
 What's the best way to collaborate on Terraform in a team setting?
 
 ### 2. Developers Writing Terraform
+
 How can we enable our developers to write and apply Terraform safely?
 
 ## Effective Collaboration
+
 When writing Terraform, there are a number of workflows you can follow. The simplest workflow is just using `master`:
 
 ![](/blog/intro/intro2.webp)
@@ -97,7 +100,7 @@ Since the introduction of Atlantis at Hootsuite we've grown to 144 Terraform rep
 
 ## Getting started with Atlantis
 
-If you'd like to try out Atlantis for your team you can download the latest release from https://github.com/runatlantis/atlantis/releases. If you run `atlantis testdrive` you can get started in less than 5 minutes. To read more about Atlantis go to https://www.runatlantis.io/.
+If you'd like to try out Atlantis for your team you can download the latest release from <https://github.com/runatlantis/atlantis/releases>. If you run `atlantis testdrive` you can get started in less than 5 minutes. To read more about Atlantis go to <https://www.runatlantis.io/>.
 
 Check out our video for more information:
 

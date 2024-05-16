@@ -3,12 +3,12 @@ title: I'm Joining HashiCorp!
 lang: en-US
 ---
 
-# I'm Joining HashiCorp!
+# I'm Joining HashiCorp
 
 ::: info
 This post was originally written on October 23th, 2018
 
-Original post: https://medium.com/runatlantis/joining-hashicorp-200ee9572dc5
+Original post: <https://medium.com/runatlantis/joining-hashicorp-200ee9572dc5>
 :::
 
 Dear Atlantis Community,

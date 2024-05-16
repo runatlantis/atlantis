@@ -8,15 +8,15 @@ lang: en-US
 ::: info
 This post was originally written on March 4, 2018
 
-Original post: https://medium.com/runatlantis/hosting-our-static-site-over-ssl-with-s3-acm-cloudfront-and-terraform-513b799aec0f
+Original post: <https://medium.com/runatlantis/hosting-our-static-site-over-ssl-with-s3-acm-cloudfront-and-terraform-513b799aec0f>
 :::
 
-In this post I cover how I hosted www.runatlantis.io using
+In this post I cover how I hosted <www.runatlantis.io> using
 
 - S3 — for storing the static site
 - CloudFront — for serving the static site over SSL
 - AWS Certificate Manager — for generating the SSL certificates
-- Route53 — for routing the domain name www.runatlantis.io to the correct location
+- Route53 — for routing the domain name <www.runatlantis.io> to the correct location
 
 I chose Terraform in this case because Atlantis is a tool for automating and collaborating on Terraform in a team (see github.com/runatlantis/atlantis)–and so obviously it made sense to host our homepage using Terraform–but also because it's now much easier to manage. I don't have to go into the AWS console and click around to find what settings I want to change. Instead I can just look at ~100 lines of code, make a change, and run `terraform apply`.
 
@@ -42,15 +42,15 @@ Once you've got a website, you need it to be accessible on the internet. I used 
 
 ## Step 3 — Generate an SSL Certificate
 
-I needed to generate an SSL certificate for https://www.runatlantis.io. I used the AWS Certificate Manager for this because it's free and is easily integrated with the rest of the system.
+I needed to generate an SSL certificate for <https://www.runatlantis.io>. I used the AWS Certificate Manager for this because it's free and is easily integrated with the rest of the system.
 
 ## Step 4 — Set up DNS
 
-Because I'm going to host the site on AWS services, I need requests to www.runatlantis.io to be routed to those services. Route53 is the obvious solution.
+Because I'm going to host the site on AWS services, I need requests to <www.runatlantis.io> to be routed to those services. Route53 is the obvious solution.
 
 ## Step 5 — Host with CloudFront
 
-At this point, we've generated an SSL certificate for www.runatlantis.io and our website is available on the internet via its [S3 url](http://www.runatlantis.io.s3-website-us-east-1.amazonaws.com/) so can't we just CNAME to the S3 bucket and call it a day? Unfortunately not.
+At this point, we've generated an SSL certificate for <www.runatlantis.io> and our website is available on the internet via its [S3 url](http://www.runatlantis.io.s3-website-us-east-1.amazonaws.com/) so can't we just CNAME to the S3 bucket and call it a day? Unfortunately not.
 
 Since we generated our own certificate, we would need S3 to sign its responses using our certificiate. S3 doesn't support this and thus we need CloudFront. CloudFront supports using our own SSL cert and will just pull its data from the S3 bucket.
 
@@ -73,8 +73,8 @@ Assuming we've generated our site content already, we need to create an S3 bucke
 We should be able to run Terraform now to create the S3 bucket
 
 ```sh
-$ terraform init
-$ `terraform apply`
+terraform init
+`terraform apply`
 ```
 
 ![](/blog/hosting-our-static-site/pic2.webp)
@@ -128,7 +128,7 @@ $ terraform state show aws_cloudfront_distribution.www_distribution | grep ^doma
 domain_name                                                                                          = d1l8j8yicxhafq.cloudfront.net
 ```
 
-You'll probably get an error if you go to that URL right away. You need to wait a couple minutes for CloudFront to set itself up. It took me 10 minutes. You can view its progress in the console: https://console.aws.amazon.com/cloudfront/home
+You'll probably get an error if you go to that URL right away. You need to wait a couple minutes for CloudFront to set itself up. It took me 10 minutes. You can view its progress in the console: <https://console.aws.amazon.com/cloudfront/home>
 
 ## DNS
 
@@ -167,8 +167,7 @@ Congrats! You're done!
 
 <iframe src="https://cdn.embedly.com/widgets/media.html?src=https%3A%2F%2Fgiphy.com%2Fembed%2Fl0MYt5jPR6QX5pnqM%2Ftwitter%2Fiframe&amp;display_name=Giphy&amp;url=https%3A%2F%2Fmedia.giphy.com%2Fmedia%2Fl0MYt5jPR6QX5pnqM%2Fgiphy.gif&amp;image=https%3A%2F%2Fi.giphy.com%2Fmedia%2Fl0MYt5jPR6QX5pnqM%2Fgiphy.gif&amp;key=d04bfffea46d4aeda930ec88cc64b87c&amp;type=text%2Fhtml&amp;schema=giphy" allowfullscreen="" frameborder="0" height="244" width="435" title="The Office Party Hard GIF - Find &amp; Share on GIPHY" class="fr n gh dv bg" scrolling="no"></iframe>
 
-
-If you're using Terraform in a team, check out Atlantis: https://github.com/runatlantis/atlantis for automation and collaboration to make your team happier!
+If you're using Terraform in a team, check out Atlantis: <https://github.com/runatlantis/atlantis> for automation and collaboration to make your team happier!
 
 Here's the Terraform needed to redirect your root domain:
 
