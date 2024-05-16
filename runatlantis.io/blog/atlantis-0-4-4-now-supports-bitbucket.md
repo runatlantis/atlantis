@@ -64,7 +64,7 @@ Atlantis is listening for pull request comments and will run `terraform apply` r
 
 ### Pull Request Approvals
 
-If you don't want anyone to be able to `terraform apply`, you can run Atlantis with `--require-approval` or add that setting to your [atlantis.yaml file](https://www.runatlantis.io/guide/atlantis-yaml-use-cases.html#requiring-approvals-for-production).
+If you don't want anyone to be able to `terraform apply`, you can run Atlantis with `--require-approval` or add that setting to your [atlantis.yaml file](https://www.runatlantis.io/docs/command-requirements.html#approved).
 
 This will ensure that the pull request has been approved before someone can run `apply`.
 
