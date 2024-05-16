@@ -100,6 +100,7 @@ const en = [
     collapsed: false,
     items: [
       { text: "Introducing Atlantis", link: "/blog/introducing-atlantis.md" },
+      { text: "Hosting Our Static Site", link: "/blog/hosting-our-static-site-over-ssl-with-s3-acm-cloudfront-and-terraform.md" },
     ]
   }
 ]
