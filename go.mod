@@ -45,7 +45,7 @@ require (
 	github.com/urfave/negroni/v3 v3.1.0
 	github.com/warrensbox/terraform-switcher v0.1.1-0.20240413181427-4d66b260d90c
 	github.com/xanzy/go-gitlab v0.102.0
-	go.etcd.io/bbolt v1.3.9
+	go.etcd.io/bbolt v1.3.10
 	go.uber.org/zap v1.27.0
 	golang.org/x/term v0.19.0
 	golang.org/x/text v0.14.0
