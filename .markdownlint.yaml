@@ -31,3 +31,8 @@ MD024:
 #
 # https://github.com/DavidAnson/markdownlint/blob/main/doc/md051.md
 MD051: false
+
+# for blog posts
+MD025: false
+MD045: false
+MD001: false
