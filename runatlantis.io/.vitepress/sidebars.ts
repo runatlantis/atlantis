@@ -97,6 +97,7 @@ const en = [
   },
   {
     text: "Blog",
+    link: "/blog",
     collapsed: false,
     items: [
       {
