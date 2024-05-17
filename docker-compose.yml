@@ -1,42 +1,41 @@
 # Note: This file is only used for Atlantis local development
-version: "3.8"
 services:
-    ngrok:
-        image: wernight/ngrok:latest
-        ports:
-        - 4040:4040
-        environment:
-            # https://dashboard.ngrok.com/get-started/your-authtoken
-            # NGROK_AUTH: REPLACE-WITH-YOUR-TOKEN // set this in atlantis.env
-            NGROK_PROTOCOL: http
-            NGROK_PORT: atlantis:4141
-        env_file:
-            - ./atlantis.env
-        depends_on:
-        - atlantis
-    redis:
-        image: redis:7.2-alpine
-        restart: always
-        ports:
-        - '6379:6379'
-        command: redis-server --save 20 1 --loglevel warning --requirepass test123
-        volumes:
-        - redis:/data
-    atlantis:
-        depends_on:
-        - redis
-        build:
-            context: .
-            dockerfile: Dockerfile.dev
-        ports:
-        - 4141:4141
-        volumes:
-            - ~/.ssh:/.ssh
-            - ./:/atlantis/src
-        # Contains the flags that atlantis uses in env var form
-        env_file:
-            - ./atlantis.env
+  ngrok:
+    image: wernight/ngrok:latest@sha256:d211f29ebcfe5f4e72df4fa8bdd9a667886e127d7fcb1be4a1af5ad83a8a1b77
+    ports:
+      - 4040:4040
+    environment:
+      # https://dashboard.ngrok.com/get-started/your-authtoken
+      # NGROK_AUTH: REPLACE-WITH-YOUR-TOKEN // set this in atlantis.env
+      NGROK_PROTOCOL: http
+      NGROK_PORT: atlantis:4141
+    env_file:
+      - atlantis.env
+    depends_on:
+      - atlantis
+  redis:
+    image: redis:7.2-alpine@sha256:a40e29800d387e3cf9431902e1e7a362e4d819233d68ae39380532c3310091ac
+    restart: always
+    ports:
+      - 6379:6379
+    command: redis-server --save 20 1 --loglevel warning --requirepass test123
+    volumes:
+      - redis:/data
+  atlantis:
+    depends_on:
+      - redis
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - 4141:4141
+    volumes:
+      - ${HOME}/.ssh:/.ssh:ro
+      - ${PWD}:/atlantis/src:ro
+    # Contains the flags that atlantis uses in env var form
+    env_file:
+      - atlantis.env
 
 volumes:
-    redis:
-        driver: local
+  redis:
+    driver: local

@@ -1,108 +1,116 @@
 {
   extends: [
-    "config:base",
-    "schedule:daily",
+    'config:best-practices',
+    ':separateMultipleMajorReleases',
+    'schedule:daily',
   ],
-  commitMessageSuffix: " in {{packageFile}}",
+  commitMessageSuffix: ' in {{packageFile}}',
   dependencyDashboardAutoclose: true,
   automerge: true,
-  baseBranches: ["main", "/^release\-.*/"],
-  platformAutomerge: true,
-  labels: ["dependencies"],
-  postUpdateOptions: [
-    "gomodTidy",
-    "gomodUpdateImportPaths",
-    "pnpmDedupe",
+  baseBranches: [
+    'main',
+    '/^release-.*/',
   ],
-  // needed so e2e tests do not stomp over each other
+  platformAutomerge: true,
+  labels: [
+    'dependencies',
+  ],
+  postUpdateOptions: [
+    'gomodTidy',
+    'gomodUpdateImportPaths',
+    'pnpmDedupe',
+  ],
   prHourlyLimit: 1,
-  lockFileMaintenance: {
-    enabled: true,
-  },
+  osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
     enabled: true,
     labels: [
-      "security",
+      'security',
     ],
   },
   packageRules: [
-    // For vuepress
     {
-      "matchPackageNames": ["vuepress", "@vuepress/client", "@vuepress/markdown", "@vuepress/utils"],
-      "groupName": "vuepress",
-      "allowedVersions": "!/pre.*$/",
+      "matchFileNames": ["package.json"],
+      "enabled": false
     },
-    // e2e test depends on testing/Dockefile testing-image which has conftest specific version.
-    // to upgrade conftest versions, we need following PRs.
-    // 1. update testing/Dockerfile conftest version
-    // 2. update testing-env tag
-    // 3. update e2e conftest version
-    // This will allow conftest version updates in testing/Dockefile
     {
-      matchPaths: ["testing/**"],
-      matchPackagePatterns: ["conftest"],
-      additionalBranchPrefix: "{{baseDir}}-",
-      groupName: "conftest-testing",
-      /*
-      prBodyNotes: [
-        ":warning: Upgrade testing-env conftest and then upgrade other conftest versions for e2e :warning:",
+      matchFileNames: [
+        'testing/**',
       ],
-      */
+      matchPackagePatterns: [
+        'conftest',
+      ],
+      additionalBranchPrefix: '{{packageFileDir}}-',
+      groupName: 'conftest-testing',
     },
     {
-      ignorePaths: ["testing/**"],
-      matchPackagePatterns: ["github-actions"],
-      groupName: "github-",
+      ignorePaths: [
+        'testing/**',
+      ],
+      matchPackagePatterns: [
+        'github-actions',
+      ],
+      groupName: 'github-',
     },
-    /*
-    // This tag is currently latest so we can skip this check for now unless we need to pin it again.
     {
-      // we need to upgrade testing-env on ci quickly
-      matchPackageNames: ["ghcr.io/runatlantis/testing-env"],
-      groupName: "testing-env-ci-test",
-      schedule: ["every 1 hour after 00:00 and before 23:59 every day"],
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'node',
+        'cimg/node',
+      ],
+      versioning: 'node',
     },
-    */
     {
-      // use LTS node version for node docker image
-      matchDatasources: ["docker"],
-      matchPackageNames: ["node", "cimg/node"],
-      versioning: "node",
+      matchPackageNames: [
+        'go',
+        'golang',
+      ],
+      versioning: 'go',
+      groupName: 'go'
     },
   ],
-  // https://docs.renovatebot.com/modules/manager/regex/
-  regexManagers: [
+  customManagers: [
     {
-      fileMatch: ["(^|/)Dockerfile$", "(^|/)Dockerfile\\.[^/]*$"],
-      matchStrings: [
-        // example:
-        // renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-        // ENV DEFAULT_TERRAFORM_VERSION=x.x.x
-        "renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\sENV .*?_VERSION=(?<currentValue>.*)\\s",
+      customType: 'regex',
+      fileMatch: [
+        '(^|/)Dockerfile$',
+        '(^|/)Dockerfile\\.[^/]*$',
       ],
-      versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}",
-      extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      fileMatch: [".*go$"],
-      matchStrings: [
-        // example:
-        // const ConftestVersion = "x.x.x" // renovate: datasource=github-releases depName=open-policy-agent/conftest
-        "\\sconst .*Version = \"(?<currentValue>.*)\"\\s// renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s",
-      ],
-      versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}",
-      extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',
-    },
-    {
-      fileMatch: [".circleci/config.yml$"],
       matchStrings: [
         // example:
         // # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-        // TRRAFORM_VERSION: x.x.x
-        "renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.*?_VERSION: (?<currentValue>.*)\\s",
+        // ENV DEFAULT_TERRAFORM_VERSION=x.x.x
+        // # renovate: datasource=github-releases depName=open-policy-agent/conftest
+        // ARG DEFAULT_CONFTEST_VERSION=x.x.x
+        "renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION=(?<currentValue>.*)\\s",
       ],
-      versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}",
+      versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}',
       extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',
     },
-  ]
+    {
+      customType: 'regex',
+      fileMatch: [
+        '.*go$',
+      ],
+      matchStrings: [
+        '\\sconst .*Version = "(?<currentValue>.*)"\\s// renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s',
+      ],
+      versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}',
+      extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',
+    },
+    {
+      customType: 'regex',
+      fileMatch: [
+        '.circleci/config.yml$',
+        '^\\.github/workflows/[^/]+\\.ya?ml$',
+      ],
+      matchStrings: [
+        'renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.*?_VERSION: (?<currentValue>.*)\\s',
+      ],
+      versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}',
+      extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',
+    },
+  ],
 }

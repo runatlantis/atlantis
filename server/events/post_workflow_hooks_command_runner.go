@@ -79,6 +79,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
 			CommandName:        cmd.Name.String(),
+			API:                ctx.API,
 		},
 		postWorkflowHooks, repoDir)
 
@@ -124,7 +125,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 			shellArgs = "-c"
 		}
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
-		if err != nil {
+		if err != nil && !ctx.API {
 			return err
 		}
 
