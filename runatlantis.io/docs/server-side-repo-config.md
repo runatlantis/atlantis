@@ -56,7 +56,7 @@ repos:
 
   # allowed_overrides specifies which keys can be overridden by this repo in
   # its atlantis.yaml file.
-  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge, repo_locking, custom_policy_check]
+  allowed_overrides: [apply_requirements, workflow, delete_source_branch_on_merge, repo_locking, repo_locks, custom_policy_check]
 
   # allowed_workflows specifies which workflows the repos that match
   # are allowed to select.
@@ -73,7 +73,13 @@ repos:
 
   # repo_locking defines whether lock repository when planning.
   # If true (default), atlantis try to get a lock.
+  # deprecated: use repo_locks instead
   repo_locking: true
+
+  # repo_locks defines whether the repository would be locked on apply instead of plan, or disabled
+  # Valid values are on_plan (default), on_apply or disabled.
+  repo_locks:
+    mode: on_plan
 
   # custom_policy_check defines whether policy checking tools besides Conftest are enabled in checks
   # If false (default), only Conftest JSON output is allowed
@@ -518,23 +524,24 @@ If you set a workflow with the key `default`, it will override this.
 
 ### Repo
 
-| Key                           | Type         | Default | Required | Description                                                                                                                                                                                                                                                                                               |
-|-------------------------------|--------------|---------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| id                            | string       | none    | yes      | Value can be a regular expression when specified as /&lt;regex&gt;/ or an exact string match. Repo IDs are of the form `{vcs hostname}/{org}/{name}`, ex. `github.com/owner/repo`. Hostname is specified without scheme or port. For Bitbucket Server, {org} is the **name** of the project, not the key. |
-| branch                        | string       | none    | no       | An regex matching pull requests by base branch (the branch the pull request is getting merged into). By default, all branches are matched                                                                                                                                                                 |
-| repo_config_file              | string       | none    | no       | Repo config file path in this repo. By default, use `atlantis.yaml` which is located on repository root. When multiple atlantis servers work with the same repo, please set different file names.                                                                                                         |
-| workflow                      | string       | none    | no       | A custom workflow.                                                                                                                                                                                                                                                                                        |
-| plan_requirements             | []string     | none    | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.                                                                     |
-| apply_requirements            | []string     | none    | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.                                                                    |
-| import_requirements           | []string     | none    | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.                                                                   |
-| allowed_overrides             | []string     | none    | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge`,`repo_locking`, and `custom_policy_check`                                                                                                |
-| allowed_workflows             | []string     | none    | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                                                                                           |
-| allow_custom_workflows        | bool         | false   | no       | Whether or not to allow [Custom Workflows](custom-workflows.md).                                                                                                                                                                                                                                          |
-| delete_source_branch_on_merge | bool         | false   | no       | Whether or not to delete the source branch on merge.                                                                                                                                                                                                                                                      |
-| repo_locking                  | bool         | false   | no       | Whether or not to get a lock.                                                                                                                                                                                                                                                                             |
-| policy_check                  | bool         | false   | no       | Whether or not to run policy checks on this repository.                                                                                                                                                                                                                                                   |
-| custom_policy_check           | bool         | false   | no       | Whether or not to enable custom policy check tools outside of Conftest on this repository.                                                                                                                                                                                                                |
-| autodiscover                  | AutoDiscover | none    | no       | Auto discover settings for this repo                                                                                                                                                                                                                                                                      |
+| Key                           | Type                    | Default         | Required | Description                                                                                                                                                                                                                                                                                               |
+|-------------------------------|-------------------------|-----------------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| id                            | string                  | none            | yes      | Value can be a regular expression when specified as /&lt;regex&gt;/ or an exact string match. Repo IDs are of the form `{vcs hostname}/{org}/{name}`, ex. `github.com/owner/repo`. Hostname is specified without scheme or port. For Bitbucket Server, {org} is the **name** of the project, not the key. |
+| branch                        | string                  | none            | no       | An regex matching pull requests by base branch (the branch the pull request is getting merged into). By default, all branches are matched                                                                                                                                                                 |
+| repo_config_file              | string                  | none            | no       | Repo config file path in this repo. By default, use `atlantis.yaml` which is located on repository root. When multiple atlantis servers work with the same repo, please set different file names.                                                                                                         |
+| workflow                      | string                  | none            | no       | A custom workflow.                                                                                                                                                                                                                                                                                        |
+| plan_requirements             | []string                | none            | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.                                                                   |
+| apply_requirements            | []string                | none            | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.                                                                  |
+| import_requirements           | []string                | none            | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.                                                                 |
+| allowed_overrides             | []string                | none            | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge`,`repo_locking`, `repo_locks`, and `custom_policy_check`                                                                                  |
+| allowed_workflows             | []string                | none            | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                                                                                           |
+| allow_custom_workflows        | bool                    | false           | no       | Whether or not to allow [Custom Workflows](custom-workflows.md).                                                                                                                                                                                                                                        |
+| delete_source_branch_on_merge | bool                    | false           | no       | Whether or not to delete the source branch on merge.                                                                                                                                                                                                                                                      |
+| repo_locking                  | bool                    | false           | no       | (deprecated) Whether or not to get a lock.                                                                                                                                                                                                                                                                |
+| repo_locks                    | [RepoLocks](#repolocks) | `mode: on_plan` | no       | Whether or not repository locks are enabled for this project on plan or apply. See [RepoLocks](#repolocks) for more details.                                                                                                                                                                              |
+| policy_check                  | bool                    | false           | no       | Whether or not to run policy checks on this repository.                                                                                                                                                                                                                                                   |
+| custom_policy_check           | bool                    | false           | no       | Whether or not to enable custom policy check tools outside of Conftest on this repository.                                                                                                                                                                                                                |
+| autodiscover                  | AutoDiscover            | none            | no       | Auto discover settings for this repo                                                                                                                                                                                                                                                                      |
 
 :::tip Notes
 
@@ -570,6 +577,16 @@ If you set a workflow with the key `default`, it will override this.
   * `allow_custom_workflows` is set from the `id: /.*/` config and isn't unset
     by the `id: github.com/owner/repo` config because it didn't define that key.
 :::
+
+### RepoLocks
+
+```yaml
+mode: on_apply
+```
+
+| Key  | Type   | Default   | Required | Description                                                                                                                           |
+|------|--------|-----------|----------|---------------------------------------------------------------------------------------------------------------------------------------|
+| mode | `Mode` | `on_plan` | no       | Whether or not repository locks are enabled for this project on plan or apply. Valid values are `disabled`, `on_plan` and `on_apply`. |
 
 ### Policies
 
