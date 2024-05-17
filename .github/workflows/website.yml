@@ -82,9 +82,11 @@ jobs:
         run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
 
       # medium.com => was being rate limited: HTTP 429
+      # twitter.com => too many redirections
       - run: |
           ./muffet \
             -e 'https://medium.com/runatlantis' \
+            -e 'https://twitter.com/*' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \
