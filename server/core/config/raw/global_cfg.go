@@ -34,6 +34,7 @@ type Repo struct {
 	AllowCustomWorkflows      *bool          `yaml:"allow_custom_workflows,omitempty" json:"allow_custom_workflows,omitempty"`
 	DeleteSourceBranchOnMerge *bool          `yaml:"delete_source_branch_on_merge,omitempty" json:"delete_source_branch_on_merge,omitempty"`
 	RepoLocking               *bool          `yaml:"repo_locking,omitempty" json:"repo_locking,omitempty"`
+	RepoLocks                 *RepoLocks     `yaml:"repo_locks,omitempty" json:"repo_locks,omitempty"`
 	PolicyCheck               *bool          `yaml:"policy_check,omitempty" json:"policy_check,omitempty"`
 	CustomPolicyCheck         *bool          `yaml:"custom_policy_check,omitempty" json:"custom_policy_check,omitempty"`
 	AutoDiscover              *AutoDiscover  `yaml:"autodiscover,omitempty" json:"autodiscover,omitempty"`
@@ -194,8 +195,8 @@ func (r Repo) Validate() error {
 	overridesValid := func(value interface{}) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey && o != valid.PolicyCheckKey && o != valid.CustomPolicyCheckKey {
-				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q, %q, %q, %q, and %q are supported", o, valid.PlanRequirementsKey, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey, valid.PolicyCheckKey, valid.CustomPolicyCheckKey)
+			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey && o != valid.RepoLocksKey && o != valid.PolicyCheckKey && o != valid.CustomPolicyCheckKey {
+				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q, %q, %q, %q, %q, and %q are supported", o, valid.PlanRequirementsKey, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey, valid.RepoLocksKey, valid.PolicyCheckKey, valid.CustomPolicyCheckKey)
 			}
 		}
 		return nil
@@ -220,6 +221,14 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
+	repoLocksValid := func(value interface{}) error {
+		repoLocks := value.(*RepoLocks)
+		if repoLocks != nil {
+			return repoLocks.Validate()
+		}
+		return nil
+	}
+
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.ID, validation.Required, validation.By(idValid)),
 		validation.Field(&r.Branch, validation.By(branchValid)),
@@ -231,6 +240,7 @@ func (r Repo) Validate() error {
 		validation.Field(&r.Workflow, validation.By(workflowExists)),
 		validation.Field(&r.DeleteSourceBranchOnMerge, validation.By(deleteSourceBranchOnMergeValid)),
 		validation.Field(&r.AutoDiscover, validation.By(autoDiscoverValid)),
+		validation.Field(&r.RepoLocks, validation.By(repoLocksValid)),
 	)
 }
 
@@ -330,6 +340,11 @@ OuterGlobalImportReqs:
 		autoDiscover = r.AutoDiscover.ToValid()
 	}
 
+	var repoLocks *valid.RepoLocks
+	if r.RepoLocks != nil {
+		repoLocks = r.RepoLocks.ToValid()
+	}
+
 	return valid.Repo{
 		ID:                        id,
 		IDRegex:                   idRegex,
@@ -346,6 +361,7 @@ OuterGlobalImportReqs:
 		AllowCustomWorkflows:      r.AllowCustomWorkflows,
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 		RepoLocking:               r.RepoLocking,
+		RepoLocks:                 repoLocks,
 		PolicyCheck:               r.PolicyCheck,
 		CustomPolicyCheck:         r.CustomPolicyCheck,
 		AutoDiscover:              autoDiscover,

@@ -113,8 +113,8 @@ type ProjectContext struct {
 	ClearPolicyApproval bool
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
-	// RepoLocking will get a lock when plan
-	RepoLocking bool
+	// Repo locks mode: disabled, on plan or on apply
+	RepoLocksMode valid.RepoLocksMode
 	// RepoConfigFile
 	RepoConfigFile string
 	// UUID for atlantis logs
