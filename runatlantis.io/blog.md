@@ -23,6 +23,6 @@ We have a rich history of blog posts dating back to 2017-2019. Here are some of 
 
 We are excited to welcome new authors to our blog. Our diverse team brings a wealth of knowledge and experience to share with our readers. Stay tuned for fresh perspectives and in-depth articles on the latest trends and technologies.
 
-If you have any questions or topics you would like us to cover, feel free to reach out. We are always looking to engage with our community and provide valuable content.
+If you have any questions or topics you would like us to cover, feel free to reach out [on Slack](https://join.slack.com/t/atlantis-community/shared_invite/zt-9xlxtxtc-CUSKB1ATt_sQy6um~LDPNw). We are always looking to engage with our community and provide valuable content.
 
 Happy reading!
