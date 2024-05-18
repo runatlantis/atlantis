@@ -13,17 +13,13 @@ IFS=$'\n\t'
   &> /tmp/atlantis-server.log &
 sleep 2
 
-echo "Started atlantis server"
-
 # start ngrok in the background and wait for it to start
-./ngrok config add-authtoken $NGROK_AUTH_TOKEN
-./ngrok http 4141 > /tmp/ngrok.log &
-sleep 4
+./ngrok config add-authtoken $NGROK_AUTH_TOKEN > /dev/null 2>&1
+./ngrok http 4141 > /tmp/ngrok.log 2>&1 &
+sleep 2
 
 # find out what URL ngrok has given us
 export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[] | select(.proto=="https") | .public_url')
-
-echo "ATLANTIS_URL is $ATLANTIS_URL"
 
 # Now we can start the e2e tests
 cd "${GITHUB_WORKSPACE}/e2e"
