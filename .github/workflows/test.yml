@@ -101,7 +101,7 @@ jobs:
     steps:
       - run: 'echo "No build required"'
 
-  e2e:
+  e2e-github:
     runs-on: ubuntu-latest
     # dont run e2e tests on forked PRs
     if: github.repository == 'runatlantis/atlantis'
