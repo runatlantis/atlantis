@@ -124,7 +124,7 @@ jobs:
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
-      - name: Setup deps
+      - name: Setup ngrok
         run: |
             wget -q -nc https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
             tar -xzf ngrok-v3-stable-linux-amd64.tgz && \
