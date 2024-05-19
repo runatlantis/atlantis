@@ -187,7 +187,7 @@ jobs:
       - name: "Setup Goss"
         uses: e1himself/goss-installation-action@fbb6fb55d3e59c96045b2500eeb8ce0995d99ac1 # v1.2.1
         with:
-          version: "v0.4.6"
+          version: "v0.4.7"
 
       - name: Execute Goss tests
         run: |
