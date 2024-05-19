@@ -132,7 +132,7 @@ jobs:
             ./ngrok --help
       - name: Setup gitconfig
         run: |
-          git config --global user.email "rui+atlantis@chenrui.dev"
+          git config --global user.email "maintainers@runatlantis.io"
           git config --global user.name "atlantisbot"
 
       - run: |
