@@ -5,8 +5,8 @@ IFS=$'\n\t'
 
 # start atlantis server in the background and wait for it to start
 ./atlantis server \
-  --gh-user="$GITHUB_USERNAME" \
-  --gh-token="$GITHUB_PASSWORD" \
+  --gh-user="$ATLANTISBOT_GITHUB_USERNAME" \
+  --gh-token="$ATLANTISBOT_GITHUB_TOKEN" \
   --data-dir="/tmp" \
   --log-level="debug" \
   --repo-allowlist="github.com/runatlantis/atlantis-tests" \

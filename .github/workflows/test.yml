@@ -107,8 +107,8 @@ jobs:
     if: github.repository == 'runatlantis/atlantis'
     env:
       TERRAFORM_VERSION: 1.8.3
-      GITHUB_USERNAME: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
-      GITHUB_PASSWORD: ${{ secrets.ATLANTISBOT_GITHUB_PASSWORD }}
+      ATLANTISBOT_GITHUB_USERNAME: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
+      ATLANTISBOT_GITHUB_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4
