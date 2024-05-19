@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
 IFS=$'\n\t'
 
 # start atlantis server in the background and wait for it to start
