@@ -23,7 +23,7 @@ sleep 2
 export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[] | select(.proto=="https") | .public_url')
 
 # Now we can start the e2e tests
-cd "${GITHUB_WORKSPACE}/e2e"
+cd "${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}/e2e"
 echo "Running 'make build'"
 make build
 
