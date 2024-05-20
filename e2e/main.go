@@ -38,13 +38,13 @@ type Project struct {
 
 func main() {
 
-	githubUsername := os.Getenv("GITHUB_USERNAME")
+	githubUsername := os.Getenv("ATLANTISBOT_GITHUB_USERNAME")
 	if githubUsername == "" {
-		log.Fatalf("GITHUB_USERNAME cannot be empty")
+		log.Fatalf("ATLANTISBOT_GITHUB_USERNAME cannot be empty")
 	}
-	githubToken := os.Getenv("GITHUB_PASSWORD")
+	githubToken := os.Getenv("ATLANTISBOT_GITHUB_TOKEN")
 	if githubToken == "" {
-		log.Fatalf("GITHUB_PASSWORD cannot be empty")
+		log.Fatalf("ATLANTISBOT_GITHUB_TOKEN cannot be empty")
 	}
 	atlantisURL := os.Getenv("ATLANTIS_URL")
 	if atlantisURL == "" {
