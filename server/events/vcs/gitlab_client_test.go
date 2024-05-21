@@ -177,7 +177,6 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 			Equals(t, []string{"somefile.yaml"}, filenames)
 		})
 	}
-
 }
 
 func TestGitlabClient_MergePull(t *testing.T) {
@@ -342,6 +341,113 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 				}, c.status, "src", "description", "https://google.com")
 			Ok(t, err)
 			Assert(t, gotRequest, "expected to get the request")
+		})
+	}
+}
+
+func TestGitlabClient_UpdateStatusRetryable(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
+	Ok(t, err)
+
+	cases := []struct {
+		status              models.CommitStatus
+		numberOfConflicts   int
+		expNumberOfRequests int
+		expState            string
+		expError            bool
+	}{
+		// Ensure that 0 x 409 Conflict succeeds
+		{
+			status:              models.PendingCommitStatus,
+			numberOfConflicts:   0,
+			expNumberOfRequests: 1,
+			expState:            "running",
+		},
+		// Ensure that 5 x 409 Conflict still succeeds
+		{
+			status:              models.PendingCommitStatus,
+			numberOfConflicts:   5,
+			expNumberOfRequests: 6,
+			expState:            "running",
+		},
+		// Ensure that 10 x 409 Conflict still fail due to running out of retries
+		{
+			status:              models.FailedCommitStatus,
+			numberOfConflicts:   100, // anything larger than 10 is fine
+			expNumberOfRequests: 10,
+			expState:            "failed",
+			expError:            true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.expState, func(t *testing.T) {
+			handledNumberOfRequests := 0
+
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+						handledNumberOfRequests++
+						shouldSendConflict := handledNumberOfRequests <= c.numberOfConflicts
+
+						body, err := io.ReadAll(r.Body)
+						Ok(t, err)
+						exp := fmt.Sprintf(`{"state":"%s","ref":"patch-1-merger","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
+						Equals(t, exp, string(body))
+						defer r.Body.Close() // nolint: errcheck
+
+						if shouldSendConflict {
+							w.WriteHeader(http.StatusConflict)
+						}
+
+						w.Write([]byte("{}")) // nolint: errcheck
+
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
+						w.WriteHeader(http.StatusOK)
+						w.Write(pipelineSuccess) // nolint: errcheck
+
+					case "/api/v4/":
+						// Rate limiter requests.
+						w.WriteHeader(http.StatusOK)
+
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &GitlabClient{
+				Client:          internalClient,
+				Version:         nil,
+				PollingInterval: 10 * time.Millisecond,
+			}
+
+			repo := models.Repo{
+				FullName: "runatlantis/atlantis",
+				Owner:    "runatlantis",
+				Name:     "atlantis",
+			}
+			err = client.UpdateStatus(
+				logger,
+				repo,
+				models.PullRequest{
+					Num:        1,
+					BaseRepo:   repo,
+					HeadCommit: "sha",
+					HeadBranch: "test",
+				}, c.status, "src", "description", "https://google.com")
+
+			if c.expError {
+				ErrContains(t, "failed to update commit status for 'runatlantis/atlantis' @ 'sha' to 'src' after 10 attempts", err)
+				ErrContains(t, "409", err)
+			} else {
+				Ok(t, err)
+			}
+
+			Assert(t, c.expNumberOfRequests == handledNumberOfRequests, fmt.Sprintf("expected %d number of requests, but processed %d", c.expNumberOfRequests, handledNumberOfRequests))
 		})
 	}
 }

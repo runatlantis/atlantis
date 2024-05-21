@@ -27,6 +27,7 @@ type RepoCfg struct {
 	EmojiReaction              *string             `yaml:"emoji_reaction,omitempty"`
 	AllowedRegexpPrefixes      []string            `yaml:"allowed_regexp_prefixes,omitempty"`
 	AbortOnExcecutionOrderFail *bool               `yaml:"abort_on_execution_order_fail,omitempty"`
+	RepoLocks                  *RepoLocks          `yaml:"repo_locks,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
@@ -77,6 +78,10 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		autoDiscover = r.AutoDiscover.ToValid()
 	}
 
+	var repoLocks *valid.RepoLocks
+	if r.RepoLocks != nil {
+		repoLocks = r.RepoLocks.ToValid()
+	}
 	return valid.RepoCfg{
 		Version:                    *r.Version,
 		Projects:                   validProjects,
@@ -90,5 +95,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		AllowedRegexpPrefixes:      r.AllowedRegexpPrefixes,
 		EmojiReaction:              emojiReaction,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
+		RepoLocks:                  repoLocks,
 	}
 }

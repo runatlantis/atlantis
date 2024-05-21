@@ -21,9 +21,6 @@
     'pnpmDedupe',
   ],
   prHourlyLimit: 1,
-  lockFileMaintenance: {
-    enabled: true,
-  },
   osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
     enabled: true,
@@ -33,14 +30,8 @@
   },
   packageRules: [
     {
-      matchPackageNames: [
-        'vuepress',
-        '@vuepress/client',
-        '@vuepress/markdown',
-        '@vuepress/utils',
-      ],
-      groupName: 'vuepress',
-      allowedVersions: '!/pre.*$/',
+      "matchFileNames": ["package.json"],
+      "enabled": false
     },
     {
       matchFileNames: [
@@ -88,7 +79,12 @@
         '(^|/)Dockerfile\\.[^/]*$',
       ],
       matchStrings: [
-        'renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\sENV .*?_VERSION=(?<currentValue>.*)\\s',
+        // example:
+        // # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
+        // ENV DEFAULT_TERRAFORM_VERSION=x.x.x
+        // # renovate: datasource=github-releases depName=open-policy-agent/conftest
+        // ARG DEFAULT_CONFTEST_VERSION=x.x.x
+        "renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION=(?<currentValue>.*)\\s",
       ],
       versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}',
       extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',
@@ -108,6 +104,7 @@
       customType: 'regex',
       fileMatch: [
         '.circleci/config.yml$',
+        '^\\.github/workflows/[^/]+\\.ya?ml$',
       ],
       matchStrings: [
         'renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.*?_VERSION: (?<currentValue>.*)\\s',

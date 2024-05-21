@@ -1,18 +1,22 @@
 {
   "license": "Apache-2.0",
+  "type": "module",
   "devDependencies": {
-    "@vuepress/bundler-webpack": "2.0.0-rc.9",
-    "@vuepress/plugin-docsearch": "2.0.0-rc.24",
-    "@vuepress/plugin-google-analytics": "2.0.0-rc.21",
-    "@vuepress/plugin-sitemap": "2.0.0-rc.25",
-    "@vuepress/theme-default": "2.0.0-rc.24",
-    "@vuepress/utils": "2.0.0-rc.9",
-    "sass-loader": "14.1.1",
-    "vuepress": "2.0.0-rc.9",
-    "vue": "3.4.21"
+    "@playwright/test": "^1.44.0",
+    "@types/node": "^20.12.10",
+    "@vueuse/core": "^10.9.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdownlint-cli": "^0.40.0",
+    "sass": "^1.77.0",
+    "sitemap-ts": "^1.6.1",
+    "vitepress": "^1.1.4",
+    "vue": "^3.4.27"
   },
   "scripts": {
-    "website:dev": "vuepress dev runatlantis.io",
-    "website:build": "NODE_OPTIONS=--openssl-legacy-provider vuepress build runatlantis.io"
+    "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
+    "website:lint": "markdownlint runatlantis.io",
+    "website:lint-fix": "markdownlint --fix runatlantis.io",
+    "website:build": "vitepress build runatlantis.io",
+    "e2e": "playwright test"
   }
 }
