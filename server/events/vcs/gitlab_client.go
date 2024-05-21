@@ -441,10 +441,13 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	var (
 		resp        *gitlab.Response
 		maxAttempts = 10
-		b           = &backoff.Backoff{Jitter: true}
+		retryer     = &backoff.Backoff{
+			Jitter: true,
+			Max:    g.PollingInterval,
+		}
 	)
 
-	for i := 0; i <= maxAttempts; i++ {
+	for i := 0; i < maxAttempts; i++ {
 		logger := logger.With(
 			"attempt", i+1,
 			"max_attempts", maxAttempts,
@@ -475,7 +478,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			// GitLab does not allow merge requests to be merged when the pipeline status is "running."
 
 			if resp.StatusCode == http.StatusConflict {
-				sleep := b.ForAttempt(float64(i))
+				sleep := retryer.ForAttempt(float64(i))
 
 				logger.With("retry_in", sleep).Warn("GitLab returned HTTP [409 Conflict] when updating commit status")
 				time.Sleep(sleep)

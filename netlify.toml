@@ -1,7 +1,7 @@
 # Netlify Config, https://www.netlify.com/docs/netlify-toml-reference/
 [build]
   base    = "/"
-  publish = "runatlantis.io/.vuepress/dist/"
+  publish = "runatlantis.io/.vitepress/dist/"
   command = "pnpm website:build"
 
 [[redirects]]
@@ -21,8 +21,7 @@
   [headers.values]
     X-Frame-Options = "DENY"
     X-XSS-Protection = "1; mode=block"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
-    Cache-Control = "public, max-age=86400, must-revalidate"
+    Cache-Control = "public, max-age=86400"
     Strict-Transport-Security = "max-age=86400; includeSubDomains; preload"
     Referrer-Policy = "no-referrer"
     X-Content-Type-Options = "nosniff"

@@ -26,9 +26,11 @@ To mitigate, use repo allowlists and IP allowlists. See [Security](security.md#b
 :::
 
 ## Generating A Webhook Secret
+
 You can use any random string generator to create your Webhook secret. It should be > 24 characters.
 
 For example:
+
 * Generate via Ruby with `ruby -rsecurerandom -e 'puts SecureRandom.hex(32)'`
 * Generate online with [browserling: Generate Random Strings and Numbers](https://www.browserling.com/tools/random-string)
 
@@ -37,6 +39,7 @@ You must use **the same** webhook secret for each repo.
 :::
 
 ## Next Steps
+
 * Record your secret
 * You'll be using it later to [configure your webhooks](configuring-webhooks.md), however if you're
 following the [Installation Guide](installation-guide.md) then your next step is to
