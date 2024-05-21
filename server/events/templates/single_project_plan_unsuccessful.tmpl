@@ -2,6 +2,9 @@
 {{ $result := index .Results 0 -}}
 Ran {{ .Command }} for dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
 
-{{ $result.Rendered }}
+{{ if (le (len $result.Rendered) 500000) }}{{$result.Rendered}}{{ else }}[..]
+{{trunc -100 $result.Rendered}}
+
+:warning: The plan is too large to render; run `terraform plan` locally, or open the atlantis job page.{{ end }}
 {{ template "log" . -}}
 {{ end -}}
