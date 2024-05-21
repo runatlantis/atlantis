@@ -9,8 +9,6 @@ workflows](custom-workflows.md#custom-run-command) in several ways.
 2. Pre workflow hooks are run outside of Atlantis commands. Which means
    they do not surface their output back to the PR as a comment.
 
-[[toc]]
-
 ## Usage
 
 Pre workflow hooks can only be specified in the Server-Side Repo Config under the
@@ -21,7 +19,7 @@ By default, `pre-workflow-hooks` do not prevent Atlantis from executing its
 workflows(`plan`, `apply`) even if a `run` command exits with an error. This
 behavior can be changed by setting the [fail-on-pre-workflow-hook-error](server-configuration.md#fail-on-pre-workflow-hook-error)
 flag in the Atlantis server configuration.
-::: 
+:::
 
 ## Atlantis Command Targetting
 
@@ -98,6 +96,7 @@ command](custom-workflows.md#custom-run-command).
 | shellArgs   | string | '-c'    | no       | The shell arguments to use for running the command |
 
 ::: tip Notes
+
 * `run` commands are executed with the following environment variables:
   * `BASE_REPO_NAME` - Name of the repository that the pull request will be merged into, ex. `atlantis`.
   * `BASE_REPO_OWNER` - Owner of the repository that the pull request will be merged into, ex. `runatlantis`.
@@ -109,7 +108,7 @@ command](custom-workflows.md#custom-run-command).
   * `PULL_NUM` - Pull request number or ID, ex. `2`.
   * `PULL_URL` - Pull request URL, ex. `https://github.com/runatlantis/atlantis/pull/2`.
   * `PULL_AUTHOR` - Username of the pull request author, ex. `acme-user`.
-  * `DIR` - The absolute path to the root of the cloned repository. 
+  * `DIR` - The absolute path to the root of the cloned repository.
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
