@@ -21,7 +21,7 @@
     'pnpmDedupe',
   ],
   prHourlyLimit: 1,
-  minimumReleaseAge: 3,
+  minimumReleaseAge: 10,
   osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
     enabled: true,
