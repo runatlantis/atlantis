@@ -2,6 +2,9 @@
 {{ $result := index .Results 0 -}}
 Ran {{ .Command }} for {{ if $result.ProjectName }}project: `{{ $result.ProjectName }}` {{ end }}dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
 
-{{ $result.Rendered }}
+{{ if (le (len $result.Rendered) 500000) }}{{$result.Rendered}}{{ else }}[..]
+{{trunc -100 $result.Rendered}}
+
+:warning: The apply summary is large to render; open the atlantis job page.{{ end }}
 {{ template "log" . -}}
 {{ end -}}

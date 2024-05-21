@@ -5,8 +5,10 @@
 {{ range $i, $result := .Results -}}
 {{ if (and $hideUnchangedPlans $result.NoChanges) }}{{continue}}{{end -}}
 ### {{ add $i 1 }}. {{ if $result.ProjectName }}project: `{{ $result.ProjectName }}` {{ end }}dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
-{{ $result.Rendered }}
+{{ if (le (len $result.Rendered) 500000) }}{{$result.Rendered}}{{ else }}[..]
+{{trunc -100 $result.Rendered}}
 
+:warning: The plan is too large to render; run `terraform plan` locally, or open the atlantis job page.{{ end }}
 ---
 {{ end -}}
 {{ template "multiProjectPlanFooter" . -}}
