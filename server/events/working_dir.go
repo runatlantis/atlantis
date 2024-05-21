@@ -356,7 +356,7 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 
 		// fetch once more, otherwise `FETCH_HEAD` was reset to base when we ran
 		// fetch --unshallow
-		if err := w.wrappedGit(c, "fetch", fetchRemote, fetchRef); err != nil {
+		if err := w.wrappedGit(logger, c, "fetch", fetchRemote, fetchRef); err != nil {
 			return err
 		}
 	}
