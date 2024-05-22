@@ -239,18 +239,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				return nil, err
 			}
 			githubCredentials = &vcs.GithubAppCredentials{
-				AppID:    userConfig.GithubAppID,
-				Key:      privateKey,
-				Hostname: userConfig.GithubHostname,
-				AppSlug:  userConfig.GithubAppSlug,
+				AppID:          userConfig.GithubAppID,
+				InstallationID: userConfig.GithubInstallationID,
+				Key:            privateKey,
+				Hostname:       userConfig.GithubHostname,
+				AppSlug:        userConfig.GithubAppSlug,
 			}
 			githubAppEnabled = true
 		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKey != "" {
 			githubCredentials = &vcs.GithubAppCredentials{
-				AppID:    userConfig.GithubAppID,
-				Key:      []byte(userConfig.GithubAppKey),
-				Hostname: userConfig.GithubHostname,
-				AppSlug:  userConfig.GithubAppSlug,
+				AppID:          userConfig.GithubAppID,
+				InstallationID: userConfig.GithubInstallationID,
+				Key:            []byte(userConfig.GithubAppKey),
+				Hostname:       userConfig.GithubHostname,
+				AppSlug:        userConfig.GithubAppSlug,
 			}
 			githubAppEnabled = true
 		}
