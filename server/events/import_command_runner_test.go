@@ -64,7 +64,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			ctx := &command.Context{
 				User:     testdata.User,
-				Log:      logging.NewNoopLogger(t),
+				Log:      logger,
 				Scope:    scopeNull,
 				Pull:     modelPull,
 				HeadRepo: testdata.GithubRepo,
@@ -72,16 +72,18 @@ func TestImportCommandRunner_Run(t *testing.T) {
 			}
 			cmd := &events.CommentCommand{Name: command.Import}
 
-			When(pullReqStatusFetcher.FetchPullStatus(modelPull)).ThenReturn(tt.pullReqStatus, nil)
+			When(pullReqStatusFetcher.FetchPullStatus(logger, modelPull)).ThenReturn(tt.pullReqStatus, nil)
 			When(projectCommandBuilder.BuildImportCommands(ctx, cmd)).ThenReturn(tt.projectCmds, nil)
 
 			importCommandRunner.Run(ctx, cmd)
 
 			Assert(t, ctx.PullRequestStatus.Mergeable == true, "PullRequestStatus must be set for import_requirements")
 			if tt.expNoComment {
-				vcsClient.VerifyWasCalled(Never()).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+				vcsClient.VerifyWasCalled(Never()).CreateComment(
+					Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 			} else {
-				vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, modelPull.Num, tt.expComment, "import")
+				vcsClient.VerifyWasCalledOnce().CreateComment(
+					Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(tt.expComment), Eq("import"))
 			}
 		})
 	}

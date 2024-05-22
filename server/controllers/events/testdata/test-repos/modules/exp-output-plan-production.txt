@@ -19,17 +19,25 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 Changes to Outputs:
 + var = "production"
 ```
+</details>
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d production`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  ```shell
+  atlantis apply -d production
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -d production`
-</details>
+  ```shell
+  atlantis plan -d production
+  ```
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * `atlantis apply`
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * `atlantis unlock`
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  ```shell
+  atlantis apply
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  ```shell
+  atlantis unlock
+  ```

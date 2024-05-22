@@ -33,7 +33,7 @@ func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, c
 				return "Pull request must be mergeable before running plan.", nil
 			}
 		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(repoDir) {
+			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
 				return "Default branch must be rebased onto pull request before running plan.", nil
 			}
 		}
@@ -60,7 +60,7 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 				return "Pull request must be mergeable before running apply.", nil
 			}
 		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(repoDir) {
+			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
 				return "Default branch must be rebased onto pull request before running apply.", nil
 			}
 		}
@@ -95,7 +95,7 @@ func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string,
 				return "Pull request must be mergeable before running import.", nil
 			}
 		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(repoDir) {
+			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
 				return "Default branch must be rebased onto pull request before running import.", nil
 			}
 		}

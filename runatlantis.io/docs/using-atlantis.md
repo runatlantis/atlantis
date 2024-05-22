@@ -5,8 +5,9 @@ Atlantis triggers commands via pull request comments.
 
 ::: tip
 You can use following executable names.
+
 * `atlantis help`
-  * `atlantis` is executable name. You can configure by [Executable Name](/docs/server-configuration.html#executable-name).
+  * `atlantis` is executable name. You can configure by [Executable Name](server-configuration.md#executable-name).
 * `run help`
   * `run` is a global executable name.
 * `@GithubUser help`
@@ -14,35 +15,46 @@ You can use following executable names.
 :::
 
 Currently, Atlantis supports the following commands.
-[[toc]]
 
 ---
+
 ## atlantis help
+
 ```bash
 atlantis help
 ```
+
 ### Explanation
+
 View help
 
 ---
+
 ## atlantis version
+
 ```bash
 atlantis version
 ```
 
 ### Explanation
+
 Print the output of 'terraform version'.
 
 ---
+
 ## atlantis plan
+
 ```bash
 atlantis plan [options] -- [terraform plan flags]
 ```
+
 ### Explanation
+
 Runs `terraform plan` on the pull request's branch. You may wish to re-run plan after Atlantis has already done
 so if you've changed some resources manually.
 
 ### Examples
+
 ```bash
 # Runs plan for any projects that Atlantis thinks were modified.
 # If an `atlantis.yaml` file is specified, runs plan on the projects that
@@ -60,9 +72,10 @@ atlantis plan -w staging
 ```
 
 ### Options
+
 * `-d directory` Which directory to run plan in relative to root of repo. Use `.` for root.
-    * Ex. `atlantis plan -d child/dir`
-* `-p project` Which project to run plan for. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w` because the project defines this already.
+  * Ex. `atlantis plan -d child/dir`
+* `-p project` Which project to run plan for. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.md). Cannot be used at same time as `-d` or `-w` because the project defines this already.
 * `-w workspace` Switch to this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) before planning. Defaults to `default`. Ignore this if Terraform workspaces are unused.
 * `--verbose` Append Atlantis log to comment.
 
@@ -74,30 +87,38 @@ A `atlantis plan` (without flags), like autoplans, discards all plans previously
 
 If `terraform plan` requires additional arguments, like `-target=resource` or `-var 'foo=bar'` or `-var-file myfile.tfvars`
 you can append them to the end of the comment after `--`, ex.
-```
+
+```shell
 atlantis plan -d dir -- -var foo='bar'
 ```
-If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
+
+If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.md#adding-extra-arguments-to-terraform-commands).
 
 ### Using the -destroy Flag
 
 #### Example
+
 To perform a destructive plan that will destroy resources you can use the `-destroy` flag like this:
 
 ```bash
 atlantis plan -- -destroy
 atlantis plan -d dir -- -destroy
 ```
-::: warning NOTE 
+
+::: warning NOTE
 The `-destroy` flag generates a destroy plan, If this plan is applied it can result in data loss or service disruptions. Ensure that you have thoroughly reviewed your Terraform configuration and intend to remove the specified resources before using this flag.
 :::
 
 ---
+
 ## atlantis apply
+
 ```bash
 atlantis apply [options] -- [terraform apply flags]
 ```
+
 ### Explanation
+
 Runs `terraform apply` for the plan that matches the directory/project/workspace.
 
 ::: tip
@@ -106,8 +127,8 @@ This includes all projects that have been planned manually with `atlantis plan` 
 For Atlantis commands to work,  Atlantis needs to know the location where the plan file is. For that, you can use $PLANFILE which will contain the path of the plan file to be used in your custom steps. i.e `terraform plan -out $PLANFILE`
 :::
 
-
 ### Examples
+
 ```bash
 # Runs apply for all unapplied plans from this pull request.
 atlantis apply
@@ -123,15 +144,17 @@ atlantis apply -w staging
 ```
 
 ### Options
+
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use `.` for root.
-* `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.html). Cannot be used at same time as `-d` or `-w`.
+* `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.md). Cannot be used at same time as `-d` or `-w`.
 * `-w workspace` Apply the plan for this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
-* `--auto-merge-disabled` Disable [automerge](automerging.html) for this apply command.
+* `--auto-merge-disabled` Disable [automerge](automerging.md) for this apply command.
 * `--verbose` Append Atlantis log to comment.
 
 ### Additional Terraform flags
 
 Because Atlantis under the hood is running `terraform apply plan.tfplan`, any Terraform options that would change the `plan` are ignored, ex:
+
 * `-target=resource`
 * `-var 'foo=bar'`
 * `-var-file=myfile.tfvars`
@@ -140,17 +163,22 @@ They're ignored because they can't be specified for an already generated planfil
 If you would like to specify these flags, do it while running `atlantis plan`.
 
 ---
+
 ## atlantis import
+
 ```bash
 atlantis import [options] ADDRESS ID -- [terraform import flags]
 ```
+
 ### Explanation
+
 Runs `terraform import` that matches the directory/project/workspace.
 This command discards the terraform plan result. After an import and before an apply, another `atlantis plan` must be run again.
 
-To allow the `import` command requires [--allow-commands](/docs/server-configuration.html#allow-commands) configuration.
+To allow the `import` command requires [--allow-commands](server-configuration.md#allow-commands) configuration.
 
 ### Examples
+
 ```bash
 # Runs import
 atlantis import ADDRESS ID
@@ -166,36 +194,45 @@ atlantis import -w staging ADDRESS ID
 ```
 
 ::: tip
+
 * If import for_each resources, it requires a single quoted address.
   * ex. `atlantis import 'aws_instance.example["foo"]' i-1234567890abcdef0`
 :::
 
 ### Options
+
 * `-d directory` Import a resource for this directory, relative to root of repo. Use `.` for root.
-* `-p project` Import a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml`](repo-level-atlantis-yaml.html) repo configuration file. This cannot be used at the same time as `-d` or `-w`.
+* `-p project` Import a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml`](repo-level-atlantis-yaml.md) repo configuration file. This cannot be used at the same time as `-d` or `-w`.
 * `-w workspace` Import a resource for a specific [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
 
 ### Additional Terraform flags
 
 If `terraform import` requires additional arguments, like `-var 'foo=bar'` or `-var-file myfile.tfvars`
 append them to the end of the comment after `--`, e.g.
-```
+
+```shell
 atlantis import -d dir 'aws_instance.example["foo"]' i-1234567890abcdef0 -- -var foo='bar'
 ```
-If a flag is needed to be always appended, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
+
+If a flag is needed to be always appended, see [Custom Workflow Use Cases](custom-workflows.md#adding-extra-arguments-to-terraform-commands).
 
 ---
+
 ## atlantis state rm
+
 ```bash
 atlantis state [options] rm ADDRESS... -- [terraform state rm flags]
 ```
+
 ### Explanation
+
 Runs `terraform state rm` that matches the directory/project/workspace.
 This command discards the terraform plan result. After run state rm and before an apply, another `atlantis plan` must be run again.
 
-To allow the `state` command requires [--allow-commands](/docs/server-configuration.html#allow-commands) configuration.
+To allow the `state` command requires [--allow-commands](server-configuration.md#allow-commands) configuration.
 
 ### Examples
+
 ```bash
 # Runs state rm
 atlantis state rm ADDRESS1 ADDRESS2
@@ -211,44 +248,55 @@ atlantis state -w staging rm ADDRESS
 ```
 
 ::: tip
+
 * If run state rm to for_each resources, it requires a single quoted address.
   * ex. `atlantis state rm 'aws_instance.example["foo"]'`
 :::
 
 ### Options
+
 * `-d directory` Run state rm a resource for this directory, relative to root of repo. Use `.` for root.
-* `-p project` Run state rm a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml`](repo-level-atlantis-yaml.html) repo configuration file. This cannot be used at the same time as `-d` or `-w`.
+* `-p project` Run state rm a resource for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml`](repo-level-atlantis-yaml.md) repo configuration file. This cannot be used at the same time as `-d` or `-w`.
 * `-w workspace` Run state rm a resource for a specific [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
 
 ### Additional Terraform flags
 
 If `terraform state rm` requires additional arguments, like `-lock=false'`
 append them to the end of the comment after `--`, e.g.
-```
+
+```shell
 atlantis state -d dir rm 'aws_instance.example["foo"]' -- -lock=false
 ```
-If a flag is needed to be always appended, see [Custom Workflow Use Cases](custom-workflows.html#adding-extra-arguments-to-terraform-commands).
+
+If a flag is needed to be always appended, see [Custom Workflow Use Cases](custom-workflows.md#adding-extra-arguments-to-terraform-commands).
 
 ---
+
 ## atlantis unlock
+
 ```bash
 atlantis unlock
 ```
 
 ### Explanation
+
 Removes all atlantis locks and discards all plans for this PR.
 To unlock a specific plan you can use the Atlantis UI.
 
 ---
+
 ## atlantis approve_policies
+
 ```bash
 atlantis approve_policies
 ```
 
 ### Explanation
+
 Approves all current policy checking failures for the PR.
 
-See also [policy checking](/docs/policy-checking.html).
+See also [policy checking](policy-checking.md).
 
 ### Options
+
 * `--verbose` Append Atlantis log to comment.

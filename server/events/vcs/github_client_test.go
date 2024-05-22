@@ -67,19 +67,21 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	files, err := client.GetModifiedFiles(models.Repo{
-		FullName:          "owner/repo",
-		Owner:             "owner",
-		Name:              "repo",
-		CloneURL:          "",
-		SanitizedCloneURL: "",
-		VCSHost: models.VCSHost{
-			Type:     models.Github,
-			Hostname: "github.com",
-		},
-	}, models.PullRequest{
-		Num: 1,
-	})
+	files, err := client.GetModifiedFiles(
+		logger,
+		models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.Github,
+				Hostname: "github.com",
+			},
+		}, models.PullRequest{
+			Num: 1,
+		})
 	Ok(t, err)
 	Equals(t, []string{"file1.txt", "file2.txt"}, files)
 }
@@ -87,6 +89,7 @@ func TestGithubClient_GetModifiedFiles(t *testing.T) {
 // GetModifiedFiles should include the source and destination of a moved
 // file.
 func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	resp := `[
   {
     "sha": "bbcd538c8e72b8c175046e27cc8f907076331401",
@@ -122,24 +125,27 @@ func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	files, err := client.GetModifiedFiles(models.Repo{
-		FullName:          "owner/repo",
-		Owner:             "owner",
-		Name:              "repo",
-		CloneURL:          "",
-		SanitizedCloneURL: "",
-		VCSHost: models.VCSHost{
-			Type:     models.Github,
-			Hostname: "github.com",
-		},
-	}, models.PullRequest{
-		Num: 1,
-	})
+	files, err := client.GetModifiedFiles(
+		logger,
+		models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.Github,
+				Hostname: "github.com",
+			},
+		}, models.PullRequest{
+			Num: 1,
+		})
 	Ok(t, err)
 	Equals(t, []string{"new/filename.txt", "previous/filename.txt"}, files)
 }
 
 func TestGithubClient_PaginatesComments(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	calls := 0
 	issueResps := []string{
 		`[
@@ -217,6 +223,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	defer disableSSLVerification()()
 
 	err = client.HidePrevCommandComments(
+		logger,
 		models.Repo{
 			FullName:          "owner/repo",
 			Owner:             "owner",
@@ -241,6 +248,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 }
 
 func TestGithubClient_HideOldComments(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	atlantisUser := "AtlantisUser"
 	pullRequestNum := 123
 	issueResp := strings.ReplaceAll(`[
@@ -332,6 +340,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 			defer disableSSLVerification()()
 
 			err = client.HidePrevCommandComments(
+				logger,
 				models.Repo{
 					FullName:          "owner/repo",
 					Owner:             "owner",
@@ -358,6 +367,7 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 }
 
 func TestGithubClient_UpdateStatus(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	cases := []struct {
 		status   models.CommitStatus
 		expState string
@@ -401,25 +411,28 @@ func TestGithubClient_UpdateStatus(t *testing.T) {
 			Ok(t, err)
 			defer disableSSLVerification()()
 
-			err = client.UpdateStatus(models.Repo{
-				FullName:          "owner/repo",
-				Owner:             "owner",
-				Name:              "repo",
-				CloneURL:          "",
-				SanitizedCloneURL: "",
-				VCSHost: models.VCSHost{
-					Type:     models.Github,
-					Hostname: "github.com",
-				},
-			}, models.PullRequest{
-				Num: 1,
-			}, c.status, "src", "description", "https://google.com")
+			err = client.UpdateStatus(
+				logger,
+				models.Repo{
+					FullName:          "owner/repo",
+					Owner:             "owner",
+					Name:              "repo",
+					CloneURL:          "",
+					SanitizedCloneURL: "",
+					VCSHost: models.VCSHost{
+						Type:     models.Github,
+						Hostname: "github.com",
+					},
+				}, models.PullRequest{
+					Num: 1,
+				}, c.status, "src", "description", "https://google.com")
 			Ok(t, err)
 		})
 	}
 }
 
 func TestGithubClient_PullIsApproved(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	respTemplate := `[
 		{
 			"id": %d,
@@ -487,24 +500,27 @@ func TestGithubClient_PullIsApproved(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	approvalStatus, err := client.PullIsApproved(models.Repo{
-		FullName:          "owner/repo",
-		Owner:             "owner",
-		Name:              "repo",
-		CloneURL:          "",
-		SanitizedCloneURL: "",
-		VCSHost: models.VCSHost{
-			Type:     models.Github,
-			Hostname: "github.com",
-		},
-	}, models.PullRequest{
-		Num: 1,
-	})
+	approvalStatus, err := client.PullIsApproved(
+		logger,
+		models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.Github,
+				Hostname: "github.com",
+			},
+		}, models.PullRequest{
+			Num: 1,
+		})
 	Ok(t, err)
 	Equals(t, false, approvalStatus.IsApproved)
 }
 
 func TestGithubClient_PullIsMergeable(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	vcsStatusName := "atlantis-test"
 	cases := []struct {
 		state        string
@@ -602,19 +618,21 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 			Ok(t, err)
 			defer disableSSLVerification()()
 
-			actMergeable, err := client.PullIsMergeable(models.Repo{
-				FullName:          "owner/repo",
-				Owner:             "owner",
-				Name:              "repo",
-				CloneURL:          "",
-				SanitizedCloneURL: "",
-				VCSHost: models.VCSHost{
-					Type:     models.Github,
-					Hostname: "github.com",
-				},
-			}, models.PullRequest{
-				Num: 1,
-			}, vcsStatusName)
+			actMergeable, err := client.PullIsMergeable(
+				logger,
+				models.Repo{
+					FullName:          "owner/repo",
+					Owner:             "owner",
+					Name:              "repo",
+					CloneURL:          "",
+					SanitizedCloneURL: "",
+					VCSHost: models.VCSHost{
+						Type:     models.Github,
+						Hostname: "github.com",
+					},
+				}, models.PullRequest{
+					Num: 1,
+				}, vcsStatusName)
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})
@@ -622,6 +640,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 }
 
 func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	vcsStatusName := "atlantis"
 	cases := []struct {
 		state          string
@@ -753,19 +772,21 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			Ok(t, err)
 			defer disableSSLVerification()()
 
-			actMergeable, err := client.PullIsMergeable(models.Repo{
-				FullName:          "octocat/repo",
-				Owner:             "octocat",
-				Name:              "repo",
-				CloneURL:          "",
-				SanitizedCloneURL: "",
-				VCSHost: models.VCSHost{
-					Type:     models.Github,
-					Hostname: "github.com",
-				},
-			}, models.PullRequest{
-				Num: 1,
-			}, vcsStatusName)
+			actMergeable, err := client.PullIsMergeable(
+				logger,
+				models.Repo{
+					FullName:          "octocat/repo",
+					Owner:             "octocat",
+					Name:              "repo",
+					CloneURL:          "",
+					SanitizedCloneURL: "",
+					VCSHost: models.VCSHost{
+						Type:     models.Github,
+						Hostname: "github.com",
+					},
+				}, models.PullRequest{
+					Num: 1,
+				}, vcsStatusName)
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})
@@ -773,6 +794,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 }
 
 func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApplyButWithNoBranchProtectionChecks(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	vcsStatusName := "atlantis"
 	cases := []struct {
 		state          string
@@ -861,19 +883,21 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApplyButWithNoBranc
 			Ok(t, err)
 			defer disableSSLVerification()()
 
-			actMergeable, err := client.PullIsMergeable(models.Repo{
-				FullName:          "octocat/Hello-World",
-				Owner:             "octocat",
-				Name:              "Hello-World",
-				CloneURL:          "",
-				SanitizedCloneURL: "",
-				VCSHost: models.VCSHost{
-					Type:     models.Github,
-					Hostname: "github.com",
-				},
-			}, models.PullRequest{
-				Num: 1,
-			}, vcsStatusName)
+			actMergeable, err := client.PullIsMergeable(
+				logger,
+				models.Repo{
+					FullName:          "octocat/Hello-World",
+					Owner:             "octocat",
+					Name:              "Hello-World",
+					CloneURL:          "",
+					SanitizedCloneURL: "",
+					VCSHost: models.VCSHost{
+						Type:     models.Github,
+						Hostname: "github.com",
+					},
+				}, models.PullRequest{
+					Num: 1,
+				}, vcsStatusName)
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})
@@ -881,6 +905,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApplyButWithNoBranc
 }
 
 func TestGithubClient_MergePullHandlesError(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	cases := []struct {
 		code    int
 		message string
@@ -944,6 +969,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 			defer disableSSLVerification()()
 
 			err = client.MergePull(
+				logger,
 				models.PullRequest{
 					BaseRepo: models.Repo{
 						FullName:          "owner/repo",
@@ -973,6 +999,7 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 // Test that if the pull request only allows a certain merge method that we
 // use that method
 func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	cases := map[string]struct {
 		allowMerge  bool
 		allowRebase bool
@@ -1067,6 +1094,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			defer disableSSLVerification()()
 
 			err = client.MergePull(
+				logger,
 				models.PullRequest{
 					BaseRepo: models.Repo{
 						FullName:          "runatlantis/atlantis",
@@ -1110,6 +1138,7 @@ func disableSSLVerification() func() {
 }
 
 func TestGithubClient_SplitComments(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	type githubComment struct {
 		Body string `json:"body"`
 	}
@@ -1162,9 +1191,9 @@ func TestGithubClient_SplitComments(t *testing.T) {
 	}
 	// create an extra long string
 	comment := strings.Repeat("a", 65537)
-	err = client.CreateComment(repo, pull.Num, comment, command.Plan.String())
+	err = client.CreateComment(logger, repo, pull.Num, comment, command.Plan.String())
 	Ok(t, err)
-	err = client.CreateComment(repo, pull.Num, comment, "")
+	err = client.CreateComment(logger, repo, pull.Num, comment, "")
 	Ok(t, err)
 
 	body := strings.Split(githubComments[1].Body, "\n")
@@ -1179,6 +1208,7 @@ func TestGithubClient_SplitComments(t *testing.T) {
 
 // Test that we retry the get pull request call if it 404s.
 func TestGithubClient_Retry404(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	var numCalls = 0
 
 	testServer := httptest.NewTLSServer(
@@ -1217,13 +1247,14 @@ func TestGithubClient_Retry404(t *testing.T) {
 			Hostname: "github.com",
 		},
 	}
-	_, err = client.GetPullRequest(repo, 1)
+	_, err = client.GetPullRequest(logger, repo, 1)
 	Ok(t, err)
 	Equals(t, 3, numCalls)
 }
 
 // Test that we retry the get pull request files call if it 404s.
 func TestGithubClient_Retry404Files(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	var numCalls = 0
 
 	testServer := httptest.NewTLSServer(
@@ -1263,7 +1294,7 @@ func TestGithubClient_Retry404Files(t *testing.T) {
 		},
 	}
 	pr := models.PullRequest{Num: 1}
-	_, err = client.GetModifiedFiles(repo, pr)
+	_, err = client.GetModifiedFiles(logger, repo, pr)
 	Ok(t, err)
 	Equals(t, 3, numCalls)
 }
@@ -1572,12 +1603,14 @@ func TestGithubClient_GetPullLabels(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	labels, err := client.GetPullLabels(models.Repo{
-		Owner: "runatlantis",
-		Name:  "atlantis",
-	}, models.PullRequest{
-		Num: 1,
-	})
+	labels, err := client.GetPullLabels(
+		logger,
+		models.Repo{
+			Owner: "runatlantis",
+			Name:  "atlantis",
+		}, models.PullRequest{
+			Num: 1,
+		})
 	Ok(t, err)
 	Equals(t, []string{"docs", "go", "needs tests", "work-in-progress"}, labels)
 }
@@ -1607,12 +1640,15 @@ func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	labels, err := client.GetPullLabels(models.Repo{
-		Owner: "runatlantis",
-		Name:  "atlantis",
-	}, models.PullRequest{
-		Num: 1,
-	})
+	labels, err := client.GetPullLabels(
+		logger,
+		models.Repo{
+			Owner: "runatlantis",
+			Name:  "atlantis",
+		},
+		models.PullRequest{
+			Num: 1,
+		})
 	Ok(t, err)
 	Equals(t, 0, len(labels))
 }

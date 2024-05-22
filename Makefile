@@ -98,7 +98,7 @@ check-lint: ## Run linter in CI/CD. If running locally use 'lint'
 
 .PHONY: check-fmt
 check-fmt: ## Fail if not formatted
-	if [[ $$(goimports -l $$(find . -type f -name '*.go' ! -path "./vendor/*" ! -path "**/mocks/*")) ]]; then exit 1; fi
+	./scripts/fmt.sh
 
 .PHONY: end-to-end-deps
 end-to-end-deps: ## Install e2e dependencies
@@ -110,4 +110,4 @@ end-to-end-tests: ## Run e2e tests
 
 .PHONY: website-dev
 website-dev: ## Run runatlantic.io on localhost:8080
-	yarn website:dev
+	pnpm website:dev

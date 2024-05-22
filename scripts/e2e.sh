@@ -3,15 +3,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# download all the tooling needed for e2e tests
-CIRCLE_WORKING_DIRECTORY="${CIRCLE_WORKING_DIRECTORY/#\~/$HOME}" # https://discuss.circleci.com/t/circle-working-directory-doesnt-expand/17007/5
-${CIRCLE_WORKING_DIRECTORY}/scripts/e2e-deps.sh
-cd "${CIRCLE_WORKING_DIRECTORY}/e2e"
-
 # start atlantis server in the background and wait for it to start
 ./atlantis server \
-  --gh-user="$GITHUB_USERNAME" \
-  --gh-token="$GITHUB_PASSWORD" \
+  --gh-user="$ATLANTISBOT_GITHUB_USERNAME" \
+  --gh-token="$ATLANTISBOT_GITHUB_TOKEN" \
   --data-dir="/tmp" \
   --log-level="debug" \
   --repo-allowlist="github.com/runatlantis/atlantis-tests" \
@@ -20,13 +15,15 @@ cd "${CIRCLE_WORKING_DIRECTORY}/e2e"
 sleep 2
 
 # start ngrok in the background and wait for it to start
-./ngrok http 4141 > /tmp/ngrok.log &
+./ngrok config add-authtoken $NGROK_AUTH_TOKEN > /dev/null 2>&1
+./ngrok http 4141 > /tmp/ngrok.log 2>&1 &
 sleep 2
 
 # find out what URL ngrok has given us
 export ATLANTIS_URL=$(curl -s 'http://localhost:4040/api/tunnels' | jq -r '.tunnels[] | select(.proto=="https") | .public_url')
 
 # Now we can start the e2e tests
+cd "${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}/e2e"
 echo "Running 'make build'"
 make build
 

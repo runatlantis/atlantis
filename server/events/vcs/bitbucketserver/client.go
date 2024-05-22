@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/logging"
 
 	validator "github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
@@ -64,7 +65,7 @@ func NewClient(httpClient *http.Client, username string, password string, baseUR
 
 // GetModifiedFiles returns the names of files that were modified in the merge request
 // relative to the repo root, e.g. parent/child/file.txt.
-func (b *Client) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
@@ -133,7 +134,7 @@ func (b *Client) GetProjectKey(repoName string, cloneURL string) (string, error)
 
 // CreateComment creates a comment on the merge request. It will write multiple
 // comments if a single comment is too long.
-func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, _ string) error {
+func (b *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, _ string) error {
 	sepEnd := "\n```\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n```diff\n"
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
@@ -145,11 +146,11 @@ func (b *Client) CreateComment(repo models.Repo, pullNum int, comment string, _ 
 	return nil
 }
 
-func (b *Client) ReactToComment(_ models.Repo, _ int, _ int64, _ string) error {
+func (b *Client) ReactToComment(_ logging.SimpleLogging, _ models.Repo, _ int, _ int64, _ string) error {
 	return nil
 }
 
-func (b *Client) HidePrevCommandComments(_ models.Repo, _ int, _ string, _ string) error {
+func (b *Client) HidePrevCommandComments(_ logging.SimpleLogging, _ models.Repo, _ int, _ string, _ string) error {
 	return nil
 }
 
@@ -169,7 +170,7 @@ func (b *Client) postComment(repo models.Repo, pullNum int, comment string) erro
 }
 
 // PullIsApproved returns true if the merge request was approved.
-func (b *Client) PullIsApproved(repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
+func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
 		return approvalStatus, err
@@ -202,7 +203,7 @@ func (b *Client) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, _ string) (bool, error) {
+func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string) (bool, error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
 		return false, err
@@ -226,7 +227,7 @@ func (b *Client) PullIsMergeable(repo models.Repo, pull models.PullRequest, _ st
 }
 
 // UpdateStatus updates the status of a commit.
-func (b *Client) UpdateStatus(_ models.Repo, pull models.PullRequest, status models.CommitStatus, src string, description string, url string) error {
+func (b *Client) UpdateStatus(logger logging.SimpleLogging, _ models.Repo, pull models.PullRequest, status models.CommitStatus, src string, description string, url string) error {
 	bbState := "FAILED"
 	switch status {
 	case models.PendingCommitStatus:
@@ -259,7 +260,7 @@ func (b *Client) UpdateStatus(_ models.Repo, pull models.PullRequest, status mod
 }
 
 // MergePull merges the pull request.
-func (b *Client) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+func (b *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	projectKey, err := b.GetProjectKey(pull.BaseRepo.Name, pull.BaseRepo.SanitizedCloneURL)
 	if err != nil {
 		return err
@@ -358,14 +359,14 @@ func (b *Client) SupportsSingleFileDownload(_ models.Repo) bool {
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (b *Client) GetFileContent(_ models.PullRequest, _ string) (bool, []byte, error) {
+func (b *Client) GetFileContent(_ logging.SimpleLogging, _ models.PullRequest, _ string) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("not implemented")
 }
 
-func (b *Client) GetCloneURL(_ models.VCSHostType, _ string) (string, error) {
+func (b *Client) GetCloneURL(_ logging.SimpleLogging, _ models.VCSHostType, _ string) (string, error) {
 	return "", fmt.Errorf("not yet implemented")
 }
 
-func (b *Client) GetPullLabels(_ models.Repo, _ models.PullRequest) ([]string, error) {
+func (b *Client) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }

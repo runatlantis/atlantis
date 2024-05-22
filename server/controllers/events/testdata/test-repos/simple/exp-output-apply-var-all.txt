@@ -2,6 +2,7 @@ Ran Apply for 2 projects:
 
 1. dir: `.` workspace: `default`
 1. dir: `.` workspace: `new_workspace`
+---
 
 ### 1. dir: `.` workspace: `default`
 <details><summary>Show Output</summary>
@@ -47,3 +48,6 @@ workspace = "new_workspace"
 </details>
 
 ---
+### Apply Summary
+
+2 projects, 2 successful, 0 failed, 0 errored

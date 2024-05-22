@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/runatlantis/atlantis/server/controllers/templates"
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -62,7 +62,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	app, err := client.ExchangeCode(code)
+	app, err := client.ExchangeCode(g.Logger, code)
 	if err != nil {
 		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return
@@ -70,7 +70,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 
 	g.Logger.Debug("Found credentials for GitHub app %q with id %d", app.Name, app.ID)
 
-	err = templates.GithubAppSetupTemplate.Execute(w, templates.GithubSetupData{
+	err = web_templates.GithubAppSetupTemplate.Execute(w, web_templates.GithubSetupData{
 		Target:          "",
 		Manifest:        "",
 		ID:              app.ID,
@@ -142,7 +142,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	err = templates.GithubAppSetupTemplate.Execute(w, templates.GithubSetupData{
+	err = web_templates.GithubAppSetupTemplate.Execute(w, web_templates.GithubSetupData{
 		Target:   url.String(),
 		Manifest: string(jsonManifest),
 	})

@@ -43,4 +43,7 @@ type Context struct {
 	ClearPolicyApproval bool
 
 	Trigger Trigger
+
+	// API is true if plan/apply by API endpoints
+	API bool
 }
