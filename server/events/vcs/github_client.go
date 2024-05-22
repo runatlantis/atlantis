@@ -192,6 +192,7 @@ func (g *GithubClient) CreateComment(logger logging.SimpleLogging, repo models.R
 	}
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	common.ReverseComments(comments)
 	for i := range comments {
 		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
 		if resp != nil {

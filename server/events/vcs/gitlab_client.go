@@ -178,6 +178,7 @@ func (g *GitlabClient) CreateComment(logger logging.SimpleLogging, repo models.R
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
 		"```diff\n"
 	comments := common.SplitComment(comment, gitlabMaxCommentLength, sepEnd, sepStart)
+	common.ReverseComments(comments)
 	for _, c := range comments {
 		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(c)})
 		if resp != nil {
