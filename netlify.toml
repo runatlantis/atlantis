@@ -2,7 +2,7 @@
 [build]
   base    = "/"
   publish = "runatlantis.io/.vitepress/dist/"
-  command = "pnpm website:build"
+  command = "pnpm install && pnpm website:build"
 
 [[redirects]]
   from = "/guide/getting-started.html"
