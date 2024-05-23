@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -x
-
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -17,7 +15,7 @@ IFS=$'\n\t'
 sleep 2
 
 # start ngrok in the background and wait for it to start
-./ngrok config add-authtoken $NGROK_AUTH_TOKEN > /dev/null
+./ngrok config add-authtoken $NGROK_AUTH_TOKEN > /dev/null 2>&1
 ./ngrok http 4141 > /tmp/ngrok.log 2>&1 &
 sleep 2
 
