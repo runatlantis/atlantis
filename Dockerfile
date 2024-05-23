@@ -7,10 +7,10 @@ ARG GOLANG_TAG=1.22.3-alpine@sha256:a52ec26b648564b6cef8adf7bea14348b499a32d08de
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.8.4
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.6.2
+ARG DEFAULT_OPENTOFU_VERSION=1.7.1
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-#ARG DEFAULT_CONFTEST_VERSION=0.52.0
-ARG DEFAULT_CONFTEST_VERSION=0.51.0-2
+ARG DEFAULT_CONFTEST_VERSION=0.52.0
+#ARG DEFAULT_CONFTEST_VERSION=0.51.0-2
 
 # Stage 1: build artifact and download deps
 
