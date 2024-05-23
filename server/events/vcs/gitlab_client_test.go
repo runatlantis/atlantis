@@ -347,6 +347,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 func TestGitlabClient_PullIsApproved(t *testing.T) {
 	gitlabClientUnderTest = true
+	logger := logging.NewNoopLogger(t)
 
 	unapprovedMergeRequest, err := os.ReadFile("testdata/gitlab-unapproved-merge-request.json")
 	Ok(t, err)
@@ -409,7 +410,6 @@ func TestGitlabClient_PullIsApproved(t *testing.T) {
 			client := &GitlabClient{
 				Client:  internalClient,
 				Version: nil,
-				logger:  logging.NewNoopLogger(t),
 			}
 
 			repo := models.Repo{
@@ -422,7 +422,7 @@ func TestGitlabClient_PullIsApproved(t *testing.T) {
 				},
 			}
 
-			approved, err := client.PullIsApproved(repo, models.PullRequest{
+			approved, err := client.PullIsApproved(logger, repo, models.PullRequest{
 				Num:        c.mrID,
 				BaseRepo:   repo,
 				Author:     c.author,
