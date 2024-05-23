@@ -431,7 +431,9 @@ func TestClient_DeleteComment(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.RequestURI {
 		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments/1":
-			w.Write([]byte("")) // nolint: errcheck
+			if r.Method == "DELETE" {
+				w.WriteHeader(http.StatusNoContent)
+			}
 			return
 		default:
 			t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -472,11 +474,17 @@ func TestClient_HidePRComments(t *testing.T) {
 		// we have two comments in the test file
 		// The code is going to delete them all and then create a new one
 		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments/498931882":
+			if r.Method == "DELETE" {
+				w.WriteHeader(http.StatusNoContent)
+			}
 			w.Write([]byte("")) // nolint: errcheck
 			called += 1
 			return
 			// This is the second one
 		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments/498931784":
+			if r.Method == "DELETE" {
+				http.Error(w, "", http.StatusNoContent)
+			}
 			w.Write([]byte("")) // nolint: errcheck
 			called += 1
 			return
