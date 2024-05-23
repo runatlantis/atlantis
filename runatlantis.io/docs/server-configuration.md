@@ -476,8 +476,8 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_EMOJI_REACTION=thumbsup
   ```
 
-  The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab.
-  Defaults to `eyes`.
+  The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
+  Defaults to "" (empty string).
 
 ### `--enable-diff-markdown-format`
 
@@ -686,6 +686,21 @@ and set `--autoplan-modules` to `false`.
 
   Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
   don't set. Defaults to `github.com`.
+
+### `--gh-installation-id`
+
+  ```bash
+  atlantis server --gh-installation-id="123"
+  # or
+  ATLANTIS_GH_INSTALLATION_ID="123"
+  ```
+
+The installation ID of a specific instance of a GitHub application. Normally this value is
+derived by querying GitHub for the list of installations of the ID supplied via `--gh-app-id` and selecting
+the first one found and where multiple installations results in an error. Use this flag if you have multiple
+instances of Atlantis but you want to use a single already-installed GitHub app for all of them. You would normally do this if
+you are running a proxy as your single GitHub application that will proxy to an appropriate Atlantis instance
+based on the organization or user that triggered the webhook.
 
 ### `--gh-org`
 
