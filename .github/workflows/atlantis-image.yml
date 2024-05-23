@@ -146,7 +146,7 @@ jobs:
 
   test:
     needs: [changes]
-    if: needs.changes.outputs.should-run-build == 'true'
+    if: needs.changes.outputs.should-run-build == 'false'
     name: Test Image With Goss
     runs-on: ubuntu-22.04
     strategy:
