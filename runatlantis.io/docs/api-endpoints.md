@@ -21,18 +21,18 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 
 #### Parameters
 
-| Name       | Type                              | Required | Description                              |
-|------------|-----------------------------------|----------|------------------------------------------|
-| Repository | string                            | Yes      | Name of the Terraform repository         |
-| Ref        | string                            | Yes      | Git reference, like a branch name        |
-| Type       | string                            | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Paths      | [ [Path](api-endpoints.md#path) ] | Yes      | Paths to the projects to run the plan    |
-| PR         | int                               | No       | Pull Request number                      |
+| Name       | Type    | Required | Description                              |
+|------------|---------|----------|------------------------------------------|
+| Repository | string  | Yes      | Name of the Terraform repository         |
+| Ref        | string  | Yes      | Git reference, like a branch name        |
+| Type       | string  | Yes      | Type of the VCS provider (Github/Gitlab) |
+| Paths      | Path    | Yes      | Paths to the projects to run the plan    |
+| PR         | int     | No       | Pull Request number                      |
 
-##### Path
+#### Path
 
 Similar to the [Options](using-atlantis.md#options) of `atlantis plan`. Path specifies which directory/workspace
-within the repository to run the plan.  
+within the repository to run the plan.
 At least one of `Directory` or `Workspace` should be specified.
 
 | Name      | Type   | Required | Description                                                                                                                                               |
@@ -96,18 +96,18 @@ Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repo
 
 #### Parameters
 
-| Name       | Type                                | Required | Description                              |
-|------------|-------------------------------------|----------|------------------------------------------|
-| Repository | string                              | Yes      | Name of the Terraform repository         |
-| Ref        | string                              | Yes      | Git reference, like a branch name        |
-| Type       | string                              | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Paths      | [ [Path](api-endpoints.md#path-1) ] | Yes      | Paths to the projects to run the apply   |
-| PR         | int                                 | No       | Pull Request number                      |
+| Name       | Type   | Required | Description                              |
+|------------|--------|----------|------------------------------------------|
+| Repository | string | Yes      | Name of the Terraform repository         |
+| Ref        | string | Yes      | Git reference, like a branch name        |
+| Type       | string | Yes      | Type of the VCS provider (Github/Gitlab) |
+| Paths      | Path   | Yes      | Paths to the projects to run the apply   |
+| PR         | int    | No       | Pull Request number                      |
 
-##### Path
+#### Path
 
 Similar to the [Options](using-atlantis.md#options-1) of `atlantis apply`. Path specifies which directory/workspace
-within the repository to run the apply.  
+within the repository to run the apply.
 At least one of `Directory` or `Workspace` should be specified.
 
 | Name      | Type   | Required | Description                                                                                                                                               |
