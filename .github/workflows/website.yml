@@ -26,7 +26,7 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -46,7 +46,13 @@ jobs:
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4
+      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+
+      - name: markdown-lint
+        uses: DavidAnson/markdownlint-cli2-action@b4c9feab76d8025d1e83c653fa3990936df0e6c8 # v16
+        with:
+          config: .markdownlint.yaml
+          globs: 'runatlantis.io/**/*.md'
 
       - uses: wyvox/action-setup-pnpm@6597ef5c1300fe08efa6bc75e6141f7153e2b4cc # v3
         with:
@@ -65,7 +71,7 @@ jobs:
           pnpm website:build
 
           # start http-server for integration testing
-          npx http-server runatlantis.io/.vuepress/dist &
+          npx http-server runatlantis.io/.vitepress/dist &
 
       - name: Run Playwright E2E tests
         run: |
@@ -76,9 +82,11 @@ jobs:
         run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
 
       # medium.com => was being rate limited: HTTP 429
+      # twitter.com => too many redirections
       - run: |
           ./muffet \
             -e 'https://medium.com/runatlantis' \
+            -e 'https://twitter.com/*' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \
