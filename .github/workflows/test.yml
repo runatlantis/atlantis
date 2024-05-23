@@ -104,7 +104,7 @@ jobs:
   e2e-github:
     runs-on: ubuntu-latest
     # dont run e2e tests on forked PRs
-    if: github.repository_owner == 'runatlantis'
+    if: github.event.repository.fork == false
     env:
       TERRAFORM_VERSION: 1.8.3
       ATLANTISBOT_GITHUB_USERNAME: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
