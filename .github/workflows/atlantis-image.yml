@@ -151,7 +151,8 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        #image_type: [alpine, debian]
+        image_type: [alpine]
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ghcr.io/${{ github.repository }}
