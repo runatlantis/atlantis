@@ -41,7 +41,7 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-22.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:346fd2028603d7c9369f709023ef993faf60a70ef4c91963f5baa7454196df32
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:5a0430c5e6c6e26860404a3cff81e91f100e1ae7f7b7ac367d3b7068a293a203
     steps:
       - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
 
@@ -104,8 +104,7 @@ jobs:
   e2e-github:
     runs-on: ubuntu-latest
     # dont run e2e tests on forked PRs
-    if: github.event_name == 'pull_request' &&
-        github.event.pull_request.head.repo.fork == false
+    if: github.event.pull_request.head.repo.fork == false
     env:
       TERRAFORM_VERSION: 1.8.3
       ATLANTISBOT_GITHUB_USERNAME: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
