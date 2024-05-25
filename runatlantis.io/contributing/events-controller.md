@@ -15,7 +15,43 @@ Atlantis currently handles one of the following events:
 
 All the other events are ignored.
 
-![Events Controller flow](./images/events-controller.png)
+```mermaid
+---
+title: events controller flowchart
+---
+flowchart LR
+    events(/events - Endpoint) --> Comment_Event(Comment - Event)
+    events --> Pull_Request_Event(Pull Request - Event)
+
+    Comment_Event --> pre_workflow(pre-workflow - Hook)
+    pre_workflow --> plan(plan - command)
+    pre_workflow --> apply(apply - command)
+    pre_workflow --> approve_policies(approve policies - command)
+    pre_workflow --> unlock(unlock - command)
+    pre_workflow --> version(version - command)
+    pre_workflow --> import(import - command)
+    pre_workflow --> state(state - command)
+
+    plan --> post_workflow(post-workflow - Hook)
+    apply --> post_workflow
+    approve_policies --> post_workflow
+    unlock --> post_workflow
+    version --> post_workflow
+    import --> post_workflow
+    state --> post_workflow
+
+    Pull_Request_Event --> Open_Update_PR(Open / Update Pull Request)
+    Pull_Request_Event --> Close_PR(Close Pull Request)
+
+    Open_Update_PR --> pre_workflow(pre-workflow - Hook)
+    Close_PR --> plan(plan - command)
+
+    pre_workflow --> plan
+    plan --> post_workflow(post-workflow - Hook)
+
+    Close_PR --> CleanUpPull(CleanUpPull)
+    CleanUpPull --> post_workflow(post-workflow - Hook)
+```
 
 ## Comment Event
 
