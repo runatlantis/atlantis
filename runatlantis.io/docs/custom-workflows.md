@@ -625,18 +625,30 @@ as the environment variable value.
 The `multienv` command allows you to set dynamic number of multiple environment variables that will be available
 to all steps defined **below** the `multienv` step.
 
+Compact:
 ```yaml
 - multienv: custom-command
 ```
+| Key      | Type   | Default | Required | Description                                                |
+|----------|--------|---------|----------|------------------------------------------------------------|
+| multienv | string | none    | no       | Run a custom command and add printed environment variables |
 
-| Key      | Type   | Default | Required | Description                                                                    |
-|----------|--------|---------|----------|--------------------------------------------------------------------------------|
-| multienv | string | none    | no       | Run a custom command and add set environment variables according to the result |
+Full:
+```yaml
+- multienv:
+    command: custom-command
+    output: show
+```
+| Key              | Type                  | Default | Required | Description                                                                         |
+|------------------|-----------------------|---------|----------|-------------------------------------------------------------------------------------|
+| multienv         | map[string -> string] | none    | no       | Run a custom command and add printed environment variables                          |
+| multienv.command | string                | none    | yes      | Name of the custom script to run                                                    |
+| multienv.output  | string                | "show"  | no       | Setting output to "hide" will supress the message obout added environment variables |
 
-The result of the executed command must have a fixed format:
-EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3
+The output of the command execution must have the following format:
+`EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3`
 
-The name-value pairs in the result are added as environment variables if success is true otherwise the workflow execution stops with error and the errorMessage is getting displayed.
+The name-value pairs in the output are added as environment variables if command execution is successful, otherwise the workflow execution is interrupted with an error and the errorMessage is returned.
 
 ::: tip Notes
 
