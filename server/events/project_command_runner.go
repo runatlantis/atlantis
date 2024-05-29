@@ -78,7 +78,7 @@ type EnvStepRunner interface {
 // MultiEnvStepRunner runs multienv steps.
 type MultiEnvStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
+	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -795,7 +795,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 			// be printed to the PR, it's solely to set the environment variable.
 			out = ""
 		case "multienv":
-			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs)
+			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs, step.Output)
 		}
 
 		if out != "" {
