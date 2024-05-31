@@ -2,7 +2,7 @@
 # what distro is the image being built for
 ARG ALPINE_TAG=3.19.1@sha256:c5b1261d6d3e43071626931fc004f70149baeba2c8ec672bd4f27761f8e1ad6b
 ARG DEBIAN_TAG=12.5-slim@sha256:804194b909ef23fb995d9412c9378fb3505fe2427b70f3cc425339e48a828fca
-ARG GOLANG_TAG=1.22.3-alpine@sha256:b8ded51bad03238f67994d0a6b88680609b392db04312f60c23358cc878d4902
+ARG GOLANG_TAG=1.22.3-alpine@sha256:7e788330fa9ae95c68784153b7fd5d5076c79af47651e992a3cdeceeb5dd1df0
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.8.3
