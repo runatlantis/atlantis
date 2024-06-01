@@ -225,13 +225,14 @@ type DefaultProjectCommandRunner struct {
 func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
 	planSuccess, failure, err := p.doPlan(ctx)
 	return command.ProjectResult{
-		Command:     command.Plan,
-		PlanSuccess: planSuccess,
-		Error:       err,
-		Failure:     failure,
-		RepoRelDir:  ctx.RepoRelDir,
-		Workspace:   ctx.Workspace,
-		ProjectName: ctx.ProjectName,
+		Command:           command.Plan,
+		PlanSuccess:       planSuccess,
+		Error:             err,
+		Failure:           failure,
+		RepoRelDir:        ctx.RepoRelDir,
+		Workspace:         ctx.Workspace,
+		ProjectName:       ctx.ProjectName,
+		SilencePRComments: ctx.SilencePRComments,
 	}
 }
 
@@ -253,13 +254,14 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
 	applyOut, failure, err := p.doApply(ctx)
 	return command.ProjectResult{
-		Command:      command.Apply,
-		Failure:      failure,
-		Error:        err,
-		ApplySuccess: applyOut,
-		RepoRelDir:   ctx.RepoRelDir,
-		Workspace:    ctx.Workspace,
-		ProjectName:  ctx.ProjectName,
+		Command:           command.Apply,
+		Failure:           failure,
+		Error:             err,
+		ApplySuccess:      applyOut,
+		RepoRelDir:        ctx.RepoRelDir,
+		Workspace:         ctx.Workspace,
+		ProjectName:       ctx.ProjectName,
+		SilencePRComments: ctx.SilencePRComments,
 	}
 }
 
