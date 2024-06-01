@@ -276,8 +276,7 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, c
 	}
 	ctx.Log.Debug("Building plan command for specific project with directory: '%v', workspace: '%v', project: '%v'",
 		cmd.RepoRelDir, cmd.Workspace, cmd.ProjectName)
-	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
-	return pcc, err
+	return p.buildProjectPlanCommand(ctx, cmd)
 }
 
 // See ProjectCommandBuilder.BuildApplyCommands.
@@ -285,24 +284,21 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, 
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommandsByPlan(ctx, cmd)
 	}
-	pac, err := p.buildProjectCommand(ctx, cmd)
-	return pac, err
+	return p.buildProjectCommand(ctx, cmd)
 }
 
 func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommandsByPlan(ctx, cmd)
 	}
-	pac, err := p.buildProjectCommand(ctx, cmd)
-	return pac, err
+	return p.buildProjectCommand(ctx, cmd)
 }
 
 func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommandsByPlan(ctx, cmd)
 	}
-	pac, err := p.buildProjectCommand(ctx, cmd)
-	return pac, err
+	return p.buildProjectCommand(ctx, cmd)
 }
 
 func (p *DefaultProjectCommandBuilder) BuildImportCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {

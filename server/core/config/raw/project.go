@@ -38,6 +38,7 @@ type Project struct {
 	ExecutionOrderGroup       *int       `yaml:"execution_order_group,omitempty"`
 	PolicyCheck               *bool      `yaml:"policy_check,omitempty"`
 	CustomPolicyCheck         *bool      `yaml:"custom_policy_check,omitempty"`
+	SilencePRComments         []string   `yaml:"silence_pr_comments,omitempty"`
 }
 
 func (p Project) Validate() error {
@@ -154,6 +155,10 @@ func (p Project) ToValid() valid.Project {
 
 	if p.CustomPolicyCheck != nil {
 		v.CustomPolicyCheck = p.CustomPolicyCheck
+	}
+
+	if p.SilencePRComments != nil {
+		v.SilencePRComments = p.SilencePRComments
 	}
 
 	return v

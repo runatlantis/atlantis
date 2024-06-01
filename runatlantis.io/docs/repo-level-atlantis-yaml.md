@@ -78,6 +78,7 @@ projects:
   plan_requirements: [mergeable, approved, undiverged]
   apply_requirements: [mergeable, approved, undiverged]
   import_requirements: [mergeable, approved, undiverged]
+  silence_pr_comments: ["apply"]
   execution_order_group: 1
   depends_on:
     - project-1
@@ -433,6 +434,7 @@ terraform_version: 0.11.0
 plan_requirements: ["approved"]
 apply_requirements: ["approved"]
 import_requirements: ["approved"]
+silence_pr_comments: ["apply"]
 workflow: myworkflow
 ```
 
@@ -452,6 +454,7 @@ workflow: myworkflow
 | plan_requirements<br />*(restricted)*   | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.   |
 | apply_requirements<br />*(restricted)*  | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.  |
 | import_requirements<br />*(restricted)* | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
+| silence_pr_comments                     | array\[string\]         | none            | no       | Silence PR comments from defined stages while preserving PR status checks. Supported values are: `plan`, `apply`.                                                                                                                       |
 | workflow <br />*(restricted)*           | string                  | none            | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                                              |
 
 ::: tip

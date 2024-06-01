@@ -76,6 +76,7 @@ type PlanCommandRunner struct {
 	// a plan.
 	DiscardApprovalOnPlan bool
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
+	SilencePRComments     []string
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
