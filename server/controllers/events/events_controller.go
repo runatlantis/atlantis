@@ -49,6 +49,7 @@ const bitbucketEventTypeHeader = "X-Event-Key"
 const bitbucketCloudRequestIDHeader = "X-Request-UUID"
 const bitbucketServerRequestIDHeader = "X-Request-ID"
 const bitbucketServerSignatureHeader = "X-Hub-Signature"
+const bitbucketServerSignatureHeader256 = "X-Hub-Signature-256"
 
 // The URL used for Azure DevOps test webhooks
 const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079"
@@ -244,7 +245,10 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r *http.Request) {
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
 	reqID := r.Header.Get(bitbucketServerRequestIDHeader)
-	sig := r.Header.Get(bitbucketServerSignatureHeader)
+	sig := r.Header.Get(bitbucketServerSignatureHeader256)
+	if sig == "" {
+		sig = r.Header.Get(bitbucketServerSignatureHeader)
+	}
 	defer r.Body.Close() // nolint: errcheck
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

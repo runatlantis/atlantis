@@ -54,6 +54,36 @@ func TestValidate_WithSecret(t *testing.T) {
 	Equals(t, `{"yo":true}`, string(bs))
 }
 
+func TestValidate256_WithSecretErr(t *testing.T) {
+	t.Log("if the request is not valid against the secret there is an error")
+	RegisterMockTestingT(t)
+	g := events.DefaultGithubRequestValidator{}
+	buf := bytes.NewBufferString("")
+	req, err := http.NewRequest("POST", "http://localhost/event", buf)
+	Ok(t, err)
+	req.Header.Set("X-Hub-Signature-256", "sha256=b1f8020f5b4cd42042f807dd939015c4a418bc1ff7f604dd55b0a19b5d953d9b")
+	req.Header.Set("Content-Type", "application/json")
+
+	_, err = g.Validate(req, []byte("secret"))
+	Assert(t, err != nil, "error should not be nil")
+	Equals(t, "payload signature check failed", err.Error())
+}
+
+func TestValidate256_WithSecret(t *testing.T) {
+	t.Log("if the request is valid against the secret the payload is returned")
+	RegisterMockTestingT(t)
+	g := events.DefaultGithubRequestValidator{}
+	buf := bytes.NewBufferString(`{"yo":true}`)
+	req, err := http.NewRequest("POST", "http://localhost/event", buf)
+	Ok(t, err)
+	req.Header.Set("X-Hub-Signature-256", "sha256=b1f8020f5b4cd42042f807dd939015c4a418bc1ff7f604dd55b0a19b5d953d9b")
+	req.Header.Set("Content-Type", "application/json")
+
+	bs, err := g.Validate(req, []byte("0123456789abcdef"))
+	Ok(t, err)
+	Equals(t, `{"yo":true}`, string(bs))
+}
+
 func TestValidate_WithoutSecretInvalidContentType(t *testing.T) {
 	t.Log("if the request has an invalid content type an error is returned")
 	RegisterMockTestingT(t)
