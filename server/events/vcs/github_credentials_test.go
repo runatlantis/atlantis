@@ -77,7 +77,7 @@ func TestGithubClient_MultipleAppAuthentication(t *testing.T) {
 	Ok(t, err)
 
 	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, logging.NewNoopLogger(t))
+	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
@@ -88,7 +88,7 @@ func TestGithubClient_MultipleAppAuthentication(t *testing.T) {
 		Key:            []byte(testdata.GithubPrivateKey),
 		Hostname:       testServer,
 	}
-	_, err = vcs.NewGithubClient(testServer, appCreds, vcs.GithubConfig{}, logging.NewNoopLogger(t))
+	_, err = vcs.NewGithubClient(testServer, appCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 
 	token, err := appCreds.GetToken()
