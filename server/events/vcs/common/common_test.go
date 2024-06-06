@@ -37,8 +37,8 @@ func TestSplitComment_TwoComments(t *testing.T) {
 	split := common.SplitComment(comment, len(comment)-1, sepEnd, sepStart, 0, "")
 
 	expCommentLen := len(comment) - len(sepEnd) - len(sepStart) - 1
-	expFirstComment := comment[:expCommentLen]
-	expSecondComment := comment[expCommentLen:]
+	expFirstComment := comment[:len(comment)-expCommentLen]
+	expSecondComment := comment[len(comment)-expCommentLen:]
 	Equals(t, 2, len(split))
 	Equals(t, expFirstComment+sepEnd, split[0])
 	Equals(t, sepStart+expSecondComment, split[1])
@@ -55,27 +55,27 @@ func TestSplitComment_FourComments(t *testing.T) {
 
 	expMax := len(comment) / 4
 	Equals(t, []string{
-		comment[:expMax] + sepEnd,
-		sepStart + comment[expMax:expMax*2] + sepEnd,
-		sepStart + comment[expMax*2:expMax*3] + sepEnd,
-		sepStart + comment[expMax*3:]}, split)
+		comment[:len(comment)-expMax*3] + sepEnd,
+		sepStart + comment[len(comment)-expMax*3:len(comment)-expMax*2] + sepEnd,
+		sepStart + comment[len(comment)-expMax*2:len(comment)-expMax] + sepEnd,
+		sepStart + comment[len(comment)-expMax:]}, split)
 }
 
 func TestSplitComment_Limited(t *testing.T) {
 	comment := strings.Repeat("a", 1000)
 	sepEnd := "-sepEnd"
 	sepStart := "-sepStart"
-	truncationFooter := "-truncated"
-	max := (len(comment) / 8) + max(len(sepEnd), len(truncationFooter)) + len(sepStart)
-	split := common.SplitComment(comment, max, sepEnd, sepStart, 5, truncationFooter)
+	truncationHeader := "truncated-"
+	max := (len(comment) / 8) + max(len(sepEnd), len(truncationHeader)) + len(sepStart)
+	split := common.SplitComment(comment, max, sepEnd, sepStart, 5, truncationHeader)
 
 	expMax := len(comment) / 8
 	Equals(t, []string{
-		comment[:expMax] + sepEnd,
-		sepStart + comment[expMax:expMax*2] + sepEnd,
-		sepStart + comment[expMax*2:expMax*3] + sepEnd,
-		sepStart + comment[expMax*3:expMax*4] + sepEnd,
-		sepStart + comment[expMax*4:expMax*5] + truncationFooter}, split)
+		truncationHeader + comment[len(comment)-expMax*5:len(comment)-expMax*4] + sepEnd,
+		sepStart + comment[len(comment)-expMax*4:len(comment)-expMax*3] + sepEnd,
+		sepStart + comment[len(comment)-expMax*3:len(comment)-expMax*2] + sepEnd,
+		sepStart + comment[len(comment)-expMax*2:len(comment)-expMax] + sepEnd,
+		sepStart + comment[len(comment)-expMax:]}, split)
 }
 
 func TestAutomergeCommitMsg(t *testing.T) {

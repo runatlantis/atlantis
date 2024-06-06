@@ -18,13 +18,13 @@ func AutomergeCommitMsg(pullNum int) string {
 // If maxCommentsPerCommand is non-zero, it never returns more than maxCommentsPerCommand
 // comments, and it appends truncationFooter to the final comment if it would have
 // produced more comments.
-func SplitComment(comment string, maxSize int, sepEnd string, sepStart string, maxCommentsPerCommand int, truncationFooter string) []string {
+func SplitComment(comment string, maxSize int, sepEnd string, sepStart string, maxCommentsPerCommand int, truncationHeader string) []string {
 	if len(comment) <= maxSize {
 		return []string{comment}
 	}
 
 	// No comment contains both sepEnd and truncationFooter, so we only have to count their max.
-	maxWithSep := maxSize - max(len(sepEnd), len(truncationFooter)) - len(sepStart)
+	maxWithSep := maxSize - max(len(sepEnd), len(truncationHeader)) - len(sepStart)
 	var comments []string
 	numPotentialComments := int(math.Ceil(float64(len(comment)) / float64(maxWithSep)))
 	var numComments int
@@ -33,19 +33,21 @@ func SplitComment(comment string, maxSize int, sepEnd string, sepStart string, m
 	} else {
 		numComments = min(numPotentialComments, maxCommentsPerCommand)
 	}
-
-	for i := 0; i < numComments; i++ {
-		upTo := min(len(comment), (i+1)*maxWithSep)
-		portion := comment[i*maxWithSep : upTo]
-		if i < numComments-1 {
-			portion += sepEnd
-		} else if i == numComments-1 && numComments < numPotentialComments {
-			portion += truncationFooter
-		}
-		if i > 0 {
+	isTruncated := numComments < numPotentialComments
+	upTo := len(comment)
+	for len(comments) < numComments {
+		downFrom := max(0, upTo-maxWithSep)
+		portion := comment[downFrom:upTo]
+		if len(comments)+1 != numComments {
 			portion = sepStart + portion
+		} else if len(comments)+1 == numComments && isTruncated {
+			portion = truncationHeader + portion
 		}
-		comments = append(comments, portion)
+		if len(comments) != 0 {
+			portion = portion + sepEnd
+		}
+		comments = append([]string{portion}, comments...)
+		upTo = downFrom
 	}
 	return comments
 }
