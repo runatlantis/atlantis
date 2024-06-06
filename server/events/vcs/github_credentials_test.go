@@ -10,6 +10,7 @@ import (
 )
 
 func TestGithubClient_GetUser_AppSlug(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	defer disableSSLVerification()()
 	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
@@ -17,7 +18,7 @@ func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 	anonCreds := &vcs.GithubAnonymousCredentials{}
 	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
-	tempSecrets, err := anonClient.ExchangeCode("good-code")
+	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
 
 	appCreds := &vcs.GithubAppCredentials{
@@ -34,6 +35,7 @@ func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 }
 
 func TestGithubClient_AppAuthentication(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	defer disableSSLVerification()()
 	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
@@ -41,7 +43,7 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 	anonCreds := &vcs.GithubAnonymousCredentials{}
 	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
-	tempSecrets, err := anonClient.ExchangeCode("good-code")
+	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
 
 	appCreds := &vcs.GithubAppCredentials{
@@ -50,6 +52,43 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 		Hostname: testServer,
 	}
 	_, err = vcs.NewGithubClient(testServer, appCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	Ok(t, err)
+
+	token, err := appCreds.GetToken()
+	Ok(t, err)
+
+	newToken, err := appCreds.GetToken()
+	Ok(t, err)
+
+	user, err := appCreds.GetUser()
+	Ok(t, err)
+
+	Assert(t, user == "", "user should be empty")
+
+	if token != newToken {
+		t.Errorf("app token was not cached: %q != %q", token, newToken)
+	}
+}
+
+func TestGithubClient_MultipleAppAuthentication(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	defer disableSSLVerification()()
+	testServer, err := testdata.GithubMultipleAppTestServer(t)
+	Ok(t, err)
+
+	anonCreds := &vcs.GithubAnonymousCredentials{}
+	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, logging.NewNoopLogger(t))
+	Ok(t, err)
+	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
+	Ok(t, err)
+
+	appCreds := &vcs.GithubAppCredentials{
+		AppID:          tempSecrets.ID,
+		InstallationID: 1,
+		Key:            []byte(testdata.GithubPrivateKey),
+		Hostname:       testServer,
+	}
+	_, err = vcs.NewGithubClient(testServer, appCreds, vcs.GithubConfig{}, logging.NewNoopLogger(t))
 	Ok(t, err)
 
 	token, err := appCreds.GetToken()

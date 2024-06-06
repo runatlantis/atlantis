@@ -14,6 +14,7 @@ import (
 )
 
 func Test_githubAppTokenRotator_GenerateJob(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	defer disableSSLVerification()()
 	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
@@ -21,7 +22,7 @@ func Test_githubAppTokenRotator_GenerateJob(t *testing.T) {
 	anonCreds := &vcs.GithubAnonymousCredentials{}
 	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
-	tempSecrets, err := anonClient.ExchangeCode("good-code")
+	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
 	type fields struct {
 		githubCredentials vcs.GithubCredentials

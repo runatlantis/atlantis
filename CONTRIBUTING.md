@@ -1,9 +1,24 @@
-# Topics
-* [Reporting Issues](#reporting-issues)
-* [Reporting Security Issues](#reporting-security-issues)
-* [Updating The Website](#updating-the-website)
-* [Developing](#developing)
-* [Releasing](#creating-a-new-release)
+# Contributing <!-- omit in toc -->
+
+# Table of Contents <!-- omit in toc -->
+- [Reporting Issues](#reporting-issues)
+- [Reporting Security Issues](#reporting-security-issues)
+- [Updating The Website](#updating-the-website)
+- [Developing](#developing)
+  - [Running Atlantis Locally](#running-atlantis-locally)
+  - [Running Atlantis With Local Changes](#running-atlantis-with-local-changes)
+    - [Rebuilding](#rebuilding)
+  - [Running Tests Locally](#running-tests-locally)
+  - [Running Tests In Docker](#running-tests-in-docker)
+  - [Calling Your Local Atlantis From GitHub](#calling-your-local-atlantis-from-github)
+  - [Code Style](#code-style)
+    - [Logging](#logging)
+    - [Errors](#errors)
+    - [Testing](#testing)
+    - [Mocks](#mocks)
+- [Backporting Fixes](#backporting-fixes)
+  - [Manual Backporting Fixes](#manual-backporting-fixes)
+- [Creating a New Release](#creating-a-new-release)
 
 # Reporting Issues
 * When reporting issues, please include the output of `atlantis version`.
@@ -14,7 +29,7 @@
 We take security issues seriously. Please report a security vulnerability to the maintainers using [private vulnerability reporting](https://github.com/runatlantis/atlantis/security/advisories/new).
 
 # Updating The Website
-* To view the generated website locally, run `yarn website:dev` and then
+* To view the generated website locally, run `pnpm website:dev` and then
 open your browser to http://localhost:8080.
 * The website will be regenerated when your pull request is merged to main.
 
@@ -23,11 +38,11 @@ open your browser to http://localhost:8080.
 ## Running Atlantis Locally
 * Clone the repo from https://github.com/runatlantis/atlantis/
 * Compile Atlantis:
-    ```
+    ```sh
     go install
     ```
 * Run Atlantis:
-    ```
+    ```sh
     atlantis server --gh-user <your username> --gh-token <your token> --repo-allowlist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
     ```
     If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
@@ -36,43 +51,46 @@ open your browser to http://localhost:8080.
 Docker compose is set up to start an atlantis container and ngrok container in the same network in order to expose the atlantis instance to the internet.  In order to do this, create a file in the repository called `atlantis.env` and add the required env vars for the atlantis server configuration.
 
 e.g.
-```
+
+```sh
+NGROK_AUTH=1234567890
+
 ATLANTIS_GH_APP_ID=123
 ATLANTIS_GH_APP_KEY_FILE="/.ssh/somekey.pem"
 ATLANTIS_GH_WEBHOOK_SECRET=12345
 ```
 
-Note: `~/.ssh` is mounted to allow for referencing any local ssh keys
+Note: `~/.ssh` is mounted to allow for referencing any local ssh keys.
 
 Following this just run:
 
-```
+```sh
 make build-service
-docker-compose up
+docker-compose up --detach
+docker-compose logs --follow
 ```
 
 ### Rebuilding
-
 If the ngrok container is restarted, the url will change which is a hassle. Fortunately, when we make a code change, we can rebuild and restart the atlantis container easily without disrupting ngrok.
 
 e.g.
 
-```
+```sh
 make build-service
 docker-compose up --detach --build
 ```
 
-## Running Tests Locally:
-
+## Running Tests Locally
 `make test`. If you want to run the integration tests that actually run real `terraform` commands, run `make test-all`.
 
-## Running Tests In Docker:
-```
+## Running Tests In Docker
+```sh
 docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis ghcr.io/runatlantis/testing-env:latest make test
 ```
 
 Or to run the integration tests
-```
+
+```sh
 docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis ghcr.io/runatlantis/testing-env:latest make test-all
 ```
 
@@ -80,18 +98,19 @@ docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/git
 - Create a test terraform repository in your GitHub.
 - Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/runatlantis/atlantis/tree/main/runatlantis.io/docs/access-credentials.md#generating-an-access-token).
 - Start Atlantis in server mode using that token:
-```
+```sh
 atlantis server --gh-user <your username> --gh-token <your token> --repo-allowlist <your repo> --gh-webhook-secret <your webhook secret> --log-level debug
 ```
 - Download ngrok from https://ngrok.com/download. This will enable you to expose Atlantis running on your laptop to the internet so GitHub can call it.
 - When you've downloaded and extracted ngrok, run it on port `4141`:
-```
+```sh
 ngrok http 4141
 ```
 - Create a Webhook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/runatlantis/atlantis/blob/main/runatlantis.io/docs/configuring-webhooks.md#configuring-webhooks).
 - Create a pull request and type `atlantis help`. You should see the request in the `ngrok` and Atlantis logs and you should also see Atlantis comment back.
 
 ## Code Style
+
 ### Logging
 - `ctx.Log` should be available in most methods. If not, pass it down.
 - levels:
@@ -160,18 +179,33 @@ If you get an error about `pegomock` not being available, install it:
 go get github.com/petergtz/pegomock/...
 ```
 
+# Backporting Fixes
+Atlantis now uses a [cherry-pick-bot](https://github.com/googleapis/repo-automation-bots/tree/main/packages/cherry-pick-bot) from Google. The bot assists in maintaining changes across releases branches by easily cherry-picking changes via pull requests.
+
+Maintainers and Core Contributors can add a comment to a pull request:
+
+```sh
+/cherry-pick target-branch-name
+```
+
+target-branch-name is the branch to cherry-pick to. cherry-pick-bot will cherry-pick the merged commit to a new branch (created from the target branch) and open a new pull request to the target branch.
+
+The bot will immediately try to cherry-pick a merged PR. On unmerged pull request, it will not do anything immediately, but wait until merge. You can comment multiple times on a PR for multiple release branches.
+
+## Manual Backporting Fixes
+The bot will fail to cherry-pick if the feature branches' git history is not linear (merge commits instead of rebase). In that case, you will need to manually cherry-pick the squashed merged commit from main to the release branch
+
+1. Switch to the release branch intended for the fix.
+1. Run `git cherry-pick <sha>` with the commit hash from the main branch.
+1. Push the newly cherry-picked commit up to the remote release branch.
+
 # Creating a New Release
-1. Update version number in `main.go`.
-1. Update image tag version in the [kustomize/bundle.yaml](kustomize/bundle.yaml).
-1. Update `CHANGELOG.md` with latest release number and information (this URL might be useful: https://github.com/runatlantis/atlantis/compare/v0.3.5...main)
-1. Create a pull request and merge to main
-1. Check out main and fetch latest
-1. Run `make release`
-    1. If you get `signal: killed` errors, bump up your Docker resources to have more memory, e.g. 6 G.B.
+1. (Major/Minor release only) Create a new release branch `release-x.y`
 1. Go to https://github.com/runatlantis/atlantis/releases and click "Draft a new release"
-    1. Prefix version with `v`
+    1. Prefix version with `v` and increment based on last release.
     1. The title of the release is the same as the tag (ex. v0.2.2)
-    1. Fill in description by copying from the CHANGELOG just without the Downloads section
-    1. Drag in binaries made with `make release`
-1. Re-run main branch build to ensure tag gets pushed to Github: https://github.com/runatlantis/atlantis/pkgs/container/atlantis
-1. Update the default version in `Chart.yaml` in [the official Helm chart](https://github.com/runatlantis/helm-charts/blob/main/charts/atlantis/values.yaml).
+    1. Fill in description by clicking on the "Generate Release Notes" button.
+        1. You may have to manually move around some commit titles as they are determined by PR labels (see .github/labeler.yml & .github/release.yml)
+    1. (Latest Major/Minor branches only) Make sure the release is set as latest
+        1. Don't set "latest release" for patches on older release branches.
+1. Check and update the default version in `Chart.yaml` in [the official Helm chart](https://github.com/runatlantis/helm-charts/blob/main/charts/atlantis/values.yaml) as needed.

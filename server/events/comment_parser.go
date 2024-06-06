@@ -79,6 +79,7 @@ type CommentBuilder interface {
 type CommentParser struct {
 	GithubUser      string
 	GitlabUser      string
+	GiteaUser       string
 	BitbucketUser   string
 	AzureDevopsUser string
 	ExecutableName  string
@@ -86,7 +87,7 @@ type CommentParser struct {
 }
 
 // NewCommentParser returns a CommentParser
-func NewCommentParser(githubUser, gitlabUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name) *CommentParser {
+func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name) *CommentParser {
 	var commentAllowCommands []command.Name
 	for _, acceptableCommand := range command.AllCommentCommands {
 		for _, allowCommand := range allowCommands {
@@ -100,6 +101,7 @@ func NewCommentParser(githubUser, gitlabUser, bitbucketUser, azureDevopsUser, ex
 	return &CommentParser{
 		GithubUser:      githubUser,
 		GitlabUser:      gitlabUser,
+		GiteaUser:       giteaUser,
 		BitbucketUser:   bitbucketUser,
 		AzureDevopsUser: azureDevopsUser,
 		ExecutableName:  executableName,
@@ -174,6 +176,8 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		vcsUser = e.GithubUser
 	case models.Gitlab:
 		vcsUser = e.GitlabUser
+	case models.Gitea:
+		vcsUser = e.GiteaUser
 	case models.BitbucketCloud, models.BitbucketServer:
 		vcsUser = e.BitbucketUser
 	case models.AzureDevops:

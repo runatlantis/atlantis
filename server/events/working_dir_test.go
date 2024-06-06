@@ -3,12 +3,13 @@ package events_test
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -42,10 +43,9 @@ func TestClone_NoneExisting(t *testing.T) {
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 		GpgNoSigningEnabled:         true,
-		Logger:                      logger,
 	}
 
-	cloneDir, _, err := wd.Clone(models.Repo{}, models.PullRequest{
+	cloneDir, _, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
@@ -95,10 +95,9 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
 		GpgNoSigningEnabled:         true,
-		Logger:                      logger,
 	}
 
-	cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
+	cloneDir, mergedAgain, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -147,10 +146,9 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
 		GpgNoSigningEnabled:         true,
-		Logger:                      logger,
 	}
 
-	_, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
+	_, mergedAgain, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -162,7 +160,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
+	cloneDir, mergedAgain, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -200,10 +198,9 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
 		GpgNoSigningEnabled:         true,
-		Logger:                      logger,
 	}
 
-	_, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
+	_, mergedAgain, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -215,7 +212,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// Now run the clone again.
-	cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
+	cloneDir, mergedAgain, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -258,10 +255,9 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 		TestingOverrideHeadCloneURL: overrideURL,
 		TestingOverrideBaseCloneURL: overrideURL,
 		GpgNoSigningEnabled:         true,
-		Logger:                      logger,
 	}
 
-	_, _, err := wd.Clone(models.Repo{}, models.PullRequest{
+	_, _, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
@@ -318,10 +314,9 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 			TestingOverrideHeadCloneURL: overrideURL,
 			TestingOverrideBaseCloneURL: overrideURL,
 			GpgNoSigningEnabled:         true,
-			Logger:                      logger,
 		}
 
-		cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
+		cloneDir, mergedAgain, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 			BaseRepo:   models.Repo{},
 			HeadBranch: "branch",
 			BaseBranch: "main",
@@ -349,10 +344,9 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 			TestingOverrideHeadCloneURL: overrideURL,
 			TestingOverrideBaseCloneURL: overrideURL,
 			GpgNoSigningEnabled:         true,
-			Logger:                      logger,
 		}
 
-		cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
+		cloneDir, mergedAgain, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 			BaseRepo:   models.Repo{},
 			HeadBranch: "branch",
 			BaseBranch: "main",
@@ -386,9 +380,8 @@ func TestClone_NoReclone(t *testing.T) {
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 		GpgNoSigningEnabled:         true,
-		Logger:                      logger,
 	}
-	cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
+	cloneDir, mergedAgain, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
@@ -431,9 +424,8 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 		GpgNoSigningEnabled:         true,
-		Logger:                      logger,
 	}
-	cloneDir, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
+	cloneDir, mergedAgain, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		HeadCommit: expCommit,
@@ -505,7 +497,6 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 		CheckoutMerge:       false,
 		CheckoutDepth:       50,
 		GpgNoSigningEnabled: true,
-		Logger:              logger,
 	}
 
 	// Pretend terraform has created a plan file, we'll check for it later
@@ -517,7 +508,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 
 	// Run the clone without the checkout merge strategy. It should return
 	// false for mergedAgain
-	_, mergedAgain, err := wd.Clone(models.Repo{}, models.PullRequest{
+	_, mergedAgain, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "second-pr",
 		BaseBranch: "main",
@@ -531,7 +522,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	// Run the clone twice with the merge strategy, the first run should
 	// return true for mergedAgain, subsequent runs should
 	// return false since the first call is supposed to merge.
-	_, mergedAgain, err = wd.Clone(models.Repo{CloneURL: repoDir}, models.PullRequest{
+	_, mergedAgain, err = wd.Clone(logger, models.Repo{CloneURL: repoDir}, models.PullRequest{
 		BaseRepo:   models.Repo{CloneURL: repoDir},
 		HeadBranch: "second-pr",
 		BaseBranch: "main",
@@ -541,7 +532,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	Assert(t, mergedAgain == true, "First clone with CheckoutMerge=true with diverged base should have merged")
 
 	wd.SetCheckForUpstreamChanges()
-	_, mergedAgain, err = wd.Clone(models.Repo{CloneURL: repoDir}, models.PullRequest{
+	_, mergedAgain, err = wd.Clone(logger, models.Repo{CloneURL: repoDir}, models.PullRequest{
 		BaseRepo:   models.Repo{CloneURL: repoDir},
 		HeadBranch: "second-pr",
 		BaseBranch: "main",
@@ -609,15 +600,14 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 		CheckoutMerge:       true,
 		CheckoutDepth:       50,
 		GpgNoSigningEnabled: true,
-		Logger:              logger,
 	}
-	hasDiverged := wd.HasDiverged(repoDir + "/repos/0/default")
+	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default")
 	Equals(t, hasDiverged, true)
 
 	// Run it again but without the checkout merge strategy. It should return
 	// false.
 	wd.CheckoutMerge = false
-	hasDiverged = wd.HasDiverged(repoDir + "/repos/0/default")
+	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default")
 	Equals(t, hasDiverged, false)
 }
 

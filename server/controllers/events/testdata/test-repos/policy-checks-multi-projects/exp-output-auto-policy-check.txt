@@ -2,6 +2,7 @@ Ran Policy Check for 2 projects:
 
 1. dir: `dir1` workspace: `default`
 1. dir: `dir2` workspace: `default`
+---
 
 ### 1. dir: `dir1` workspace: `default`
 #### Policy Set: `test_policy`
@@ -13,10 +14,14 @@ Ran Policy Check for 2 projects:
 
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d dir1`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  ```shell
+  atlantis apply -d dir1
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * `atlantis plan -d dir1`
+  ```shell
+  atlantis plan -d dir1
+  ```
 
 ---
 ### 2. dir: `dir2` workspace: `default`
@@ -35,15 +40,25 @@ FAIL - <redacted plan file> - main - WARNING: Forbidden Resource creation is pro
 policy set: test_policy: requires: 1 approval(s), have: 0.
 ```
 * :heavy_check_mark: To **approve** this project, comment:
-    * `atlantis approve_policies -d dir2`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  ```shell
+  atlantis approve_policies -d dir2
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * `atlantis plan -d dir2`
+  ```shell
+  atlantis plan -d dir2
+  ```
 
 ---
-* :heavy_check_mark: To **approve** all unapplied plans from this pull request, comment:
-    * `atlantis approve_policies`
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * `atlantis unlock`
+* :heavy_check_mark: To **approve** all unapplied plans from this Pull Request, comment:
+  ```shell
+  atlantis approve_policies
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  ```shell
+  atlantis unlock
+  ```
 * :repeat: To re-run policies **plan** this project again by commenting:
-    * `atlantis plan`
+  ```shell
+  atlantis plan
+  ```

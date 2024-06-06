@@ -193,9 +193,8 @@ Terraform will perform the following actions:
 				return []ReturnValue{"default", nil}
 			} else if tfArgs[0] == "plan" {
 				return []ReturnValue{rawOutput, nil}
-			} else {
-				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 			}
+			return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 		})
 	actOutput, err := s.Run(command.ProjectContext{Workspace: "default"}, nil, "", map[string]string(nil))
 	Ok(t, err)
@@ -246,9 +245,8 @@ func TestRun_OutputOnErr(t *testing.T) {
 				return []ReturnValue{"default\n", nil}
 			} else if tfArgs[0] == "plan" {
 				return []ReturnValue{expOutput, errors.New(expErrMsg)}
-			} else {
-				return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 			}
+			return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
 		})
 	actOutput, actErr := s.Run(command.ProjectContext{Workspace: "default"}, nil, "", map[string]string(nil))
 	ErrEquals(t, expErrMsg, actErr)
@@ -545,7 +543,7 @@ type remotePlanMock struct {
 	CalledArgs []string
 }
 
-func (r *remotePlanMock) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line) {
+func (r *remotePlanMock) RunCommandAsync(_ command.ProjectContext, _ string, args []string, _ map[string]string, _ *version.Version, _ string) (chan<- string, <-chan runtimemodels.Line) {
 	r.CalledArgs = args
 	in := make(chan string)
 	out := make(chan runtimemodels.Line)

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/google/go-github/v54/github"
+	"github.com/google/go-github/v59/github"
 	"github.com/pkg/errors"
 )
 
@@ -71,7 +71,7 @@ type GithubAppCredentials struct {
 	Key            []byte
 	Hostname       string
 	apiURL         *url.URL
-	installationID int64
+	InstallationID int64
 	tr             *ghinstallation.Transport
 	AppSlug        string
 }
@@ -122,8 +122,8 @@ func (c *GithubAppCredentials) GetToken() (string, error) {
 }
 
 func (c *GithubAppCredentials) getInstallationID() (int64, error) {
-	if c.installationID != 0 {
-		return c.installationID, nil
+	if c.InstallationID != 0 {
+		return c.InstallationID, nil
 	}
 
 	tr := http.DefaultTransport
@@ -148,8 +148,8 @@ func (c *GithubAppCredentials) getInstallationID() (int64, error) {
 		return 0, fmt.Errorf("wrong number of installations, expected 1, found %d", len(installations))
 	}
 
-	c.installationID = installations[0].GetID()
-	return c.installationID, nil
+	c.InstallationID = installations[0].GetID()
+	return c.InstallationID, nil
 }
 
 func (c *GithubAppCredentials) transport() (*ghinstallation.Transport, error) {

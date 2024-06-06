@@ -17,13 +17,14 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v54/github"
+	"github.com/google/go-github/v59/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
@@ -36,7 +37,7 @@ const (
 	ShutdownComment = "Atlantis server is shutting down, please try again later."
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_command_runner.go CommandRunner
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_command_runner.go CommandRunner
 
 // CommandRunner is the first step after a command request has been parsed.
 type CommandRunner interface {
@@ -47,28 +48,28 @@ type CommandRunner interface {
 	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
 
 // GithubPullGetter makes API calls to get pull requests.
 type GithubPullGetter interface {
 	// GetPullRequest gets the pull request with id pullNum for the repo.
-	GetPullRequest(repo models.Repo, pullNum int) (*github.PullRequest, error)
+	GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
 
 // AzureDevopsPullGetter makes API calls to get pull requests.
 type AzureDevopsPullGetter interface {
 	// GetPullRequest gets the pull request with id pullNum for the repo.
-	GetPullRequest(repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error)
+	GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
 // GitlabMergeRequestGetter makes API calls to get merge requests.
 type GitlabMergeRequestGetter interface {
 	// GetMergeRequest gets the pull request with the id pullNum for the repo.
-	GetMergeRequest(repoFullName string, pullNum int) (*gitlab.MergeRequest, error)
+	GetMergeRequest(logger logging.SimpleLogging, repoFullName string, pullNum int) (*gitlab.MergeRequest, error)
 }
 
 // CommentCommandRunner runs individual command workflows.
@@ -97,6 +98,7 @@ type DefaultCommandRunner struct {
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
+	GiteaPullGetter          *gitea.GiteaClient
 	// User config option: Disables autoplan when a pull request is opened or updated.
 	DisableAutoplan      bool
 	DisableAutoplanLabel string
@@ -134,7 +136,7 @@ type DefaultCommandRunner struct {
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pull.Num, ShutdownComment, command.Plan.String()); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pull.Num, ShutdownComment, command.Plan.String()); commentErr != nil {
 			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
 		return
@@ -153,6 +155,16 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
+	// Check if the user who triggered the autoplan has permissions to run 'plan'.
+	ok, err := c.checkUserPermissions(baseRepo, user, "plan")
+	if err != nil {
+		c.Logger.Err("Unable to check user permissions: %s", err)
+		return
+	}
+	if !ok {
+		return
+	}
+
 	ctx := &command.Context{
 		User:       user,
 		Log:        log,
@@ -169,7 +181,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 	if len(c.DisableAutoplanLabel) > 0 {
-		labels, err := c.VCSClient.GetPullLabels(baseRepo, pull)
+		labels, err := c.VCSClient.GetPullLabels(ctx.Log, baseRepo, pull)
 		if err != nil {
 			ctx.Log.Err("Unable to get pull labels. Proceeding with %s command.", err, command.Plan)
 		} else if utils.SlicesContains(labels, c.DisableAutoplanLabel) {
@@ -191,11 +203,11 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 			// Update the plan or apply commit status to pending whilst the pre workflow hook is running so that the PR can't be merged.
 			switch cmd.Name {
 			case command.Plan:
-				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
+				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
 					ctx.Log.Warn("unable to update plan commit status: %s", err)
 				}
 			case command.Apply:
-				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
+				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
 					ctx.Log.Warn("unable to update apply commit status: %s", err)
 				}
 			}
@@ -221,13 +233,13 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 // is not allowed to execute the command.
 func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models.Repo, pullNum int, user models.User, cmd *CommentCommand) {
 	errMsg := fmt.Sprintf("```\nError: User @%s does not have permissions to execute '%s' command.\n```", user.Username, cmd.Name.String())
-	if err := c.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); err != nil {
+	if err := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, errMsg, ""); err != nil {
 		c.Logger.Err("unable to comment on pull request: %s", err)
 	}
 }
 
 // checkUserPermissions checks if the user has permissions to execute the command
-func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmd *CommentCommand) (bool, error) {
+func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmdName string) (bool, error) {
 	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
 		// allowlist restriction is not enabled
 		return true, nil
@@ -236,7 +248,7 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 	if err != nil {
 		return false, err
 	}
-	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmd.Name.String())
+	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmdName)
 	if !ok {
 		return false, nil
 	}
@@ -259,7 +271,7 @@ func (c *DefaultCommandRunner) checkVarFilesInPlanCommandAllowlisted(cmd *Commen
 // wasteful) call to get the necessary data.
 func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, ShutdownComment, ""); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, ShutdownComment, ""); commentErr != nil {
 			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
 		return
@@ -278,7 +290,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	defer timer.Stop()
 
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
-	ok, err := c.checkUserPermissions(baseRepo, user, cmd)
+	ok, err := c.checkUserPermissions(baseRepo, user, cmd.Name.String())
 	if err != nil {
 		c.Logger.Err("Unable to check user permissions: %s", err)
 		return
@@ -291,7 +303,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	// Check if the provided var files in a 'plan' command are allowlisted
 	if err := c.checkVarFilesInPlanCommandAllowlisted(cmd); err != nil {
 		errMsg := fmt.Sprintf("```\n%s\n```", err.Error())
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, errMsg, ""); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, errMsg, ""); commentErr != nil {
 			c.Logger.Err("unable to comment on pull request: %s", commentErr)
 		}
 		return
@@ -335,11 +347,11 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			// Update the plan or apply commit status to pending whilst the pre workflow hook is running so that the PR can't be merged.
 			switch cmd.Name {
 			case command.Plan:
-				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
+				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
 					ctx.Log.Warn("unable to update plan commit status: %s", err)
 				}
 			case command.Apply:
-				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
+				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
 					ctx.Log.Warn("unable to update apply commit status: %s", err)
 				}
 			}
@@ -361,26 +373,41 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 }
 
-func (c *DefaultCommandRunner) getGithubData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
+func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GithubPullGetter == nil {
 		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support GitHub")
 	}
-	ghPull, err := c.GithubPullGetter.GetPullRequest(baseRepo, pullNum)
+	ghPull, err := c.GithubPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
 		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to GitHub")
 	}
-	pull, _, headRepo, err := c.EventParser.ParseGithubPull(ghPull)
+	pull, _, headRepo, err := c.EventParser.ParseGithubPull(logger, ghPull)
 	if err != nil {
 		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
 	}
 	return pull, headRepo, nil
 }
 
-func (c *DefaultCommandRunner) getGitlabData(baseRepo models.Repo, pullNum int) (models.PullRequest, error) {
+func (c *DefaultCommandRunner) getGiteaData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
+	if c.GiteaPullGetter == nil {
+		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support Gitea")
+	}
+	giteaPull, err := c.GiteaPullGetter.GetPullRequest(logger, baseRepo, pullNum)
+	if err != nil {
+		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Gitea")
+	}
+	pull, _, headRepo, err := c.EventParser.ParseGiteaPull(giteaPull)
+	if err != nil {
+		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+	}
+	return pull, headRepo, nil
+}
+
+func (c *DefaultCommandRunner) getGitlabData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, error) {
 	if c.GitlabMergeRequestGetter == nil {
 		return models.PullRequest{}, errors.New("Atlantis not configured to support GitLab")
 	}
-	mr, err := c.GitlabMergeRequestGetter.GetMergeRequest(baseRepo.FullName, pullNum)
+	mr, err := c.GitlabMergeRequestGetter.GetMergeRequest(logger, baseRepo.FullName, pullNum)
 	if err != nil {
 		return models.PullRequest{}, errors.Wrap(err, "making merge request API call to GitLab")
 	}
@@ -388,11 +415,11 @@ func (c *DefaultCommandRunner) getGitlabData(baseRepo models.Repo, pullNum int) 
 	return pull, nil
 }
 
-func (c *DefaultCommandRunner) getAzureDevopsData(baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
+func (c *DefaultCommandRunner) getAzureDevopsData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.AzureDevopsPullGetter == nil {
 		return models.PullRequest{}, models.Repo{}, errors.New("atlantis not configured to support Azure DevOps")
 	}
-	adPull, err := c.AzureDevopsPullGetter.GetPullRequest(baseRepo, pullNum)
+	adPull, err := c.AzureDevopsPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
 		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Azure DevOps")
 	}
@@ -415,7 +442,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	baseRepo models.Repo,
 	maybeHeadRepo *models.Repo,
 	maybePull *models.PullRequest,
-	user models.User,
+	_ models.User,
 	pullNum int,
 	log logging.SimpleLogging,
 ) (headRepo models.Repo, pull models.PullRequest, err error) {
@@ -425,9 +452,9 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 
 	switch baseRepo.VCSHost.Type {
 	case models.Github:
-		pull, headRepo, err = c.getGithubData(baseRepo, pullNum)
+		pull, headRepo, err = c.getGithubData(log, baseRepo, pullNum)
 	case models.Gitlab:
-		pull, err = c.getGitlabData(baseRepo, pullNum)
+		pull, err = c.getGitlabData(log, baseRepo, pullNum)
 	case models.BitbucketCloud, models.BitbucketServer:
 		if maybePull == nil {
 			err = errors.New("pull request should not be nil–this is a bug")
@@ -435,14 +462,16 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 		}
 		pull = *maybePull
 	case models.AzureDevops:
-		pull, headRepo, err = c.getAzureDevopsData(baseRepo, pullNum)
+		pull, headRepo, err = c.getAzureDevopsData(log, baseRepo, pullNum)
+	case models.Gitea:
+		pull, headRepo, err = c.getGiteaData(log, baseRepo, pullNum)
 	default:
 		err = errors.New("Unknown VCS type–this is a bug")
 	}
 
 	if err != nil {
 		log.Err(err.Error())
-		if commentErr := c.VCSClient.CreateComment(baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err), ""); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err), ""); commentErr != nil {
 			log.Err("unable to comment: %s", commentErr)
 		}
 	}
@@ -456,7 +485,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 			return false
 		}
 		ctx.Log.Info("command was run on a fork pull request which is disallowed")
-		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag), ""); err != nil {
+		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag), ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)
 		}
 		return false
@@ -464,7 +493,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 
 	if ctx.Pull.State != models.OpenPullState && commandName != command.Unlock {
 		ctx.Log.Info("command was run on closed pull request")
-		if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
+		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)
 		}
 		return false
@@ -485,6 +514,7 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 		stack := recovery.Stack(3)
 		logger.Err("PANIC: %s\n%s", err, stack)
 		if commentErr := c.VCSClient.CreateComment(
+			logger,
 			baseRepo,
 			pullNum,
 			fmt.Sprintf("**Error: goroutine panic. This is a bug.**\n```\n%s\n%s```", err, stack),

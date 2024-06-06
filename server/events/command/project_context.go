@@ -57,6 +57,13 @@ type ProjectContext struct {
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.
 	HeadRepo models.Repo
+	// Dependencies are a list of project that this project relies on
+	// their apply status. These projects must be applied first.
+	//
+	// Atlantis uses this information to valid the apply
+	// orders and to warn the user if they're applying a project that
+	// depends on other projects.
+	DependsOn []string
 	// Log is a logger that's been set up for this context.
 	Log logging.SimpleLogging
 	// Scope is the scope for reporting stats setup for this context
@@ -65,8 +72,11 @@ type ProjectContext struct {
 	PullReqStatus models.PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
+	//PullStatus is the status of the current pull request prior to this command.
+	PullStatus *models.PullStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
 	ProjectPolicyStatus []models.PolicySetStatus
+
 	// Pull is the pull request we're responding to.
 	Pull models.PullRequest
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
@@ -103,8 +113,8 @@ type ProjectContext struct {
 	ClearPolicyApproval bool
 	// DeleteSourceBranchOnMerge will attempt to allow a branch to be deleted when merged (AzureDevOps & GitLab Support Only)
 	DeleteSourceBranchOnMerge bool
-	// RepoLocking will get a lock when plan
-	RepoLocking bool
+	// Repo locks mode: disabled, on plan or on apply
+	RepoLocksMode valid.RepoLocksMode
 	// RepoConfigFile
 	RepoConfigFile string
 	// UUID for atlantis logs
@@ -115,6 +125,7 @@ type ProjectContext struct {
 	AbortOnExcecutionOrderFail bool
 	// Allows custom policy check tools outside of Conftest to run in checks
 	CustomPolicyCheck bool
+	SilencePRComments []string
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

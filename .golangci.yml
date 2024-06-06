@@ -7,22 +7,26 @@ linters-settings:
     ignore-words:
       # for gitlab notes api
       - noteable
+  revive:
+    rules:
+      - name: dot-imports
+        disabled: true
 
 linters:
   enable:
-  - errcheck
-  - gochecknoinits
-  - gofmt
-  - gosec
-  - gosimple
-  - ineffassign
-  - misspell
-  - revive
-  - staticcheck
-  - typecheck
-  - unconvert
-  - unused
-  - vet
-  - vetshadow
+    - errcheck
+    - gochecknoinits
+    - gofmt
+    - gosec
+    - gosimple
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - typecheck
+    - unconvert
+    - unused
+    - vet
+    - vetshadow
 run:
   timeout: 10m

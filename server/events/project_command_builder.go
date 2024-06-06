@@ -18,6 +18,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
@@ -35,6 +36,7 @@ const (
 )
 
 func NewInstrumentedProjectCommandBuilder(
+	logger logging.SimpleLogging,
 	policyChecksSupported bool,
 	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
@@ -54,8 +56,8 @@ func NewInstrumentedProjectCommandBuilder(
 	RestrictFileList bool,
 	SilenceNoProjects bool,
 	IncludeGitUntrackedFiles bool,
+	AutoDiscoverMode string,
 	scope tally.Scope,
-	logger logging.SimpleLogging,
 	terraformClient terraform.Client,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
@@ -85,8 +87,8 @@ func NewInstrumentedProjectCommandBuilder(
 			RestrictFileList,
 			SilenceNoProjects,
 			IncludeGitUntrackedFiles,
+			AutoDiscoverMode,
 			scope,
-			logger,
 			terraformClient,
 		),
 		Logger: logger,
@@ -114,8 +116,8 @@ func NewProjectCommandBuilder(
 	RestrictFileList bool,
 	SilenceNoProjects bool,
 	IncludeGitUntrackedFiles bool,
+	AutoDiscoverMode string,
 	scope tally.Scope,
-	logger logging.SimpleLogging,
 	terraformClient terraform.Client,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
@@ -136,6 +138,7 @@ func NewProjectCommandBuilder(
 		RestrictFileList:         RestrictFileList,
 		SilenceNoProjects:        SilenceNoProjects,
 		IncludeGitUntrackedFiles: IncludeGitUntrackedFiles,
+		AutoDiscoverMode:         AutoDiscoverMode,
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
 			policyChecksSupported,
 			commentBuilder,
@@ -242,6 +245,8 @@ type DefaultProjectCommandBuilder struct {
 	SilenceNoProjects bool
 	// User config option: Include git untracked files in the modified file list.
 	IncludeGitUntrackedFiles bool
+	// User config option: Controls auto-discovery of projects in a repository.
+	AutoDiscoverMode string
 	// Handles the actual running of Terraform commands.
 	TerraformExecutor terraform.Client
 }
@@ -255,7 +260,7 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 	var autoplanEnabled []command.ProjectContext
 	for _, projCtx := range projCtxs {
 		if !projCtx.AutoplanEnabled {
-			ctx.Log.Debug("ignoring project at dir %q, workspace: %q because autoplan is disabled", projCtx.RepoRelDir, projCtx.Workspace)
+			ctx.Log.Debug("ignoring project at dir '%s', workspace: '%s' because autoplan is disabled", projCtx.RepoRelDir, projCtx.Workspace)
 			continue
 		}
 		autoplanEnabled = append(autoplanEnabled, projCtx)
@@ -271,8 +276,7 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, c
 	}
 	ctx.Log.Debug("Building plan command for specific project with directory: '%v', workspace: '%v', project: '%v'",
 		cmd.RepoRelDir, cmd.Workspace, cmd.ProjectName)
-	pcc, err := p.buildProjectPlanCommand(ctx, cmd)
-	return pcc, err
+	return p.buildProjectPlanCommand(ctx, cmd)
 }
 
 // See ProjectCommandBuilder.BuildApplyCommands.
@@ -280,24 +284,21 @@ func (p *DefaultProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, 
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommandsByPlan(ctx, cmd)
 	}
-	pac, err := p.buildProjectCommand(ctx, cmd)
-	return pac, err
+	return p.buildProjectCommand(ctx, cmd)
 }
 
 func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommandsByPlan(ctx, cmd)
 	}
-	pac, err := p.buildProjectCommand(ctx, cmd)
-	return pac, err
+	return p.buildProjectCommand(ctx, cmd)
 }
 
 func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommandsByPlan(ctx, cmd)
 	}
-	pac, err := p.buildProjectCommand(ctx, cmd)
-	return pac, err
+	return p.buildProjectCommand(ctx, cmd)
 }
 
 func (p *DefaultProjectCommandBuilder) BuildImportCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
@@ -320,14 +321,14 @@ func (p *DefaultProjectCommandBuilder) BuildStateRmCommands(ctx *command.Context
 // modified in this ctx.
 func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Context, cmdName command.Name, subCmdName string, commentFlags []string, verbose bool) ([]command.ProjectContext, error) {
 	// We'll need the list of modified files.
-	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
+	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
 		return nil, err
 	}
 
 	if p.IncludeGitUntrackedFiles {
 		ctx.Log.Debug(("'include-git-untracked-files' option is set, getting untracked files"))
-		untrackedFiles, err := p.WorkingDir.GetGitUntrackedFiles(ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+		untrackedFiles, err := p.WorkingDir.GetGitUntrackedFiles(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 		if err != nil {
 			return nil, err
 		}
@@ -336,9 +337,16 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 
 	ctx.Log.Debug("%d files were modified in this pull request. Modified files: %v", len(modifiedFiles), modifiedFiles)
 
+	// Get default AutoDiscoverMode from userConfig/globalConfig
+	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
+	globalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
+	if globalAutoDiscover != nil {
+		defaultAutoDiscoverMode = globalAutoDiscover.Mode
+	}
+
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
 		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Pull, repoCfgFile)
+		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.Pull, repoCfgFile)
 		if err != nil {
 			return nil, errors.Wrapf(err, "downloading %s", repoCfgFile)
 		}
@@ -349,18 +357,27 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 				return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 			}
 			ctx.Log.Info("successfully parsed remote %s file", repoCfgFile)
-			if len(repoCfg.Projects) > 0 {
-				matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
-				if err != nil {
-					return nil, err
-				}
-				ctx.Log.Info("%d projects are changed on MR %q based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
-				if len(matchingProjects) == 0 {
-					ctx.Log.Info("skipping repo clone since no project was modified")
-					return []command.ProjectContext{}, nil
+
+			if repoCfg.AutoDiscover != nil {
+				defaultAutoDiscoverMode = repoCfg.AutoDiscover.Mode
+			}
+			// If auto discover is enabled, we never want to skip cloning
+			if !repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode) {
+				if len(repoCfg.Projects) > 0 {
+					matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
+					if err != nil {
+						return nil, err
+					}
+					ctx.Log.Info("%d projects are changed on MR %d based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
+					if len(matchingProjects) == 0 {
+						ctx.Log.Info("skipping repo clone since no project was modified")
+						return []command.ProjectContext{}, nil
+					}
+				} else {
+					ctx.Log.Info("no projects are defined in %s. Will resume automatic detection", repoCfgFile)
 				}
 			} else {
-				ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", repoCfgFile)
+				ctx.Log.Info("automatic project discovery enabled. Will resume automatic detection")
 			}
 			// NOTE: We discard this work here and end up doing it again after
 			// cloning to ensure all the return values are set properly with
@@ -379,7 +396,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
+	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +405,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
 	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
 	if err != nil {
-		return nil, errors.Wrapf(err, "looking for %s file in %q", repoCfgFile, repoDir)
+		return nil, errors.Wrapf(err, "looking for '%s' file in '%s'", repoCfgFile, repoDir)
 	}
 
 	var projCtxs []command.ProjectContext
@@ -402,13 +419,22 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 		}
 		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+		// It's possible we've already set defaultAutoDiscoverMode
+		// from the config file while checking whether we can skip
+		// cloning. We still need to set it here in the case that
+		// we were not able to check whether we can skip cloning
+		// and thus were not able to previously fetch the repo
+		// config.
+		if repoCfg.AutoDiscover != nil {
+			defaultAutoDiscoverMode = repoCfg.AutoDiscover.Mode
+		}
 	}
 
 	moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
 	if err != nil {
 		ctx.Log.Warn("error(s) loading project module dependencies: %s", err)
 	}
-	ctx.Log.Debug("moduleInfo for %s (matching %q) = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
+	ctx.Log.Debug("moduleInfo for '%s' (matching '%s') = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
 
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
@@ -435,7 +461,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		ctx.Log.Info("%d projects are to be planned based on their when_modified config", len(matchingProjects))
 
 		for _, mp := range matchingProjects {
-			ctx.Log.Debug("determining config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
+			ctx.Log.Debug("determining config for project at dir: '%s' workspace: '%s'", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
 
 			projCtxs = append(projCtxs,
@@ -450,26 +476,52 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
-					repoCfg.AbortOnExcecutionOrderFail,
+					abortOnExcecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
-	} else {
+	}
+
+	if repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode) {
 		// If there is no config file or it specified no projects, then we'll plan each project that
 		// our algorithm determines was modified.
 		if hasRepoCfg {
-			ctx.Log.Info("No projects are defined in %s. Will resume automatic detection", repoCfgFile)
+			if len(repoCfg.Projects) == 0 {
+				ctx.Log.Info("no projects are defined in %s. Will resume automatic detection", repoCfgFile)
+			} else {
+				ctx.Log.Info("automatic project discovery enabled. Will resume automatic detection")
+			}
 		} else {
 			ctx.Log.Info("found no %s file", repoCfgFile)
 		}
 		// build a module index for projects that are explicitly included
-		modifiedProjects := p.ProjectFinder.DetermineProjects(ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
-		ctx.Log.Info("automatically determined that there were %d projects modified in this pull request: %s", len(modifiedProjects), modifiedProjects)
+		allModifiedProjects := p.ProjectFinder.DetermineProjects(
+			ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
+		// If a project is already manually configured with the same dir as a discovered project, the manually configured
+		// project should take precedence
+		modifiedProjects := make([]models.Project, 0)
+		configuredProjDirs := make(map[string]bool)
+		// We compare against all configured projects instead of projects which match the modified files in case a
+		// project is being specifically excluded (ex: when_modified doesn't match). We don't want to accidentally
+		// "discover" it again.
+		for _, configProj := range repoCfg.Projects {
+			// Clean the path to make sure ./rel_path is equivalent to rel_path, etc
+			configuredProjDirs[filepath.Clean(configProj.Dir)] = true
+		}
+		for _, mp := range allModifiedProjects {
+			_, dirExists := configuredProjDirs[filepath.Clean(mp.Path)]
+			if !dirExists {
+				modifiedProjects = append(modifiedProjects, mp)
+			}
+		}
+		ctx.Log.Info("automatically determined that there were %d additional projects modified in this pull request: %s",
+			len(modifiedProjects), modifiedProjects)
 		for _, mp := range modifiedProjects {
-			ctx.Log.Debug("determining config for project at dir: %q", mp.Path)
-			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, repoDir)
+			ctx.Log.Debug("determining config for project at dir: '%s'", mp.Path)
+			absProjectDir := filepath.Join(repoDir, mp.Path)
+			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir)
 			if err != nil {
-				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", repoDir)
+				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", absProjectDir)
 			}
 
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)
@@ -509,6 +561,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 
 	var pcc []command.ProjectContext
 
+	ctx.Log.Debug("building plan command")
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
+	if err != nil {
+		return pcc, err
+	}
+	defer unlockFn()
+
+	ctx.Log.Debug("cloning repository")
+	_, _, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return pcc, err
+	}
+
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
@@ -518,14 +583,14 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 
 	if p.RestrictFileList {
 		ctx.Log.Debug("'restrict-file-list' option is set, checking modified files")
-		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Pull.BaseRepo, ctx.Pull)
+		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
 		if err != nil {
 			return nil, err
 		}
 
 		if p.IncludeGitUntrackedFiles {
 			ctx.Log.Debug(("'include-git-untracked-files' option is set, getting untracked files"))
-			untrackedFiles, err := p.WorkingDir.GetGitUntrackedFiles(ctx.HeadRepo, ctx.Pull, workspace)
+			untrackedFiles, err := p.WorkingDir.GetGitUntrackedFiles(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
 			if err != nil {
 				return nil, err
 			}
@@ -580,17 +645,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		}
 	}
 
-	ctx.Log.Debug("building plan command")
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
-	if err != nil {
-		return pcc, err
-	}
-	defer unlockFn()
-
-	ctx.Log.Debug("cloning repository")
-	_, _, err = p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, workspace)
-	if err != nil {
-		return pcc, err
+	if DefaultWorkspace != workspace {
+		ctx.Log.Debug("cloning repository with workspace %s", workspace)
+		_, _, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+		if err != nil {
+			return pcc, err
+		}
 	}
 
 	repoRelDir := DefaultRepoRelDir
@@ -617,7 +677,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
 	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
 	if err != nil {
-		err = errors.Wrapf(err, "looking for %s file in %q", repoCfgFile, repoDir)
+		err = errors.Wrapf(err, "looking for '%s' file in '%s'", repoCfgFile, repoDir)
 		return
 	}
 	if !hasRepoCfg {
@@ -647,9 +707,9 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 		}
 		if len(projectsCfg) == 0 {
 			if p.SilenceNoProjects && len(repoConfig.Projects) > 0 {
-				ctx.Log.Debug("no project with name %q found but silencing the error", projectName)
+				ctx.Log.Debug("no project with name '%s' found but silencing the error", projectName)
 			} else {
-				err = fmt.Errorf("no project with name %q is defined in %s", projectName, repoCfgFile)
+				err = fmt.Errorf("no project with name '%s' is defined in '%s'", projectName, repoCfgFile)
 			}
 			return
 		}
@@ -661,7 +721,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 		return
 	}
 	if len(projCfgs) > 1 {
-		err = fmt.Errorf("must specify project name: more than one project defined in %s matched dir: %q workspace: %q", repoCfgFile, dir, workspace)
+		err = fmt.Errorf("must specify project name: more than one project defined in '%s' matched dir: '%s' workspace: '%s'", repoCfgFile, dir, workspace)
 		return
 	}
 	projectsCfg = projCfgs
@@ -700,7 +760,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	for _, plan := range plans {
 		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), commentCmd.SubName, plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
 		if err != nil {
-			return nil, errors.Wrapf(err, "building command for dir %q", plan.RepoRelDir)
+			return nil, errors.Wrapf(err, "building command for dir '%s'", plan.RepoRelDir)
 		}
 		cmds = append(cmds, commentCmds...)
 	}
@@ -796,7 +856,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		repoRelDir = projCfg.RepoRelDir
 		workspace = projCfg.Workspace
 		for _, mp := range matchingProjects {
-			ctx.Log.Debug("Merging config for project at dir: %q workspace: %q", mp.Dir, mp.Workspace)
+			ctx.Log.Debug("Merging config for project at dir: '%s' workspace: '%s'", mp.Dir, mp.Workspace)
 			projCfg = p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, *repoCfgPtr)
 
 			projCtxs = append(projCtxs,

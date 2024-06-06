@@ -17,6 +17,7 @@ import (
 	"fmt"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // NotConfiguredVCSClient is used as a placeholder when Atlantis isn't configured
@@ -26,54 +27,54 @@ type NotConfiguredVCSClient struct {
 	Host models.VCSHostType
 }
 
-func (a *NotConfiguredVCSClient) GetModifiedFiles(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (a *NotConfiguredVCSClient) GetModifiedFiles(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, a.err()
 }
-func (a *NotConfiguredVCSClient) CreateComment(repo models.Repo, pullNum int, comment string, command string) error {
+func (a *NotConfiguredVCSClient) CreateComment(_ logging.SimpleLogging, _ models.Repo, _ int, _ string, _ string) error {
 	return a.err()
 }
-func (a *NotConfiguredVCSClient) HidePrevCommandComments(repo models.Repo, pullNum int, command string) error {
+func (a *NotConfiguredVCSClient) HidePrevCommandComments(_ logging.SimpleLogging, _ models.Repo, _ int, _ string, _ string) error {
 	return nil
 }
-func (a *NotConfiguredVCSClient) ReactToComment(repo models.Repo, pullNum int, commentID int64, reaction string) error { // nolint: revive
+func (a *NotConfiguredVCSClient) ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error { // nolint: revive
 	return nil
 }
-func (a *NotConfiguredVCSClient) PullIsApproved(repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
+func (a *NotConfiguredVCSClient) PullIsApproved(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) (models.ApprovalStatus, error) {
 	return models.ApprovalStatus{}, a.err()
 }
-func (a *NotConfiguredVCSClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (a *NotConfiguredVCSClient) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 	return nil
 }
-func (a *NotConfiguredVCSClient) PullIsMergeable(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (a *NotConfiguredVCSClient) PullIsMergeable(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ string) (bool, error) {
 	return false, a.err()
 }
-func (a *NotConfiguredVCSClient) UpdateStatus(repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (a *NotConfiguredVCSClient) UpdateStatus(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ models.CommitStatus, _ string, _ string, _ string) error {
 	return a.err()
 }
-func (a *NotConfiguredVCSClient) MergePull(pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+func (a *NotConfiguredVCSClient) MergePull(_ logging.SimpleLogging, _ models.PullRequest, _ models.PullRequestOptions) error {
 	return a.err()
 }
-func (a *NotConfiguredVCSClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+func (a *NotConfiguredVCSClient) MarkdownPullLink(_ models.PullRequest) (string, error) {
 	return "", a.err()
 }
 func (a *NotConfiguredVCSClient) err() error {
 	return fmt.Errorf("atlantis was not configured to support repos from %s", a.Host.String())
 }
-func (a *NotConfiguredVCSClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (a *NotConfiguredVCSClient) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]string, error) {
 	return nil, a.err()
 }
 
-func (a *NotConfiguredVCSClient) SupportsSingleFileDownload(repo models.Repo) bool {
+func (a *NotConfiguredVCSClient) SupportsSingleFileDownload(_ models.Repo) bool {
 	return false
 }
 
-func (a *NotConfiguredVCSClient) GetFileContent(pull models.PullRequest, fileName string) (bool, []byte, error) {
+func (a *NotConfiguredVCSClient) GetFileContent(_ logging.SimpleLogging, _ models.PullRequest, _ string) (bool, []byte, error) {
 	return true, []byte{}, a.err()
 }
-func (a *NotConfiguredVCSClient) GetCloneURL(VCSHostType models.VCSHostType, repo string) (string, error) {
+func (a *NotConfiguredVCSClient) GetCloneURL(_ logging.SimpleLogging, _ models.VCSHostType, _ string) (string, error) {
 	return "", a.err()
 }
 
-func (a *NotConfiguredVCSClient) GetPullLabels(repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (a *NotConfiguredVCSClient) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, a.err()
 }

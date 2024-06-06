@@ -56,7 +56,7 @@ func New(hostname string, port int, password string, tlsEnabled bool, insecureSk
 }
 
 // NewWithClient is used for testing.
-func NewWithClient(client *redis.Client, bucket string, globalBucket string) (*RedisDB, error) {
+func NewWithClient(client *redis.Client, _ string, _ string) (*RedisDB, error) {
 	return &RedisDB{
 		client: client,
 	}, nil
@@ -82,12 +82,12 @@ func (r *RedisDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock,
 	} else if err != nil {
 		// otherwise the lock fails, return to caller the run that's holding the lock
 		return false, currLock, errors.Wrap(err, "db transaction failed")
-	} else {
-		if err := json.Unmarshal([]byte(val), &currLock); err != nil {
-			return false, currLock, errors.Wrap(err, "failed to deserialize current lock")
-		}
-		return false, currLock, nil
 	}
+
+	if err := json.Unmarshal([]byte(val), &currLock); err != nil {
+		return false, currLock, errors.Wrap(err, "failed to deserialize current lock")
+	}
+	return false, currLock, nil
 }
 
 // Unlock attempts to unlock the project and workspace.
@@ -103,13 +103,13 @@ func (r *RedisDB) Unlock(project models.Project, workspace string) (*models.Proj
 		return nil, nil
 	} else if err != nil {
 		return nil, errors.Wrap(err, "db transaction failed")
-	} else {
-		if err := json.Unmarshal([]byte(val), &lock); err != nil {
-			return nil, errors.Wrap(err, "failed to deserialize current lock")
-		}
-		r.client.Del(ctx, key)
-		return &lock, nil
 	}
+
+	if err := json.Unmarshal([]byte(val), &lock); err != nil {
+		return nil, errors.Wrap(err, "failed to deserialize current lock")
+	}
+	r.client.Del(ctx, key)
+	return &lock, nil
 }
 
 // List lists all current locks.
@@ -144,15 +144,15 @@ func (r *RedisDB) GetLock(project models.Project, workspace string) (*models.Pro
 		return nil, nil
 	} else if err != nil {
 		return nil, errors.Wrap(err, "db transaction failed")
-	} else {
-		var lock models.ProjectLock
-		if err := json.Unmarshal([]byte(val), &lock); err != nil {
-			return nil, errors.Wrapf(err, "deserializing lock at key %q", key)
-		}
-		// need to set it to Local after deserialization due to https://github.com/golang/go/issues/19486
-		lock.Time = lock.Time.Local()
-		return &lock, nil
 	}
+
+	var lock models.ProjectLock
+	if err := json.Unmarshal([]byte(val), &lock); err != nil {
+		return nil, errors.Wrapf(err, "deserializing lock at key %q", key)
+	}
+	// need to set it to Local after deserialization due to https://github.com/golang/go/issues/19486
+	lock.Time = lock.Time.Local()
+	return &lock, nil
 }
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
@@ -203,9 +203,9 @@ func (r *RedisDB) LockCommand(cmdName command.Name, lockTime time.Time) (*comman
 		return &lock, errors.Wrap(err, "db transaction failed")
 	} else if err != nil {
 		return nil, errors.Wrap(err, "db transaction failed")
-	} else {
-		return nil, errors.New("db transaction failed: lock already exists")
 	}
+
+	return nil, errors.New("db transaction failed: lock already exists")
 }
 
 func (r *RedisDB) UnlockCommand(cmdName command.Name) error {
@@ -215,9 +215,10 @@ func (r *RedisDB) UnlockCommand(cmdName command.Name) error {
 		return errors.New("db transaction failed: no lock exists")
 	} else if err != nil {
 		return errors.Wrap(err, "db transaction failed")
-	} else {
-		return r.client.Del(ctx, cmdLockKey).Err()
 	}
+
+	return r.client.Del(ctx, cmdLockKey).Err()
+
 }
 
 func (r *RedisDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
@@ -229,15 +230,15 @@ func (r *RedisDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) 
 		return nil, nil
 	} else if err != nil {
 		return nil, errors.Wrap(err, "db transaction failed")
-	} else {
-		if err := json.Unmarshal([]byte(val), &cmdLock); err != nil {
-			return nil, errors.Wrap(err, "failed to deserialize Lock")
-		}
-		return &cmdLock, err
 	}
+
+	if err := json.Unmarshal([]byte(val), &cmdLock); err != nil {
+		return nil, errors.Wrap(err, "failed to deserialize Lock")
+	}
+	return &cmdLock, err
 }
 
-// UpdatePullWithResults updates pull's status with the latest project results.
+// UpdateProjectStatus updates pull's status with the latest project results.
 // It returns the new PullStatus object.
 func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
 	key, err := r.pullKey(pull)
@@ -367,13 +368,13 @@ func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
 		return nil, nil
 	} else if err != nil {
 		return nil, errors.Wrap(err, "db transaction failed")
-	} else {
-		var p models.PullStatus
-		if err := json.Unmarshal([]byte(val), &p); err != nil {
-			return nil, errors.Wrapf(err, "deserializing pull at %q with contents %q", key, val)
-		}
-		return &p, nil
 	}
+
+	var p models.PullStatus
+	if err := json.Unmarshal([]byte(val), &p); err != nil {
+		return nil, errors.Wrapf(err, "deserializing pull at %q with contents %q", key, val)
+	}
+	return &p, nil
 }
 
 func (r *RedisDB) writePull(key string, pull models.PullStatus) error {

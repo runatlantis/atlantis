@@ -82,6 +82,25 @@ func (mock *MockCommandRequirementHandler) ValidatePlanProject(repoDir string, c
 	return ret0, ret1
 }
 
+func (mock *MockCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) (string, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockCommandRequirementHandler().")
+	}
+	params := []pegomock.Param{ctx}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("ValidateProjectDependencies", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 string
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(string)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
+}
+
 func (mock *MockCommandRequirementHandler) VerifyWasCalledOnce() *VerifierMockCommandRequirementHandler {
 	return &VerifierMockCommandRequirementHandler{
 		mock:                   mock,
@@ -207,6 +226,33 @@ func (c *MockCommandRequirementHandler_ValidatePlanProject_OngoingVerification) 
 		_param1 = make([]command.ProjectContext, len(c.methodInvocations))
 		for u, param := range params[1] {
 			_param1[u] = param.(command.ProjectContext)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) *MockCommandRequirementHandler_ValidateProjectDependencies_OngoingVerification {
+	params := []pegomock.Param{ctx}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ValidateProjectDependencies", params, verifier.timeout)
+	return &MockCommandRequirementHandler_ValidateProjectDependencies_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockCommandRequirementHandler_ValidateProjectDependencies_OngoingVerification struct {
+	mock              *MockCommandRequirementHandler
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockCommandRequirementHandler_ValidateProjectDependencies_OngoingVerification) GetCapturedArguments() command.ProjectContext {
+	ctx := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1]
+}
+
+func (c *MockCommandRequirementHandler_ValidateProjectDependencies_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(command.ProjectContext)
 		}
 	}
 	return

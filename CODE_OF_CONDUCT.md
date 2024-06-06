@@ -55,8 +55,9 @@ further defined and clarified by project maintainers.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting the project team by messaging `@lkysow` on the [Atlantis Slack channel](https://join.slack.com/t/atlantis-community/shared_invite/zt-1nt7yx7uq-AnVRc_JItF1CDwZtfqv_OA). All
-complaints will be reviewed and investigated and will result in a response that
+reported by contacting the project team by messaging `@lkysow` on the
+[Atlantis Slack community](https://join.slack.com/t/atlantis-community/shared_invite/zt-9xlxtxtc-CUSKB1ATt_sQy6um~LDPNw).
+All complaints will be reviewed and investigated and will result in a response that
 is deemed necessary and appropriate to the circumstances. The project team is
 obligated to maintain confidentiality with regard to the reporter of an incident.
 Further details of specific enforcement policies may be posted separately.

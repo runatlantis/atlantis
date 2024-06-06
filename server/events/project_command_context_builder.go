@@ -144,6 +144,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		abortOnExcecutionOrderFail,
 		ctx.Scope,
 		ctx.PullRequestStatus,
+		ctx.PullStatus,
 	)
 
 	projectCmds = append(projectCmds, projectCmdContext)
@@ -215,6 +216,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			abortOnExcecutionOrderFail,
 			ctx.Scope,
 			ctx.PullRequestStatus,
+			ctx.PullStatus,
 		))
 	}
 
@@ -238,7 +240,8 @@ func newProjectCommandContext(ctx *command.Context,
 	verbose bool,
 	abortOnExcecutionOrderFail bool,
 	scope tally.Scope,
-	pullStatus models.PullReqStatus,
+	pullReqStatus models.PullReqStatus,
+	pullStatus *models.PullStatus,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
@@ -270,11 +273,12 @@ func newProjectCommandContext(ctx *command.Context,
 		EscapedCommentArgs:         escapedCommentArgs,
 		AutomergeEnabled:           automergeEnabled,
 		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
-		RepoLocking:                projCfg.RepoLocking,
+		RepoLocksMode:              projCfg.RepoLocks.Mode,
 		CustomPolicyCheck:          projCfg.CustomPolicyCheck,
 		ParallelApplyEnabled:       parallelApplyEnabled,
 		ParallelPlanEnabled:        parallelPlanEnabled,
 		ParallelPolicyCheckEnabled: parallelPlanEnabled,
+		DependsOn:                  projCfg.DependsOn,
 		AutoplanEnabled:            projCfg.AutoplanEnabled,
 		Steps:                      steps,
 		HeadRepo:                   ctx.HeadRepo,
@@ -297,10 +301,12 @@ func newProjectCommandContext(ctx *command.Context,
 		PolicySets:                 policySets,
 		PolicySetTarget:            ctx.PolicySet,
 		ClearPolicyApproval:        ctx.ClearPolicyApproval,
-		PullReqStatus:              pullStatus,
+		PullReqStatus:              pullReqStatus,
+		PullStatus:                 pullStatus,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
+		SilencePRComments:          projCfg.SilencePRComments,
 	}
 }
 
