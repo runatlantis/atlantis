@@ -24,11 +24,12 @@ const dismiss = () => {
   <div ref="el" class="banner">
     <div class="text">
       <p>
-        In April 2024, the Core Atlantis Team launched an anonymous survey to better understand our community's needs and help prioritize our roadmap.
+        <del>
+          In April 2024, the Core Atlantis Team launched an anonymous survey to better understand our community's needs and help prioritize our roadmap.
+        </del>
       </p>
       <p>
-        If you're an Atlantis user, please take 5 minutes to fill it out:
-        <a href="https://docs.google.com/forms/d/1fOGWkdinDV2_46CZvzQRdz8401ypZR8Z-iwkNNt3EX0">Survey Link</a>
+        That survey is now closed, we will compile the results and publish a summary as a blog post soon!
       </p>
     </div>
 
