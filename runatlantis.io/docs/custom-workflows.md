@@ -626,19 +626,23 @@ The `multienv` command allows you to set dynamic number of multiple environment 
 to all steps defined **below** the `multienv` step.
 
 Compact:
+
 ```yaml
 - multienv: custom-command
 ```
+
 | Key      | Type   | Default | Required | Description                                                |
 |----------|--------|---------|----------|------------------------------------------------------------|
 | multienv | string | none    | no       | Run a custom command and add printed environment variables |
 
 Full:
+
 ```yaml
 - multienv:
     command: custom-command
     output: show
 ```
+
 | Key              | Type                  | Default | Required | Description                                                                         |
 |------------------|-----------------------|---------|----------|-------------------------------------------------------------------------------------|
 | multienv         | map[string -> string] | none    | no       | Run a custom command and add printed environment variables                          |
