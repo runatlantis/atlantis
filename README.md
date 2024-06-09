@@ -43,4 +43,4 @@ Runs `terraform plan`, `import`, `apply` remotely and comments back on the pull 
 
 ## User Survey
 
-In April 2024, the Core Atlantis Team put together an anonymous survey for Atlantis users to help us understand the community needs and prioritize our roadmap. If you are a user of Atlantis, please take 5 minutes to fill it out <https://docs.google.com/forms/d/1fOGWkdinDV2_46CZvzQRdz8401ypZR8Z-iwkNNt3EX0>
+In April 2024, the Core Atlantis Team put together an anonymous survey for Atlantis users to help us understand the community needs and prioritize our roadmap. That survey is now closed, we will compile the results and publish a summary as a blog post soon!
