@@ -18,7 +18,7 @@
   postUpdateOptions: [
     'gomodTidy',
     'gomodUpdateImportPaths',
-    'pnpmDedupe',
+    'npmDedupe',
   ],
   prHourlyLimit: 1,
   minimumReleaseAge: '5 days',
