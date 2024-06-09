@@ -40,7 +40,3 @@ Runs `terraform plan`, `import`, `apply` remotely and comments back on the pull 
 ## Stargazers over time
 
 [![Stargazers over time](https://starchart.cc/runatlantis/atlantis.svg)](https://starchart.cc/runatlantis/atlantis)
-
-## User Survey
-
-In April 2024, the Core Atlantis Team put together an anonymous survey for Atlantis users to help us understand the community needs and prioritize our roadmap. If you are a user of Atlantis, please take 5 minutes to fill it out <https://docs.google.com/forms/d/1fOGWkdinDV2_46CZvzQRdz8401ypZR8Z-iwkNNt3EX0>
