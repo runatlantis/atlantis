@@ -70,7 +70,7 @@ jobs:
 
           # build site
           npm install
-          npm website:build
+          npm run website:build
 
           # start http-server for integration testing
           npx http-server runatlantis.io/.vitepress/dist &
