@@ -687,12 +687,12 @@ and set `--autoplan-modules` to `false`.
   Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
   don't set. Defaults to `github.com`.
 
-### `--gh-installation-id`
+### `--gh-app-installation-id`
 
   ```bash
-  atlantis server --gh-installation-id="123"
+  atlantis server --gh-app-installation-id="123"
   # or
-  ATLANTIS_GH_INSTALLATION_ID="123"
+  ATLANTIS_GH_APP_INSTALLATION_ID="123"
   ```
 
 The installation ID of a specific instance of a GitHub application. Normally this value is
