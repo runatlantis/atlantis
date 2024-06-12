@@ -1,4 +1,4 @@
-name: tester
+name: test
 
 on:
   push:
@@ -96,7 +96,7 @@ jobs:
   skip-test:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'false'
-    name: Tests
+    name: Skip Tests
     runs-on: ubuntu-22.04
     steps:
       - run: 'echo "No build required"'
