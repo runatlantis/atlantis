@@ -8,7 +8,7 @@
     "markdown-it-footnote": "^4.0.0",
     "markdownlint-cli": "^0.40.0",
     "mermaid": "^10.9.1",
-    "sitemap-ts": "~1.6.1",
+    "sitemap-ts": "^1.7.3",
     "vitepress": "~1.1.4",
     "vitepress-plugin-mermaid": "^2.0.16",
     "vue": "^3.4.27"
