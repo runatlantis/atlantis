@@ -1,4 +1,4 @@
-name: tester
+name: test
 
 on:
   push:
@@ -41,7 +41,7 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-22.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:59a03e779b51ba3ef13f5d61a8875dd41028b94b077975853a5f97a81e7b545a
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:74fb8d02c8a4dc3a1e330b8347ea9bd18039af4a4103fbd813c9ec65e40b480c
     steps:
       - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
 
@@ -96,7 +96,7 @@ jobs:
   skip-test:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'false'
-    name: Tests
+    name: Skip Tests
     runs-on: ubuntu-22.04
     steps:
       - run: 'echo "No build required"'
