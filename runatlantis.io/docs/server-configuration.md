@@ -1197,7 +1197,7 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_SLACK_TOKEN='token'
   ```
 
-  API token for Slack notifications. Slack is not fully supported. TODO: Slack docs.
+  API token for Slack notifications. See [Using Slack hooks](using-slack-hooks.md).
 
 ### `--ssl-cert-file`
 

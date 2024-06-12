@@ -6,8 +6,7 @@ on:
       - 'main'
       - 'release-**'
     tags:
-      - v*.*.* # stable release like, v0.19.2
-      - v*.*.*-pre.* # pre release like, v0.19.0-pre.calendardate
+      - v*.*.*
   pull_request:
     branches:
       - 'main'
@@ -118,7 +117,7 @@ jobs:
           # Suffix is not used here since there's no way to disable it above
 
     - name: Login to Packages Container registry
-      uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3
+      uses: docker/login-action@0d4c9c5ea7693da7b068278f7b52bda2a190a446 # v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -131,7 +130,7 @@ jobs:
 
     - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-      uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v5
+      uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
       with:
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -172,7 +171,7 @@ jobs:
 
       - name: "Build and load into Docker"
         if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-        uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
