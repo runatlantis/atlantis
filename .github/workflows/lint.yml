@@ -1,4 +1,4 @@
-name: linter
+name: lint
 
 on:
   pull_request:
@@ -54,7 +54,7 @@ jobs:
   skip-lint:
     needs: [changes]
     if: needs.changes.outputs.should-run-linting == 'false'
-    name: Linting
+    name: Skip Linting
     runs-on: ubuntu-22.04
     steps:
       - run: 'echo "No build required"'

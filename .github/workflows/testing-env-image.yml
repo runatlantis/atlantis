@@ -71,7 +71,7 @@ jobs:
   skip-build:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'false'
-    name: Build Testing Env Image
+    name: Skip Build Testing Env Image
     runs-on: ubuntu-22.04
     steps:
       - run: 'echo "No build required"'
