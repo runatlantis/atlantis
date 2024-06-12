@@ -31,6 +31,9 @@ const dismiss = () => {
       <p>
         That survey is now closed, we will compile the results and publish a summary as a blog post soon!
       </p>
+      <p>
+        Exciting news! The Atlantis project is now in the CNCF TOC vote—show your support and cast your vote <a href="https://github.com/cncf/sandbox/issues/60#issuecomment-2161214347">here</a>.
+      </p>
     </div>
 
     <button type="button" @click="dismiss">
