@@ -1,4 +1,3 @@
-provider "null" {}
 terraform {
   required_providers {
     null = {

@@ -195,7 +195,7 @@ jobs:
   skip-build:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'false'
-    name: Build Image
+    name: Skip Building Image
     strategy:
       matrix:
         image_type: [alpine, debian]
