@@ -1317,7 +1317,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		ExecutableName: "atlantis",
 		AllowCommands:  allowCommands,
 	}
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, true, false, projectCmdOutputHandler)
+	terraformClient, err := terraform.NewClient(logger, &terraform.DistributionTerraform{}, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, true, false, projectCmdOutputHandler)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)

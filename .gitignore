@@ -16,6 +16,7 @@ atlantis
 atlantis.env
 *.act
 Dockerfile.local
+main
 
 # gitreleaser
 dist/

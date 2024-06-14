@@ -67,7 +67,7 @@ RUN apt-get update && \
 FROM debian-base as deps
 
 # Get the architecture the image is being built for
-ARG TARGETPLATFORM
+ARG TARGETPLATFORM=linux/amd64
 WORKDIR /tmp/build
 
 # install conftest
