@@ -90,7 +90,7 @@ const (
 	GHAppKeyFlag                     = "gh-app-key"
 	GHAppKeyFileFlag                 = "gh-app-key-file"
 	GHAppSlugFlag                    = "gh-app-slug"
-	GHInstallationIDFlag             = "gh-installation-id"
+	GHAppInstallationIDFlag          = "gh-app-installation-id"
 	GHOrganizationFlag               = "gh-org"
 	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
 	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
@@ -625,8 +625,8 @@ var int64Flags = map[string]int64Flag{
 		description:  "GitHub App Id. If defined, initializes the GitHub client with app-based credentials",
 		defaultValue: 0,
 	},
-	GHInstallationIDFlag: {
-		description: "GitHub Installation Id. If defined, initializes the GitHub client with app-based credentials " +
+	GHAppInstallationIDFlag: {
+		description: "GitHub App Installation Id. If defined, initializes the GitHub client with app-based credentials " +
 			"using this specific GitHub Application Installation ID, otherwise it attempts to auto-detect it. " +
 			"Note that this value must be set if you want to have one App and multiple installations of that same " +
 			"application.",

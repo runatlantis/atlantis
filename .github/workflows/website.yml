@@ -1,4 +1,4 @@
-name: website
+name: website-lint-check
 
 on:
   push:
@@ -33,7 +33,7 @@ jobs:
           filters: |
             src:
               - '**.js'
-              - 'pnpm-lock.yaml'
+              - 'package-lock.json'
               - 'package.json'
               - '.github/workflows/website.yml'
 
@@ -54,9 +54,11 @@ jobs:
           config: .markdownlint.yaml
           globs: 'runatlantis.io/**/*.md'
 
-      - uses: wyvox/action-setup-pnpm@6597ef5c1300fe08efa6bc75e6141f7153e2b4cc # v3
+      - name: setup npm
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4
         with:
-          node-version: 20
+          node-version: '20'
+          cache: 'npm'
 
       - name: run http-server
         env:
@@ -67,16 +69,16 @@ jobs:
           curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
 
           # build site
-          pnpm install
-          pnpm website:build
+          npm install
+          npm run website:build
 
           # start http-server for integration testing
           npx http-server runatlantis.io/.vitepress/dist &
 
       - name: Run Playwright E2E tests
         run: |
-          pnpx playwright install --with-deps
-          pnpm run e2e
+          npx playwright install --with-deps
+          npm run e2e
 
       - name: wait until server listened
         run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
@@ -98,7 +100,7 @@ jobs:
   skip-link-check:
     needs: [changes]
     if: needs.changes.outputs.should-run-link-check == 'false'
-    name: Website Link Check
+    name: Skip Website Link Check
     runs-on: ubuntu-latest
     steps:
       - run: 'echo "No build required"'

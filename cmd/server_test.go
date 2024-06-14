@@ -91,7 +91,7 @@ var testFlags = map[string]interface{}{
 	GHAppKeyFlag:                     "",
 	GHAppKeyFileFlag:                 "",
 	GHAppSlugFlag:                    "atlantis",
-	GHInstallationIDFlag:             int64(0),
+	GHAppInstallationIDFlag:          int64(0),
 	GHOrganizationFlag:               "",
 	GHWebhookSecretFlag:              "secret",
 	GiteaBaseURLFlag:                 "http://localhost",
@@ -751,16 +751,16 @@ func TestExecute_GithubApp(t *testing.T) {
 func TestExecute_GithubAppWithInstallationID(t *testing.T) {
 	t.Log("Should pass the installation ID to the config.")
 	c := setup(map[string]interface{}{
-		GHAppKeyFlag:         testdata.GithubPrivateKey,
-		GHAppIDFlag:          "1",
-		GHInstallationIDFlag: "2",
-		RepoAllowlistFlag:    "*",
+		GHAppKeyFlag:            testdata.GithubPrivateKey,
+		GHAppIDFlag:             "1",
+		GHAppInstallationIDFlag: "2",
+		RepoAllowlistFlag:       "*",
 	}, t)
 	err := c.Execute()
 	Ok(t, err)
 
 	Equals(t, int64(1), passedConfig.GithubAppID)
-	Equals(t, int64(2), passedConfig.GithubInstallationID)
+	Equals(t, int64(2), passedConfig.GithubAppInstallationID)
 }
 
 func TestExecute_GiteaUser(t *testing.T) {
