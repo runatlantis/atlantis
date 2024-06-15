@@ -61,7 +61,7 @@ func (r *githubAppTokenRotator) rotate() error {
 	if err != nil {
 		return errors.Wrap(err, "Getting github token")
 	}
-	r.log.Debug("token %s", token)
+	r.log.Debug("Token successfully refreshed")
 
 	// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#http-based-git-access-by-an-installation
 	if err := WriteGitCreds("x-access-token", token, r.githubHostname, r.homeDirPath, r.log, true); err != nil {
