@@ -93,7 +93,7 @@ lint: ## Run linter locally
 
 .PHONY: check-lint
 check-lint: ## Run linter in CI/CD. If running locally use 'lint'
-	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin v1.49.0
+	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin v1.59.1
 	./bin/golangci-lint run -j 4 --timeout 5m
 
 .PHONY: check-fmt
