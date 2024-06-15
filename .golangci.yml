@@ -26,7 +26,6 @@ linters:
     - typecheck
     - unconvert
     - unused
-    - vet
-    - vetshadow
+    - govet
 run:
   timeout: 10m
