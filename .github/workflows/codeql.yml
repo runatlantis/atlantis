@@ -105,10 +105,10 @@ jobs:
   skip-analyze:
     needs: [changes]
     if: needs.changes.outputs.should-run-analyze == 'false'
-    name: Skip Analyze
+    name: Analyze
     strategy:
       matrix:
         language: [ 'go', 'javascript' ]
     runs-on: ubuntu-22.04
     steps:
-      - run: 'echo "No build required"'
+      - run: 'echo "No build required"'  
