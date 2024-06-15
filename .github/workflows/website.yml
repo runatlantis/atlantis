@@ -1,4 +1,4 @@
-name: website-lint-check
+name: website
 
 on:
   push:
@@ -100,7 +100,7 @@ jobs:
   skip-link-check:
     needs: [changes]
     if: needs.changes.outputs.should-run-link-check == 'false'
-    name: Skip Website Link Check
+    name: Website Link Check
     runs-on: ubuntu-latest
     steps:
       - run: 'echo "No build required"'
