@@ -8,6 +8,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestName_TitleString(t *testing.T) {
@@ -182,7 +183,7 @@ func TestParseCommandName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := command.ParseCommandName(tt.name)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.exp, got)
 		})
 	}

@@ -24,6 +24,7 @@ linters:
     - misspell
     - revive
     - staticcheck
+    - testifylint
     - typecheck
     - unconvert
     - unused
