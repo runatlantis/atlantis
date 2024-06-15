@@ -2,27 +2,22 @@
 
 set -euo pipefail
 
+go install golang.org/x/tools/cmd/goimports@latest
+
+gobin="$(go env GOPATH)/bin"
+declare -r gobin
+
 declare -a files
 readarray -d '' files < <(find . -type f -name '*.go' ! -name 'mock_*' ! -path './vendor/*' ! -path '**/mocks/*' -print0)
 declare -r files
 
-# Run go fmt on the files
-gofmt -s -w "${files[@]}"
+output="$("${gobin}"/goimports -l "${files[@]}")"
+declare -r output
 
-# Check for import changes using grep
-changed_files=()
-for file in "${files[@]}"; do
-    if grep -q "^import (" "$file"; then
-        changed_files+=("$file")
-    fi
-done
-
-if [[ ${#changed_files[@]} -gt 0 ]]; then
+if [[ -n "$output" ]]; then
     echo "These files had their 'import' changed - please fix them locally and push a fix"
 
-    for file in "${changed_files[@]}"; do
-        echo "$file"
-    done
+    echo "$output"
 
     exit 1
 fi

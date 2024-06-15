@@ -19,6 +19,7 @@ linters:
     - gofmt
     - gosec
     - gosimple
+    - govet
     - ineffassign
     - misspell
     - revive
@@ -26,6 +27,5 @@ linters:
     - typecheck
     - unconvert
     - unused
-    - govet
 run:
   timeout: 10m
