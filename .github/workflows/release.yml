@@ -42,20 +42,3 @@ jobs:
           -q .body > tmp-CHANGELOG.md
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
-  homebrew:
-    name: "Bump Homebrew formula"
-    runs-on: ubuntu-22.04
-    if: false
-    # if: (!contains(github.ref, 'pre'))
-    steps:
-      - uses: mislav/bump-homebrew-formula-action@v2
-        with:
-          # A PR will be sent to github.com/Homebrew/homebrew-core to update this formula:
-          formula-name: atlantis
-          commit-message: |
-            {{formulaName}} {{version}}
-
-            Created by https://github.com/mislav/bump-homebrew-formula-action
-        env:
-          COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
