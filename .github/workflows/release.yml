@@ -26,6 +26,8 @@ jobs:
         # You can pass flags to goreleaser via GORELEASER_ARGS
         # --clean will save you deleting the dist dir
         args: release --clean
+        distribution: goreleaser # or 'goreleaser-pro'
+        version: "~> v2" # or 'latest', 'nightly', semver
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -40,18 +42,6 @@ jobs:
           -q .body > tmp-CHANGELOG.md
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-
-    - name: Run GoReleaser for pre-release
-      uses: goreleaser/goreleaser-action@286f3b13b1b49da4ac219696163fb8c1c93e1200 # v6
-      if: contains(github.ref, 'pre')
-      with:
-        version: v1.16.2
-        # You can pass flags to goreleaser via GORELEASER_ARGS
-        # --clean will save you deleting the dist dir
-        args: release --clean --release-notes=tmp-CHANGELOG.md
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GORELEASER_CURRENT_TAG: ${{ steps.changelog.outputs.RELEASE_TAG }}
 
   homebrew:
     name: "Bump Homebrew formula"
