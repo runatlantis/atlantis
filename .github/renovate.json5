@@ -104,8 +104,8 @@
     {
       customType: 'regex',
       fileMatch: [
-        '.circleci/config.yml$',
         '^\\.github/workflows/[^/]+\\.ya?ml$',
+        'Makefile$',
       ],
       matchStrings: [
         'renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.*?_VERSION: (?<currentValue>.*)\\s',
