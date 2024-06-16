@@ -9,8 +9,9 @@ We are thrilled to have you here! Our blog is a collection of insightful article
 
 ### Explore Our Popular Posts
 
-We have a rich history of blog posts dating back to 2017-2019. Here are some of our popular posts:
+We have a rich history of blog posts dating back to 2017-2024. Here are some of our popular posts:
 
+- [Integrating Atlantis with OpenTofu](/blog/2024/integrating-atlantis-with-opentofu)
 - [4 Reasons To Try HashiCorp's (New) Free Terraform Remote State Storage](/blog/2019/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage)
 - [I'm Joining HashiCorp!](/blog/2018/joining-hashicorp)
 - [Putting The Dev Into DevOps: Why Your Developers Should Write Terraform Too](/blog/2018/putting-the-dev-into-devops-why-your-developers-should-write-terraform-too)
