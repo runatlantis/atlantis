@@ -15,6 +15,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+permissions:
+  # Required: allow read access to the content for analysis.
+  contents: read
+  # Optional: allow read access to pull request. Use with `only-new-issues` option.
+  pull-requests: read
+  # Optional: Allow write access to checks to allow the action to annotate code in the PR.
+  checks: write
+
 jobs:
   changes:
     outputs:
@@ -47,9 +55,10 @@ jobs:
         go-version-file: go.mod
 
     - name: golangci-lint
-      uses: reviewdog/action-golangci-lint@7708105983c614f7a2725e2172908b7709d1c3e4 # v2
+      uses: golangci/golangci-lint-action@a4f60bb28d35aeee14e6880718e0c85ff1882e64 # v6
       with:
-        tool_name: golangci-lint
+        # renovate: datasource=github-releases depName=golangci/golangci-lint
+        version: v1.59.1
 
   skip-lint:
     needs: [changes]
