@@ -139,9 +139,12 @@ func TestHealthz(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/healthz", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s.Healthz(w, req)
-	Equals(t, http.StatusOK, w.Result().StatusCode)
-	body, _ := io.ReadAll(w.Result().Body)
-	Equals(t, "application/json", w.Result().Header["Content-Type"][0])
+
+	resp := w.Result()
+	defer resp.Body.Close()
+	Equals(t, http.StatusOK, resp.StatusCode)
+	body, _ := io.ReadAll(resp.Body)
+	Equals(t, "application/json", resp.Header["Content-Type"][0])
 	Equals(t,
 		`{
   "status": "ok"

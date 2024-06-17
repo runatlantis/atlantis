@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 //go:embed testdata/fs
@@ -20,9 +21,9 @@ func Test_findModuleDependants(t *testing.T) {
 		autoplanModuleDependants string
 	}
 	a, err := fs.Sub(repos, "testdata/fs/repoA")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	b, err := fs.Sub(repos, "testdata/fs/repoB")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	tests := []struct {
 		name    string
