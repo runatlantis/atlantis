@@ -306,6 +306,7 @@ func newProjectCommandContext(ctx *command.Context,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
+		SilencePRComments:          projCfg.SilencePRComments,
 	}
 }
 

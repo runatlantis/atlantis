@@ -1286,7 +1286,7 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   allowed_overrides: [invalid]`,
-			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"plan_requirements\", \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\", \"repo_locking\", \"repo_locks\", \"policy_check\", and \"custom_policy_check\" are supported.).).",
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"plan_requirements\", \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\", \"repo_locking\", \"repo_locks\", \"policy_check\", \"custom_policy_check\", and \"silence_pr_comments\" are supported.).).",
 		},
 		"invalid plan_requirement": {
 			input: `repos:
@@ -1306,8 +1306,14 @@ func TestParseGlobalCfg(t *testing.T) {
   import_requirements: [invalid]`,
 			expErr: "repos: (0: (import_requirements: \"invalid\" is not a valid import_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
 		},
+		"invalid silence_pr_comments": {
+			input: `repos:
+- id: /.*/
+  silence_pr_comments: [invalid]`,
+			expErr: "server-side repo config 'silence_pr_comments' key value of 'invalid' is not supported, supported values are [plan, apply]",
+		},
 		"disable autodiscover": {
-			input: `repos: 
+			input: `repos:
 - id: /.*/
   autodiscover:
     mode: disabled`,

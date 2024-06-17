@@ -1,4 +1,4 @@
-FROM golang:1.22.3@sha256:4304d944c421bb279ad1faada14d03ac7e7edca61793d2f6a7ad94681c457887
+FROM golang:1.22.4@sha256:c2010b9c2342431a24a2e64e33d9eb2e484af49e72c820e200d332d214d5e61f
 
 RUN apt-get update && apt-get --no-install-recommends -y install unzip \
     && apt-get clean \
@@ -6,7 +6,7 @@ RUN apt-get update && apt-get --no-install-recommends -y install unzip \
 
 # Install Terraform
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV TERRAFORM_VERSION=1.8.3
+ENV TERRAFORM_VERSION=1.8.5
 RUN case $(uname -m) in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
     wget -nv -O terraform.zip https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${ARCH}.zip && \
     mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
