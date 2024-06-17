@@ -6,15 +6,15 @@ lang: en-US
 # Integrating Atlantis with Opentofu
 
 ::: info
-This post was originally written on May 27nd, 2024  
+This post was originally written on May 27nd, 2024
 Original post: <https://dev.to/jmateusousa/integrating-atlantis-with-opentofu-lnd>
 :::
 
 ## What was our motivation?
 
-Due to the Terraform license change, many companies are migrating their IAC processes to OpenTofu, with this in mind and knowing that many of them use Atlantis and Terraform as infrastructure delivery automation, I created this documentation showing what to do to integrate Atlantis with OpenTofu.  
+Due to the Terraform license change, many companies are migrating their IAC processes to OpenTofu, with this in mind and knowing that many of them use Atlantis and Terraform as infrastructure delivery automation, I created this documentation showing what to do to integrate Atlantis with OpenTofu.
 
-Stack: Atlantis, Terragrunt, OpenTofu, Github, ALB, EKS.  
+Stack: Atlantis, Terragrunt, OpenTofu, Github, ALB, EKS.
 
 We will implement it with your [Helm chart](https://www.runatlantis.io/docs/deployment.html#kubernetes-helm-chart):
 
@@ -26,18 +26,18 @@ helm repo add runatlantis https://runatlantis.github.io/helm-charts
 ```
 helm inspect values runatlantis/atlantis > values.yaml
 ```
-**3** - Edit the file values.yaml and add your credentials access and secret which will be used in the Atlantis webhook configuration:  
+**3** - Edit the file values.yaml and add your credentials access and secret which will be used in the Atlantis webhook configuration:
 See as create a [GitHubApp](https://docs.github.com/pt/apps/creating-github-apps/about-creating-github-apps).
 
 ```
 githubApp:
   id: "CHANGE ME"
   key: |
-    -----BEGIN RSA PRIVATE KEY-----    
+    -----BEGIN RSA PRIVATE KEY-----
             "CHANGE ME"
     -----END RSA PRIVATE KEY-----
   slug: atlantis
-# secret webhook Atlantis  
+# secret webhook Atlantis
   secret: "CHANGE ME"
 ```
 **4** - Enter the org and repository from github that Atlantis will interact in orgAllowlist:
@@ -87,7 +87,7 @@ initConfig:
 **6** - Here we configure the envs to avoid downloading alternative versions of Terraform and indicate to Terragrunt where it should fetch the OpenTofu binary.
 ```
 # envs
-environment: 
+environment:
   ATLANTIS_TF_DOWNLOAD: false
   TERRAGRUNT_TFPATH: /plugins/tofu
 ```
@@ -154,8 +154,8 @@ workflows:
       - run:
           command: terragrunt plan -input=false -out=$PLANFILE
           output: strip_refreshing
-    apply:  
-      steps:      
+    apply:
+      steps:
         - run: terragrunt apply $PLANFILE
 ```
 **10** - Now let’s go to the installation itself, search for the available versions of Atlantis:
@@ -168,14 +168,14 @@ Replace ```CHART-VERSION``` with the version you want to install and run the com
 helm upgrade -i atlantis runatlantis/atlantis --version CHART-VERSION -f values.yaml --create-namespace atlantis
 ```
 
-Now, see as configure Atlantis [webhook on github](https://www.runatlantis.io/docs/configuring-webhooks.html?source=post_page-----85ca0fbe45e5--------------------------------#github-github-enterprise) repository.
+Now, see as configure Atlantis [webhook on github](../../docs/configuring-webhooks.md) repository.
 
-See as Atlantis [work](https://www.runatlantis.io/docs/using-atlantis.html?source=post_page-----85ca0fbe45e5--------------------------------).
+See as Atlantis [work](../../docs/using-atlantis.md).
 
 Find out more at:
 
-https://www.runatlantis.io/guide.html.  
-https://opentofu.org/docs/.  
-https://github.com/runatlantis/atlantis/issues/3741. 
+https://www.runatlantis.io/guide.html.
+https://opentofu.org/docs/.
+https://github.com/runatlantis/atlantis/issues/3741.
 
 Share it with your friends =)
