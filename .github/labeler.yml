@@ -14,7 +14,8 @@ docs:
 
 github-actions:
 - changed-files:
-  - any-glob-to-any-file: '.github/**'
+  - any-glob-to-any-file:
+    - '.github/workflows/*.yml'
 
 go:
 - changed-files:
@@ -46,4 +47,4 @@ website:
 
 blog:
 - changed-files:
-  - any-glob-to-any-file: 'blog/**'
+  - any-glob-to-any-file: 'runatlantis.io/blog/**'
