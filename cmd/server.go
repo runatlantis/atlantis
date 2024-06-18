@@ -596,7 +596,7 @@ var intFlags = map[string]intFlag{
 	},
 	MaxCommentsPerCommand: {
 		description:  "If non-zero, the maximum number of comments to split command output into before truncating.",
-		defaultValue: 0,
+		defaultValue: 100,
 	},
 	GiteaPageSizeFlag: {
 		description:  "Optional value that specifies the number of results per page to expect from Gitea.",

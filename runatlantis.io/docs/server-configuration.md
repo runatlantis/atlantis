@@ -905,15 +905,11 @@ This is useful when you have many projects and want to keep the pull request cle
 
 ### `--max-comments-per-command`
   ```bash
-  atlantis server --max-comments-per-command=10
+  atlantis server --max-comments-per-command=100
   # or
-  ATLANTIS_MAX_COMMENTS_PER_COMMAND=10
+  ATLANTIS_MAX_COMMENTS_PER_COMMAND=100
   ```
-  When a command's output is large, Atlantis automatically splits it into multiple comments with a maximum size based
-  on the specific VCS. By default, Atlantis will post enough comments to include the full command output. If your
-  command has a huge amount of output (eg, from setting `TF_LOG=debug`), the amount of comments may be enough to make
-  it challenging to read your PR, or it may even cause your VCS to rate limit Atlantis. Set this option to a non-zero
-  number to make Atlantis truncate output after this many comments.
+  Limit the number of comments published after a command is executed, to prevent spamming your VCS and Atlantis to get throttled as a result. Defaults to `100`. Set this option to `0` to disable log truncation. Note that the truncation will happen on the top of the command output, to preserve the most important parts of the output, often displayed at the end.
 
 ### `--parallel-apply`
 
