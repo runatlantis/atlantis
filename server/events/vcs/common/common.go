@@ -54,17 +54,3 @@ func SplitComment(comment string, maxSize int, sepEnd string, sepStart string, m
 	}
 	return comments
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
