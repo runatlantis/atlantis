@@ -101,6 +101,20 @@ const en = [
     collapsed: false,
     items: [
       {
+        text: "2024",
+        collapsed: true,
+        items: [
+          {
+            text: "Integrating Atlantis with OpenTofu",
+            link: "/blog/2024/integrating-atlantis-with-opentofu"
+          },
+          {
+            text: "Atlantis User Survey Results",
+            link: "/blog/2024/april-2024-survey-results"
+          },
+        ]
+      },
+      {
         text: "2019",
         collapsed: true,
         items: [

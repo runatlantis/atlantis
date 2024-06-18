@@ -1,4 +1,4 @@
-name: website-lint-check
+name: website
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -46,7 +46,7 @@ jobs:
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
       - name: markdown-lint
         uses: DavidAnson/markdownlint-cli2-action@b4c9feab76d8025d1e83c653fa3990936df0e6c8 # v16
@@ -100,7 +100,7 @@ jobs:
   skip-link-check:
     needs: [changes]
     if: needs.changes.outputs.should-run-link-check == 'false'
-    name: Skip Website Link Check
+    name: Website Link Check
     runs-on: ubuntu-latest
     steps:
       - run: 'echo "No build required"'
