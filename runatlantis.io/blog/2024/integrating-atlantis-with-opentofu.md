@@ -19,17 +19,21 @@ Stack: Atlantis, Terragrunt, OpenTofu, Github, ALB, EKS.
 We will implement it with your [Helm chart](https://www.runatlantis.io/docs/deployment.html#kubernetes-helm-chart):
 
 **1** - Add the runatlantis repository.
-```
+
+```sh
 helm repo add runatlantis https://runatlantis.github.io/helm-charts
 ```
+
 **2** - Create file values.yaml and run:
-```
+
+```sh
 helm inspect values runatlantis/atlantis > values.yaml
 ```
+
 **3** - Edit the file values.yaml and add your credentials access and secret which will be used in the Atlantis webhook configuration:
 See as create a [GitHubApp](https://docs.github.com/pt/apps/creating-github-apps/about-creating-github-apps).
 
-```
+```yaml
 githubApp:
   id: "CHANGE ME"
   key: |
@@ -40,8 +44,10 @@ githubApp:
 # secret webhook Atlantis
   secret: "CHANGE ME"
 ```
+
 **4** - Enter the org and repository from github that Atlantis will interact in orgAllowlist:
-```
+
+```yaml
 # All repositories the org
 orgAllowlist: github.com/MY-ORG/*
 
@@ -53,8 +59,10 @@ or
 # All repositories that start with MY-REPO-IAC-
 orgAllowlist: github.com/MY-ORG/MY-REPO-IAC-*
 ```
+
 **5** - Now let’s configure the script that will be executed upon startup of the Atlantis init pod. In this step we download and install Terragrunt and OpenTofu, as well as include their binaries in the shared dir ```/plugins```.
-```
+
+```yaml
 initConfig:
   enabled: true
   image: alpine:latest
@@ -84,15 +92,19 @@ initConfig:
     chmod 755 "${TF_FILE}"
     tofu -v
 ```
+
 **6** - Here we configure the envs to avoid downloading alternative versions of Terraform and indicate to Terragrunt where it should fetch the OpenTofu binary.
-```
+
+```yaml
 # envs
 environment:
   ATLANTIS_TF_DOWNLOAD: false
   TERRAGRUNT_TFPATH: /plugins/tofu
 ```
+
 **7** - Last but not least, here we specify which Atlantis-side configurations we will have for the repositories.
-```
+
+```yaml
 # repository config
 repoConfig: |
   ---
@@ -102,8 +114,10 @@ repoConfig: |
     allow_custom_workflows: true
     allowed_overrides: [workflow, apply_requirements, delete_source_branch_on_merge]
 ```
+
 **8** - Configure Atlantis webhook ingress, in the example below we are using the AWS ALB.
-```
+
+```yaml
 # ingress config
 ingress:
   annotations:
@@ -125,10 +139,12 @@ ingress:
   path: /*
   pathType: ImplementationSpecific
 ```
+
 Save all changes made to ```values.yaml```
 
 **9** - Using one of the Atlantis options custom workflows, we can create a file ```atlantis.yaml``` in the root folder of your repository, the example below should meet most scenarios, adapt as needed.
-```
+
+```yaml
 version: 3
 automerge: true
 parallel_plan: true
@@ -158,13 +174,16 @@ workflows:
       steps:
         - run: terragrunt apply $PLANFILE
 ```
+
 **10** - Now let’s go to the installation itself, search for the available versions of Atlantis:
-```
+
+```sh
 helm search repo runatlantis
 ```
+
 Replace ```CHART-VERSION``` with the version you want to install and run the command below:
 
-```
+```sh
 helm upgrade -i atlantis runatlantis/atlantis --version CHART-VERSION -f values.yaml --create-namespace atlantis
 ```
 
@@ -174,8 +193,8 @@ See as Atlantis [work](../../docs/using-atlantis.md).
 
 Find out more at:
 
-https://www.runatlantis.io/guide.html.
-https://opentofu.org/docs/.
-https://github.com/runatlantis/atlantis/issues/3741.
+- <https://www.runatlantis.io/guide.html>.
+- <https://opentofu.org/docs/>.
+- <https://github.com/runatlantis/atlantis/issues/3741>.
 
 Share it with your friends =)
