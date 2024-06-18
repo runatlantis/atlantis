@@ -108,6 +108,10 @@ const en = [
             text: "Integrating Atlantis with OpenTofu",
             link: "/blog/2024/integrating-atlantis-with-opentofu"
           },
+          {
+            text: "Atlantis User Survey Results",
+            link: "/blog/2024/april-2024-survey-results"
+          },
         ]
       },
       {
