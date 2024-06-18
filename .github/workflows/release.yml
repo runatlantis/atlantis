@@ -22,7 +22,6 @@ jobs:
       uses: goreleaser/goreleaser-action@286f3b13b1b49da4ac219696163fb8c1c93e1200 # v6
       if: (!contains(github.ref, 'pre'))
       with:
-        version: v1.16.2
         # You can pass flags to goreleaser via GORELEASER_ARGS
         # --clean will save you deleting the dist dir
         args: release --clean
