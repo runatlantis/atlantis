@@ -1,5 +1,6 @@
 quiet: False
+all: True
 testonly: False
 with-expecter: True
-keeptree: True
-all: True
+outpkg: mocks
+inpackage: true
