@@ -28,8 +28,6 @@ func NewInstrumentedGithubClient(client *GithubClient, statsScope tally.Scope, l
 	}
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_github_pull_request_getter.go GithubPullRequestGetter
-
 type GithubPullRequestGetter interface {
 	GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error)
 }

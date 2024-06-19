@@ -54,16 +54,12 @@ const (
 // and pasting GitHub comments.
 var multiLineRegex = regexp.MustCompile(`.*\r?\n[^\r\n]+`)
 
-//go:generate pegomock generate --package mocks -o mocks/mock_comment_parsing.go CommentParsing
-
 // CommentParsing handles parsing pull request comments.
 type CommentParsing interface {
 	// Parse attempts to parse a pull request comment to see if it's an Atlantis
 	// command.
 	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
 }
-
-//go:generate pegomock generate --package mocks -o mocks/mock_comment_building.go CommentBuilder
 
 // CommentBuilder builds comment commands that can be used on pull requests.
 type CommentBuilder interface {

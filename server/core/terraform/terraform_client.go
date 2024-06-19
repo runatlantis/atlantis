@@ -46,8 +46,6 @@ import (
 
 var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
 
-//go:generate pegomock generate --package mocks -o mocks/mock_terraform_client.go Client
-
 type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
@@ -89,8 +87,6 @@ type DefaultClient struct {
 
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
-
-//go:generate pegomock generate --package mocks -o mocks/mock_downloader.go Downloader
 
 // Downloader is for downloading terraform versions.
 type Downloader interface {
