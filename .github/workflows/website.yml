@@ -88,6 +88,7 @@ jobs:
       - run: |
           ./muffet \
             -e 'https://medium.com/runatlantis' \
+            -e 'https://dev.to/*' \
             -e 'https://twitter.com/*' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
