@@ -20,7 +20,7 @@ jobs:
     outputs:
       should-run-build: ${{ steps.changes.outputs.src == 'true' }}
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
@@ -35,7 +35,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'true'
     name: Build Testing Env Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
@@ -72,6 +72,6 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'false'
     name: Build Testing Env Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - run: 'echo "No build required"'

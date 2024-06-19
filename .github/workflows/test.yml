@@ -24,7 +24,7 @@ jobs:
     outputs:
       should-run-tests: ${{ steps.changes.outputs.go == 'true' }}
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
@@ -40,7 +40,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container: ghcr.io/runatlantis/testing-env:latest@sha256:94680793fcbe92923328ea27053e691f7a16d0daebe6616f353e48cb81b48438
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
@@ -97,7 +97,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'false'
     name: Tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - run: 'echo "No build required"'
 
