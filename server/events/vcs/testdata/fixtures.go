@@ -496,6 +496,79 @@ var githubAppInstallationJSON = `[
 	}
 ]`
 
+var githubAppMultipleInstallationJSON = `[
+	{
+		"id": 1,
+		"account": {
+			"login": "github",
+			"id": 1,
+			"node_id": "MDEyOk9yZ2FuaXphdGlvbjE=",
+			"url": "https://api.github.com/orgs/github",
+			"repos_url": "https://api.github.com/orgs/github/repos",
+			"events_url": "https://api.github.com/orgs/github/events",
+			"hooks_url": "https://api.github.com/orgs/github/hooks",
+			"issues_url": "https://api.github.com/orgs/github/issues",
+			"members_url": "https://api.github.com/orgs/github/members{/member}",
+			"public_members_url": "https://api.github.com/orgs/github/public_members{/member}",
+			"avatar_url": "https://github.com/images/error/octocat_happy.gif",
+			"description": "A great organization"
+		},
+		"access_tokens_url": "https://api.github.com/installations/1/access_tokens",
+		"repositories_url": "https://api.github.com/installation/repositories",
+		"html_url": "https://github.com/organizations/github/settings/installations/1",
+		"app_id": 1,
+		"target_id": 1,
+		"target_type": "Organization",
+		"permissions": {
+			"metadata": "read",
+			"contents": "read",
+			"issues": "write",
+			"single_file": "write"
+		},
+		"events": [
+			"push",
+			"pull_request"
+		],
+		"single_file_name": "config.yml",
+		"repository_selection": "selected"
+	},
+	{
+		"id": 2,
+		"account": {
+			"login": "github",
+			"id": 1,
+			"node_id": "MDEyOk9yZ2FuaXphdGlvbjE=",
+			"url": "https://api.github.com/orgs/github",
+			"repos_url": "https://api.github.com/orgs/github/repos",
+			"events_url": "https://api.github.com/orgs/github/events",
+			"hooks_url": "https://api.github.com/orgs/github/hooks",
+			"issues_url": "https://api.github.com/orgs/github/issues",
+			"members_url": "https://api.github.com/orgs/github/members{/member}",
+			"public_members_url": "https://api.github.com/orgs/github/public_members{/member}",
+			"avatar_url": "https://github.com/images/error/octocat_happy.gif",
+			"description": "A great organization"
+		},
+		"access_tokens_url": "https://api.github.com/installations/1/access_tokens",
+		"repositories_url": "https://api.github.com/installation/repositories",
+		"html_url": "https://github.com/organizations/github/settings/installations/1",
+		"app_id": 1,
+		"target_id": 1,
+		"target_type": "Organization",
+		"permissions": {
+			"metadata": "read",
+			"contents": "read",
+			"issues": "write",
+			"single_file": "write"
+		},
+		"events": [
+			"push",
+			"pull_request"
+		],
+		"single_file_name": "config.yml",
+		"repository_selection": "selected"
+	}
+]`
+
 // nolint: gosec
 var githubAppTokenJSON = `{
 	"token":      "some-token",
@@ -706,6 +779,61 @@ func GithubAppTestServer(t *testing.T) (string, error) {
 				}
 
 				w.Write([]byte(githubAppInstallationJSON)) // nolint: errcheck
+				return
+			case "/api/v3/apps/some-app":
+				token := strings.Replace(r.Header.Get("Authorization"), "token ", "", 1)
+
+				// token is taken from githubAppTokenJSON
+				if token != "some-token" {
+					w.WriteHeader(403)
+					w.Write([]byte("Invalid installation token")) // nolint: errcheck
+					return
+				}
+				w.Write([]byte(githubAppJSON)) // nolint: errcheck
+				return
+			case "/api/v3/app/installations/1/access_tokens":
+				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
+				if err := validateGithubToken(token); err != nil {
+					w.WriteHeader(403)
+					w.Write([]byte("Invalid token")) // nolint: errcheck
+					return
+				}
+
+				appToken := fmt.Sprintf(githubAppTokenJSON, counter)
+				counter++
+				w.Write([]byte(appToken)) // nolint: errcheck
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+
+	return testServerURL.Host, err
+}
+
+func GithubMultipleAppTestServer(t *testing.T) (string, error) {
+	counter := 0
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/app-manifests/good-code/conversions":
+				encodedKey := strings.Join(strings.Split(GithubPrivateKey, "\n"), "\\n")
+				appInfo := fmt.Sprintf(githubConversionJSON, encodedKey)
+				w.Write([]byte(appInfo)) // nolint: errcheck
+			// https://developer.github.com/v3/apps/#list-installations
+			case "/api/v3/app/installations":
+				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
+				if err := validateGithubToken(token); err != nil {
+					w.WriteHeader(403)
+					w.Write([]byte("Invalid token")) // nolint: errcheck
+					return
+				}
+
+				w.Write([]byte(githubAppMultipleInstallationJSON)) // nolint: errcheck
 				return
 			case "/api/v3/apps/some-app":
 				token := strings.Replace(r.Header.Get("Authorization"), "token ", "", 1)

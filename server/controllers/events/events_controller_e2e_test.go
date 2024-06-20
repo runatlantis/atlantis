@@ -53,12 +53,12 @@ var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
 
 var mockPostWorkflowHookRunner *runtimemocks.MockPostWorkflowHookRunner
 
-func (m *NoopTFDownloader) GetFile(_, _ string) error {
+func (m *NoopTFDownloader) GetAny(_, _ string) error {
 	return nil
 }
 
-func (m *NoopTFDownloader) GetAny(_, _ string) error {
-	return nil
+func (m *NoopTFDownloader) Install(_ string, _ string, _ *version.Version) (string, error) {
+	return "", nil
 }
 
 type LocalConftestCache struct {
@@ -1333,7 +1333,6 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		TestingOverrideHeadCloneURL: "override-me",
-		Logger:                      logger,
 	}
 	var preWorkflowHooks []*valid.WorkflowHook
 	if !opt.disablePreWorkflowHooks {
@@ -1425,7 +1424,6 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		false,
 		"auto",
 		statsScope,
-		logger,
 		terraformClient,
 	)
 

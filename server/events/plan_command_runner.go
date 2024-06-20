@@ -76,6 +76,7 @@ type PlanCommandRunner struct {
 	// a plan.
 	DiscardApprovalOnPlan bool
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
+	SilencePRComments     []string
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -116,6 +117,12 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	// At this point we are sure Atlantis has work to do, so set commit status to pending
 	if err := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
 		ctx.Log.Warn("unable to update plan commit status: %s", err)
+	}
+
+	if baseRepo.VCSHost.Type == models.Gitlab {
+		if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply, 0, len(projectCmds)); err != nil {
+			ctx.Log.Warn("unable to update apply commit status: %s", err)
+		}
 	}
 
 	// discard previous plans that might not be relevant anymore

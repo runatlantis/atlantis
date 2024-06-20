@@ -48,7 +48,6 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 	expectedPlanCmt := "Plan Comment"
 
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(commandCtx.Log))
 
 	t.Run("with project name defined", func(t *testing.T) {
 		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, projName, []string{})).ThenReturn(expectedPlanCmt)

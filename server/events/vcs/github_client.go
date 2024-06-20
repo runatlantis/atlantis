@@ -76,7 +76,7 @@ type GithubPRReviewSummary struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, logger logging.SimpleLogging) (*GithubClient, error) { //nolint:staticcheck
+func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, logger logging.SimpleLogging) (*GithubClient, error) {
 	logger.Debug("Creating new GitHub client for host: %s", hostname)
 	transport, err := credentials.Client()
 	if err != nil {
@@ -90,7 +90,8 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		graphqlURL = "https://api.github.com/graphql"
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
-		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport) // nolint: staticcheck
+		// TODO: Deprecated: Use NewClient(httpClient).WithEnterpriseURLs(baseURL, uploadURL) instead
+		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}

@@ -19,7 +19,6 @@ package logging
 import (
 	"bytes"
 	"fmt"
-	"testing"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -184,7 +183,7 @@ func (l *StructuredLogger) saveToHistory(lvl LogLevel, format string, a ...inter
 
 // NewNoopLogger creates a logger instance that discards all logs and never
 // writes them. Used for testing.
-func NewNoopLogger(t *testing.T) SimpleLogging {
+func NewNoopLogger(t zaptest.TestingT) SimpleLogging {
 	level := zap.DebugLevel
 	return &StructuredLogger{
 		z:     zaptest.NewLogger(t, zaptest.Level(level)).Sugar(),

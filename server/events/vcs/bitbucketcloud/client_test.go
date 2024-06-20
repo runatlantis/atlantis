@@ -14,6 +14,8 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+const diffstatURL = "/2.0/repositories/owner/repo/pullrequests/1/diffstat"
+
 // Should follow pagination properly.
 func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
@@ -56,12 +58,12 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.RequestURI {
 		// The first request should hit this URL.
-		case "/2.0/repositories/owner/repo/pullrequests/1/diffstat":
-			resp := firstResp + fmt.Sprintf(`,"next": "%s/2.0/repositories/owner/repo/pullrequests/1/diffstat?page=2"}`, serverURL)
+		case diffstatURL:
+			resp := firstResp + fmt.Sprintf(`,"next": "%s%s?page=2"}`, serverURL, diffstatURL)
 			w.Write([]byte(resp)) // nolint: errcheck
 			return
 			// The second should hit this URL.
-		case "/2.0/repositories/owner/repo/pullrequests/1/diffstat?page=2":
+		case fmt.Sprintf("%s?page=2", diffstatURL):
 			w.Write([]byte(secondResp + "}")) // nolint: errcheck
 		default:
 			t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -125,7 +127,7 @@ func TestClient_GetModifiedFilesOldNil(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.RequestURI {
 		// The first request should hit this URL.
-		case "/2.0/repositories/owner/repo/pullrequests/1/diffstat":
+		case diffstatURL:
 			w.Write([]byte(resp)) // nolint: errcheck
 			return
 		default:
@@ -322,7 +324,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.RequestURI {
-				case "/2.0/repositories/owner/repo/pullrequests/1/diffstat":
+				case diffstatURL:
 					w.Write([]byte(c.DiffStat)) // nolint: errcheck
 					return
 				default:

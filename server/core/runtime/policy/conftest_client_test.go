@@ -33,7 +33,6 @@ func TestConfTestVersionDownloader(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 
-		When(mockDownloader.GetFile(Eq(destPath), Eq(fullURL))).ThenReturn(nil)
 		binPath, err := subject.downloadConfTestVersion(version, destPath)
 
 		mockDownloader.VerifyWasCalledOnce().GetAny(Eq(destPath), Eq(fullURL))

@@ -42,6 +42,9 @@ const (
 //     name: test
 //     command: echo 312
 //     value: value
+//   - multienv:
+//     command: envs.sh
+//     outpiut: hide
 //   - run:
 //     command: my custom command
 //     output: hide
@@ -63,8 +66,8 @@ type Step struct {
 	// Key will be set in case #1 and #3 above to the key. In case #2, there
 	// could be multiple keys (since the element is a map) so we don't set Key.
 	Key *string
-	// EnvOrRun will be set in case #2 above.
-	EnvOrRun map[string]map[string]string
+	// CommandMap will be set in case #2 above.
+	CommandMap map[string]map[string]string
 	// Map will be set in case #3 above.
 	Map map[string]map[string][]string
 	// StringVal will be set in case #4 above.
@@ -152,7 +155,7 @@ func (s Step) Validate() error {
 		return nil
 	}
 
-	envOrRunStep := func(value interface{}) error {
+	envOrRunOrMultiEnvStep := func(value interface{}) error {
 		elem := value.(map[string]map[string]string)
 		var keys []string
 		for k := range elem {
@@ -198,20 +201,25 @@ func (s Step) Validate() error {
 				return fmt.Errorf("env steps only support one of the %q or %q keys, found both",
 					ValueArgKey, CommandArgKey)
 			}
-		case RunStepName:
+		case RunStepName, MultiEnvStepName:
 			argsCopy := make(map[string]string)
 			for k, v := range args {
 				argsCopy[k] = v
 			}
 			args = argsCopy
 			if _, ok := args[CommandArgKey]; !ok {
-				return fmt.Errorf("run step must have a %q key set", CommandArgKey)
+				return fmt.Errorf("%q step must have a %q key set", stepName, CommandArgKey)
 			}
 			delete(args, CommandArgKey)
 			if v, ok := args[OutputArgKey]; ok {
-				if !valid.MatchesAnyPostProcessRunOutputOptions(v) {
+				if stepName == RunStepName && !valid.MatchesAnyPostProcessRunOutputOptions(v) {
 					return fmt.Errorf("run step %q option must be one of %q", OutputArgKey, strings.Join(valid.PostProcessRunOutputOptions(), ","))
 				}
+
+				if stepName == MultiEnvStepName && !(v == valid.PostProcessRunOutputShow || v == valid.PostProcessRunOutputHide) {
+					return fmt.Errorf("multienv step %q option must be %q or %q", OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide)
+				}
+
 				// When output requires regex option
 				if v == valid.PostProcessRunOutputCustomRegex || v == valid.PostProcessRunOutputStripRefreshingWithCustomRegex {
 					if regex, ok := args[OutputRegexFilterKey]; ok {
@@ -232,7 +240,7 @@ func (s Step) Validate() error {
 				}
 				// Sort so tests can be deterministic.
 				sort.Strings(argKeys)
-				return fmt.Errorf("run steps only support keys %q, %q and %q, found extra keys %q", RunStepName, CommandArgKey, OutputArgKey, strings.Join(argKeys, ","))
+				return fmt.Errorf("%q steps only support keys %q and %q, found extra keys %q", stepName, CommandArgKey, OutputArgKey, strings.Join(argKeys, ","))
 			}
 		default:
 			return fmt.Errorf("%q is not a valid step type", stepName)
@@ -241,7 +249,7 @@ func (s Step) Validate() error {
 		return nil
 	}
 
-	runStep := func(value interface{}) error {
+	runOrMultiEnvStep := func(value interface{}) error {
 		elem := value.(map[string]string)
 		var keys []string
 		for k := range elem {
@@ -255,7 +263,7 @@ func (s Step) Validate() error {
 				len(keys), strings.Join(keys, ","))
 		}
 		for stepName := range elem {
-			if stepName != RunStepName && stepName != MultiEnvStepName {
+			if !(stepName == RunStepName || stepName == MultiEnvStepName) {
 				return fmt.Errorf("%q is not a valid step type", stepName)
 			}
 		}
@@ -268,11 +276,11 @@ func (s Step) Validate() error {
 	if len(s.Map) > 0 {
 		return validation.Validate(s.Map, validation.By(extraArgs))
 	}
-	if len(s.EnvOrRun) > 0 {
-		return validation.Validate(s.EnvOrRun, validation.By(envOrRunStep))
+	if len(s.CommandMap) > 0 {
+		return validation.Validate(s.CommandMap, validation.By(envOrRunOrMultiEnvStep))
 	}
 	if len(s.StringVal) > 0 {
-		return validation.Validate(s.StringVal, validation.By(runStep))
+		return validation.Validate(s.StringVal, validation.By(runOrMultiEnvStep))
 	}
 	return errors.New("step element is empty")
 }
@@ -286,10 +294,10 @@ func (s Step) ToValid() valid.Step {
 	}
 
 	// This will trigger in case #2 (see Step docs).
-	if len(s.EnvOrRun) > 0 {
+	if len(s.CommandMap) > 0 {
 		// After validation we assume there's only one key and it's a valid
 		// step name so we just use the first one.
-		for stepName, stepArgs := range s.EnvOrRun {
+		for stepName, stepArgs := range s.CommandMap {
 			step := valid.Step{
 				StepName:          stepName,
 				EnvVarName:        stepArgs[NameArgKey],
@@ -374,7 +382,7 @@ func (s *Step) unmarshalGeneric(unmarshal func(interface{}) error) error {
 	var envStep map[string]map[string]string
 	err = unmarshal(&envStep)
 	if err == nil {
-		s.EnvOrRun = envStep
+		s.CommandMap = envStep
 		return nil
 	}
 
@@ -397,8 +405,8 @@ func (s Step) marshalGeneric() (interface{}, error) {
 		return s.StringVal, nil
 	} else if len(s.Map) != 0 {
 		return s.Map, nil
-	} else if len(s.EnvOrRun) != 0 {
-		return s.EnvOrRun, nil
+	} else if len(s.CommandMap) != 0 {
+		return s.CommandMap, nil
 	} else if s.Key != nil {
 		return s.Key, nil
 	}

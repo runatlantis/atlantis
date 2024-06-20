@@ -5,6 +5,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -84,7 +85,7 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 				ProjectName:      c.ProjectName,
 			}
 			envMap := make(map[string]string)
-			value, err := multiEnvStepRunner.Run(ctx, c.Command, tmpDir, envMap)
+			value, err := multiEnvStepRunner.Run(ctx, c.Command, tmpDir, envMap, valid.PostProcessRunOutputShow)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

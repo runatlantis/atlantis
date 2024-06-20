@@ -5,10 +5,14 @@ Ran {{ .Command }} for {{ if $result.ProjectName }}project: `{{ $result.ProjectN
 {{ $result.Rendered }}
 {{ if ne .DisableApplyAll true }}
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * `{{ .ExecutableName }} apply`
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * `{{ .ExecutableName }} unlock`
+* :fast_forward: To **apply** all unapplied plans from this {{ .VcsRequestType }}, comment:
+  ```shell
+  {{ .ExecutableName }} apply
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this {{ .VcsRequestType }}, comment:
+  ```shell
+  {{ .ExecutableName }} unlock
+  ```
 {{ end -}}
 {{ template "log" . -}}
 {{ end -}}

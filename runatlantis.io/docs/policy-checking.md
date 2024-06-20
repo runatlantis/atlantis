@@ -10,7 +10,7 @@ for using this step include:
 
 ## How it works?
 
-Enabling "policy checking" in addition to the [mergeable apply requirement](/docs/command-requirements.html#supported-requirements) blocks applies on plans that fail any of the defined conftest policies.
+Enabling "policy checking" in addition to the [mergeable apply requirement](command-requirements.md#supported-requirements) blocks applies on plans that fail any of the defined conftest policies.
 
 ![Policy Check Apply Failure](./images/policy-check-apply-failure.png)
 
@@ -20,9 +20,9 @@ Any failures need to either be addressed in a successive commit, or approved by 
 
 ![Policy Check Approval](./images/policy-check-approval.png)
 
-
 Policy approvals may be cleared either by re-planing, or by issuing the following command:
-```
+
+```shell
 atlantis approve_policies --clear-policy-approval
 ```
 
@@ -44,11 +44,11 @@ All repositories will have policy checking enabled.
 
 ### Step 2: Define the policy configuration
 
-Policy Configuration is defined in the [server-side repo configuration](https://www.runatlantis.io/docs/server-side-repo-config.html#reference).
+Policy Configuration is defined in the [server-side repo configuration](server-side-repo-config.md#reference).
 
 In this example we will define one policy set with one owner:
 
-```
+```yaml
 policies:
   owners:
     users:
@@ -72,11 +72,11 @@ policies:
 - `owners` - Defines the users/teams which are able to approve a specific policy set.
 - `approve_count` - Defines the number of approvals needed to bypass policy checks. Defaults to the top-level policies configuration, if not specified.
 
-By default conftest is configured to only run the `main` package. If you wish to run specific/multiple policies consider passing `--namespace` or `--all-namespaces` to conftest with [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) via a custom workflow as shown in the below example.
+By default conftest is configured to only run the `main` package. If you wish to run specific/multiple policies consider passing `--namespace` or `--all-namespaces` to conftest with [`extra_args`](custom-workflows.md#adding-extra-arguments-to-terraform-commands) via a custom workflow as shown in the below example.
 
 Example Server Side Repo configuration using `--all-namespaces` and a local src dir.
 
-```
+```yaml
 repos:
   - id: github.com/myorg/example-repo
     workflow: custom
@@ -104,7 +104,7 @@ workflows:
 
 Conftest policies are based on [Open Policy Agent (OPA)](https://www.openpolicyagent.org/) and written in [rego](https://www.openpolicyagent.org/docs/latest/policy-language/#what-is-rego). Following our example, simply create a `rego` file in `null_resource_warning` folder with following code, the code below a simple policy that will fail for plans containing newly created `null_resource`s.
 
-```
+```rego
 package main
 
 resource_types = {"null_resource"}
@@ -144,7 +144,7 @@ That's it! Now your Atlantis instance is configured to run policies on your Terr
 
 ### Pulling policies from a remote location
 
-Conftest supports [pulling policies](https://www.conftest.dev/sharing/#pulling) from remote locations such as S3, git, OCI, and other protocols supported by the [go-getter](https://github.com/hashicorp/go-getter) library. The key [`extra_args`](https://www.runatlantis.io/docs/custom-workflows.html#adding-extra-arguments-to-terraform-commands) can be used to pass in the [`--update`](https://www.conftest.dev/sharing/#-update-flag) flag to tell `conftest` to pull the policies into the project folder before running the policy check.
+Conftest supports [pulling policies](https://www.conftest.dev/sharing/#pulling) from remote locations such as S3, git, OCI, and other protocols supported by the [go-getter](https://github.com/hashicorp/go-getter) library. The key [`extra_args`](custom-workflows.md#adding-extra-arguments-to-terraform-commands) can be used to pass in the [`--update`](https://www.conftest.dev/sharing/#-update-flag) flag to tell `conftest` to pull the policies into the project folder before running the policy check.
 
 ```yaml
 workflows:
@@ -163,7 +163,7 @@ Note that authentication may need to be configured separately if pulling policie
 
 ### Running policy check against Terraform source code
 
-By default, Atlantis runs the policy check against the [`SHOWFILE`](https://www.runatlantis.io/docs/custom-workflows.html#custom-run-command). In order to run the policy test against Terraform files directly, override the default `conftest` command used and pass in `*.tf` as one of the inputs to `conftest`. The `show` step is required so that Atlantis will generate the `SHOWFILE`.
+By default, Atlantis runs the policy check against the [`SHOWFILE`](custom-workflows.md#custom-run-command). In order to run the policy test against Terraform files directly, override the default `conftest` command used and pass in `*.tf` as one of the inputs to `conftest`. The `show` step is required so that Atlantis will generate the `SHOWFILE`.
 
 ```yaml
 workflows:
@@ -171,13 +171,12 @@ workflows:
     policy_check:
       steps:
         - show
-        - run: conftest test $SHOWFILE *.tf
+        - run: conftest test $SHOWFILE *.tf --no-fail
 ```
 
 ### Quiet policy checks
 
-By default, Atlantis will add a comment to all pull requests with the policy check result - both successes and failures. Version 0.21.0 added the [`--quiet-policy-checks`](server-configuration.html#quiet-policy-checks) option, which will instead only add comments when policy checks fail, significantly reducing the number of comments when most policy check results succeed.
-
+By default, Atlantis will add a comment to all pull requests with the policy check result - both successes and failures. Version 0.21.0 added the [`--quiet-policy-checks`](server-configuration.md#quiet-policy-checks) option, which will instead only add comments when policy checks fail, significantly reducing the number of comments when most policy check results succeed.
 
 ### Data for custom run steps
 
@@ -198,9 +197,10 @@ When the policy check workflow runs, a file is created in the working directory 
 
 ## Running policy check only on some repositories
 
-When policy checking is enabled it will be enforced on all repositories, in order to disable policy checking on some repositories first [enable policy checks](https://www.runatlantis.io/docs/policy-checking.html#getting-started) and then disable it explicitly on each repository with the `policy_check` flag.
+When policy checking is enabled it will be enforced on all repositories, in order to disable policy checking on some repositories first [enable policy checks](policy-checking.md#getting-started) and then disable it explicitly on each repository with the `policy_check` flag.
 
 For server side config:
+
 ```yml
 # repos.yaml
 repos:
@@ -216,6 +216,7 @@ repos:
 ```
 
 For repo level `atlantis.yaml` config:
+
 ```yml
 version: 3
 projects:

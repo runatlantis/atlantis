@@ -304,6 +304,7 @@ const (
 	BitbucketCloud
 	BitbucketServer
 	AzureDevops
+	Gitea
 )
 
 func (h VCSHostType) String() string {
@@ -318,6 +319,8 @@ func (h VCSHostType) String() string {
 		return "BitbucketServer"
 	case AzureDevops:
 		return "AzureDevops"
+	case Gitea:
+		return "Gitea"
 	}
 	return "<missing String() implementation>"
 }
@@ -334,6 +337,8 @@ func NewVCSHostType(t string) (VCSHostType, error) {
 		return BitbucketServer, nil
 	case "AzureDevops":
 		return AzureDevops, nil
+	case "Gitea":
+		return Gitea, nil
 	}
 
 	return -1, fmt.Errorf("%q is not a valid type", t)
@@ -648,6 +653,8 @@ type WorkflowHookCommandContext struct {
 	// Workspace is the Terraform workspace this project is in. It will always
 	// be set.
 	Workspace string
+	// API is true if plan/apply by API endpoints
+	API bool
 }
 
 // PlanSuccessStats holds stats for a plan.
