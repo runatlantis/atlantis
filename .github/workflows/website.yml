@@ -24,7 +24,7 @@ jobs:
     outputs:
       should-run-link-check: ${{ steps.changes.outputs.src == 'true' }}
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
@@ -88,6 +88,7 @@ jobs:
       - run: |
           ./muffet \
             -e 'https://medium.com/runatlantis' \
+            -e 'https://dev.to/*' \
             -e 'https://twitter.com/*' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
