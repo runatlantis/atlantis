@@ -17,12 +17,12 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
-	github.com/gorilla/websocket v1.5.2
+	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/go-getter/v2 v2.2.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/hashicorp/hc-install v0.7.1-0.20240607080111-03e0bd63529f
+	github.com/hashicorp/hc-install v0.7.1-0.20240624082812-2597d9ec8be6
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20240607080351-271db412dbcb
 	github.com/jpillora/backoff v1.0.0
 	github.com/kr/pretty v0.3.1
@@ -34,7 +34,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/petergtz/pegomock/v4 v4.0.0
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.5.2
+	github.com/redis/go-redis/v9 v9.5.3
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20240429030203-be2daab69064
 	github.com/slack-go/slack v0.12.5
