@@ -10,7 +10,7 @@ ARG DEFAULT_TERRAFORM_VERSION=1.8.5
 ARG DEFAULT_OPENTOFU_VERSION=1.7.2
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 # ARG DEFAULT_CONFTEST_VERSION=0.52.0
-#ARG DEFAULT_CONFTEST_VERSION=0.53.0-1
+ARG DEFAULT_CONFTEST_VERSION=0.53.0-1
 
 # Stage 1: build artifact and download deps
 
