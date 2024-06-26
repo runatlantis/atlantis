@@ -19,6 +19,7 @@ type ProjectResult struct {
 	ImportSuccess      *models.ImportSuccess
 	StateRmSuccess     *models.StateRmSuccess
 	ProjectName        string
+	SilencePRComments  []string
 }
 
 // CommitStatus returns the vcs commit status of this project result.

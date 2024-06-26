@@ -29,6 +29,7 @@ type RepoCfg struct {
 	EmojiReaction              string
 	AllowedRegexpPrefixes      []string
 	AbortOnExcecutionOrderFail bool
+	SilencePRComments          []string
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
@@ -158,6 +159,7 @@ type Project struct {
 	ExecutionOrderGroup       int
 	PolicyCheck               *bool
 	CustomPolicyCheck         *bool
+	SilencePRComments         []string
 }
 
 // GetName returns the name of the project or an empty string if there is no

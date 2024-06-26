@@ -6,6 +6,9 @@ IMAGE_NAME := runatlantis/atlantis
 
 .DEFAULT_GOAL := help
 
+# renovate: datasource=github-releases depName=golangci/golangci-lint
+GOLANGCI_LINT_VERSION := v1.59.1
+
 .PHONY: help
 help: ## List targets & descriptions
 	@cat Makefile* | grep -E '^[a-zA-Z\/_-]+:.*?## .*$$' | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -93,7 +96,7 @@ lint: ## Run linter locally
 
 .PHONY: check-lint
 check-lint: ## Run linter in CI/CD. If running locally use 'lint'
-	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin v1.49.0
+	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin $(GOLANGCI_LINT_VERSION)
 	./bin/golangci-lint run -j 4 --timeout 5m
 
 .PHONY: check-fmt
@@ -110,4 +113,4 @@ end-to-end-tests: ## Run e2e tests
 
 .PHONY: website-dev
 website-dev: ## Run runatlantic.io on localhost:8080
-	pnpm website:dev
+	npm website:dev

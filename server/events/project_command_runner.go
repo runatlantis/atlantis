@@ -78,7 +78,7 @@ type EnvStepRunner interface {
 // MultiEnvStepRunner runs multienv steps.
 type MultiEnvStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
+	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -225,13 +225,14 @@ type DefaultProjectCommandRunner struct {
 func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
 	planSuccess, failure, err := p.doPlan(ctx)
 	return command.ProjectResult{
-		Command:     command.Plan,
-		PlanSuccess: planSuccess,
-		Error:       err,
-		Failure:     failure,
-		RepoRelDir:  ctx.RepoRelDir,
-		Workspace:   ctx.Workspace,
-		ProjectName: ctx.ProjectName,
+		Command:           command.Plan,
+		PlanSuccess:       planSuccess,
+		Error:             err,
+		Failure:           failure,
+		RepoRelDir:        ctx.RepoRelDir,
+		Workspace:         ctx.Workspace,
+		ProjectName:       ctx.ProjectName,
+		SilencePRComments: ctx.SilencePRComments,
 	}
 }
 
@@ -253,13 +254,14 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
 	applyOut, failure, err := p.doApply(ctx)
 	return command.ProjectResult{
-		Command:      command.Apply,
-		Failure:      failure,
-		Error:        err,
-		ApplySuccess: applyOut,
-		RepoRelDir:   ctx.RepoRelDir,
-		Workspace:    ctx.Workspace,
-		ProjectName:  ctx.ProjectName,
+		Command:           command.Apply,
+		Failure:           failure,
+		Error:             err,
+		ApplySuccess:      applyOut,
+		RepoRelDir:        ctx.RepoRelDir,
+		Workspace:         ctx.Workspace,
+		ProjectName:       ctx.ProjectName,
+		SilencePRComments: ctx.SilencePRComments,
 	}
 }
 
@@ -795,7 +797,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 			// be printed to the PR, it's solely to set the environment variable.
 			out = ""
 		case "multienv":
-			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs)
+			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs, step.Output)
 		}
 
 		if out != "" {

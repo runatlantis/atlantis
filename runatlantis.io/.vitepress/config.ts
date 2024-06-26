@@ -3,9 +3,10 @@ import footnote from 'markdown-it-footnote'
 import { defineConfig } from 'vitepress';
 import * as navbars from "./navbars";
 import * as sidebars from "./sidebars";
+import { withMermaid } from "vitepress-plugin-mermaid";
 
 // https://vitepress.dev/reference/site-config
-export default defineConfig({
+const config = defineConfig({
     title: 'Atlantis',
     description: 'Atlantis: Terraform Pull Request Automation',
     lang: 'en-US',
@@ -128,3 +129,5 @@ export default defineConfig({
         }
     }
 })
+
+export default withMermaid(config)

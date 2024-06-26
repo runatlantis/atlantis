@@ -234,7 +234,7 @@ TOKEN="{YOUR_TOKEN}"
 TOKEN="{YOUR_TOKEN}"
 ```
 
-### Gite Access Token
+### Gitea Access Token
 
 - Go to "Profile and Settings" > "Settings" in Gitea (top-right)
 - Go to "Applications" under "User Settings" in Gitea

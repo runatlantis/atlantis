@@ -24,9 +24,9 @@ jobs:
     outputs:
       should-run-tests: ${{ steps.changes.outputs.go == 'true' }}
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -40,10 +40,10 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
-    runs-on: ubuntu-22.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:5a0430c5e6c6e26860404a3cff81e91f100e1ae7f7b7ac367d3b7068a293a203
+    runs-on: ubuntu-24.04
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:fc9508e90a25fe8e16ef48f6cb9fd1e4c63e23e5e6c6fa385ab463fdd3c129f4
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
       # need to setup go toolchain explicitly
       - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5
@@ -58,7 +58,7 @@ jobs:
       ###########################################################
       - name: Slack failure notification
         if: ${{ github.ref == 'refs/heads/main' && failure() }}
-        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
         with:
           payload: |
             {
@@ -97,7 +97,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'false'
     name: Tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - run: 'echo "No build required"'
 
@@ -111,7 +111,7 @@ jobs:
       ATLANTISBOT_GITHUB_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5
         with:
           go-version-file: go.mod
