@@ -31,20 +31,22 @@ import (
 )
 
 const (
-	workspaceFlagLong            = "workspace"
-	workspaceFlagShort           = "w"
-	dirFlagLong                  = "dir"
-	dirFlagShort                 = "d"
-	projectFlagLong              = "project"
-	projectFlagShort             = "p"
-	policySetFlagLong            = "policy-set"
-	policySetFlagShort           = ""
-	autoMergeDisabledFlagLong    = "auto-merge-disabled"
-	autoMergeDisabledFlagShort   = ""
-	verboseFlagLong              = "verbose"
-	verboseFlagShort             = ""
-	clearPolicyApprovalFlagLong  = "clear-policy-approval"
-	clearPolicyApprovalFlagShort = ""
+	workspaceFlagLong                   = "workspace"
+	workspaceFlagShort                  = "w"
+	dirFlagLong                         = "dir"
+	dirFlagShort                        = "d"
+	projectFlagLong                     = "project"
+	projectFlagShort                    = "p"
+	policySetFlagLong                   = "policy-set"
+	policySetFlagShort                  = ""
+	autoMergeDisabledFlagLong           = "auto-merge-disabled"
+	autoMergeDisabledFlagShort          = ""
+	verboseFlagLong                     = "verbose"
+	verboseFlagShort                    = ""
+	clearPolicyApprovalFlagLong         = "clear-policy-approval"
+	clearPolicyApprovalFlagShort        = ""
+	allowPartialSuccessVerboseFlagLong  = "allow-partial-success"
+	allowPartialSuccessVerboseFlagShort = ""
 )
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -226,7 +228,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var project string
 	var policySet string
 	var clearPolicyApproval bool
-	var verbose, autoMergeDisabled bool
+	var verbose, autoMergeDisabled, allowPartialSuccess bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
 
@@ -240,6 +242,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run plan for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+		flagSet.BoolVarP(&allowPartialSuccess, allowPartialSuccessVerboseFlagLong, allowPartialSuccessVerboseFlagLong, false, "Allow for some plans to succeed even when auto merge is enabled (the default is an atomic action which deletes all plans upon failure of at least one other plan).")
 	case command.Apply.String():
 		name = command.Apply
 		flagSet = pflag.NewFlagSet(command.Apply.String(), pflag.ContinueOnError)
@@ -318,7 +321,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project, policySet, clearPolicyApproval),
+		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project, policySet, clearPolicyApproval, allowPartialSuccess),
 	}
 }
 
