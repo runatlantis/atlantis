@@ -43,7 +43,7 @@ require (
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.9.0
 	github.com/uber-go/tally/v4 v4.1.10
-	github.com/urfave/negroni/v3 v3.1.0
+	github.com/urfave/negroni/v3 v3.1.1
 	github.com/xanzy/go-gitlab v0.102.0
 	go.etcd.io/bbolt v1.3.10
 	go.uber.org/zap v1.27.0
