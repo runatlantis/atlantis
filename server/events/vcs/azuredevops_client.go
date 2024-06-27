@@ -107,7 +107,7 @@ func (g *AzureDevopsClient) CreateComment(logger logging.SimpleLogging, repo mod
 	// or tested limit in Azure DevOps.
 	const maxCommentLength = 150000
 
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, 0, "")
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	for i := range comments {
