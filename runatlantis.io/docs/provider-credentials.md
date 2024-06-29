@@ -23,6 +23,16 @@ It's up to you how you provide credentials for your specific provider to Atlanti
 As a general rule, if you can `ssh` or `exec` into the server where Atlantis is
 running and run `terraform` commands like you would locally, then Atlantis will work.
 :::
+## GCP Specific Info
+
+### Service account IAM and scopes
+
+[GCE Instance IAC ](https://github.com/geekette86/gce-atlantis/tree/main)
+
+when deploying Atlantis on GCE, two points to take in consideration
+
+ * The attached service account to your Atlantis VM needs to have two scopes: storage-rw and cloud-platform.
+ * The service account needs to have the IAM roles that allow it to create any resources on project or folder or organisation level
 
 ## AWS Specific Info
 
