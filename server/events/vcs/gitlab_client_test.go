@@ -280,7 +280,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 	}{
 		{
 			models.PendingCommitStatus,
-			"running",
+			"pending",
 		},
 		{
 			models.SuccessCommitStatus,
