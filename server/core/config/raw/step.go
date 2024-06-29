@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -12,21 +13,22 @@ import (
 )
 
 const (
-	ExtraArgsKey        = "extra_args"
-	NameArgKey          = "name"
-	CommandArgKey       = "command"
-	ValueArgKey         = "value"
-	OutputArgKey        = "output"
-	RunStepName         = "run"
-	PlanStepName        = "plan"
-	ShowStepName        = "show"
-	PolicyCheckStepName = "policy_check"
-	ApplyStepName       = "apply"
-	InitStepName        = "init"
-	EnvStepName         = "env"
-	MultiEnvStepName    = "multienv"
-	ImportStepName      = "import"
-	StateRmStepName     = "state_rm"
+	ExtraArgsKey         = "extra_args"
+	NameArgKey           = "name"
+	CommandArgKey        = "command"
+	ValueArgKey          = "value"
+	OutputArgKey         = "output"
+	OutputRegexFilterKey = "regex_filter"
+	RunStepName          = "run"
+	PlanStepName         = "plan"
+	ShowStepName         = "show"
+	PolicyCheckStepName  = "policy_check"
+	ApplyStepName        = "apply"
+	InitStepName         = "init"
+	EnvStepName          = "env"
+	MultiEnvStepName     = "multienv"
+	ImportStepName       = "import"
+	StateRmStepName      = "state_rm"
 )
 
 // Step represents a single action/command to perform. In YAML, it can be set as
@@ -46,6 +48,10 @@ const (
 //   - run:
 //     command: my custom command
 //     output: hide
+//   - run:
+//     command: my custom command
+//     output: custom_regex
+//     regex_filter: .*
 //
 // 3. A map for a built-in command and extra_args:
 //   - plan:
@@ -206,10 +212,24 @@ func (s Step) Validate() error {
 			}
 			delete(args, CommandArgKey)
 			if v, ok := args[OutputArgKey]; ok {
-				if stepName == RunStepName && !(v == valid.PostProcessRunOutputShow || v == valid.PostProcessRunOutputHide || v == valid.PostProcessRunOutputStripRefreshing) {
-					return fmt.Errorf("run step %q option must be one of %q, %q, or %q", OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide, valid.PostProcessRunOutputStripRefreshing)
-				} else if stepName == MultiEnvStepName && !(v == valid.PostProcessRunOutputShow || v == valid.PostProcessRunOutputHide) {
+				if stepName == RunStepName && !valid.MatchesAnyPostProcessRunOutputOptions(v) {
+					return fmt.Errorf("run step %q option must be one of %q", OutputArgKey, strings.Join(valid.PostProcessRunOutputOptions(), ","))
+				}
+
+				if stepName == MultiEnvStepName && !(v == valid.PostProcessRunOutputShow || v == valid.PostProcessRunOutputHide) {
 					return fmt.Errorf("multienv step %q option must be %q or %q", OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide)
+				}
+
+				// When output requires regex option
+				if v == valid.PostProcessRunOutputCustomRegex || v == valid.PostProcessRunOutputStripRefreshingWithCustomRegex {
+					if regex, ok := args[OutputRegexFilterKey]; ok {
+						if _, err := regexp.Compile(regex); err != nil {
+							return fmt.Errorf("run step %q option with expression %q is not a valid regex: %w", OutputRegexFilterKey, regex, err)
+						}
+						delete(args, OutputRegexFilterKey)
+					} else {
+						return fmt.Errorf("run step %q option requires %q to be set", OutputArgKey, OutputRegexFilterKey)
+					}
 				}
 			}
 			delete(args, OutputArgKey)
@@ -279,11 +299,12 @@ func (s Step) ToValid() valid.Step {
 		// step name so we just use the first one.
 		for stepName, stepArgs := range s.CommandMap {
 			step := valid.Step{
-				StepName:    stepName,
-				EnvVarName:  stepArgs[NameArgKey],
-				RunCommand:  stepArgs[CommandArgKey],
-				EnvVarValue: stepArgs[ValueArgKey],
-				Output:      valid.PostProcessRunOutputOption(stepArgs[OutputArgKey]),
+				StepName:          stepName,
+				EnvVarName:        stepArgs[NameArgKey],
+				RunCommand:        stepArgs[CommandArgKey],
+				EnvVarValue:       stepArgs[ValueArgKey],
+				Output:            valid.PostProcessRunOutputOption(stepArgs[OutputArgKey]),
+				OutputRegexFilter: stepArgs[OutputRegexFilterKey],
 			}
 			if step.StepName == RunStepName && step.Output == "" {
 				step.Output = valid.PostProcessRunOutputShow

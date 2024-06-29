@@ -354,7 +354,10 @@ workflows:
           value: 'true'
       - run:
           command: terragrunt plan -input=false -out=$PLANFILE
-          output: strip_refreshing
+          output: strip_refreshing_with_custom_regex
+          # Filters text matching 'mySecret: "aaa"' -> 'mySecret: "<redacted>"'
+          regex_filter: "((?i)secret:\\s\")[^\"]*"
+
     apply:
       steps:
       - env:
@@ -541,13 +544,15 @@ Full
 - run:
     command: custom-command arg1 arg2
     output: show
+    custom_regex: .*
 ```
 
-| Key | Type                                                         | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                             |
-|-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| run | map\[string -> string\] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
+| Key               | Type                  | Default | Required  | Description           |
+|-------------------|-----------------------|---------|-----------|-----------------------|
+| run               | map[string -> string] | none    | no        | Run a custom command  |
+| run.command       | string                | none    | yes       | Shell command to run  |
+| run.output        | string                | "show"  | no        | How to post-process the output of this command when posted in the PR comment. The options are<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> *`strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command<br/>* `custom_regex` - filters the comment output based on the regex specified on `run.regex_filter` by replacing matched patterns with the text `<redacted`. Note: this filter only applies to the comments posted by Atlantis, the plan output on the URL job is untouched <br/> * `strip_refreshing_with_custom_regex` - applies `strip_refreshing` and `custom_regex` to the output |
+| run.custom_regex  | string                | none    | no        | Regex filter to be applied to output. Required when `run.output` is `custom_regex` or `strip_refreshing_with_custom_regex` |
 
 ::: tip Notes
 
