@@ -662,6 +662,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			DefaultTFVersion:    defaultTfVersion,
 			CommitStatusUpdater: commitStatusUpdater,
 			AsyncTFExec:         terraformClient,
+			ApplyErrorLabel:     userConfig.ApplyErrorLabel,
+			VcsClient:           vcsClient,
 		},
 		RunStepRunner: runStepRunner,
 		EnvStepRunner: &runtime.EnvStepRunner{

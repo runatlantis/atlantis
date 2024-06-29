@@ -429,3 +429,7 @@ func (g *AzureDevopsClient) GetCloneURL(_ logging.SimpleLogging, VCSHostType mod
 func (g *AzureDevopsClient) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }
+
+func (g *AzureDevopsClient) AddPullLabel(repo models.Repo, pull models.PullRequest, label string) error {
+	return fmt.Errorf("not yet implemented")
+}
