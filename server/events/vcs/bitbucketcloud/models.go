@@ -45,6 +45,34 @@ type Repository struct {
 	FullName *string `json:"full_name,omitempty" validate:"required"`
 	Links    Links   `json:"links,omitempty" validate:"required"`
 }
+
+type User struct {
+	Type        *string `json:"type,omitempty" validate:"required"`
+	CreateOn    *string `json:"created_on" validate:"required"`
+	DisplayName *string `json:"display_name" validate:"required"`
+	Username    *string `json:"username" validate:"required"`
+	UUID        *string `json:"uuid" validate:"required"`
+}
+
+type UserInComment struct {
+	Type        *string `json:"type,omitempty" validate:"required"`
+	Nickname    *string `json:"nickname" validate:"required"`
+	DisplayName *string `json:"display_name" validate:"required"`
+	UUID        *string `json:"uuid" validate:"required"`
+}
+
+type PullRequestComment struct {
+	ID      *int           `json:"id,omitempty" validate:"required"`
+	User    *UserInComment `json:"user" validate:"required"`
+	Content *struct {
+		Raw string `json:"raw"`
+	} `json:"content" validate:"required"`
+}
+
+type PullRequestComments struct {
+	Values []PullRequestComment `json:"values,omitempty"`
+}
+
 type PullRequest struct {
 	ID           *int          `json:"id,omitempty" validate:"required"`
 	Source       *BranchMeta   `json:"source,omitempty" validate:"required"`
