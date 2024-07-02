@@ -81,38 +81,50 @@ func (t tfFs) ReadDir(dirname string) ([]os.FileInfo, error) {
 var _ tfconfig.FS = tfFs{}
 
 func (m moduleInfo) load(files fs.FS, dir string, projects ...string) (_ *module, diags tfconfig.Diagnostics) {
-	if _, set := m[dir]; !set {
-		tfFiles := tfFs{files}
-		var mod *tfconfig.Module
-		mod, diags = tfconfig.LoadModuleFromFilesystem(tfFiles, dir)
+	dependenciesHandled := map[string]struct{}{dir: {}} // Only look at each dependency once
+	todo := []string{dir}
 
-		deps := make(map[string]bool)
-		if mod != nil {
-			for _, c := range mod.ModuleCalls {
-				mPath := path.Join(dir, c.Source)
-				if !tfconfig.IsModuleDirOnFilesystem(tfFiles, mPath) {
-					continue
+	for len(todo) > 0 {
+		dir := todo[len(todo)-1] // order of processing list not important, pick last for efficiency
+		todo = todo[:len(todo)-1]
+
+		if _, set := m[dir]; !set {
+			tfFiles := tfFs{files}
+			var mod *tfconfig.Module
+			mod, diag := tfconfig.LoadModuleFromFilesystem(tfFiles, dir)
+			if diag != nil {
+				diags = append(diags, diag...)
+			}
+
+			deps := make(map[string]bool)
+			if mod != nil {
+				for _, c := range mod.ModuleCalls {
+					mPath := path.Join(dir, c.Source)
+					if !tfconfig.IsModuleDirOnFilesystem(tfFiles, mPath) {
+						continue
+					}
+					deps[mPath] = true
 				}
-				deps[mPath] = true
+			}
+
+			m[dir] = &module{
+				path:         dir,
+				dependencies: deps,
+				projects:     make(map[string]bool),
 			}
 		}
 
-		m[dir] = &module{
-			path:         dir,
-			dependencies: deps,
-			projects:     make(map[string]bool),
+		// set projects on my dependencies
+		for dep := range m[dir].dependencies {
+			if _, exists := dependenciesHandled[dep]; !exists {
+				dependenciesHandled[dep] = struct{}{}
+				todo = append(todo, dep)
+			}
 		}
-	}
-	// set projects on my dependencies
-	for dep := range m[dir].dependencies {
-		_, err := m.load(files, dep, projects...)
-		if err != nil {
-			diags = append(diags, err...)
+		// add projects to the list of dependant projects
+		for _, p := range projects {
+			m[dir].projects[p] = true
 		}
-	}
-	// add projects to the list of dependant projects
-	for _, p := range projects {
-		m[dir].projects[p] = true
 	}
 	return m[dir], diags
 }
