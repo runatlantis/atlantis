@@ -191,8 +191,6 @@ type ProjectStateCommandBuilder interface {
 	BuildStateRmCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
-
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
 	ProjectPlanCommandBuilder

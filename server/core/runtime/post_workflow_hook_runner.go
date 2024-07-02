@@ -11,7 +11,6 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_post_workflows_hook_runner.go PostWorkflowHookRunner
 type PostWorkflowHookRunner interface {
 	Run(ctx models.WorkflowHookCommandContext, command string, shell string, shellArgs string, path string) (string, string, error)
 }

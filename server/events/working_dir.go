@@ -33,9 +33,6 @@ const workingDirPrefix = "repos"
 
 var cloneLocks sync.Map
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
-
 // WorkingDir handles the workspace on disk for running commands.
 type WorkingDir interface {
 	// Clone git clones headRepo, checks out the branch and then returns the

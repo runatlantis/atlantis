@@ -12,8 +12,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_github_credentials.go GithubCredentials
-
 // GithubCredentials handles creating http.Clients that authenticate.
 type GithubCredentials interface {
 	Client() (*http.Client, error)

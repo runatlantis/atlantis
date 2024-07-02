@@ -25,8 +25,6 @@ import (
 	"golang.org/x/text/language"
 )
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_commit_status_updater.go CommitStatusUpdater
-
 // CommitStatusUpdater updates the status of a commit with the VCS host. We set
 // the status to signify whether the plan/apply succeeds.
 type CommitStatusUpdater interface {

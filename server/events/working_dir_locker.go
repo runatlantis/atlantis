@@ -19,8 +19,6 @@ import (
 	"sync"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_working_dir_locker.go WorkingDirLocker
-
 // WorkingDirLocker is used to prevent multiple commands from executing
 // at the same time for a single repo, pull, and workspace. We need to prevent
 // this from happening because a specific repo/pull/workspace has a single workspace

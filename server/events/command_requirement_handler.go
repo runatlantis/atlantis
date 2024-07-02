@@ -9,7 +9,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_command_requirement_handler.go CommandRequirementHandler
 type CommandRequirementHandler interface {
 	ValidateProjectDependencies(ctx command.ProjectContext) (string, error)
 	ValidatePlanProject(repoDir string, ctx command.ProjectContext) (string, error)
