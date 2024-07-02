@@ -27,27 +27,23 @@ func NewMockWorkingDir(options ...pegomock.Option) *MockWorkingDir {
 func (mock *MockWorkingDir) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockWorkingDir) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockWorkingDir) Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, bool, error) {
+func (mock *MockWorkingDir) Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
 	}
 	params := []pegomock.Param{logger, headRepo, p, workspace}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Clone", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Clone", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
-	var ret1 bool
-	var ret2 error
+	var ret1 error
 	if len(result) != 0 {
 		if result[0] != nil {
 			ret0 = result[0].(string)
 		}
 		if result[1] != nil {
-			ret1 = result[1].(bool)
-		}
-		if result[2] != nil {
-			ret2 = result[2].(error)
+			ret1 = result[1].(error)
 		}
 	}
-	return ret0, ret1, ret2
+	return ret0, ret1
 }
 
 func (mock *MockWorkingDir) Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error {
@@ -167,12 +163,23 @@ func (mock *MockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir s
 	return ret0
 }
 
-func (mock *MockWorkingDir) SetCheckForUpstreamChanges() {
+func (mock *MockWorkingDir) MergeAgain(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (bool, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
 	}
-	params := []pegomock.Param{}
-	pegomock.GetGenericMockFrom(mock).Invoke("SetCheckForUpstreamChanges", params, []reflect.Type{})
+	params := []pegomock.Param{logger, headRepo, p, workspace}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("MergeAgain", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var ret0 bool
+	var ret1 error
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(bool)
+		}
+		if result[1] != nil {
+			ret1 = result[1].(error)
+		}
+	}
+	return ret0, ret1
 }
 
 func (mock *MockWorkingDir) VerifyWasCalledOnce() *VerifierMockWorkingDir {
@@ -508,19 +515,41 @@ func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetAllCapturedArguments
 	return
 }
 
-func (verifier *VerifierMockWorkingDir) SetCheckForUpstreamChanges() *MockWorkingDir_SetCheckForUpstreamChanges_OngoingVerification {
-	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "SetCheckForUpstreamChanges", params, verifier.timeout)
-	return &MockWorkingDir_SetCheckForUpstreamChanges_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+func (verifier *VerifierMockWorkingDir) MergeAgain(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) *MockWorkingDir_MergeAgain_OngoingVerification {
+	params := []pegomock.Param{logger, headRepo, p, workspace}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "MergeAgain", params, verifier.timeout)
+	return &MockWorkingDir_MergeAgain_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type MockWorkingDir_SetCheckForUpstreamChanges_OngoingVerification struct {
+type MockWorkingDir_MergeAgain_OngoingVerification struct {
 	mock              *MockWorkingDir
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockWorkingDir_SetCheckForUpstreamChanges_OngoingVerification) GetCapturedArguments() {
+func (c *MockWorkingDir_MergeAgain_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.Repo, models.PullRequest, string) {
+	logger, headRepo, p, workspace := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], headRepo[len(headRepo)-1], p[len(p)-1], workspace[len(workspace)-1]
 }
 
-func (c *MockWorkingDir_SetCheckForUpstreamChanges_OngoingVerification) GetAllCapturedArguments() {
+func (c *MockWorkingDir_MergeAgain_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []models.PullRequest, _param3 []string) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(logging.SimpleLogging)
+		}
+		_param1 = make([]models.Repo, len(c.methodInvocations))
+		for u, param := range params[1] {
+			_param1[u] = param.(models.Repo)
+		}
+		_param2 = make([]models.PullRequest, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(models.PullRequest)
+		}
+		_param3 = make([]string, len(c.methodInvocations))
+		for u, param := range params[3] {
+			_param3[u] = param.(string)
+		}
+	}
+	return
 }
