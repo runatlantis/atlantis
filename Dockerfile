@@ -44,7 +44,14 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
-FROM debian:${DEBIAN_TAG} as debian-base
+FROM debian:${DEBIAN_TAG} AS debian-base
+
+# Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
+RUN groupadd --gid 1000 atlantis && \
+    useradd --uid 100 --system --create-home --gid 1000 --shell /bin/bash atlantis && \
+    useradd --uid 1000 --system --home=/home/atlantis/ --gid 1000 --shell /bin/bash atlantis2 && \
+    chown atlantis:atlantis /home/atlantis/ && \
+    chmod ug+rwx /home/atlantis/
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
@@ -64,7 +71,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-FROM debian-base as deps
+FROM debian-base AS deps
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM
@@ -139,8 +146,8 @@ HEALTHCHECK --interval=5m --timeout=3s \
   CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # Set up the 'atlantis' user and adjust permissions
-RUN addgroup atlantis && \
-    adduser -S -G atlantis atlantis && \
+RUN addgroup --gid 1000 atlantis && \
+    adduser -u 100 -S -G atlantis atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/
 
@@ -178,11 +185,6 @@ EXPOSE ${ATLANTIS_PORT:-4141}
 
 HEALTHCHECK --interval=5m --timeout=3s \
   CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
-
-# Set up the 'atlantis' user and adjust permissions
-RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
-    chown atlantis:root /home/atlantis/ && \
-    chmod u+rwx /home/atlantis/
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
