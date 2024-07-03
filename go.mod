@@ -11,7 +11,7 @@ require (
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-playground/validator/v10 v10.19.0
-	github.com/go-test/deep v1.1.0
+	github.com/go-test/deep v1.1.1
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/go-github/v59 v59.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
@@ -43,7 +43,7 @@ require (
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.9.0
 	github.com/uber-go/tally/v4 v4.1.10
-	github.com/urfave/negroni/v3 v3.1.0
+	github.com/urfave/negroni/v3 v3.1.1
 	github.com/xanzy/go-gitlab v0.102.0
 	go.etcd.io/bbolt v1.3.10
 	go.uber.org/zap v1.27.0
