@@ -95,7 +95,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.5.1-1
+ENV GIT_LFS_VERSION=3.5.1-2
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
@@ -167,9 +167,10 @@ RUN apk add --no-cache \
         dumb-init~=1 \
         gcompat~=1
 
-#TODO HACK to avoid CVE-2024-2511. Remove after the vulnerability is fixed
-#TODO HACK to avoid CVE-2023-42366 and CVE-2023-42363. Remove after the vulnerability is fixed
-RUN apk update && apk upgrade --no-cache libssl3 libcrypto3 busybox
+#TODO HACK to avoidCVE-2024-4741 and CVE-2024-5535. Remove after the vulnerability is fixed:  openssl
+#TODO HACK to avoid CVE-2023-42364 and CVE-2023-42365. Remove after the vulnerability is fixed: busybox
+#TODO HACK to avoid CVE-2024-6387. Remove after the vulnerability is fixed: openssh
+RUN apk update && apk upgrade --no-cache libssl3 libcrypto3 busybox openssh
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
