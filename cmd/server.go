@@ -110,6 +110,7 @@ const (
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
+	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
@@ -167,6 +168,7 @@ const (
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
+	DefaultMaxCommentsPerCommand        = 100
 	DefaultParallelPoolSize             = 15
 	DefaultStatsNamespace               = "atlantis"
 	DefaultPort                         = 4141
@@ -593,6 +595,10 @@ var intFlags = map[string]intFlag{
 			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
 		defaultValue: DefaultCheckoutDepth,
 	},
+	MaxCommentsPerCommand: {
+		description:  "If non-zero, the maximum number of comments to split command output into before truncating.",
+		defaultValue: DefaultMaxCommentsPerCommand,
+	},
 	GiteaPageSizeFlag: {
 		description:  "Optional value that specifies the number of results per page to expect from Gitea.",
 		defaultValue: DefaultGiteaPageSize,
@@ -783,7 +789,7 @@ func (s *ServerCmd) run() error {
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
 	}
-	s.setDefaults(&userConfig)
+	s.setDefaults(&userConfig, s.Viper)
 
 	// Now that we've parsed the config we can set our local logger to the
 	// right level.
@@ -824,7 +830,7 @@ func (s *ServerCmd) run() error {
 	return server.Start()
 }
 
-func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.AzureDevOpsHostname == "" {
 		c.AzureDevOpsHostname = DefaultADHostname
 	}
@@ -872,6 +878,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.MarkdownTemplateOverridesDir == "" {
 		c.MarkdownTemplateOverridesDir = DefaultMarkdownTemplateOverridesDir
+	}
+	if !v.IsSet("max-comments-per-command") {
+		c.MaxCommentsPerCommand = DefaultMaxCommentsPerCommand
 	}
 	if c.ParallelPoolSize == 0 {
 		c.ParallelPoolSize = DefaultParallelPoolSize

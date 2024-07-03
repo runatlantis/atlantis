@@ -903,6 +903,14 @@ This is useful when you have many projects and want to keep the pull request cle
 
   Defaults to the atlantis home directory `/home/atlantis/.markdown_templates/` in `/$HOME/.markdown_templates`.
 
+### `--max-comments-per-command`
+  ```bash
+  atlantis server --max-comments-per-command=100
+  # or
+  ATLANTIS_MAX_COMMENTS_PER_COMMAND=100
+  ```
+  Limit the number of comments published after a command is executed, to prevent spamming your VCS and Atlantis to get throttled as a result. Defaults to `100`. Set this option to `0` to disable log truncation. Note that the truncation will happen on the top of the command output, to preserve the most important parts of the output, often displayed at the end.
+
 ### `--parallel-apply`
 
   ```bash
