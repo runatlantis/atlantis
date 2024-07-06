@@ -28,6 +28,8 @@ jobs:
           go-version-file: go.mod
       - run: |
           echo "Hello!"
+          sudo apt-get update
+          sudo apt-get -y install age
     # This version of TF will be downloaded before Atlantis is started.
     # We do this instead of setting --default-tf-version because setting
     # that flag starts the download asynchronously so we'd have a race
