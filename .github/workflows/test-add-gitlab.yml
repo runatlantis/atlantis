@@ -1,5 +1,4 @@
 name: gitlab-tester
-
 on:
   push:
     branches:
@@ -12,11 +11,9 @@ on:
       - ready_for_review
     branches:
       - 'add_gitlab_e2e_tests'
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
-
 jobs:
   e2e-gitlab:
     runs-on: ubuntu-latest
@@ -30,26 +27,26 @@ jobs:
         with:
           go-version-file: go.mod
       - run: |
-        echo "Hello!"
-      # This version of TF will be downloaded before Atlantis is started.
-      # We do this instead of setting --default-tf-version because setting
-      # that flag starts the download asynchronously so we'd have a race
-      # condition.
-      #- uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3
-      #  with:
-      #    terraform_version: ${{ env.TERRAFORM_VERSION }}
-      #
-      #- name: Setup ngrok
-      #  run: |
-      #      wget -q -nc https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-      #      tar -xzf ngrok-v3-stable-linux-amd64.tgz && \
-      #      chmod +x ngrok
-      #      ./ngrok --help
-      #- name: Setup gitconfig
-      #  run: |
-      #    git config --global user.email "maintainers@runatlantis.io"
-      #    git config --global user.name "atlantisbot"
-      #
-      #- run: |
-      #    make build-service
-      #    ./scripts/e2e.sh
+          echo "Hello!"
+    # This version of TF will be downloaded before Atlantis is started.
+    # We do this instead of setting --default-tf-version because setting
+    # that flag starts the download asynchronously so we'd have a race
+    # condition.
+    #- uses: hashicorp/setup-terraform@651471c36a6092792c552e8b1bef71e592b462d8 # v3
+    #  with:
+    #    terraform_version: ${{ env.TERRAFORM_VERSION }}
+    #
+    #- name: Setup ngrok
+    #  run: |
+    #      wget -q -nc https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+    #      tar -xzf ngrok-v3-stable-linux-amd64.tgz && \
+    #      chmod +x ngrok
+    #      ./ngrok --help
+    #- name: Setup gitconfig
+    #  run: |
+    #    git config --global user.email "maintainers@runatlantis.io"
+    #    git config --global user.name "atlantisbot"
+    #
+    #- run: |
+    #    make build-service
+    #    ./scripts/e2e.sh
