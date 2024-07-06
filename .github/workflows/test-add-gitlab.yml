@@ -1,4 +1,4 @@
-name: tester
+name: gitlab-tester
 
 on:
   push:
