@@ -3,18 +3,19 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# start atlantis server in the background and wait for it to start
 ./atlantis server \
+  --gitlab-user="$ATLANTISBOT_GITLAB_USERNAME" \
+  --gitlab-token="$ATLANTISBOT_GITLAB_TOKEN" \
   --data-dir="/tmp" \
   --log-level="debug" \
-  --repo-allowlist="github.com/runatlantis/atlantis-tests" \
+  --repo-allowlist="gitlab.com/run-atlantis/atlantis-tests" \
   --repo-config-json='{"repos":[{"id":"/.*/", "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true}]}' \
-  &> /tmp/atlantis-server.log &
+  &> /tmp/atlantis-server.log  &
 sleep 2
 
 # start ngrok in the background and wait for it to start
-./ngrok config add-authtoken $NGROK_AUTH_TOKEN > /dev/null 2>&1
-./ngrok http 4141 > /tmp/ngrok.log 2>&1 &
+ngrok config add-authtoken $NGROK_AUTH_TOKEN > /dev/null 2>&1
+ngrok http 4141 > /tmp/ngrok.log 2>&1 &
 sleep 2
 
 # find out what URL ngrok has given us
