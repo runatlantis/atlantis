@@ -17,11 +17,9 @@ import (
 	"context"
 	"log"
 	"os"
-	"strings"
 
 	"fmt"
 
-	"github.com/google/go-github/v59/github"
 	multierror "github.com/hashicorp/go-multierror"
 )
 
@@ -38,30 +36,13 @@ type Project struct {
 
 func main() {
 
-	githubUsername := os.Getenv("ATLANTISBOT_GITHUB_USERNAME")
-	if githubUsername == "" {
-		log.Fatalf("ATLANTISBOT_GITHUB_USERNAME cannot be empty")
-	}
-	githubToken := os.Getenv("ATLANTISBOT_GITHUB_TOKEN")
-	if githubToken == "" {
-		log.Fatalf("ATLANTISBOT_GITHUB_TOKEN cannot be empty")
-	}
 	atlantisURL := os.Getenv("ATLANTIS_URL")
 	if atlantisURL == "" {
 		atlantisURL = defaultAtlantisURL
 	}
 	// add /events to the url
 	atlantisURL = fmt.Sprintf("%s/events", atlantisURL)
-	ownerName := os.Getenv("GITHUB_REPO_OWNER_NAME")
-	if ownerName == "" {
-		ownerName = "runatlantis"
-	}
-	repoName := os.Getenv("GITHUB_REPO_NAME")
-	if repoName == "" {
-		repoName = "atlantis-tests"
-	}
-	// using https to clone the repo
-	repoURL := fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", githubUsername, githubToken, ownerName, repoName)
+
 	cloneDirRoot := os.Getenv("CLONE_DIR")
 	if cloneDirRoot == "" {
 		cloneDirRoot = "/tmp/atlantis-tests"
@@ -74,28 +55,18 @@ func main() {
 		log.Fatalf("failed to clean dir %q before cloning, attempting to continue: %v", cloneDirRoot, err)
 	}
 
-	// create github client
-	tp := github.BasicAuthTransport{
-		Username: strings.TrimSpace(githubUsername),
-		Password: strings.TrimSpace(githubToken),
-	}
-	ghClient := github.NewClient(tp.Client())
-
-	githubClient := &GithubClient{client: ghClient, username: githubUsername}
+	githubClient := NewGithubClient()
 	ctx := context.Background()
 	// we create atlantis hook once for the repo, since the atlantis server can handle multiple requests
 	log.Printf("creating atlantis webhook with %s url", atlantisURL)
-	hookID, err := createAtlantisWebhook(ctx, githubClient, ownerName, repoName, atlantisURL)
+	hookID, err := githubClient.CreateAtlantisWebhook(ctx, atlantisURL)
 	if err != nil {
 		log.Fatalf("error creating atlantis webhook: %v", err)
 	}
 
 	// create e2e test
 	e2e := E2ETester{
-		githubClient: githubClient,
-		repoURL:      repoURL,
-		ownerName:    ownerName,
-		repoName:     repoName,
+		vcsClient:    githubClient,
 		hookID:       hookID,
 		cloneDirRoot: cloneDirRoot,
 	}
@@ -105,7 +76,7 @@ func main() {
 	log.Printf("Test Results\n---------------------------\n")
 	for _, result := range results {
 		fmt.Printf("Project Type: %s \n", result.projectType)
-		fmt.Printf("Pull Request Link: %s \n", result.githubPullRequestURL)
+		fmt.Printf("Pull Request Link: %s \n", result.pullRequestURL)
 		fmt.Printf("Atlantis Run Status: %s \n", result.testResult)
 		fmt.Println("---------------------------")
 	}
@@ -113,37 +84,6 @@ func main() {
 		log.Fatalf(fmt.Sprintf("%s", err))
 	}
 
-}
-
-func createAtlantisWebhook(ctx context.Context, g *GithubClient, ownerName string, repoName string, hookURL string) (int64, error) {
-	// create atlantis hook
-	atlantisHook := &github.Hook{
-		Events: []string{"issue_comment", "pull_request", "push"},
-		Config: map[string]interface{}{
-			"url":          hookURL,
-			"content_type": "json",
-		},
-		Active: github.Bool(true),
-	}
-
-	// moved to github.go
-	hook, _, err := g.client.Repositories.CreateHook(ctx, ownerName, repoName, atlantisHook)
-	if err != nil {
-		return 0, err
-	}
-	log.Println(hook.GetURL())
-
-	return hook.GetID(), nil
-}
-
-func deleteAtlantisHook(ctx context.Context, g *GithubClient, ownerName string, repoName string, hookID int64) error {
-	_, err := g.client.Repositories.DeleteHook(ctx, ownerName, repoName, hookID)
-	if err != nil {
-		return err
-	}
-	log.Printf("deleted webhook id %d", hookID)
-
-	return nil
 }
 
 func cleanDir(path string) error {
@@ -154,7 +94,7 @@ func startTests(ctx context.Context, e2e E2ETester) ([]*E2EResult, error) {
 	var testResults []*E2EResult
 	var testErrors *multierror.Error
 	// delete webhook when we are done running tests
-	defer deleteAtlantisHook(ctx, e2e.githubClient, e2e.ownerName, e2e.repoName, e2e.hookID) // nolint: errcheck
+	defer e2e.vcsClient.DeleteAtlantisHook(ctx, e2e.hookID) // nolint: errcheck
 
 	for _, projectType := range projectTypes {
 		log.Printf("starting e2e test for project type %q", projectType.Name)
