@@ -14,6 +14,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -45,7 +46,7 @@ resource "null_resource" "hello" {
 `
 
 // nolint: gosec
-func (t *E2ETester) Start() (*E2EResult, error) {
+func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	cloneDir := fmt.Sprintf("%s/%s-test", t.cloneDirRoot, t.projectType.Name)
 	branchName := fmt.Sprintf("%s-%s", t.projectType.Name, time.Now().Format("20060102150405"))
 	testFileName := fmt.Sprintf("%s.tf", t.projectType.Name)
@@ -113,7 +114,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	base := "main"
 	newPullRequest := &github.NewPullRequest{Title: &title, Head: &head, Body: &body, Base: &base}
 
-	pull, _, err := t.githubClient.client.PullRequests.Create(t.githubClient.ctx, t.ownerName, t.repoName, newPullRequest)
+	pull, _, err := t.githubClient.client.PullRequests.Create(ctx, t.ownerName, t.repoName, newPullRequest)
 	if err != nil {
 		return e2eResult, fmt.Errorf("error while creating new pull request: %v", err)
 	}
@@ -124,7 +125,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	log.Printf("created pull request %s", pull.GetHTMLURL())
 
 	// defer closing pull request and delete remote branch
-	defer cleanUp(t, pull.GetNumber(), branchName) // nolint: errcheck
+	defer cleanUp(ctx, t, pull.GetNumber(), branchName) // nolint: errcheck
 
 	// wait for atlantis to respond to webhook and autoplan.
 	time.Sleep(2 * time.Second)
@@ -135,7 +136,7 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	i := 0
 	for ; i < maxLoops && checkStatus(state); i++ {
 		time.Sleep(2 * time.Second)
-		state, _ = getAtlantisStatus(t, branchName)
+		state, _ = getAtlantisStatus(ctx, t, branchName)
 		if state == "" {
 			log.Println("atlantis run hasn't started")
 			continue
@@ -156,9 +157,9 @@ func (t *E2ETester) Start() (*E2EResult, error) {
 	return e2eResult, nil
 }
 
-func getAtlantisStatus(t *E2ETester, branchName string) (string, error) {
+func getAtlantisStatus(ctx context.Context, t *E2ETester, branchName string) (string, error) {
 	// check repo status
-	combinedStatus, _, err := t.githubClient.client.Repositories.GetCombinedStatus(t.githubClient.ctx, t.ownerName, t.repoName, branchName, nil)
+	combinedStatus, _, err := t.githubClient.client.Repositories.GetCombinedStatus(ctx, t.ownerName, t.repoName, branchName, nil)
 	if err != nil {
 		return "", err
 	}
@@ -181,16 +182,16 @@ func checkStatus(state string) bool {
 	return true
 }
 
-func cleanUp(t *E2ETester, pullRequestNumber int, branchName string) error {
+func cleanUp(ctx context.Context, t *E2ETester, pullRequestNumber int, branchName string) error {
 	// clean up
-	pullClosed, _, err := t.githubClient.client.PullRequests.Edit(t.githubClient.ctx, t.ownerName, t.repoName, pullRequestNumber, &github.PullRequest{State: github.String("closed")})
+	pullClosed, _, err := t.githubClient.client.PullRequests.Edit(ctx, t.ownerName, t.repoName, pullRequestNumber, &github.PullRequest{State: github.String("closed")})
 	if err != nil {
 		return fmt.Errorf("error while closing new pull request: %v", err)
 	}
 	log.Printf("closed pull request %d", pullClosed.GetNumber())
 
 	deleteBranchName := fmt.Sprintf("%s/%s", "heads", branchName)
-	_, err = t.githubClient.client.Git.DeleteRef(t.githubClient.ctx, t.ownerName, t.repoName, deleteBranchName)
+	_, err = t.githubClient.client.Git.DeleteRef(ctx, t.ownerName, t.repoName, deleteBranchName)
 	if err != nil {
 		return fmt.Errorf("error while deleting branch %s: %v", deleteBranchName, err)
 	}

@@ -81,11 +81,11 @@ func main() {
 	}
 	ghClient := github.NewClient(tp.Client())
 
-	githubClient := &GithubClient{client: ghClient, ctx: context.Background(), username: githubUsername}
-
+	githubClient := &GithubClient{client: ghClient, username: githubUsername}
+	ctx := context.Background()
 	// we create atlantis hook once for the repo, since the atlantis server can handle multiple requests
 	log.Printf("creating atlantis webhook with %s url", atlantisURL)
-	hookID, err := createAtlantisWebhook(githubClient, ownerName, repoName, atlantisURL)
+	hookID, err := createAtlantisWebhook(ctx, githubClient, ownerName, repoName, atlantisURL)
 	if err != nil {
 		log.Fatalf("error creating atlantis webhook: %v", err)
 	}
@@ -101,7 +101,7 @@ func main() {
 	}
 
 	// start e2e tests
-	results, err := startTests(e2e)
+	results, err := startTests(ctx, e2e)
 	log.Printf("Test Results\n---------------------------\n")
 	for _, result := range results {
 		fmt.Printf("Project Type: %s \n", result.projectType)
@@ -115,7 +115,7 @@ func main() {
 
 }
 
-func createAtlantisWebhook(g *GithubClient, ownerName string, repoName string, hookURL string) (int64, error) {
+func createAtlantisWebhook(ctx context.Context, g *GithubClient, ownerName string, repoName string, hookURL string) (int64, error) {
 	// create atlantis hook
 	atlantisHook := &github.Hook{
 		Events: []string{"issue_comment", "pull_request", "push"},
@@ -127,7 +127,7 @@ func createAtlantisWebhook(g *GithubClient, ownerName string, repoName string, h
 	}
 
 	// moved to github.go
-	hook, _, err := g.client.Repositories.CreateHook(g.ctx, ownerName, repoName, atlantisHook)
+	hook, _, err := g.client.Repositories.CreateHook(ctx, ownerName, repoName, atlantisHook)
 	if err != nil {
 		return 0, err
 	}
@@ -136,8 +136,8 @@ func createAtlantisWebhook(g *GithubClient, ownerName string, repoName string, h
 	return hook.GetID(), nil
 }
 
-func deleteAtlantisHook(g *GithubClient, ownerName string, repoName string, hookID int64) error {
-	_, err := g.client.Repositories.DeleteHook(g.ctx, ownerName, repoName, hookID)
+func deleteAtlantisHook(ctx context.Context, g *GithubClient, ownerName string, repoName string, hookID int64) error {
+	_, err := g.client.Repositories.DeleteHook(ctx, ownerName, repoName, hookID)
 	if err != nil {
 		return err
 	}
@@ -150,17 +150,17 @@ func cleanDir(path string) error {
 	return os.RemoveAll(path)
 }
 
-func startTests(e2e E2ETester) ([]*E2EResult, error) {
+func startTests(ctx context.Context, e2e E2ETester) ([]*E2EResult, error) {
 	var testResults []*E2EResult
 	var testErrors *multierror.Error
 	// delete webhook when we are done running tests
-	defer deleteAtlantisHook(e2e.githubClient, e2e.ownerName, e2e.repoName, e2e.hookID) // nolint: errcheck
+	defer deleteAtlantisHook(ctx, e2e.githubClient, e2e.ownerName, e2e.repoName, e2e.hookID) // nolint: errcheck
 
 	for _, projectType := range projectTypes {
 		log.Printf("starting e2e test for project type %q", projectType.Name)
 		e2e.projectType = projectType
 		// start e2e test
-		result, err := e2e.Start()
+		result, err := e2e.Start(ctx)
 		testResults = append(testResults, result)
 		testErrors = multierror.Append(testErrors, err)
 	}
