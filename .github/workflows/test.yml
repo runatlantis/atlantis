@@ -107,8 +107,8 @@ jobs:
     if: github.event.pull_request.head.repo.fork == false
     env:
       TERRAFORM_VERSION: 1.8.3
-      ATLANTISBOT_GITHUB_USERNAME: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
-      ATLANTISBOT_GITHUB_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
+      ATLANTIS_GH_USER: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
+      ATLANTIS_GH_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
