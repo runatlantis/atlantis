@@ -177,7 +177,7 @@ func (g *GitlabClient) CreateComment(logger logging.SimpleLogging, repo models.R
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
 		"```diff\n"
-	comments := common.SplitComment(comment, gitlabMaxCommentLength, sepEnd, sepStart)
+	comments := common.SplitComment(comment, gitlabMaxCommentLength, sepEnd, sepStart, 0, "")
 	for _, c := range comments {
 		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(c)})
 		if resp != nil {
@@ -441,10 +441,13 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	var (
 		resp        *gitlab.Response
 		maxAttempts = 10
-		b           = &backoff.Backoff{Jitter: true}
+		retryer     = &backoff.Backoff{
+			Jitter: true,
+			Max:    g.PollingInterval,
+		}
 	)
 
-	for i := 0; i <= maxAttempts; i++ {
+	for i := 0; i < maxAttempts; i++ {
 		logger := logger.With(
 			"attempt", i+1,
 			"max_attempts", maxAttempts,
@@ -475,7 +478,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			// GitLab does not allow merge requests to be merged when the pipeline status is "running."
 
 			if resp.StatusCode == http.StatusConflict {
-				sleep := b.ForAttempt(float64(i))
+				sleep := retryer.ForAttempt(float64(i))
 
 				logger.With("retry_in", sleep).Warn("GitLab returned HTTP [409 Conflict] when updating commit status")
 				time.Sleep(sleep)

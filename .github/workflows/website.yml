@@ -24,16 +24,16 @@ jobs:
     outputs:
       should-run-link-check: ${{ steps.changes.outputs.src == 'true' }}
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
           filters: |
             src:
               - '**.js'
-              - 'pnpm-lock.yaml'
+              - 'package-lock.json'
               - 'package.json'
               - '.github/workflows/website.yml'
 
@@ -46,7 +46,7 @@ jobs:
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
       - name: markdown-lint
         uses: DavidAnson/markdownlint-cli2-action@b4c9feab76d8025d1e83c653fa3990936df0e6c8 # v16
@@ -54,37 +54,42 @@ jobs:
           config: .markdownlint.yaml
           globs: 'runatlantis.io/**/*.md'
 
-      - uses: wyvox/action-setup-pnpm@6597ef5c1300fe08efa6bc75e6141f7153e2b4cc # v3
+      - name: setup npm
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4
         with:
-          node-version: 20
+          node-version: '20'
+          cache: 'npm'
 
       - name: run http-server
         env:
           # renovate: datasource=github-releases depName=raviqqe/muffet
-          MUFFET_VERSION: 2.9.3
+          MUFFET_VERSION: 2.10.1
         run: |
           # install raviqqe/muffet to check for broken links.
           curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
 
           # build site
-          pnpm install
-          pnpm website:build
+          npm install
+          npm run website:build
 
           # start http-server for integration testing
           npx http-server runatlantis.io/.vitepress/dist &
 
       - name: Run Playwright E2E tests
         run: |
-          pnpx playwright install --with-deps
-          pnpm run e2e
+          npx playwright install --with-deps
+          npm run e2e
 
       - name: wait until server listened
         run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
 
       # medium.com => was being rate limited: HTTP 429
+      # twitter.com => too many redirections
       - run: |
           ./muffet \
             -e 'https://medium.com/runatlantis' \
+            -e 'https://dev.to/*' \
+            -e 'https://twitter.com/*' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \

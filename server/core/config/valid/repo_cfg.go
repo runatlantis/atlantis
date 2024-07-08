@@ -24,11 +24,12 @@ type RepoCfg struct {
 	ParallelPlan               *bool
 	ParallelPolicyCheck        *bool
 	DeleteSourceBranchOnMerge  *bool
-	RepoLocking                *bool
+	RepoLocks                  *RepoLocks
 	CustomPolicyCheck          *bool
 	EmojiReaction              string
 	AllowedRegexpPrefixes      []string
 	AbortOnExcecutionOrderFail bool
+	SilencePRComments          []string
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
@@ -154,9 +155,11 @@ type Project struct {
 	DependsOn                 []string
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
+	RepoLocks                 *RepoLocks
 	ExecutionOrderGroup       int
 	PolicyCheck               *bool
 	CustomPolicyCheck         *bool
+	SilencePRComments         []string
 }
 
 // GetName returns the name of the project or an empty string if there is no

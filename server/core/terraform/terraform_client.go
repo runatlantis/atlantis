@@ -19,23 +19,23 @@ package terraform
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/go-getter/v2"
 	"github.com/hashicorp/go-version"
+	install "github.com/hashicorp/hc-install"
+	"github.com/hashicorp/hc-install/product"
+	"github.com/hashicorp/hc-install/releases"
+	"github.com/hashicorp/hc-install/src"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
-	"github.com/warrensbox/terraform-switcher/lib"
 
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -56,9 +56,6 @@ type Client interface {
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
-
-	// ListAvailableVersions returns all available version of Terraform, if available; otherwise this will return an empty list.
-	ListAvailableVersions(log logging.SimpleLogging) ([]string, error)
 
 	// DetectVersion Extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
 	DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version
@@ -97,7 +94,7 @@ type DefaultClient struct {
 
 // Downloader is for downloading terraform versions.
 type Downloader interface {
-	GetFile(dst, src string) error
+	Install(dir string, downloadURL string, v *version.Version) (string, error)
 	GetAny(dst, src string) error
 }
 
@@ -278,99 +275,83 @@ func (c *DefaultClient) TerraformBinDir() string {
 	return c.binDir
 }
 
-// ListAvailableVersions returns all available version of Terraform. If downloads are not allowed, this will return an empty list.
-func (c *DefaultClient) ListAvailableVersions(log logging.SimpleLogging) ([]string, error) {
-	url := fmt.Sprintf("%s/terraform", c.downloadBaseURL)
-
-	if !c.downloadAllowed {
-		log.Debug("Terraform downloads disabled. Won't list Terraform versions available at %s", url)
-		return []string{}, nil
+// ExtractExactRegex attempts to extract an exact version number from the provided string as a fallback.
+// The function expects the version string to be in one of the following formats: "= x.y.z", "=x.y.z", or "x.y.z" where x, y, and z are integers.
+// If the version string matches one of these formats, the function returns a slice containing the exact version number.
+// If the version string does not match any of these formats, the function logs a debug message and returns nil.
+func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version string) []string {
+	re := regexp.MustCompile(`^=?\s*([0-9.]+)\s*$`)
+	matched := re.FindStringSubmatch(version)
+	if len(matched) == 0 {
+		log.Debug("exact version regex not found in the version %q", version)
+		return nil
 	}
-
-	log.Debug("Listing Terraform versions available at: %s", url)
-
-	// terraform-switcher calls os.Exit(1) if it fails to successfully GET the configured URL.
-	// So, before calling it, test if we can connect. Then we can return an error instead if the request fails.
-	resp, err := http.Get(url) // #nosec G107 -- terraform-switch makes this same call below. Also, we don't process the response payload.
-	if err != nil {
-		return nil, fmt.Errorf("Unable to list Terraform versions: %s", err)
-	}
-	defer resp.Body.Close() // nolint: errcheck
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Unable to list Terraform versions: response code %d from %s", resp.StatusCode, url)
-	}
-
-	versions, err := lib.GetTFList(url, true)
-	return versions, err
+	// The first element of the slice is the entire string, so we want the second element (the first capture group)
+	tfVersions := []string{matched[1]}
+	log.Debug("extracted exact version %q from version %q", tfVersions[0], version)
+	return tfVersions
 }
 
-// DetectVersion Extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
-// This will also try to intelligently evaluate non-exact matches by listing the available versions of Terraform and picking the best match.
+// DetectVersion extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
+// It will also try to evaluate non-exact matches by passing the Constraints to the hc-install Releases API, which will return a list of available versions.
+// It will then select the highest version that satisfies the constraint.
 func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version {
 	module, diags := tfconfig.LoadModule(projectDirectory)
 	if diags.HasErrors() {
-		log.Err("Trying to detect required version: %s", diags.Error())
+		log.Err("trying to detect required version: %s", diags.Error())
 	}
 
 	if len(module.RequiredCore) != 1 {
-		log.Info("Cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
 		return nil
 	}
 	requiredVersionSetting := module.RequiredCore[0]
 	log.Debug("Found required_version setting of %q", requiredVersionSetting)
 
-	tfVersions, err := c.ListAvailableVersions(log)
-	if err != nil {
-		log.Err("Unable to list Terraform versions, may fall back to default: %s", err)
-	}
-
-	if len(tfVersions) == 0 {
-		// Fall back to an exact required version string
-		// We allow `= x.y.z`, `=x.y.z` or `x.y.z` where `x`, `y` and `z` are integers.
-		re := regexp.MustCompile(`^=?\s*([0-9.]+)\s*$`)
-		matched := re.FindStringSubmatch(requiredVersionSetting)
+	if !c.downloadAllowed {
+		log.Debug("terraform downloads disabled.")
+		matched := c.ExtractExactRegex(log, requiredVersionSetting)
 		if len(matched) == 0 {
-			log.Debug("Did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
+			log.Debug("did not specify exact version in terraform configuration, found %q", requiredVersionSetting)
 			return nil
 		}
-		tfVersions = []string{matched[1]}
-	}
 
-	constraint, _ := version.NewConstraint(requiredVersionSetting)
-	// Since terraform version 1.8.2, terraform is not a single file download anymore and
-	// Atlantis fails to download version 1.8.2 and higher. So, as a short-term fix,
-	// we need to block any version higher than 1.8.1 until proper solution is implemented.
-	// More details on the issue here - https://github.com/runatlantis/atlantis/issues/4471
-	highestSupportedConstraint, _ := version.NewConstraint("<= 1.8.1")
-	versions := make([]*version.Version, len(tfVersions))
-
-	for i, tfvals := range tfVersions {
-		newVersion, err := version.NewVersion(tfvals)
-		if err == nil {
-			versions[i] = newVersion
+		version, err := version.NewVersion(matched[0])
+		if err != nil {
+			log.Err("error parsing version string: %s", err)
+			return nil
 		}
+		return version
 	}
 
-	if len(versions) == 0 {
-		log.Debug("Did not specify exact valid version in terraform configuration, found %q", requiredVersionSetting)
+	constraintStr := requiredVersionSetting
+	vc, err := version.NewConstraint(constraintStr)
+	if err != nil {
+		log.Err("Error parsing constraint string: %s", err)
 		return nil
 	}
 
-	sort.Sort(sort.Reverse(version.Collection(versions)))
-
-	for _, element := range versions {
-		if constraint.Check(element) && highestSupportedConstraint.Check(element) { // Validate a version against a constraint
-			tfversionStr := element.String()
-			if lib.ValidVersionFormat(tfversionStr) { //check if version format is correct
-				tfversion, _ := version.NewVersion(tfversionStr)
-				log.Info("Detected module requires version: %s", tfversionStr)
-				return tfversion
-			}
-		}
+	constrainedVersions := &releases.Versions{
+		Product:     product.Terraform,
+		Constraints: vc,
 	}
-	log.Debug("Could not match any valid terraform version with %q", requiredVersionSetting)
-	return nil
+	installCandidates, err := constrainedVersions.List(context.Background())
+	if err != nil {
+		log.Err("error listing available versions: %s", err)
+		return nil
+	}
+	if len(installCandidates) == 0 {
+		log.Err("no Terraform versions found for constraints %s", constraintStr)
+		return nil
+	}
+
+	// We want to select the highest version that satisfies the constraint.
+	versionDownloader := installCandidates[len(installCandidates)-1]
+
+	// Get the Version object from the versionDownloader.
+	downloadVersion := versionDownloader.(*releases.ExactVersion).Version
+
+	return downloadVersion
 }
 
 // See Client.EnsureVersion.
@@ -532,7 +513,15 @@ func MustConstraint(v string) version.Constraints {
 
 // ensureVersion returns the path to a terraform binary of version v.
 // It will download this version if we don't have it.
-func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string]string, v *version.Version, binDir string, downloadURL string, downloadsAllowed bool) (string, error) {
+func ensureVersion(
+	log logging.SimpleLogging,
+	dl Downloader,
+	versions map[string]string,
+	v *version.Version,
+	binDir string,
+	downloadURL string,
+	downloadsAllowed bool,
+) (string, error) {
 	if binPath, ok := versions[v.String()]; ok {
 		return binPath, nil
 	}
@@ -554,21 +543,25 @@ func ensureVersion(log logging.SimpleLogging, dl Downloader, versions map[string
 		return dest, nil
 	}
 	if !downloadsAllowed {
-		return "", fmt.Errorf("Could not find terraform version %s in PATH or %s, and downloads are disabled", v.String(), binDir)
+		return "", fmt.Errorf(
+			"could not find terraform version %s in PATH or %s, and downloads are disabled",
+			v.String(),
+			binDir,
+		)
 	}
 
-	log.Info("Could not find terraform version %s in PATH or %s, downloading from %s", v.String(), binDir, downloadURL)
-	urlPrefix := fmt.Sprintf("%s/terraform/%s/terraform_%s", downloadURL, v.String(), v.String())
-	binURL := fmt.Sprintf("%s_%s_%s.zip", urlPrefix, runtime.GOOS, runtime.GOARCH)
-	checksumURL := fmt.Sprintf("%s_SHA256SUMS", urlPrefix)
-	fullSrcURL := fmt.Sprintf("%s?checksum=file:%s", binURL, checksumURL)
-	if err := dl.GetFile(dest, fullSrcURL); err != nil {
-		return "", errors.Wrapf(err, "downloading terraform version %s at %q", v.String(), fullSrcURL)
+	log.Info("could not find terraform version %s in PATH or %s", v.String(), binDir)
+
+	log.Info("using Hashicorp's 'hc-install' to download Terraform version %s from download URL %s", v.String(), downloadURL)
+	execPath, err := dl.Install(binDir, downloadURL, v)
+
+	if err != nil {
+		return "", errors.Wrapf(err, "error downloading terraform version %s", v.String())
 	}
 
-	log.Info("Downloaded terraform %s to %s", v.String(), dest)
-	versions[v.String()] = dest
-	return dest, nil
+	log.Info("Downloaded terraform %s to %s", v.String(), execPath)
+	versions[v.String()] = execPath
+	return execPath, nil
 }
 
 // generateRCFile generates a .terraformrc file containing config for tfeToken
@@ -632,13 +625,31 @@ var rcFileContents = `credentials "%s" {
 
 type DefaultDownloader struct{}
 
-// See go-getter.GetFile.
-func (d *DefaultDownloader) GetFile(dst, src string) error {
-	_, err := getter.GetFile(context.Background(), dst, src)
-	return err
+func (d *DefaultDownloader) Install(dir string, downloadURL string, v *version.Version) (string, error) {
+	installer := install.NewInstaller()
+	execPath, err := installer.Install(context.Background(), []src.Installable{
+		&releases.ExactVersion{
+			Product:    product.Terraform,
+			Version:    v,
+			InstallDir: dir,
+			ApiBaseURL: downloadURL,
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	// hc-install installs terraform binary as just "terraform".
+	// We need to rename it to terraform{version} to be consistent with current naming convention.
+	newPath := filepath.Join(dir, "terraform"+v.String())
+	if err := os.Rename(execPath, newPath); err != nil {
+		return "", err
+	}
+
+	return newPath, nil
 }
 
-// See go-getter.GetFile.
+// See go-getter.GetAny.
 func (d *DefaultDownloader) GetAny(dst, src string) error {
 	_, err := getter.GetAny(context.Background(), dst, src)
 	return err

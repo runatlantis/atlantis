@@ -273,7 +273,7 @@ func newProjectCommandContext(ctx *command.Context,
 		EscapedCommentArgs:         escapedCommentArgs,
 		AutomergeEnabled:           automergeEnabled,
 		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
-		RepoLocking:                projCfg.RepoLocking,
+		RepoLocksMode:              projCfg.RepoLocks.Mode,
 		CustomPolicyCheck:          projCfg.CustomPolicyCheck,
 		ParallelApplyEnabled:       parallelApplyEnabled,
 		ParallelPlanEnabled:        parallelPlanEnabled,
@@ -306,6 +306,7 @@ func newProjectCommandContext(ctx *command.Context,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
+		SilencePRComments:          projCfg.SilencePRComments,
 	}
 }
 

@@ -49,7 +49,7 @@ func (p *showStepRunner) Run(ctx command.ProjectContext, _ []string, path string
 		return "", errors.Wrap(err, "running terraform show")
 	}
 
-	if err := os.WriteFile(showResultFile, []byte(output), os.ModePerm); err != nil {
+	if err := os.WriteFile(showResultFile, []byte(output), 0600); err != nil {
 		return "", errors.Wrap(err, "writing terraform show result")
 	}
 

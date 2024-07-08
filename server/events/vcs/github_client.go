@@ -76,12 +76,13 @@ func (c *GitHubRepoIdCache) Set(key githubv4.String, value githubv4.Int) {
 
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
-	user        string
-	client      *github.Client
-	v4Client    *githubv4.Client
-	ctx         context.Context
-	config      GithubConfig
-	repoIdCache GitHubRepoIdCache
+	user                  string
+	client                *github.Client
+	v4Client              *githubv4.Client
+	ctx                   context.Context
+	config                GithubConfig
+	maxCommentsPerCommand int
+	repoIdCache           GitHubRepoIdCache
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -112,7 +113,8 @@ type GithubPRReviewSummary struct {
 }
 
 // NewGithubClient returns a valid GitHub client.
-func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, logger logging.SimpleLogging) (*GithubClient, error) {
+
+func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, maxCommentsPerCommand int, logger logging.SimpleLogging) (*GithubClient, error) {
 	logger.Debug("Creating new GitHub client for host: %s", hostname)
 	transport, err := credentials.Client()
 	if err != nil {
@@ -126,7 +128,8 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		graphqlURL = "https://api.github.com/graphql"
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
-		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport)
+		// TODO: Deprecated: Use NewClient(httpClient).WithEnterpriseURLs(baseURL, uploadURL) instead
+		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}
@@ -144,12 +147,13 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 	}
 
 	return &GithubClient{
-		user:        user,
-		client:      client,
-		v4Client:    v4Client,
-		ctx:         context.Background(),
-		config:      config,
-		repoIdCache: NewGitHubRepoIdCache(),
+		user:                  user,
+		client:                client,
+		v4Client:              v4Client,
+		ctx:                   context.Background(),
+		config:                config,
+		maxCommentsPerCommand: maxCommentsPerCommand,
+		repoIdCache:           NewGitHubRepoIdCache(),
 	}, nil
 }
 
@@ -228,7 +232,10 @@ func (g *GithubClient) CreateComment(logger logging.SimpleLogging, repo models.R
 			"```diff\n"
 	}
 
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	truncationHeader := "\n```\n</details>" +
+		"\n<br>\n\n**Warning**: Command output is larger than the maximum number of comments per command. Output truncated.\n\n[..]\n"
+
+	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, g.maxCommentsPerCommand, truncationHeader)
 	for i := range comments {
 		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
 		if resp != nil {

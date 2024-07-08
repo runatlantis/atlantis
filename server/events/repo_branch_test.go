@@ -80,7 +80,7 @@ projects:
 	repo, err := parser.ParseRepoCfg(tmp, global, "github.com/foo/bar", "main")
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(repo.Projects))
+	require.Len(t, repo.Projects, 1)
 
 	t.Logf("Projects: %+v", repo.Projects)
 }

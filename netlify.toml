@@ -1,33 +1,32 @@
 # Netlify Config, https://www.netlify.com/docs/netlify-toml-reference/
 [build]
-  base    = "/"
-  publish = "runatlantis.io/.vitepress/dist/"
-  command = "pnpm website:build"
+base = "/"
+command = "npm install && npm run website:build"
+publish = "runatlantis.io/.vitepress/dist/"
 
 [[redirects]]
-  from = "/guide/getting-started.html"
-  to = "/guide/"
-  status = 301
-  force = true
+force = true
+from = "/guide/getting-started.html"
+status = 301
+to = "/guide/"
 
 [[redirects]]
-  from = "/docs/atlantis-yaml-reference.html"
-  to = "/docs/repo-level-atlantis-yaml.html"
-  status = 301
-  force = true
+force = true
+from = "/docs/atlantis-yaml-reference.html"
+status = 301
+to = "/docs/repo-level-atlantis-yaml.html"
 
 [[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
-    Cache-Control = "public, max-age=86400, must-revalidate"
-    Strict-Transport-Security = "max-age=86400; includeSubDomains; preload"
-    Referrer-Policy = "no-referrer"
-    X-Content-Type-Options = "nosniff"
+for = "/*"
+[headers.values]
+Cache-Control = "public, max-age=86400"
+Referrer-Policy = "no-referrer"
+Strict-Transport-Security = "max-age=86400; includeSubDomains; preload"
+X-Content-Type-Options = "nosniff"
+X-Frame-Options = "DENY"
+X-XSS-Protection = "1; mode=block"
 
 [[headers]]
-  for = "*.html"
-  [headers.values]
-    Content-Type = "text/html; charset=UTF-8"
+for = "*.html"
+[headers.values]
+Content-Type = "text/html; charset=UTF-8"

@@ -14,7 +14,8 @@ docs:
 
 github-actions:
 - changed-files:
-  - any-glob-to-any-file: '.github/**'
+  - any-glob-to-any-file:
+    - '.github/workflows/*.yml'
 
 go:
 - changed-files:
@@ -42,4 +43,8 @@ website:
 - changed-files:
   - any-glob-to-any-file: 'runatlantis.io/.vitepress/**/*'
   - any-glob-to-any-file: 'package.json'
-  - any-glob-to-any-file: 'pnpm-lock.yaml'
+  - any-glob-to-any-file: 'package-lock.json'
+
+blog:
+- changed-files:
+  - any-glob-to-any-file: 'runatlantis.io/blog/**'

@@ -94,6 +94,70 @@ const en = [
       { text: "Glossary", link: "/contributing/glossary" },
     ]
 
+  },
+  {
+    text: "Blog",
+    link: "/blog",
+    collapsed: false,
+    items: [
+      {
+        text: "2024",
+        collapsed: true,
+        items: [
+          {
+            text: "Integrating Atlantis with OpenTofu",
+            link: "/blog/2024/integrating-atlantis-with-opentofu"
+          },
+          {
+            text: "Atlantis User Survey Results",
+            link: "/blog/2024/april-2024-survey-results"
+          },
+        ]
+      },
+      {
+        text: "2019",
+        collapsed: true,
+        items: [
+          {
+            text: "4 Reasons To Try HashiCorp's (New) Free Terraform Remote State Storage",
+            link: "/blog/2019/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage"
+          },
+        ]
+      },
+      {
+        text: "2018",
+        collapsed: true,
+        items: [
+          {
+            text: "I'm Joining HashiCorp!",
+            link: "/blog/2018/joining-hashicorp"
+          },
+          {
+            text: "Putting The Dev Into DevOps: Why Your Developers Should Write Terraform Too",
+            link: "/blog/2018/putting-the-dev-into-devops-why-your-developers-should-write-terraform-too"
+          },
+          {
+            text: "Atlantis 0.4.4 Now Supports Bitbucket",
+            link: "/blog/2018/atlantis-0-4-4-now-supports-bitbucket"
+          },
+          {
+            text: "Terraform And The Dangers Of Applying Locally",
+            link: "/blog/2018/terraform-and-the-dangers-of-applying-locally"
+          },
+          {
+            text: "Hosting Our Static Site over SSL with S3, ACM, CloudFront and Terraform",
+            link: "/blog/2018/hosting-our-static-site-over-ssl-with-s3-acm-cloudfront-and-terraform"
+          },
+        ]
+      },
+      {
+        text: "2017",
+        collapsed: true,
+        items: [
+          { text: "Introducing Atlantis", link: "/blog/2017/introducing-atlantis" },
+        ]
+      },
+    ]
   }
 ]
 

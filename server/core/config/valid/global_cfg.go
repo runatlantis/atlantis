@@ -23,9 +23,13 @@ const AllowCustomWorkflowsKey = "allow_custom_workflows"
 const DefaultWorkflowName = "default"
 const DeleteSourceBranchOnMergeKey = "delete_source_branch_on_merge"
 const RepoLockingKey = "repo_locking"
+const RepoLocksKey = "repo_locks"
 const PolicyCheckKey = "policy_check"
 const CustomPolicyCheckKey = "custom_policy_check"
 const AutoDiscoverKey = "autodiscover"
+const SilencePRCommentsKey = "silence_pr_comments"
+
+var AllowedSilencePRComments = []string{"plan", "apply"}
 
 // DefaultAtlantisFile is the default name of the config file for each repo.
 const DefaultAtlantisFile = "atlantis.yaml"
@@ -80,9 +84,11 @@ type Repo struct {
 	AllowCustomWorkflows      *bool
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
+	RepoLocks                 *RepoLocks
 	PolicyCheck               *bool
 	CustomPolicyCheck         *bool
 	AutoDiscover              *AutoDiscover
+	SilencePRComments         []string
 }
 
 type MergedProjectCfg struct {
@@ -102,9 +108,10 @@ type MergedProjectCfg struct {
 	PolicySets                PolicySets
 	DeleteSourceBranchOnMerge bool
 	ExecutionOrderGroup       int
-	RepoLocking               bool
+	RepoLocks                 RepoLocks
 	PolicyCheck               bool
 	CustomPolicyCheck         bool
+	SilencePRComments         []string
 }
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.
@@ -207,11 +214,12 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 
 	allowCustomWorkflows := false
 	deleteSourceBranchOnMerge := false
-	repoLockingKey := true
+	repoLocks := DefaultRepoLocks
 	customPolicyCheck := false
 	autoDiscover := AutoDiscover{Mode: AutoDiscoverAutoMode}
+	var silencePRComments []string
 	if args.AllowAllRepoSettings {
-		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, PolicyCheckKey}
+		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, RepoLocksKey, PolicyCheckKey, SilencePRCommentsKey}
 		allowCustomWorkflows = true
 	}
 
@@ -231,10 +239,11 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 				AllowedOverrides:          allowedOverrides,
 				AllowCustomWorkflows:      &allowCustomWorkflows,
 				DeleteSourceBranchOnMerge: &deleteSourceBranchOnMerge,
-				RepoLocking:               &repoLockingKey,
+				RepoLocks:                 &repoLocks,
 				PolicyCheck:               &policyCheck,
 				CustomPolicyCheck:         &customPolicyCheck,
 				AutoDiscover:              &autoDiscover,
+				SilencePRComments:         silencePRComments,
 			},
 		},
 		Workflows: map[string]Workflow{
@@ -271,8 +280,7 @@ func (r Repo) IDString() string {
 // final config. It assumes that all configs have been validated.
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
 	log.Debug("MergeProjectCfg started")
-	planReqs, applyReqs, importReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge, repoLocking, policyCheck, customPolicyCheck, _ := g.getMatchingCfg(log, repoID)
-
+	planReqs, applyReqs, importReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge, repoLocks, policyCheck, customPolicyCheck, _, silencePRComments := g.getMatchingCfg(log, repoID)
 	// If repos are allowed to override certain keys then override them.
 	for _, key := range allowedOverrides {
 		switch key {
@@ -335,8 +343,26 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		case RepoLockingKey:
 			if proj.RepoLocking != nil {
 				log.Debug("overriding server-defined %s with repo settings: [%t]", RepoLockingKey, *proj.RepoLocking)
-				repoLocking = *proj.RepoLocking
+				if *proj.RepoLocking && repoLocks.Mode == RepoLocksDisabledMode {
+					repoLocks.Mode = DefaultRepoLocksMode
+				} else if !*proj.RepoLocking {
+					repoLocks.Mode = RepoLocksDisabledMode
+				}
 			}
+		case RepoLocksKey:
+			//We check whether the server configured value and repo-root level
+			//config is different. If it is then we change to the more granular.
+			if rCfg.RepoLocks != nil && repoLocks.Mode != rCfg.RepoLocks.Mode {
+				log.Debug("overriding server-defined %s with repo settings: [%#v]", RepoLocksKey, rCfg.RepoLocks)
+				repoLocks = *rCfg.RepoLocks
+			}
+			//Then we check whether the more granular project based config is
+			//different. If it is then we set it.
+			if proj.RepoLocks != nil && repoLocks.Mode != proj.RepoLocks.Mode {
+				log.Debug("overriding repo-root-defined %s with repo settings: [%#v]", RepoLocksKey, *proj.RepoLocks)
+				repoLocks = *proj.RepoLocks
+			}
+			log.Debug("merged repoLocks: [%#v]", repoLocks)
 		case PolicyCheckKey:
 			if proj.PolicyCheck != nil {
 				log.Debug("overriding server-defined %s with repo settings: [%t]", PolicyCheckKey, *proj.PolicyCheck)
@@ -347,12 +373,29 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				log.Debug("overriding server-defined %s with repo settings: [%t]", CustomPolicyCheckKey, *proj.CustomPolicyCheck)
 				customPolicyCheck = *proj.CustomPolicyCheck
 			}
+		case SilencePRCommentsKey:
+			if proj.SilencePRComments != nil {
+				log.Debug("overriding repo-root-defined %s with repo settings: [%t]", SilencePRCommentsKey, strings.Join(proj.SilencePRComments, ","))
+				silencePRComments = proj.SilencePRComments
+			} else if rCfg.SilencePRComments != nil {
+				log.Debug("overriding server-defined %s with repo settings: [%s]", SilencePRCommentsKey, strings.Join(rCfg.SilencePRComments, ","))
+				silencePRComments = rCfg.SilencePRComments
+			}
 		}
 		log.Debug("MergeProjectCfg completed")
 	}
 
-	log.Debug("final settings: %s: [%s], %s: [%s], %s: [%s], %s: %s",
-		PlanRequirementsKey, strings.Join(planReqs, ","), ApplyRequirementsKey, strings.Join(applyReqs, ","), ImportRequirementsKey, strings.Join(importReqs, ","), WorkflowKey, workflow.Name)
+	log.Debug("final settings: %s: [%s], %s: [%s], %s: [%s], %s: %s, %s: %t, %s: %s, %s: %t, %s: %t, %s: [%s]",
+		PlanRequirementsKey, strings.Join(planReqs, ","),
+		ApplyRequirementsKey, strings.Join(applyReqs, ","),
+		ImportRequirementsKey, strings.Join(importReqs, ","),
+		WorkflowKey, workflow.Name,
+		DeleteSourceBranchOnMergeKey, deleteSourceBranchOnMerge,
+		RepoLockingKey, repoLocks.Mode,
+		PolicyCheckKey, policyCheck,
+		CustomPolicyCheckKey, policyCheck,
+		SilencePRCommentsKey, strings.Join(silencePRComments, ","),
+	)
 
 	return MergedProjectCfg{
 		PlanRequirements:          planReqs,
@@ -369,9 +412,10 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
 		ExecutionOrderGroup:       proj.ExecutionOrderGroup,
-		RepoLocking:               repoLocking,
+		RepoLocks:                 repoLocks,
 		PolicyCheck:               policyCheck,
 		CustomPolicyCheck:         customPolicyCheck,
+		SilencePRComments:         silencePRComments,
 	}
 }
 
@@ -379,7 +423,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 // repo with id repoID. It is used when there is no repo config.
 func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repoRelDir string, workspace string) MergedProjectCfg {
 	log.Debug("building config based on server-side config")
-	planReqs, applyReqs, importReqs, workflow, _, _, deleteSourceBranchOnMerge, repoLocking, policyCheck, customPolicyCheck, _ := g.getMatchingCfg(log, repoID)
+	planReqs, applyReqs, importReqs, workflow, _, _, deleteSourceBranchOnMerge, repoLocks, policyCheck, customPolicyCheck, _, silencePRComments := g.getMatchingCfg(log, repoID)
 	return MergedProjectCfg{
 		PlanRequirements:          planReqs,
 		ApplyRequirements:         applyReqs,
@@ -392,9 +436,10 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		TerraformVersion:          nil,
 		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
-		RepoLocking:               repoLocking,
+		RepoLocks:                 repoLocks,
 		PolicyCheck:               policyCheck,
 		CustomPolicyCheck:         customPolicyCheck,
+		SilencePRComments:         silencePRComments,
 	}
 }
 
@@ -412,7 +457,6 @@ func (g GlobalCfg) RepoAutoDiscoverCfg(repoID string) *AutoDiscover {
 // ValidateRepoCfg validates that rCfg for repo with id repoID is valid based
 // on our global config.
 func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
-
 	mapContainsF := func(m map[string]Workflow, key string) bool {
 		for k := range m {
 			if k == key {
@@ -450,8 +494,31 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		if p.RepoLocking != nil && !utils.SlicesContains(allowedOverrides, RepoLockingKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", RepoLockingKey, AllowedOverridesKey, RepoLockingKey)
 		}
+		if p.RepoLocks != nil && !utils.SlicesContains(allowedOverrides, RepoLocksKey) {
+			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", RepoLocksKey, AllowedOverridesKey, RepoLocksKey)
+		}
 		if p.CustomPolicyCheck != nil && !utils.SlicesContains(allowedOverrides, CustomPolicyCheckKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", CustomPolicyCheckKey, AllowedOverridesKey, CustomPolicyCheckKey)
+		}
+		if p.SilencePRComments != nil {
+			if !utils.SlicesContains(allowedOverrides, SilencePRCommentsKey) {
+				return fmt.Errorf(
+					"repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'",
+					SilencePRCommentsKey,
+					AllowedOverridesKey,
+					SilencePRCommentsKey,
+				)
+			}
+			for _, silenceStage := range p.SilencePRComments {
+				if !utils.SlicesContains(AllowedSilencePRComments, silenceStage) {
+					return fmt.Errorf(
+						"repo config '%s' key value of '%s' is not supported, supported values are [%s]",
+						SilencePRCommentsKey,
+						silenceStage,
+						strings.Join(AllowedSilencePRComments, ", "),
+					)
+				}
+			}
 		}
 	}
 
@@ -511,7 +578,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 }
 
 // getMatchingCfg returns the key settings for repoID.
-func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (planReqs []string, applyReqs []string, importReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocking bool, policyCheck bool, customPolicyCheck bool, autoDiscover AutoDiscover) {
+func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (planReqs []string, applyReqs []string, importReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocks RepoLocks, policyCheck bool, customPolicyCheck bool, autoDiscover AutoDiscover, silencePRComments []string) {
 	toLog := make(map[string]string)
 	traceF := func(repoIdx int, repoID string, key string, val interface{}) string {
 		from := "default server config"
@@ -535,8 +602,10 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (pla
 
 	// Can't use raw.DefaultAutoDiscoverMode() because of an import cycle. Should refactor to avoid that.
 	autoDiscover = AutoDiscover{Mode: AutoDiscoverAutoMode}
+	repoLocking := true
+	repoLocks = DefaultRepoLocks
 
-	for _, key := range []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, PolicyCheckKey, CustomPolicyCheckKey} {
+	for _, key := range []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, AllowedOverridesKey, AllowCustomWorkflowsKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, RepoLocksKey, PolicyCheckKey, CustomPolicyCheckKey, SilencePRCommentsKey} {
 		for i, repo := range g.Repos {
 			if repo.IDMatches(repoID) {
 				switch key {
@@ -580,6 +649,11 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (pla
 						toLog[RepoLockingKey] = traceF(i, repo.IDString(), RepoLockingKey, *repo.RepoLocking)
 						repoLocking = *repo.RepoLocking
 					}
+				case RepoLocksKey:
+					if repo.RepoLocks != nil {
+						toLog[RepoLocksKey] = traceF(i, repo.IDString(), RepoLocksKey, repo.RepoLocks.Mode)
+						repoLocks = *repo.RepoLocks
+					}
 				case PolicyCheckKey:
 					if repo.PolicyCheck != nil {
 						toLog[PolicyCheckKey] = traceF(i, repo.IDString(), PolicyCheckKey, *repo.PolicyCheck)
@@ -595,12 +669,21 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (pla
 						toLog[AutoDiscoverKey] = traceF(i, repo.IDString(), AutoDiscoverKey, repo.AutoDiscover.Mode)
 						autoDiscover = *repo.AutoDiscover
 					}
+				case SilencePRCommentsKey:
+					if repo.SilencePRComments != nil {
+						toLog[SilencePRCommentsKey] = traceF(i, repo.IDString(), SilencePRCommentsKey, repo.SilencePRComments)
+						silencePRComments = repo.SilencePRComments
+					}
 				}
 			}
 		}
 	}
 	for _, l := range toLog {
 		log.Debug(l)
+	}
+	// repoLocking is deprecated and enabled by default, disable repo locks if it is explicitly disabled
+	if !repoLocking {
+		repoLocks.Mode = RepoLocksDisabledMode
 	}
 	return
 }

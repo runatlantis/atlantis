@@ -91,6 +91,7 @@ var testFlags = map[string]interface{}{
 	GHAppKeyFlag:                     "",
 	GHAppKeyFileFlag:                 "",
 	GHAppSlugFlag:                    "atlantis",
+	GHAppInstallationIDFlag:          int64(0),
 	GHOrganizationFlag:               "",
 	GHWebhookSecretFlag:              "secret",
 	GiteaBaseURLFlag:                 "http://localhost",
@@ -108,6 +109,7 @@ var testFlags = map[string]interface{}{
 	LockingDBType:                    "boltdb",
 	LogLevelFlag:                     "debug",
 	MarkdownTemplateOverridesDirFlag: "/path2",
+	MaxCommentsPerCommand:            10,
 	StatsNamespace:                   "atlantis",
 	AllowDraftPRs:                    true,
 	PortFlag:                         8181,
@@ -744,6 +746,21 @@ func TestExecute_GithubApp(t *testing.T) {
 	Ok(t, err)
 
 	Equals(t, int64(1), passedConfig.GithubAppID)
+}
+
+func TestExecute_GithubAppWithInstallationID(t *testing.T) {
+	t.Log("Should pass the installation ID to the config.")
+	c := setup(map[string]interface{}{
+		GHAppKeyFlag:            testdata.GithubPrivateKey,
+		GHAppIDFlag:             "1",
+		GHAppInstallationIDFlag: "2",
+		RepoAllowlistFlag:       "*",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+
+	Equals(t, int64(1), passedConfig.GithubAppID)
+	Equals(t, int64(2), passedConfig.GithubAppInstallationID)
 }
 
 func TestExecute_GiteaUser(t *testing.T) {
