@@ -34,13 +34,13 @@ type GithubClient struct {
 
 func NewGithubClient() *GithubClient {
 
-	githubUsername := os.Getenv("ATLANTISBOT_GITHUB_USERNAME")
+	githubUsername := os.Getenv("ATLANTIS_GH_USER")
 	if githubUsername == "" {
-		log.Fatalf("ATLANTISBOT_GITHUB_USERNAME cannot be empty")
+		log.Fatalf("ATLANTIS_GH_USER cannot be empty")
 	}
-	githubToken := os.Getenv("ATLANTISBOT_GITHUB_TOKEN")
+	githubToken := os.Getenv("ATLANTIS_GH_TOKEN")
 	if githubToken == "" {
-		log.Fatalf("ATLANTISBOT_GITHUB_TOKEN cannot be empty")
+		log.Fatalf("ATLANTIS_GH_TOKEN cannot be empty")
 	}
 	ownerName := os.Getenv("GITHUB_REPO_OWNER_NAME")
 	if ownerName == "" {
