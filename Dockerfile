@@ -157,7 +157,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
-        ca-certificates~=20240226-r0 \
+        ca-certificates~=20240705-r0 \
         curl~=8 \
         git~=2 \
         unzip~=6 \
