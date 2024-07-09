@@ -22,7 +22,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/hashicorp/hc-install v0.7.1-0.20240625085452-3f6f9f2ad944
+	github.com/hashicorp/hc-install v0.7.1-0.20240708063736-321faf4a1066
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20240701073647-9fc3669f7553
 	github.com/jpillora/backoff v1.0.0
 	github.com/kr/pretty v0.3.1
@@ -129,7 +129,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.23.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
-	golang.org/x/mod v0.18.0 // indirect
+	golang.org/x/mod v0.19.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
