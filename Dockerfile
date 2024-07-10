@@ -45,7 +45,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
-FROM debian:${DEBIAN_TAG} as debian-base
+FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
@@ -65,7 +65,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-FROM debian-base as deps
+FROM debian-base AS deps
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM
@@ -158,7 +158,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
-        ca-certificates~=20240226-r0 \
+        ca-certificates~=20240705-r0 \
         curl~=8 \
         git~=2 \
         unzip~=6 \
