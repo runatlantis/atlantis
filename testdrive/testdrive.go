@@ -120,7 +120,7 @@ Follow these instructions to create a token (we don't store any tokens):
 		return errors.Wrapf(err, "forking repo %s/%s", terraformExampleRepoOwner, terraformExampleRepo)
 	}
 	if !githubClient.CheckForkSuccess(terraformExampleRepoOwner, terraformExampleRepo) {
-		return fmt.Errorf("didn't find forked repo %s/%s. fork unsuccessful", terraformExampleRepoOwner, terraformExampleRepoOwner)
+		return fmt.Errorf("didn't find forked repo %s/%s. fork unsuccessful", terraformExampleRepoOwner, terraformExampleRepo)
 	}
 	s.Stop()
 	colorstring.Println("[green]=> fork completed![reset]")
