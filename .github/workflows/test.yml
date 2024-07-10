@@ -3,8 +3,8 @@ name: tester
 on:
   push:
     branches:
-      - 'main'
-      - 'release-**'
+      - "main"
+      - "release-**"
   pull_request:
     types:
       - opened
@@ -12,8 +12,8 @@ on:
       - synchronize
       - ready_for_review
     branches:
-      - 'main'
-      - 'release-**'
+      - "main"
+      - "release-**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -106,7 +106,7 @@ jobs:
     # dont run e2e tests on forked PRs
     if: github.event.pull_request.head.repo.fork == false
     env:
-      TERRAFORM_VERSION: 1.8.3
+      TERRAFORM_VERSION: 1.9.2
       ATLANTIS_GH_USER: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
       ATLANTIS_GH_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
@@ -126,10 +126,10 @@ jobs:
 
       - name: Setup ngrok
         run: |
-            wget -q -nc https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-            tar -xzf ngrok-v3-stable-linux-amd64.tgz && \
-            chmod +x ngrok
-            ./ngrok --help
+          wget -q -nc https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+          tar -xzf ngrok-v3-stable-linux-amd64.tgz && \
+          chmod +x ngrok
+          ./ngrok --help
       - name: Setup gitconfig
         run: |
           git config --global user.email "maintainers@runatlantis.io"
