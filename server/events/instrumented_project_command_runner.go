@@ -13,6 +13,7 @@ type IntrumentedCommandRunner interface {
 	ApprovePolicies(ctx command.ProjectContext) command.ProjectResult
 	Import(ctx command.ProjectContext) command.ProjectResult
 	StateRm(ctx command.ProjectContext) command.ProjectResult
+	Lock(ctx command.ProjectContext) command.ProjectResult
 }
 
 type InstrumentedProjectCommandRunner struct {
@@ -56,6 +57,10 @@ func (p *InstrumentedProjectCommandRunner) Import(ctx command.ProjectContext) co
 
 func (p *InstrumentedProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectResult {
 	return RunAndEmitStats(ctx, p.projectCommandRunner.StateRm, p.scope)
+}
+
+func (p *InstrumentedProjectCommandRunner) Lock(ctx command.ProjectContext) command.ProjectResult {
+	return RunAndEmitStats(ctx, p.projectCommandRunner.Lock, p.scope)
 }
 
 func RunAndEmitStats(ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult, scope tally.Scope) command.ProjectResult {

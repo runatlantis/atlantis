@@ -33,6 +33,8 @@ const (
 	DefaultDeleteSourceBranchOnMerge = false
 	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
 	DefaultAbortOnExcecutionOrderFail = false
+	// DefaultLockAllProjectsBeforeExec being false is the default setting for locking all projects before plan/apply
+	DefaultLockAllProjectsBeforeExec = false
 )
 
 func NewInstrumentedProjectCommandBuilder(
@@ -440,6 +442,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
+	lockAllProjectsBeforeExec := DefaultLockAllProjectsBeforeExec
 	if hasRepoCfg {
 		if repoCfg.Automerge != nil {
 			automerge = *repoCfg.Automerge
@@ -451,6 +454,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			parallelPlan = *repoCfg.ParallelPlan
 		}
 		abortOnExcecutionOrderFail = repoCfg.AbortOnExcecutionOrderFail
+		lockAllProjectsBeforeExec = repoCfg.LockAllProjectsBeforeExec
 	}
 
 	if len(repoCfg.Projects) > 0 {
@@ -477,6 +481,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelPlan,
 					verbose,
 					abortOnExcecutionOrderFail,
+					lockAllProjectsBeforeExec,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -539,6 +544,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelPlan,
 					verbose,
 					abortOnExcecutionOrderFail,
+					lockAllProjectsBeforeExec,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -836,6 +842,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
+	lockAllProjectsBeforeExec := DefaultLockAllProjectsBeforeExec
 	if repoCfgPtr != nil {
 		if repoCfgPtr.Automerge != nil {
 			automerge = *repoCfgPtr.Automerge
@@ -847,6 +854,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 			parallelPlan = *repoCfgPtr.ParallelPlan
 		}
 		abortOnExcecutionOrderFail = repoCfgPtr.AbortOnExcecutionOrderFail
+		lockAllProjectsBeforeExec = repoCfgPtr.LockAllProjectsBeforeExec
 	}
 
 	if len(matchingProjects) > 0 {
@@ -872,6 +880,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					parallelPlan,
 					verbose,
 					abortOnExcecutionOrderFail,
+					lockAllProjectsBeforeExec,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -896,6 +905,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				parallelPlan,
 				verbose,
 				abortOnExcecutionOrderFail,
+				lockAllProjectsBeforeExec,
 				p.TerraformExecutor,
 			)...)
 	}

@@ -134,6 +134,7 @@ parallel_apply: true
 parallel_plan: false
 repo_locks:
   mode: on_apply
+lock_all_projects_before_exec: true
 projects:
 - dir: mydir
   workspace: myworkspace
@@ -157,12 +158,13 @@ allowed_regexp_prefixes:
 - dev/
 - staging/`,
 			exp: raw.RepoCfg{
-				Version:       Int(3),
-				AutoDiscover:  &raw.AutoDiscover{Mode: &autoDiscoverEnabled},
-				Automerge:     Bool(true),
-				ParallelApply: Bool(true),
-				ParallelPlan:  Bool(false),
-				RepoLocks:     &raw.RepoLocks{Mode: &repoLocksOnApply},
+				Version:                   Int(3),
+				AutoDiscover:              &raw.AutoDiscover{Mode: &autoDiscoverEnabled},
+				Automerge:                 Bool(true),
+				ParallelApply:             Bool(true),
+				ParallelPlan:              Bool(false),
+				RepoLocks:                 &raw.RepoLocks{Mode: &repoLocksOnApply},
+				LockAllProjectsBeforeExec: Bool(true),
 				Projects: []raw.Project{
 					{
 						Dir:              String("mydir"),

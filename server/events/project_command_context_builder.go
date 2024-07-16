@@ -38,7 +38,8 @@ type ProjectCommandContextBuilder interface {
 		prjCfg valid.MergedProjectCfg,
 		commentFlags []string,
 		repoDir string,
-		automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool, terraformClient terraform.Client,
+		automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail, lockAllProjectsBeforeExec bool,
+		terraformClient terraform.Client,
 	) []command.ProjectContext
 }
 
@@ -58,13 +59,14 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
+	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail, lockAllProjectsBeforeExec bool,
 	terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
 	cb.ProjectCounter.Inc(1)
 
 	cmds := cb.ProjectCommandContextBuilder.BuildProjectContext(
-		ctx, cmdName, subCmdName, prjCfg, commentFlags, repoDir, automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail, terraformClient,
+		ctx, cmdName, subCmdName, prjCfg, commentFlags, repoDir, automerge, parallelApply, parallelPlan, verbose,
+		abortOnExcecutionOrderFail, lockAllProjectsBeforeExec, terraformClient,
 	)
 
 	projectCmds = []command.ProjectContext{}
@@ -92,7 +94,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
+	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail, lockAllProjectsBeforeExec bool,
 	terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
@@ -142,6 +144,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		parallelPlan,
 		verbose,
 		abortOnExcecutionOrderFail,
+		lockAllProjectsBeforeExec,
 		ctx.Scope,
 		ctx.PullRequestStatus,
 		ctx.PullStatus,
@@ -164,7 +167,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	prjCfg valid.MergedProjectCfg,
 	commentFlags []string,
 	repoDir string,
-	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail bool,
+	automerge, parallelApply, parallelPlan, verbose, abortOnExcecutionOrderFail, lockAllProjectsBeforeExec bool,
 	terraformClient terraform.Client,
 ) (projectCmds []command.ProjectContext) {
 	if prjCfg.PolicyCheck {
@@ -192,6 +195,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		parallelPlan,
 		verbose,
 		abortOnExcecutionOrderFail,
+		lockAllProjectsBeforeExec,
 		terraformClient,
 	)
 
@@ -214,6 +218,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			parallelPlan,
 			verbose,
 			abortOnExcecutionOrderFail,
+			lockAllProjectsBeforeExec,
 			ctx.Scope,
 			ctx.PullRequestStatus,
 			ctx.PullStatus,
@@ -239,6 +244,7 @@ func newProjectCommandContext(ctx *command.Context,
 	parallelPlanEnabled bool,
 	verbose bool,
 	abortOnExcecutionOrderFail bool,
+	lockAllProjectsBeforeExec bool,
 	scope tally.Scope,
 	pullReqStatus models.PullReqStatus,
 	pullStatus *models.PullStatus,
@@ -307,6 +313,7 @@ func newProjectCommandContext(ctx *command.Context,
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
 		SilencePRComments:          projCfg.SilencePRComments,
+		LockAllProjectsBeforeExec:  lockAllProjectsBeforeExec,
 	}
 }
 

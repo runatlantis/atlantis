@@ -58,6 +58,12 @@ func TestRenderErr(t *testing.T) {
 			fmt.Errorf("some conftest error"),
 			"**Policy Check Error**\n```\nsome conftest error\n```",
 		},
+		{
+			"lock error",
+			command.LockCmd,
+			err,
+			"**Lock Error**\n```\nerr\n```",
+		},
 	}
 
 	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
@@ -121,6 +127,12 @@ func TestRenderFailure(t *testing.T) {
 			command.PolicyCheck,
 			"failure",
 			"**Policy Check Failed**: failure",
+		},
+		{
+			"lock failure",
+			command.LockCmd,
+			"failure",
+			"**Lock Failed**: failure",
 		},
 	}
 

@@ -315,6 +315,10 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
 			}
+		} else if result.LockSuccess != nil {
+			if !*result.LockSuccess {
+				continue // ignore successful locks
+			}
 			// Error out if no template was found, only if there are no errors or failures.
 			// This is because some errors and failures rely on additional context rendered by templtes, but not all errors or failures.
 		} else if !(result.Error != nil || result.Failure != "") {

@@ -126,6 +126,11 @@ type ProjectStateCommandRunner interface {
 	StateRm(ctx command.ProjectContext) command.ProjectResult
 }
 
+type ProjectLockCommandRunner interface {
+	// Lock acquires a lock for the project described by ctx.
+	Lock(ctx command.ProjectContext) command.ProjectResult
+}
+
 // ProjectCommandRunner runs project commands. A project command is a command
 // for a specific TF project.
 type ProjectCommandRunner interface {
@@ -136,6 +141,7 @@ type ProjectCommandRunner interface {
 	ProjectVersionCommandRunner
 	ProjectImportCommandRunner
 	ProjectStateCommandRunner
+	ProjectLockCommandRunner
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_job_url_setter.go JobURLSetter
@@ -320,16 +326,28 @@ func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) comman
 	}
 }
 
+// Lock acquires a lock for the project described by ctx.
+func (p *DefaultProjectCommandRunner) Lock(ctx command.ProjectContext) command.ProjectResult {
+	lockAttempt, failure, err := p.tryLock(ctx, ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
+	res := lockAttempt != nil && lockAttempt.LockAcquired
+	return command.ProjectResult{
+		Command:           command.LockCmd,
+		LockSuccess:       &res,
+		Error:             err,
+		Failure:           failure,
+		RepoRelDir:        ctx.RepoRelDir,
+		Workspace:         ctx.Workspace,
+		ProjectName:       ctx.ProjectName,
+		SilencePRComments: ctx.SilencePRComments,
+	}
+}
+
 func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckResults, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
-	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+	lockAttempt, lockFailure, err := p.tryLock(ctx, ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
+	if lockAttempt == nil || !lockAttempt.LockAcquired {
+		return nil, lockFailure, err
 	}
-	if !lockAttempt.LockAcquired {
-		return nil, lockAttempt.LockFailureReason, nil
-	}
-	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
@@ -419,15 +437,11 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// we will attempt to capture the lock here but fail to get the working directory
 	// at which point we will unlock again to preserve functionality
 	// If we fail to capture the lock here (super unlikely) then we error out and the user is forced to replan
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
-
-	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+	// Acquire Atlantis lock for this repo/dir/workspace.
+	lockAttempt, lockFailure, err := p.tryLock(ctx, ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
+	if lockAttempt == nil || !lockAttempt.LockAcquired {
+		return nil, lockFailure, err
 	}
-	if !lockAttempt.LockAcquired {
-		return nil, lockAttempt.LockFailureReason, nil
-	}
-	ctx.Log.Debug("acquired lock for project.")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
@@ -538,14 +552,10 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*models.PlanSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
-	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+	lockAttempt, lockFailure, err := p.tryLock(ctx, ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
+	if lockAttempt == nil || !lockAttempt.LockAcquired {
+		return nil, lockFailure, err
 	}
-	if !lockAttempt.LockAcquired {
-		return nil, lockAttempt.LockFailureReason, nil
-	}
-	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
@@ -615,14 +625,10 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnApplyMode)
-	if err != nil {
-		return "", "", errors.Wrap(err, "acquiring lock")
+	lockAttempt, lockFailure, err := p.tryLock(ctx, ctx.RepoLocksMode == valid.RepoLocksOnApplyMode)
+	if lockAttempt == nil || !lockAttempt.LockAcquired {
+		return "", lockFailure, err
 	}
-	if !lockAttempt.LockAcquired {
-		return "", lockAttempt.LockFailureReason, nil
-	}
-	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
@@ -694,14 +700,10 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
-	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+	lockAttempt, lockFailure, err := p.tryLock(ctx, ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
+	if lockAttempt == nil || !lockAttempt.LockAcquired {
+		return nil, lockFailure, err
 	}
-	if !lockAttempt.LockAcquired {
-		return nil, lockAttempt.LockFailureReason, nil
-	}
-	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
@@ -735,14 +737,10 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
-	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+	lockAttempt, lockFailure, err := p.tryLock(ctx, ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
+	if lockAttempt == nil || !lockAttempt.LockAcquired {
+		return nil, lockFailure, err
 	}
-	if !lockAttempt.LockAcquired {
-		return nil, lockAttempt.LockFailureReason, nil
-	}
-	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
@@ -808,4 +806,16 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		}
 	}
 	return outputs, nil
+}
+
+func (p *DefaultProjectCommandRunner) tryLock(ctx command.ProjectContext, repoLocking bool) (lockAttempt *TryLockResponse, failure string, err error) {
+	lockAttempt, err = p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), repoLocking)
+	if err != nil {
+		return lockAttempt, "", errors.Wrap(err, "acquiring lock")
+	}
+	if !lockAttempt.LockAcquired {
+		return lockAttempt, lockAttempt.LockFailureReason, nil
+	}
+	ctx.Log.Debug("acquired lock for project")
+	return lockAttempt, "", nil
 }

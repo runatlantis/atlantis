@@ -30,6 +30,8 @@ const (
 	Import
 	// State is a command to run terraform state rm
 	State
+	// LockCmd is command to acquire lock
+	LockCmd
 	// Adding more? Don't forget to update String() below
 )
 
@@ -74,6 +76,8 @@ func (c Name) String() string {
 		return "import"
 	case State:
 		return "state"
+	case LockCmd:
+		return "lock"
 	}
 	return ""
 }
@@ -149,6 +153,8 @@ func ParseCommandName(name string) (Name, error) {
 		return Import, nil
 	case "state":
 		return State, nil
+	case "lock":
+		return LockCmd, nil
 	}
 	return -1, fmt.Errorf("unknown command name: %s", name)
 }
