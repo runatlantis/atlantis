@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1@sha256:e87caa74dcb7d46cd820352bfea12591f3dba3ddc4285e19c7dcd13359f7cefd
 # what distro is the image being built for
-ARG ALPINE_TAG=3.20.0@sha256:77726ef6b57ddf65bb551896826ec38bc3e53f75cdde31354fbffb4f25238ebd
-ARG DEBIAN_TAG=12.5-slim@sha256:67f3931ad8cb1967beec602d8c0506af1e37e8d73c2a0b38b181ec5d8560d395
-ARG GOLANG_TAG=1.22.4-alpine@sha256:6522f0ca555a7b14c46a2c9f50b86604a234cdc72452bf6a268cae6461d9000b
+ARG ALPINE_TAG=3.20.1@sha256:b89d9c93e9ed3597455c90a0b88a8bbb5cb7188438f70953fede212a0c4394e0
+ARG DEBIAN_TAG=12.6-slim@sha256:f528891ab1aa484bf7233dbcc84f3c806c3e427571d75510a9d74bb5ec535b33
+ARG GOLANG_TAG=1.22.5-alpine@sha256:8c9183f715b0b4eca05b8b3dbf59766aaedb41ec07477b132ee2891ac0110a07
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.8.5
+ARG DEFAULT_TERRAFORM_VERSION=1.9.2
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.7.2
+ARG DEFAULT_OPENTOFU_VERSION=1.7.3
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.52.0
+ARG DEFAULT_CONFTEST_VERSION=0.54.0
 
 # Stage 1: build artifact and download deps
 
@@ -122,7 +122,7 @@ RUN ./download-release.sh \
         "terraform" \
         "${TARGETPLATFORM}" \
         "${DEFAULT_TERRAFORM_VERSION}" \
-        "1.5.7 1.6.6 1.7.5 ${DEFAULT_TERRAFORM_VERSION}" \
+        "1.6.6 1.7.5 1.8.5 ${DEFAULT_TERRAFORM_VERSION}" \
     && ./download-release.sh \
         "tofu" \
         "${TARGETPLATFORM}" \
@@ -157,7 +157,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
-        ca-certificates~=20240226-r0 \
+        ca-certificates~=20240705-r0 \
         curl~=8 \
         git~=2 \
         unzip~=6 \

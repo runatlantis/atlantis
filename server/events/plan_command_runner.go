@@ -119,12 +119,6 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		ctx.Log.Warn("unable to update plan commit status: %s", err)
 	}
 
-	if baseRepo.VCSHost.Type == models.Gitlab {
-		if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply, 0, len(projectCmds)); err != nil {
-			ctx.Log.Warn("unable to update apply commit status: %s", err)
-		}
-	}
-
 	// discard previous plans that might not be relevant anymore
 	ctx.Log.Debug("deleting previous plans and locks")
 	p.deletePlans(ctx)
