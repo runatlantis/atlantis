@@ -8,13 +8,13 @@ on:
 
 jobs:
   goreleaser:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       with:
         submodules: true
 
-    - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5
+    - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
       with:
         go-version-file: go.mod
 
@@ -22,7 +22,6 @@ jobs:
       uses: goreleaser/goreleaser-action@286f3b13b1b49da4ac219696163fb8c1c93e1200 # v6
       if: (!contains(github.ref, 'pre'))
       with:
-        version: v1.16.2
         # You can pass flags to goreleaser via GORELEASER_ARGS
         # --clean will save you deleting the dist dir
         args: release --clean
