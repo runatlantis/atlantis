@@ -22,7 +22,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/hashicorp/hc-install v0.7.1-0.20240708063736-321faf4a1066
+	github.com/hashicorp/hc-install v0.7.1-0.20240718133626-0c03a35d9fcb
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20240701073647-9fc3669f7553
 	github.com/jpillora/backoff v1.0.0
 	github.com/kr/pretty v0.3.1
