@@ -126,10 +126,10 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -nc https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-          tar -xzf ngrok-v3-stable-linux-amd64.tgz && \
+          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/4no1PS1PoRF/ngrok-v3-3.13.0-linux-amd64.tar.gz
+          tar -xzf ngrok.tar.gz
           chmod +x ngrok
-          ./ngrok --help
+          ./ngrok version
       - name: Setup gitconfig
         run: |
           git config --global user.email "maintainers@runatlantis.io"
