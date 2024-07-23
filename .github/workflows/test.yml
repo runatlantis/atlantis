@@ -41,7 +41,7 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:60ec258107ba55c967a3fc746c1e9910e7035e9ff72ea41d533109c1051405e2
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:c93e38fc03245bfcb1f750769b85d08f04b0946c078e8610abf3a64e181c1d50
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
@@ -126,10 +126,10 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -nc https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-          tar -xzf ngrok-v3-stable-linux-amd64.tgz && \
+          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/4no1PS1PoRF/ngrok-v3-3.13.0-linux-amd64.tar.gz
+          tar -xzf ngrok.tar.gz
           chmod +x ngrok
-          ./ngrok --help
+          ./ngrok version
       - name: Setup gitconfig
         run: |
           git config --global user.email "maintainers@runatlantis.io"
