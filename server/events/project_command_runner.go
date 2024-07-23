@@ -582,9 +582,20 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
 
+	showfile := filepath.Join(projAbsPath, ctx.GetShowResultFileName())
+
+	var showResult []byte
+	if _, err := os.Stat(showfile); err == nil {
+		showResult, err = os.ReadFile(showfile)
+		if err != nil {
+			return nil, "", errors.Wrap(err, "reading showfile")
+		}
+	}
+
 	return &models.PlanSuccess{
 		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		TerraformOutput: strings.Join(outputs, "\n"),
+		ShowResult:      string(showResult),
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,
 		MergedAgain:     mergedAgain,

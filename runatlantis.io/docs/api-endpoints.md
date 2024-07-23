@@ -73,6 +73,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
       "Failure": "",
       "PlanSuccess": {
         "TerraformOutput": "<redacted>",
+        "ShowResult": "<redacted>",
         "LockURL": "<redacted>",
         "RePlanCmd": "atlantis plan -d .",
         "ApplyCmd": "atlantis apply -d .",
