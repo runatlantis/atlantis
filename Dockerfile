@@ -5,7 +5,7 @@ ARG DEBIAN_TAG=12.6-slim@sha256:f528891ab1aa484bf7233dbcc84f3c806c3e427571d75510
 ARG GOLANG_TAG=1.22.5-alpine@sha256:8c9183f715b0b4eca05b8b3dbf59766aaedb41ec07477b132ee2891ac0110a07
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.9.2
+ARG DEFAULT_TERRAFORM_VERSION=1.9.3
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.7.3
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
@@ -170,7 +170,7 @@ RUN apk add --no-cache \
 #TODO HACK to avoidCVE-2024-4741 and CVE-2024-5535. Remove after the vulnerability is fixed:  openssl
 #TODO HACK to avoid CVE-2023-42364 and CVE-2023-42365. Remove after the vulnerability is fixed: busybox
 #TODO HACK to avoid CVE-2024-6387. Remove after the vulnerability is fixed: openssh
-RUN apk update && apk upgrade --no-cache libssl3 libcrypto3 busybox openssh
+RUN apk update && apk upgrade --no-cache libssl3 libcrypto3 busybox openssh curl
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
