@@ -12,16 +12,18 @@ import (
 	"testing"
 	"time"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	gitlab "github.com/xanzy/go-gitlab"
+	"github.com/xanzy/go-gitlab"
 
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 var projectID = 4580910
+
+const gitlabPipelineSuccessSha = "67cb91d3f6198189f433c045154a885784ba6977"
 
 // Test that the base url gets set properly.
 func TestNewGitlabClient_BaseURL(t *testing.T) {
@@ -297,7 +299,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 			testServer := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
-					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+					case fmt.Sprintf("/api/v4/projects/runatlantis%satlantis/statuses/%s", "%2F", gitlabPipelineSuccessSha):
 						gotRequest = true
 
 						body, err := io.ReadAll(r.Body)
@@ -336,7 +338,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 				models.PullRequest{
 					Num:        1,
 					BaseRepo:   repo,
-					HeadCommit: "sha",
+					HeadCommit: gitlabPipelineSuccessSha,
 					HeadBranch: "test",
 				}, c.status, "src", "description", "https://google.com")
 			Ok(t, err)
@@ -387,7 +389,7 @@ func TestGitlabClient_UpdateStatusRetryable(t *testing.T) {
 			testServer := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
-					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+					case fmt.Sprintf("/api/v4/projects/runatlantis%satlantis/statuses/%s", "%2F", gitlabPipelineSuccessSha):
 						handledNumberOfRequests++
 						shouldSendConflict := handledNumberOfRequests <= c.numberOfConflicts
 
@@ -436,18 +438,86 @@ func TestGitlabClient_UpdateStatusRetryable(t *testing.T) {
 				models.PullRequest{
 					Num:        1,
 					BaseRepo:   repo,
-					HeadCommit: "sha",
+					HeadCommit: gitlabPipelineSuccessSha,
 					HeadBranch: "test",
 				}, c.status, "src", "description", "https://google.com")
 
 			if c.expError {
-				ErrContains(t, "failed to update commit status for 'runatlantis/atlantis' @ 'sha' to 'src' after 10 attempts", err)
+				ErrContains(t, fmt.Sprintf("failed to update commit status for 'runatlantis/atlantis' @ '%s' to 'src' after 10 attempts", gitlabPipelineSuccessSha), err)
 				ErrContains(t, "409", err)
 			} else {
 				Ok(t, err)
 			}
 
 			Assert(t, c.expNumberOfRequests == handledNumberOfRequests, fmt.Sprintf("expected %d number of requests, but processed %d", c.expNumberOfRequests, handledNumberOfRequests))
+		})
+	}
+}
+
+func TestGitlabClient_UpdateStatusSkipNewCommit(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
+	Ok(t, err)
+
+	cases := []struct {
+		status   models.CommitStatus
+		expState string
+	}{
+		{
+			models.SuccessCommitStatus,
+			"success",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.expState, func(t *testing.T) {
+			gotRequest := false
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/newsha":
+						gotRequest = true
+
+						body, err := io.ReadAll(r.Body)
+						Ok(t, err)
+						exp := fmt.Sprintf(`{"state":"%s","ref":"patch-1-merger","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
+						Equals(t, exp, string(body))
+						defer r.Body.Close()  // nolint: errcheck
+						w.Write([]byte("{}")) // nolint: errcheck
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
+						w.WriteHeader(http.StatusOK)
+						w.Write(pipelineSuccess) // nolint: errcheck
+					case "/api/v4/":
+						// Rate limiter requests.
+						w.WriteHeader(http.StatusOK)
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &GitlabClient{
+				Client:  internalClient,
+				Version: nil,
+			}
+
+			repo := models.Repo{
+				FullName: "runatlantis/atlantis",
+				Owner:    "runatlantis",
+				Name:     "atlantis",
+			}
+			err = client.UpdateStatus(
+				logger,
+				repo,
+				models.PullRequest{
+					Num:        1,
+					BaseRepo:   repo,
+					HeadCommit: "newsha",
+					HeadBranch: "test",
+				}, c.status, "src", "description", "https://google.com")
+			Ok(t, err)
+			Assert(t, gotRequest == false, "expected to get the request")
 		})
 	}
 }
@@ -614,9 +684,9 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 						case fmt.Sprintf("/api/v4/projects/%v", projectID):
 							w.WriteHeader(http.StatusOK)
 							w.Write(projectSuccess) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
+						case fmt.Sprintf("/api/v4/projects/%v/repository/commits/%s/statuses", projectID, gitlabPipelineSuccessSha):
 							w.WriteHeader(http.StatusOK)
-							response := fmt.Sprintf(`[{"id":133702594,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"ApplySuccess","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}]`, c.status, c.statusName)
+							response := fmt.Sprintf(`[{"id":133702594,"sha":"%s","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"ApplySuccess","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}]`, gitlabPipelineSuccessSha, c.status, c.statusName)
 							w.Write([]byte(response)) // nolint: errcheck
 						case "/api/v4/version":
 							w.WriteHeader(http.StatusOK)
@@ -656,7 +726,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 					models.PullRequest{
 						Num:        c.mrID,
 						BaseRepo:   repo,
-						HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
+						HeadCommit: gitlabPipelineSuccessSha,
 					}, vcsStatusName)
 
 				Ok(t, err)

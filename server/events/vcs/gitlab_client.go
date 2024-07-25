@@ -22,14 +22,14 @@ import (
 	"strings"
 	"time"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
-	gitlab "github.com/xanzy/go-gitlab"
+	"github.com/xanzy/go-gitlab"
 )
 
 // gitlabMaxCommentLength is the maximum number of chars allowed by Gitlab in a
@@ -425,6 +425,11 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		if mr.HeadPipeline != nil {
 			logger.Debug("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
 				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
+			// if these are different then there is already a new commit so let's stop setting any statuses and return
+			if mr.HeadPipeline.SHA != pull.HeadCommit {
+				logger.Debug("mr.HeadPipeline.SHA: '%s' does not match pull.HeadCommit '%s'", mr.HeadPipeline.SHA, pull.HeadCommit)
+				return nil
+			}
 			refTarget = mr.HeadPipeline.Ref
 			break
 		}
