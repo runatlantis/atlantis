@@ -377,7 +377,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					ignorePolicy = true
 				}
 				// Increment approval if user is owner.
-				if isOwner && !ignorePolicy {
+				if isOwner && !ignorePolicy && (ctx.User.Username != ctx.Pull.Author || policySet.SelfApprove) {
 					if !ctx.ClearPolicyApproval {
 						prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
 					} else {
@@ -391,6 +391,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 				if !policyStatus.Passed && (prjPolicyStatus[i].Approvals != policySet.ApproveCount) {
 					allPassed = false
 				}
+
 				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
 					PolicySetName: policySet.Name,
 					Passed:        policyStatus.Passed,

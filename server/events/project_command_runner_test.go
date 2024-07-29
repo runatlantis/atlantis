@@ -791,10 +791,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 					{
 						Name:         "policy1",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 					{
 						Name:         "policy2",
 						ApproveCount: 2,
+						SelfApprove:  true,
 					},
 				},
 			},
@@ -823,10 +825,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 					{
 						Name:         "policy2",
 						ApproveCount: 2,
+						SelfApprove:  true,
 					},
 				},
 			},
@@ -855,10 +859,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 					{
 						Name:         "policy1",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 					{
 						Name:         "policy2",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 				},
 			},
@@ -888,10 +894,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 					{
 						Name:         "policy2",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 				},
 			},
@@ -920,6 +928,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 2,
+						SelfApprove:  true,
 					},
 				},
 			},
@@ -950,6 +959,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 2,
+						SelfApprove:  true,
 					},
 				},
 			},
@@ -983,6 +993,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 					{
 						Owners: valid.PolicyOwners{
@@ -990,6 +1001,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy2",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 				},
 			},
@@ -1032,6 +1044,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 					{
 						Owners: valid.PolicyOwners{
@@ -1039,6 +1052,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy2",
 						ApproveCount: 2,
+						SelfApprove:  true,
 					},
 				},
 			},
@@ -1081,6 +1095,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 					{
 						Owners: valid.PolicyOwners{
@@ -1088,6 +1103,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy2",
 						ApproveCount: 2,
+						SelfApprove:  true,
 					},
 				},
 			},
@@ -1131,6 +1147,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
+						SelfApprove:  true,
 					},
 					{
 						Owners: valid.PolicyOwners{
@@ -1138,6 +1155,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy2",
 						ApproveCount: 2,
+						SelfApprove:  true,
 					},
 				},
 			},
@@ -1167,6 +1185,56 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expFailure: `One or more policy sets require additional approval.`,
 			hasErr:     false,
+		},
+		{
+			description:         "Policy Approval should not be the Author of the PR",
+			userTeams:           []string{"someuserteam"},
+			clearPolicyApproval: false,
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Users: []string{"lkysow"},
+						},
+						Name:         "policy1",
+						ApproveCount: 1,
+						SelfApprove:  true,
+					},
+					{
+						Owners: valid.PolicyOwners{
+							Users: []string{"lkysow"},
+						},
+						Name:         "policy2",
+						ApproveCount: 1,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Approvals:     0,
+					Passed:        false,
+				},
+				{
+					PolicySetName: "policy2",
+					Approvals:     0,
+					Passed:        false,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+			},
+			expFailure: `One or more policy sets require additional approval.`,
+			hasErr:     true,
 		},
 	}
 
@@ -1225,7 +1293,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				projPolicyStatus = c.policySetStatus
 			}
 
-			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, Author: testdata.User.Username}
 			When(runner.VcsClient.GetTeamNamesForUser(testdata.GithubRepo, testdata.User)).ThenReturn(c.userTeams, nil)
 			ctx := command.ProjectContext{
 				User:                testdata.User,

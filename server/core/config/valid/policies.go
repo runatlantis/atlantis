@@ -32,6 +32,7 @@ type PolicySet struct {
 	Name         string
 	ApproveCount int
 	Owners       PolicyOwners
+	SelfApprove  bool
 }
 
 func (p *PolicySets) HasPolicies() bool {
