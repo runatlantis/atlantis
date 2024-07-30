@@ -45,7 +45,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 		GithubHostname: testServer,
 	}
 
-	cloneDir, _, err := gwd.Clone(logger, models.Repo{}, models.PullRequest{
+	cloneDir, err := gwd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 	}, "default")
@@ -90,11 +90,11 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	When(credentials.GetToken()).ThenReturn("token", nil)
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Eq(modifiedBaseRepo), Eq(models.PullRequest{BaseRepo: modifiedBaseRepo}),
-		Eq("default"))).ThenReturn("", true, nil)
+		Eq("default"))).ThenReturn("", nil)
 
-	_, success, _ := ghAppWorkingDir.Clone(logger, headRepo, models.PullRequest{BaseRepo: baseRepo}, "default")
+	_, err := ghAppWorkingDir.Clone(logger, headRepo, models.PullRequest{BaseRepo: baseRepo}, "default")
 
 	workingDir.VerifyWasCalledOnce().Clone(logger, modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")
 
-	Assert(t, success == true, "clone url mutation error")
+	Ok(t, err)
 }
