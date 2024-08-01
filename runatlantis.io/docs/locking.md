@@ -1,4 +1,5 @@
 # Locking
+
 When `plan` is run, the directory and Terraform workspace are **Locked** until the pull request is merged or closed, or the plan is manually deleted.
 
 If another user attempts to `plan` for the same directory and workspace in a different pull request
@@ -12,9 +13,8 @@ Which links them to the pull request that holds the lock.
 Only the directory in the repo and Terraform workspace are locked, not the whole repo.
 :::
 
-[[toc]]
-
 ## Why
+
 1. Because `atlantis apply` is being done before the pull request is merged, after
 an apply your `main` branch does not represent the most up to date version of your infrastructure
 anymore. With locking, you can ensure that no other changes will be made until the
@@ -30,6 +30,7 @@ but with the added ability to re-plan/apply multiple times if things don't work.
 will be made invalid after the in-progress plan is applied.
 
 ## Viewing Locks
+
 To view locks, go to the URL that Atlantis is hosted at:
 
 ![Locks View](./images/locks-ui.png)
@@ -41,6 +42,7 @@ You can click on a lock to view its details:
 </p>
 
 ## Unlocking
+
 The project and workspace will be automatically unlocked when the PR is merged or closed.
 
 To unlock the project and workspace without completing an `apply` and merging, comment `atlantis unlock` on the PR,
@@ -59,6 +61,7 @@ to delete the lock.
 Once a plan is discarded, you'll need to run `plan` again prior to running `apply` when you go back to that pull request.
 
 ## Relationship to Terraform State Locking
+
 Atlantis does not conflict with [Terraform State Locking](https://developer.hashicorp.com/terraform/language/state/locking). Under the hood, all
 Atlantis is doing is running `terraform plan` and `apply` and so all of the
 locking built in to those commands by Terraform isn't affected.

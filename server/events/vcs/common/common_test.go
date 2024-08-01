@@ -24,7 +24,7 @@ import (
 // If under the maximum number of chars, we shouldn't split the comments.
 func TestSplitComment_UnderMax(t *testing.T) {
 	comment := "comment under max size"
-	split := common.SplitComment(comment, len(comment)+1, "sepEnd", "sepStart")
+	split := common.SplitComment(comment, len(comment)+1, "sepEnd", "sepStart", 0, "")
 	Equals(t, []string{comment}, split)
 }
 
@@ -34,11 +34,11 @@ func TestSplitComment_TwoComments(t *testing.T) {
 	comment := strings.Repeat("a", 1000)
 	sepEnd := "-sepEnd"
 	sepStart := "-sepStart"
-	split := common.SplitComment(comment, len(comment)-1, sepEnd, sepStart)
+	split := common.SplitComment(comment, len(comment)-1, sepEnd, sepStart, 0, "")
 
 	expCommentLen := len(comment) - len(sepEnd) - len(sepStart) - 1
-	expFirstComment := comment[:expCommentLen]
-	expSecondComment := comment[expCommentLen:]
+	expFirstComment := comment[:len(comment)-expCommentLen]
+	expSecondComment := comment[len(comment)-expCommentLen:]
 	Equals(t, 2, len(split))
 	Equals(t, expFirstComment+sepEnd, split[0])
 	Equals(t, sepStart+expSecondComment, split[1])
@@ -51,14 +51,31 @@ func TestSplitComment_FourComments(t *testing.T) {
 	sepEnd := "-sepEnd"
 	sepStart := "-sepStart"
 	max := (len(comment) / 4) + len(sepEnd) + len(sepStart)
-	split := common.SplitComment(comment, max, sepEnd, sepStart)
+	split := common.SplitComment(comment, max, sepEnd, sepStart, 0, "")
 
 	expMax := len(comment) / 4
 	Equals(t, []string{
-		comment[:expMax] + sepEnd,
-		sepStart + comment[expMax:expMax*2] + sepEnd,
-		sepStart + comment[expMax*2:expMax*3] + sepEnd,
-		sepStart + comment[expMax*3:]}, split)
+		comment[:len(comment)-expMax*3] + sepEnd,
+		sepStart + comment[len(comment)-expMax*3:len(comment)-expMax*2] + sepEnd,
+		sepStart + comment[len(comment)-expMax*2:len(comment)-expMax] + sepEnd,
+		sepStart + comment[len(comment)-expMax:]}, split)
+}
+
+func TestSplitComment_Limited(t *testing.T) {
+	comment := strings.Repeat("a", 1000)
+	sepEnd := "-sepEnd"
+	sepStart := "-sepStart"
+	truncationHeader := "truncated-"
+	max := (len(comment) / 8) + max(len(sepEnd), len(truncationHeader)) + len(sepStart)
+	split := common.SplitComment(comment, max, sepEnd, sepStart, 5, truncationHeader)
+
+	expMax := len(comment) / 8
+	Equals(t, []string{
+		truncationHeader + comment[len(comment)-expMax*5:len(comment)-expMax*4] + sepEnd,
+		sepStart + comment[len(comment)-expMax*4:len(comment)-expMax*3] + sepEnd,
+		sepStart + comment[len(comment)-expMax*3:len(comment)-expMax*2] + sepEnd,
+		sepStart + comment[len(comment)-expMax*2:len(comment)-expMax] + sepEnd,
+		sepStart + comment[len(comment)-expMax:]}, split)
 }
 
 func TestAutomergeCommitMsg(t *testing.T) {

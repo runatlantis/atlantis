@@ -20,4 +20,3 @@ This will link to the atlantis UI which provides real-time logging in addition t
 ::: warning
 As of now the logs are currently stored in memory and cleared when a given pull request is closed, so this link shouldn't be persisted anywhere.
 :::
-

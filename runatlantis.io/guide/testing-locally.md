@@ -1,45 +1,51 @@
 # Testing Locally
+
 These instructions are for running Atlantis **locally on your own computer** so you can test it out against
 your own repositories before deciding whether to install it more permanently.
 
 ::: tip
-If you want to set up a production-ready Atlantis installation, read [Deployment](../docs/deployment.html).
+If you want to set up a production-ready Atlantis installation, read [Deployment](../docs/deployment.md).
 :::
 
 Steps:
 
-[[toc]]
-
 ## Install Terraform
+
 `terraform` needs to be in the `$PATH` for Atlantis.
-Download from [https://developer.hashicorp.com/terraform/downloads](https://developer.hashicorp.com/terraform/downloads)
-```
+Download from [Terraform](https://developer.hashicorp.com/terraform/downloads)
+
+```shell
 unzip path/to/terraform_*.zip -d /usr/local/bin
 ```
 
 ## Download Atlantis
-Get the latest release from [https://github.com/runatlantis/atlantis/releases](https://github.com/runatlantis/atlantis/releases)
+
+Get the latest release from [GitHub](https://github.com/runatlantis/atlantis/releases)
 and unpackage it.
 
 ## Download Ngrok
+
 Atlantis needs to be accessible somewhere that github.com/gitlab.com/bitbucket.org or your GitHub/GitLab Enterprise installation can reach.
 One way to accomplish this is with ngrok, a tool that forwards your local port to a random
 public hostname.
 
-Go to [https://ngrok.com/download](https://ngrok.com/download), download ngrok and `unzip` it.
+[Download](https://ngrok.com/download) ngrok and `unzip` it.
 
 Start `ngrok` on port `4141` and take note of the hostname it gives you:
+
 ```bash
 ./ngrok http 4141
 ```
 
 In a new tab (where you'll soon start Atlantis) create an environment variable with
 ngrok's hostname:
+
 ```bash
 URL="https://{YOUR_HOSTNAME}.ngrok.io"
 ```
 
 ## Create a Webhook Secret
+
 GitHub and GitLab use webhook secrets so clients can verify that the webhooks came
 from them.
 ::: warning
@@ -47,16 +53,19 @@ Bitbucket Cloud (bitbucket.org) doesn't use webhook secrets so if you're using B
 When you're ready to do a production deploy of Atlantis you should allowlist [Bitbucket IPs](https://confluence.atlassian.com/bitbucket/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall-343343385.html)
 to ensure the webhooks are coming from them.
 :::
-Create a random string of any length (you can use [https://www.random.org/strings/](https://www.random.org/strings/))
+Create a random string of any length (you can use [random.org](https://www.random.org/strings/))
 and set an environment variable:
-```
+
+```shell
 SECRET="{YOUR_RANDOM_STRING}"
 ```
 
 ## Add Webhook
+
 Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bitbucket repo:
 
 ### GitHub or GitHub Enterprise Webhook
+
 <details>
     <summary>Expand</summary>
     <ul>
@@ -82,6 +91,7 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
 </details>
 
 ### GitLab or GitLab Enterprise Webhook
+
 <details>
     <summary>Expand</summary>
     <ul>
@@ -103,6 +113,7 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
 </details>
 
 ### Bitbucket Cloud (bitbucket.org) Webhook
+
 <details>
     <summary>Expand</summary>
     <ul>
@@ -124,6 +135,7 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
 </details>
 
 ### Bitbucket Server (aka Stash) Webhook
+
 <details>
     <summary>Expand</summary>
     <ul>
@@ -140,51 +152,99 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
     </ul>
 </details>
 
+### Gitea Webhook
+
+<details>
+    <summary>Expand</summary>
+    <ul>
+        <li>Click <strong>Settings &gt; Webhooks</strong> in the top- and then sidebar</li>
+        <li>Click <strong>Add webhook &gt; Gitea</strong> (Gitea webhooks are service specific, but this works)</li>
+        <li>set <strong>Target URL</strong> to <code>http://$URL/events</code> (or <code>https://$URL/events</code> if you're using SSL) where <code>$URL</code> is where Atlantis is hosted. <strong>Be sure to add <code>/events</code></strong></li>
+        <li>double-check you added <code>/events</code> to the end of your URL.</li>
+        <li>set <strong>Secret</strong> to the Webhook Secret you generated previously
+        <ul>
+            <li><strong>NOTE</strong> If you're adding a webhook to multiple repositories, each repository will need to use the <strong>same</strong> secret.</li>
+        </ul>
+        </li>
+        <li>Select <strong>Custom Events...</strong></li>
+        <li>Check the boxes
+            <ul>
+                <li><strong>Repository events &gt; Push</strong></li>
+                <li><strong>Issue events &gt; Issue Comment</strong></li>
+                <li><strong>Pull Request events &gt; Pull Request</strong></li>
+                <li><strong>Pull Request events &gt; Pull Request Comment</strong></li>
+                <li><strong>Pull Request events &gt; Pull Request Reviewed</strong></li>
+                <li><strong>Pull Request events &gt; Pull Request Synchronized</strong></li>
+            </ul>
+        </li>
+        <li>Leave <strong>Active</strong> checked</li>
+        <li>Click <strong>Add Webhook</strong></li>
+        <li>See <a href="#next-steps">Next Steps</a></li>
+    </ul>
+</details>
 
 ## Create an access token for Atlantis
+
 We recommend using a dedicated CI user or creating a new user named **@atlantis** that performs all API actions, however for testing,
 you can use your own user. Here we'll create the access token that Atlantis uses to comment on the pull request and
 set commit statuses.
 
 ### GitHub or GitHub Enterprise Access Token
+
 - Create a [Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-fine-grained-personal-access-token)
 - create a token with **repo** scope
 - set the token as an environment variable
-```
+
+```shell
 TOKEN="{YOUR_TOKEN}"
 ```
 
 ### GitLab or GitLab Enterprise Access Token
-- follow [https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
+
+- follow [GitLab: Create a personal access token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
 - create a token with **api** scope
 - set the token as an environment variable
-```
+
+```shell
 TOKEN="{YOUR_TOKEN}"
 ```
 
 ### Bitbucket Cloud (bitbucket.org) Access Token
-- follow [https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
+
+- follow [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 - Label the password "atlantis"
 - Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
 - set the token as an environment variable
-```
+
+```shell
 TOKEN="{YOUR_TOKEN}"
 ```
 
 ### Bitbucket Server (aka Stash) Access Token
+
 - Click on your avatar in the top right and select **Manage account**
 - Click **HTTP access tokens** in the sidebar
 - Click **Create token**
 - Name the token **atlantis**
 - Give the token **Read** Project permissions and **Write** Pull request permissions
-- Choose an Expiry option **Do not expire** or **Expire automatically** 
+- Choose an Expiry option **Do not expire** or **Expire automatically**
 - Click **Create** and set the token as an environment variable
-```
+
+```shell
 TOKEN="{YOUR_TOKEN}"
 ```
 
+### Gitea Access Token
+
+- Go to "Profile and Settings" > "Settings" in Gitea (top-right)
+- Go to "Applications" under "User Settings" in Gitea
+- Create a token under the "Manage Access Tokens" with the following permissions:
+  - issue: Read and Write
+  - repository: Read and Write
+- Record the access token
 
 ## Start Atlantis
+
 You're almost ready to start Atlantis, just set two more variables:
 
 ```bash
@@ -195,9 +255,11 @@ REPO_ALLOWLIST="$YOUR_GIT_HOST/$YOUR_USERNAME/$YOUR_REPO"
 # server without scheme or port and $YOUR_USERNAME will be the name of the **project** the repo
 # is under, **not the key** of the project.
 ```
+
 Now you can start Atlantis. The exact command differs depending on your Git host:
 
 ### GitHub Command
+
 ```bash
 atlantis server \
 --atlantis-url="$URL" \
@@ -208,6 +270,7 @@ atlantis server \
 ```
 
 ### GitHub Enterprise Command
+
 ```bash
 HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io
 atlantis server \
@@ -220,6 +283,7 @@ atlantis server \
 ```
 
 ### GitLab Command
+
 ```bash
 atlantis server \
 --atlantis-url="$URL" \
@@ -230,6 +294,7 @@ atlantis server \
 ```
 
 ### GitLab Enterprise Command
+
 ```bash
 HOSTNAME=YOUR_GITLAB_ENTERPRISE_HOSTNAME # ex. gitlab.runatlantis.io
 atlantis server \
@@ -242,6 +307,7 @@ atlantis server \
 ```
 
 ### Bitbucket Cloud (bitbucket.org) Command
+
 ```bash
 atlantis server \
 --atlantis-url="$URL" \
@@ -251,6 +317,7 @@ atlantis server \
 ```
 
 ### Bitbucket Server (aka Stash) Command
+
 ```bash
 BASE_URL=YOUR_BITBUCKET_SERVER_URL # ex. http://bitbucket.mycorp:7990
 atlantis server \
@@ -278,46 +345,71 @@ atlantis server \
 --ssl-key-file=file.key
 ```
 
+### Gitea
+
+```bash
+atlantis server \
+--atlantis-url="$URL" \
+--gitea-user="$ATLANTIS_GITEA_USER" \
+--gitea-token="$ATLANTIS_GITEA_TOKEN" \
+--gitea-webhook-secret="$ATLANTIS_GITEA_WEBHOOK_SECRET" \
+--gitea-base-url="$ATLANTIS_GITEA_BASE_URL" \
+--gitea-page-size="$ATLANTIS_GITEA_PAGE_SIZE" \
+--repo-allowlist="$REPO_ALLOWLIST"
+--ssl-cert-file=file.crt
+--ssl-key-file=file.key
+```
+
 ## Create a pull request
+
 Create a pull request so you can test Atlantis.
 ::: tip
 You could add a null resource as a test:
+
 ```hcl
 resource "null_resource" "example" {}
 ```
+
 Or just modify the whitespace in a file.
 :::
 
 ### Autoplan
+
 You should see Atlantis logging about receiving the webhook and you should see the output of `terraform plan` on your repo.
 
 Atlantis tries to figure out the directory to plan in based on the files modified.
 If you need to customize the directories that Atlantis runs in or the commands it runs if you're using workspaces
-or `.tfvars` files, see [atlantis.yaml Reference](/docs/repo-level-atlantis-yaml.html#reference).
+or `.tfvars` files, see [atlantis.yaml Reference](../docs/repo-level-atlantis-yaml.md#reference).
 
 ### Manual Plan
+
 To manually `plan` in a specific directory or workspace, comment on the pull request using the `-d` or `-w` flags:
-```
+
+```shell
 atlantis plan -d mydir
 atlantis plan -w staging
 ```
 
 To add additional arguments to the underlying `terraform plan` you can use:
-```
+
+```shell
 atlantis plan -- -target=resource -var 'foo=bar'
 ```
 
 ### Apply
+
 If you'd like to `apply`, type a comment: `atlantis apply`. You can use the `-d` or `-w` flags to point
 Atlantis at a specific plan. Otherwise it tries to apply the plan for the root directory.
 
 ## Real-time logs
-The [real-time terraform output](/docs/streaming-logs.md) for your command can be found by clicking into the status check for a given project in a PR which
+
+The [real-time terraform output](../docs/streaming-logs.md) for your command can be found by clicking into the status check for a given project in a PR which
 links to the log-streaming UI. This is a terminal UI where you can view your commands executing in real-time.
 
 ## Next Steps
-* If things are working as expected you can `Ctrl-C` the `atlantis server` command and the `ngrok` command.
-* Hopefully Atlantis is working with your repo and you're ready to move on to a [production-ready deployment](../docs/deployment.html).
-* If it's not working as expected, you may need to customize how Atlantis runs with an `atlantis.yaml` file.
-See [atlantis.yaml use cases](/docs/repo-level-atlantis-yaml.html#use-cases).
-* Check out our [full documentation](../docs/) for more details.
+
+- If things are working as expected you can `Ctrl-C` the `atlantis server` command and the `ngrok` command.
+- Hopefully Atlantis is working with your repo and you're ready to move on to a [production-ready deployment](../docs/deployment.md).
+- If it's not working as expected, you may need to customize how Atlantis runs with an `atlantis.yaml` file.
+See [atlantis.yaml use cases](../docs/repo-level-atlantis-yaml.md#use-cases).
+- Check out our [full documentation](../docs.md) for more details.

@@ -76,9 +76,9 @@ const (
 	DisableUnlockLabelFlag                         = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag                      = "discard-approval-on-plan"
 	EmojiReaction                                  = "emoji-reaction"
+	EnableDiffMarkdownFormat                       = "enable-diff-markdown-format"
 	EnablePolicyChecksFlag                         = "enable-policy-checks"
 	EnableRegExpCmdFlag                            = "enable-regexp-cmd"
-	EnableDiffMarkdownFormat                       = "enable-diff-markdown-format"
 	ExecutableName                                 = "executable-name"
 	FailOnPreWorkflowHookError                     = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments                      = "hide-unchanged-plan-comments"
@@ -90,9 +90,15 @@ const (
 	GHAppKeyFlag                                   = "gh-app-key"
 	GHAppKeyFileFlag                               = "gh-app-key-file"
 	GHAppSlugFlag                                  = "gh-app-slug"
+	GHAppInstallationIDFlag                        = "gh-app-installation-id"
 	GHOrganizationFlag                             = "gh-org"
 	GHWebhookSecretFlag                            = "gh-webhook-secret"               // nolint: gosec
 	GHAllowMergeableBypassApply                    = "gh-allow-mergeable-bypass-apply" // nolint: gosec
+	GiteaBaseURLFlag                               = "gitea-base-url"
+	GiteaTokenFlag                                 = "gitea-token"
+	GiteaUserFlag                                  = "gitea-user"
+	GiteaWebhookSecretFlag                         = "gitea-webhook-secret" // nolint: gosec
+	GiteaPageSizeFlag                              = "gitea-page-size"
 	GitlabHostnameFlag                             = "gitlab-hostname"
 	GitlabTokenFlag                                = "gitlab-token"
 	GitlabUserFlag                                 = "gitlab-user"
@@ -104,6 +110,7 @@ const (
 	LockingDBType                                  = "locking-db-type"
 	LogLevelFlag                                   = "log-level"
 	MarkdownTemplateOverridesDirFlag               = "markdown-template-overrides-dir"
+	MaxCommentsPerCommand                          = "max-comments-per-command"
 	ParallelPoolSize                               = "parallel-pool-size"
 	StatsNamespace                                 = "stats-namespace"
 	AllowDraftPRs                                  = "allow-draft-prs"
@@ -153,13 +160,16 @@ const (
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
-	DefaultEmojiReaction                = "eyes"
+	DefaultEmojiReaction                = ""
 	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
+	DefaultGiteaBaseURL                 = "https://gitea.com"
+	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
+	DefaultMaxCommentsPerCommand        = 100
 	DefaultParallelPoolSize             = 15
 	DefaultStatsNamespace               = "atlantis"
 	DefaultPort                         = 4141
@@ -269,7 +279,7 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: "",
 	},
 	EmojiReaction: {
-		description:  "Emoji Reaction to use to react to comments",
+		description:  "Emoji Reaction to use to react to comments.",
 		defaultValue: DefaultEmojiReaction,
 	},
 	ExecutableName: {
@@ -318,6 +328,22 @@ var stringFlags = map[string]stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
+	},
+	GiteaBaseURLFlag: {
+		description: "Base URL of Gitea server installation. Must include 'http://' or 'https://'.",
+	},
+	GiteaUserFlag: {
+		description:  "Gitea username of API user.",
+		defaultValue: "",
+	},
+	GiteaTokenFlag: {
+		description: "Gitea token of API user. Can also be specified via the ATLANTIS_GITEA_TOKEN environment variable.",
+	},
+	GiteaWebhookSecretFlag: {
+		description: "Optional secret used to validate Gitea webhooks." +
+			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from Gitea. " +
+			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
+			"Should be specified via the ATLANTIS_GITEA_WEBHOOK_SECRET environment variable.",
 	},
 	GitlabHostnameFlag: {
 		description:  "Hostname of your GitLab Enterprise installation. If using gitlab.com, no need to set.",
@@ -437,6 +463,7 @@ var boolFlags = map[string]boolFlag{
 		description:  "Disable atlantis auto planning feature",
 		defaultValue: false,
 	},
+
 	DisableRepoLockingFlag: {
 		description: "Disable atlantis locking repos",
 	},
@@ -573,6 +600,14 @@ var intFlags = map[string]intFlag{
 			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
 		defaultValue: DefaultCheckoutDepth,
 	},
+	MaxCommentsPerCommand: {
+		description:  "If non-zero, the maximum number of comments to split command output into before truncating.",
+		defaultValue: DefaultMaxCommentsPerCommand,
+	},
+	GiteaPageSizeFlag: {
+		description:  "Optional value that specifies the number of results per page to expect from Gitea.",
+		defaultValue: DefaultGiteaPageSize,
+	},
 	ParallelPoolSize: {
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
 		defaultValue: DefaultParallelPoolSize,
@@ -594,6 +629,13 @@ var intFlags = map[string]intFlag{
 var int64Flags = map[string]int64Flag{
 	GHAppIDFlag: {
 		description:  "GitHub App Id. If defined, initializes the GitHub client with app-based credentials",
+		defaultValue: 0,
+	},
+	GHAppInstallationIDFlag: {
+		description: "GitHub App Installation Id. If defined, initializes the GitHub client with app-based credentials " +
+			"using this specific GitHub Application Installation ID, otherwise it attempts to auto-detect it. " +
+			"Note that this value must be set if you want to have one App and multiple installations of that same " +
+			"application.",
 		defaultValue: 0,
 	},
 }
@@ -752,7 +794,7 @@ func (s *ServerCmd) run() error {
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
 	}
-	s.setDefaults(&userConfig)
+	s.setDefaults(&userConfig, s.Viper)
 
 	// Now that we've parsed the config we can set our local logger to the
 	// right level.
@@ -793,7 +835,7 @@ func (s *ServerCmd) run() error {
 	return server.Start()
 }
 
-func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.AzureDevOpsHostname == "" {
 		c.AzureDevOpsHostname = DefaultADHostname
 	}
@@ -818,6 +860,12 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.GitlabHostname == "" {
 		c.GitlabHostname = DefaultGitlabHostname
 	}
+	if c.GiteaBaseURL == "" {
+		c.GiteaBaseURL = DefaultGiteaBaseURL
+	}
+	if c.GiteaPageSize == 0 {
+		c.GiteaPageSize = DefaultGiteaPageSize
+	}
 	if c.BitbucketBaseURL == "" {
 		c.BitbucketBaseURL = DefaultBitbucketBaseURL
 	}
@@ -835,6 +883,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	}
 	if c.MarkdownTemplateOverridesDir == "" {
 		c.MarkdownTemplateOverridesDir = DefaultMarkdownTemplateOverridesDir
+	}
+	if !v.IsSet("max-comments-per-command") {
+		c.MaxCommentsPerCommand = DefaultMaxCommentsPerCommand
 	}
 	if c.ParallelPoolSize == 0 {
 		c.ParallelPoolSize = DefaultParallelPoolSize
@@ -890,12 +941,17 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// The following combinations are valid.
 	// 1. github user and token set
 	// 2. github app ID and (key file set or key set)
-	// 3. gitlab user and token set
-	// 4. bitbucket user and token set
-	// 5. azuredevops user and token set
-	// 6. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) || ((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) || ((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) || ((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+	// 3. gitea user and token set
+	// 4. gitlab user and token set
+	// 5. bitbucket user and token set
+	// 6. azuredevops user and token set
+	// 7. any combination of the above
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GiteaUserFlag, GiteaTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) ||
+		((userConfig.GiteaUser == "") != (userConfig.GiteaToken == "")) ||
+		((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) ||
+		((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) ||
+		((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
 		return vcsErr
 	}
 	if (userConfig.GithubAppID != 0) && ((userConfig.GithubAppKey == "") && (userConfig.GithubAppKeyFile == "")) {
@@ -906,7 +962,7 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
-	if userConfig.GithubAppID == 0 && userConfig.GithubUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" {
+	if userConfig.GithubAppID == 0 && userConfig.GithubUser == "" && userConfig.GiteaUser == "" && userConfig.GitlabUser == "" && userConfig.BitbucketUser == "" && userConfig.AzureDevopsUser == "" {
 		return vcsErr
 	}
 
@@ -929,6 +985,14 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("--%s must have http:// or https://, got %q", BitbucketBaseURLFlag, userConfig.BitbucketBaseURL)
 	}
 
+	parsed, err = url.Parse(userConfig.GiteaBaseURL)
+	if err != nil {
+		return fmt.Errorf("error parsing --%s flag value %q: %s", GiteaWebhookSecretFlag, userConfig.GiteaBaseURL, err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("--%s must have http:// or https://, got %q", GiteaBaseURLFlag, userConfig.GiteaBaseURL)
+	}
+
 	if userConfig.RepoConfig != "" && userConfig.RepoConfigJSON != "" {
 		return fmt.Errorf("cannot use --%s and --%s at the same time", RepoConfigFlag, RepoConfigJSONFlag)
 	}
@@ -941,6 +1005,8 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		GitlabWebhookSecretFlag:    userConfig.GitlabWebhookSecret,
 		BitbucketTokenFlag:         userConfig.BitbucketToken,
 		BitbucketWebhookSecretFlag: userConfig.BitbucketWebhookSecret,
+		GiteaTokenFlag:             userConfig.GiteaToken,
+		GiteaWebhookSecretFlag:     userConfig.GiteaWebhookSecret,
 	} {
 		if strings.Contains(token, "\n") {
 			s.Logger.Warn("--%s contains a newline which is usually unintentional", name)
@@ -1034,6 +1100,7 @@ func (s *ServerCmd) setVarFileAllowlist(userConfig *server.UserConfig) {
 // trimAtSymbolFromUsers trims @ from the front of the github and gitlab usernames
 func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 	userConfig.GithubUser = strings.TrimPrefix(userConfig.GithubUser, "@")
+	userConfig.GiteaUser = strings.TrimPrefix(userConfig.GiteaUser, "@")
 	userConfig.GitlabUser = strings.TrimPrefix(userConfig.GitlabUser, "@")
 	userConfig.BitbucketUser = strings.TrimPrefix(userConfig.BitbucketUser, "@")
 	userConfig.AzureDevopsUser = strings.TrimPrefix(userConfig.AzureDevopsUser, "@")
@@ -1042,6 +1109,9 @@ func (s *ServerCmd) trimAtSymbolFromUsers(userConfig *server.UserConfig) {
 func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.GithubUser != "" && userConfig.GithubWebhookSecret == "" && !s.SilenceOutput {
 		s.Logger.Warn("no GitHub webhook secret set. This could allow attackers to spoof requests from GitHub")
+	}
+	if userConfig.GiteaUser != "" && userConfig.GiteaWebhookSecret == "" && !s.SilenceOutput {
+		s.Logger.Warn("no Gitea webhook secret set. This could allow attackers to spoof requests from Gitea")
 	}
 	if userConfig.GitlabUser != "" && userConfig.GitlabWebhookSecret == "" && !s.SilenceOutput {
 		s.Logger.Warn("no GitLab webhook secret set. This could allow attackers to spoof requests from GitLab")

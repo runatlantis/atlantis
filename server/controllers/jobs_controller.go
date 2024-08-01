@@ -6,7 +6,7 @@ import (
 	"net/url"
 
 	"github.com/gorilla/mux"
-	"github.com/runatlantis/atlantis/server/controllers/templates"
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -29,8 +29,8 @@ type JobsController struct {
 	AtlantisVersion          string
 	AtlantisURL              *url.URL
 	Logger                   logging.SimpleLogging
-	ProjectJobsTemplate      templates.TemplateWriter
-	ProjectJobsErrorTemplate templates.TemplateWriter
+	ProjectJobsTemplate      web_templates.TemplateWriter
+	ProjectJobsErrorTemplate web_templates.TemplateWriter
 	Backend                  locking.Backend
 	WsMux                    *websocket.Multiplexor
 	KeyGenerator             JobIDKeyGenerator
@@ -45,7 +45,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 		return err
 	}
 
-	viewData := templates.ProjectJobData{
+	viewData := web_templates.ProjectJobData{
 		AtlantisVersion: j.AtlantisVersion,
 		ProjectPath:     jobID,
 		CleanedBasePath: j.AtlantisURL.Path,

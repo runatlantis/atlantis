@@ -1,16 +1,19 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:fe40cf4e92cd0c467be2cfc30657a680ae2398318afd50b0c80585784c604f28
 # what distro is the image being built for
-ARG ALPINE_TAG=3.19.1
-ARG DEBIAN_TAG=12.5-slim
+ARG ALPINE_TAG=3.20.2@sha256:0a4eaa0eecf5f8c050e5bba433f58c052be7587ee8af3e8b3910ef9ab5fbe9f5
+ARG DEBIAN_TAG=12.6-slim@sha256:5f7d5664eae4a192c2d2d6cb67fc3f3c7891a8722cd2903cc35aa649a12b0c8d
+ARG GOLANG_TAG=1.22.5-alpine@sha256:0d3653dd6f35159ec6e3d10263a42372f6f194c3dea0b35235d72aabde86486e
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.7.2
+ARG DEFAULT_TERRAFORM_VERSION=1.9.2
+# renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
+ARG DEFAULT_OPENTOFU_VERSION=1.7.3
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.49.1
+ARG DEFAULT_CONFTEST_VERSION=0.54.0
 
 # Stage 1: build artifact and download deps
 
-FROM golang:1.22.1-alpine AS builder
+FROM golang:${GOLANG_TAG} AS builder
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -68,7 +71,6 @@ ARG TARGETPLATFORM
 WORKDIR /tmp/build
 
 # install conftest
-# renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION
 ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -106,31 +108,26 @@ RUN case ${TARGETPLATFORM} in \
     git-lfs --version
 
 # install terraform binaries
-# renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION
 ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
+ARG DEFAULT_OPENTOFU_VERSION
+ENV DEFAULT_OPENTOFU_VERSION=${DEFAULT_OPENTOFU_VERSION}
+
+# COPY scripts/download-release.sh .
+COPY --from=builder /app/scripts/download-release.sh download-release.sh
 
 # In the official Atlantis image, we only have the latest of each Terraform version.
 # Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
-RUN AVAILABLE_TERRAFORM_VERSIONS="1.4.7 1.5.7 1.6.6 ${DEFAULT_TERRAFORM_VERSION}" && \
-    case "${TARGETPLATFORM}" in \
-        "linux/amd64") TERRAFORM_ARCH=amd64 ;; \
-        "linux/arm64") TERRAFORM_ARCH=arm64 ;; \
-        "linux/arm/v7") TERRAFORM_ARCH=arm ;; \
-        *) echo "ERROR: 'TARGETPLATFORM' value expected: ${TARGETPLATFORM}"; exit 1 ;; \
-    esac && \
-    for VERSION in ${AVAILABLE_TERRAFORM_VERSIONS}; do \
-        curl -LOs "https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip" && \
-        curl -LOs "https://releases.hashicorp.com/terraform/${VERSION}/terraform_${VERSION}_SHA256SUMS" && \
-        sed -n "/terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip/p" "terraform_${VERSION}_SHA256SUMS" | sha256sum -c && \
-        mkdir -p "/usr/local/bin/tf/versions/${VERSION}" && \
-        unzip "terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip" -d "/usr/local/bin/tf/versions/${VERSION}" && \
-        ln -s "/usr/local/bin/tf/versions/${VERSION}/terraform" "/usr/local/bin/terraform${VERSION}" && \
-        rm "terraform_${VERSION}_linux_${TERRAFORM_ARCH}.zip" && \
-        rm "terraform_${VERSION}_SHA256SUMS"; \
-    done && \
-    ln -s "/usr/local/bin/tf/versions/${DEFAULT_TERRAFORM_VERSION}/terraform" /usr/local/bin/terraform
-
+RUN ./download-release.sh \
+        "terraform" \
+        "${TARGETPLATFORM}" \
+        "${DEFAULT_TERRAFORM_VERSION}" \
+        "1.6.6 1.7.5 1.8.5 ${DEFAULT_TERRAFORM_VERSION}" \
+    && ./download-release.sh \
+        "tofu" \
+        "${TARGETPLATFORM}" \
+        "${DEFAULT_OPENTOFU_VERSION}" \
+        "${DEFAULT_OPENTOFU_VERSION}"
 
 # Stage 2 - Alpine
 # Creating the individual distro builds using targets
@@ -150,16 +147,20 @@ RUN addgroup atlantis && \
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
+COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+# renovate: datasource=repology depName=alpine_3_20/ca-certificates versioning=loose
+ENV CA_CERTIFICATES_VERSION="20240705-r0"
+
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
-        ca-certificates~=20230506 \
+        ca-certificates~=${CA_CERTIFICATES_VERSION} \
         curl~=8 \
         git~=2 \
         unzip~=6 \
@@ -167,7 +168,6 @@ RUN apk add --no-cache \
         openssh~=9 \
         dumb-init~=1 \
         gcompat~=1
-
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
@@ -190,7 +190,8 @@ RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform* /usr/local/bin/
+COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs

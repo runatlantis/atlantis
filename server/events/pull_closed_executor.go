@@ -51,7 +51,6 @@ type PullClosedExecutor struct {
 	Locker                   locking.Locker
 	VCSClient                vcs.Client
 	WorkingDir               WorkingDir
-	Logger                   logging.SimpleLogging
 	Backend                  locking.Backend
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
@@ -82,7 +81,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	pullStatus, err := p.Backend.GetPullStatus(pull)
 	if err != nil {
 		// Log and continue to clean up other resources.
-		p.Logger.Err("retrieving pull status: %s", err)
+		logger.Err("retrieving pull status: %s", err)
 	}
 
 	if pullStatus != nil {
@@ -97,7 +96,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		}
 	}
 
-	if err := p.WorkingDir.Delete(repo, pull); err != nil {
+	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
 		return errors.Wrap(err, "cleaning workspace")
 	}
 
@@ -111,7 +110,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 
 	// Delete pull from DB.
 	if err := p.Backend.DeletePullStatus(pull); err != nil {
-		p.Logger.Err("deleting pull from db: %s", err)
+		logger.Err("deleting pull from db: %s", err)
 	}
 
 	// If there are no locks then there's no need to comment.

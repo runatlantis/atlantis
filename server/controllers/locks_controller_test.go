@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/controllers"
-	"github.com/runatlantis/atlantis/server/controllers/templates"
-	tMocks "github.com/runatlantis/atlantis/server/controllers/templates/mocks"
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
+	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 
@@ -159,7 +159,7 @@ func TestGetLock_None(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.GetLock(w, req)
-	ResponseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
+	ResponseContains(t, w, http.StatusNotFound, "No lock found at id 'id'")
 }
 
 func TestGetLock_Success(t *testing.T) {
@@ -185,7 +185,7 @@ func TestGetLock_Success(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.GetLock(w, req)
-	tmpl.VerifyWasCalledOnce().Execute(w, templates.LockDetailData{
+	tmpl.VerifyWasCalledOnce().Execute(w, web_templates.LockDetailData{
 		LockKeyEncoded:  "id",
 		LockKey:         "id",
 		RepoOwner:       "owner",
@@ -215,14 +215,14 @@ func TestDeleteLock_InvalidLockID(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "%A@"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusBadRequest, "Invalid lock id \"%A@\"")
+	ResponseContains(t, w, http.StatusBadRequest, "Invalid lock id '%A@'")
 }
 
 func TestDeleteLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(nil, errors.New("err"))
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(nil, errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -238,7 +238,7 @@ func TestDeleteLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 404")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(nil, nil)
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(nil, nil)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -247,7 +247,7 @@ func TestDeleteLock_None(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusNotFound, "No lock found at id \"id\"")
+	ResponseContains(t, w, http.StatusNotFound, "No lock found at id 'id'")
 }
 
 func TestDeleteLock_OldFormat(t *testing.T) {
@@ -255,7 +255,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	RegisterMockTestingT(t)
 	cp := vcsmocks.NewMockClient()
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{}, nil)
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{}, nil)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -265,7 +265,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
 	cp.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
@@ -284,7 +284,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: repoName},
 	}
-	When(l.DeleteLock("id")).ThenReturn(&models.ProjectLock{
+	When(l.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{
 		Pull:      pull,
 		Workspace: workspaceName,
 		Project: models.Project{
@@ -321,7 +321,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
 	status, err := backend.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, status.Projects != nil, "status projects was nil")
@@ -338,7 +338,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	t.Log("If the commenting fails we still return success")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{FullName: "owner/repo"},
 		},
@@ -363,7 +363,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
 }
 
 func TestDeleteLock_CommentSuccess(t *testing.T) {
@@ -380,7 +380,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
-	When(dlc.DeleteLock("id")).ThenReturn(&models.ProjectLock{
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{
 		Pull:      pull,
 		Workspace: "workspace",
 		Project: models.Project{
@@ -400,7 +400,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
-	ResponseContains(t, w, http.StatusOK, "Deleted lock id \"id\"")
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
 	cp.VerifyWasCalled(Once()).CreateComment(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num),
 		Eq("**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again."), Eq(""))
