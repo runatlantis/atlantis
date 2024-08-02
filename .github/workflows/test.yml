@@ -35,6 +35,7 @@ jobs:
               - '**.go'
               - '**.txt' # golden file test output
               - 'go.*'
+              - '**.tmpl'
               - '.github/workflows/test.yml'
   test:
     needs: [changes]
