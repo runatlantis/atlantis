@@ -44,6 +44,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 
 	cases := []struct {
 		Command        string
+		ProjectName    string
 		Shell          string
 		ShellArgs      string
 		ExpOut         string
@@ -52,6 +53,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 	}{
 		{
 			Command:        "",
+			ProjectName:    "",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         "",
@@ -60,6 +62,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo hi",
+			ProjectName:    "",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         "hi\r\n",
@@ -68,6 +71,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        `printf \'your main.tf file does not provide default region.\\ncheck\'`,
+			ProjectName:    "",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         `'your`,
@@ -76,6 +80,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        `printf 'your main.tf file does not provide default region.\ncheck'`,
+			ProjectName:    "",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         "your main.tf file does not provide default region.\r\ncheck",
@@ -84,6 +89,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo 'a",
+			ProjectName:    "",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         defaultUnterminatedStringError,
@@ -92,6 +98,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo hi >> file && cat file",
+			ProjectName:    "",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         "hi\r\n",
@@ -100,6 +107,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "lkjlkj",
+			ProjectName:    "",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         fmt.Sprintf(defautShellCommandNotFoundErrorFormat, "lkjlkj"),
@@ -107,15 +115,17 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 			ExpDescription: "",
 		},
 		{
-			Command:        "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME head_commit=$HEAD_COMMIT base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_url=$PULL_URL pull_author=$PULL_AUTHOR",
+			Command:        "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME head_commit=$HEAD_COMMIT base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_url=$PULL_URL pull_author=$PULL_AUTHOR project=$PROJECT_NAME",
+			ProjectName:    "my/project/name",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
-			ExpOut:         "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=main pull_num=2 pull_url=https://github.com/runatlantis/atlantis/pull/2 pull_author=acme\r\n",
+			ExpOut:         "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=main pull_num=2 pull_url=https://github.com/runatlantis/atlantis/pull/2 pull_author=acme project=my/project/name\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
 		{
 			Command:        "echo user_name=$USER_NAME",
+			ProjectName:    "",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         "user_name=acme-user\r\n",
@@ -124,6 +134,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo something > $OUTPUT_STATUS_FILE",
+			ProjectName:    "",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         "",
@@ -132,6 +143,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo shell test 1",
+			ProjectName:    "",
 			Shell:          "bash",
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         "shell test 1\r\n",
@@ -140,6 +152,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo shell test 2",
+			ProjectName:    "",
 			Shell:          defaultShell,
 			ShellArgs:      "-cx",
 			ExpOut:         "+ echo shell test 2\r\nshell test 2\r\n",
@@ -148,6 +161,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		},
 		{
 			Command:        "echo shell test 3",
+			ProjectName:    "",
 			Shell:          "bash",
 			ShellArgs:      "-cv",
 			ExpOut:         "echo shell test 3\r\nshell test 3\r\n",
@@ -196,6 +210,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 				},
 				Log:         logger,
 				CommandName: "plan",
+				ProjectName: c.ProjectName,
 			}
 			_, desc, err := r.Run(ctx, c.Command, c.Shell, c.ShellArgs, tmpDir)
 			if c.ExpErr != "" {
