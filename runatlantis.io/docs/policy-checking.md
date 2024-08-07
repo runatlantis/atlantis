@@ -71,7 +71,7 @@ policies:
 - `source` - Tells atlantis where to fetch the policies from. Currently you can only host policies locally by using `local`.
 - `owners` - Defines the users/teams which are able to approve a specific policy set.
 - `approve_count` - Defines the number of approvals needed to bypass policy checks. Defaults to the top-level policies configuration, if not specified.
-- `self_approve` - Defines whether the PR author can approve policies (the author must be in owners)
+- `prevent_self_approve` - Defines whether the PR author can approve policies
 
 By default conftest is configured to only run the `main` package. If you wish to run specific/multiple policies consider passing `--namespace` or `--all-namespaces` to conftest with [`extra_args`](custom-workflows.md#adding-extra-arguments-to-terraform-commands) via a custom workflow as shown in the below example.
 

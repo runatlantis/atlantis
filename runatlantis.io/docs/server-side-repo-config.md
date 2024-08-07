@@ -607,12 +607,12 @@ mode: on_apply
 
 ### PolicySet
 
-| Key          | Type   | Default | Required | Description                                                                                                   |
-| ------       | ------ | ------- | -------- | --------------------------------------------------------------------------------------------------------------|
-| name         | string | none    | yes      | unique name for the policy set                                                                                |
-| path         | string | none    | yes      | path to the rego policies directory                                                                           |
-| source       | string | none    | yes      | only `local` is supported at this time                                                                        |
-| self_approve | bool   | false   | no       | Whether or not the author of PR can approve policies. Defaults to `false` (the author must also be in owners) |
+| Key                  | Type   | Default | Required | Description                                                                                                   |
+| ------               | ------ | ------- | -------- | --------------------------------------------------------------------------------------------------------------|
+| name                 | string | none    | yes      | unique name for the policy set                                                                                |
+| path                 | string | none    | yes      | path to the rego policies directory                                                                           |
+| source               | string | none    | yes      | only `local` is supported at this time                                                                        |
+| prevent_self_approve | bool   | false   | no       | Whether or not the author of PR can approve policies. Defaults to `false` (the author must also be in owners) |
 
 ### Metrics
 
