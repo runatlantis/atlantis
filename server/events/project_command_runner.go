@@ -377,7 +377,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					ignorePolicy = true
 				}
 				// Increment approval if user is owner.
-				if isOwner && !ignorePolicy && (ctx.User.Username != ctx.Pull.Author || policySet.SelfApprove) {
+				if isOwner && !ignorePolicy && (ctx.User.Username != ctx.Pull.Author || !policySet.PreventSelfApprove) {
 					if !ctx.ClearPolicyApproval {
 						prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
 					} else {

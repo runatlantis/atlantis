@@ -791,12 +791,10 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 					{
 						Name:         "policy1",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 					{
 						Name:         "policy2",
 						ApproveCount: 2,
-						SelfApprove:  true,
 					},
 				},
 			},
@@ -825,12 +823,10 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 					{
 						Name:         "policy2",
 						ApproveCount: 2,
-						SelfApprove:  true,
 					},
 				},
 			},
@@ -859,12 +855,10 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 					{
 						Name:         "policy1",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 					{
 						Name:         "policy2",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 				},
 			},
@@ -894,12 +888,10 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 					{
 						Name:         "policy2",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 				},
 			},
@@ -928,7 +920,6 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 2,
-						SelfApprove:  true,
 					},
 				},
 			},
@@ -959,7 +950,6 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 2,
-						SelfApprove:  true,
 					},
 				},
 			},
@@ -993,7 +983,6 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 					{
 						Owners: valid.PolicyOwners{
@@ -1001,7 +990,6 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy2",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 				},
 			},
@@ -1044,7 +1032,6 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 					{
 						Owners: valid.PolicyOwners{
@@ -1052,7 +1039,6 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy2",
 						ApproveCount: 2,
-						SelfApprove:  true,
 					},
 				},
 			},
@@ -1095,7 +1081,6 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 					{
 						Owners: valid.PolicyOwners{
@@ -1103,7 +1088,6 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy2",
 						ApproveCount: 2,
-						SelfApprove:  true,
 					},
 				},
 			},
@@ -1147,7 +1131,6 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 					{
 						Owners: valid.PolicyOwners{
@@ -1155,7 +1138,6 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy2",
 						ApproveCount: 2,
-						SelfApprove:  true,
 					},
 				},
 			},
@@ -1198,14 +1180,14 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 						},
 						Name:         "policy1",
 						ApproveCount: 1,
-						SelfApprove:  true,
 					},
 					{
 						Owners: valid.PolicyOwners{
 							Users: []string{"lkysow"},
 						},
-						Name:         "policy2",
-						ApproveCount: 1,
+						Name:               "policy2",
+						ApproveCount:       1,
+						PreventSelfApprove: true,
 					},
 				},
 			},
