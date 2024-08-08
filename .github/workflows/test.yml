@@ -35,13 +35,14 @@ jobs:
               - '**.go'
               - '**.txt' # golden file test output
               - 'go.*'
+              - '**.tmpl'
               - '.github/workflows/test.yml'
   test:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:c93e38fc03245bfcb1f750769b85d08f04b0946c078e8610abf3a64e181c1d50
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:c2753685ecfb321a00ac3e0deb64bb7944cdffa06870f8533d839b4efc08e1d5
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
