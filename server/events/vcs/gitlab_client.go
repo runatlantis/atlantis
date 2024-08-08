@@ -431,11 +431,9 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 				logger.Debug("mr.HeadPipeline.SHA: '%s' does not match pull.HeadCommit '%s'", mr.HeadPipeline.SHA, pull.HeadCommit)
 				return nil
 			}
-			refTarget = mr.HeadPipeline.Ref
 
 			// set pipeline ID for the req once found
 			pipelineID = gitlab.Ptr(mr.HeadPipeline.ID)
-
 			break
 		}
 		if i != retries {

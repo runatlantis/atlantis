@@ -23,10 +23,9 @@ import (
 
 var projectID = 4580910
 
-
 const (
-  gitlabPipelineSuccessSha  = "67cb91d3f6198189f433c045154a885784ba6977"
-  gitlabPipelineSuccessMrID = 488598
+	gitlabPipelineSuccessSha  = "67cb91d3f6198189f433c045154a885784ba6977"
+	gitlabPipelineSuccessMrID = 488598
 )
 
 // Test that the base url gets set properly.
