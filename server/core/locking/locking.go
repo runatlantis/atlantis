@@ -26,8 +26,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_backend.go Backend
-
 // Backend is an implementation of the locking API we require.
 type Backend interface {
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
@@ -59,8 +57,6 @@ type TryLockResponse struct {
 type Client struct {
 	backend Backend
 }
-
-//go:generate pegomock generate --package mocks -o mocks/mock_locker.go Locker
 
 type Locker interface {
 	TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error)
