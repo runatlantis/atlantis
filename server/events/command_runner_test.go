@@ -303,7 +303,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 	t.Run("nil checker", func(t *testing.T) {
 		vcsClient := setup(t)
 		// by default these are false so don't need to reset
-		ch.TeamAllowlistChecker = nil
+		ch.GitHubTeamAllowlistChecker = nil
 		var pull github.PullRequest
 		modelPull := models.PullRequest{
 			BaseRepo: testdata.GithubRepo,
@@ -313,7 +313,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(testdata.GithubRepo, testdata.User)
+		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.User](), Any[[]string]())
 		vcsClient.VerifyWasCalledOnce().CreateComment(
 			Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Ran Plan for 0 projects:"), Eq("plan"))
 	})
@@ -321,7 +321,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 	t.Run("no rules", func(t *testing.T) {
 		vcsClient := setup(t)
 		// by default these are false so don't need to reset
-		ch.TeamAllowlistChecker = &events.TeamAllowlistChecker{}
+		ch.GitHubTeamAllowlistChecker = &events.TeamAllowlistChecker{}
 		var pull github.PullRequest
 		modelPull := models.PullRequest{
 			BaseRepo: testdata.GithubRepo,
@@ -331,7 +331,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(testdata.GithubRepo, testdata.User)
+		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.User](), Any[[]string]())
 		vcsClient.VerifyWasCalledOnce().CreateComment(
 			Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Ran Plan for 0 projects:"), Eq("plan"))
 	})

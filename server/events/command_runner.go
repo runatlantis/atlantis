@@ -128,7 +128,8 @@ type DefaultCommandRunner struct {
 	PreWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner
 	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
 	PullStatusFetcher              PullStatusFetcher
-	TeamAllowlistChecker           *TeamAllowlistChecker
+	GitHubTeamAllowlistChecker     *TeamAllowlistChecker
+	GitLabGroupAllowlistChecker    *TeamAllowlistChecker
 	VarFileAllowlistChecker        *VarFileAllowlistChecker
 	CommitStatusUpdater            CommitStatusUpdater
 }
@@ -240,15 +241,27 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 
 // checkUserPermissions checks if the user has permissions to execute the command
 func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmdName string) (bool, error) {
-	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
+	var teamAllowListChecker *TeamAllowlistChecker
+
+	switch repo.VCSHost.Type {
+	case models.Github:
+		teamAllowListChecker = c.GitHubTeamAllowlistChecker
+	case models.Gitlab:
+		teamAllowListChecker = c.GitLabGroupAllowlistChecker
+	default:
+		// allowlist restriction is not supported
+		return true, nil
+	}
+
+	if teamAllowListChecker == nil || !teamAllowListChecker.HasRules() {
 		// allowlist restriction is not enabled
 		return true, nil
 	}
-	teams, err := c.VCSClient.GetTeamNamesForUser(repo, user)
+	teams, err := c.VCSClient.GetTeamNamesForUser(c.Logger, repo, user, teamAllowListChecker.AllTeamsForCommand(cmdName))
 	if err != nil {
 		return false, err
 	}
-	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmdName)
+	ok := teamAllowListChecker.IsCommandAllowedForAnyTeam(teams, cmdName)
 	if !ok {
 		return false, nil
 	}
