@@ -569,22 +569,6 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	Ok(t, err)
 	prJSON := string(jsBytes)
 
-	// Status Check Response
-	jsBytes, err = os.ReadFile("testdata/github-commit-status-full.json")
-	Ok(t, err)
-	commitJSON := string(jsBytes)
-
-	//reviewDecision Response
-	reviewDecision := `{
-		"data": {
-			"repository": {
-				"pullRequest": {
-					"reviewDecision": "REVIEW_REQUIRED"
-				}
-			}
-		}
-	}`
-
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
 			response := strings.Replace(prJSON,
@@ -599,13 +583,6 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 					case "/api/v3/repos/owner/repo/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
 						return
-					case "/api/v3/repos/owner/repo/pulls/1/reviews?per_page=300":
-						w.Write([]byte("[]")) // nolint: errcheck
-						return
-					case "/api/v3/repos/owner/repo/commits/new-topic/status":
-						w.Write([]byte(commitJSON)) // nolint: errcheck
-					case "/api/graphql":
-						w.Write([]byte(reviewDecision)) // nolint: errcheck
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
@@ -643,62 +620,176 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 	logger := logging.NewNoopLogger(t)
 	vcsStatusName := "atlantis"
 	cases := []struct {
-		state          string
-		reviewDecision string
-		expMergeable   bool
+		state                     string
+		statusCheckRollupFilePath string
+		reviewDecision            string
+		expMergeable              bool
 	}{
 		{
 			"dirty",
+			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			false,
 		},
 		{
 			"unknown",
+			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			false,
 		},
 		{
 			"blocked",
+			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			false,
 		},
 		{
 			"blocked",
+			"ruleset-atlantis-apply-pending.json",
 			`"APPROVED"`,
 			true,
 		},
 		{
 			"blocked",
+			"ruleset-atlantis-apply-pending.json",
 			"null",
 			true,
 		},
 		{
 			"behind",
+			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			false,
 		},
 		{
 			"random",
+			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			false,
 		},
 		{
 			"unstable",
+			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
 			true,
 		},
 		{
 			"has_hooks",
+			"ruleset-atlantis-apply-pending.json",
 			`"APPROVED"`,
 			true,
 		},
 		{
 			"clean",
+			"ruleset-atlantis-apply-pending.json",
 			`"APPROVED"`,
 			true,
 		},
 		{
 			"",
+			"ruleset-atlantis-apply-pending.json",
+			`"APPROVED"`,
+			false,
+		},
+		{
+			"blocked",
+			"ruleset-optional-check-failed.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-optional-status-failed.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-check-pending.json",
+			`"APPROVED"`,
+			false,
+		},
+		{
+			"blocked",
+			"ruleset-check-skipped.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-check-neutral.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-evaluate-workflow-failed.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"branch-protection-expected.json",
+			`"APPROVED"`,
+			false,
+		},
+		{
+			"blocked",
+			"branch-protection-failed.json",
+			`"APPROVED"`,
+			false,
+		},
+		{
+			"blocked",
+			"branch-protection-passed.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-check-expected.json",
+			`"APPROVED"`,
+			false,
+		},
+		{
+			"blocked",
+			"ruleset-check-failed.json",
+			`"APPROVED"`,
+			false,
+		},
+		{
+			"blocked",
+			"ruleset-check-passed.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-expected.json",
+			`"APPROVED"`,
+			false,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-failed.json",
+			`"APPROVED"`,
+			false,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-passed.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-passed-sha-match.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-passed-sha-mismatch.json",
 			`"APPROVED"`,
 			false,
 		},
@@ -709,20 +800,9 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 	Ok(t, err)
 	prJSON := string(jsBytes)
 
-	// Status Check Response
-	jsBytes, err = os.ReadFile("testdata/github-commit-status-full.json")
+	jsBytes, err = os.ReadFile("testdata/github-pull-request-mergeability/repository-id.json")
 	Ok(t, err)
-	commitJSON := string(jsBytes)
-
-	// Branch protection Response
-	jsBytes, err = os.ReadFile("testdata/github-branch-protection-required-checks.json")
-	Ok(t, err)
-	branchProtectionJSON := string(jsBytes)
-
-	// List check suites Response
-	jsBytes, err = os.ReadFile("testdata/github-commit-check-suites.json")
-	Ok(t, err)
-	checkSuites := string(jsBytes)
+	repoIdJSON := string(jsBytes)
 
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
@@ -732,16 +812,17 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 				1,
 			)
 
-			// reviewDecision Response
-			reviewDecision := fmt.Sprintf(`{
-				"data": {
-					"repository": {
-						"pullRequest": {
-							"reviewDecision": %s
-						}
-					}
-				}
-			}`, c.reviewDecision)
+			// PR review decision and checks statuses Response
+			jsBytes, err = os.ReadFile("testdata/github-pull-request-mergeability/" + c.statusCheckRollupFilePath)
+			Ok(t, err)
+			prMergeableStatusJSON := string(jsBytes)
+
+			// PR review decision and checks statuses Response
+			prMergeableStatus := strings.Replace(prMergeableStatusJSON,
+				`"reviewDecision": null,`,
+				fmt.Sprintf(`"reviewDecision": %s,`, c.reviewDecision),
+				1,
+			)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -749,17 +830,23 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 					case "/api/v3/repos/octocat/repo/pulls/1":
 						w.Write([]byte(response)) // nolint: errcheck
 						return
-					case "/api/v3/repos/octocat/repo/pulls/1/reviews?per_page=300":
-						w.Write([]byte("[]")) // nolint: errcheck
-						return
-					case "/api/v3/repos/octocat/repo/commits/new-topic/status":
-						w.Write([]byte(commitJSON)) // nolint: errcheck
 					case "/api/graphql":
-						w.Write([]byte(reviewDecision)) // nolint: errcheck
-					case "/api/v3/repos/octocat/repo/branches/main/protection":
-						w.Write([]byte(branchProtectionJSON)) // nolint: errcheck
-					case "/api/v3/repos/octocat/repo/commits/new-topic/check-suites":
-						w.Write([]byte(checkSuites)) // nolint: errcheck
+						body, err := io.ReadAll(r.Body)
+						if err != nil {
+							t.Errorf("read body error: %v", err)
+							http.Error(w, "", http.StatusInternalServerError)
+							return
+						}
+						if strings.Contains(string(body), "pullRequest(") {
+							w.Write([]byte(prMergeableStatus)) // nolint: errcheck
+							return
+						} else if strings.Contains(string(body), "databaseId") {
+							w.Write([]byte(repoIdJSON)) // nolint: errcheck
+							return
+						}
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
 						http.Error(w, "not found", http.StatusNotFound)
@@ -778,117 +865,6 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 					FullName:          "octocat/repo",
 					Owner:             "octocat",
 					Name:              "repo",
-					CloneURL:          "",
-					SanitizedCloneURL: "",
-					VCSHost: models.VCSHost{
-						Type:     models.Github,
-						Hostname: "github.com",
-					},
-				}, models.PullRequest{
-					Num: 1,
-				}, vcsStatusName)
-			Ok(t, err)
-			Equals(t, c.expMergeable, actMergeable)
-		})
-	}
-}
-
-func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApplyButWithNoBranchProtectionChecks(t *testing.T) {
-	logger := logging.NewNoopLogger(t)
-	vcsStatusName := "atlantis"
-	cases := []struct {
-		state          string
-		reviewDecision string
-		expMergeable   bool
-	}{
-		{
-			"blocked",
-			`"REVIEW_REQUIRED"`,
-			false,
-		},
-	}
-
-	// Use a real GitHub json response and edit the mergeable_state field.
-	jsBytes, err := os.ReadFile("testdata/github-pull-request.json")
-	Ok(t, err)
-	prJSON := string(jsBytes)
-
-	// Status Check Response
-	jsBytes, err = os.ReadFile("testdata/github-commit-status-full.json")
-	Ok(t, err)
-	commitJSON := string(jsBytes)
-
-	// Branch protection Response
-	jsBytes, err = os.ReadFile("testdata/github-branch-protection-no-required-checks.json")
-	Ok(t, err)
-	branchProtectionJSON := string(jsBytes)
-
-	// List check suites Response
-	jsBytes, err = os.ReadFile("testdata/github-commit-check-suites-completed.json")
-	Ok(t, err)
-	checkSuites := string(jsBytes)
-
-	// List check runs in a check suite
-	jsBytes, err = os.ReadFile("testdata/github-commit-check-suites-check-runs-completed.json")
-	Ok(t, err)
-	checkRuns := string(jsBytes)
-
-	for _, c := range cases {
-		t.Run(c.state, func(t *testing.T) {
-			response := strings.Replace(prJSON,
-				`"mergeable_state": "clean"`,
-				fmt.Sprintf(`"mergeable_state": "%s"`, c.state),
-				1,
-			)
-
-			// reviewDecision Response
-			reviewDecision := fmt.Sprintf(`{
-				"data": {
-					"repository": {
-						"pullRequest": {
-							"reviewDecision": %s
-						}
-					}
-				}
-			}`, c.reviewDecision)
-
-			testServer := httptest.NewTLSServer(
-				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					switch r.RequestURI {
-					case "/api/v3/repos/octocat/Hello-World/pulls/1":
-						w.Write([]byte(response)) // nolint: errcheck
-						return
-					case "/api/v3/repos/octocat/Hello-World/pulls/1/reviews?per_page=300":
-						w.Write([]byte("[]")) // nolint: errcheck
-						return
-					case "/api/v3/repos/octocat/Hello-World/commits/new-topic/status":
-						w.Write([]byte(commitJSON)) // nolint: errcheck
-					case "/api/graphql":
-						w.Write([]byte(reviewDecision)) // nolint: errcheck
-					case "/api/v3/repos/octocat/Hello-World/branches/main/protection":
-						w.Write([]byte(branchProtectionJSON)) // nolint: errcheck
-					case "/api/v3/repos/octocat/Hello-World/commits/new-topic/check-suites":
-						w.Write([]byte(checkSuites)) // nolint: errcheck
-					case "/api/v3/repos/octocat/Hello-World/check-suites/1234567890/check-runs":
-						w.Write([]byte(checkRuns)) // nolint: errcheck
-					default:
-						t.Errorf("got unexpected request at %q", r.RequestURI)
-						http.Error(w, "not found", http.StatusNotFound)
-						return
-					}
-				}))
-			testServerURL, err := url.Parse(testServer.URL)
-			Ok(t, err)
-			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass"}, vcs.GithubConfig{AllowMergeableBypassApply: true}, 0, logging.NewNoopLogger(t))
-			Ok(t, err)
-			defer disableSSLVerification()()
-
-			actMergeable, err := client.PullIsMergeable(
-				logger,
-				models.Repo{
-					FullName:          "octocat/Hello-World",
-					Owner:             "octocat",
-					Name:              "Hello-World",
 					CloneURL:          "",
 					SanitizedCloneURL: "",
 					VCSHost: models.VCSHost{
