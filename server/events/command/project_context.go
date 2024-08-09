@@ -126,6 +126,8 @@ type ProjectContext struct {
 	// Allows custom policy check tools outside of Conftest to run in checks
 	CustomPolicyCheck bool
 	SilencePRComments []string
+	// LockAllProjectsBeforeExec controls how to lock projects, if true all projects will be locked before plan/apply
+	LockAllProjectsBeforeExec bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

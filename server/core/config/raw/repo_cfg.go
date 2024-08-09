@@ -13,6 +13,9 @@ const DefaultEmojiReaction = ""
 // DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
 const DefaultAbortOnExcecutionOrderFail = false
 
+// DefaultLockAllProjectsBeforeExec being false is the default setting for locking all projects before plan/apply
+const DefaultLockAllProjectsBeforeExec = false
+
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
 type RepoCfg struct {
 	Version                    *int                `yaml:"version,omitempty"`
@@ -29,6 +32,7 @@ type RepoCfg struct {
 	AbortOnExcecutionOrderFail *bool               `yaml:"abort_on_execution_order_fail,omitempty"`
 	RepoLocks                  *RepoLocks          `yaml:"repo_locks,omitempty"`
 	SilencePRComments          []string            `yaml:"silence_pr_comments,omitempty"`
+	LockAllProjectsBeforeExec  *bool               `yaml:"lock_all_projects_before_exec,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
@@ -83,6 +87,12 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 	if r.RepoLocks != nil {
 		repoLocks = r.RepoLocks.ToValid()
 	}
+
+	lockAllProjectsBeforeExec := DefaultLockAllProjectsBeforeExec
+	if r.LockAllProjectsBeforeExec != nil {
+		lockAllProjectsBeforeExec = *r.LockAllProjectsBeforeExec
+	}
+
 	return valid.RepoCfg{
 		Version:                    *r.Version,
 		Projects:                   validProjects,
@@ -98,5 +108,6 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
 		RepoLocks:                  repoLocks,
 		SilencePRComments:          r.SilencePRComments,
+		LockAllProjectsBeforeExec:  lockAllProjectsBeforeExec,
 	}
 }

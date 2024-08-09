@@ -10,6 +10,7 @@ import (
 )
 
 func TestProjectResult_IsSuccessful(t *testing.T) {
+	trueVal := true
 	cases := map[string]struct {
 		pr  command.ProjectResult
 		exp bool
@@ -29,6 +30,12 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 		"apply success": {
 			command.ProjectResult{
 				ApplySuccess: "success",
+			},
+			true,
+		},
+		"lock success": {
+			command.ProjectResult{
+				LockSuccess: &trueVal,
 			},
 			true,
 		},

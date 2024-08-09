@@ -30,6 +30,7 @@ type RepoCfg struct {
 	AllowedRegexpPrefixes      []string
 	AbortOnExcecutionOrderFail bool
 	SilencePRComments          []string
+	LockAllProjectsBeforeExec  bool
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {

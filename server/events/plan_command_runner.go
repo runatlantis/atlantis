@@ -7,6 +7,11 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
+type ProjectCommandRunnerForPlan interface {
+	ProjectPlanCommandRunner
+	ProjectLockCommandRunner
+}
+
 func NewPlanCommandRunner(
 	silenceVCSStatusNoPlans bool,
 	silenceVCSStatusNoProjects bool,
@@ -15,7 +20,7 @@ func NewPlanCommandRunner(
 	workingDir WorkingDir,
 	commitStatusUpdater CommitStatusUpdater,
 	projectCommandBuilder ProjectPlanCommandBuilder,
-	projectCommandRunner ProjectPlanCommandRunner,
+	projectCommandRunner ProjectCommandRunnerForPlan,
 	dbUpdater *DBUpdater,
 	pullUpdater *PullUpdater,
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
@@ -64,7 +69,7 @@ type PlanCommandRunner struct {
 	pendingPlanFinder          PendingPlanFinder
 	workingDir                 WorkingDir
 	prjCmdBuilder              ProjectPlanCommandBuilder
-	prjCmdRunner               ProjectPlanCommandRunner
+	prjCmdRunner               ProjectCommandRunnerForPlan
 	dbUpdater                  *DBUpdater
 	pullUpdater                *PullUpdater
 	policyCheckCommandRunner   *PolicyCheckCommandRunner
@@ -125,6 +130,13 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	_, err = p.lockingLocker.UnlockByPull(baseRepo.FullName, pull.Num)
 	if err != nil {
 		ctx.Log.Err("deleting locks: %s", err)
+	}
+
+	if len(projectCmds) > 0 && projectCmds[0].LockAllProjectsBeforeExec {
+		ctx.Log.Debug("locking all projects before running plan")
+		if !p.lockAllProjects(ctx, AutoplanCommand{}, projectCmds, baseRepo.FullName, pull.Num) {
+			return
+		}
 	}
 
 	// Only run commands in parallel if enabled
@@ -251,6 +263,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		_, err = p.lockingLocker.UnlockByPull(baseRepo.FullName, pull.Num)
 		if err != nil {
 			ctx.Log.Err("deleting locks: %s", err)
+		}
+
+		if len(projectCmds) > 0 && projectCmds[0].LockAllProjectsBeforeExec {
+			ctx.Log.Debug("locking all projects before running plan")
+			if !p.lockAllProjects(ctx, cmd, projectCmds, baseRepo.FullName, pull.Num) {
+				return
+			}
 		}
 	}
 
@@ -381,4 +400,46 @@ func (p *PlanCommandRunner) partitionProjectCmds(
 
 func (p *PlanCommandRunner) isParallelEnabled(projectCmds []command.ProjectContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
+}
+
+func (p *PlanCommandRunner) lockAllProjects(ctx *command.Context, cmd PullCommand, projectCmds []command.ProjectContext, repoFullname string, pullNum int) bool {
+	var err error
+	result := runProjectCmds(projectCmds, p.prjCmdRunner.Lock)
+	if result.HasErrors() {
+		ctx.Log.Err("failed to lock all projects before running plan")
+		_, err = p.lockingLocker.UnlockByPull(repoFullname, pullNum)
+		if err != nil {
+			ctx.Log.Err("deleting locks: %s", err)
+		}
+
+		p.pullUpdater.updatePull(ctx, cmd, result)
+
+		if err := p.commitStatusUpdater.UpdateCombinedCount(
+			ctx.Log,
+			ctx.Pull.BaseRepo,
+			ctx.Pull,
+			models.FailedCommitStatus,
+			command.Plan,
+			0,
+			0,
+		); err != nil {
+			ctx.Log.Warn("unable to update commit status: %s", err)
+		}
+
+		if err := p.commitStatusUpdater.UpdateCombinedCount(
+			ctx.Log,
+			ctx.Pull.BaseRepo,
+			ctx.Pull,
+			models.FailedCommitStatus,
+			command.Apply,
+			0,
+			0,
+		); err != nil {
+			ctx.Log.Warn("unable to update commit status: %s", err)
+		}
+
+		return false
+	}
+
+	return true
 }

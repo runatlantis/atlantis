@@ -61,6 +61,7 @@ delete_source_branch_on_merge: true
 parallel_plan: true
 parallel_apply: true
 abort_on_execution_order_fail: true
+lock_all_projects_before_exec: true
 projects:
 - name: my-project-name
   branch: /main/
@@ -394,6 +395,25 @@ it's still desirable for Atlantis to plan/apply for projects not enumerated in t
 
 See [Custom Workflow Use Cases: Custom Backend Config](custom-workflows.md#custom-backend-config)
 
+### Lock all changed projects before plan/apply
+
+```yaml
+lock_all_projects_before_exec: true
+```
+
+By default, Atlantis acquires a lock for project right before running `plan` on it 
+(in this context, and later, we use `plan`, but this option works similarly with `apply` locking).
+For example, if you have a pull request with changes in projects `project1` and `project2`, 
+scheme of locking will be the following (parallel planning is disabled for easier understanding):
+```
+lock project1 -> plan project1 -> lock project2 (this lock may fail) -> plan project2
+```
+With this option enabled, Atlantis will lock each changed project before running `plan` on any of the projects.
+So, in the same example, the scheme will be as follows:
+```
+lock project1 -> lock project2 (locks for all changed projects are acquired, or not) -> plan project1 -> plan project2
+```
+
 ## Reference
 
 ### Top-Level Keys
@@ -405,6 +425,8 @@ delete_source_branch_on_merge: false
 projects:
 workflows:
 allowed_regexp_prefixes:
+abort_on_execution_order_fail: false
+lock_all_projects_before_exec: false
 ```
 
 | Key                           | Type                                                   | Default | Required | Description                                                                                                                        |
@@ -415,6 +437,8 @@ allowed_regexp_prefixes:
 | projects                      | array[[Project](repo-level-atlantis-yaml.md#project)]  | `[]`    | no       | Lists the projects in this repo.                                                                                                   |
 | workflows<br />*(restricted)* | map[string: [Workflow](custom-workflows.md#reference)] | `{}`    | no       | Custom workflows.                                                                                                                  |
 | allowed_regexp_prefixes       | array\[string\]                                          | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.md#enable-regexp-cmd) flag is used. |
+| abort_on_execution_order_fail | bool                                                   | `false` | no       | Stops all following execution groups when failed in some one.                                                                      |
+| lock_all_projects_before_exec | bool                                                   | `false` | no       | Acquires locks on each projects before planning/applying on any of project.                                                        |
 
 ### Project
 
