@@ -364,6 +364,8 @@ func SplitRepoFullName(repoFullName string) (owner string, repo string) {
 type PlanSuccess struct {
 	// TerraformOutput is the output from Terraform of running plan.
 	TerraformOutput string
+	// ShowResult is the output from Terraform of running show.
+	ShowResult string
 	// LockURL is the full URL to the lock held by this plan.
 	LockURL string
 	// RePlanCmd is the command that users should run to re-plan this project.
