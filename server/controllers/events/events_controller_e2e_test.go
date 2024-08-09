@@ -26,7 +26,9 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
+	mock_policy "github.com/runatlantis/atlantis/server/core/runtime/policy/mocks"
 	"github.com/runatlantis/atlantis/server/core/terraform"
+	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -52,10 +54,6 @@ type NoopTFDownloader struct{}
 var mockPreWorkflowHookRunner *runtimemocks.MockPreWorkflowHookRunner
 
 var mockPostWorkflowHookRunner *runtimemocks.MockPostWorkflowHookRunner
-
-func (m *NoopTFDownloader) GetAny(_, _ string) error {
-	return nil
-}
 
 func (m *NoopTFDownloader) Install(_ string, _ string, _ *version.Version) (string, error) {
 	return "", nil
@@ -1317,7 +1315,11 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		ExecutableName: "atlantis",
 		AllowCommands:  allowCommands,
 	}
-	terraformClient, err := terraform.NewClient(logger, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", &NoopTFDownloader{}, true, false, projectCmdOutputHandler)
+
+	mockDownloader := terraform_mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+
+	terraformClient, err := terraform.NewClient(logger, distribution, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", true, false, projectCmdOutputHandler)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
@@ -1431,7 +1433,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	Ok(t, err)
 
-	conftextExec := policy.NewConfTestExecutorWorkflow(logger, binDir, &NoopTFDownloader{})
+	conftextExec := policy.NewConfTestExecutorWorkflow(logger, binDir, mock_policy.NewMockDownloader())
 
 	// swapping out version cache to something that always returns local conftest
 	// binary
@@ -1881,4 +1883,7 @@ func ensureRunning014(t *testing.T) {
 //
 //	    Terraform v0.11.10
 //		   => 0.11.10
-var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
+//
+//	    OpenTofu v1.0.0
+//		   => 1.0.0
+var versionRegex = regexp.MustCompile("(?:Terraform|OpenTofu) v(.*?)(\\s.*)?\n")
