@@ -12,14 +12,10 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_post_workflow_hook_url_generator.go PostWorkflowHookURLGenerator
-
 // PostWorkflowHookURLGenerator generates urls to view the post workflow progress.
 type PostWorkflowHookURLGenerator interface {
 	GenerateProjectWorkflowHookURL(hookID string) (string, error)
 }
-
-//go:generate pegomock generate --package mocks -o mocks/mock_post_workflows_hooks_command_runner.go PostWorkflowHooksCommandRunner
 
 type PostWorkflowHooksCommandRunner interface {
 	RunPostHooks(ctx *command.Context, cmd *CommentCommand) error
