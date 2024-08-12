@@ -22,8 +22,8 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/hashicorp/hc-install v0.7.1-0.20240718133626-0c03a35d9fcb
-	github.com/hashicorp/terraform-config-inspect v0.0.0-20240701073647-9fc3669f7553
+	github.com/hashicorp/hc-install v0.8.0
+	github.com/hashicorp/terraform-config-inspect v0.0.0-20240801114854-6714b46f5fe4
 	github.com/jpillora/backoff v1.0.0
 	github.com/kr/pretty v0.3.1
 	github.com/mcdafydd/go-azuredevops v0.12.1
@@ -32,9 +32,9 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/patternmatcher v0.6.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
-	github.com/petergtz/pegomock/v4 v4.0.0
+	github.com/petergtz/pegomock/v4 v4.1.0
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.5.4
+	github.com/redis/go-redis/v9 v9.6.1
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
 	github.com/slack-go/slack v0.12.5
@@ -55,7 +55,7 @@ require (
 require (
 	github.com/agext/levenshtein v1.2.3
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
-	github.com/hashicorp/hcl/v2 v2.20.1
+	github.com/hashicorp/hcl/v2 v2.21.0
 	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 )
