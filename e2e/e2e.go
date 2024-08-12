@@ -175,5 +175,5 @@ func cleanUp(ctx context.Context, t *E2ETester, pullRequestNumber int, branchNam
 	}
 	log.Printf("deleted branch %s", deleteBranchName)
 
-    return fmt.Errorf("INTENTIONAL ERROR")
+	return nil
 }
