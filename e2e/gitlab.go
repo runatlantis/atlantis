@@ -24,12 +24,13 @@ import (
 )
 
 type GitlabClient struct {
-	client    *gitlab.Client
-	username  string
-	ownerName string
-	repoName  string
-	token     string
-	projectId int
+	client     *gitlab.Client
+	username   string
+	ownerName  string
+	repoName   string
+	token      string
+	projectId  int
+	branchToMR map[string]int
 }
 
 func NewGitlabClient() *GitlabClient {
@@ -61,12 +62,13 @@ func NewGitlabClient() *GitlabClient {
 	}
 
 	return &GitlabClient{
-		client:    gitlabClient,
-		username:  gitlabUsername,
-		ownerName: ownerName,
-		repoName:  repoName,
-		token:     gitlabToken,
-		projectId: project.ID,
+		client:     gitlabClient,
+		username:   gitlabUsername,
+		ownerName:  ownerName,
+		repoName:   repoName,
+		token:      gitlabToken,
+		projectId:  project.ID,
+		branchToMR: make(map[string]int),
 	}
 
 }
@@ -107,53 +109,44 @@ func (g GitlabClient) DeleteAtlantisHook(ctx context.Context, hookID int64) erro
 	return nil
 }
 
-func (g GitlabClient) CreatePullRequest(ctx context.Context, title, branchName string) (string, PullRequest, error) {
+func (g GitlabClient) CreatePullRequest(ctx context.Context, title, branchName string) (string, int, error) {
+	//	log.Printf("Sleeping 10 seconds to prevent race conditions creating MR")
+	//	time.Sleep(time.Second * 10)
 	mr, _, err := g.client.MergeRequests.CreateMergeRequest(g.projectId, &gitlab.CreateMergeRequestOptions{
 		Title:        gitlab.Ptr(title),
 		SourceBranch: gitlab.Ptr(branchName),
 		TargetBranch: gitlab.Ptr("main"),
 	})
 	if err != nil {
-		return "", PullRequest{}, fmt.Errorf("error while creating new pull request: %v", err)
+		return "", 0, fmt.Errorf("error while creating new pull request: %v", err)
 	}
-	return mr.WebURL, PullRequest{
-		id:     mr.IID,
-		branch: branchName,
-	}, nil
+	g.branchToMR[branchName] = mr.IID
+	return mr.WebURL, mr.IID, nil
 
 }
 
-func (g GitlabClient) GetAtlantisStatus(ctx context.Context, pullRequest PullRequest) (string, error) {
+func (g GitlabClient) GetAtlantisStatus(ctx context.Context, branchName string) (string, error) {
 
-	fmt.Println(pullRequest)
-	res, _, err := g.client.MergeRequests.ListMergeRequestPipelines(g.projectId, pullRequest.id)
+	pipelineInfos, _, err := g.client.MergeRequests.ListMergeRequestPipelines(g.projectId, g.branchToMR[branchName])
 	if err != nil {
-		fmt.Println("I have error", err)
 		return "", err
 	}
-	fmt.Println(res)
-	return "", nil
-	/*
+	// Possible todo: determine which status in the pipeline we care about?
+	if len(pipelineInfos) != 1 {
+		return "", fmt.Errorf("unexpected pipelines: %d", len(pipelineInfos))
+	}
+	pipelineInfo := pipelineInfos[0]
+	pipeline, _, err := g.client.Pipelines.GetPipeline(g.projectId, pipelineInfo.ID)
+	if err != nil {
+		return "", err
+	}
 
-		// check repo status
-		combinedStatus, _, err := g.client.Repositories.GetCombinedStatus(ctx, g.ownerName, g.repoName, branchName, nil)
-		if err != nil {
-			return "", err
-		}
-
-		for _, status := range combinedStatus.Statuses {
-			if status.GetContext() == "atlantis/plan" {
-				return status.GetState(), nil
-			}
-		}
-
-		return "", nil
-	*/
+	return pipeline.Status, nil
 }
 
-func (g GitlabClient) ClosePullRequest(ctx context.Context, pullRequest PullRequest) error {
+func (g GitlabClient) ClosePullRequest(ctx context.Context, pullRequestNumber int) error {
 	// clean up
-	_, _, err := g.client.MergeRequests.UpdateMergeRequest(g.projectId, pullRequest.id, &gitlab.UpdateMergeRequestOptions{
+	_, _, err := g.client.MergeRequests.UpdateMergeRequest(g.projectId, pullRequestNumber, &gitlab.UpdateMergeRequestOptions{
 		StateEvent: gitlab.Ptr("close"),
 	})
 	if err != nil {
@@ -163,13 +156,26 @@ func (g GitlabClient) ClosePullRequest(ctx context.Context, pullRequest PullRequ
 
 }
 func (g GitlabClient) DeleteBranch(ctx context.Context, branchName string) error {
-	panic("I'mdeleting branch")
-	/*
+	_, err := g.client.Branches.DeleteBranch(g.projectId, branchName)
 
-		_, err := g.client.Git.DeleteRef(ctx, g.ownerName, g.repoName, branchName)
-		if err != nil {
-			return fmt.Errorf("error while deleting branch %s: %v", branchName, err)
+	if err != nil {
+		return fmt.Errorf("error while deleting branch %s: %v", branchName, err)
+	}
+	return nil
+
+}
+
+func (g GitlabClient) IsAtlantisInProgress(state string) bool {
+	// From https://docs.gitlab.com/ee/api/pipelines.html
+	// created, waiting_for_resource, preparing, pending, running, success, failed, canceled, skipped, manual, scheduled
+	for _, s := range []string{"success", "failed", "canceled", "skipped"} {
+		if state == s {
+			return false
 		}
-		return nil
-	*/
+	}
+	return true
+}
+
+func (g GitlabClient) DidAtlantisSucceed(state string) bool {
+	return state == "success"
 }

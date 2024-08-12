@@ -155,7 +155,7 @@ func cleanUp(ctx context.Context, t *E2ETester, pullRequestNumber int, branchNam
 	// clean up
 	err := t.vcsClient.ClosePullRequest(ctx, pullRequestNumber)
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to close PR %d: %v", pullRequestNumber, err)
 	}
 	log.Printf("closed pull request %d", pullRequestNumber)
 
@@ -166,4 +166,5 @@ func cleanUp(ctx context.Context, t *E2ETester, pullRequestNumber int, branchNam
 	log.Printf("deleted branch %s", branchName)
 
 	return nil
+
 }
