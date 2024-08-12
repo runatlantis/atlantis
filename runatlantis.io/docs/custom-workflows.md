@@ -471,8 +471,6 @@ workflows:
             command: 'echo "${REPO_REL_DIR}"'
     apply:
       steps:
-        # These env vars TF_AWS_DEFAULT_TAGS_ will work for aws provider 5.62.0+
-        # https://github.com/hashicorp/terraform-provider-aws/releases/tag/v5.62.0
         - *env_default_tags_repository
         - *env_default_tags_repository_dir
 ```
