@@ -38,9 +38,11 @@ type Project struct {
 func getVCSClient() (VCSClient, error) {
 
 	if os.Getenv("ATLANTISBOT_GITHUB_USERNAME") != "" {
+		log.Print("Running tests for github")
 		return NewGithubClient(), nil
 	}
 	if os.Getenv("ATLANTISBOT_GITLAB_USERNAME") != "" {
+		log.Print("Running tests for gitlab")
 		return NewGitlabClient(), nil
 	}
 

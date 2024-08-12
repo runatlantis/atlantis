@@ -29,7 +29,6 @@ cd "${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}/e2e"
 echo "Running 'make build'"
 make build
 
-exit 0
 echo "Running e2e test: 'make run'"
 set +e
 make run
