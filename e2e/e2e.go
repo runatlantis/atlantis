@@ -123,7 +123,7 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	// waiting for atlantis run and finish
 	maxLoops := 20
 	i := 0
-	for ; i < maxLoops && checkStatus(state); i++ {
+	for ; i < maxLoops && t.vcsClient.IsAtlantisInProgress(state); i++ {
 		time.Sleep(2 * time.Second)
 		state, _ = t.vcsClient.GetAtlantisStatus(ctx, branchName)
 		if state == "" {
@@ -139,20 +139,11 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	log.Printf("atlantis run finished with status %q", state)
 	e2eResult.testResult = state
 	// check if atlantis run was a success
-	if state != "success" {
+	if !t.vcsClient.DidAtlantisSucceed(state) {
 		return e2eResult, fmt.Errorf("atlantis run project type %q failed with %q status", t.projectType.Name, state)
 	}
 
 	return e2eResult, nil
-}
-
-func checkStatus(state string) bool {
-	for _, s := range []string{"success", "error", "failure"} {
-		if state == s {
-			return false
-		}
-	}
-	return true
 }
 
 func cleanUp(ctx context.Context, t *E2ETester, pullRequestNumber int, branchName string) error {
@@ -163,12 +154,11 @@ func cleanUp(ctx context.Context, t *E2ETester, pullRequestNumber int, branchNam
 	}
 	log.Printf("closed pull request %d", pullRequestNumber)
 
-	deleteBranchName := fmt.Sprintf("%s/%s", "heads", branchName)
-	err = t.vcsClient.DeleteBranch(ctx, deleteBranchName)
+	err = t.vcsClient.DeleteBranch(ctx, branchName)
 	if err != nil {
-		return fmt.Errorf("error while deleting branch %s: %v", deleteBranchName, err)
+		return fmt.Errorf("error while deleting branch %s: %v", branchName, err)
 	}
-	log.Printf("deleted branch %s", deleteBranchName)
+	log.Printf("deleted branch %s", branchName)
 
 	return nil
 }
