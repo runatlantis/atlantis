@@ -452,7 +452,7 @@ projects:
 
 ### Add directory and repo context for aws resources using default tags
 
-This is only available in AWS providers 5.62.0 and higher.
+This is only available in AWS providers [5.62.0](https://github.com/hashicorp/terraform-provider-aws/releases/tag/v5.62.0) and higher.
 
 ```yaml
 workflows:
