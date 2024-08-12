@@ -110,8 +110,7 @@ func (g GitlabClient) DeleteAtlantisHook(ctx context.Context, hookID int64) erro
 }
 
 func (g GitlabClient) CreatePullRequest(ctx context.Context, title, branchName string) (string, int, error) {
-	//	log.Printf("Sleeping 10 seconds to prevent race conditions creating MR")
-	//	time.Sleep(time.Second * 10)
+
 	mr, _, err := g.client.MergeRequests.CreateMergeRequest(g.projectId, &gitlab.CreateMergeRequestOptions{
 		Title:        gitlab.Ptr(title),
 		SourceBranch: gitlab.Ptr(branchName),
