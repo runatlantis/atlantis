@@ -24,12 +24,13 @@ import (
 )
 
 type GitlabClient struct {
-	client     *gitlab.Client
-	username   string
-	ownerName  string
-	repoName   string
-	token      string
-	projectId  int
+	client    *gitlab.Client
+	username  string
+	ownerName string
+	repoName  string
+	token     string
+	projectId int
+	// A mapping from branch names to MR IDs
 	branchToMR map[string]int
 }
 
