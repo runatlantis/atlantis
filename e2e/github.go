@@ -153,9 +153,23 @@ func (g GithubClient) ClosePullRequest(ctx context.Context, pullRequestNumber in
 }
 func (g GithubClient) DeleteBranch(ctx context.Context, branchName string) error {
 
-	_, err := g.client.Git.DeleteRef(ctx, g.ownerName, g.repoName, branchName)
+	deleteBranchName := fmt.Sprintf("%s/%s", "heads", branchName)
+	_, err := g.client.Git.DeleteRef(ctx, g.ownerName, g.repoName, deleteBranchName)
 	if err != nil {
 		return fmt.Errorf("error while deleting branch %s: %v", branchName, err)
 	}
 	return nil
+}
+
+func (g GithubClient) IsAtlantisInProgress(state string) bool {
+	for _, s := range []string{"success", "error", "failure"} {
+		if state == s {
+			return false
+		}
+	}
+	return true
+}
+
+func (g GithubClient) DidAtlantisSucceed(state string) bool {
+	return state == "success"
 }
