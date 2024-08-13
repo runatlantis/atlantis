@@ -114,7 +114,12 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	log.Printf("created pull request %s", url)
 
 	// defer closing pull request and delete remote branch
-	defer cleanUp(ctx, t, pullId, branchName) // nolint: errcheck
+	defer func() {
+		err := cleanUp(ctx, t, pullId, branchName)
+		if err != nil {
+			log.Printf("Failed to cleanup: %v", err)
+		}
+	}()
 
 	// wait for atlantis to respond to webhook and autoplan.
 	time.Sleep(2 * time.Second)
