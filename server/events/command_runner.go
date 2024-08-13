@@ -128,7 +128,7 @@ type DefaultCommandRunner struct {
 	PreWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner
 	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
 	PullStatusFetcher              PullStatusFetcher
-	TeamAllowlistChecker           *TeamAllowlistChecker
+	TeamAllowlistChecker           command.TeamAllowlistChecker
 	VarFileAllowlistChecker        *VarFileAllowlistChecker
 	CommitStatusUpdater            CommitStatusUpdater
 }
@@ -156,6 +156,12 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	defer timer.Stop()
 
 	// Check if the user who triggered the autoplan has permissions to run 'plan'.
+	err = c.fetchUserTeams(baseRepo, &user)
+	if err != nil {
+		c.Logger.Err("Unable to fetch user teams: %s", err)
+		return
+	}
+
 	ok, err := c.checkUserPermissions(baseRepo, user, "plan")
 	if err != nil {
 		c.Logger.Err("Unable to check user permissions: %s", err)
@@ -244,11 +250,16 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 		// allowlist restriction is not enabled
 		return true, nil
 	}
-	teams, err := c.VCSClient.GetTeamNamesForUser(repo, user)
-	if err != nil {
-		return false, err
+	ctx := models.TeamAllowlistCheckerContext{
+		BaseRepo:    repo,
+		CommandName: cmdName,
+		Log:         c.Logger,
+		Pull:        models.PullRequest{},
+		User:        user,
+		Verbose:     false,
+		API:         false,
 	}
-	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmdName)
+	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmdName)
 	if !ok {
 		return false, nil
 	}
@@ -290,14 +301,22 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	defer timer.Stop()
 
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
-	ok, err := c.checkUserPermissions(baseRepo, user, cmd.Name.String())
-	if err != nil {
-		c.Logger.Err("Unable to check user permissions: %s", err)
-		return
-	}
-	if !ok {
-		c.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, cmd)
-		return
+	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
+		err := c.fetchUserTeams(baseRepo, &user)
+		if err != nil {
+			c.Logger.Err("Unable to fetch user teams: %s", err)
+			return
+		}
+
+		ok, err := c.checkUserPermissions(baseRepo, user, cmd.Name.String())
+		if err != nil {
+			c.Logger.Err("Unable to check user permissions: %s", err)
+			return
+		}
+		if !ok {
+			c.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, cmd)
+			return
+		}
 	}
 
 	// Check if the provided var files in a 'plan' command are allowlisted
@@ -321,15 +340,16 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	ctx := &command.Context{
-		User:                user,
-		Log:                 log,
-		Pull:                pull,
-		PullStatus:          status,
-		HeadRepo:            headRepo,
-		Scope:               scope,
-		Trigger:             command.CommentTrigger,
-		PolicySet:           cmd.PolicySet,
-		ClearPolicyApproval: cmd.ClearPolicyApproval,
+		User:                 user,
+		Log:                  log,
+		Pull:                 pull,
+		PullStatus:           status,
+		HeadRepo:             headRepo,
+		Scope:                scope,
+		Trigger:              command.CommentTrigger,
+		PolicySet:            cmd.PolicySet,
+		ClearPolicyApproval:  cmd.ClearPolicyApproval,
+		TeamAllowlistChecker: c.TeamAllowlistChecker,
 	}
 
 	if !c.validateCtxAndComment(ctx, cmd.Name) {
@@ -477,6 +497,16 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	}
 
 	return
+}
+
+func (c *DefaultCommandRunner) fetchUserTeams(repo models.Repo, user *models.User) error {
+	teams, err := c.VCSClient.GetTeamNamesForUser(repo, *user)
+	if err != nil {
+		return err
+	}
+
+	user.Teams = teams
+	return nil
 }
 
 func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, commandName command.Name) bool {

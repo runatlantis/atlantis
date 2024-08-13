@@ -17,6 +17,7 @@ type GlobalCfg struct {
 	Workflows  map[string]Workflow `yaml:"workflows" json:"workflows"`
 	PolicySets PolicySets          `yaml:"policies" json:"policies"`
 	Metrics    Metrics             `yaml:"metrics" json:"metrics"`
+	TeamAuthz  TeamAuthz           `yaml:"team_authz" json:"team_authz"`
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
@@ -161,6 +162,7 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 		Workflows:  workflows,
 		PolicySets: g.PolicySets.ToValid(),
 		Metrics:    g.Metrics.ToValid(),
+		TeamAuthz:  g.TeamAuthz.ToValid(),
 	}
 }
 

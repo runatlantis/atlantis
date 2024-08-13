@@ -126,6 +126,9 @@ type ProjectContext struct {
 	// Allows custom policy check tools outside of Conftest to run in checks
 	CustomPolicyCheck bool
 	SilencePRComments []string
+
+	// TeamAllowlistChecker is used to check authorization on a project-level
+	TeamAllowlistChecker TeamAllowlistChecker
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

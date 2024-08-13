@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -548,6 +549,30 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
 	})
 
+	// Filter projects to only include ones the user is authorized for
+	projCtxs = slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
+		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
+			// allowlist restriction is not enabled
+			return false
+		}
+		ctx := models.TeamAllowlistCheckerContext{
+			BaseRepo:           projCtx.BaseRepo,
+			CommandName:        projCtx.CommandName.String(),
+			EscapedCommentArgs: projCtx.EscapedCommentArgs,
+			HeadRepo:           projCtx.HeadRepo,
+			Log:                projCtx.Log,
+			Pull:               projCtx.Pull,
+			ProjectName:        projCtx.ProjectName,
+			RepoDir:            repoDir,
+			RepoRelDir:         projCtx.RepoRelDir,
+			User:               projCtx.User,
+			Verbose:            projCtx.Verbose,
+			Workspace:          projCtx.Workspace,
+			API:                false,
+		}
+		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
+	})
+
 	return projCtxs, nil
 }
 
@@ -903,6 +928,30 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	if err := p.validateWorkspaceAllowed(repoCfgPtr, repoRelDir, workspace); err != nil {
 		return []command.ProjectContext{}, err
 	}
+
+	// Filter projects to only include ones the user is authorized for
+	projCtxs = slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
+		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
+			// allowlist restriction is not enabled
+			return false
+		}
+		ctx := models.TeamAllowlistCheckerContext{
+			BaseRepo:           projCtx.BaseRepo,
+			CommandName:        projCtx.CommandName.String(),
+			EscapedCommentArgs: projCtx.EscapedCommentArgs,
+			HeadRepo:           projCtx.HeadRepo,
+			Log:                projCtx.Log,
+			Pull:               projCtx.Pull,
+			ProjectName:        projCtx.ProjectName,
+			RepoDir:            repoDir,
+			RepoRelDir:         projCtx.RepoRelDir,
+			User:               projCtx.User,
+			Verbose:            projCtx.Verbose,
+			Workspace:          projCtx.Workspace,
+			API:                false,
+		}
+		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
+	})
 
 	return projCtxs, nil
 }
