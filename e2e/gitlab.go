@@ -35,19 +35,19 @@ type GitlabClient struct {
 
 func NewGitlabClient() *GitlabClient {
 
-	gitlabUsername := os.Getenv("ATLANTISBOT_GITLAB_USERNAME")
+	gitlabUsername := os.Getenv("ATLANTIS_GITLAB_USER")
 	if gitlabUsername == "" {
-		log.Fatalf("ATLANTISBOT_GITHUB_USERNAME cannot be empty")
+		log.Fatalf("ATLANTIS_GITLAB_USER cannot be empty")
 	}
-	gitlabToken := os.Getenv("ATLANTISBOT_GITLAB_TOKEN")
+	gitlabToken := os.Getenv("ATLANTIS_GITLAB_TOKEN")
 	if gitlabToken == "" {
-		log.Fatalf("ATLANTISBOT_GITLAB_TOKEN cannot be empty")
+		log.Fatalf("ATLANTIS_GITLAB_TOKEN cannot be empty")
 	}
-	ownerName := os.Getenv("GITHUB_REPO_OWNER_NAME")
+	ownerName := os.Getenv("GITLAB_REPO_OWNER_NAME")
 	if ownerName == "" {
 		ownerName = "run-atlantis"
 	}
-	repoName := os.Getenv("GITHUB_REPO_NAME")
+	repoName := os.Getenv("GITLAB_REPO_NAME")
 	if repoName == "" {
 		repoName = "atlantis-tests"
 	}

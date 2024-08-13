@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
+set -euo pipefail
 IFS=$'\n\t'
 
 # start atlantis server in the background and wait for it to start
+# It's the responsibility of the caller of this script to set the github, gitlab, etc.
+# permissions via environment variable
 ./atlantis server \
-  --gh-user="$ATLANTISBOT_GITHUB_USERNAME" \
-  --gh-token="$ATLANTISBOT_GITHUB_TOKEN" \
-  --gitlab-user="$ATLANTISBOT_GITLAB_USERNAME" \
-  --gitlab-token="$ATLANTISBOT_GITLAB_TOKEN" \
   --data-dir="/tmp" \
   --log-level="debug" \
   --repo-allowlist="github.com/runatlantis/atlantis-tests,gitlab.com/run-atlantis/atlantis-tests" \
