@@ -1,6 +1,6 @@
 module github.com/runatlantis/atlantis/e2e
 
-go 1.22
+go 1.23.0
 
 require (
 	github.com/google/go-github/v59 v59.0.0
