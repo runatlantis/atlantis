@@ -294,9 +294,9 @@ func getDocumentedFlags(t *testing.T) []string {
 		ret = append(ret, flag)
 	}
 
-	if err := scanner.Err(); err != nil {
-		Ok(t, err)
-	}
+	err = scanner.Err()
+	Ok(t, err)
+
 	return ret
 }
 
