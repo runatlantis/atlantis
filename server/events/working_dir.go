@@ -77,9 +77,9 @@ type FileWorkspace struct {
 	// TestingOverrideBaseCloneURL can be used during testing to override the
 	// URL of the base repo to be cloned. If it's empty then we clone normally.
 	TestingOverrideBaseCloneURL string
-	// GithubAppEnabled is true if we should fetch the ref "pull/PR_NUMBER/head"
-	// from the "origin" remote. If this is false, we fetch "+refs/heads/$HEAD_BRANCH"
-	// from the "head" remote.
+	// GithubAppEnabled is true and a PR number is supplied, we should fetch
+	// the ref "pull/PR_NUMBER/head" from the "origin" remote. If this is false,
+	// we fetch "+refs/heads/$HEAD_BRANCH" from the "head" remote.
 	GithubAppEnabled bool
 	// use the global setting without overriding
 	GpgNoSigningEnabled bool
@@ -352,7 +352,7 @@ func (w *FileWorkspace) wrappedGit(logger logging.SimpleLogging, c wrappedGitCon
 func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappedGitContext) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", c.pr.HeadBranch)
 	fetchRemote := "head"
-	if w.GithubAppEnabled {
+	if w.GithubAppEnabled && c.pr.Num > 0 {
 		fetchRef = fmt.Sprintf("pull/%d/head:", c.pr.Num)
 		fetchRemote = "origin"
 	}
