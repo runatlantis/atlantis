@@ -450,6 +450,31 @@ projects:
   workflow: production
 ```
 
+### Add directory and repo context for aws resources using default tags
+
+This is only available in AWS providers [5.62.0](https://github.com/hashicorp/terraform-provider-aws/releases/tag/v5.62.0) and higher.
+
+```yaml
+workflows:
+  terraform:
+    plan:
+      steps:
+        # These env vars TF_AWS_DEFAULT_TAGS_ will work for aws provider 5.62.0+
+        # https://github.com/hashicorp/terraform-provider-aws/releases/tag/v5.62.0
+        - &env_default_tags_repository
+          env:
+            name: TF_AWS_DEFAULT_TAGS_repository
+            command: 'echo "github.com/${HEAD_REPO_OWNER}/${HEAD_REPO_NAME}"'
+        - &env_default_tags_repository_dir
+          env:
+            name: TF_AWS_DEFAULT_TAGS_repository_dir
+            command: 'echo "${REPO_REL_DIR}"'
+    apply:
+      steps:
+        - *env_default_tags_repository
+        - *env_default_tags_repository_dir
+```
+
 ## Reference
 
 ### Workflow
