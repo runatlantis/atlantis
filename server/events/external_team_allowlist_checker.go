@@ -3,10 +3,11 @@ package events
 import (
 	"context"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/models"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 type ExternalTeamAllowlistChecker struct {

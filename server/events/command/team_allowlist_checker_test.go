@@ -1,9 +1,10 @@
 package command_test
 
 import (
+	"testing"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"testing"
 
 	. "github.com/runatlantis/atlantis/testing"
 )

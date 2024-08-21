@@ -1,8 +1,9 @@
 package command
 
 import (
-	"github.com/runatlantis/atlantis/server/events/models"
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // Wildcard matches all teams and all commands

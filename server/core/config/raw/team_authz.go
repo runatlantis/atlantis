@@ -12,9 +12,7 @@ func (t *TeamAuthz) ToValid() valid.TeamAuthz {
 	v.Command = t.Command
 	v.Args = make([]string, 0)
 	if t.Args != nil {
-		for _, arg := range t.Args {
-			v.Args = append(v.Args, arg)
-		}
+		v.Args = append(v.Args, t.Args...)
 	}
 
 	return v
