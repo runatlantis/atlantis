@@ -109,12 +109,13 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 		logger.Debug("clone directory '%s' already exists, checking if it's at the right commit", cloneDir)
 
 		// We use git rev-parse to see if our repo is at the right commit.
-		// If just checking out the pull request branch, we can use HEAD.
+		// If just checking out the pull request branch or if there is no
+		// pull request (API triggered with a custom git ref), we can use HEAD.
 		// If doing a merge, then HEAD won't be at the pull request's HEAD
 		// because we'll already have performed a merge. Instead, we'll check
 		// HEAD^2 since that will be the commit before our merge.
 		pullHead := "HEAD"
-		if w.CheckoutMerge {
+		if w.CheckoutMerge && c.pr.Num > 0 {
 			pullHead = "HEAD^2"
 		}
 		revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
