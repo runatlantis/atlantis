@@ -37,7 +37,7 @@ require (
 	github.com/redis/go-redis/v9 v9.6.1
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
-	github.com/slack-go/slack v0.13.1
+	github.com/slack-go/slack v0.14.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.19.0
@@ -47,7 +47,7 @@ require (
 	github.com/xanzy/go-gitlab v0.107.0
 	go.etcd.io/bbolt v1.3.10
 	go.uber.org/zap v1.27.0
-	golang.org/x/term v0.21.0
+	golang.org/x/term v0.23.0
 	golang.org/x/text v0.16.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -133,7 +133,7 @@ require (
 	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/sys v0.23.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/appengine v1.6.8 // indirect
