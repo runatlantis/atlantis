@@ -809,8 +809,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var teamAllowlistChecker command.TeamAllowlistChecker
 	if globalCfg.TeamAuthz.Command != "" {
 		teamAllowlistChecker = &events.ExternalTeamAllowlistChecker{
-			Command:   globalCfg.TeamAuthz.Command,
-			ExtraArgs: globalCfg.TeamAuthz.Args,
+			Command:                     globalCfg.TeamAuthz.Command,
+			ExtraArgs:                   globalCfg.TeamAuthz.Args,
+			ExternalTeamAllowlistRunner: &runtime.DefaultExternalTeamAllowlistRunner{},
 		}
 	} else {
 		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
