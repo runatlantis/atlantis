@@ -2,8 +2,9 @@ package events
 
 import (
 	"fmt"
-	"github.com/runatlantis/atlantis/server/core/runtime"
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/core/runtime"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 )

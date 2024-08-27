@@ -1,9 +1,10 @@
 package events_test
 
 import (
+	"testing"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
 	runtime_mocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"

@@ -3,10 +3,11 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"github.com/runatlantis/atlantis/server/events/models"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_external_team_allowlist_runner.go ExternalTeamAllowlistRunner
