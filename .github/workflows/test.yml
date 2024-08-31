@@ -42,7 +42,7 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:4149a804e081244b10b5abef4bd52bfb051283f532d56cba75efb31047cbd2ae
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:eeb4c08aa2c7f27c4cfef089fafd6404ce806d77452d5ad3010bb3ca0e573538
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
@@ -110,6 +110,43 @@ jobs:
       TERRAFORM_VERSION: 1.9.2
       ATLANTIS_GH_USER: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
       ATLANTIS_GH_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
+      NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+        with:
+          go-version-file: go.mod
+
+      # This version of TF will be downloaded before Atlantis is started.
+      # We do this instead of setting --default-tf-version because setting
+      # that flag starts the download asynchronously so we'd have a race
+      # condition.
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Setup ngrok
+        run: |
+          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/4no1PS1PoRF/ngrok-v3-3.13.0-linux-amd64.tar.gz
+          tar -xzf ngrok.tar.gz
+          chmod +x ngrok
+          ./ngrok version
+      - name: Setup gitconfig
+        run: |
+          git config --global user.email "maintainers@runatlantis.io"
+          git config --global user.name "atlantisbot"
+
+      - run: |
+          make build-service
+          ./scripts/e2e.sh
+  e2e-gitlab:
+    runs-on: ubuntu-latest
+    # dont run e2e tests on forked PRs
+    if: github.event.pull_request.head.repo.fork == false
+    env:
+      TERRAFORM_VERSION: 1.9.2
+      ATLANTIS_GITLAB_USER: ${{ secrets.ATLANTISBOT_GITLAB_USERNAME }}
+      ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4

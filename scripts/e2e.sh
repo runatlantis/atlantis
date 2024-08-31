@@ -37,7 +37,7 @@ function cleanupPid() {
 ./atlantis server \
   --data-dir="/tmp" \
   --log-level="debug" \
-  --repo-allowlist="github.com/runatlantis/atlantis-tests" \
+  --repo-allowlist="github.com/runatlantis/atlantis-tests,gitlab.com/run-atlantis/atlantis-tests" \
   --repo-config-json='{"repos":[{"id":"/.*/", "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true}]}' \
   &> /tmp/atlantis-server.log &
 ATLANTIS_PID=$!
