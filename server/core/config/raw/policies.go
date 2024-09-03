@@ -75,7 +75,7 @@ type PolicySet struct {
 	Name               string       `yaml:"name" json:"name"`
 	Owners             PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
 	ApproveCount       int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
-	PreventSelfApprove bool         `yaml:"self_approve,omitempty" json:"prevent_self_approve,omitempty"`
+	PreventSelfApprove bool         `yaml:"prevent_self_approve,omitempty" json:"prevent_self_approve,omitempty"`
 }
 
 func (p PolicySet) Validate() error {
