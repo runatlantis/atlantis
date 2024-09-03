@@ -7,13 +7,18 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
+type ProjectCommandRunnerForApply interface {
+	ProjectApplyCommandRunner
+	ProjectLockCommandRunner
+}
+
 func NewApplyCommandRunner(
 	vcsClient vcs.Client,
 	disableApplyAll bool,
 	applyCommandLocker locking.ApplyLockChecker,
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
-	prjCmdRunner ProjectApplyCommandRunner,
+	prjCmdRunner ProjectCommandRunnerForApply,
 	autoMerger *AutoMerger,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
@@ -48,7 +53,7 @@ type ApplyCommandRunner struct {
 	vcsClient            vcs.Client
 	commitStatusUpdater  CommitStatusUpdater
 	prjCmdBuilder        ProjectApplyCommandBuilder
-	prjCmdRunner         ProjectApplyCommandRunner
+	prjCmdRunner         ProjectCommandRunnerForApply
 	autoMerger           *AutoMerger
 	pullUpdater          *PullUpdater
 	dbUpdater            *DBUpdater
@@ -158,6 +163,13 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
+	if len(projectCmds) > 0 && projectCmds[0].LockAllProjectsBeforeExec {
+		ctx.Log.Debug("locking all projects before running apply")
+		if !a.lockAllProjects(ctx, cmd, projectCmds) {
+			return
+		}
+	}
+
 	// Only run commands in parallel if enabled
 	var result command.Result
 	if a.isParallelEnabled(projectCmds) {
@@ -222,6 +234,30 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 	); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
+}
+
+func (a *ApplyCommandRunner) lockAllProjects(ctx *command.Context, cmd PullCommand, projectCmds []command.ProjectContext) bool {
+	result := runProjectCmds(projectCmds, a.prjCmdRunner.Lock)
+	if result.HasErrors() {
+		ctx.Log.Err("failed to lock all projects before running apply")
+
+		a.pullUpdater.updatePull(ctx, cmd, result)
+
+		if err := a.commitStatusUpdater.UpdateCombinedCount(
+			ctx.Log,
+			ctx.Pull.BaseRepo,
+			ctx.Pull,
+			models.FailedCommitStatus,
+			command.Apply,
+			0,
+			0,
+		); err != nil {
+			ctx.Log.Warn("unable to update commit status: %s", err)
+		}
+
+		return false
+	}
+	return true
 }
 
 // applyAllDisabledComment is posted when apply all commands (i.e. "atlantis apply")

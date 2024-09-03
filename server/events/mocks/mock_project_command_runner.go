@@ -70,6 +70,21 @@ func (mock *MockProjectCommandRunner) Import(ctx command.ProjectContext) command
 	return ret0
 }
 
+func (mock *MockProjectCommandRunner) Lock(ctx command.ProjectContext) command.ProjectResult {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
+	}
+	params := []pegomock.Param{ctx}
+	result := pegomock.GetGenericMockFrom(mock).Invoke("Lock", params, []reflect.Type{reflect.TypeOf((*command.ProjectResult)(nil)).Elem()})
+	var ret0 command.ProjectResult
+	if len(result) != 0 {
+		if result[0] != nil {
+			ret0 = result[0].(command.ProjectResult)
+		}
+	}
+	return ret0
+}
+
 func (mock *MockProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
@@ -238,6 +253,33 @@ func (c *MockProjectCommandRunner_Import_OngoingVerification) GetCapturedArgumen
 }
 
 func (c *MockProjectCommandRunner_Import_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext) {
+	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(params) > 0 {
+		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
+		for u, param := range params[0] {
+			_param0[u] = param.(command.ProjectContext)
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockProjectCommandRunner) Lock(ctx command.ProjectContext) *MockProjectCommandRunner_Lock_OngoingVerification {
+	params := []pegomock.Param{ctx}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Lock", params, verifier.timeout)
+	return &MockProjectCommandRunner_Lock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandRunner_Lock_OngoingVerification struct {
+	mock              *MockProjectCommandRunner
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandRunner_Lock_OngoingVerification) GetCapturedArguments() command.ProjectContext {
+	ctx := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1]
+}
+
+func (c *MockProjectCommandRunner_Lock_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
