@@ -1,7 +1,9 @@
-package events
+package command
 
 import (
 	"strings"
+
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // Wildcard matches all teams and all commands
@@ -10,14 +12,25 @@ const wildcard = "*"
 // mapOfStrings is an alias for map[string]string
 type mapOfStrings map[string]string
 
-// TeamAllowlistChecker implements checking the teams and the operations that the members
+type TeamAllowlistChecker interface {
+	// HasRules returns true if the checker has rules defined
+	HasRules() bool
+
+	// IsCommandAllowedForTeam determines if the specified team can perform the specified action
+	IsCommandAllowedForTeam(ctx models.TeamAllowlistCheckerContext, team, command string) bool
+
+	// IsCommandAllowedForAnyTeam determines if any of the specified teams can perform the specified action
+	IsCommandAllowedForAnyTeam(ctx models.TeamAllowlistCheckerContext, teams []string, command string) bool
+}
+
+// DefaultTeamAllowlistChecker implements checking the teams and the operations that the members
 // of a particular team are allowed to perform
-type TeamAllowlistChecker struct {
+type DefaultTeamAllowlistChecker struct {
 	rules []mapOfStrings
 }
 
 // NewTeamAllowlistChecker constructs a new checker
-func NewTeamAllowlistChecker(allowlist string) (*TeamAllowlistChecker, error) {
+func NewTeamAllowlistChecker(allowlist string) (*DefaultTeamAllowlistChecker, error) {
 	var rules []mapOfStrings
 	pairs := strings.Split(allowlist, ",")
 	if pairs[0] != "" {
@@ -29,18 +42,18 @@ func NewTeamAllowlistChecker(allowlist string) (*TeamAllowlistChecker, error) {
 			rules = append(rules, m)
 		}
 	}
-	return &TeamAllowlistChecker{
+	return &DefaultTeamAllowlistChecker{
 		rules: rules,
 	}, nil
 }
 
-func (checker *TeamAllowlistChecker) HasRules() bool {
+func (checker *DefaultTeamAllowlistChecker) HasRules() bool {
 	return len(checker.rules) > 0
 }
 
 // IsCommandAllowedForTeam returns true if the team is allowed to execute the command
 // and false otherwise.
-func (checker *TeamAllowlistChecker) IsCommandAllowedForTeam(team string, command string) bool {
+func (checker *DefaultTeamAllowlistChecker) IsCommandAllowedForTeam(_ models.TeamAllowlistCheckerContext, team string, command string) bool {
 	for _, rule := range checker.rules {
 		for key, value := range rule {
 			if (key == wildcard || strings.EqualFold(key, team)) && (value == wildcard || strings.EqualFold(value, command)) {
@@ -53,7 +66,7 @@ func (checker *TeamAllowlistChecker) IsCommandAllowedForTeam(team string, comman
 
 // IsCommandAllowedForAnyTeam returns true if any of the teams is allowed to execute the command
 // and false otherwise.
-func (checker *TeamAllowlistChecker) IsCommandAllowedForAnyTeam(teams []string, command string) bool {
+func (checker *DefaultTeamAllowlistChecker) IsCommandAllowedForAnyTeam(ctx models.TeamAllowlistCheckerContext, teams []string, command string) bool {
 	if len(teams) == 0 {
 		for _, rule := range checker.rules {
 			for key, value := range rule {
@@ -64,7 +77,7 @@ func (checker *TeamAllowlistChecker) IsCommandAllowedForAnyTeam(teams []string, 
 		}
 	} else {
 		for _, t := range teams {
-			if checker.IsCommandAllowedForTeam(t, command) {
+			if checker.IsCommandAllowedForTeam(ctx, t, command) {
 				return true
 			}
 		}
