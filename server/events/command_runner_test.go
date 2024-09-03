@@ -321,7 +321,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 	t.Run("no rules", func(t *testing.T) {
 		vcsClient := setup(t)
 		// by default these are false so don't need to reset
-		ch.TeamAllowlistChecker = &events.TeamAllowlistChecker{}
+		ch.TeamAllowlistChecker = &command.DefaultTeamAllowlistChecker{}
 		var pull github.PullRequest
 		modelPull := models.PullRequest{
 			BaseRepo: testdata.GithubRepo,

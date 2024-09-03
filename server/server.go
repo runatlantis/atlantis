@@ -806,10 +806,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		command.State:           stateCommandRunner,
 	}
 
-	githubTeamAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
-	if err != nil {
-		return nil, err
+	var teamAllowlistChecker command.TeamAllowlistChecker
+	if globalCfg.TeamAuthz.Command != "" {
+		teamAllowlistChecker = &events.ExternalTeamAllowlistChecker{
+			Command:                     globalCfg.TeamAuthz.Command,
+			ExtraArgs:                   globalCfg.TeamAuthz.Args,
+			ExternalTeamAllowlistRunner: &runtime.DefaultExternalTeamAllowlistRunner{},
+		}
+	} else {
+		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	varFileAllowlistChecker, err := events.NewVarFileAllowlistChecker(userConfig.VarFileAllowlist)
 	if err != nil {
 		return nil, err
@@ -837,7 +847,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              backend,
-		TeamAllowlistChecker:           githubTeamAllowlistChecker,
+		TeamAllowlistChecker:           teamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}

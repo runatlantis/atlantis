@@ -1326,10 +1326,13 @@ func TestParseGlobalCfg(t *testing.T) {
 					},
 				},
 				Workflows: defaultCfg.Workflows,
+				TeamAuthz: valid.TeamAuthz{
+					Args: make([]string, 0),
+				},
 			},
 		},
 		"disable repo locks": {
-			input: `repos: 
+			input: `repos:
 - id: /.*/
   repo_locks:
     mode: disabled`,
@@ -1342,6 +1345,9 @@ func TestParseGlobalCfg(t *testing.T) {
 					},
 				},
 				Workflows: defaultCfg.Workflows,
+				TeamAuthz: valid.TeamAuthz{
+					Args: make([]string, 0),
+				},
 			},
 		},
 		"no workflows key": {
@@ -1362,6 +1368,9 @@ workflows:
 					"default": defaultCfg.Workflows["default"],
 					"name":    defaultWorkflow("name"),
 				},
+				TeamAuthz: valid.TeamAuthz{
+					Args: make([]string, 0),
+				},
 			},
 		},
 		"workflow stages empty": {
@@ -1379,6 +1388,9 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
 					"name":    defaultWorkflow("name"),
+				},
+				TeamAuthz: valid.TeamAuthz{
+					Args: make([]string, 0),
 				},
 			},
 		},
@@ -1402,6 +1414,9 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
 					"name":    defaultWorkflow("name"),
+				},
+				TeamAuthz: valid.TeamAuthz{
+					Args: make([]string, 0),
 				},
 			},
 		},
@@ -1509,6 +1524,9 @@ policies:
 						},
 					},
 				},
+				TeamAuthz: valid.TeamAuthz{
+					Args: make([]string, 0),
+				},
 			},
 		},
 		"id regex with trailing slash": {
@@ -1525,6 +1543,9 @@ repos:
 				},
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
+				},
+				TeamAuthz: valid.TeamAuthz{
+					Args: make([]string, 0),
 				},
 			},
 		},
@@ -1544,6 +1565,9 @@ repos:
 				},
 				Workflows: map[string]valid.Workflow{
 					"default": defaultCfg.Workflows["default"],
+				},
+				TeamAuthz: valid.TeamAuthz{
+					Args: make([]string, 0),
 				},
 			},
 		},
@@ -1619,6 +1643,9 @@ workflows:
 							},
 						},
 					},
+				},
+				TeamAuthz: valid.TeamAuthz{
+					Args: make([]string, 0),
 				},
 			},
 		},
@@ -1840,6 +1867,9 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 							ApproveCount: 1,
 						},
 					},
+				},
+				TeamAuthz: valid.TeamAuthz{
+					Args: make([]string, 0),
 				},
 			},
 		},
