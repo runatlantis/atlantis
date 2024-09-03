@@ -41,3 +41,11 @@ func TestIsCommandAllowedForAnyTeam(t *testing.T) {
 	Equals(t, true, checker.IsCommandAllowedForAnyTeam(teams, `unlock`))
 	Equals(t, false, checker.IsCommandAllowedForAnyTeam(teams, `noop`))
 }
+
+func TestAllTeamsForCommand(t *testing.T) {
+	allowlist := `bob:plan, dave:apply, connie:plan, connie:apply`
+	checker, err := events.NewTeamAllowlistChecker(allowlist)
+	Ok(t, err)
+	Equals(t, []string{"bob", "connie"}, checker.AllTeamsForCommand(`plan`))
+	Equals(t, []string{"dave", "connie"}, checker.AllTeamsForCommand(`apply`))
+}
