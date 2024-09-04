@@ -128,6 +128,8 @@ type CommentCommand struct {
 	SubName string
 	// AutoMergeDisabled is true if the command should not automerge after apply.
 	AutoMergeDisabled bool
+	// MergeMethod specified the merge method for the VCS if automerge enabled.
+	MergeMethod string
 	// Verbose is true if the command should output verbosely.
 	Verbose bool
 	// Workspace is the name of the Terraform workspace to run the command in.
@@ -177,11 +179,11 @@ func (c CommentCommand) IsAutoplan() bool {
 
 // String returns a string representation of the command.
 func (c CommentCommand) String() string {
-	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q policyset=%q, clear-policy-approval=%t, flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.PolicySet, c.ClearPolicyApproval, strings.Join(c.Flags, ","))
+	return fmt.Sprintf("command=%q, verbose=%t, dir=%q, workspace=%q, project=%q, policyset=%q, auto-merge-disabled=%t, merge-method=%s, clear-policy-approval=%t, flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.PolicySet, c.AutoMergeDisabled, c.MergeMethod, c.ClearPolicyApproval, strings.Join(c.Flags, ","))
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, workspace string, project string, policySet string, clearPolicyApproval bool) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, mergeMethod string, workspace string, project string, policySet string, clearPolicyApproval bool) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -198,6 +200,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, sub
 		Verbose:             verbose,
 		Workspace:           workspace,
 		AutoMergeDisabled:   autoMergeDisabled,
+		MergeMethod:         mergeMethod,
 		ProjectName:         project,
 		PolicySet:           policySet,
 		ClearPolicyApproval: clearPolicyApproval,
