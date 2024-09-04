@@ -130,7 +130,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	projectCmdContext := newProjectCommandContext(
 		ctx,
 		cmdName,
-		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled, prjCfg.MergeMethod),
 		cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 		prjCfg,
@@ -203,7 +203,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		projectCmds = append(projectCmds, newProjectCommandContext(
 			ctx,
 			command.PolicyCheck,
-			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled, prjCfg.MergeMethod),
 			cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 			prjCfg,

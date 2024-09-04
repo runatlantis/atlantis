@@ -181,7 +181,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	a.updateCommitStatus(ctx, pullStatus)
 
 	if a.autoMerger.automergeEnabled(projectCmds) && !cmd.AutoMergeDisabled {
-		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds))
+		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.MergeMethod)
 	}
 }
 
