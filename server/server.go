@@ -265,10 +265,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 		githubClient = vcs.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
 	}
+	gitlabGroupAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+	if err != nil {
+		return nil, err
+	}
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
 		var err error
-		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, logger)
+		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, logger, gitlabGroupAllowlistChecker.AllTeams())
 		if err != nil {
 			return nil, err
 		}
@@ -811,10 +815,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	gitlabGroupAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
-	if err != nil {
-		return nil, err
-	}
+
 	varFileAllowlistChecker, err := events.NewVarFileAllowlistChecker(userConfig.VarFileAllowlist)
 	if err != nil {
 		return nil, err

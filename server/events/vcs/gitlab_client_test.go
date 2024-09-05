@@ -66,7 +66,7 @@ func TestNewGitlabClient_BaseURL(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Hostname, func(t *testing.T) {
 			log := logging.NewNoopLogger(t)
-			client, err := NewGitlabClient(c.Hostname, "token", log)
+			client, err := NewGitlabClient(c.Hostname, "token", log, nil)
 			Ok(t, err)
 			Equals(t, c.ExpBaseURL, client.Client.BaseURL().String())
 		})
@@ -672,7 +672,7 @@ func TestGitlabClient_MarkdownPullLink(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	gitlabClientUnderTest = true
 	defer func() { gitlabClientUnderTest = false }()
-	client, err := NewGitlabClient("gitlab.com", "token", logger)
+	client, err := NewGitlabClient("gitlab.com", "token", logger, nil)
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
@@ -928,8 +928,9 @@ func TestGitlabClient_GetTeamNamesForUser(t *testing.T) {
 	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 	Ok(t, err)
 	client := &GitlabClient{
-		Client:  internalClient,
-		Version: nil,
+		Client:          internalClient,
+		Version:         nil,
+		configuredTeams: configuredTeams,
 	}
 
 	teams, err := client.GetTeamNamesForUser(
@@ -938,8 +939,8 @@ func TestGitlabClient_GetTeamNamesForUser(t *testing.T) {
 			Owner: "someorg",
 		}, models.User{
 			Username: "testuser",
-		},
-		configuredTeams)
+		})
+
 	Ok(t, err)
 	Equals(t, []string{"someorg/group1", "someorg/group2"}, teams)
 }

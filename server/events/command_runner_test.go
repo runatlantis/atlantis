@@ -313,7 +313,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.User](), Any[[]string]())
+		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.User]())
 		vcsClient.VerifyWasCalledOnce().CreateComment(
 			Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Ran Plan for 0 projects:"), Eq("plan"))
 	})
@@ -331,7 +331,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.User](), Any[[]string]())
+		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.User]())
 		vcsClient.VerifyWasCalledOnce().CreateComment(
 			Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Ran Plan for 0 projects:"), Eq("plan"))
 	})

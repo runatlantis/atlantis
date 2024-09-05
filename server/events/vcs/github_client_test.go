@@ -1342,8 +1342,7 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 			Owner: "testrepo",
 		}, models.User{
 			Username: "testuser",
-		},
-		[]string{})
+		})
 	Ok(t, err)
 	Equals(t, []string{"Frontend Developers", "frontend-developers", "Employees", "employees"}, teams)
 }

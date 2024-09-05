@@ -45,6 +45,11 @@ type GitlabClient struct {
 	PollingInterval time.Duration
 	// PollingInterval is the total duration for which to poll, where applicable.
 	PollingTimeout time.Duration
+
+	// configuredTeams are teams whose membership we might want to check
+	// the gitlab list groups for a user, so instead of looping over every possible group when running GetTeamNamesForUser,
+	// we only use those we know we might need
+	configuredTeams []string
 }
 
 // commonMarkSupported is a version constraint that is true when this version of
@@ -56,11 +61,12 @@ var commonMarkSupported = MustConstraint(">=11.1")
 var gitlabClientUnderTest = false
 
 // NewGitlabClient returns a valid GitLab client.
-func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging) (*GitlabClient, error) {
+func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging, configuredTeams []string) (*GitlabClient, error) {
 	logger.Debug("Creating new GitLab client for %s", hostname)
 	client := &GitlabClient{
 		PollingInterval: time.Second,
 		PollingTimeout:  time.Second * 30,
+		configuredTeams: configuredTeams,
 	}
 
 	// Create the client differently depending on the base URL.
@@ -628,8 +634,9 @@ func MustConstraint(constraint string) version.Constraints {
 // GetTeamNamesForUser returns the names of the GitLab groups that the user belongs to.
 // The user membership is checked in each group from configuredTeams, groups
 // that the Atlantis user doesn't have access to are silently ignored.
-func (g *GitlabClient) GetTeamNamesForUser(logger logging.SimpleLogging, _ models.Repo, user models.User, configuredTeams []string) ([]string, error) {
+func (g *GitlabClient) GetTeamNamesForUser(logger logging.SimpleLogging, _ models.Repo, user models.User) ([]string, error) {
 	logger.Debug("Getting GitLab group names for user '%s'", user)
+
 	var teamNames []string
 
 	users, resp, err := g.Client.Users.ListUsers(&gitlab.ListUsersOptions{Username: &user.Username})
@@ -645,7 +652,7 @@ func (g *GitlabClient) GetTeamNamesForUser(logger logging.SimpleLogging, _ model
 		return nil, errors.Wrap(err, "GET /users returned more than 1 user")
 	}
 	userID := users[0].ID
-	for _, groupName := range configuredTeams {
+	for _, groupName := range g.configuredTeams {
 		membership, resp, err := g.Client.GroupMembers.GetGroupMember(groupName, userID)
 		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden {
 			continue

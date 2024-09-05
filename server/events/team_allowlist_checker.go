@@ -84,3 +84,16 @@ func (checker *TeamAllowlistChecker) AllTeamsForCommand(command string) []string
 	}
 	return teamNames
 }
+
+// AllTeams returns all teams listed in the rule for all commands
+func (checker *TeamAllowlistChecker) AllTeams() []string {
+	var teamNames []string
+	for _, rule := range checker.rules {
+		for key := range rule {
+
+			teamNames = append(teamNames, key)
+
+		}
+	}
+	return teamNames
+}

@@ -257,7 +257,7 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 		// allowlist restriction is not enabled
 		return true, nil
 	}
-	teams, err := c.VCSClient.GetTeamNamesForUser(c.Logger, repo, user, teamAllowListChecker.AllTeamsForCommand(cmdName))
+	teams, err := c.VCSClient.GetTeamNamesForUser(c.Logger, repo, user)
 	if err != nil {
 		return false, err
 	}

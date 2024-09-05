@@ -60,7 +60,7 @@ func (a *NotConfiguredVCSClient) MarkdownPullLink(_ models.PullRequest) (string,
 func (a *NotConfiguredVCSClient) err() error {
 	return fmt.Errorf("atlantis was not configured to support repos from %s", a.Host.String())
 }
-func (a *NotConfiguredVCSClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User, _ []string) ([]string, error) {
+func (a *NotConfiguredVCSClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) {
 	return nil, a.err()
 }
 

@@ -97,8 +97,8 @@ func (d *ClientProxy) MarkdownPullLink(pull models.PullRequest) (string, error) 
 	return d.clients[pull.BaseRepo.VCSHost.Type].MarkdownPullLink(pull)
 }
 
-func (d *ClientProxy) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User, configuredTeams []string) ([]string, error) {
-	return d.clients[repo.VCSHost.Type].GetTeamNamesForUser(logger, repo, user, configuredTeams)
+func (d *ClientProxy) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) {
+	return d.clients[repo.VCSHost.Type].GetTeamNamesForUser(logger, repo, user)
 }
 
 func (d *ClientProxy) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {
