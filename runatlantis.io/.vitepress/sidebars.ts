@@ -37,6 +37,7 @@ const en = [
           { text: "Post Workflow Hooks", link: "/docs/post-workflow-hooks" },
           { text: "Conftest Policy Checking", link: "/docs/policy-checking" },
           { text: "Custom Workflows", link: "/docs/custom-workflows" },
+          { text: "Repo and Project Permissions", link: "/docs/repo-and-project-permissions" },
           { text: "Repo Level atlantis.yaml", link: "/docs/repo-level-atlantis-yaml" },
           { text: "Upgrading atlantis.yaml", link: "/docs/upgrading-atlantis-yaml" },
           { text: "Command Requirements", link: "/docs/command-requirements" },

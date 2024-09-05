@@ -47,6 +47,7 @@ type GlobalCfg struct {
 	Workflows  map[string]Workflow
 	PolicySets PolicySets
 	Metrics    Metrics
+	TeamAuthz  TeamAuthz
 }
 
 type Metrics struct {
@@ -248,6 +249,9 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 		},
 		Workflows: map[string]Workflow{
 			DefaultWorkflowName: defaultWorkflow,
+		},
+		TeamAuthz: TeamAuthz{
+			Args: make([]string, 0),
 		},
 	}
 }
