@@ -23,4 +23,6 @@ type VCSClient interface {
 	GetAtlantisStatus(ctx context.Context, branchName string) (string, error)
 	ClosePullRequest(ctx context.Context, pullRequestNumber int) error
 	DeleteBranch(ctx context.Context, branchName string) error
+	IsAtlantisInProgress(state string) bool
+	DidAtlantisSucceed(state string) bool
 }

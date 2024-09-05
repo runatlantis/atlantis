@@ -9,7 +9,7 @@ on:
       - ready_for_review
     branches:
       - "main"
-      - 'release-**'
+      - "release-**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -47,18 +47,18 @@ jobs:
     name: Linting
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
-    # need to setup go toolchain explicitly
-    - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
-      with:
-        go-version-file: go.mod
+      # need to setup go toolchain explicitly
+      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+        with:
+          go-version-file: go.mod
 
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@a4f60bb28d35aeee14e6880718e0c85ff1882e64 # v6
-      with:
-        # renovate: datasource=github-releases depName=golangci/golangci-lint
-        version: v1.59.1
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@aaa42aa0628b4ae2578232a66b541047968fac86 # v6
+        with:
+          # renovate: datasource=github-releases depName=golangci/golangci-lint
+          version: v1.60.1
 
   skip-lint:
     needs: [changes]

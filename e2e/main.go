@@ -15,6 +15,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 
@@ -32,6 +33,20 @@ var projectTypes = []Project{
 type Project struct {
 	Name         string
 	ApplyCommand string
+}
+
+func getVCSClient() (VCSClient, error) {
+
+	if os.Getenv("ATLANTIS_GH_USER") != "" {
+		log.Print("Running tests for github")
+		return NewGithubClient(), nil
+	}
+	if os.Getenv("ATLANTIS_GITLAB_USER") != "" {
+		log.Print("Running tests for gitlab")
+		return NewGitlabClient(), nil
+	}
+
+	return nil, errors.New("could not determine which vcs client")
 }
 
 func main() {
@@ -55,18 +70,21 @@ func main() {
 		log.Fatalf("failed to clean dir %q before cloning, attempting to continue: %v", cloneDirRoot, err)
 	}
 
-	githubClient := NewGithubClient()
+	vcsClient, err := getVCSClient()
+	if err != nil {
+		log.Fatalf("failed to get vcs client: %v", err)
+	}
 	ctx := context.Background()
 	// we create atlantis hook once for the repo, since the atlantis server can handle multiple requests
 	log.Printf("creating atlantis webhook with %s url", atlantisURL)
-	hookID, err := githubClient.CreateAtlantisWebhook(ctx, atlantisURL)
+	hookID, err := vcsClient.CreateAtlantisWebhook(ctx, atlantisURL)
 	if err != nil {
 		log.Fatalf("error creating atlantis webhook: %v", err)
 	}
 
 	// create e2e test
 	e2e := E2ETester{
-		vcsClient:    githubClient,
+		vcsClient:    vcsClient,
 		hookID:       hookID,
 		cloneDirRoot: cloneDirRoot,
 	}

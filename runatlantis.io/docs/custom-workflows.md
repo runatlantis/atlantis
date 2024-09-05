@@ -450,6 +450,63 @@ projects:
   workflow: production
 ```
 
+### Add directory and repo context for aws resources using default tags
+
+This is only available in AWS provider version [5.62.0](https://github.com/hashicorp/terraform-provider-aws/releases/tag/v5.62.0) and higher.
+
+This configuration will create the following tags
+
+* `repository` equal to `github.com/<owner>/<repo>` which can be changed for gitlab or other VCS
+* `repository_dir` equal to the relative directory
+
+Other default variables can be added such as for workspace. See below for more available environment variables.
+
+```yaml
+workflows:
+  terraform:
+    plan:
+      steps:
+        # These env vars TF_AWS_DEFAULT_TAGS_ will work for aws provider 5.62.0+
+        # https://github.com/hashicorp/terraform-provider-aws/releases/tag/v5.62.0
+        - &env_default_tags_repository
+          env:
+            name: TF_AWS_DEFAULT_TAGS_repository
+            command: 'echo "github.com/${BASE_REPO_OWNER}/${BASE_REPO_NAME}"'
+        - &env_default_tags_repository_dir
+          env:
+            name: TF_AWS_DEFAULT_TAGS_repository_dir
+            command: 'echo "${REPO_REL_DIR}"'
+    apply:
+      steps:
+        - *env_default_tags_repository
+        - *env_default_tags_repository_dir
+```
+
+NOTE:
+- Appending tags to every resource may regenerate data sources such as `aws_iam_policy_document` which will cause many resources to be modified. See known issue in aws provider [#29421](https://github.com/hashicorp/terraform-provider-aws/issues/29421).
+- To run a local plan outside of terraform, the same environment variables will need to be created.
+
+    ```bash
+    tfvars () {
+      export terraform_repository=$(git config --get remote.origin.url | sed 's,^git@,,g' | tr ':' '/' | sed 's,.git$,,g')
+      export terraform_repository_dir=$(git rev-parse --show-prefix | sed 's,\/$,,g')
+    }
+    export TF_AWS_DEFAULT_TAGS_repository=$terraform_repository
+    export TF_AWS_DEFAULT_TAGS_repository_dir=$terraform_repository_dir
+    tfvars
+    terraform plan
+    ```
+
+    If a colon is used in the tag name, use the `env` command instead of `export`.
+
+    ```bash
+    tfvars
+    env \
+      TF_AWS_DEFAULT_TAGS_org:repository=$terraform_repository \
+      TF_AWS_DEFAULT_TAGS_org:repository_dir=$terraform_repository_dir \
+      terraform plan
+    ```
+
 ## Reference
 
 ### Workflow
