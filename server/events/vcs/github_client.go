@@ -18,6 +18,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,6 +40,40 @@ var (
 	pullRequestDismissalMessage = *githubv4.NewString("Dismissing reviews because of plan changes")
 )
 
+type GithubRepoIdCacheEntry struct {
+	RepoId     githubv4.Int
+	LookupTime time.Time
+}
+
+type GitHubRepoIdCache struct {
+	cache map[githubv4.String]GithubRepoIdCacheEntry
+}
+
+func NewGitHubRepoIdCache() GitHubRepoIdCache {
+	return GitHubRepoIdCache{
+		cache: make(map[githubv4.String]GithubRepoIdCacheEntry),
+	}
+}
+
+func (c *GitHubRepoIdCache) Get(key githubv4.String) (githubv4.Int, bool) {
+	entry, ok := c.cache[key]
+	if !ok {
+		return githubv4.Int(0), false
+	}
+	if time.Since(entry.LookupTime) > time.Hour {
+		delete(c.cache, key)
+		return githubv4.Int(0), false
+	}
+	return entry.RepoId, true
+}
+
+func (c *GitHubRepoIdCache) Set(key githubv4.String, value githubv4.Int) {
+	c.cache[key] = GithubRepoIdCacheEntry{
+		RepoId:     value,
+		LookupTime: time.Now(),
+	}
+}
+
 // GithubClient is used to perform GitHub actions.
 type GithubClient struct {
 	user                  string
@@ -47,6 +82,7 @@ type GithubClient struct {
 	ctx                   context.Context
 	config                GithubConfig
 	maxCommentsPerCommand int
+	repoIdCache           GitHubRepoIdCache
 }
 
 // GithubAppTemporarySecrets holds app credentials obtained from github after creation.
@@ -109,6 +145,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 	if err != nil {
 		return nil, errors.Wrap(err, "getting user")
 	}
+
 	return &GithubClient{
 		user:                  user,
 		client:                client,
@@ -116,6 +153,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		ctx:                   context.Background(),
 		config:                config,
 		maxCommentsPerCommand: maxCommentsPerCommand,
+		repoIdCache:           NewGitHubRepoIdCache(),
 	}, nil
 }
 
@@ -410,117 +448,346 @@ func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest)
 	return nil
 }
 
-// isRequiredCheck is a helper function to determine if a check is required or not
-func isRequiredCheck(check string, required []string) bool {
-	//in go1.18 can prob replace this with slices.Contains
-	for _, r := range required {
-		if r == check {
-			return true
+type PageInfo struct {
+	EndCursor   *githubv4.String
+	HasNextPage githubv4.Boolean
+}
+
+type WorkflowFileReference struct {
+	Path         githubv4.String
+	RepositoryId githubv4.Int
+	Sha          *githubv4.String
+}
+
+func (original WorkflowFileReference) Copy() WorkflowFileReference {
+	copy := WorkflowFileReference{
+		Path:         original.Path,
+		RepositoryId: original.RepositoryId,
+		Sha:          new(githubv4.String),
+	}
+	if original.Sha != nil {
+		*copy.Sha = *original.Sha
+	}
+	return copy
+}
+
+type WorkflowRun struct {
+	File struct {
+		Path              githubv4.String
+		RepositoryFileUrl githubv4.String
+		RepositoryName    githubv4.String
+	}
+}
+
+type CheckRun struct {
+	Name       githubv4.String
+	Conclusion githubv4.String
+	// Not currently used: GitHub API classifies as required if coming from ruleset, even when the ruleset is not enforced!
+	IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
+	CheckSuite struct {
+		WorkflowRun *WorkflowRun
+	}
+}
+
+func (original CheckRun) Copy() CheckRun {
+	copy := CheckRun{
+		Name:       original.Name,
+		Conclusion: original.Conclusion,
+		IsRequired: original.IsRequired,
+		CheckSuite: original.CheckSuite,
+	}
+	if original.CheckSuite.WorkflowRun != nil {
+		copy.CheckSuite.WorkflowRun = new(WorkflowRun)
+		*copy.CheckSuite.WorkflowRun = *original.CheckSuite.WorkflowRun
+	}
+	return copy
+}
+
+type StatusContext struct {
+	Context githubv4.String
+	State   githubv4.String
+	// Not currently used: GitHub API classifies as required if coming from ruleset, even when the ruleset is not enforced!
+	IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
+}
+
+func (g *GithubClient) LookupRepoId(repo githubv4.String) (githubv4.Int, error) {
+	// This function may get many calls for the same repo, and repo names are not often changed
+	// Utilize caching to reduce the number of API calls to GitHub
+	if repoId, ok := g.repoIdCache.Get(repo); ok {
+		return repoId, nil
+	}
+
+	repoSplit := strings.Split(string(repo), "/")
+	if len(repoSplit) != 2 {
+		return githubv4.Int(0), fmt.Errorf("invalid repository name: %s", repo)
+	}
+
+	var query struct {
+		Repository struct {
+			DatabaseId githubv4.Int
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repoSplit[0]),
+		"name":  githubv4.String(repoSplit[1]),
+	}
+
+	err := g.v4Client.Query(g.ctx, &query, variables)
+
+	if err != nil {
+		return githubv4.Int(0), errors.Wrap(err, "getting repository id from GraphQL")
+	}
+
+	g.repoIdCache.Set(repo, query.Repository.DatabaseId)
+
+	return query.Repository.DatabaseId, nil
+}
+
+func (g *GithubClient) WorkflowRunMatchesWorkflowFileReference(workflowRun WorkflowRun, workflowFileReference WorkflowFileReference) (bool, error) {
+	// Unfortunately, the GitHub API doesn't expose the repositoryId for the WorkflowRunFile from the statusCheckRollup.
+	// Conversely, it doesn't expose the repository name for the WorkflowFileReference from the RepositoryRuleConnection.
+	// Therefore, a second query is required to lookup the association between repositoryId and repositoryName.
+	repoId, err := g.LookupRepoId(workflowRun.File.RepositoryName)
+	if err != nil {
+		return false, err
+	}
+
+	if !(repoId == workflowFileReference.RepositoryId && workflowRun.File.Path == workflowFileReference.Path) {
+		return false, nil
+	} else if workflowFileReference.Sha != nil {
+		return strings.Contains(string(workflowRun.File.RepositoryFileUrl), string(*workflowFileReference.Sha)), nil
+	} else {
+		return true, nil
+	}
+}
+
+func (g *GithubClient) GetPullRequestMergeabilityInfo(
+	repo models.Repo,
+	pull *github.PullRequest,
+) (
+	reviewDecision githubv4.String,
+	requiredChecks []githubv4.String,
+	requiredWorkflows []WorkflowFileReference,
+	checkRuns []CheckRun,
+	statusContexts []StatusContext,
+	err error,
+) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				ReviewDecision githubv4.String
+				BaseRef        struct {
+					BranchProtectionRule struct {
+						RequiredStatusChecks []struct {
+							Context githubv4.String
+						}
+					}
+					Rules struct {
+						PageInfo PageInfo
+						Nodes    []struct {
+							Type              githubv4.String
+							RepositoryRuleset struct {
+								Enforcement githubv4.String
+							}
+							Parameters struct {
+								RequiredStatusChecksParameters struct {
+									RequiredStatusChecks []struct {
+										Context githubv4.String
+									}
+								} `graphql:"... on RequiredStatusChecksParameters"`
+								WorkflowsParameters struct {
+									Workflows []WorkflowFileReference
+								} `graphql:"... on WorkflowsParameters"`
+							}
+						}
+					} `graphql:"rules(first: 100, after: $ruleCursor)"`
+				}
+				Commits struct {
+					Nodes []struct {
+						Commit struct {
+							StatusCheckRollup struct {
+								Contexts struct {
+									PageInfo PageInfo
+									Nodes    []struct {
+										Typename      githubv4.String `graphql:"__typename"`
+										CheckRun      CheckRun        `graphql:"... on CheckRun"`
+										StatusContext StatusContext   `graphql:"... on StatusContext"`
+									}
+								} `graphql:"contexts(first: 100, after: $contextCursor)"`
+							}
+						}
+					}
+				} `graphql:"commits(last: 1)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":         githubv4.String(repo.Owner),
+		"name":          githubv4.String(repo.Name),
+		"number":        githubv4.Int(*pull.Number),
+		"ruleCursor":    (*githubv4.String)(nil),
+		"contextCursor": (*githubv4.String)(nil),
+	}
+
+	requiredChecksSet := make(map[githubv4.String]any)
+
+pagination:
+	for {
+		err = g.v4Client.Query(g.ctx, &query, variables)
+
+		if err != nil {
+			break pagination
+		}
+
+		reviewDecision = query.Repository.PullRequest.ReviewDecision
+
+		for _, rule := range query.Repository.PullRequest.BaseRef.BranchProtectionRule.RequiredStatusChecks {
+			requiredChecksSet[rule.Context] = struct{}{}
+		}
+
+		for _, rule := range query.Repository.PullRequest.BaseRef.Rules.Nodes {
+			if rule.RepositoryRuleset.Enforcement != "ACTIVE" {
+				continue
+			}
+			switch rule.Type {
+			case "REQUIRED_STATUS_CHECKS":
+				for _, context := range rule.Parameters.RequiredStatusChecksParameters.RequiredStatusChecks {
+					requiredChecksSet[context.Context] = struct{}{}
+				}
+			case "WORKFLOWS":
+				for _, workflow := range rule.Parameters.WorkflowsParameters.Workflows {
+					requiredWorkflows = append(requiredWorkflows, workflow.Copy())
+				}
+			default:
+				continue
+			}
+		}
+
+		if len(query.Repository.PullRequest.Commits.Nodes) == 0 {
+			err = errors.New("no commits found on PR")
+			break pagination
+		}
+
+		for _, context := range query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
+			switch context.Typename {
+			case "CheckRun":
+				checkRuns = append(checkRuns, context.CheckRun.Copy())
+			case "StatusContext":
+				statusContexts = append(statusContexts, context.StatusContext)
+			default:
+				err = fmt.Errorf("unknown type of status check, %q", context.Typename)
+				break pagination
+			}
+		}
+
+		if !query.Repository.PullRequest.BaseRef.Rules.PageInfo.HasNextPage &&
+			!query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.HasNextPage {
+			break pagination
+		}
+
+		if query.Repository.PullRequest.BaseRef.Rules.PageInfo.EndCursor != nil {
+			variables["ruleCursor"] = query.Repository.PullRequest.BaseRef.Rules.PageInfo.EndCursor
+		}
+		if query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.EndCursor != nil {
+			variables["contextCursor"] = query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.EndCursor
+		}
+	}
+
+	if err != nil {
+		return "", nil, nil, nil, nil, errors.Wrap(err, "fetching rulesets, branch protections and status checks from GraphQL")
+	}
+
+	for context := range requiredChecksSet {
+		requiredChecks = append(requiredChecks, context)
+	}
+
+	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, nil
+}
+
+func CheckRunPassed(checkRun CheckRun) bool {
+	return checkRun.Conclusion == "SUCCESS" || checkRun.Conclusion == "SKIPPED" || checkRun.Conclusion == "NEUTRAL"
+}
+
+func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool {
+	return strings.HasPrefix(string(statusContext.Context), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) ||
+		statusContext.State == "SUCCESS"
+}
+
+func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string) bool {
+	for _, checkRun := range checkRuns {
+		if checkRun.Name == expectedContext {
+			return CheckRunPassed(checkRun)
+		}
+	}
+
+	for _, statusContext := range statusContexts {
+		if statusContext.Context == expectedContext {
+			return StatusContextPassed(statusContext, vcsstatusname)
 		}
 	}
 
 	return false
 }
 
-// GetCombinedStatusMinusApply checks Statuses for PR, excluding atlantis apply. Returns true if all other statuses are not in failure.
-func (g *GithubClient) GetCombinedStatusMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcstatusname string) (bool, error) {
-	logger.Debug("Checking if GitHub pull request %d has successful status checks", pull.GetNumber())
-	//check combined status api
-	status, resp, err := g.client.Repositories.GetCombinedStatus(g.ctx, *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
-	if resp != nil {
-		logger.Debug("GET /repos/%v/%v/commits/%s/status returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, resp.StatusCode)
-	}
-	if err != nil {
-		return false, errors.Wrap(err, "getting combined status")
-	}
-
-	//iterate over statuses - return false if we find one that isn't "apply" and doesn't have state = "success"
-	for _, r := range status.Statuses {
-		if strings.HasPrefix(*r.Context, fmt.Sprintf("%s/%s", vcstatusname, command.Apply.String())) {
+func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
+	for _, checkRun := range checkRuns {
+		if checkRun.CheckSuite.WorkflowRun == nil {
 			continue
 		}
-		if *r.State != "success" {
+		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun, expectedWorkflow)
+		if err != nil {
+			return false, err
+		}
+		if match {
+			return CheckRunPassed(checkRun), nil
+		}
+	}
+
+	return false, nil
+}
+
+// IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
+func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
+	if pull.Number == nil {
+		return false, errors.New("pull request number is nil")
+	}
+	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, err := g.GetPullRequestMergeabilityInfo(repo, pull)
+	if err != nil {
+		return false, err
+	}
+
+	notMergeablePrefix := fmt.Sprintf("Pull Request %s/%s:%s is not mergeable", repo.Owner, repo.Name, strconv.Itoa(*pull.Number))
+
+	// Review decision takes CODEOWNERS into account
+	// Empty review decision means review is not required
+	if reviewDecision != "APPROVED" && len(reviewDecision) != 0 {
+		logger.Debug("%s: Review Decision: %s", notMergeablePrefix, reviewDecision)
+		return false, nil
+	}
+
+	// The statusCheckRollup does not always contain all required checks
+	// For example, if a check was made required after the pull request was opened, it would be missing
+	// Go through all checks and workflows required by branch protection or rulesets
+	// Make sure that they can all be found in the statusCheckRollup and that they all pass
+	for _, requiredCheck := range requiredChecks {
+		if !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname) {
+			logger.Debug("%s: Expected Required Check: %s", notMergeablePrefix, requiredCheck)
+			return false, nil
+		}
+	}
+	for _, requiredWorkflow := range requiredWorkflows {
+		passed, err := g.ExpectedWorkflowPassed(requiredWorkflow, checkRuns)
+		if err != nil {
+			return false, err
+		}
+		if !passed {
+			logger.Debug("%s: Expected Required Workflow: RepositoryId: %d Path: %s", notMergeablePrefix, requiredWorkflow.RepositoryId, requiredWorkflow.Path)
 			return false, nil
 		}
 	}
 
-	//get required status checks
-	required, resp, err := g.client.Repositories.GetBranchProtection(context.Background(), repo.Owner, repo.Name, *pull.Base.Ref)
-	if resp != nil {
-		logger.Debug("GET /repos/%v/%v/branches/%s/protection returned: %v", repo.Owner, repo.Name, *pull.Base.Ref, resp.StatusCode)
-	}
-	if err != nil {
-		return false, errors.Wrap(err, "getting required status checks")
-	}
-
-	if required.RequiredStatusChecks == nil {
-		return true, nil
-	}
-
-	//check check suite/check run api
-	checksuites, resp, err := g.client.Checks.ListCheckSuitesForRef(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, nil)
-	if resp != nil {
-		logger.Debug("GET /repos/%v/%v/commits/%s/check-suites returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *pull.Head.Ref, resp.StatusCode)
-	}
-	if err != nil {
-		return false, errors.Wrap(err, "getting check suites for ref")
-	}
-
-	//iterate over check completed check suites - return false if we find one that doesnt have conclusion = "success"
-	for _, c := range checksuites.CheckSuites {
-		if *c.Status == "completed" {
-			//iterate over the runs inside the suite
-			suite, resp, err := g.client.Checks.ListCheckRunsCheckSuite(context.Background(), *pull.Head.Repo.Owner.Login, repo.Name, *c.ID, nil)
-			if resp != nil {
-				logger.Debug("GET /repos/%v/%v/check-suites/%d/check-runs returned: %v", *pull.Head.Repo.Owner.Login, repo.Name, *c.ID, resp.StatusCode)
-			}
-			if err != nil {
-				return false, errors.Wrap(err, "getting check runs for check suite")
-			}
-
-			for _, r := range suite.CheckRuns {
-				//check to see if the check is required
-				if isRequiredCheck(*r.Name, required.RequiredStatusChecks.Contexts) {
-					if *c.Conclusion == "success" {
-						continue
-					}
-					return false, nil
-				}
-				//ignore checks that arent required
-				continue
-			}
-		}
-	}
-
 	return true, nil
-}
-
-// GetPullReviewDecision gets the pull review decision, which takes into account CODEOWNERS
-func (g *GithubClient) GetPullReviewDecision(repo models.Repo, pull models.PullRequest) (approvalStatus bool, err error) {
-	var query struct {
-		Repository struct {
-			PullRequest struct {
-				ReviewDecision string
-			} `graphql:"pullRequest(number: $number)"`
-		} `graphql:"repository(owner: $owner, name: $name)"`
-	}
-
-	variables := map[string]interface{}{
-		"owner":  githubv4.String(repo.Owner),
-		"name":   githubv4.String(repo.Name),
-		"number": githubv4.Int(pull.Num),
-	}
-
-	err = g.v4Client.Query(g.ctx, &query, variables)
-	if err != nil {
-		return approvalStatus, errors.Wrap(err, "getting reviewDecision")
-	}
-
-	if query.Repository.PullRequest.ReviewDecision == "APPROVED" || len(query.Repository.PullRequest.ReviewDecision) == 0 {
-		return true, nil
-	}
-
-	return false, nil
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
@@ -531,7 +798,6 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		return false, errors.Wrap(err, "getting pull request")
 	}
 
-	state := githubPR.GetMergeableState()
 	// We map our mergeable check to when the GitHub merge button is clickable.
 	// This corresponds to the following states:
 	// clean: No conflicts, all requirements satisfied.
@@ -541,33 +807,22 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
-	if state != "clean" && state != "unstable" && state != "has_hooks" {
-		//mergeable bypass apply code hidden by feature flag
+	switch githubPR.GetMergeableState() {
+	case "clean", "unstable", "has_hooks":
+		return true, nil
+	case "blocked":
 		if g.config.AllowMergeableBypassApply {
 			logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
-			if state == "blocked" {
-				//check status excluding atlantis apply
-				status, err := g.GetCombinedStatusMinusApply(logger, repo, githubPR, vcsstatusname)
-				if err != nil {
-					return false, errors.Wrap(err, "getting pull request status")
-				}
-
-				//check to see if pr is approved using reviewDecision
-				approved, err := g.GetPullReviewDecision(repo, pull)
-				if err != nil {
-					return false, errors.Wrap(err, "getting pull request reviewDecision")
-				}
-
-				//if all other status checks EXCEPT atlantis/apply are successful, and the PR is approved based on reviewDecision, let it proceed
-				if status && approved {
-					return true, nil
-				}
+			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname)
+			if err != nil {
+				return false, errors.Wrap(err, "getting pull request status")
 			}
+			return isMergeableMinusApply, nil
 		}
-
+		return false, nil
+	default:
 		return false, nil
 	}
-	return true, nil
 }
 
 // GetPullRequest returns the pull request.
