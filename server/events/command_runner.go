@@ -156,19 +156,21 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	defer timer.Stop()
 
 	// Check if the user who triggered the autoplan has permissions to run 'plan'.
-	err = c.fetchUserTeams(baseRepo, &user)
-	if err != nil {
-		c.Logger.Err("Unable to fetch user teams: %s", err)
-		return
-	}
+	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
+		err := c.fetchUserTeams(baseRepo, &user)
+		if err != nil {
+			c.Logger.Err("Unable to fetch user teams: %s", err)
+			return
+		}
 
-	ok, err := c.checkUserPermissions(baseRepo, user, "plan")
-	if err != nil {
-		c.Logger.Err("Unable to check user permissions: %s", err)
-		return
-	}
-	if !ok {
-		return
+		ok, err := c.checkUserPermissions(baseRepo, user, "plan")
+		if err != nil {
+			c.Logger.Err("Unable to check user permissions: %s", err)
+			return
+		}
+		if !ok {
+			return
+		}
 	}
 
 	ctx := &command.Context{
