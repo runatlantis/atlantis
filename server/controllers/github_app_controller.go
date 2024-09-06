@@ -123,6 +123,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, _ *http.Request) {
 			"statuses":         "write",
 			"administration":   "read",
 			"members":          "read",
+			"actions":          "read",
 		},
 	}
 
