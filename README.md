@@ -4,7 +4,6 @@
 [![SuperDopeBadge](./runatlantis.io/public/hightower-super-dope.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
 [![Go Report Card](https://goreportcard.com/badge/github.com/runatlantis/atlantis)](https://goreportcard.com/report/github.com/runatlantis/atlantis)
 [![Go Reference](https://pkg.go.dev/badge/github.com/runatlantis/atlantis.svg)](https://pkg.go.dev/github.com/runatlantis/atlantis)
-[![CircleCI](https://circleci.com/gh/runatlantis/atlantis/tree/main.svg?style=shield)](https://circleci.com/gh/runatlantis/atlantis/tree/main)
 [![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://join.slack.com/t/atlantis-community/shared_invite/zt-9xlxtxtc-CUSKB1ATt_sQy6um~LDPNw)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/runatlantis/atlantis/badge)](https://scorecard.dev/viewer/?uri=github.com/runatlantis/atlantis)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9428/badge)](https://www.bestpractices.dev/projects/9428)
