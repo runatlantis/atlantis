@@ -18,6 +18,7 @@ type githubAppTokenRotator struct {
 	log               logging.SimpleLogging
 	githubCredentials GithubCredentials
 	githubHostname    string
+	gitUser           string
 	homeDirPath       string
 }
 
@@ -25,12 +26,14 @@ func NewGithubAppTokenRotator(
 	log logging.SimpleLogging,
 	githubCredentials GithubCredentials,
 	githubHostname string,
+	gitUser string,
 	homeDirPath string) GitCredsTokenRotator {
 
 	return &githubAppTokenRotator{
 		log:               log,
 		githubCredentials: githubCredentials,
 		githubHostname:    githubHostname,
+		gitUser:           gitUser,
 		homeDirPath:       homeDirPath,
 	}
 }
@@ -55,7 +58,7 @@ func (r *githubAppTokenRotator) Run() {
 }
 
 func (r *githubAppTokenRotator) rotate() error {
-	r.log.Debug("Refreshing git tokens for Github App")
+	r.log.Debug("Refreshing Github tokens for .git-credentials")
 
 	token, err := r.githubCredentials.GetToken()
 	if err != nil {
@@ -64,7 +67,7 @@ func (r *githubAppTokenRotator) rotate() error {
 	r.log.Debug("Token successfully refreshed")
 
 	// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#http-based-git-access-by-an-installation
-	if err := WriteGitCreds("x-access-token", token, r.githubHostname, r.homeDirPath, r.log, true); err != nil {
+	if err := WriteGitCreds(r.gitUser, token, r.githubHostname, r.homeDirPath, r.log, true); err != nil {
 		return errors.Wrap(err, "Writing ~/.git-credentials file")
 	}
 	return nil
