@@ -232,8 +232,8 @@ func (g *GithubClient) CreateComment(logger logging.SimpleLogging, repo models.R
 			"```diff\n"
 	}
 
-	truncationHeader := "\n```\n</details>" +
-		"\n<br>\n\n**Warning**: Command output is larger than the maximum number of comments per command. Output truncated.\n\n[..]\n"
+	truncationHeader := "> [!WARNING]\n" +
+		"> **Warning**: Command output is larger than the maximum number of comments per command. Output truncated.\n"
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, g.maxCommentsPerCommand, truncationHeader)
 	for i := range comments {
