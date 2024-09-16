@@ -55,7 +55,7 @@ func (*DistributionOpenTofu) ResolveConstraint(constraintStr string) (*version.V
 
 	allVersions, err := dl.ListVersions(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("error listing OpenTofu verisons: %s", err)
+		return nil, fmt.Errorf("error listing OpenTofu versions: %s", err)
 	}
 
 	var versions []*version.Version
