@@ -126,7 +126,6 @@ func NewClientWithDefaultVersion(
 	if err == nil {
 		localVersion, err = getVersion(localPath)
 		if err != nil {
-			panic(err)
 			return nil, err
 		}
 		versions[localVersion.String()] = localPath
