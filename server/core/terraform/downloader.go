@@ -35,7 +35,7 @@ func (d *TofuDownloader) Install(dir string, _downloadURL string, v *version.Ver
 	}
 
 	// Write out the tofu binary to the disk:
-	file := filepath.Join(dir, "terraform"+v.String())
+	file := filepath.Join(dir, "tofu"+v.String())
 	if err := os.WriteFile(file, binary, 0755); err != nil {
 		return "", err
 	}
