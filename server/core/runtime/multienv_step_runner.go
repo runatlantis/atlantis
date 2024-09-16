@@ -16,32 +16,39 @@ type MultiEnvStepRunner struct {
 
 // Run runs the multienv step command.
 // The command must return a json string containing the array of name-value pairs that are being added as extra environment variables
-func (r *MultiEnvStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string) (string, error) {
-	res, err := r.RunStepRunner.Run(ctx, command, path, envs, false, valid.PostProcessRunOutputShow)
+func (r *MultiEnvStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
+	res, err := r.RunStepRunner.Run(ctx, command, path, envs, false, postProcessOutput)
 	if err != nil {
 		return "", err
 	}
 
-	if len(res) == 0 {
-		return "No dynamic environment variable added", nil
-	}
-
 	var sb strings.Builder
-	sb.WriteString("Dynamic environment variables added:\n")
+	if len(res) == 0 {
+		sb.WriteString("No dynamic environment variable added")
+	} else {
+		sb.WriteString("Dynamic environment variables added:\n")
 
-	vars, err := parseMultienvLine(res)
-	if err != nil {
-		return "", fmt.Errorf("Invalid environment variable definition: %s (%w)", res, err)
+		vars, err := parseMultienvLine(res)
+		if err != nil {
+			return "", fmt.Errorf("Invalid environment variable definition: %s (%w)", res, err)
+		}
+
+		for i := 0; i < len(vars); i += 2 {
+			key := vars[i]
+			envs[key] = vars[i+1]
+			sb.WriteString(key)
+			sb.WriteRune('\n')
+		}
 	}
 
-	for i := 0; i < len(vars); i += 2 {
-		key := vars[i]
-		envs[key] = vars[i+1]
-		sb.WriteString(key)
-		sb.WriteRune('\n')
+	switch postProcessOutput {
+	case valid.PostProcessRunOutputHide:
+		return "", nil
+	case valid.PostProcessRunOutputShow:
+		return sb.String(), nil
+	default:
+		return sb.String(), nil
 	}
-
-	return sb.String(), nil
 }
 
 func parseMultienvLine(in string) ([]string, error) {

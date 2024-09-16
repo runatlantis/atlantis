@@ -1,5 +1,5 @@
 {{ define "multiProjectPolicy" -}}
-{{ template "multiProjectHeader" . }}
+{{ template "multiProjectHeader" . -}}
 {{ $disableApplyAll := .DisableApplyAll -}}
 {{ $hideUnchangedPlans := .HideUnchangedPlanComments -}}
 {{ range $i, $result := .Results -}}
@@ -13,10 +13,14 @@
 {{ end -}}
 {{ if ne .DisableApplyAll true -}}
 {{ if and (gt (len .Results) 0) (not .PlansDeleted) -}}
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * `{{ .ExecutableName }} apply`
-* :put_litter_in_its_place: To **delete** all plans and locks for the PR, comment:
-    * `{{ .ExecutableName }} unlock`
+* :fast_forward: To **apply** all unapplied plans from this {{ .VcsRequestType }}, comment:
+  ```shell
+  {{ .ExecutableName }} apply
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this {{ .VcsRequestType }}, comment:
+  ```shell
+  {{ .ExecutableName }} unlock
+  ```
 {{ end -}}
 {{ end -}}
 {{ template "log" . -}}

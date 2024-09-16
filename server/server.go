@@ -50,7 +50,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
-	"github.com/runatlantis/atlantis/server/controllers/templates"
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
@@ -62,6 +62,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
+	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -106,10 +107,10 @@ type Server struct {
 	StatusController               *controllers.StatusController
 	JobsController                 *controllers.JobsController
 	APIController                  *controllers.APIController
-	IndexTemplate                  templates.TemplateWriter
-	LockDetailTemplate             templates.TemplateWriter
-	ProjectJobsTemplate            templates.TemplateWriter
-	ProjectJobsErrorTemplate       templates.TemplateWriter
+	IndexTemplate                  web_templates.TemplateWriter
+	LockDetailTemplate             web_templates.TemplateWriter
+	ProjectJobsTemplate            web_templates.TemplateWriter
+	ProjectJobsErrorTemplate       web_templates.TemplateWriter
 	SSLCertFile                    string
 	SSLKeyFile                     string
 	CertLastRefreshTime            time.Time
@@ -176,6 +177,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
 	var azuredevopsClient *vcs.AzureDevopsClient
+	var giteaClient *gitea.GiteaClient
 
 	policyChecksEnabled := false
 	if userConfig.EnablePolicyChecksFlag {
@@ -237,24 +239,26 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				return nil, err
 			}
 			githubCredentials = &vcs.GithubAppCredentials{
-				AppID:    userConfig.GithubAppID,
-				Key:      privateKey,
-				Hostname: userConfig.GithubHostname,
-				AppSlug:  userConfig.GithubAppSlug,
+				AppID:          userConfig.GithubAppID,
+				InstallationID: userConfig.GithubAppInstallationID,
+				Key:            privateKey,
+				Hostname:       userConfig.GithubHostname,
+				AppSlug:        userConfig.GithubAppSlug,
 			}
 			githubAppEnabled = true
 		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKey != "" {
 			githubCredentials = &vcs.GithubAppCredentials{
-				AppID:    userConfig.GithubAppID,
-				Key:      []byte(userConfig.GithubAppKey),
-				Hostname: userConfig.GithubHostname,
-				AppSlug:  userConfig.GithubAppSlug,
+				AppID:          userConfig.GithubAppID,
+				InstallationID: userConfig.GithubAppInstallationID,
+				Key:            []byte(userConfig.GithubAppKey),
+				Hostname:       userConfig.GithubHostname,
+				AppSlug:        userConfig.GithubAppSlug,
 			}
 			githubAppEnabled = true
 		}
 
 		var err error
-		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, logger)
+		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -300,6 +304,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, err
 		}
 	}
+	if userConfig.GiteaToken != "" {
+		supportedVCSHosts = append(supportedVCSHosts, models.Gitea)
+
+		giteaClient, err = gitea.NewClient(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaPageSize, logger)
+		if err != nil {
+			fmt.Println("error setting up gitea client", "error", err)
+			return nil, errors.Wrapf(err, "setting up Gitea client")
+		} else {
+			logger.Info("gitea client configured successfully")
+		}
+	}
+
+	logger.Info("Supported VCS Hosts", "hosts", supportedVCSHosts)
 
 	home, err := homedir.Dir()
 	if err != nil {
@@ -333,6 +350,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				return nil, err
 			}
 		}
+		if userConfig.GiteaUser != "" {
+			if err := vcs.WriteGitCreds(userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaBaseURL, home, logger, false); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	// default the project files used to generate the module index to the autoplan-file-list if autoplan-modules is true
@@ -356,7 +378,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
-	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient)
+	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient, giteaClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
@@ -469,7 +491,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:    userConfig.CheckoutDepth,
 		GithubAppEnabled: githubAppEnabled,
-		Logger:           logger,
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(
@@ -503,7 +524,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
-		Logger:           logger,
 		WorkingDir:       workingDir,
 		WorkingDirLocker: workingDirLocker,
 		Backend:          backend,
@@ -515,7 +535,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		&events.PullClosedExecutor{
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
-			Logger:                   logger,
 			Backend:                  backend,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
@@ -528,6 +547,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubToken:        userConfig.GithubToken,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
+		GiteaUser:          userConfig.GiteaUser,
+		GiteaToken:         userConfig.GiteaToken,
 		AllowDraftPRs:      userConfig.PlanDrafts,
 		BitbucketUser:      userConfig.BitbucketUser,
 		BitbucketToken:     userConfig.BitbucketToken,
@@ -538,6 +559,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	commentParser := events.NewCommentParser(
 		userConfig.GithubUser,
 		userConfig.GitlabUser,
+		userConfig.GiteaUser,
 		userConfig.BitbucketUser,
 		userConfig.AzureDevopsUser,
 		userConfig.ExecutableName,
@@ -580,6 +602,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Router:              router,
 	}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
+		logger,
 		policyChecksEnabled,
 		validator,
 		&events.DefaultProjectFinder{},
@@ -601,7 +624,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverModeFlag,
 		statsScope,
-		logger,
 		terraformClient,
 	)
 
@@ -784,10 +806,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		command.State:           stateCommandRunner,
 	}
 
-	githubTeamAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
-	if err != nil {
-		return nil, err
+	var teamAllowlistChecker command.TeamAllowlistChecker
+	if globalCfg.TeamAuthz.Command != "" {
+		teamAllowlistChecker = &events.ExternalTeamAllowlistChecker{
+			Command:                     globalCfg.TeamAuthz.Command,
+			ExtraArgs:                   globalCfg.TeamAuthz.Args,
+			ExternalTeamAllowlistRunner: &runtime.DefaultExternalTeamAllowlistRunner{},
+		}
+	} else {
+		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	varFileAllowlistChecker, err := events.NewVarFileAllowlistChecker(userConfig.VarFileAllowlist)
 	if err != nil {
 		return nil, err
@@ -798,6 +830,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubPullGetter:               githubClient,
 		GitlabMergeRequestGetter:       gitlabClient,
 		AzureDevopsPullGetter:          azuredevopsClient,
+		GiteaPullGetter:                giteaClient,
 		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
 		EventParser:                    eventParser,
 		FailOnPreWorkflowHookError:     userConfig.FailOnPreWorkflowHookError,
@@ -814,7 +847,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              backend,
-		TeamAllowlistChecker:           githubTeamAllowlistChecker,
+		TeamAllowlistChecker:           teamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}
@@ -829,7 +862,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ApplyLocker:        applyLockingClient,
 		Logger:             logger,
 		VCSClient:          vcsClient,
-		LockDetailTemplate: templates.LockTemplate,
+		LockDetailTemplate: web_templates.LockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
 		Backend:            backend,
@@ -847,24 +880,27 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisVersion:          config.AtlantisVersion,
 		AtlantisURL:              parsedURL,
 		Logger:                   logger,
-		ProjectJobsTemplate:      templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate: templates.ProjectJobsErrorTemplate,
+		ProjectJobsTemplate:      web_templates.ProjectJobsTemplate,
+		ProjectJobsErrorTemplate: web_templates.ProjectJobsErrorTemplate,
 		Backend:                  backend,
 		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
 	}
 	apiController := &controllers.APIController{
-		APISecret:                 []byte(userConfig.APISecret),
-		Locker:                    lockingClient,
-		Logger:                    logger,
-		Parser:                    eventParser,
-		ProjectCommandBuilder:     projectCommandBuilder,
-		ProjectPlanCommandRunner:  instrumentedProjectCmdRunner,
-		ProjectApplyCommandRunner: instrumentedProjectCmdRunner,
-		RepoAllowlistChecker:      repoAllowlist,
-		Scope:                     statsScope.SubScope("api"),
-		VCSClient:                 vcsClient,
+		APISecret:                      []byte(userConfig.APISecret),
+		Locker:                         lockingClient,
+		Logger:                         logger,
+		Parser:                         eventParser,
+		ProjectCommandBuilder:          projectCommandBuilder,
+		ProjectPlanCommandRunner:       instrumentedProjectCmdRunner,
+		ProjectApplyCommandRunner:      instrumentedProjectCmdRunner,
+		FailOnPreWorkflowHookError:     userConfig.FailOnPreWorkflowHookError,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		RepoAllowlistChecker:           repoAllowlist,
+		Scope:                          statsScope.SubScope("api"),
+		VCSClient:                      vcsClient,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -889,6 +925,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
 		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
 		AzureDevopsRequestValidator:     &events_controllers.DefaultAzureDevopsRequestValidator{},
+		GiteaWebhookSecret:              []byte(userConfig.GiteaWebhookSecret),
 	}
 	githubAppController := &controllers.GithubAppController{
 		AtlantisURL:         parsedURL,
@@ -918,10 +955,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		JobsController:                 jobsController,
 		StatusController:               statusController,
 		APIController:                  apiController,
-		IndexTemplate:                  templates.IndexTemplate,
-		LockDetailTemplate:             templates.LockTemplate,
-		ProjectJobsTemplate:            templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate:       templates.ProjectJobsErrorTemplate,
+		IndexTemplate:                  web_templates.IndexTemplate,
+		LockDetailTemplate:             web_templates.LockTemplate,
+		ProjectJobsTemplate:            web_templates.ProjectJobsTemplate,
+		ProjectJobsErrorTemplate:       web_templates.ProjectJobsErrorTemplate,
 		SSLKeyFile:                     userConfig.SSLKeyFile,
 		SSLCertFile:                    userConfig.SSLCertFile,
 		DisableGlobalApplyLock:         userConfig.DisableGlobalApplyLock,
@@ -1046,10 +1083,10 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	var lockResults []templates.LockIndexData
+	var lockResults []web_templates.LockIndexData
 	for id, v := range locks {
 		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
-		lockResults = append(lockResults, templates.LockIndexData{
+		lockResults = append(lockResults, web_templates.LockIndexData{
 			// NOTE: must use .String() instead of .Path because we need the
 			// query params as part of the lock URL.
 			LockPath:      lockURL.String(),
@@ -1059,7 +1096,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			Path:          v.Project.Path,
 			Workspace:     v.Workspace,
 			Time:          v.Time,
-			TimeFormatted: v.Time.Format("02-01-2006 15:04:05"),
+			TimeFormatted: v.Time.Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -1071,16 +1108,16 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
-	applyLockData := templates.ApplyLockData{
+	applyLockData := web_templates.ApplyLockData{
 		Time:                   applyCmdLock.Time,
 		Locked:                 applyCmdLock.Locked,
 		GlobalApplyLockEnabled: applyCmdLock.GlobalApplyLockEnabled,
-		TimeFormatted:          applyCmdLock.Time.Format("02-01-2006 15:04:05"),
+		TimeFormatted:          applyCmdLock.Time.Format("2006-01-02 15:04:05"),
 	}
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 
-	err = s.IndexTemplate.Execute(w, templates.IndexData{
+	err = s.IndexTemplate.Execute(w, web_templates.IndexData{
 		Locks:            lockResults,
 		PullToJobMapping: preparePullToJobMappings(s),
 		ApplyLock:        applyLockData,
@@ -1100,7 +1137,7 @@ func preparePullToJobMappings(s *Server) []jobs.PullInfoWithJobIDs {
 		for j := range pullToJobMappings[i].JobIDInfos {
 			jobUrl, _ := s.Router.Get(ProjectJobsViewRouteName).URL("job-id", pullToJobMappings[i].JobIDInfos[j].JobID)
 			pullToJobMappings[i].JobIDInfos[j].JobIDUrl = jobUrl.String()
-			pullToJobMappings[i].JobIDInfos[j].TimeFormatted = pullToJobMappings[i].JobIDInfos[j].Time.Format("02-01-2006 15:04:05")
+			pullToJobMappings[i].JobIDInfos[j].TimeFormatted = pullToJobMappings[i].JobIDInfos[j].Time.Format("2006-01-02 15:04:05")
 		}
 
 		//Sort by date - newest to oldest.

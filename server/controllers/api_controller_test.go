@@ -86,17 +86,27 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 		ApplySuccess: "success",
 	})
 
+	preWorkflowHooksCommandRunner := NewMockPreWorkflowHooksCommandRunner()
+
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+
+	postWorkflowHooksCommandRunner := NewMockPostWorkflowHooksCommandRunner()
+
+	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+
 	ac := controllers.APIController{
-		APISecret:                 []byte(atlantisToken),
-		Locker:                    locker,
-		Logger:                    logger,
-		Scope:                     scope,
-		Parser:                    parser,
-		ProjectCommandBuilder:     projectCommandBuilder,
-		ProjectPlanCommandRunner:  projectCommandRunner,
-		ProjectApplyCommandRunner: projectCommandRunner,
-		VCSClient:                 vcsClient,
-		RepoAllowlistChecker:      repoAllowlistChecker,
+		APISecret:                      []byte(atlantisToken),
+		Locker:                         locker,
+		Logger:                         logger,
+		Scope:                          scope,
+		Parser:                         parser,
+		ProjectCommandBuilder:          projectCommandBuilder,
+		ProjectPlanCommandRunner:       projectCommandRunner,
+		ProjectApplyCommandRunner:      projectCommandRunner,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		VCSClient:                      vcsClient,
+		RepoAllowlistChecker:           repoAllowlistChecker,
 	}
 	return ac, projectCommandBuilder, projectCommandRunner
 }

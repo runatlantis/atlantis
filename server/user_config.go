@@ -57,7 +57,13 @@ type UserConfig struct {
 	GithubAppKey                    string `mapstructure:"gh-app-key"`
 	GithubAppKeyFile                string `mapstructure:"gh-app-key-file"`
 	GithubAppSlug                   string `mapstructure:"gh-app-slug"`
+	GithubAppInstallationID         int64  `mapstructure:"gh-app-installation-id"`
 	GithubTeamAllowlist             string `mapstructure:"gh-team-allowlist"`
+	GiteaBaseURL                    string `mapstructure:"gitea-base-url"`
+	GiteaToken                      string `mapstructure:"gitea-token"`
+	GiteaUser                       string `mapstructure:"gitea-user"`
+	GiteaWebhookSecret              string `mapstructure:"gitea-webhook-secret"`
+	GiteaPageSize                   int    `mapstructure:"gitea-page-size"`
 	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
@@ -68,6 +74,7 @@ type UserConfig struct {
 	LockingDBType                   string `mapstructure:"locking-db-type"`
 	LogLevel                        string `mapstructure:"log-level"`
 	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
+	MaxCommentsPerCommand           int    `mapstructure:"max-comments-per-command"`
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`

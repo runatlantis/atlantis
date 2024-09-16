@@ -24,6 +24,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
@@ -97,6 +98,7 @@ type DefaultCommandRunner struct {
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
+	GiteaPullGetter          *gitea.GiteaClient
 	// User config option: Disables autoplan when a pull request is opened or updated.
 	DisableAutoplan      bool
 	DisableAutoplanLabel string
@@ -126,7 +128,7 @@ type DefaultCommandRunner struct {
 	PreWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner
 	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
 	PullStatusFetcher              PullStatusFetcher
-	TeamAllowlistChecker           *TeamAllowlistChecker
+	TeamAllowlistChecker           command.TeamAllowlistChecker
 	VarFileAllowlistChecker        *VarFileAllowlistChecker
 	CommitStatusUpdater            CommitStatusUpdater
 }
@@ -154,13 +156,21 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	defer timer.Stop()
 
 	// Check if the user who triggered the autoplan has permissions to run 'plan'.
-	ok, err := c.checkUserPermissions(baseRepo, user, "plan")
-	if err != nil {
-		c.Logger.Err("Unable to check user permissions: %s", err)
-		return
-	}
-	if !ok {
-		return
+	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
+		err := c.fetchUserTeams(baseRepo, &user)
+		if err != nil {
+			c.Logger.Err("Unable to fetch user teams: %s", err)
+			return
+		}
+
+		ok, err := c.checkUserPermissions(baseRepo, user, "plan")
+		if err != nil {
+			c.Logger.Err("Unable to check user permissions: %s", err)
+			return
+		}
+		if !ok {
+			return
+		}
 	}
 
 	ctx := &command.Context{
@@ -242,11 +252,16 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 		// allowlist restriction is not enabled
 		return true, nil
 	}
-	teams, err := c.VCSClient.GetTeamNamesForUser(repo, user)
-	if err != nil {
-		return false, err
+	ctx := models.TeamAllowlistCheckerContext{
+		BaseRepo:    repo,
+		CommandName: cmdName,
+		Log:         c.Logger,
+		Pull:        models.PullRequest{},
+		User:        user,
+		Verbose:     false,
+		API:         false,
 	}
-	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(teams, cmdName)
+	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmdName)
 	if !ok {
 		return false, nil
 	}
@@ -288,14 +303,22 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	defer timer.Stop()
 
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
-	ok, err := c.checkUserPermissions(baseRepo, user, cmd.Name.String())
-	if err != nil {
-		c.Logger.Err("Unable to check user permissions: %s", err)
-		return
-	}
-	if !ok {
-		c.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, cmd)
-		return
+	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
+		err := c.fetchUserTeams(baseRepo, &user)
+		if err != nil {
+			c.Logger.Err("Unable to fetch user teams: %s", err)
+			return
+		}
+
+		ok, err := c.checkUserPermissions(baseRepo, user, cmd.Name.String())
+		if err != nil {
+			c.Logger.Err("Unable to check user permissions: %s", err)
+			return
+		}
+		if !ok {
+			c.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, cmd)
+			return
+		}
 	}
 
 	// Check if the provided var files in a 'plan' command are allowlisted
@@ -319,15 +342,16 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	ctx := &command.Context{
-		User:                user,
-		Log:                 log,
-		Pull:                pull,
-		PullStatus:          status,
-		HeadRepo:            headRepo,
-		Scope:               scope,
-		Trigger:             command.CommentTrigger,
-		PolicySet:           cmd.PolicySet,
-		ClearPolicyApproval: cmd.ClearPolicyApproval,
+		User:                 user,
+		Log:                  log,
+		Pull:                 pull,
+		PullStatus:           status,
+		HeadRepo:             headRepo,
+		Scope:                scope,
+		Trigger:              command.CommentTrigger,
+		PolicySet:            cmd.PolicySet,
+		ClearPolicyApproval:  cmd.ClearPolicyApproval,
+		TeamAllowlistChecker: c.TeamAllowlistChecker,
 	}
 
 	if !c.validateCtxAndComment(ctx, cmd.Name) {
@@ -380,6 +404,21 @@ func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseR
 		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to GitHub")
 	}
 	pull, _, headRepo, err := c.EventParser.ParseGithubPull(logger, ghPull)
+	if err != nil {
+		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+	}
+	return pull, headRepo, nil
+}
+
+func (c *DefaultCommandRunner) getGiteaData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
+	if c.GiteaPullGetter == nil {
+		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support Gitea")
+	}
+	giteaPull, err := c.GiteaPullGetter.GetPullRequest(logger, baseRepo, pullNum)
+	if err != nil {
+		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Gitea")
+	}
+	pull, _, headRepo, err := c.EventParser.ParseGiteaPull(giteaPull)
 	if err != nil {
 		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
 	}
@@ -446,6 +485,8 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 		pull = *maybePull
 	case models.AzureDevops:
 		pull, headRepo, err = c.getAzureDevopsData(log, baseRepo, pullNum)
+	case models.Gitea:
+		pull, headRepo, err = c.getGiteaData(log, baseRepo, pullNum)
 	default:
 		err = errors.New("Unknown VCS type–this is a bug")
 	}
@@ -458,6 +499,16 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	}
 
 	return
+}
+
+func (c *DefaultCommandRunner) fetchUserTeams(repo models.Repo, user *models.User) error {
+	teams, err := c.VCSClient.GetTeamNamesForUser(repo, *user)
+	if err != nil {
+		return err
+	}
+
+	user.Teams = teams
+	return nil
 }
 
 func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, commandName command.Name) bool {
