@@ -1274,7 +1274,7 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
 
   This has no impact if `--tf-download` is set to `false`.
 
-  This setting is currently ignored if `--tf-distribution` is set to `opentofu`
+  This setting is not yet supported, and is ignored when `--tf-distribution` is set to `opentofu`
 
 ### `--tfe-hostname`
 
