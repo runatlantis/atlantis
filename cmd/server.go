@@ -85,7 +85,7 @@ const (
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
 	GHTokenFlag                      = "gh-token"
-	GHTokenFileFlag                  = "gh-token-file"
+	GHTokenFileFlag                  = "gh-token-file" // nolint: gosec
 	GHUserFlag                       = "gh-user"
 	GHAppIDFlag                      = "gh-app-id"
 	GHAppKeyFlag                     = "gh-app-key"
