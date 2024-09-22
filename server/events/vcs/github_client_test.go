@@ -1648,10 +1648,10 @@ func TestGithubClient_SecondaryRateLimitHandling_CreateComment(t *testing.T) {
 				w.Header().Set("x-ratelimit-remaining", "1")
 				w.Header().Set("x-ratelimit-reset", fmt.Sprintf("%d", time.Now().Unix()+1))
 				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte(`{"message": "You have exceeded a secondary rate limit"}`))
+				w.Write([]byte(`{"message": "You have exceeded a secondary rate limit"}`)) // nolint: errcheck
 			} else {
 				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(`{"id": 1, "body": "Test comment"}`))
+				w.Write([]byte(`{"id": 1, "body": "Test comment"}`)) // nolint: errcheck
 			}
 			calls++
 		}),
