@@ -63,7 +63,7 @@ jobs:
       - name: run http-server
         env:
           # renovate: datasource=github-releases depName=raviqqe/muffet
-          MUFFET_VERSION: 2.10.2
+          MUFFET_VERSION: 2.10.3
         run: |
           # install raviqqe/muffet to check for broken links.
           curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
