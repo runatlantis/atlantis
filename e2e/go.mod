@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/google/go-github/v59 v59.0.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/xanzy/go-gitlab v0.108.0
+	github.com/xanzy/go-gitlab v0.109.0
 )
 
 require (
