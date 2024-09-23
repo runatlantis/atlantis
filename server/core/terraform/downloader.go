@@ -36,7 +36,7 @@ func (d *TofuDownloader) Install(ctx context.Context, dir string, _downloadURL s
 
 	// Write out the tofu binary to the disk:
 	file := filepath.Join(dir, "tofu"+v.String())
-	if err := os.WriteFile(file, binary, 0755); err != nil { // #nosec G306
+	if err := os.WriteFile(file, binary, 0755); /* #nosec G306 */ err != nil {
 		return "", err
 	}
 
