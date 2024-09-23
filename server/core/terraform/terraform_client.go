@@ -524,7 +524,7 @@ func ensureVersion(
 
 	log.Info("could not find %s version %s in PATH or %s", dist.BinName(), v.String(), binDir)
 
-	log.Info("using Hashicorp's 'hc-install' to download Terraform version %s from download URL %s", v.String(), downloadURL)
+	log.Info("downloading %s version %s from download URL %s", dist.BinName(), v.String(), downloadURL)
 
 	execPath, err := dist.Downloader().Install(context.Background(), binDir, downloadURL, v)
 
