@@ -13,7 +13,7 @@ require (
 	github.com/go-playground/validator/v10 v10.22.1
 	github.com/go-test/deep v1.1.1
 	github.com/golang-jwt/jwt/v5 v5.2.1
-	github.com/google/go-github/v59 v59.0.0
+	github.com/google/go-github/v63 v63.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
