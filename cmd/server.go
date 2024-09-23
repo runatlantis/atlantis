@@ -415,7 +415,7 @@ var stringFlags = map[string]stringFlag{
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
 	},
 	TFDistributionFlag: {
-		description:  "Which TF distribution to use. Can be set to terraform or opentofu.",
+		description:  fmt.Sprintf("Which TF distribution to use. Can be set to %s or %s.", TFDistributionTerraform, TFDistributionOpenTofu),
 		defaultValue: DefaultTFDistribution,
 	},
 	TFDownloadURLFlag: {
