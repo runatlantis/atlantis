@@ -21,7 +21,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/google/go-github/v59/github"
+	"github.com/google/go-github/v63/github"
 )
 
 type GithubClient struct {
