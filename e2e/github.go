@@ -84,7 +84,7 @@ func (g GithubClient) CreateAtlantisWebhook(ctx context.Context, hookURL string)
 	contentType := "json"
 	hookConfig := &github.HookConfig{
 		ContentType: &contentType,
-		URL: &hookURL,
+		URL:         &hookURL,
 	}
 	// create atlantis hook
 	atlantisHook := &github.Hook{

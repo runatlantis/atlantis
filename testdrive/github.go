@@ -58,7 +58,7 @@ func (g *Client) CreateWebhook(ownerName string, repoName string, hookURL string
 	contentType := "json"
 	hookConfig := &github.HookConfig{
 		ContentType: &contentType,
-		URL: &hookURL,
+		URL:         &hookURL,
 	}
 	atlantisHook := &github.Hook{
 		Events: []string{"issue_comment", "pull_request", "pull_request_review", "push"},
