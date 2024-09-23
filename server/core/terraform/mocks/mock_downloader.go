@@ -4,6 +4,7 @@
 package mocks
 
 import (
+	context "context"
 	go_version "github.com/hashicorp/go-version"
 	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
@@ -25,11 +26,11 @@ func NewMockDownloader(options ...pegomock.Option) *MockDownloader {
 func (mock *MockDownloader) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockDownloader) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockDownloader) Install(dir string, downloadURL string, v *go_version.Version) (string, error) {
+func (mock *MockDownloader) Install(ctx context.Context, dir string, downloadURL string, v *go_version.Version) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDownloader().")
 	}
-	_params := []pegomock.Param{dir, downloadURL, v}
+	_params := []pegomock.Param{ctx, dir, downloadURL, v}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("Install", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 string
 	var _ret1 error
@@ -81,8 +82,8 @@ type VerifierMockDownloader struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockDownloader) Install(dir string, downloadURL string, v *go_version.Version) *MockDownloader_Install_OngoingVerification {
-	_params := []pegomock.Param{dir, downloadURL, v}
+func (verifier *VerifierMockDownloader) Install(ctx context.Context, dir string, downloadURL string, v *go_version.Version) *MockDownloader_Install_OngoingVerification {
+	_params := []pegomock.Param{ctx, dir, downloadURL, v}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Install", _params, verifier.timeout)
 	return &MockDownloader_Install_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -92,18 +93,18 @@ type MockDownloader_Install_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockDownloader_Install_OngoingVerification) GetCapturedArguments() (string, string, *go_version.Version) {
-	dir, downloadURL, v := c.GetAllCapturedArguments()
-	return dir[len(dir)-1], downloadURL[len(downloadURL)-1], v[len(v)-1]
+func (c *MockDownloader_Install_OngoingVerification) GetCapturedArguments() (context.Context, string, string, *go_version.Version) {
+	ctx, dir, downloadURL, v := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], dir[len(dir)-1], downloadURL[len(downloadURL)-1], v[len(v)-1]
 }
 
-func (c *MockDownloader_Install_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []string, _param2 []*go_version.Version) {
+func (c *MockDownloader_Install_OngoingVerification) GetAllCapturedArguments() (_param0 []context.Context, _param1 []string, _param2 []string, _param3 []*go_version.Version) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
-			_param0 = make([]string, len(c.methodInvocations))
+			_param0 = make([]context.Context, len(c.methodInvocations))
 			for u, param := range _params[0] {
-				_param0[u] = param.(string)
+				_param0[u] = param.(context.Context)
 			}
 		}
 		if len(_params) > 1 {
@@ -113,9 +114,15 @@ func (c *MockDownloader_Install_OngoingVerification) GetAllCapturedArguments() (
 			}
 		}
 		if len(_params) > 2 {
-			_param2 = make([]*go_version.Version, len(c.methodInvocations))
+			_param2 = make([]string, len(c.methodInvocations))
 			for u, param := range _params[2] {
-				_param2[u] = param.(*go_version.Version)
+				_param2[u] = param.(string)
+			}
+		}
+		if len(_params) > 3 {
+			_param3 = make([]*go_version.Version, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(*go_version.Version)
 			}
 		}
 	}

@@ -17,6 +17,7 @@
 package terraform
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -315,7 +316,7 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 		return version
 	}
 
-	downloadVersion, err := c.distribution.ResolveConstraint(requiredVersionSetting)
+	downloadVersion, err := c.distribution.ResolveConstraint(context.Background(), requiredVersionSetting)
 	if err != nil {
 		log.Err("%s", err)
 		return nil
@@ -525,7 +526,7 @@ func ensureVersion(
 
 	log.Info("using Hashicorp's 'hc-install' to download Terraform version %s from download URL %s", v.String(), downloadURL)
 
-	execPath, err := dist.Downloader().Install(binDir, downloadURL, v)
+	execPath, err := dist.Downloader().Install(context.Background(), binDir, downloadURL, v)
 
 	if err != nil {
 		return "", errors.Wrapf(err, "error downloading terraform version %s", v.String())

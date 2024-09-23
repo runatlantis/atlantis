@@ -1,6 +1,7 @@
 package terraform_test
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -17,7 +18,7 @@ func TestTerraformInstall(t *testing.T) {
 
 	v, _ := version.NewVersion("1.8.1")
 
-	newPath, err := d.Install(binDir, cmd.DefaultTFDownloadURL, v)
+	newPath, err := d.Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -34,7 +35,7 @@ func TestOpenTofuInstall(t *testing.T) {
 
 	v, _ := version.NewVersion("1.8.0")
 
-	newPath, err := d.Install(binDir, cmd.DefaultTFDownloadURL, v)
+	newPath, err := d.Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

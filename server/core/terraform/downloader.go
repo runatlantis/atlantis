@@ -17,26 +17,26 @@ import (
 
 // Downloader is for downloading terraform versions.
 type Downloader interface {
-	Install(dir string, downloadURL string, v *version.Version) (string, error)
+	Install(ctx context.Context, dir string, downloadURL string, v *version.Version) (string, error)
 }
 
 type TofuDownloader struct{}
 
-func (d *TofuDownloader) Install(dir string, _downloadURL string, v *version.Version) (string, error) {
+func (d *TofuDownloader) Install(ctx context.Context, dir string, _downloadURL string, v *version.Version) (string, error) {
 	// Initialize the downloader:
 	dl, err := tofudl.New()
 	if err != nil {
 		return "", err
 	}
 
-	binary, err := dl.Download(context.Background(), tofudl.DownloadOptVersion(tofudl.Version(v.String())))
+	binary, err := dl.Download(ctx, tofudl.DownloadOptVersion(tofudl.Version(v.String())))
 	if err != nil {
 		return "", err
 	}
 
 	// Write out the tofu binary to the disk:
 	file := filepath.Join(dir, "tofu"+v.String())
-	if err := os.WriteFile(file, binary, 0755); err != nil { // nolint: gosec
+	if err := os.WriteFile(file, binary, 0755); err != nil { // #nosec G306
 		return "", err
 	}
 
@@ -45,9 +45,9 @@ func (d *TofuDownloader) Install(dir string, _downloadURL string, v *version.Ver
 
 type TerraformDownloader struct{}
 
-func (d *TerraformDownloader) Install(dir string, downloadURL string, v *version.Version) (string, error) {
+func (d *TerraformDownloader) Install(ctx context.Context, dir string, downloadURL string, v *version.Version) (string, error) {
 	installer := install.NewInstaller()
-	execPath, err := installer.Install(context.Background(), []src.Installable{
+	execPath, err := installer.Install(ctx, []src.Installable{
 		&releases.ExactVersion{
 			Product:    product.Terraform,
 			Version:    v,
