@@ -54,6 +54,9 @@ var GitlabRepo = models.Repo{
 
 var User = models.User{
 	Username: "lkysow",
+	Teams: []string{
+		"atlantis-team",
+	},
 }
 
 var projectName = "test-project"

@@ -23,6 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -334,6 +335,55 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(testdata.GithubRepo, testdata.User)
 		vcsClient.VerifyWasCalledOnce().CreateComment(
 			Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Ran Plan for 0 projects:"), Eq("plan"))
+	})
+
+	t.Run("check environment variables", func(t *testing.T) {
+		vcsClient := setup(t)
+
+		ch.TeamAllowlistChecker = &events.ExternalTeamAllowlistChecker{
+			Command: strings.Join([]string{
+				"script() {",
+				"[ \"$1\" != \"arg1\" ] && exit 1",
+				"[ \"$2\" != \"arg2\" ] && exit 1",
+				"[ \"$3\" != \"apply\" ] && exit 1",
+				fmt.Sprintf("[ \"$4\" != \"%s\" ] && exit 1", testdata.GithubRepo.FullName),
+				fmt.Sprintf("[ \"$5\" != \"%s/%s\" ] && exit 1", testdata.GithubRepo.Owner, testdata.User.Teams[0]),
+				"[ -z \"${BASE_REPO_NAME}\" ] && exit 1",
+				"[ -z \"${BASE_REPO_OWNER}\" ] && exit 1",
+				"[ -z \"${COMMAND_NAME}\" ] && exit 1",
+				"[ -z \"${USER_NAME}\" ] && exit 1",
+				"[ -z \"${BASE_BRANCH_NAME}\" ] && exit 1",
+				"[ -z \"${COMMENT_ARGS}\" ] && exit 1",
+				"[ -z \"${HEAD_REPO_NAME}\" ] && exit 1",
+				"[ -z \"${HEAD_REPO_OWNER}\" ] && exit 1",
+				"[ -z \"${HEAD_BRANCH_NAME}\" ] && exit 1",
+				"[ -z \"${HEAD_COMMIT}\" ] && exit 1",
+				"[ -z \"${PROJECT_NAME}\" ] && exit 1",
+				"[ -z \"${PULL_NUM}\" ] && exit 1",
+				"[ -z \"${PULL_URL}\" ] && exit 1",
+				"[ -z \"${PULL_AUTHOR}\" ] && exit 1",
+				"[ -z \"${REPO_ROOT}\" ] && exit 1",
+				"[ -z \"${REPO_REL_PATH}\" ] && exit 1",
+				"echo pass",
+				"}",
+				"script",
+			}, "\n"),
+			ExtraArgs:                   []string{"arg1", "arg2"},
+			ExternalTeamAllowlistRunner: &runtime.DefaultExternalTeamAllowlistRunner{},
+		}
+		var pull github.PullRequest
+		modelPull := models.PullRequest{
+			BaseRepo: testdata.GithubRepo,
+			State:    models.OpenPullState,
+		}
+		When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+		When(vcsClient.GetTeamNamesForUser(Eq(testdata.GithubRepo), Eq(testdata.User))).ThenReturn(testdata.User.Teams, nil)
+
+		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+		vcsClient.VerifyWasCalledOnce().GetTeamNamesForUser(testdata.GithubRepo, testdata.User)
+		vcsClient.VerifyWasCalledOnce().CreateComment(
+			Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Ran Apply for 0 projects:"), Eq("apply"))
 	})
 }
 
