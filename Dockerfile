@@ -5,7 +5,7 @@ ARG DEBIAN_TAG=12.7-slim@sha256:a629e796d77a7b2ff82186ed15d01a493801c020eed5ce6a
 ARG GOLANG_TAG=1.23.0-alpine@sha256:d0b31558e6b3e4cc59f6011d79905835108c919143ebecc58f35965bf79948f4
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.9.5
+ARG DEFAULT_TERRAFORM_VERSION=1.9.6
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.8.2
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
