@@ -30,8 +30,14 @@ on:
   schedule:
     - cron: '17 9 * * 5'
 
+permissions:
+  contents: read
+
 jobs:
   changes:
+    permissions:
+      contents: read  # for dorny/paths-filter to fetch a list of changed files
+      pull-requests: read  # for dorny/paths-filter to read pull requests
     outputs:
       should-run-analyze: ${{ steps.changes.outputs.src == 'true' }}
     if: github.event.pull_request.draft == false
