@@ -27,12 +27,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-getter/v2"
 	"github.com/hashicorp/go-version"
-	install "github.com/hashicorp/hc-install"
-	"github.com/hashicorp/hc-install/product"
-	"github.com/hashicorp/hc-install/releases"
-	"github.com/hashicorp/hc-install/src"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
@@ -62,6 +57,9 @@ type Client interface {
 }
 
 type DefaultClient struct {
+	// Distribution handles logic specific to the TF distribution being used by Atlantis
+	distribution Distribution
+
 	// defaultVersion is the default version of terraform to use if another
 	// version isn't specified.
 	defaultVersion *version.Version
@@ -72,8 +70,7 @@ type DefaultClient struct {
 	// overrideTF can be used to override the terraform binary during testing
 	// with another binary, ex. echo.
 	overrideTF string
-	// downloader downloads terraform versions.
-	downloader      Downloader
+	// settings for the downloader.
 	downloadBaseURL string
 	downloadAllowed bool
 	// versions maps from the string representation of a tf version (ex. 0.11.10)
@@ -90,14 +87,6 @@ type DefaultClient struct {
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_downloader.go Downloader
-
-// Downloader is for downloading terraform versions.
-type Downloader interface {
-	Install(dir string, downloadURL string, v *version.Version) (string, error)
-	GetAny(dst, src string) error
-}
-
 // versionRegex extracts the version from `terraform version` output.
 //
 //	    Terraform v0.12.0-alpha4 (2c36829d3265661d8edbd5014de8090ea7e2a076)
@@ -105,11 +94,15 @@ type Downloader interface {
 //
 //	    Terraform v0.11.10
 //		   => 0.11.10
-var versionRegex = regexp.MustCompile("Terraform v(.*?)(\\s.*)?\n")
+//
+//	    OpenTofu v1.0.0
+//		   => 1.0.0
+var versionRegex = regexp.MustCompile("(?:Terraform|OpenTofu) v(.*?)(\\s.*)?\n")
 
 // NewClientWithDefaultVersion creates a new terraform client and pre-fetches the default version
 func NewClientWithDefaultVersion(
 	log logging.SimpleLogging,
+	distribution Distribution,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -117,7 +110,6 @@ func NewClientWithDefaultVersion(
 	defaultVersionStr string,
 	defaultVersionFlagName string,
 	tfDownloadURL string,
-	tfDownloader Downloader,
 	tfDownloadAllowed bool,
 	usePluginCache bool,
 	fetchAsync bool,
@@ -128,9 +120,9 @@ func NewClientWithDefaultVersion(
 	versions := make(map[string]string)
 	var versionsLock sync.Mutex
 
-	localPath, err := exec.LookPath("terraform")
+	localPath, err := exec.LookPath(distribution.BinName())
 	if err != nil && defaultVersionStr == "" {
-		return nil, fmt.Errorf("terraform not found in $PATH. Set --%s or download terraform from https://developer.hashicorp.com/terraform/downloads", defaultVersionFlagName)
+		return nil, fmt.Errorf("%s not found in $PATH. Set --%s or download terraform from https://developer.hashicorp.com/terraform/downloads", distribution.BinName(), defaultVersionFlagName)
 	}
 	if err == nil {
 		localVersion, err = getVersion(localPath)
@@ -139,6 +131,7 @@ func NewClientWithDefaultVersion(
 		}
 		versions[localVersion.String()] = localPath
 		if defaultVersionStr == "" {
+
 			// If they haven't set a default version, then whatever they had
 			// locally is now the default.
 			finalDefaultVersion = localVersion
@@ -155,10 +148,10 @@ func NewClientWithDefaultVersion(
 			// Since ensureVersion might end up downloading terraform,
 			// we call it asynchronously so as to not delay server startup.
 			versionsLock.Lock()
-			_, err := ensureVersion(log, tfDownloader, versions, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed)
+			_, err := ensureVersion(log, distribution, versions, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed)
 			versionsLock.Unlock()
 			if err != nil {
-				log.Err("could not download terraform %s: %s", defaultVersion.String(), err)
+				log.Err("could not download %s %s: %s", distribution.BinName(), defaultVersion.String(), err)
 			}
 		}
 
@@ -180,10 +173,10 @@ func NewClientWithDefaultVersion(
 		}
 	}
 	return &DefaultClient{
+		distribution:            distribution,
 		defaultVersion:          finalDefaultVersion,
 		terraformPluginCacheDir: cacheDir,
 		binDir:                  binDir,
-		downloader:              tfDownloader,
 		downloadBaseURL:         tfDownloadURL,
 		downloadAllowed:         tfDownloadAllowed,
 		versionsLock:            &versionsLock,
@@ -196,6 +189,7 @@ func NewClientWithDefaultVersion(
 
 func NewTestClient(
 	log logging.SimpleLogging,
+	distribution Distribution,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -203,13 +197,13 @@ func NewTestClient(
 	defaultVersionStr string,
 	defaultVersionFlagName string,
 	tfDownloadURL string,
-	tfDownloader Downloader,
 	tfDownloadAllowed bool,
 	usePluginCache bool,
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 ) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
+		distribution,
 		binDir,
 		cacheDir,
 		tfeToken,
@@ -217,7 +211,6 @@ func NewTestClient(
 		defaultVersionStr,
 		defaultVersionFlagName,
 		tfDownloadURL,
-		tfDownloader,
 		tfDownloadAllowed,
 		usePluginCache,
 		false,
@@ -231,10 +224,10 @@ func NewTestClient(
 // a specific version is set.
 // defaultVersionFlagName is the name of the flag that sets the default terraform
 // version.
-// tfDownloader is used to download terraform versions.
 // Will asynchronously download the required version if it doesn't exist already.
 func NewClient(
 	log logging.SimpleLogging,
+	distribution Distribution,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -242,13 +235,13 @@ func NewClient(
 	defaultVersionStr string,
 	defaultVersionFlagName string,
 	tfDownloadURL string,
-	tfDownloader Downloader,
 	tfDownloadAllowed bool,
 	usePluginCache bool,
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 ) (*DefaultClient, error) {
 	return NewClientWithDefaultVersion(
 		log,
+		distribution,
 		binDir,
 		cacheDir,
 		tfeToken,
@@ -256,7 +249,6 @@ func NewClient(
 		defaultVersionStr,
 		defaultVersionFlagName,
 		tfDownloadURL,
-		tfDownloader,
 		tfDownloadAllowed,
 		usePluginCache,
 		true,
@@ -324,32 +316,11 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 		return version
 	}
 
-	constraintStr := requiredVersionSetting
-	vc, err := version.NewConstraint(constraintStr)
+	downloadVersion, err := c.distribution.ResolveConstraint(context.Background(), requiredVersionSetting)
 	if err != nil {
-		log.Err("Error parsing constraint string: %s", err)
+		log.Err("%s", err)
 		return nil
 	}
-
-	constrainedVersions := &releases.Versions{
-		Product:     product.Terraform,
-		Constraints: vc,
-	}
-	installCandidates, err := constrainedVersions.List(context.Background())
-	if err != nil {
-		log.Err("error listing available versions: %s", err)
-		return nil
-	}
-	if len(installCandidates) == 0 {
-		log.Err("no Terraform versions found for constraints %s", constraintStr)
-		return nil
-	}
-
-	// We want to select the highest version that satisfies the constraint.
-	versionDownloader := installCandidates[len(installCandidates)-1]
-
-	// Get the Version object from the versionDownloader.
-	downloadVersion := versionDownloader.(*releases.ExactVersion).Version
 
 	return downloadVersion
 }
@@ -362,7 +333,7 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 
 	var err error
 	c.versionsLock.Lock()
-	_, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
+	_, err = ensureVersion(log, c.distribution, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
 	c.versionsLock.Unlock()
 	if err != nil {
 		return err
@@ -442,7 +413,7 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, w
 	} else {
 		var err error
 		c.versionsLock.Lock()
-		binPath, err = ensureVersion(log, c.downloader, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
+		binPath, err = ensureVersion(log, c.distribution, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
 		c.versionsLock.Unlock()
 		if err != nil {
 			return "", nil, err
@@ -515,7 +486,7 @@ func MustConstraint(v string) version.Constraints {
 // It will download this version if we don't have it.
 func ensureVersion(
 	log logging.SimpleLogging,
-	dl Downloader,
+	dist Distribution,
 	versions map[string]string,
 	v *version.Version,
 	binDir string,
@@ -529,7 +500,7 @@ func ensureVersion(
 	// This tf version might not yet be in the versions map even though it
 	// exists on disk. This would happen if users have manually added
 	// terraform{version} binaries. In this case we don't want to re-download.
-	binFile := "terraform" + v.String()
+	binFile := dist.BinName() + v.String()
 	if binPath, err := exec.LookPath(binFile); err == nil {
 		versions[v.String()] = binPath
 		return binPath, nil
@@ -544,22 +515,24 @@ func ensureVersion(
 	}
 	if !downloadsAllowed {
 		return "", fmt.Errorf(
-			"could not find terraform version %s in PATH or %s, and downloads are disabled",
+			"could not find %s version %s in PATH or %s, and downloads are disabled",
+			dist.BinName(),
 			v.String(),
 			binDir,
 		)
 	}
 
-	log.Info("could not find terraform version %s in PATH or %s", v.String(), binDir)
+	log.Info("could not find %s version %s in PATH or %s", dist.BinName(), v.String(), binDir)
 
-	log.Info("using Hashicorp's 'hc-install' to download Terraform version %s from download URL %s", v.String(), downloadURL)
-	execPath, err := dl.Install(binDir, downloadURL, v)
+	log.Info("downloading %s version %s from download URL %s", dist.BinName(), v.String(), downloadURL)
+
+	execPath, err := dist.Downloader().Install(context.Background(), binDir, downloadURL, v)
 
 	if err != nil {
 		return "", errors.Wrapf(err, "error downloading terraform version %s", v.String())
 	}
 
-	log.Info("Downloaded terraform %s to %s", v.String(), execPath)
+	log.Info("Downloaded %s %s to %s", dist.BinName(), v.String(), execPath)
 	versions[v.String()] = execPath
 	return execPath, nil
 }
@@ -622,35 +595,3 @@ func getVersion(tfBinary string) (*version.Version, error) {
 var rcFileContents = `credentials "%s" {
   token = %q
 }`
-
-type DefaultDownloader struct{}
-
-func (d *DefaultDownloader) Install(dir string, downloadURL string, v *version.Version) (string, error) {
-	installer := install.NewInstaller()
-	execPath, err := installer.Install(context.Background(), []src.Installable{
-		&releases.ExactVersion{
-			Product:    product.Terraform,
-			Version:    v,
-			InstallDir: dir,
-			ApiBaseURL: downloadURL,
-		},
-	})
-	if err != nil {
-		return "", err
-	}
-
-	// hc-install installs terraform binary as just "terraform".
-	// We need to rename it to terraform{version} to be consistent with current naming convention.
-	newPath := filepath.Join(dir, "terraform"+v.String())
-	if err := os.Rename(execPath, newPath); err != nil {
-		return "", err
-	}
-
-	return newPath, nil
-}
-
-// See go-getter.GetAny.
-func (d *DefaultDownloader) GetAny(dst, src string) error {
-	_, err := getter.GetAny(context.Background(), dst, src)
-	return err
-}
