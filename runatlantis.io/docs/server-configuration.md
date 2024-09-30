@@ -1241,6 +1241,14 @@ This is useful when you have many projects and want to keep the pull request cle
 
   Namespace for emitting stats/metrics. See [stats](stats.md) section.
 
+### `--tf-distribution`
+  ```bash
+  atlantis server --tf-distribution="terraform"
+  # or
+  ATLANTIS_TF_DISTRIBUTION="terraform"
+  ```
+  Which TF distribution to use. Can be set to `terraform` or `opentofu`.
+
 ### `--tf-download`
 
   ```bash
@@ -1265,6 +1273,8 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   endpoint should match that of releases.hashicorp.com.
 
   This has no impact if `--tf-download` is set to `false`.
+
+  This setting is not yet supported when `--tf-distribution` is set to `opentofu`.
 
 ### `--tfe-hostname`
 
