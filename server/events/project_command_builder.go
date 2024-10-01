@@ -629,8 +629,10 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 			foundDir := false
 
 			for _, f := range modifiedFiles {
-				if filepath.Dir(f) == cmd.RepoRelDir {
+				// Check if the file is in the directory or any subdirectory of the target
+				if strings.HasPrefix(filepath.Dir(f), cmd.RepoRelDir) {
 					foundDir = true
+					break
 				}
 			}
 
@@ -654,8 +656,10 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 				foundDir := false
 
 				for _, p := range repoCfgProjects {
-					if filepath.Dir(f) == p.Dir {
+					// Check if the file is in the directory or any subdirectory of the project directory
+					if strings.HasPrefix(filepath.Dir(f), p.Dir) {
 						foundDir = true
+						break
 					}
 				}
 
