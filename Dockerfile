@@ -173,10 +173,7 @@ RUN apk add --no-cache \
         python3~=3 \
         py3-setuptools~=70
 
-#TODO HACK to avoidCVE-2024-4741 and CVE-2024-5535. Remove after the vulnerability is fixed:  openssl
-#TODO HACK to avoid CVE-2023-42364 and CVE-2023-42365. Remove after the vulnerability is fixed: busybox
-#TODO HACK to avoid CVE-2024-6387. Remove after the vulnerability is fixed: openssh
-RUN apk update && apk upgrade --no-cache libssl3 libcrypto3 busybox openssh curl
+RUN apk update && apk upgrade --no-cache libssl3 libcrypto3 curl
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
