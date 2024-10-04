@@ -81,8 +81,8 @@ func (d *ClientProxy) DiscardReviews(repo models.Repo, pull models.PullRequest) 
 	return d.clients[repo.VCSHost.Type].DiscardReviews(repo, pull)
 }
 
-func (d *ClientProxy) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, otherStatusNamesToIgnore []string) (bool, error) {
-	return d.clients[repo.VCSHost.Type].PullIsMergeable(logger, repo, pull, vcsstatusname, otherStatusNamesToIgnore)
+func (d *ClientProxy) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
+	return d.clients[repo.VCSHost.Type].PullIsMergeable(logger, repo, pull, vcsstatusname, ignoreVCSStatusNames)
 }
 
 func (d *ClientProxy) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {

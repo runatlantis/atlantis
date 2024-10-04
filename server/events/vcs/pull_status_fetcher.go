@@ -13,16 +13,16 @@ type PullReqStatusFetcher interface {
 }
 
 type pullReqStatusFetcher struct {
-	client                   Client
-	vcsStatusName            string
-	otherStatusNamesToIgnore []string
+	client               Client
+	vcsStatusName        string
+	ignoreVCSStatusNames []string
 }
 
-func NewPullReqStatusFetcher(client Client, vcsStatusName string, otherStatusNamesToIgnore []string) PullReqStatusFetcher {
+func NewPullReqStatusFetcher(client Client, vcsStatusName string, ignoreVCSStatusNames []string) PullReqStatusFetcher {
 	return &pullReqStatusFetcher{
-		client:                   client,
-		vcsStatusName:            vcsStatusName,
-		otherStatusNamesToIgnore: otherStatusNamesToIgnore,
+		client:               client,
+		vcsStatusName:        vcsStatusName,
+		ignoreVCSStatusNames: ignoreVCSStatusNames,
 	}
 }
 
@@ -32,7 +32,7 @@ func (f *pullReqStatusFetcher) FetchPullStatus(logger logging.SimpleLogging, pul
 		return pullStatus, errors.Wrapf(err, "fetching pull approval status for repo: %s, and pull number: %d", pull.BaseRepo.FullName, pull.Num)
 	}
 
-	mergeable, err := f.client.PullIsMergeable(logger, pull.BaseRepo, pull, f.vcsStatusName, f.otherStatusNamesToIgnore)
+	mergeable, err := f.client.PullIsMergeable(logger, pull.BaseRepo, pull, f.vcsStatusName, f.ignoreVCSStatusNames)
 	if err != nil {
 		return pullStatus, errors.Wrapf(err, "fetching mergeability status for repo: %s, and pull number: %d", pull.BaseRepo.FullName, pull.Num)
 	}
