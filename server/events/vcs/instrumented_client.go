@@ -183,7 +183,7 @@ func (c *InstrumentedClient) PullIsApproved(logger logging.SimpleLogging, repo m
 	return approved, err
 }
 
-func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, otherStatusNamesToIgnore []string) (bool, error) {
 	scope := c.StatsScope.SubScope("pull_is_mergeable")
 	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
 
@@ -193,7 +193,7 @@ func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo 
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	mergeable, err := c.Client.PullIsMergeable(logger, repo, pull, vcsstatusname)
+	mergeable, err := c.Client.PullIsMergeable(logger, repo, pull, vcsstatusname, otherStatusNamesToIgnore)
 
 	if err != nil {
 		executionError.Inc(1)

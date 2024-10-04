@@ -609,7 +609,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 					},
 				}, models.PullRequest{
 					Num: 1,
-				}, vcsStatusName)
+				}, vcsStatusName, []string{})
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})
@@ -873,7 +873,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 					},
 				}, models.PullRequest{
 					Num: 1,
-				}, vcsStatusName)
+				}, vcsStatusName, []string{})
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})

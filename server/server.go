@@ -722,7 +722,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.QuietPolicyChecks,
 	)
 
-	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName)
+	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName, strings.Split(userConfig.OtherVCSStatusNamesToIgnore, ","))
 	planCommandRunner := events.NewPlanCommandRunner(
 		userConfig.SilenceVCSStatusNoPlans,
 		userConfig.SilenceVCSStatusNoProjects,

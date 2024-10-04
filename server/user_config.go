@@ -75,6 +75,7 @@ type UserConfig struct {
 	LogLevel                        string `mapstructure:"log-level"`
 	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
 	MaxCommentsPerCommand           int    `mapstructure:"max-comments-per-command"`
+	OtherVCSStatusNamesToIgnore     string `mapstructure:"other-vcs-status-names-to-ignore"`
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`

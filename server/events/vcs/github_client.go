@@ -709,12 +709,25 @@ func CheckRunPassed(checkRun CheckRun) bool {
 	return checkRun.Conclusion == "SUCCESS" || checkRun.Conclusion == "SKIPPED" || checkRun.Conclusion == "NEUTRAL"
 }
 
-func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool {
+func StatusContextPassed(statusContext StatusContext, vcsstatusname string, otherStatusNamesToIgnore []string) bool {
+	// iterates through the list of other status names that were set to be ignored, allowing other atlantis servers
+	// to not be considered when determining if the status context is successful
+	otherStatusNamesOK := false
+	if len(otherStatusNamesToIgnore) > 0 {
+		otherStatusNamesOK = true
+	}
+	for _, otherStatusNameToIgnore := range otherStatusNamesToIgnore {
+		if !strings.HasPrefix(string(statusContext.Context), fmt.Sprintf("%s/%s", otherStatusNameToIgnore, command.Plan.String())) ||
+			!strings.HasPrefix(string(statusContext.Context), fmt.Sprintf("%s/%s", otherStatusNameToIgnore, command.Apply.String())) {
+			otherStatusNamesOK = false
+			break
+		}
+	}
 	return strings.HasPrefix(string(statusContext.Context), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) ||
-		statusContext.State == "SUCCESS"
+		statusContext.State == "SUCCESS" || otherStatusNamesOK
 }
 
-func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string) bool {
+func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string, otherStatusNamesToIgnore []string) bool {
 	for _, checkRun := range checkRuns {
 		if checkRun.Name == expectedContext {
 			return CheckRunPassed(checkRun)
@@ -723,7 +736,7 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 
 	for _, statusContext := range statusContexts {
 		if statusContext.Context == expectedContext {
-			return StatusContextPassed(statusContext, vcsstatusname)
+			return StatusContextPassed(statusContext, vcsstatusname, otherStatusNamesToIgnore)
 		}
 	}
 
@@ -748,7 +761,7 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 }
 
 // IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
-func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
+func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcsstatusname string, otherStatusNamesToIgnore []string) (bool, error) {
 	if pull.Number == nil {
 		return false, errors.New("pull request number is nil")
 	}
@@ -771,7 +784,7 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 	// Go through all checks and workflows required by branch protection or rulesets
 	// Make sure that they can all be found in the statusCheckRollup and that they all pass
 	for _, requiredCheck := range requiredChecks {
-		if !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname) {
+		if !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname, otherStatusNamesToIgnore) {
 			logger.Debug("%s: Expected Required Check: %s", notMergeablePrefix, requiredCheck)
 			return false, nil
 		}
@@ -791,7 +804,7 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
-func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, otherStatusNamesToIgnore []string) (bool, error) {
 	logger.Debug("Checking if GitHub pull request %d is mergeable", pull.Num)
 	githubPR, err := g.GetPullRequest(logger, repo, pull.Num)
 	if err != nil {
@@ -813,7 +826,7 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 	case "blocked":
 		if g.config.AllowMergeableBypassApply {
 			logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
-			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname)
+			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname, otherStatusNamesToIgnore)
 			if err != nil {
 				return false, errors.Wrap(err, "getting pull request status")
 			}
