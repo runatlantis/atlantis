@@ -1,4 +1,4 @@
-package runtime_test
+package runtime
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -111,7 +110,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 		tmpDir := t.TempDir()
 
-		r := runtime.RunStepRunner{
+		r := RunStepRunner{
 			TerraformExecutor:       terraform,
 			DefaultTFVersion:        defaultVersion,
 			TerraformBinDir:         "/bin/dir",
@@ -145,7 +144,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				ProjectName:        c.ProjectName,
 				EscapedCommentArgs: []string{"-target=resource1", "-target=resource2"},
 			}
-			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow)
+			out, err := r.Run(ctx, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow, "")
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

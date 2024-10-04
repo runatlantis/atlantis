@@ -26,11 +26,11 @@ func NewMockCustomStepRunner(options ...pegomock.Option) *MockCustomStepRunner {
 func (mock *MockCustomStepRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockCustomStepRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockCustomStepRunner) Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
+func (mock *MockCustomStepRunner) Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption, postProcessRegexFilter string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCustomStepRunner().")
 	}
-	params := []pegomock.Param{ctx, cmd, path, envs, streamOutput, postProcessOutput}
+	params := []pegomock.Param{ctx, cmd, path, envs, streamOutput, postProcessOutput, postProcessRegexFilter}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 string
 	var ret1 error
@@ -82,8 +82,8 @@ type VerifierMockCustomStepRunner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockCustomStepRunner) Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) *MockCustomStepRunner_Run_OngoingVerification {
-	params := []pegomock.Param{ctx, cmd, path, envs, streamOutput, postProcessOutput}
+func (verifier *VerifierMockCustomStepRunner) Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption, postProcessRegexFilter string) *MockCustomStepRunner_Run_OngoingVerification {
+	params := []pegomock.Param{ctx, cmd, path, envs, streamOutput, postProcessOutput, postProcessRegexFilter}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
 	return &MockCustomStepRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -93,12 +93,12 @@ type MockCustomStepRunner_Run_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockCustomStepRunner_Run_OngoingVerification) GetCapturedArguments() (command.ProjectContext, string, string, map[string]string, bool, valid.PostProcessRunOutputOption) {
-	ctx, cmd, path, envs, streamOutput, postProcessOutput := c.GetAllCapturedArguments()
-	return ctx[len(ctx)-1], cmd[len(cmd)-1], path[len(path)-1], envs[len(envs)-1], streamOutput[len(streamOutput)-1], postProcessOutput[len(postProcessOutput)-1]
+func (c *MockCustomStepRunner_Run_OngoingVerification) GetCapturedArguments() (command.ProjectContext, string, string, map[string]string, bool, valid.PostProcessRunOutputOption, string) {
+	ctx, cmd, path, envs, streamOutput, postProcessOutput, postProcessRegexFilter := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], cmd[len(cmd)-1], path[len(path)-1], envs[len(envs)-1], streamOutput[len(streamOutput)-1], postProcessOutput[len(postProcessOutput)-1], postProcessRegexFilter[len(postProcessRegexFilter)-1]
 }
 
-func (c *MockCustomStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 []string, _param3 []map[string]string, _param4 []bool, _param5 []valid.PostProcessRunOutputOption) {
+func (c *MockCustomStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 []string, _param3 []map[string]string, _param4 []bool, _param5 []valid.PostProcessRunOutputOption, _param6 []string) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
 		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
@@ -124,6 +124,10 @@ func (c *MockCustomStepRunner_Run_OngoingVerification) GetAllCapturedArguments()
 		_param5 = make([]valid.PostProcessRunOutputOption, len(c.methodInvocations))
 		for u, param := range params[5] {
 			_param5[u] = param.(valid.PostProcessRunOutputOption)
+		}
+		_param6 = make([]string, len(c.methodInvocations))
+		for u, param := range params[6] {
+			_param6[u] = param.(string)
 		}
 	}
 	return
