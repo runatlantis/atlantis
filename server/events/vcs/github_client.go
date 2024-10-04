@@ -18,6 +18,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -709,25 +711,12 @@ func CheckRunPassed(checkRun CheckRun) bool {
 	return checkRun.Conclusion == "SUCCESS" || checkRun.Conclusion == "SKIPPED" || checkRun.Conclusion == "NEUTRAL"
 }
 
-func StatusContextPassed(statusContext StatusContext, vcsstatusname string, ignoreVCSStatusNames []string) bool {
-	// iterates through the list of other status names that were set to be ignored, allowing other atlantis servers
-	// to not be considered when determining if the status context is successful
-	otherStatusNamesOK := false
-	if len(ignoreVCSStatusNames) > 0 {
-		otherStatusNamesOK = true
-	}
-	for _, ignoreVCSStatusName := range ignoreVCSStatusNames {
-		if !strings.HasPrefix(string(statusContext.Context), fmt.Sprintf("%s/%s", ignoreVCSStatusName, command.Plan.String())) ||
-			!strings.HasPrefix(string(statusContext.Context), fmt.Sprintf("%s/%s", ignoreVCSStatusName, command.Apply.String())) {
-			otherStatusNamesOK = false
-			break
-		}
-	}
+func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool {
 	return strings.HasPrefix(string(statusContext.Context), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) ||
-		statusContext.State == "SUCCESS" || otherStatusNamesOK
+		statusContext.State == "SUCCESS"
 }
 
-func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string, ignoreVCSStatusNames []string) bool {
+func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string) bool {
 	for _, checkRun := range checkRuns {
 		if checkRun.Name == expectedContext {
 			return CheckRunPassed(checkRun)
@@ -736,7 +725,7 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 
 	for _, statusContext := range statusContexts {
 		if statusContext.Context == expectedContext {
-			return StatusContextPassed(statusContext, vcsstatusname, ignoreVCSStatusNames)
+			return StatusContextPassed(statusContext, vcsstatusname)
 		}
 	}
 
@@ -784,8 +773,8 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 	// Go through all checks and workflows required by branch protection or rulesets
 	// Make sure that they can all be found in the statusCheckRollup and that they all pass
 	for _, requiredCheck := range requiredChecks {
-		if !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname, ignoreVCSStatusNames) {
-			logger.Debug("%s: Expected Required Check: %s", notMergeablePrefix, requiredCheck)
+		if !slices.Contains(ignoreVCSStatusNames, GetVCSStatusNameFromRequiredCheck(requiredCheck)) && !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname) {
+			logger.Debug("%s: Expected Required Check: %s VCS Status Name: %s Ignore VCS Status Names: %s", notMergeablePrefix, requiredCheck, vcsstatusname, ignoreVCSStatusNames)
 			return false, nil
 		}
 	}
@@ -801,6 +790,10 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 	}
 
 	return true, nil
+}
+
+func GetVCSStatusNameFromRequiredCheck(requiredCheck githubv4.String) string {
+	return strings.Split(string(requiredCheck), "/")[0]
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
