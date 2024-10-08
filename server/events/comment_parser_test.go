@@ -198,6 +198,31 @@ func TestParse_UnusedArguments(t *testing.T) {
 			"arg arg2",
 		},
 		{
+			command.DraftPlan,
+			"-d . arg",
+			"arg",
+		},
+		{
+			command.DraftPlan,
+			"arg -d .",
+			"arg",
+		},
+		{
+			command.DraftPlan,
+			"arg",
+			"arg",
+		},
+		{
+			command.DraftPlan,
+			"arg arg2",
+			"arg arg2",
+		},
+		{
+			command.DraftPlan,
+			"-d . arg -w kjj arg2",
+			"arg arg2",
+		},
+		{
 			command.Apply,
 			"-d . arg",
 			"arg",
@@ -241,6 +266,8 @@ func TestParse_UnusedArguments(t *testing.T) {
 			switch c.Command {
 			case command.Plan:
 				usage = PlanUsage
+			case command.DraftPlan:
+				usage = DraftPlanUsage
 			case command.Apply:
 				usage = ApplyUsage
 			case command.ApprovePolicies:
@@ -298,13 +325,14 @@ func TestParse_InvalidCommand(t *testing.T) {
 			command.Unlock,
 			command.Apply,
 			command.Plan,
+			command.DraftPlan,
 			command.Apply, // duplicate command is filtered
 		},
 		nil,
 	)
 	for _, c := range comments {
 		r := cp.Parse(c, models.Github)
-		exp := fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\nAvailable commands(--allow-commands): version, plan, apply, unlock\n```", strings.Fields(c)[1])
+		exp := fmt.Sprintf("```\nError: unknown command %q.\nRun 'atlantis --help' for usage.\nAvailable commands(--allow-commands): version, plan, apply, unlock, draftplan\n```", strings.Fields(c)[1])
 		Equals(t, exp, r.CommentResponse)
 	}
 }
@@ -350,6 +378,10 @@ func TestParse_InvalidFlags(t *testing.T) {
 		},
 		{
 			"atlantis plan --abc",
+			"Error: unknown flag: --abc",
+		},
+		{
+			"atlantis draftplan --abc",
 			"Error: unknown flag: --abc",
 		},
 		{
@@ -1071,6 +1103,10 @@ Examples:
 Commands:
   plan     Runs 'terraform plan' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.
+  draftplan
+           Runs plan in draft mode. Runs quickly without locks or
+           refreshing, plan is only added to PR comments. Cannot be applied.
+           To plan a specific project, use the -d, -w and -p flags.
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
   unlock   Removes all atlantis locks and discards all plans for this PR.
@@ -1207,6 +1243,15 @@ func TestParse_VCSUsername(t *testing.T) {
 }
 
 var PlanUsage = `Usage of plan:
+  -d, --dir string         Which directory to run plan in relative to root of repo,
+                           ex. 'child/dir'.
+  -p, --project string     Which project to run plan for. Refers to the name of the
+                           project configured in a repo config file. Cannot be used
+                           at same time as workspace or dir flags.
+      --verbose            Append Atlantis log to comment.
+  -w, --workspace string   Switch to this Terraform workspace before planning.
+`
+var DraftPlanUsage = `Usage of draftplan:
   -d, --dir string         Which directory to run plan in relative to root of repo,
                            ex. 'child/dir'.
   -p, --project string     Which project to run plan for. Refers to the name of the

@@ -1,0 +1,11 @@
+{{ define "draftplanSuccessWrapped" -}}
+<details><summary>Show Output</summary>
+
+```diff
+{{ if .EnableDiffMarkdownFormat }}{{ .DiffMarkdownFormattedTerraformOutput }}{{ else }}{{ .TerraformOutput }}{{ end }}
+```
+
+</details>
+{{ .PlanSummary -}}
+{{ template "mergedAgain" . -}}
+{{ end -}}
