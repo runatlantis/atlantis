@@ -33,7 +33,7 @@ func (b *InstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.C
 
 func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
 	return b.buildAndEmitStats(
-		"plan",
+		comment.Name.String(),
 		func() ([]command.ProjectContext, error) {
 			return b.ProjectCommandBuilder.BuildPlanCommands(ctx, comment)
 		},

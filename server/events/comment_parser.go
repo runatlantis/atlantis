@@ -240,6 +240,14 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run plan for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+	case command.DraftPlan.String():
+		name = command.DraftPlan
+		flagSet = pflag.NewFlagSet(command.Plan.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run plan for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.Apply.String():
 		name = command.Apply
 		flagSet = pflag.NewFlagSet(command.Apply.String(), pflag.ContinueOnError)
@@ -490,6 +498,7 @@ func (e *CommentParser) HelpComment() string {
 	if err := tmpl.Execute(buf, struct {
 		ExecutableName       string
 		AllowVersion         bool
+		AllowDraftPlan       bool
 		AllowPlan            bool
 		AllowApply           bool
 		AllowUnlock          bool
@@ -499,6 +508,7 @@ func (e *CommentParser) HelpComment() string {
 	}{
 		ExecutableName:       e.ExecutableName,
 		AllowVersion:         e.isAllowedCommand(command.Version.String()),
+		AllowDraftPlan:       e.isAllowedCommand(command.DraftPlan.String()),
 		AllowPlan:            e.isAllowedCommand(command.Plan.String()),
 		AllowApply:           e.isAllowedCommand(command.Apply.String()),
 		AllowUnlock:          e.isAllowedCommand(command.Unlock.String()),
@@ -538,6 +548,12 @@ Examples:
 Commands:
 {{- if .AllowPlan }}
   plan     Runs 'terraform plan' for the changes in this pull request.
+           To plan a specific project, use the -d, -w and -p flags.
+{{- end }}
+{{- if .AllowDraftPlan }}
+  draftplan
+           Runs plan in draft mode. Runs quickly without locks or
+           refreshing, plan is only added to PR comments. Cannot be applied.
            To plan a specific project, use the -d, -w and -p flags.
 {{- end }}
 {{- if .AllowApply }}

@@ -1,0 +1,7 @@
+{{ define "draftplanSuccessUnwrapped" -}}
+```diff
+{{ if .EnableDiffMarkdownFormat }}{{ .DiffMarkdownFormattedTerraformOutput }}{{ else }}{{ .TerraformOutput }}{{ end }}
+```
+
+{{ template "mergedAgain" . }}
+{{ end -}}

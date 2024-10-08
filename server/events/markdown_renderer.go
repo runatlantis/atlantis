@@ -29,6 +29,7 @@ import (
 
 var (
 	planCommandTitle            = command.Plan.TitleString()
+	draftplanCommandTitle       = command.DraftPlan.TitleString()
 	applyCommandTitle           = command.Apply.TitleString()
 	policyCheckCommandTitle     = command.PolicyCheck.TitleString()
 	approvePoliciesCommandTitle = command.ApprovePolicies.TitleString()
@@ -238,11 +239,20 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 				EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat,
 				PlanStats:                result.PlanSuccess.Stats(),
 			}
-			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				data.PlanSummary = result.PlanSuccess.Summary()
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), data)
+			if common.Command == draftplanCommandTitle {
+				if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
+					data.PlanSummary = result.PlanSuccess.Summary()
+					resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("draftplanSuccessWrapped"), data)
+				} else {
+					resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("draftplanSuccessUnwrapped"), data)
+				}
 			} else {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), data)
+				if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
+					data.PlanSummary = result.PlanSuccess.Summary()
+					resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), data)
+				} else {
+					resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), data)
+				}
 			}
 			resultData.NoChanges = result.PlanSuccess.NoChanges()
 			if result.PlanSuccess.NoChanges() {
@@ -343,8 +353,12 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 	switch {
 	case len(resultsTmplData) == 1 && common.Command == planCommandTitle && numPlanSuccesses > 0:
 		tmpl = templates.Lookup("singleProjectPlanSuccess")
+	case len(resultsTmplData) == 1 && common.Command == draftplanCommandTitle && numPlanSuccesses > 0:
+		tmpl = templates.Lookup("singleProjectDraftPlanSuccess")
 	case len(resultsTmplData) == 1 && common.Command == planCommandTitle && numPlanSuccesses == 0:
 		tmpl = templates.Lookup("singleProjectPlanUnsuccessful")
+	case len(resultsTmplData) == 1 && common.Command == draftplanCommandTitle && numPlanSuccesses == 0:
+		tmpl = templates.Lookup("singleProjectDraftPlanUnsuccessful")
 	case len(resultsTmplData) == 1 && common.Command == policyCheckCommandTitle && numPolicyCheckSuccesses > 0:
 		tmpl = templates.Lookup("singleProjectPlanSuccess")
 	case len(resultsTmplData) == 1 && common.Command == policyCheckCommandTitle && numPolicyCheckSuccesses == 0:
@@ -366,6 +380,8 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 		}
 	case common.Command == planCommandTitle:
 		tmpl = templates.Lookup("multiProjectPlan")
+	case common.Command == draftplanCommandTitle:
+		tmpl = templates.Lookup("multiProjectDraftPlan")
 	case common.Command == policyCheckCommandTitle:
 		if numPolicyCheckSuccesses == len(results) {
 			tmpl = templates.Lookup("multiProjectPolicy")
