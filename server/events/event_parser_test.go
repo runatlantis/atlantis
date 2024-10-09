@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v59/github"
+	"github.com/google/go-github/v63/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"

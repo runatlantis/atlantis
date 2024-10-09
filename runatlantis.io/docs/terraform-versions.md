@@ -53,7 +53,7 @@ terraform {
 }
 ```
 
-See [Terraform `required_version`](https://developer.hashicorp.com/terraform/language/settings#specifying-a-required-terraform-version) for reference.
+See [Terraform `required_version`](https://developer.hashicorp.com/terraform/language/terraform#terraform-required_version) for reference.
 
 ::: tip NOTE
 Atlantis will automatically download the latest version that fulfills the constraint specified.

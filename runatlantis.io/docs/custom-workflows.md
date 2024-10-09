@@ -483,8 +483,10 @@ workflows:
 ```
 
 NOTE:
-- Appending tags to every resource may regenerate data sources such as `aws_iam_policy_document` which will cause many resources to be modified. See known issue in aws provider [#29421](https://github.com/hashicorp/terraform-provider-aws/issues/29421).
-- To run a local plan outside of terraform, the same environment variables will need to be created.
+
+* Appending tags to every resource may regenerate data sources such as `aws_iam_policy_document` which will cause many resources to be modified. See known issue in aws provider [#29421](https://github.com/hashicorp/terraform-provider-aws/issues/29421).
+
+* To run a local plan outside of terraform, the same environment variables will need to be created.
 
     ```bash
     tfvars () {

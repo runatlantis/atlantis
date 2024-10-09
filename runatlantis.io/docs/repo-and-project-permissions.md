@@ -11,7 +11,7 @@ permissions to run a command:
 
 1. After a command has been validated, before var files, repo metadata, or
    pull request statuses are checked and validated.
-2. After pre workflow hooks have run, repo configuration processed, and 
+2. After pre workflow hooks have run, repo configuration processed, and
    affected projects determined.
 
 ::: tip Note
@@ -21,6 +21,7 @@ project in that repo.
 :::
 
 ### Why check permissions twice?
+
 The way Atlantis is currently designed, not all relevant information may be
 available when the first check happens.  In particular, affected projects
 are not known because pre workflow hooks haven't run yet, so repositories
@@ -57,18 +58,21 @@ the `--gh-team-allowlist` option is ignored.
 ## Example
 
 ### Restrict production changes
+
 This example shows a simple example of how a script could be used to restrict
-production changes to a specific team, while allowing anyone to work on other 
+production changes to a specific team, while allowing anyone to work on other
 environments.  For brevity, this example assumes each user is a member of a
 single team.
 
 `server-side-repo-config.yaml`
+
 ```yaml
 team_authz:
   command: "/scripts/example.sh"
 ```
 
 `example.sh`
+
 ```shell
 #!/bin/bash
 
@@ -89,16 +93,17 @@ then
       echo "pass"
       exit 0
    fi
-   
+
    # Print reason for failing and exit
    echo "user \"${USER_NAME}\" must be a member of \"${PROD_TEAM}\" to apply changes to production."
    exit 0
-fi 
+fi
 
 # Any other command and environment is okay
 echo "pass"
 exit 0
 ```
+
 ## Reference
 
 ### External Command Execution
@@ -117,8 +122,7 @@ external_command [external_args...] atlantis_command repo [teams...]
 | `external_args`    | yes      | Command arguments defined in [server side repo configuration](server-side-repo-config.md) |
 | `atlantis_command` | no       | The atlantis command being run (`plan`, `apply`, etc)                                     |
 | `repo`             | no       | The full name of the repo being executed (format: `owner/repo_name`)                      |
-| `teams`            | yes      | A list of zero or more teams of the user executing the command                            | 
-
+| `teams`            | yes      | A list of zero or more teams of the user executing the command                            |
 
 The following environment variables are passed to the command on every execution:
 
@@ -128,7 +132,6 @@ The following environment variables are passed to the command on every execution
 | `BASE_REPO_OWNER`    | Owner of the repository that the pull request will be merged into, ex. `runatlantis`.                                                                                                                                                 |
 | `COMMAND_NAME`       | The name of the command that is being executed, i.e. `plan`, `apply` etc.                                                                                                                                                             |
 | `USER_NAME`          | Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.                                                                                                |
-
 
 The following environment variables are also passed to the command when checking project authorization:
 
@@ -149,22 +152,23 @@ The following environment variables are also passed to the command when checking
 
 ### External Command Result Handling
 
-Atlantis determines if a user is authorized to run the requested command by 
+Atlantis determines if a user is authorized to run the requested command by
 checking if the external command exited with code `0` and if the last line
 of output is `pass`.
 
-```
+```text
 # Psuedo-code of Atlantis evaluation of external commands
 
 user_authorized =
   external_command.exit_code == 0
-  && external_command.output.last_line == 'pass' 
+  && external_command.output.last_line == 'pass'
 ```
 
 ::: tip
+
 * A non-zero exit code means the command failed to evaluate the request for
 some reason (bad configuration, missing dependencies, solar flares, etc).
 * If the command was able to run successfully, but determined the user is not
 authorized, it should still exit with code `0`.
-   * The command output could contain the reasoning for the authorization failure.
+  * The command output could contain the reasoning for the authorization failure.
 :::
