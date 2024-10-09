@@ -107,6 +107,7 @@ type UserConfig struct {
 	SSLCertFile                string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile                 string          `mapstructure:"ssl-key-file"`
 	RestrictFileList           bool            `mapstructure:"restrict-file-list"`
+	TFDistribution             string          `mapstructure:"tf-distribution"`
 	TFDownload                 bool            `mapstructure:"tf-download"`
 	TFDownloadURL              string          `mapstructure:"tf-download-url"`
 	TFEHostname                string          `mapstructure:"tfe-hostname"`

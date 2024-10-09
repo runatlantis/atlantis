@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,13 +11,13 @@ import (
 	"encoding/json"
 	"regexp"
 
+	"github.com/hashicorp/go-getter/v2"
 	"github.com/hashicorp/go-multierror"
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime/cache"
 	runtime_models "github.com/runatlantis/atlantis/server/core/runtime/models"
-	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -103,8 +104,21 @@ func (p *SourceResolverProxy) Resolve(policySet valid.PolicySet) (string, error)
 	}
 }
 
+//go:generate pegomock generate --package mocks -o mocks/mock_downloader.go Downloader
+
+type Downloader interface {
+	GetAny(dst, src string) error
+}
+
+type ConfTestGoGetterVersionDownloader struct{}
+
+func (c ConfTestGoGetterVersionDownloader) GetAny(dst, src string) error {
+	_, err := getter.GetAny(context.Background(), dst, src)
+	return err
+}
+
 type ConfTestVersionDownloader struct {
-	downloader terraform.Downloader
+	downloader Downloader
 }
 
 func (c ConfTestVersionDownloader) downloadConfTestVersion(v *version.Version, destPath string) (runtime_models.FilePath, error) {
@@ -142,7 +156,7 @@ type ConfTestExecutorWorkflow struct {
 	Exec                   runtime_models.Exec
 }
 
-func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir string, conftestDownloder terraform.Downloader) *ConfTestExecutorWorkflow {
+func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir string, conftestDownloder Downloader) *ConfTestExecutorWorkflow {
 	downloader := ConfTestVersionDownloader{
 		downloader: conftestDownloder,
 	}

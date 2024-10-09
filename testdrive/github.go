@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v59/github"
+	"github.com/google/go-github/v63/github"
 )
 
 var githubUsername string
@@ -55,12 +55,14 @@ func (g *Client) CheckForkSuccess(ownerName string, forkRepoName string) bool {
 
 // CreateWebhook creates a GitHub webhook to send requests to our local ngrok.
 func (g *Client) CreateWebhook(ownerName string, repoName string, hookURL string) error {
+	contentType := "json"
+	hookConfig := &github.HookConfig{
+		ContentType: &contentType,
+		URL:         &hookURL,
+	}
 	atlantisHook := &github.Hook{
 		Events: []string{"issue_comment", "pull_request", "pull_request_review", "push"},
-		Config: map[string]interface{}{
-			"url":          hookURL,
-			"content_type": "json",
-		},
+		Config: hookConfig,
 		Active: github.Bool(true),
 	}
 	_, _, err := g.client.Repositories.CreateHook(g.ctx, ownerName, repoName, atlantisHook)

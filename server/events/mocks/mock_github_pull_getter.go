@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	github "github.com/google/go-github/v59/github"
+	github "github.com/google/go-github/v63/github"
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	logging "github.com/runatlantis/atlantis/server/logging"

@@ -421,8 +421,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		)
 	}
 
+	distribution := terraform.NewDistributionTerraform()
+	if userConfig.TFDistribution == "opentofu" {
+		distribution = terraform.NewDistributionOpenTofu()
+	}
+
 	terraformClient, err := terraform.NewClient(
 		logger,
+		distribution,
 		binDir,
 		cacheDir,
 		userConfig.TFEToken,
@@ -430,7 +436,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DefaultTFVersion,
 		config.DefaultTFVersionFlag,
 		userConfig.TFDownloadURL,
-		&terraform.DefaultDownloader{},
 		userConfig.TFDownload,
 		userConfig.UseTFPluginCache,
 		projectCmdOutputHandler)
@@ -438,7 +443,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
 	if err != nil && flag.Lookup("test.v") == nil {
-		return nil, errors.Wrap(err, "initializing terraform")
+		return nil, errors.Wrap(err, fmt.Sprintf("initializing %s", userConfig.TFDistribution))
 	}
 	markdownRenderer := events.NewMarkdownRenderer(
 		gitlabClient.SupportsCommonMark(),
@@ -635,7 +640,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	policyCheckStepRunner, err := runtime.NewPolicyCheckStepRunner(
 		defaultTfVersion,
-		policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
+		policy.NewConfTestExecutorWorkflow(logger, binDir, &policy.ConfTestGoGetterVersionDownloader{}),
 	)
 
 	if err != nil {

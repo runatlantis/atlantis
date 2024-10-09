@@ -3,7 +3,7 @@ package vcs
 import (
 	"strconv"
 
-	"github.com/google/go-github/v59/github"
+	"github.com/google/go-github/v63/github"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"

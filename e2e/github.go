@@ -21,7 +21,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/google/go-github/v59/github"
+	"github.com/google/go-github/v63/github"
 )
 
 type GithubClient struct {
@@ -81,13 +81,15 @@ func (g GithubClient) Clone(cloneDir string) error {
 }
 
 func (g GithubClient) CreateAtlantisWebhook(ctx context.Context, hookURL string) (int64, error) {
+	contentType := "json"
+	hookConfig := &github.HookConfig{
+		ContentType: &contentType,
+		URL:         &hookURL,
+	}
 	// create atlantis hook
 	atlantisHook := &github.Hook{
 		Events: []string{"issue_comment", "pull_request", "push"},
-		Config: map[string]interface{}{
-			"url":          hookURL,
-			"content_type": "json",
-		},
+		Config: hookConfig,
 		Active: github.Bool(true),
 	}
 
