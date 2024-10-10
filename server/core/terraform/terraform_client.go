@@ -125,7 +125,7 @@ func NewClientWithDefaultVersion(
 		return nil, fmt.Errorf("%s not found in $PATH. Set --%s or download terraform from https://developer.hashicorp.com/terraform/downloads", distribution.BinName(), defaultVersionFlagName)
 	}
 	if err == nil {
-		localVersion, err = getVersion(localPath)
+		localVersion, err = getVersion(localPath, distribution.BinName())
 		if err != nil {
 			return nil, err
 		}
@@ -529,7 +529,7 @@ func ensureVersion(
 	execPath, err := dist.Downloader().Install(context.Background(), binDir, downloadURL, v)
 
 	if err != nil {
-		return "", errors.Wrapf(err, "error downloading terraform version %s", v.String())
+		return "", errors.Wrapf(err, "error downloading %s version %s", dist.BinName(), v.String())
 	}
 
 	log.Info("Downloaded %s %s to %s", dist.BinName(), v.String(), execPath)
@@ -576,15 +576,15 @@ func isAsyncEligibleCommand(cmd string) bool {
 	return false
 }
 
-func getVersion(tfBinary string) (*version.Version, error) {
+func getVersion(tfBinary string, binName string) (*version.Version, error) {
 	versionOutBytes, err := exec.Command(tfBinary, "version").Output() // #nosec
 	versionOutput := string(versionOutBytes)
 	if err != nil {
-		return nil, errors.Wrapf(err, "running terraform version: %s", versionOutput)
+		return nil, errors.Wrapf(err, "running %s version: %s", binName, versionOutput)
 	}
 	match := versionRegex.FindStringSubmatch(versionOutput)
 	if len(match) <= 1 {
-		return nil, fmt.Errorf("could not parse terraform version from %s", versionOutput)
+		return nil, fmt.Errorf("could not parse %s version from %s", binName, versionOutput)
 	}
 	return version.NewVersion(match[1])
 }
