@@ -53,7 +53,7 @@ func (p ProjectResult) PolicyStatus() []models.PolicySetStatus {
 func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 	switch p.Command {
 
-	case Plan:
+	case Plan, DraftPlan:
 		if p.Error != nil {
 			return models.ErroredPlanStatus
 		} else if p.Failure != "" {

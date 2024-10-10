@@ -1,0 +1,7 @@
+{{ define "singleProjectDraftPlanUnsuccessful" -}}
+{{ $result := index .Results 0 -}}
+Ran {{ .Command }} for dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
+
+{{ $result.Rendered }}
+{{- template "log" . -}}
+{{ end -}}
