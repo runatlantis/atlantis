@@ -67,11 +67,7 @@ projects:
 	err := os.WriteFile(globalYAMLPath, []byte(globalYAML), 0600)
 	require.NoError(t, err)
 
-	globalCfgArgs := valid.GlobalCfgArgs{
-		MergeableReq:  false,
-		ApprovedReq:   false,
-		UnDivergedReq: false,
-	}
+	globalCfgArgs := valid.GlobalCfgArgs{}
 
 	parser := &config.ParserValidator{}
 	global, err := parser.ParseGlobalCfg(globalYAMLPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
@@ -84,7 +80,7 @@ projects:
 	repo, err := parser.ParseRepoCfg(tmp, global, "github.com/foo/bar", "main")
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(repo.Projects))
+	require.Len(t, repo.Projects, 1)
 
 	t.Logf("Projects: %+v", repo.Projects)
 }

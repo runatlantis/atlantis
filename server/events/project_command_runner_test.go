@@ -63,22 +63,10 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	}
 
 	repoDir := t.TempDir()
-	When(mockWorkingDir.Clone(
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Any[string](),
-	)).ThenReturn(repoDir, false, nil)
-	When(mockLocker.TryLock(
-		Any[logging.SimpleLogging](),
-		Any[models.PullRequest](),
-		Any[models.User](),
-		Any[string](),
-		Any[models.Project](),
-		AnyBool(),
-	)).ThenReturn(&events.TryLockResponse{
-		LockAcquired: true,
-		LockKey:      "lock-key",
-	}, nil)
+	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(repoDir, false, nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
+		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	expEnvs := map[string]string{
 		"name": "value",
@@ -317,7 +305,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	}
 	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
-	When(mockWorkingDir.HasDiverged(tmp)).ThenReturn(true)
+	When(mockWorkingDir.HasDiverged(ctx.Log, tmp)).ThenReturn(true)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
@@ -436,6 +424,17 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
 
 			ctx := command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
@@ -507,6 +506,17 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		Any[models.PullRequest](),
 		Any[string](),
 	)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+	}, nil)
 
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
@@ -560,22 +570,10 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	}
 
 	repoDir := t.TempDir()
-	When(mockWorkingDir.Clone(
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Any[string](),
-	)).ThenReturn(repoDir, false, nil)
-	When(mockLocker.TryLock(
-		Any[logging.SimpleLogging](),
-		Any[models.PullRequest](),
-		Any[models.User](),
-		Any[string](),
-		Any[models.Project](),
-		AnyBool(),
-	)).ThenReturn(&events.TryLockResponse{
-		LockAcquired: true,
-		LockKey:      "lock-key",
-	}, nil)
+	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(repoDir, false, nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
+		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
@@ -714,11 +712,8 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 				RePlanCmd:          "atlantis plan -d . -- addr id",
 			}
 			repoDir := t.TempDir()
-			When(mockWorkingDir.Clone(
-				Any[models.Repo](),
-				Any[models.PullRequest](),
-				Any[string](),
-			)).ThenReturn(repoDir, false, nil)
+			When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(repoDir, false, nil)
 			if c.setup != nil {
 				c.setup(repoDir, ctx, mockLocker, mockInit, mockImport)
 			}
@@ -1173,6 +1168,56 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			expFailure: `One or more policy sets require additional approval.`,
 			hasErr:     false,
 		},
+		{
+			description:         "Policy Approval should not be the Author of the PR",
+			userTeams:           []string{"someuserteam"},
+			clearPolicyApproval: false,
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Users: []string{"lkysow"},
+						},
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Owners: valid.PolicyOwners{
+							Users: []string{"lkysow"},
+						},
+						Name:               "policy2",
+						ApproveCount:       1,
+						PreventSelfApprove: true,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Approvals:     0,
+					Passed:        false,
+				},
+				{
+					PolicySetName: "policy2",
+					Approvals:     0,
+					Passed:        false,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+			},
+			expFailure: `One or more policy sets require additional approval.`,
+			hasErr:     true,
+		},
 	}
 
 	for _, c := range cases {
@@ -1230,7 +1275,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				projPolicyStatus = c.policySetStatus
 			}
 
-			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, Author: testdata.User.Username}
 			When(runner.VcsClient.GetTeamNamesForUser(testdata.GithubRepo, testdata.User)).ThenReturn(c.userTeams, nil)
 			ctx := command.ProjectContext{
 				User:                testdata.User,

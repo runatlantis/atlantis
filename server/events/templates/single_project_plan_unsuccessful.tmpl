@@ -3,5 +3,5 @@
 Ran {{ .Command }} for dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
 
 {{ $result.Rendered }}
-{{- template "log" . -}}
+{{ template "log" . -}}
 {{ end -}}

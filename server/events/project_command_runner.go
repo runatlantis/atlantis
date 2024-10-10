@@ -78,7 +78,7 @@ type EnvStepRunner interface {
 // MultiEnvStepRunner runs multienv steps.
 type MultiEnvStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string) (string, error)
+	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -225,13 +225,14 @@ type DefaultProjectCommandRunner struct {
 func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
 	planSuccess, failure, err := p.doPlan(ctx)
 	return command.ProjectResult{
-		Command:     command.Plan,
-		PlanSuccess: planSuccess,
-		Error:       err,
-		Failure:     failure,
-		RepoRelDir:  ctx.RepoRelDir,
-		Workspace:   ctx.Workspace,
-		ProjectName: ctx.ProjectName,
+		Command:           command.Plan,
+		PlanSuccess:       planSuccess,
+		Error:             err,
+		Failure:           failure,
+		RepoRelDir:        ctx.RepoRelDir,
+		Workspace:         ctx.Workspace,
+		ProjectName:       ctx.ProjectName,
+		SilencePRComments: ctx.SilencePRComments,
 	}
 }
 
@@ -253,13 +254,14 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
 	applyOut, failure, err := p.doApply(ctx)
 	return command.ProjectResult{
-		Command:      command.Apply,
-		Failure:      failure,
-		Error:        err,
-		ApplySuccess: applyOut,
-		RepoRelDir:   ctx.RepoRelDir,
-		Workspace:    ctx.Workspace,
-		ProjectName:  ctx.ProjectName,
+		Command:           command.Apply,
+		Failure:           failure,
+		Error:             err,
+		ApplySuccess:      applyOut,
+		RepoRelDir:        ctx.RepoRelDir,
+		Workspace:         ctx.Workspace,
+		ProjectName:       ctx.ProjectName,
+		SilencePRComments: ctx.SilencePRComments,
 	}
 }
 
@@ -320,7 +322,7 @@ func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) comman
 
 func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectContext) (*models.PolicyCheckResults, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir), ctx.RepoLocking)
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "acquiring lock")
 	}
@@ -375,7 +377,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					ignorePolicy = true
 				}
 				// Increment approval if user is owner.
-				if isOwner && !ignorePolicy {
+				if isOwner && !ignorePolicy && (ctx.User.Username != ctx.Pull.Author || !policySet.PreventSelfApprove) {
 					if !ctx.ClearPolicyApproval {
 						prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
 					} else {
@@ -389,6 +391,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 				if !policyStatus.Passed && (prjPolicyStatus[i].Approvals != policySet.ApproveCount) {
 					allPassed = false
 				}
+
 				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
 					PolicySetName: policySet.Name,
 					Passed:        policyStatus.Passed,
@@ -417,7 +420,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// we will attempt to capture the lock here but fail to get the working directory
 	// at which point we will unlock again to preserve functionality
 	// If we fail to capture the lock here (super unlikely) then we error out and the user is forced to replan
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir), ctx.RepoLocking)
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
 
 	if err != nil {
 		return nil, "", errors.Wrap(err, "acquiring lock")
@@ -536,7 +539,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*models.PlanSuccess, string, error) {
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir), ctx.RepoLocking)
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "acquiring lock")
 	}
@@ -554,7 +557,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 
 	p.WorkingDir.SetCheckForUpstreamChanges()
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, mergedAgain, cloneErr := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, mergedAgain, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -612,6 +615,16 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", failure, err
 	}
 
+	// Acquire Atlantis lock for this repo/dir/workspace.
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnApplyMode)
+	if err != nil {
+		return "", "", errors.Wrap(err, "acquiring lock")
+	}
+	if !lockAttempt.LockAcquired {
+		return "", lockAttempt.LockFailureReason, nil
+	}
+	ctx.Log.Debug("acquired lock for project")
+
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
 	if err != nil {
@@ -667,7 +680,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 
 func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out *models.ImportSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}
@@ -682,7 +695,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir), ctx.RepoLocking)
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "acquiring lock")
 	}
@@ -713,7 +726,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 
 func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out *models.StateRmSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}
@@ -723,7 +736,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
-	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir), ctx.RepoLocking)
+	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "acquiring lock")
 	}
@@ -785,7 +798,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 			// be printed to the PR, it's solely to set the environment variable.
 			out = ""
 		case "multienv":
-			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs)
+			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs, step.Output)
 		}
 
 		if out != "" {

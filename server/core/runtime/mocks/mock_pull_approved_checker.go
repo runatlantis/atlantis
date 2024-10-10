@@ -6,6 +6,7 @@ package mocks
 import (
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	logging "github.com/runatlantis/atlantis/server/logging"
 	"reflect"
 	"time"
 )
@@ -25,11 +26,11 @@ func NewMockPullApprovedChecker(options ...pegomock.Option) *MockPullApprovedChe
 func (mock *MockPullApprovedChecker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockPullApprovedChecker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockPullApprovedChecker) PullIsApproved(baseRepo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
+func (mock *MockPullApprovedChecker) PullIsApproved(logger logging.SimpleLogging, baseRepo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPullApprovedChecker().")
 	}
-	params := []pegomock.Param{baseRepo, pull}
+	params := []pegomock.Param{logger, baseRepo, pull}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("PullIsApproved", params, []reflect.Type{reflect.TypeOf((*models.ApprovalStatus)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 models.ApprovalStatus
 	var ret1 error
@@ -81,8 +82,8 @@ type VerifierMockPullApprovedChecker struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockPullApprovedChecker) PullIsApproved(baseRepo models.Repo, pull models.PullRequest) *MockPullApprovedChecker_PullIsApproved_OngoingVerification {
-	params := []pegomock.Param{baseRepo, pull}
+func (verifier *VerifierMockPullApprovedChecker) PullIsApproved(logger logging.SimpleLogging, baseRepo models.Repo, pull models.PullRequest) *MockPullApprovedChecker_PullIsApproved_OngoingVerification {
+	params := []pegomock.Param{logger, baseRepo, pull}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "PullIsApproved", params, verifier.timeout)
 	return &MockPullApprovedChecker_PullIsApproved_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -92,21 +93,25 @@ type MockPullApprovedChecker_PullIsApproved_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockPullApprovedChecker_PullIsApproved_OngoingVerification) GetCapturedArguments() (models.Repo, models.PullRequest) {
-	baseRepo, pull := c.GetAllCapturedArguments()
-	return baseRepo[len(baseRepo)-1], pull[len(pull)-1]
+func (c *MockPullApprovedChecker_PullIsApproved_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.Repo, models.PullRequest) {
+	logger, baseRepo, pull := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], baseRepo[len(baseRepo)-1], pull[len(pull)-1]
 }
 
-func (c *MockPullApprovedChecker_PullIsApproved_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.PullRequest) {
+func (c *MockPullApprovedChecker_PullIsApproved_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []models.PullRequest) {
 	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(c.methodInvocations))
+		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 		for u, param := range params[0] {
-			_param0[u] = param.(models.Repo)
+			_param0[u] = param.(logging.SimpleLogging)
 		}
-		_param1 = make([]models.PullRequest, len(c.methodInvocations))
+		_param1 = make([]models.Repo, len(c.methodInvocations))
 		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequest)
+			_param1[u] = param.(models.Repo)
+		}
+		_param2 = make([]models.PullRequest, len(c.methodInvocations))
+		for u, param := range params[2] {
+			_param2[u] = param.(models.PullRequest)
 		}
 	}
 	return

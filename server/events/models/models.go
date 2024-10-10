@@ -221,6 +221,7 @@ func (p PullRequestEventType) String() string {
 // During an autoplan, the user will be the Atlantis API user.
 type User struct {
 	Username string
+	Teams    []string
 }
 
 // ProjectLock represents a lock on a project.
@@ -244,6 +245,8 @@ type ProjectLock struct {
 // Terraform projects in a single repo we also include Path to the project
 // root relative to the repo root.
 type Project struct {
+	// ProjectName of the project
+	ProjectName string
 	// RepoFullName is the owner and repo name, ex. "runatlantis/atlantis"
 	RepoFullName string
 	// Path to project root in the repo.
@@ -256,6 +259,7 @@ type Project struct {
 }
 
 func (p Project) String() string {
+	// TODO: Incorporate ProjectName?
 	return fmt.Sprintf("repofullname=%s path=%s", p.RepoFullName, p.Path)
 }
 
@@ -271,12 +275,13 @@ type Plan struct {
 
 // NewProject constructs a Project. Use this constructor because it
 // sets Path correctly.
-func NewProject(repoFullName string, path string) Project {
+func NewProject(repoFullName string, path string, projectName string) Project {
 	path = paths.Clean(path)
 	if path == "/" {
 		path = "."
 	}
 	return Project{
+		ProjectName:  projectName,
 		RepoFullName: repoFullName,
 		Path:         path,
 	}
@@ -300,6 +305,7 @@ const (
 	BitbucketCloud
 	BitbucketServer
 	AzureDevops
+	Gitea
 )
 
 func (h VCSHostType) String() string {
@@ -314,6 +320,8 @@ func (h VCSHostType) String() string {
 		return "BitbucketServer"
 	case AzureDevops:
 		return "AzureDevops"
+	case Gitea:
+		return "Gitea"
 	}
 	return "<missing String() implementation>"
 }
@@ -330,6 +338,8 @@ func NewVCSHostType(t string) (VCSHostType, error) {
 		return BitbucketServer, nil
 	case "AzureDevops":
 		return AzureDevops, nil
+	case "Gitea":
+		return Gitea, nil
 	}
 
 	return -1, fmt.Errorf("%q is not a valid type", t)
@@ -606,32 +616,96 @@ func (p ProjectPlanStatus) String() string {
 	}
 }
 
-// WorkflowHookCommandContext defines the context for a pre and post worklfow_hooks that will
-// be executed before workflows.
-type WorkflowHookCommandContext struct {
+// TeamAllowlistCheckerContext defines the context for a TeamAllowlistChecker to verify
+// command permissions.
+type TeamAllowlistCheckerContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
-	// HeadRepo is the repository that is getting merged into the BaseRepo.
-	// If the pull request branch is from the same repository then HeadRepo will
-	// be the same as BaseRepo.
-	HeadRepo Repo
-	// Log is a logger that's been set up for this context.
-	Log logging.SimpleLogging
-	// Pull is the pull request we're responding to.
-	Pull PullRequest
-	// User is the user that triggered this command.
-	User User
-	// Verbose is true when the user would like verbose output.
-	Verbose bool
+
+	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
+	CommandName string
+
 	// EscapedCommentArgs are the extra arguments that were added to the atlantis
 	// command, ex. atlantis plan -- -target=resource. We then escape them
 	// by adding a \ before each character so that they can be used within
 	// sh -c safely, i.e. sh -c "terraform plan $(touch bad)".
 	EscapedCommentArgs []string
-	// UUID for reference
-	HookID string
+
+	// HeadRepo is the repository that is getting merged into the BaseRepo.
+	// If the pull request branch is from the same repository then HeadRepo will
+	// be the same as BaseRepo.
+	HeadRepo Repo
+
+	// Log is a logger that's been set up for this context.
+	Log logging.SimpleLogging
+
+	// Pull is the pull request we're responding to.
+	Pull PullRequest
+
+	// ProjectName is the name of the project set in atlantis.yaml. If there was
+	// no name this will be an empty string.
+	ProjectName string
+
+	// RepoDir is the absolute path to the repo root
+	RepoDir string
+
+	// RepoRelDir is the directory of this project relative to the repo root.
+	RepoRelDir string
+
+	// User is the user that triggered this command.
+	User User
+
+	// Verbose is true when the user would like verbose output.
+	Verbose bool
+
+	// Workspace is the Terraform workspace this project is in. It will always
+	// be set.
+	Workspace string
+
+	// API is true if plan/apply by API endpoints
+	API bool
+}
+
+// WorkflowHookCommandContext defines the context for a pre and post worklfow_hooks that will
+// be executed before workflows.
+type WorkflowHookCommandContext struct {
+	// BaseRepo is the repository that the pull request will be merged into.
+	BaseRepo Repo
 	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
 	CommandName string
+	// EscapedCommentArgs are the extra arguments that were added to the atlantis
+	// command, ex. atlantis plan -- -target=resource. We then escape them
+	// by adding a \ before each character so that they can be used within
+	// sh -c safely, i.e. sh -c "terraform plan $(touch bad)".
+	EscapedCommentArgs []string
+	// HeadRepo is the repository that is getting merged into the BaseRepo.
+	// If the pull request branch is from the same repository then HeadRepo will
+	// be the same as BaseRepo.
+	HeadRepo Repo
+	// HookDescription is a description of the hook that is being executed.
+	HookDescription string
+	// UUID for reference
+	HookID string
+	// HookStepName is the name of the step that is being executed.
+	HookStepName string
+	// Log is a logger that's been set up for this context.
+	Log logging.SimpleLogging
+	// Pull is the pull request we're responding to.
+	Pull PullRequest
+	// ProjectName is the name of the project set in atlantis.yaml. If there was
+	// no name this will be an empty string.
+	ProjectName string
+	// RepoRelDir is the directory of this project relative to the repo root.
+	RepoRelDir string
+	// User is the user that triggered this command.
+	User User
+	// Verbose is true when the user would like verbose output.
+	Verbose bool
+	// Workspace is the Terraform workspace this project is in. It will always
+	// be set.
+	Workspace string
+	// API is true if plan/apply by API endpoints
+	API bool
 }
 
 // PlanSuccessStats holds stats for a plan.

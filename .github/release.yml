@@ -5,6 +5,7 @@ changelog:
       - github-actions
     authors:
       - octocat
+      - renovate[bot]
   categories:
     - title: Breaking Changes 🛠
       labels:
@@ -15,9 +16,9 @@ changelog:
         - Semver-Minor
         - enhancement
         - feature
-    - title: Bug fixes
+    - title: Bug fixes 🐛
       labels:
         - bug
-    - title: Other Changes
+    - title: Other Changes 🔄
       labels:
         - "*"

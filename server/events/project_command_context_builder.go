@@ -145,6 +145,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		ctx.Scope,
 		ctx.PullRequestStatus,
 		ctx.PullStatus,
+		ctx.TeamAllowlistChecker,
 	)
 
 	projectCmds = append(projectCmds, projectCmdContext)
@@ -217,6 +218,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			ctx.Scope,
 			ctx.PullRequestStatus,
 			ctx.PullStatus,
+			ctx.TeamAllowlistChecker,
 		))
 	}
 
@@ -242,6 +244,7 @@ func newProjectCommandContext(ctx *command.Context,
 	scope tally.Scope,
 	pullReqStatus models.PullReqStatus,
 	pullStatus *models.PullStatus,
+	teamAllowlistChecker command.TeamAllowlistChecker,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
@@ -273,7 +276,7 @@ func newProjectCommandContext(ctx *command.Context,
 		EscapedCommentArgs:         escapedCommentArgs,
 		AutomergeEnabled:           automergeEnabled,
 		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
-		RepoLocking:                projCfg.RepoLocking,
+		RepoLocksMode:              projCfg.RepoLocks.Mode,
 		CustomPolicyCheck:          projCfg.CustomPolicyCheck,
 		ParallelApplyEnabled:       parallelApplyEnabled,
 		ParallelPlanEnabled:        parallelPlanEnabled,
@@ -306,6 +309,8 @@ func newProjectCommandContext(ctx *command.Context,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
+		SilencePRComments:          projCfg.SilencePRComments,
+		TeamAllowlistChecker:       teamAllowlistChecker,
 	}
 }
 

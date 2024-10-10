@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -13,31 +12,28 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime/cache/mocks"
 	models_mocks "github.com/runatlantis/atlantis/server/core/runtime/models/mocks"
 	conftest_mocks "github.com/runatlantis/atlantis/server/core/runtime/policy/mocks"
-	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
-
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
 func TestConfTestVersionDownloader(t *testing.T) {
 
 	version, _ := version.NewVersion("0.25.0")
 	destPath := "some/path"
-
-	fullURL := fmt.Sprintf("https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/conftest_0.25.0_%s_x86_64.tar.gz?checksum=file:https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/checksums.txt", cases.Title(language.English).String(runtime.GOOS))
+	platform := getPlatform()
+	fullURL := fmt.Sprintf("https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/conftest_0.25.0_%s.tar.gz?checksum=file:https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/checksums.txt", platform)
 
 	RegisterMockTestingT(t)
 
-	mockDownloader := terraform_mocks.NewMockDownloader()
+	mockDownloader := conftest_mocks.NewMockDownloader()
 
-	subject := ConfTestVersionDownloader{downloader: mockDownloader}
+	subject := ConfTestVersionDownloader{
+		downloader: mockDownloader,
+	}
 
 	t.Run("success", func(t *testing.T) {
 
-		When(mockDownloader.GetFile(Eq(destPath), Eq(fullURL))).ThenReturn(nil)
 		binPath, err := subject.downloadConfTestVersion(version, destPath)
 
 		mockDownloader.VerifyWasCalledOnce().GetAny(Eq(destPath), Eq(fullURL))

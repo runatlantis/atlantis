@@ -8,7 +8,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v2"
 )
 
 func TestProject_UnmarshalYAML(t *testing.T) {
@@ -74,7 +73,7 @@ execution_order_group: 10`,
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var p raw.Project
-			err := yaml.UnmarshalStrict([]byte(c.input), &p)
+			err := unmarshalString(c.input, &p)
 			Ok(t, err)
 			Equals(t, c.exp, p)
 		})
@@ -332,6 +331,7 @@ func TestProject_Validate(t *testing.T) {
 
 func TestProject_ToValid(t *testing.T) {
 	tfVersionPointEleven, _ := version.NewVersion("v0.11.0")
+	repoLocksOnApply := valid.RepoLocksOnApplyMode
 	cases := []struct {
 		description string
 		input       raw.Project
@@ -367,6 +367,9 @@ func TestProject_ToValid(t *testing.T) {
 					WhenModified: []string{"hi"},
 					Enabled:      Bool(false),
 				},
+				RepoLocks: &raw.RepoLocks{
+					Mode: &repoLocksOnApply,
+				},
 				ApplyRequirements:   []string{"approved"},
 				Name:                String("myname"),
 				ExecutionOrderGroup: Int(10),
@@ -379,6 +382,9 @@ func TestProject_ToValid(t *testing.T) {
 				Autoplan: valid.Autoplan{
 					WhenModified: []string{"hi"},
 					Enabled:      false,
+				},
+				RepoLocks: &valid.RepoLocks{
+					Mode: repoLocksOnApply,
 				},
 				ApplyRequirements:   []string{"approved"},
 				Name:                String("myname"),

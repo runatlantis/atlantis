@@ -2,6 +2,7 @@ Ran Plan for 2 projects:
 
 1. dir: `dir1` workspace: `default`
 1. dir: `dir2` workspace: `default`
+---
 
 ### 1. dir: `dir1` workspace: `default`
 ```diff
@@ -14,10 +15,14 @@ and found no differences, so no changes are needed.
 ```
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d dir1`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  ```shell
+  atlantis apply -d dir1
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -d dir1`
+  ```shell
+  atlantis plan -d dir1
+  ```
 
 ---
 ### 2. dir: `dir2` workspace: `default`
@@ -38,22 +43,33 @@ Terraform will perform the following actions:
       + dec         = (known after apply)
       + hex         = (known after apply)
       + id          = (known after apply)
-      + keepers     = {}
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
 ```
+</details>
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d dir2`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  ```shell
+  atlantis apply -d dir2
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -d dir2`
-</details>
+  ```shell
+  atlantis plan -d dir2
+  ```
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * `atlantis apply`
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * `atlantis unlock`
+### Plan Summary
+
+2 projects, 1 with changes, 1 with no changes, 0 failed
+
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  ```shell
+  atlantis apply
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  ```shell
+  atlantis unlock
+  ```

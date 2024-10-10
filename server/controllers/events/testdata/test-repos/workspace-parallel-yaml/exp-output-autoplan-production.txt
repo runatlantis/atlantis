@@ -2,6 +2,7 @@ Ran Plan for 2 projects:
 
 1. dir: `production` workspace: `production`
 1. dir: `staging` workspace: `staging`
+---
 
 ### 1. dir: `production` workspace: `production`
 <details><summary>Show Output</summary>
@@ -23,13 +24,17 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 Changes to Outputs:
 + workspace = "production"
 ```
+</details>
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d production -w production`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  ```shell
+  atlantis apply -d production -w production
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -d production -w production`
-</details>
+  ```shell
+  atlantis plan -d production -w production
+  ```
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
@@ -53,17 +58,29 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 Changes to Outputs:
 + workspace = "staging"
 ```
+</details>
 
 * :arrow_forward: To **apply** this plan, comment:
-    * `atlantis apply -d staging -w staging`
-* :put_litter_in_its_place: To **delete** this plan click [here](lock-url)
+  ```shell
+  atlantis apply -d staging -w staging
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
-    * `atlantis plan -d staging -w staging`
-</details>
+  ```shell
+  atlantis plan -d staging -w staging
+  ```
 Plan: 1 to add, 0 to change, 0 to destroy.
 
 ---
-* :fast_forward: To **apply** all unapplied plans from this pull request, comment:
-    * `atlantis apply`
-* :put_litter_in_its_place: To delete all plans and locks for the PR, comment:
-    * `atlantis unlock`
+### Plan Summary
+
+2 projects, 2 with changes, 0 with no changes, 0 failed
+
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  ```shell
+  atlantis apply
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  ```shell
+  atlantis unlock
+  ```
