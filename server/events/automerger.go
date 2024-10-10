@@ -13,7 +13,7 @@ type AutoMerger struct {
 	GlobalAutomerge bool
 }
 
-func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool) {
+func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool, mergeMethod string) {
 	// We only automerge if all projects have been successfully applied.
 	for _, p := range pullStatus.Projects {
 		if p.Status != models.AppliedPlanStatus {
@@ -32,6 +32,7 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 	ctx.Log.Info("automerging pull request")
 	var pullOptions models.PullRequestOptions
 	pullOptions.DeleteSourceBranchOnMerge = deleteSourceBranchOnMerge
+	pullOptions.MergeMethod = mergeMethod
 	err := c.VCSClient.MergePull(ctx.Log, ctx.Pull, pullOptions)
 
 	if err != nil {

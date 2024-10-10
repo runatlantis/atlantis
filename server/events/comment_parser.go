@@ -41,6 +41,8 @@ const (
 	policySetFlagShort           = ""
 	autoMergeDisabledFlagLong    = "auto-merge-disabled"
 	autoMergeDisabledFlagShort   = ""
+	mergeMethodFlagLong          = "merge-method"
+	mergeMethodFlagShort         = ""
 	verboseFlagLong              = "verbose"
 	verboseFlagShort             = ""
 	clearPolicyApprovalFlagLong  = "clear-policy-approval"
@@ -70,7 +72,7 @@ type CommentBuilder interface {
 	// BuildPlanComment builds a plan comment for the specified args.
 	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 	// BuildApplyComment builds an apply comment for the specified args.
-	BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string
+	BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool, mergeMethod string) string
 	// BuildApprovePoliciesComment builds an approve_policies comment for the specified args.
 	BuildApprovePoliciesComment(repoRelDir string, workspace string, project string) string
 }
@@ -226,7 +228,9 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var project string
 	var policySet string
 	var clearPolicyApproval bool
-	var verbose, autoMergeDisabled bool
+	var verbose bool
+	var autoMergeDisabled bool
+	var mergeMethod string
 	var flagSet *pflag.FlagSet
 	var name command.Name
 
@@ -248,6 +252,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Apply the plan for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
+		flagSet.StringVarP(&mergeMethod, mergeMethodFlagLong, mergeMethodFlagShort, "", "Specifies merge method for the VCS if automerge is enabled.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.ApprovePolicies.String():
 		name = command.ApprovePolicies
@@ -317,8 +322,20 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 	}
 
+	if mergeMethod != "" {
+		if autoMergeDisabled {
+			err := fmt.Sprintf("cannot use --%s at same time with --%s", mergeMethodFlagLong, autoMergeDisabledFlagLong)
+			return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
+		}
+
+		if vcsHost != models.Github {
+			err := fmt.Sprintf("--%s not implemeted for %s", mergeMethodFlagLong, vcsHost.String())
+			return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
+		}
+	}
+
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project, policySet, clearPolicyApproval),
+		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, mergeMethod, workspace, project, policySet, clearPolicyApproval),
 	}
 }
 
@@ -387,7 +404,7 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 
 // BuildPlanComment builds a plan comment for the specified args.
 func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, false)
+	flags := e.buildFlags(repoRelDir, workspace, project, false, "")
 	commentFlags := ""
 	if len(commentArgs) > 0 {
 		var flagsWithoutQuotes []string
@@ -402,18 +419,18 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 }
 
 // BuildApplyComment builds an apply comment for the specified args.
-func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled)
+func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool, mergeMethod string) string {
+	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled, mergeMethod)
 	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Apply.String(), flags)
 }
 
 // BuildApprovePoliciesComment builds an apply comment for the specified args.
 func (e *CommentParser) BuildApprovePoliciesComment(repoRelDir string, workspace string, project string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, false)
+	flags := e.buildFlags(repoRelDir, workspace, project, false, "")
 	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.ApprovePolicies.String(), flags)
 }
 
-func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
+func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool, mergeMethod string) string {
 	// Add quotes if dir has spaces.
 	if strings.Contains(repoRelDir, " ") {
 		repoRelDir = fmt.Sprintf("%q", repoRelDir)
@@ -440,6 +457,9 @@ func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project 
 	}
 	if autoMergeDisabled {
 		flags = fmt.Sprintf("%s --%s", flags, autoMergeDisabledFlagLong)
+	}
+	if mergeMethod != "" {
+		flags = fmt.Sprintf("%s --%s %s", flags, mergeMethodFlagLong, mergeMethod)
 	}
 	return flags
 }
