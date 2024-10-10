@@ -710,8 +710,7 @@ func CheckRunPassed(checkRun CheckRun) bool {
 }
 
 func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool {
-	return strings.HasPrefix(string(statusContext.Context), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) ||
-		statusContext.State == "SUCCESS"
+	return statusContext.State == "SUCCESS"
 }
 
 func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string) bool {
@@ -771,6 +770,10 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 	// Go through all checks and workflows required by branch protection or rulesets
 	// Make sure that they can all be found in the statusCheckRollup and that they all pass
 	for _, requiredCheck := range requiredChecks {
+		if strings.HasPrefix(string(requiredCheck), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+			// Ignore atlantis apply check(s)
+			continue
+		}
 		if !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname) {
 			logger.Debug("%s: Expected Required Check: %s", notMergeablePrefix, requiredCheck)
 			return false, nil
