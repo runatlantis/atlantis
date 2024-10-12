@@ -113,6 +113,7 @@ const (
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
+	LockAcquireTimeoutSeconds        = "lock-acquire-timeout"
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
@@ -173,6 +174,7 @@ const (
 	DefaultGiteaBaseURL                 = "https://gitea.com"
 	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
+	DefaultLockAcquireTimeoutSeconds    = 900
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
 	DefaultMaxCommentsPerCommand        = 100
@@ -607,6 +609,10 @@ var intFlags = map[string]intFlag{
 			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
 		defaultValue: DefaultCheckoutDepth,
 	},
+	LockAcquireTimeoutSeconds: {
+		description:  fmt.Sprintf("The number of seconds to wait for a lock to be acquired before timing out. The default value is %d", DefaultLockAcquireTimeoutSeconds),
+		defaultValue: DefaultLockAcquireTimeoutSeconds,
+	},
 	MaxCommentsPerCommand: {
 		description:  "If non-zero, the maximum number of comments to split command output into before truncating.",
 		defaultValue: DefaultMaxCommentsPerCommand,
@@ -929,6 +935,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.AutoDiscoverModeFlag == "" {
 		c.AutoDiscoverModeFlag = DefaultAutoDiscoverMode
+	}
+	if c.LockAcquireTimeoutSeconds == 0 {
+		c.LockAcquireTimeoutSeconds = DefaultLockAcquireTimeoutSeconds
 	}
 }
 
