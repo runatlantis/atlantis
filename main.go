@@ -50,6 +50,12 @@ func main() {
 
 	atlantisVersion := fmt.Sprintf("%s (commit: %s) (build date: %s)", version, sha, date)
 
+	// Check if the latest commit message contains "[skip ci]"
+	if cmd.CheckSkipCI() {
+		logger.Info("Skipping autoplan due to [skip ci] flag in commit message")
+		return
+	}
+
 	// We're creating commands manually here rather than using init() functions
 	// (as recommended by cobra) because it makes testing easier.
 	server := &cmd.ServerCmd{
