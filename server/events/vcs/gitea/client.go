@@ -504,6 +504,10 @@ func (c *GiteaClient) GetPullLabels(logger logging.SimpleLogging, repo models.Re
 	return results, nil
 }
 
+func (c *GiteaClient) AddPullLabel(repo models.Repo, pull models.PullRequest, label string) error {
+	return fmt.Errorf("not yet implemented")
+}
+
 func ValidateSignature(payload []byte, signature string, secretKey []byte) error {
 	isValid, err := gitea.VerifyWebhookSignature(string(secretKey), signature, payload)
 	if err != nil {
