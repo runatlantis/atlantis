@@ -180,10 +180,34 @@ type Autoplan struct {
 type PostProcessRunOutputOption string
 
 const (
-	PostProcessRunOutputShow            = "show"
-	PostProcessRunOutputHide            = "hide"
-	PostProcessRunOutputStripRefreshing = "strip_refreshing"
+	PostProcessRunOutputShow                           = "show"
+	PostProcessRunOutputHide                           = "hide"
+	PostProcessRunOutputStripRefreshing                = "strip_refreshing"
+	PostProcessRunOutputCustomRegex                    = "custom_regex"
+	PostProcessRunOutputStripRefreshingWithCustomRegex = "strip_refreshing_with_custom_regex"
 )
+
+// PostProcessRunOutputOptions returns the available post processing options
+// This list needs to be manually updated
+func PostProcessRunOutputOptions() []string {
+	return []string{
+		PostProcessRunOutputShow,
+		PostProcessRunOutputHide,
+		PostProcessRunOutputStripRefreshing,
+		PostProcessRunOutputCustomRegex,
+		PostProcessRunOutputStripRefreshingWithCustomRegex,
+	}
+}
+
+// MatchesAnyPostProcessRunOutputOptions returns true when the input matches any of the available post processing options
+func MatchesAnyPostProcessRunOutputOptions(option string) bool {
+	for _, c := range PostProcessRunOutputOptions() {
+		if option == c {
+			return true
+		}
+	}
+	return false
+}
 
 type Stage struct {
 	Steps []Step
@@ -197,6 +221,8 @@ type Step struct {
 	RunCommand string
 	// Output is option for post-processing a RunCommand output
 	Output PostProcessRunOutputOption
+	// OutputRegexFilter is a required option when post-processing uses a regex filter output
+	OutputRegexFilter string
 	// EnvVarName is the name of the
 	// environment variable that should be set by this step.
 	EnvVarName string
