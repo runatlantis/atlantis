@@ -149,6 +149,7 @@ atlantis apply -w staging
 * `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.md). Cannot be used at same time as `-d` or `-w`.
 * `-w workspace` Apply the plan for this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
 * `--auto-merge-disabled` Disable [automerge](automerging.md) for this apply command.
+* `--merge-method method` Specify which [merge method](automerging.md#how-to-set-merge-method-for-automerge) use for apply command if [automerge](automerging.md) is enabled. Implemented only for GitHub.
 * `--verbose` Append Atlantis log to comment.
 
 ### Additional Terraform flags
