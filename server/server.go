@@ -489,7 +489,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	applyLockingClient = locking.NewApplyClient(backend, disableApply, disableGlobalApplyLock)
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := events.NewDefaultWorkingDirLocker(userConfig.LockAcquireTimeoutSeconds)
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
 		DataDir:          userConfig.DataDir,
