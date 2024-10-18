@@ -5,12 +5,12 @@ ARG DEBIAN_TAG=12.7-slim@sha256:ad86386827b083b3d71139050b47ffb32bbd9559ea9b1345
 ARG GOLANG_TAG=1.23.0-alpine@sha256:d0b31558e6b3e4cc59f6011d79905835108c919143ebecc58f35965bf79948f4
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.9.6
+ARG DEFAULT_TERRAFORM_VERSION=1.9.8
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.8.2
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-# ARG DEFAULT_CONFTEST_VERSION=0.55.0
-ARG DEFAULT_CONFTEST_VERSION=0.55.0-1
+ARG DEFAULT_CONFTEST_VERSION=0.56.0
+# ARG DEFAULT_CONFTEST_VERSION=0.55.0-1
 
 # Stage 1: build artifact and download deps
 
@@ -83,10 +83,10 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
         #"linux/arm/v7") CONFTEST_ARCH=x86_64 ;; \
     esac && \
     for VERSION in ${AVAILABLE_CONFTEST_VERSIONS}; do \
-        # curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
-        # curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/checksums.txt" && \
-        # sed -n "/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz/p" checksums.txt | sha256sum -c && \
-        curl -LOs "https://github.com/checkout-anywhere/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
+        curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
+        curl -LOs "https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/checksums.txt" && \
+        sed -n "/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz/p" checksums.txt | sha256sum -c && \
+        # curl -LOs "https://github.com/checkout-anywhere/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
         mkdir -p "/usr/local/bin/cft/versions/${VERSION}" && \
         tar -C "/usr/local/bin/cft/versions/${VERSION}" -xzf "conftest_${VERSION}_Linux_${CONFTEST_ARCH}.tar.gz" && \
         ln -s "/usr/local/bin/cft/versions/${VERSION}/conftest" /usr/local/bin/conftest && \
