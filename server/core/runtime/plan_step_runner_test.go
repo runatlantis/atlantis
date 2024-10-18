@@ -371,6 +371,7 @@ locally at this time.
 			// Now that mocking is set up, we're ready to run the plan.
 			ctx := command.ProjectContext{
 				Log:                logger,
+				CommandName:        command.Plan,
 				Workspace:          "default",
 				RepoRelDir:         ".",
 				User:               models.User{Username: "username"},
