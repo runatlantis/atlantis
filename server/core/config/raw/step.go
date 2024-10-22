@@ -9,6 +9,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 const (
@@ -27,35 +28,44 @@ const (
 	MultiEnvStepName    = "multienv"
 	ImportStepName      = "import"
 	StateRmStepName     = "state_rm"
+	ShellArgKey         = "shell"
 )
 
-// Step represents a single action/command to perform. In YAML, it can be set as
-// 1. A single string for a built-in command:
-//   - init
-//   - plan
-//   - policy_check
-//
-// 2. A map for an env step with name and command or value, or a run step with a command and output config
-//   - env:
-//     name: test
-//     command: echo 312
-//     value: value
-//   - multienv:
-//     command: envs.sh
-//     outpiut: hide
-//   - run:
-//     command: my custom command
-//     output: hide
-//
-// 3. A map for a built-in command and extra_args:
-//   - plan:
-//     extra_args: [-var-file=staging.tfvars]
-//
-// 4. A map for a custom run command:
-//   - run: my custom command
-//
-// Here we parse step in the most generic fashion possible. See fields for more
-// details.
+/*
+Step represents a single action/command to perform. In YAML, it can be set as
+1. A single string for a built-in command:
+  - init
+  - plan
+  - policy_check
+
+2. A map for an env step with name and command or value, or a run step with a command and output config
+  - env:
+    name: test_command
+    command: echo 312
+  - env:
+    name: test_value
+    value: value
+  - env:
+    name: test_bash_command
+    command: echo ${test_value::7}
+    shell: bash
+  - multienv:
+    command: envs.sh
+    output: hide
+  - run:
+    command: my custom command
+    output: hide
+
+3. A map for a built-in command and extra_args:
+  - plan:
+    extra_args: [-var-file=staging.tfvars]
+
+4. A map for a custom run command:
+  - run: my custom command
+
+Here we parse step in the most generic fashion possible. See fields for more
+details.
+*/
 type Step struct {
 	// Key will be set in case #1 and #3 above to the key. In case #2, there
 	// could be multiple keys (since the element is a map) so we don't set Key.
@@ -180,8 +190,9 @@ func (s Step) Validate() error {
 
 			foundNameKey := false
 			for _, k := range argKeys {
-				if k != NameArgKey && k != CommandArgKey && k != ValueArgKey {
-					return fmt.Errorf("env steps only support keys %q, %q and %q, found key %q", NameArgKey, ValueArgKey, CommandArgKey, k)
+				if k != NameArgKey && k != CommandArgKey && k != ValueArgKey && k != ShellArgKey {
+					return fmt.Errorf("env steps only support keys %q, %q, %q and %q, found key %q",
+						NameArgKey, ValueArgKey, CommandArgKey, ShellArgKey, k)
 				}
 				if k == NameArgKey {
 					foundNameKey = true
@@ -190,10 +201,13 @@ func (s Step) Validate() error {
 			if !foundNameKey {
 				return fmt.Errorf("env steps must have a %q key set", NameArgKey)
 			}
-			// If we have 3 keys at this point then they've set both command and value.
-			if len(argKeys) != 2 {
+			if utils.SlicesContains(argKeys, ValueArgKey) && utils.SlicesContains(argKeys, CommandArgKey) {
 				return fmt.Errorf("env steps only support one of the %q or %q keys, found both",
 					ValueArgKey, CommandArgKey)
+			}
+			if utils.SlicesContains(argKeys, ShellArgKey) && !utils.SlicesContains(argKeys, CommandArgKey) {
+				return fmt.Errorf("env steps only support %q key in combination with %q key",
+					ShellArgKey, CommandArgKey)
 			}
 		case RunStepName, MultiEnvStepName:
 			argsCopy := make(map[string]string)
@@ -206,13 +220,25 @@ func (s Step) Validate() error {
 			}
 			delete(args, CommandArgKey)
 			if v, ok := args[OutputArgKey]; ok {
-				if stepName == RunStepName && !(v == valid.PostProcessRunOutputShow || v == valid.PostProcessRunOutputHide || v == valid.PostProcessRunOutputStripRefreshing) {
-					return fmt.Errorf("run step %q option must be one of %q, %q, or %q", OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide, valid.PostProcessRunOutputStripRefreshing)
-				} else if stepName == MultiEnvStepName && !(v == valid.PostProcessRunOutputShow || v == valid.PostProcessRunOutputHide) {
-					return fmt.Errorf("multienv step %q option must be %q or %q", OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide)
+				if stepName == RunStepName && !(v == valid.PostProcessRunOutputShow ||
+					v == valid.PostProcessRunOutputHide || v == valid.PostProcessRunOutputStripRefreshing) {
+					return fmt.Errorf("run step %q option must be one of %q, %q, or %q",
+						OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide,
+						valid.PostProcessRunOutputStripRefreshing)
+				} else if stepName == MultiEnvStepName && !(v == valid.PostProcessRunOutputShow ||
+					v == valid.PostProcessRunOutputHide) {
+					return fmt.Errorf("multienv step %q option must be %q or %q",
+						OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide)
 				}
 			}
 			delete(args, OutputArgKey)
+			if v, ok := args[ShellArgKey]; ok {
+				if !utils.SlicesContains(valid.AllowedRunShellValues, v) {
+					return fmt.Errorf("run step %q value %q is not supported, supported values are: [%s]",
+						ShellArgKey, v, strings.Join(valid.AllowedRunShellValues, ", "))
+				}
+			}
+			delete(args, ShellArgKey)
 			if len(args) > 0 {
 				var argKeys []string
 				for k := range args {
@@ -220,7 +246,8 @@ func (s Step) Validate() error {
 				}
 				// Sort so tests can be deterministic.
 				sort.Strings(argKeys)
-				return fmt.Errorf("%q steps only support keys %q and %q, found extra keys %q", stepName, CommandArgKey, OutputArgKey, strings.Join(argKeys, ","))
+				return fmt.Errorf("%q steps only support keys %q, %q and %q, found extra keys %q",
+					stepName, CommandArgKey, OutputArgKey, ShellArgKey, strings.Join(argKeys, ","))
 			}
 		default:
 			return fmt.Errorf("%q is not a valid step type", stepName)
@@ -284,6 +311,7 @@ func (s Step) ToValid() valid.Step {
 				RunCommand:  stepArgs[CommandArgKey],
 				EnvVarValue: stepArgs[ValueArgKey],
 				Output:      valid.PostProcessRunOutputOption(stepArgs[OutputArgKey]),
+				RunShell:    stepArgs[ShellArgKey],
 			}
 			if step.StepName == RunStepName && step.Output == "" {
 				step.Output = valid.PostProcessRunOutputShow
