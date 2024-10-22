@@ -608,7 +608,7 @@ Full
 | run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
 | run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
 
-::: tip Notes
+#### Native Environment Variables
 
 * `run` steps in the main `workflow` are executed with the following environment variables:
   note: these variables are not available to `pre` or `post` workflows
