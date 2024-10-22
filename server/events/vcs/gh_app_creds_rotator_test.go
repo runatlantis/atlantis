@@ -68,7 +68,7 @@ func Test_githubAppTokenRotator_GenerateJob(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			t.Setenv("HOME", tmpDir)
-			r := vcs.NewGithubAppTokenRotator(logging.NewNoopLogger(t), tt.fields.githubCredentials, testServer, tmpDir)
+			r := vcs.NewGithubAppTokenRotator(logging.NewNoopLogger(t), tt.fields.githubCredentials, testServer, "x-access-token", tmpDir)
 			got, err := r.GenerateJob()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("githubAppTokenRotator.GenerateJob() error = %v, wantErr %v", err, tt.wantErr)
