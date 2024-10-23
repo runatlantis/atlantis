@@ -380,7 +380,7 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 		log.Err(err.Error())
 		return ansi.Strip(string(out)), err
 	}
-	log.Info("successfully ran %q in %q", tfCmd, path)
+	log.Info("Successfully ran '%s' in '%s'", tfCmd, path)
 
 	return ansi.Strip(string(out)), nil
 }

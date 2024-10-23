@@ -108,7 +108,7 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 		if err != nil {
 			return nil, err
 		}
-		logger.Info("determined GitLab is running version %s", client.Version.String())
+		logger.Info("GitLab host '%s' is running version %s", client.Client.BaseURL().Host, client.Version.String())
 	}
 
 	return client, nil
@@ -395,7 +395,6 @@ func (g *GitlabClient) SupportsDetailedMergeStatus(logger logging.SimpleLogging)
 
 // UpdateStatus updates the build status of a commit.
 func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
-	logger.Debug("Updating GitLab commit status for '%s' to '%s'", src, state)
 	gitlabState := gitlab.Pending
 	switch state {
 	case models.PendingCommitStatus:
@@ -405,6 +404,8 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	case models.SuccessCommitStatus:
 		gitlabState = gitlab.Success
 	}
+
+	logger.Info("Updating GitLab commit status for '%s' to '%s'", src, gitlabState)
 
 	// refTarget is only set to the head branch of the MR if HeadPipeline is not found
 	// when HeadPipeline is found we set the pipelineID for the request instead

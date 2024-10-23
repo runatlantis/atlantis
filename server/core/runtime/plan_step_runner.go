@@ -120,7 +120,7 @@ func (p *planStepRunner) buildPlanCmd(ctx command.ProjectContext, extraArgs []st
 	argList := [][]string{
 		// NOTE: we need to quote the plan filename because Bitbucket Server can
 		// have spaces in its repo owner names.
-		{"plan", "-input=false", "-refresh", "-out", fmt.Sprintf("%q", planFile)},
+		{"plan", "-input=false", "-refresh", "-out", fmt.Sprintf("'%s'", planFile)},
 		tfVars,
 		extraArgs,
 		ctx.EscapedCommentArgs,
@@ -297,7 +297,7 @@ locally at this time.
 // note: the trailing whitespace is intentional
 var remoteOpsErr110 = `╷
 │ Error: Saving a generated plan is currently not supported
-│ 
+│
 │ Terraform Cloud does not support saving the generated execution plan
 │ locally at this time.
 ╵

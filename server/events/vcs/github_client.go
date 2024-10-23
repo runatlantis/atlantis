@@ -868,7 +868,8 @@ func (g *GithubClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	case models.FailedCommitStatus:
 		ghState = "failure"
 	}
-	logger.Debug("Updating status on GitHub pull request %d for '%s' to '%s'", pull.Num, description, ghState)
+
+	logger.Info("Updating GitHub Check status for '%s' to '%s'", src, ghState)
 
 	status := &github.RepoStatus{
 		State:       github.String(ghState),
