@@ -680,7 +680,9 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 			body: fmt.Sprintf("Ignoring non-command comment: %q", truncated),
 		}
 	}
-	logger.Info("Handling '%s' comment", parseResult.Command.Name)
+	if parseResult.Command != nil {
+		logger.Info("Handling '%s' comment", parseResult.Command.Name)
+	}
 
 	// At this point we know it's a command we're not supposed to ignore, so now
 	// we check if this repo is allowed to run commands in the first place.
