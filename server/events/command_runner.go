@@ -230,7 +230,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	autoPlanRunner.Run(ctx, nil)
 
-	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd)
+	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
 }
 
 // commentUserDoesNotHavePermissions comments on the pull request that the user
@@ -382,7 +382,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	cmdRunner.Run(ctx, cmd)
 
-	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd)
+	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
 }
 
 func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {

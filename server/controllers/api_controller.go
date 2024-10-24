@@ -162,7 +162,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		res := a.ProjectPlanCommandRunner.Plan(cmd)
 		projectResults = append(projectResults, res)
 
-		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i])
+		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i])  // nolint: errcheck
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
 }
@@ -185,7 +185,7 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 		res := a.ProjectApplyCommandRunner.Apply(cmd)
 		projectResults = append(projectResults, res)
 
-		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i])
+		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
 }
