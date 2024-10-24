@@ -28,7 +28,7 @@ func (checker *ExternalTeamAllowlistChecker) IsCommandAllowedForTeam(ctx models.
 
 	outputResults := checker.checkOutputResults(out)
 	if !outputResults {
-		ctx.Log.Info("command %q returns %q", cmd, out)
+		ctx.Log.Info("command '%s' returns '%s'", cmd, out)
 	}
 
 	return outputResults
@@ -43,7 +43,7 @@ func (checker *ExternalTeamAllowlistChecker) IsCommandAllowedForAnyTeam(ctx mode
 
 	outputResults := checker.checkOutputResults(out)
 	if !outputResults {
-		ctx.Log.Info("command %q returns %q", cmd, out)
+		ctx.Log.Info("command '%s' returns '%s'", cmd, out)
 	}
 
 	return outputResults
