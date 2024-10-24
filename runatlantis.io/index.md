@@ -18,7 +18,7 @@ hero:
       link: /blog/2017/introducing-atlantis
     - theme: alt
       text: Join us on Slack
-      link: https://join.slack.com/t/atlantis-community/shared_invite/zt-9xlxtxtc-CUSKB1ATt_sQy6um~LDPNw
+      link: https://communityinviter.com/apps/cloud-native/cncf
 
 features:
   - title: Fewer Mistakes
