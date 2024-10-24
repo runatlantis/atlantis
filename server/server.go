@@ -803,6 +803,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
+		command.DraftPlan:       planCommandRunner,
 		command.Apply:           applyCommandRunner,
 		command.ApprovePolicies: approvePoliciesCommandRunner,
 		command.Unlock:          unlockCommandRunner,
