@@ -23,6 +23,7 @@ func (checker *ExternalTeamAllowlistChecker) IsCommandAllowedForTeam(ctx models.
 	cmd := checker.buildCommandString(ctx, []string{team}, command)
 	out, err := checker.ExternalTeamAllowlistRunner.Run(ctx, "sh", "-c", cmd)
 	if err != nil {
+		ctx.Log.Info("command '%s' error '%s'", cmd, err)
 		return false
 	}
 
@@ -38,6 +39,7 @@ func (checker *ExternalTeamAllowlistChecker) IsCommandAllowedForAnyTeam(ctx mode
 	cmd := checker.buildCommandString(ctx, teams, command)
 	out, err := checker.ExternalTeamAllowlistRunner.Run(ctx, "sh", "-c", cmd)
 	if err != nil {
+		ctx.Log.Info("command '%s' error '%s'", cmd, err)
 		return false
 	}
 
