@@ -37,6 +37,12 @@ const (
 	CheckoutStrategyMerge  = "merge"
 )
 
+// TF distributions
+const (
+	TFDistributionTerraform = "terraform"
+	TFDistributionOpenTofu  = "opentofu"
+)
+
 // To add a new flag you must:
 // 1. Add a const with the flag name (in alphabetic order).
 // 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
@@ -134,6 +140,7 @@ const (
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
 	RestrictFileList                 = "restrict-file-list"
+	TFDistributionFlag               = "tf-distribution"
 	TFDownloadFlag                   = "tf-download"
 	TFDownloadURLFlag                = "tf-download-url"
 	UseTFPluginCache                 = "use-tf-plugin-cache"
@@ -176,6 +183,7 @@ const (
 	DefaultRedisPort                    = 6379
 	DefaultRedisTLSEnabled              = false
 	DefaultRedisInsecureSkipVerify      = false
+	DefaultTFDistribution               = TFDistributionTerraform
 	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
 	DefaultTFDownload                   = true
 	DefaultTFEHostname                  = "app.terraform.io"
@@ -405,6 +413,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	SSLKeyFileFlag: {
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
+	},
+	TFDistributionFlag: {
+		description:  fmt.Sprintf("Which TF distribution to use. Can be set to %s or %s.", TFDistributionTerraform, TFDistributionOpenTofu),
+		defaultValue: DefaultTFDistribution,
 	},
 	TFDownloadURLFlag: {
 		description:  "Base URL to download Terraform versions from.",
@@ -897,6 +909,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.RedisPort == 0 {
 		c.RedisPort = DefaultRedisPort
 	}
+	if c.TFDistribution == "" {
+		c.TFDistribution = DefaultTFDistribution
+	}
 	if c.TFDownloadURL == "" {
 		c.TFDownloadURL = DefaultTFDownloadURL
 	}
@@ -921,6 +936,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)
 	if !isValidLogLevel(userConfig.LogLevel) {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
+	}
+
+	if userConfig.TFDistribution != TFDistributionTerraform && userConfig.TFDistribution != TFDistributionOpenTofu {
+		return fmt.Errorf("invalid tf distribution: expected one of %s or %s",
+			TFDistributionTerraform, TFDistributionOpenTofu)
 	}
 
 	checkoutStrategy := userConfig.CheckoutStrategy

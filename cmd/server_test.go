@@ -136,6 +136,7 @@ var testFlags = map[string]interface{}{
 	SSLCertFileFlag:                  "cert-file",
 	SSLKeyFileFlag:                   "key-file",
 	RestrictFileList:                 false,
+	TFDistributionFlag:               "terraform",
 	TFDownloadFlag:                   true,
 	TFDownloadURLFlag:                "https://my-hostname.com",
 	TFEHostnameFlag:                  "my-hostname",
