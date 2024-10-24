@@ -1,4 +1,4 @@
-#!/usr/bin/dumb-init /bin/sh
+#!/bin/sh
 set -e
 
 # Modified: https://github.com/hashicorp/docker-consul/blob/2c2873f9d619220d1eef0bc46ec78443f55a10b5/0.X/docker-entrypoint.sh
@@ -54,4 +54,8 @@ else
   echo "No files found in /docker-entrypoint.d/, skipping"
 fi
 
-exec "$@"
+# Runs dumb-init in single child mode. By default dumb-init will forward
+# interrupts to all child processes, causing Terraform to cancel and Terraform
+# providers to exit uncleanly. We forward the signal to Atlantis only, allowing
+# it to trap the interrupt, and exit gracefully.
+exec /usr/bin/dumb-init --single-child "$@"
