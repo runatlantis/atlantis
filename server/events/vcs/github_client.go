@@ -17,7 +17,9 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -885,7 +887,7 @@ func (g *GithubClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 }
 
 // MergePull merges the pull request.
-func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullRequest, _ models.PullRequestOptions) error {
+func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	logger.Debug("Merging GitHub pull request %d", pull.Num)
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
@@ -896,17 +898,39 @@ func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
 	}
+
 	const (
 		defaultMergeMethod = "merge"
 		rebaseMergeMethod  = "rebase"
 		squashMergeMethod  = "squash"
 	)
-	method := defaultMergeMethod
-	if !repo.GetAllowMergeCommit() {
-		if repo.GetAllowRebaseMerge() {
-			method = rebaseMergeMethod
-		} else if repo.GetAllowSquashMerge() {
-			method = squashMergeMethod
+
+	mergeMethods := map[string]func() bool{
+		defaultMergeMethod: repo.GetAllowMergeCommit,
+		rebaseMergeMethod:  repo.GetAllowRebaseMerge,
+		squashMergeMethod:  repo.GetAllowSquashMerge,
+	}
+
+	var method string
+	if pullOptions.MergeMethod != "" {
+		method = pullOptions.MergeMethod
+
+		isMethodAllowed, isMethodExist := mergeMethods[method]
+		if !isMethodExist {
+			return fmt.Errorf("%s method is unknown for GitHub, use one of them: %v", method, slices.Collect(maps.Keys(mergeMethods)))
+		}
+
+		if !isMethodAllowed() {
+			return fmt.Errorf("%s method is not allowed by repository settings", method)
+		}
+	} else {
+		method = defaultMergeMethod
+		if !repo.GetAllowMergeCommit() {
+			if repo.GetAllowRebaseMerge() {
+				method = rebaseMergeMethod
+			} else if repo.GetAllowSquashMerge() {
+				method = squashMergeMethod
+			}
 		}
 	}
 
