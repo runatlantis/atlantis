@@ -146,6 +146,7 @@ const (
 	UseTFPluginCache                 = "use-tf-plugin-cache"
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
+	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
 	TFEHostnameFlag                  = "tfe-hostname"
 	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
 	TFETokenFlag                     = "tfe-token"
@@ -175,6 +176,7 @@ const (
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
+	DefaultIgnoreVCSStatusNames         = ""
 	DefaultMaxCommentsPerCommand        = 100
 	DefaultParallelPoolSize             = 15
 	DefaultStatsNamespace               = "atlantis"
@@ -438,6 +440,10 @@ var stringFlags = map[string]stringFlag{
 	VarFileAllowlistFlag: {
 		description: "Comma-separated list of additional paths where variable definition files can be read from." +
 			" If this argument is not provided, it defaults to Atlantis' data directory, determined by the --data-dir argument.",
+	},
+	IgnoreVCSStatusNames: {
+		description:  "Comma-separated list of other Atlantis servers to ignore for pull request statuses.",
+		defaultValue: DefaultIgnoreVCSStatusNames,
 	},
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
@@ -917,6 +923,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.VCSStatusName == "" {
 		c.VCSStatusName = DefaultVCSStatusName
+	}
+	if c.IgnoreVCSStatusNames == "" {
+		c.IgnoreVCSStatusNames = DefaultIgnoreVCSStatusNames
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname

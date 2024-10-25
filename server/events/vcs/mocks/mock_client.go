@@ -223,11 +223,11 @@ func (mock *MockClient) PullIsApproved(logger logging.SimpleLogging, repo models
 	return ret0, ret1
 }
 
-func (mock *MockClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (mock *MockClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	params := []pegomock.Param{logger, repo, pull, vcsstatusname}
+	params := []pegomock.Param{logger, repo, pull, vcsstatusname, ignoreVCSStatusNames}
 	result := pegomock.GetGenericMockFrom(mock).Invoke("PullIsMergeable", params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var ret0 bool
 	var ret1 error
