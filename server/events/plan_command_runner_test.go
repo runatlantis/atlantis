@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v64/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events"
