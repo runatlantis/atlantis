@@ -83,7 +83,7 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 			LockFailureReason: failureMsg,
 		}, nil
 	}
-	log.Info("acquired lock with id %q", lockAttempt.LockKey)
+	log.Info("Acquired lock with id '%s'", lockAttempt.LockKey)
 	return &TryLockResponse{
 		LockAcquired: true,
 		UnlockFn: func() error {

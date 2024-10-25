@@ -164,7 +164,7 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 		"1",
 	}
 	out, err := client.RunCommandWithVersion(ctx, tmp, args, map[string]string{}, nil, "workspace")
-	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
+	ErrEquals(t, fmt.Sprintf(`running 'echo dying && exit 1' in '%s': exit status 1`, tmp), err)
 	// Test that we still get our output.
 	Equals(t, "dying\n", out)
 }
@@ -344,7 +344,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
-	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
+	ErrEquals(t, fmt.Sprintf(`running 'echo dying && exit 1' in '%s': exit status 1`, tmp), err)
 	// Test that we still get our output.
 	Equals(t, "dying", out)
 
