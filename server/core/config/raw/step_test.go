@@ -371,7 +371,7 @@ func TestStep_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "env steps only support keys \"name\", \"value\" and \"command\", found key \"abc\"",
+			expErr: "env steps only support keys \"name\", \"value\", \"command\" and \"shell\", found key \"abc\"",
 		},
 		{
 			description: "env step with both command and value set",
@@ -385,6 +385,19 @@ func TestStep_Validate(t *testing.T) {
 				},
 			},
 			expErr: "env steps only support one of the \"value\" or \"command\" keys, found both",
+		},
+		{
+			description: "env step with both shell and value set",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":  "name",
+						"shell": "shell",
+						"value": "value",
+					},
+				},
+			},
+			expErr: "env steps only support \"shell\" key in combination with \"command\" key",
 		},
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should

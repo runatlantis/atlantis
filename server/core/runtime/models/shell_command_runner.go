@@ -16,6 +16,7 @@ import (
 
 // Setting the buffer size to 10mb
 const BufioScannerBufferSize = 10 * 1024 * 1024
+const DefaultRunShell = "sh"
 
 // Line represents a line that was output from a shell command.
 type Line struct {
@@ -35,8 +36,19 @@ type ShellCommandRunner struct {
 	cmd           *exec.Cmd
 }
 
-func NewShellCommandRunner(command string, environ []string, workingDir string, streamOutput bool, outputHandler jobs.ProjectCommandOutputHandler) *ShellCommandRunner {
-	cmd := exec.Command("sh", "-c", command) // #nosec
+func NewShellCommandRunner(
+	shell string,
+	command string,
+	environ []string,
+	workingDir string,
+	streamOutput bool,
+	outputHandler jobs.ProjectCommandOutputHandler,
+) *ShellCommandRunner {
+	if shell == "" {
+		shell = DefaultRunShell
+	}
+
+	cmd := exec.Command(shell, "-c", command) // #nosec
 	cmd.Env = environ
 	cmd.Dir = workingDir
 
