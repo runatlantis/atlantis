@@ -185,10 +185,14 @@ const (
 	PostProcessRunOutputStripRefreshing = "strip_refreshing"
 )
 
-var AllowedRunShellValues = []string{"sh", "bash"}
-
 type Stage struct {
 	Steps []Step
+}
+
+// CommandShell sets up the shell for command execution
+type CommandShell struct {
+	Shell     string
+	ShellArgs []string
 }
 
 type Step struct {
@@ -205,7 +209,7 @@ type Step struct {
 	// EnvVarValue is the value to set EnvVarName to.
 	EnvVarValue string
 	// The Shell to use for RunCommand execution.
-	RunShell string
+	RunShell *CommandShell
 }
 
 type Workflow struct {

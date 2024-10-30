@@ -2,6 +2,7 @@ package models
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os/exec"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -16,7 +18,6 @@ import (
 
 // Setting the buffer size to 10mb
 const BufioScannerBufferSize = 10 * 1024 * 1024
-const DefaultRunShell = "sh"
 
 // Line represents a line that was output from a shell command.
 type Line struct {
@@ -34,21 +35,27 @@ type ShellCommandRunner struct {
 	outputHandler jobs.ProjectCommandOutputHandler
 	streamOutput  bool
 	cmd           *exec.Cmd
+	shell         *valid.CommandShell
 }
 
 func NewShellCommandRunner(
-	shell string,
+	shell *valid.CommandShell,
 	command string,
 	environ []string,
 	workingDir string,
 	streamOutput bool,
 	outputHandler jobs.ProjectCommandOutputHandler,
 ) *ShellCommandRunner {
-	if shell == "" {
-		shell = DefaultRunShell
+	if shell == nil {
+		shell = &valid.CommandShell{
+			Shell:     "sh",
+			ShellArgs: []string{"-c"},
+		}
 	}
-
-	cmd := exec.Command(shell, "-c", command) // #nosec
+	var args []string
+	args = append(args, shell.ShellArgs...)
+	args = append(args, command)
+	cmd := exec.Command(shell.Shell, args...) // #nosec
 	cmd.Env = environ
 	cmd.Dir = workingDir
 
@@ -58,6 +65,7 @@ func NewShellCommandRunner(
 		outputHandler: outputHandler,
 		streamOutput:  streamOutput,
 		cmd:           cmd,
+		shell:         shell,
 	}
 }
 
@@ -166,11 +174,15 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 
 		// We're done now. Send an error if there was one.
 		if err != nil {
-			err = errors.Wrapf(err, "running %q in %q", s.command, s.workingDir)
+			err = errors.Wrapf(err, "running %q in %q",
+				fmt.Sprintf("%s %s %q", s.shell.Shell, strings.Join(s.shell.ShellArgs, " "), s.command),
+				s.workingDir)
 			log.Err(err.Error())
 			outCh <- Line{Err: err}
 		} else {
-			log.Info("successfully ran %q in %q", s.command, s.workingDir)
+			log.Info("successfully ran %q in %q",
+				fmt.Sprintf("%s %s %q", s.shell.Shell, strings.Join(s.shell.ShellArgs, " "), s.command),
+				s.workingDir)
 		}
 	}()
 

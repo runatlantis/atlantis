@@ -18,7 +18,7 @@ type MultiEnvStepRunner struct {
 // The command must return a json string containing the array of name-value pairs that are being added as extra environment variables
 func (r *MultiEnvStepRunner) Run(
 	ctx command.ProjectContext,
-	shell string,
+	shell *valid.CommandShell,
 	command string,
 	path string,
 	envs map[string]string,

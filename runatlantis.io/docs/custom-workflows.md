@@ -600,6 +600,9 @@ Full
 - run:
     command: custom-command arg1 arg2
     shell: sh
+    shellArgs:
+     - "--debug"
+     - "-c"
     output: show
 ```
 
@@ -607,7 +610,8 @@ Full
 |-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | run | map\[string -> string\] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
 | run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.shell   | string | "sh" | no | Name of the shell to use for command execution (valid values are "sh" and "bash") |                                                    |
+| run.shell | string | "sh" | no | Name of the shell to use for command execution |
+| run.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
 | run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
 
 #### Native Environment Variables
@@ -670,6 +674,9 @@ as the environment variable value.
     name: ENV_NAME_3
     command: echo ${DIR%$REPO_REL_DIR}
     shell: bash
+    shellArgs:
+      - "--verbose"
+      - "-c"
 ```
 
 | Key             | Type                  | Default | Required | Description                                                                                                     |
@@ -678,7 +685,8 @@ as the environment variable value.
 | env.name | string | none | yes | Name of the environment variable                                                                                |
 | env.value | string | none | no | Set the value of the environment variable to a hard-coded string. Cannot be set at the same time as `command`   |
 | env.command | string | none | no | Set the value of the environment variable to the output of a command. Cannot be set at the same time as `value` |
-| env.shell   | string | "sh" | no | Name of the shell to use for command execution (valid values are "sh" and "bash"). Cannot be set without `command`|                                                    |
+| env.shell | string | "sh" | no | Name of the shell to use for command execution. Cannot be set without `command` |
+| env.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
 
 ::: tip Notes
 
@@ -707,15 +715,19 @@ Full:
 - multienv:
     command: custom-command
     shell: bash
+    shellArgs:
+      - "--verbose"
+      - "-c"
     output: show
 ```
 
-| Key              | Type                  | Default | Required | Description                                                                         |
-|------------------|-----------------------|---------|----------|-------------------------------------------------------------------------------------|
-| multienv         | map[string -> string] | none    | no       | Run a custom command and add printed environment variables                          |
-| multienv.command | string                | none    | yes      | Name of the custom script to run                                                    |
-| multienv.shell   | string                | "sh"    | no       | Name of the shell to use for command execution (valid values are "sh" and "bash")   |                                                    |
-| multienv.output  | string                | "show"  | no       | Setting output to "hide" will supress the message obout added environment variables |
+| Key                | Type                  | Default | Required | Description                                                                         |
+|--------------------|-----------------------|---------|----------|-------------------------------------------------------------------------------------|
+| multienv           | map[string -> string] | none    | no       | Run a custom command and add printed environment variables                          |
+| multienv.command   | string                | none    | yes      | Name of the custom script to run                                                    |
+| multienv.shell     | string                | "sh"    | no       | Name of the shell to use for command execution                                      |
+| multienv.shellArgs | string or []string    | "-c"    | no       | Command line arguments to be passed to the shell. Cannot be set without `shell`     |
+| multienv.output    | string                | "show"  | no       | Setting output to "hide" will supress the message obout added environment variables |
 
 The output of the command execution must have the following format:
 `EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3`

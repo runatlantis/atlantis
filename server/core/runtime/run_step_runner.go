@@ -24,7 +24,7 @@ type RunStepRunner struct {
 
 func (r *RunStepRunner) Run(
 	ctx command.ProjectContext,
-	shell string,
+	shell *valid.CommandShell,
 	command string,
 	path string,
 	envs map[string]string,

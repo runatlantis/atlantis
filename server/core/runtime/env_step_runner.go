@@ -17,7 +17,7 @@ type EnvStepRunner struct {
 // the value. Otherwise command is run and its output is the value returned.
 func (r *EnvStepRunner) Run(
 	ctx command.ProjectContext,
-	shell string,
+	shell *valid.CommandShell,
 	command string,
 	value string,
 	path string,

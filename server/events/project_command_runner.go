@@ -67,7 +67,7 @@ type CustomStepRunner interface {
 	// Run cmd in path.
 	Run(
 		ctx command.ProjectContext,
-		shell string,
+		shell *valid.CommandShell,
 		cmd string,
 		path string,
 		envs map[string]string,
@@ -82,7 +82,7 @@ type CustomStepRunner interface {
 type EnvStepRunner interface {
 	Run(
 		ctx command.ProjectContext,
-		shell string,
+		shell *valid.CommandShell,
 		cmd string,
 		value string,
 		path string,
@@ -95,7 +95,7 @@ type MultiEnvStepRunner interface {
 	// Run cmd in path.
 	Run(
 		ctx command.ProjectContext,
-		shell string,
+		shell *valid.CommandShell,
 		cmd string,
 		path string,
 		envs map[string]string,
