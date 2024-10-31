@@ -360,7 +360,10 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		logger.Debug("Merge status: '%s'", mr.MergeStatus) //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
 	}
 
-	approval, _, err := g.Client.MergeRequestApprovals.GetConfiguration(repo.FullName, pull.Num)
+	approval, resp, err := g.Client.MergeRequestApprovals.GetConfiguration(repo.FullName, pull.Num)
+	if resp != nil {
+		logger.Debug("GET /projects/%d/merge_requests/%d/approvals returned: %d", mr.ProjectID, mr.IID, resp.StatusCode)
+	}
 	if err != nil {
 		return false, err
 	}
