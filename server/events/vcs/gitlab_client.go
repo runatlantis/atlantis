@@ -291,7 +291,7 @@ func (g *GitlabClient) PullIsApproved(logger logging.SimpleLogging, repo models.
 
 // PullIsMergeable returns true if the merge request can be merged.
 // In GitLab, there isn't a single field that tells us if the pull request is
-// mergeable so for now we check the merge_status and approvals_before_merge
+// mergeable so for now we check the merge_status and ApprovalsLeft
 // fields.
 // In order to check if the repo required these, we'd need to make another API
 // call to get the repo settings.
@@ -360,6 +360,11 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		logger.Debug("Merge status: '%s'", mr.MergeStatus) //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
 	}
 
+	approval, _, err := g.Client.MergeRequestApprovals.GetConfiguration(repo.FullName, pull.Num)
+	if err != nil {
+		return false, err
+	}
+
 	if ((supportsDetailedMergeStatus &&
 		(mr.DetailedMergeStatus == "mergeable" ||
 			mr.DetailedMergeStatus == "ci_still_running" ||
@@ -367,7 +372,7 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 			mr.DetailedMergeStatus == "need_rebase")) ||
 		(!supportsDetailedMergeStatus &&
 			mr.MergeStatus == "can_be_merged")) && //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
-		mr.ApprovalsBeforeMerge <= 0 &&
+		approval.ApprovalsLeft <= 0 &&
 		mr.BlockingDiscussionsResolved &&
 		!mr.WorkInProgress &&
 		(allowSkippedPipeline || !isPipelineSkipped) {
