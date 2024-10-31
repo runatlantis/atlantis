@@ -5,11 +5,11 @@ ARG DEBIAN_TAG=12.7-slim@sha256:36e591f228bb9b99348f584e83f16e012c33ba5cad44ef59
 ARG GOLANG_TAG=1.23.0-alpine@sha256:d0b31558e6b3e4cc59f6011d79905835108c919143ebecc58f35965bf79948f4
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.9.7
+ARG DEFAULT_TERRAFORM_VERSION=1.9.8
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.8.3
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.55.0
+ARG DEFAULT_CONFTEST_VERSION=0.56.0
 
 # Stage 1: build artifact and download deps
 
@@ -44,7 +44,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
-FROM debian:${DEBIAN_TAG} as debian-base
+FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
@@ -64,7 +64,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-FROM debian-base as deps
+FROM debian-base AS deps
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM
