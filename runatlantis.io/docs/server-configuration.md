@@ -478,6 +478,8 @@ and set `--autoplan-modules` to `false`.
 
   The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
   Defaults to "" (empty string).
+  
+  Supports the options: "+1", "-1", "laugh", "confused", "heart", "hooray", "rocket", "eyes".
 
 ### `--enable-diff-markdown-format`
 
