@@ -63,8 +63,6 @@ require (
 
 require github.com/twmb/murmur3 v1.1.8 // indirect
 
-require github.com/google/go-github/v63 v63.0.0
-
 require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
