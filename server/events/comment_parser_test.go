@@ -729,7 +729,7 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 		workspace         string
 		project           string
 		autoMergeDisabled bool
-		mergeMethod       string
+		autoMergeMethod   string
 		commentArgs       []string
 		expPlanFlags      string
 		expApplyFlags     string
@@ -829,10 +829,10 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 			repoRelDir:      "dir",
 			workspace:       "workspace",
 			project:         "",
-			mergeMethod:     "squash",
+			autoMergeMethod: "squash",
 			commentArgs:     []string{`"arg1"`, `"arg2"`, `arg3`},
 			expPlanFlags:    "-d dir -w workspace -- arg1 arg2 arg3",
-			expApplyFlags:   "-d dir -w workspace --merge-method squash",
+			expApplyFlags:   "-d dir -w workspace --auto-merge-method squash",
 			expVersionFlags: "-d dir -w workspace",
 		},
 	}
@@ -845,7 +845,7 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 					actComment := commentParser.BuildPlanComment(c.repoRelDir, c.workspace, c.project, c.commentArgs)
 					Equals(t, fmt.Sprintf("atlantis plan %s", c.expPlanFlags), actComment)
 				case command.Apply:
-					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled, c.mergeMethod)
+					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled, c.autoMergeMethod)
 					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
 				}
 			}
@@ -1031,15 +1031,17 @@ var PlanUsage = `Usage of plan:
 `
 
 var ApplyUsage = `Usage of apply:
-      --auto-merge-disabled   Disable automerge after apply.
-  -d, --dir string            Apply the plan for this directory, relative to root of
-                              repo, ex. 'child/dir'.
-      --merge-method string   Specifies merge method for the VCS if automerge is enabled.
-  -p, --project string        Apply the plan for this project. Refers to the name of
-                              the project configured in a repo config file. Cannot
-                              be used at same time as workspace or dir flags.
-      --verbose               Append Atlantis log to comment.
-  -w, --workspace string      Apply the plan for this Terraform workspace.
+      --auto-merge-disabled        Disable automerge after apply.
+      --auto-merge-method string   Specifies merge method for the VCS if automerge
+                                   is enabled.
+  -d, --dir string                 Apply the plan for this directory, relative to
+                                   root of repo, ex. 'child/dir'.
+  -p, --project string             Apply the plan for this project. Refers to the
+                                   name of the project configured in a repo config
+                                   file. Cannot be used at same time as workspace or
+                                   dir flags.
+      --verbose                    Append Atlantis log to comment.
+  -w, --workspace string           Apply the plan for this Terraform workspace.
 `
 
 var ApprovePolicyUsage = `Usage of approve_policies:

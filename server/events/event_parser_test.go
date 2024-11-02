@@ -816,7 +816,7 @@ func TestCommentCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_String(t *testing.T) {
-	exp := `command="plan", verbose=true, dir="mydir", workspace="myworkspace", project="myproject", policyset="", auto-merge-disabled=false, merge-method=, clear-policy-approval=false, flags="flag1,flag2"`
+	exp := `command="plan", verbose=true, dir="mydir", workspace="myworkspace", project="myproject", policyset="", auto-merge-disabled=false, auto-merge-method=, clear-policy-approval=false, flags="flag1,flag2"`
 	Equals(t, exp, (events.CommentCommand{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},
