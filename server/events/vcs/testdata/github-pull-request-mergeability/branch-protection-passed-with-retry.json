@@ -48,7 +48,7 @@
                       {
                         "__typename": "StatusContext",
                         "context": "my-required-expected-check",
-                        "state": "FAILED",
+                        "state": "FAILURE",
                         "isRequired": true
                       },
                       {
