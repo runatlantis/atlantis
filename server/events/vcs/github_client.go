@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/gofri/go-github-ratelimit/github_ratelimit"
-	"github.com/google/go-github/v59/github"
+	"github.com/google/go-github/v63/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -238,8 +238,9 @@ func (g *GithubClient) CreateComment(logger logging.SimpleLogging, repo models.R
 			"```diff\n"
 	}
 
-	truncationHeader := "\n```\n</details>" +
-		"\n<br>\n\n**Warning**: Command output is larger than the maximum number of comments per command. Output truncated.\n\n[..]\n"
+	truncationHeader := "> [!WARNING]\n" +
+		"> **Warning**: Command output is larger than the maximum number of comments per command. Output truncated.\n<details><summary>Show Output</summary>\n\n" +
+		"```diff\n"
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, g.maxCommentsPerCommand, truncationHeader)
 	for i := range comments {
