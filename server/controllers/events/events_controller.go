@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v65/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
