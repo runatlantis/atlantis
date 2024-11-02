@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v65/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -233,7 +233,8 @@ func (g *GithubClient) CreateComment(logger logging.SimpleLogging, repo models.R
 	}
 
 	truncationHeader := "> [!WARNING]\n" +
-		"> **Warning**: Command output is larger than the maximum number of comments per command. Output truncated.\n"
+		"> **Warning**: Command output is larger than the maximum number of comments per command. Output truncated.\n<details><summary>Show Output</summary>\n\n" +
+		"```diff\n"
 
 	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, g.maxCommentsPerCommand, truncationHeader)
 	for i := range comments {
