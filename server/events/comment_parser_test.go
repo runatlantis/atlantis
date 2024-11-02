@@ -1032,8 +1032,9 @@ var PlanUsage = `Usage of plan:
 
 var ApplyUsage = `Usage of apply:
       --auto-merge-disabled        Disable automerge after apply.
-      --auto-merge-method string   Specifies merge method for the VCS if automerge
-                                   is enabled.
+      --auto-merge-method string   Specifies the merge method for the VCS if
+                                   automerge is enabled. (Currently only implemented
+                                   for GitHub)
   -d, --dir string                 Apply the plan for this directory, relative to
                                    root of repo, ex. 'child/dir'.
   -p, --project string             Apply the plan for this project. Refers to the
