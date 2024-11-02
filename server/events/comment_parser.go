@@ -252,7 +252,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Apply the plan for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
-		flagSet.StringVarP(&autoMergeMethod, autoMergeMethodFlagLong, autoMergeMethodFlagShort, "", "Specifies merge method for the VCS if automerge is enabled.")
+		flagSet.StringVarP(&autoMergeMethod, autoMergeMethodFlagLong, autoMergeMethodFlagShort, "", "Specifies the merge method for the VCS if automerge is enabled. (Currently only implemented for GitHub)")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.ApprovePolicies.String():
 		name = command.ApprovePolicies
@@ -324,12 +324,12 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 
 	if autoMergeMethod != "" {
 		if autoMergeDisabled {
-			err := fmt.Sprintf("cannot use --%s at same time with --%s", autoMergeMethodFlagLong, autoMergeDisabledFlagLong)
+			err := fmt.Sprintf("cannot use --%s at the same time as --%s", autoMergeMethodFlagLong, autoMergeDisabledFlagLong)
 			return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 		}
 
 		if vcsHost != models.Github {
-			err := fmt.Sprintf("--%s not implemeted for %s", autoMergeMethodFlagLong, vcsHost.String())
+			err := fmt.Sprintf("--%s is not currently implemented for %s", autoMergeMethodFlagLong, vcsHost.String())
 			return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 		}
 	}

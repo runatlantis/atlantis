@@ -921,11 +921,11 @@ func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 
 		isMethodAllowed, isMethodExist := mergeMethodsAllow[method]
 		if !isMethodExist {
-			return fmt.Errorf("%s method is unknown for GitHub, use one of them: %v", method, mergeMethodsName)
+			return fmt.Errorf("Merge method '%s' is unknown. Specify one of the valid values: '%s'", method, strings.Join(mergeMethodsName, ", "))
 		}
 
 		if !isMethodAllowed() {
-			return fmt.Errorf("%s method is not allowed by repository settings", method)
+			return fmt.Errorf("Merge method '%s' is not allowed by the repository Pull Request settings", method)
 		}
 	} else {
 		method = defaultMergeMethod

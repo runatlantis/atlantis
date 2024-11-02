@@ -1035,37 +1035,37 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			mergeMethodOption: "squash",
 			expMethod:         "squash",
 		},
-		"merge with merge: overrided by command: merge not allowed": {
+		"merge with merge: overridden by command: merge not allowed": {
 			allowMerge:        false,
 			allowRebase:       true,
 			allowSquash:       true,
 			mergeMethodOption: "merge",
 			expMethod:         "",
-			expErr:            "merge method is not allowed by repository settings",
+			expErr:            "Merge method 'merge' is not allowed by the repository Pull Request settings",
 		},
-		"merge with rebase: overrided by command: rebase not allowed": {
+		"merge with rebase: overridden by command: rebase not allowed": {
 			allowMerge:        true,
 			allowRebase:       false,
 			allowSquash:       true,
 			mergeMethodOption: "rebase",
 			expMethod:         "",
-			expErr:            "rebase method is not allowed by repository settings",
+			expErr:            "Merge method 'rebase' is not allowed by the repository Pull Request settings",
 		},
-		"merge with squash: overrided by command: squash not allowed": {
+		"merge with squash: overridden by command: squash not allowed": {
 			allowMerge:        true,
 			allowRebase:       true,
 			allowSquash:       false,
 			mergeMethodOption: "squash",
 			expMethod:         "",
-			expErr:            "squash method is not allowed by repository settings",
+			expErr:            "Merge method 'squash' is not allowed by the repository Pull Request settings",
 		},
-		"merge with unknown: overrided by command: unknown not exists": {
+		"merge with unknown: overridden by command: unknown doesn't exist": {
 			allowMerge:        true,
 			allowRebase:       true,
 			allowSquash:       true,
 			mergeMethodOption: "unknown",
 			expMethod:         "",
-			expErr:            "unknown method is unknown for GitHub, use one of them: [merge rebase squash]",
+			expErr:            "Merge method 'unknown' is unknown. Specify one of the valid values: 'merge, rebase, squash'",
 		},
 	}
 
