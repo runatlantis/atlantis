@@ -480,12 +480,13 @@ Each servers handle different repository config files.
 
 ### Top-Level Keys
 
-| Key       | Type                                                  | Default   | Required | Description                                                                           |
-|-----------|-------------------------------------------------------|-----------|----------|---------------------------------------------------------------------------------------|
-| repos     | array[[Repo](#repo)]                                  | see below | no       | List of repos to apply settings to.                                                   |
-| workflows | map[string: [Workflow](custom-workflows.md#workflow)] | see below | no       | Map from workflow name to workflow. Workflows override the default Atlantis commands. |
-| policies  | Policies.                                             | none      | no       | List of policy sets to run and associated metadata                                    |
-| metrics   | Metrics.                                              | none      | no       | Map of metric configuration                                                           |
+| Key        | Type                                                  | Default   | Required | Description                                                                           |
+|------------|-------------------------------------------------------|-----------|----------|---------------------------------------------------------------------------------------|
+| repos      | array[[Repo](#repo)]                                  | see below | no       | List of repos to apply settings to.                                                   |
+| workflows  | map[string: [Workflow](custom-workflows.md#workflow)] | see below | no       | Map from workflow name to workflow. Workflows override the default Atlantis commands. |
+| policies   | Policies.                                             | none      | no       | List of policy sets to run and associated metadata                                    |
+| metrics    | Metrics.                                              | none      | no       | Map of metric configuration                                                           |
+| team_authz | [TeamAuthz](#teamauthz)                               | none      | no       | Configuration of team permission checking                                             |
 
 ::: tip A Note On Defaults
 
@@ -633,3 +634,10 @@ mode: on_apply
 | Key      | Type   | Default | Required | Description                            |
 | -------- | ------ | ------- | -------- | -------------------------------------- |
 | endpoint | string | none    | yes      | path to metrics endpoint               |
+
+### TeamAuthz
+
+| Key     | Type     | Default | Required | Description                                 |
+|---------|----------|---------|----------|---------------------------------------------|
+| command | string   | none    | yes      | full path to external authorization command |
+| args    | []string | none    | no       | optional arguments to pass to `command`     |

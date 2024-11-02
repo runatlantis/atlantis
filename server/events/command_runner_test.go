@@ -27,7 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
-	"github.com/google/go-github/v59/github"
+	"github.com/google/go-github/v63/github"
 	. "github.com/petergtz/pegomock/v4"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -321,7 +321,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 	t.Run("no rules", func(t *testing.T) {
 		vcsClient := setup(t)
 		// by default these are false so don't need to reset
-		ch.TeamAllowlistChecker = &events.TeamAllowlistChecker{}
+		ch.TeamAllowlistChecker = &command.DefaultTeamAllowlistChecker{}
 		var pull github.PullRequest
 		modelPull := models.PullRequest{
 			BaseRepo: testdata.GithubRepo,

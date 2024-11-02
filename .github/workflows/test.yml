@@ -19,8 +19,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   changes:
+    permissions:
+      contents: read  # for dorny/paths-filter to fetch a list of changed files
+      pull-requests: read  # for dorny/paths-filter to read pull requests
     outputs:
       should-run-tests: ${{ steps.changes.outputs.go == 'true' }}
     if: github.event.pull_request.draft == false
@@ -42,12 +48,12 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:4149a804e081244b10b5abef4bd52bfb051283f532d56cba75efb31047cbd2ae
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:af0b45be2e53fe0762e51adb9493d049fe947b35c0f8c3ad79f89200d6c303ca
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
       # need to setup go toolchain explicitly
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
         with:
           go-version-file: go.mod
 
@@ -59,7 +65,7 @@ jobs:
       ###########################################################
       - name: Slack failure notification
         if: ${{ github.ref == 'refs/heads/main' && failure() }}
-        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
         with:
           payload: |
             {
@@ -113,7 +119,44 @@ jobs:
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+        with:
+          go-version-file: go.mod
+
+      # This version of TF will be downloaded before Atlantis is started.
+      # We do this instead of setting --default-tf-version because setting
+      # that flag starts the download asynchronously so we'd have a race
+      # condition.
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Setup ngrok
+        run: |
+          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/4no1PS1PoRF/ngrok-v3-3.13.0-linux-amd64.tar.gz
+          tar -xzf ngrok.tar.gz
+          chmod +x ngrok
+          ./ngrok version
+      - name: Setup gitconfig
+        run: |
+          git config --global user.email "maintainers@runatlantis.io"
+          git config --global user.name "atlantisbot"
+
+      - run: |
+          make build-service
+          ./scripts/e2e.sh
+  e2e-gitlab:
+    runs-on: ubuntu-latest
+    # dont run e2e tests on forked PRs
+    if: github.event.pull_request.head.repo.fork == false
+    env:
+      TERRAFORM_VERSION: 1.9.2
+      ATLANTIS_GITLAB_USER: ${{ secrets.ATLANTISBOT_GITLAB_USERNAME }}
+      ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
+      NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
         with:
           go-version-file: go.mod
 

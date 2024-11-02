@@ -2,12 +2,17 @@ name: pr-size
 
 on: [pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   labeler:
+    permissions:
+      pull-requests: write  # for codelytv/pr-size-labeler to add labels & comment on PRs
     runs-on: ubuntu-latest
     name: Label the PR size
     steps:
-      - uses: codelytv/pr-size-labeler@56f6f0fc35c7cc0f72963b8467729e1120cb4bed # v1
+      - uses: codelytv/pr-size-labeler@c7a55a022747628b50f3eb5bf863b9e796b8f274 # v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           xs_label: 'size/xs'

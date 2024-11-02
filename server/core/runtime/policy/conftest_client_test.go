@@ -12,7 +12,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime/cache/mocks"
 	models_mocks "github.com/runatlantis/atlantis/server/core/runtime/models/mocks"
 	conftest_mocks "github.com/runatlantis/atlantis/server/core/runtime/policy/mocks"
-	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -27,9 +26,11 @@ func TestConfTestVersionDownloader(t *testing.T) {
 
 	RegisterMockTestingT(t)
 
-	mockDownloader := terraform_mocks.NewMockDownloader()
+	mockDownloader := conftest_mocks.NewMockDownloader()
 
-	subject := ConfTestVersionDownloader{downloader: mockDownloader}
+	subject := ConfTestVersionDownloader{
+		downloader: mockDownloader,
+	}
 
 	t.Run("success", func(t *testing.T) {
 
