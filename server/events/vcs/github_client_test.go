@@ -747,6 +747,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 		},
 		{
 			"blocked",
+			"branch-protection-passed-with-retry.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
 			"ruleset-check-expected.json",
 			`"APPROVED"`,
 			false,
@@ -760,6 +766,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 		{
 			"blocked",
 			"ruleset-check-passed.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
+			"ruleset-check-passed-with-retry.json",
 			`"APPROVED"`,
 			true,
 		},
@@ -792,6 +804,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			"ruleset-workflow-passed-sha-mismatch.json",
 			`"APPROVED"`,
 			false,
+		},
+		{
+			"blocked",
+			"ruleset-workflow-passed-with-retry.json",
+			`"APPROVED"`,
+			true,
 		},
 	}
 
