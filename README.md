@@ -7,6 +7,7 @@
 [![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://communityinviter.com/apps/cloud-native/cncf)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/runatlantis/atlantis/badge)](https://scorecard.dev/viewer/?uri=github.com/runatlantis/atlantis)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9428/badge)](https://www.bestpractices.dev/projects/9428)
+[![Gurubase](https://img.shields.io/badge/Gurubase-Ask%20Atlantis%20Guru-006BFF)](https://gurubase.io/g/atlantis)
 
 <p align="center">
   <img src="./runatlantis.io/public/hero.png" alt="Atlantis Logo"/><br><br>
