@@ -868,8 +868,8 @@ This is useful when you have many projects and want to keep the pull request cle
    Comma separated list of VCS status names from other atlantis services.
    When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks
    (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
-   from other atlantis services when checking if the PR is mergeable.
-   Only for Github but can be extended to other VCS in the future.
+   from other Atlantis services when checking if the PR is mergeable.
+   Currently only implemented for GitHub.
 
 ### `--locking-db-type`
 
