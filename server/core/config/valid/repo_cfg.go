@@ -195,6 +195,10 @@ type CommandShell struct {
 	ShellArgs []string
 }
 
+func (s CommandShell) String() string {
+	return fmt.Sprintf("%s %s", s.Shell, strings.Join(s.ShellArgs, " "))
+}
+
 type Step struct {
 	StepName  string
 	ExtraArgs []string
