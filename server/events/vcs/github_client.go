@@ -743,7 +743,7 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 	matchedCheckRuns := make([]CheckRun, 0)
 	for _, checkRun := range checkRuns {
 		if checkRun.CheckSuite.WorkflowRun == nil {
-			return CheckRunPassed(checkRun) //
+			return CheckRunPassed(checkRun)
 		} else if checkRun.Name == expectedContext {
 			matchedCheckRuns = append(matchedCheckRuns, checkRun)
 		}
