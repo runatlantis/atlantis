@@ -609,7 +609,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 					},
 				}, models.PullRequest{
 					Num: 1,
-				}, vcsStatusName)
+				}, vcsStatusName, []string{})
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})
@@ -619,6 +619,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	vcsStatusName := "atlantis"
+	ignoreVCSStatusNames := []string{"other-atlantis"}
 	cases := []struct {
 		state                     string
 		statusCheckRollupFilePath string
@@ -693,6 +694,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 		},
 		{
 			"blocked",
+			"ruleset-atlantis-apply-expected.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
 			"ruleset-optional-check-failed.json",
 			`"APPROVED"`,
 			true,
@@ -708,6 +715,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			"ruleset-check-pending.json",
 			`"APPROVED"`,
 			false,
+		},
+		{
+			"blocked",
+			"ruleset-check-pending-other-atlantis.json",
+			`"APPROVED"`,
+			true,
 		},
 		{
 			"blocked",
@@ -756,6 +769,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			"ruleset-check-failed.json",
 			`"APPROVED"`,
 			false,
+		},
+		{
+			"blocked",
+			"ruleset-check-failed-other-atlantis.json",
+			`"APPROVED"`,
+			true,
 		},
 		{
 			"blocked",
@@ -873,7 +892,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 					},
 				}, models.PullRequest{
 					Num: 1,
-				}, vcsStatusName)
+				}, vcsStatusName, ignoreVCSStatusNames)
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})
