@@ -167,7 +167,8 @@ RUN apk add --no-cache \
         bash~=5 \
         openssh~=9 \
         dumb-init~=1 \
-        gcompat~=1
+        gcompat~=1 \
+        coreutils-env~=9
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
