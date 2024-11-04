@@ -1256,6 +1256,7 @@ This is useful when you have many projects and want to keep the pull request cle
   Namespace for emitting stats/metrics. See [stats](stats.md) section.
 
 ### `--tf-distribution`
+
   ```bash
   atlantis server --tf-distribution="terraform"
   # or
