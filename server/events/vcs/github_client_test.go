@@ -694,6 +694,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 		},
 		{
 			"blocked",
+			"ruleset-atlantis-apply-expected.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
 			"ruleset-optional-check-failed.json",
 			`"APPROVED"`,
 			true,
@@ -990,10 +996,12 @@ func TestGithubClient_MergePullHandlesError(t *testing.T) {
 func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	cases := map[string]struct {
-		allowMerge  bool
-		allowRebase bool
-		allowSquash bool
-		expMethod   string
+		allowMerge        bool
+		allowRebase       bool
+		allowSquash       bool
+		mergeMethodOption string
+		expMethod         string
+		expErr            string
 	}{
 		"all true": {
 			allowMerge:  true,
@@ -1024,6 +1032,59 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowRebase: true,
 			allowSquash: false,
 			expMethod:   "rebase",
+		},
+		"all true: merge with merge: overrided by command": {
+			allowMerge:        true,
+			allowRebase:       true,
+			allowSquash:       true,
+			mergeMethodOption: "merge",
+			expMethod:         "merge",
+		},
+		"all true: merge with rebase: overrided by command": {
+			allowMerge:        true,
+			allowRebase:       true,
+			allowSquash:       true,
+			mergeMethodOption: "rebase",
+			expMethod:         "rebase",
+		},
+		"all true: merge with squash: overrided by command": {
+			allowMerge:        true,
+			allowRebase:       true,
+			allowSquash:       true,
+			mergeMethodOption: "squash",
+			expMethod:         "squash",
+		},
+		"merge with merge: overridden by command: merge not allowed": {
+			allowMerge:        false,
+			allowRebase:       true,
+			allowSquash:       true,
+			mergeMethodOption: "merge",
+			expMethod:         "",
+			expErr:            "Merge method 'merge' is not allowed by the repository Pull Request settings",
+		},
+		"merge with rebase: overridden by command: rebase not allowed": {
+			allowMerge:        true,
+			allowRebase:       false,
+			allowSquash:       true,
+			mergeMethodOption: "rebase",
+			expMethod:         "",
+			expErr:            "Merge method 'rebase' is not allowed by the repository Pull Request settings",
+		},
+		"merge with squash: overridden by command: squash not allowed": {
+			allowMerge:        true,
+			allowRebase:       true,
+			allowSquash:       false,
+			mergeMethodOption: "squash",
+			expMethod:         "",
+			expErr:            "Merge method 'squash' is not allowed by the repository Pull Request settings",
+		},
+		"merge with unknown: overridden by command: unknown doesn't exist": {
+			allowMerge:        true,
+			allowRebase:       true,
+			allowSquash:       true,
+			mergeMethodOption: "unknown",
+			expMethod:         "",
+			expErr:            "Merge method 'unknown' is unknown. Specify one of the valid values: 'merge, rebase, squash'",
 		},
 	}
 
@@ -1099,9 +1160,14 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 					Num: 1,
 				}, models.PullRequestOptions{
 					DeleteSourceBranchOnMerge: false,
+					MergeMethod:               c.mergeMethodOption,
 				})
 
-			Ok(t, err)
+			if c.expErr == "" {
+				Ok(t, err)
+			} else {
+				ErrContains(t, c.expErr, err)
+			}
 		})
 	}
 }
