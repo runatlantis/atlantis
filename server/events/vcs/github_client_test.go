@@ -817,7 +817,6 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 	repoIdJSON := string(jsBytes)
 
 	for _, c := range cases {
-		logger.Debug(c.statusCheckRollupFilePath)
 		t.Run(c.state, func(t *testing.T) {
 			response := strings.Replace(prJSON,
 				`"mergeable_state": "clean"`,
