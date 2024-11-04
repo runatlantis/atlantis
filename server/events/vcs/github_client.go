@@ -712,15 +712,15 @@ pagination:
 
 // GetLatestCheckRun returns the checkRun with the highest runNumber, i.e., the latest checkRun whose status we need to evaluate.
 func GetLatestCheckRun(checkRuns []CheckRun) (CheckRun, error) {
-	lastCheckRunNumber := 0
+	latestCheckRunNumber := 0
 	for _, checkRun := range checkRuns {
-		if int(checkRun.CheckSuite.WorkflowRun.RunNumber) > lastCheckRunNumber {
-			lastCheckRunNumber = int(checkRun.CheckSuite.WorkflowRun.RunNumber)
+		if int(checkRun.CheckSuite.WorkflowRun.RunNumber) > latestCheckRunNumber {
+			latestCheckRunNumber = int(checkRun.CheckSuite.WorkflowRun.RunNumber)
 		}
 	}
 
 	for _, checkRun := range checkRuns {
-		if int(checkRun.CheckSuite.WorkflowRun.RunNumber) == lastCheckRunNumber {
+		if int(checkRun.CheckSuite.WorkflowRun.RunNumber) == latestCheckRunNumber {
 			return checkRun, nil
 		}
 	}
