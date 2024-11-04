@@ -693,6 +693,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 		},
 		{
 			"blocked",
+			"ruleset-atlantis-apply-expected.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
 			"ruleset-optional-check-failed.json",
 			`"APPROVED"`,
 			true,
