@@ -866,6 +866,20 @@ This is useful when you have many projects and want to keep the pull request cle
   Used for example with CDKTF pre-workflow hooks that dynamically generate
   Terraform files.
 
+### `--ignore-vcs-status-names`
+
+   ```bash
+  atlantis server --ignore-vcs-status-names="status1,status2"
+  # or
+  ATLANTIS_IGNORE_VCS_STATUS_NAMES=status1,status2
+  ```
+
+   Comma separated list of VCS status names from other atlantis services.
+   When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks
+   (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
+   from other Atlantis services when checking if the PR is mergeable.
+   Currently only implemented for GitHub.
+
 ### `--locking-db-type`
 
   ```bash

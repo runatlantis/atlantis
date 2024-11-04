@@ -146,6 +146,7 @@ var testFlags = map[string]interface{}{
 	UseTFPluginCache:                 true,
 	VarFileAllowlistFlag:             "/path",
 	VCSStatusName:                    "my-status",
+	IgnoreVCSStatusNames:             "",
 	WebBasicAuthFlag:                 false,
 	WebPasswordFlag:                  "atlantis",
 	WebUsernameFlag:                  "atlantis",

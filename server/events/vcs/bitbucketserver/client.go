@@ -203,7 +203,7 @@ func (b *Client) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string) (bool, error) {
+func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
 		return false, err

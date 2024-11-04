@@ -177,7 +177,7 @@ func (g *AzureDevopsClient) DiscardReviews(repo models.Repo, pull models.PullReq
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) { //nolint: revive
+func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) { //nolint: revive
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
