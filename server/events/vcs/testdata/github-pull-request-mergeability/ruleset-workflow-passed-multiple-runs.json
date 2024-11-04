@@ -70,6 +70,21 @@
                       {
                         "__typename": "CheckRun",
                         "name": "my required check",
+                        "conclusion": "FAILURE",
+                        "isRequired": true,
+                        "checkSuite": {
+                          "workflowRun": {
+                            "file": {
+                              "path": ".github/workflows/my-required-workflow.yaml",
+                              "repositoryFileUrl": "https://github.com/runatlantis/atlantis/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/.github/workflows/my-required-workflow.yaml",
+                              "repositoryName": "runatlantis/atlantis"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "__typename": "CheckRun",
+                        "name": "my required check",
                         "conclusion": "SUCCESS",
                         "isRequired": true,
                         "checkSuite": {

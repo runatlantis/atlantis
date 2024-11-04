@@ -719,9 +719,11 @@ func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool
 }
 
 func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string) bool {
-	for _, checkRun := range checkRuns {
-		if checkRun.Name == expectedContext {
-			return CheckRunPassed(checkRun)
+	// Iterate through checkRuns from the end, as GitHub returns them in chronological order
+	// The last checkRun in the array represents the current status
+	for i := len(checkRuns) - 1; i >= 0; i-- {
+		if checkRuns[i].Name == expectedContext {
+			return CheckRunPassed(checkRuns[i])
 		}
 	}
 
@@ -735,16 +737,18 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 }
 
 func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
-	for _, checkRun := range checkRuns {
-		if checkRun.CheckSuite.WorkflowRun == nil {
+	// Iterate through checkRuns from the end, as GitHub returns them in chronological order
+	// The last checkRun in the array represents the current status
+	for i := len(checkRuns) - 1; i >= 0; i-- {
+		if checkRuns[i].CheckSuite.WorkflowRun == nil {
 			continue
 		}
-		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun, expectedWorkflow)
+		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRuns[i].CheckSuite.WorkflowRun, expectedWorkflow)
 		if err != nil {
 			return false, err
 		}
 		if match {
-			return CheckRunPassed(checkRun), nil
+			return CheckRunPassed(checkRuns[i]), nil
 		}
 	}
 
