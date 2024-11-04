@@ -874,7 +874,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 						Num:        c.mrID,
 						BaseRepo:   repo,
 						HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
-					}, vcsStatusName)
+					}, vcsStatusName, []string{})
 
 				Ok(t, err)
 				Equals(t, c.expState, mergeable)

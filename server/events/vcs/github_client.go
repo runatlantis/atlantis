@@ -17,7 +17,10 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -711,8 +714,7 @@ func CheckRunPassed(checkRun CheckRun) bool {
 }
 
 func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool {
-	return strings.HasPrefix(string(statusContext.Context), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) ||
-		statusContext.State == "SUCCESS"
+	return statusContext.State == "SUCCESS"
 }
 
 func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string) bool {
@@ -749,7 +751,7 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 }
 
 // IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
-func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
+func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
 	if pull.Number == nil {
 		return false, errors.New("pull request number is nil")
 	}
@@ -772,8 +774,12 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 	// Go through all checks and workflows required by branch protection or rulesets
 	// Make sure that they can all be found in the statusCheckRollup and that they all pass
 	for _, requiredCheck := range requiredChecks {
-		if !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname) {
-			logger.Debug("%s: Expected Required Check: %s", notMergeablePrefix, requiredCheck)
+		if strings.HasPrefix(string(requiredCheck), fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+			// Ignore atlantis apply check(s)
+			continue
+		}
+		if !slices.Contains(ignoreVCSStatusNames, GetVCSStatusNameFromRequiredCheck(requiredCheck)) && !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname) {
+			logger.Debug("%s: Expected Required Check: %s VCS Status Name: %s Ignore VCS Status Names: %s", notMergeablePrefix, requiredCheck, vcsstatusname, ignoreVCSStatusNames)
 			return false, nil
 		}
 	}
@@ -791,8 +797,12 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 	return true, nil
 }
 
+func GetVCSStatusNameFromRequiredCheck(requiredCheck githubv4.String) string {
+	return strings.Split(string(requiredCheck), "/")[0]
+}
+
 // PullIsMergeable returns true if the pull request is mergeable.
-func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
 	logger.Debug("Checking if GitHub pull request %d is mergeable", pull.Num)
 	githubPR, err := g.GetPullRequest(logger, repo, pull.Num)
 	if err != nil {
@@ -814,7 +824,7 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 	case "blocked":
 		if g.config.AllowMergeableBypassApply {
 			logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
-			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname)
+			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname, ignoreVCSStatusNames)
 			if err != nil {
 				return false, errors.Wrap(err, "getting pull request status")
 			}
@@ -885,7 +895,7 @@ func (g *GithubClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 }
 
 // MergePull merges the pull request.
-func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullRequest, _ models.PullRequestOptions) error {
+func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	logger.Debug("Merging GitHub pull request %d", pull.Num)
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
@@ -896,17 +906,42 @@ func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 	if err != nil {
 		return errors.Wrap(err, "fetching repo info")
 	}
+
 	const (
 		defaultMergeMethod = "merge"
 		rebaseMergeMethod  = "rebase"
 		squashMergeMethod  = "squash"
 	)
-	method := defaultMergeMethod
-	if !repo.GetAllowMergeCommit() {
-		if repo.GetAllowRebaseMerge() {
-			method = rebaseMergeMethod
-		} else if repo.GetAllowSquashMerge() {
-			method = squashMergeMethod
+
+	mergeMethodsAllow := map[string]func() bool{
+		defaultMergeMethod: repo.GetAllowMergeCommit,
+		rebaseMergeMethod:  repo.GetAllowRebaseMerge,
+		squashMergeMethod:  repo.GetAllowSquashMerge,
+	}
+
+	mergeMethodsName := slices.Collect(maps.Keys(mergeMethodsAllow))
+	sort.Strings(mergeMethodsName)
+
+	var method string
+	if pullOptions.MergeMethod != "" {
+		method = pullOptions.MergeMethod
+
+		isMethodAllowed, isMethodExist := mergeMethodsAllow[method]
+		if !isMethodExist {
+			return fmt.Errorf("Merge method '%s' is unknown. Specify one of the valid values: '%s'", method, strings.Join(mergeMethodsName, ", "))
+		}
+
+		if !isMethodAllowed() {
+			return fmt.Errorf("Merge method '%s' is not allowed by the repository Pull Request settings", method)
+		}
+	} else {
+		method = defaultMergeMethod
+		if !repo.GetAllowMergeCommit() {
+			if repo.GetAllowRebaseMerge() {
+				method = rebaseMergeMethod
+			} else if repo.GetAllowSquashMerge() {
+				method = squashMergeMethod
+			}
 		}
 	}
 

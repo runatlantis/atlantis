@@ -77,7 +77,7 @@ func TestEnvStepRunner_Run(t *testing.T) {
 				TerraformVersion: tfVersion,
 				ProjectName:      c.ProjectName,
 			}
-			value, err := envRunner.Run(ctx, c.Command, c.Value, tmpDir, map[string]string(nil))
+			value, err := envRunner.Run(ctx, nil, c.Command, c.Value, tmpDir, map[string]string(nil))
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

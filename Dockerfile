@@ -7,7 +7,7 @@ ARG GOLANG_TAG=1.23.0-alpine@sha256:d0b31558e6b3e4cc59f6011d79905835108c919143eb
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.9.8
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.8.3
+ARG DEFAULT_OPENTOFU_VERSION=1.8.4
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.56.0
 
@@ -167,7 +167,8 @@ RUN apk add --no-cache \
         bash~=5 \
         openssh~=9 \
         dumb-init~=1 \
-        gcompat~=1
+        gcompat~=1 \
+        coreutils-env~=9
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
