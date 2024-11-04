@@ -78,7 +78,8 @@
                               "path": ".github/workflows/my-required-workflow.yaml",
                               "repositoryFileUrl": "https://github.com/runatlantis/atlantis/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/.github/workflows/my-required-workflow.yaml",
                               "repositoryName": "runatlantis/atlantis"
-                            }
+                            },
+                            "runNumber": 1
                           }
                         }
                       }

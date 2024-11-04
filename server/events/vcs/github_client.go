@@ -481,6 +481,7 @@ type WorkflowRun struct {
 		RepositoryFileUrl githubv4.String
 		RepositoryName    githubv4.String
 	}
+	RunNumber githubv4.Int
 }
 
 type CheckRun struct {
@@ -709,6 +710,24 @@ pagination:
 	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, nil
 }
 
+// GetLatestCheckRun returns the checkRun with the highest runNumber, i.e., the latest checkRun whose status we need to evaluate.
+func GetLatestCheckRun(checkRuns []CheckRun) (CheckRun, error) {
+	lastCheckRunNumber := 0
+	for _, checkRun := range checkRuns {
+		if int(checkRun.CheckSuite.WorkflowRun.RunNumber) > lastCheckRunNumber {
+			lastCheckRunNumber = int(checkRun.CheckSuite.WorkflowRun.RunNumber)
+		}
+	}
+
+	for _, checkRun := range checkRuns {
+		if int(checkRun.CheckSuite.WorkflowRun.RunNumber) == lastCheckRunNumber {
+			return checkRun, nil
+		}
+	}
+
+	return CheckRun{}, errors.New("theres are not check runs passed")
+}
+
 func CheckRunPassed(checkRun CheckRun) bool {
 	return checkRun.Conclusion == "SUCCESS" || checkRun.Conclusion == "SKIPPED" || checkRun.Conclusion == "NEUTRAL"
 }
@@ -718,12 +737,20 @@ func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool
 }
 
 func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string) bool {
-	// Iterate through checkRuns from the end, as GitHub returns them in chronological order
-	// The last checkRun in the array represents the current status
-	for i := len(checkRuns) - 1; i >= 0; i-- {
-		if checkRuns[i].Name == expectedContext {
-			return CheckRunPassed(checkRuns[i])
+	// If there are no WorkflowRuns, we assume there's only one checkRun with the given name.
+	// If there are WorkflowRuns, we assume there can be multiple checkRuns with the given name,
+	// so we retrieve the latest checkRun.
+	matchedCheckRuns := make([]CheckRun, 0)
+	for _, checkRun := range checkRuns {
+		if checkRun.CheckSuite.WorkflowRun == nil {
+			return CheckRunPassed(checkRun) //
+		} else if checkRun.Name == expectedContext {
+			matchedCheckRuns = append(matchedCheckRuns, checkRun)
 		}
+	}
+	latestCheckRun, err := GetLatestCheckRun(matchedCheckRuns)
+	if err == nil {
+		return CheckRunPassed(latestCheckRun)
 	}
 
 	for _, statusContext := range statusContexts {
@@ -736,19 +763,24 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 }
 
 func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
-	// Iterate through checkRuns from the end, as GitHub returns them in chronological order
-	// The last checkRun in the array represents the current status
-	for i := len(checkRuns) - 1; i >= 0; i-- {
-		if checkRuns[i].CheckSuite.WorkflowRun == nil {
+	matchedCheckRuns := make([]CheckRun, 0)
+	for _, checkRun := range checkRuns {
+		if checkRun.CheckSuite.WorkflowRun == nil {
 			continue
+		} else {
+			match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun, expectedWorkflow)
+			if err != nil {
+				return false, err
+			}
+			if match {
+				matchedCheckRuns = append(matchedCheckRuns, checkRun)
+			}
 		}
-		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRuns[i].CheckSuite.WorkflowRun, expectedWorkflow)
-		if err != nil {
-			return false, err
-		}
-		if match {
-			return CheckRunPassed(checkRuns[i]), nil
-		}
+	}
+
+	latestCheckRun, err := GetLatestCheckRun(matchedCheckRuns)
+	if err == nil {
+		return CheckRunPassed(latestCheckRun), nil
 	}
 
 	return false, nil
