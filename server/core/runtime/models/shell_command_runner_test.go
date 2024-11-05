@@ -54,7 +54,7 @@ func TestShellCommandRunner_Run(t *testing.T) {
 			expectedOutput := fmt.Sprintf("%s\n", strings.Join(c.ExpLines, "\n"))
 
 			// Run once with streaming enabled
-			runner := models.NewShellCommandRunner(c.Command, environ, cwd, true, projectCmdOutputHandler)
+			runner := models.NewShellCommandRunner(nil, c.Command, environ, cwd, true, projectCmdOutputHandler)
 			output, err := runner.Run(ctx)
 			Ok(t, err)
 			Equals(t, expectedOutput, output)
@@ -68,7 +68,7 @@ func TestShellCommandRunner_Run(t *testing.T) {
 			// command output handler should not have received anything
 
 			projectCmdOutputHandler = mocks.NewMockProjectCommandOutputHandler()
-			runner = models.NewShellCommandRunner(c.Command, environ, cwd, false, projectCmdOutputHandler)
+			runner = models.NewShellCommandRunner(nil, c.Command, environ, cwd, false, projectCmdOutputHandler)
 			output, err = runner.Run(ctx)
 			Ok(t, err)
 			Equals(t, expectedOutput, output)
