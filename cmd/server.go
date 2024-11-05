@@ -91,6 +91,7 @@ const (
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
 	GHTokenFlag                      = "gh-token"
+	GHTokenFileFlag                  = "gh-token-file" // nolint: gosec
 	GHUserFlag                       = "gh-user"
 	GHAppIDFlag                      = "gh-app-id"
 	GHAppKeyFlag                     = "gh-app-key"
@@ -316,6 +317,9 @@ var stringFlags = map[string]stringFlag{
 	},
 	GHTokenFlag: {
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
+	},
+	GHTokenFileFlag: {
+		description: "A path to a file containing the GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN_FILE environment variable.",
 	},
 	GHAppKeyFlag: {
 		description:  "The GitHub App's private key",
@@ -965,26 +969,29 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 
 	// The following combinations are valid.
-	// 1. github user and token set
+	// 1. github user and (token or token file)
 	// 2. github app ID and (key file set or key set)
 	// 3. gitea user and token set
 	// 4. gitlab user and token set
 	// 5. bitbucket user and token set
 	// 6. azuredevops user and token set
 	// 7. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GiteaUserFlag, GiteaTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) ||
-		((userConfig.GiteaUser == "") != (userConfig.GiteaToken == "")) ||
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHUserFlag, GHTokenFileFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GiteaUserFlag, GiteaTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	if ((userConfig.GiteaUser == "") != (userConfig.GiteaToken == "")) ||
 		((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) ||
 		((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) ||
 		((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
 		return vcsErr
 	}
-	if (userConfig.GithubAppID != 0) && ((userConfig.GithubAppKey == "") && (userConfig.GithubAppKeyFile == "")) {
-		return vcsErr
+	if userConfig.GithubUser != "" {
+		if (userConfig.GithubToken == "") == (userConfig.GithubTokenFile == "") {
+			return vcsErr
+		}
 	}
-	if (userConfig.GithubAppID == 0) && ((userConfig.GithubAppKey != "") || (userConfig.GithubAppKeyFile != "")) {
-		return vcsErr
+	if userConfig.GithubAppID != 0 {
+		if (userConfig.GithubAppKey == "") == (userConfig.GithubAppKeyFile == "") {
+			return vcsErr
+		}
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
@@ -1026,6 +1033,7 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// Warn if any tokens have newlines.
 	for name, token := range map[string]string{
 		GHTokenFlag:                userConfig.GithubToken,
+		GHTokenFileFlag:            userConfig.GithubTokenFile,
 		GHWebhookSecretFlag:        userConfig.GithubWebhookSecret,
 		GitlabTokenFlag:            userConfig.GitlabToken,
 		GitlabWebhookSecretFlag:    userConfig.GitlabWebhookSecret,

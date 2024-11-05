@@ -743,6 +743,16 @@ based on the organization or user that triggered the webhook.
 
   GitHub token of API user.
 
+### `--gh-token-file`
+
+  ```bash
+  atlantis server --gh-token-file="/path/to/token"
+  # or
+  ATLANTIS_GH_TOKEN_FILE="/path/to/token"
+  ```
+
+  GitHub token of API user. The token is loaded from disk regularly to allow for rotation of the token without the need to restart the Atlantis server.
+
 ### `--gh-user`
 
   ```bash
@@ -1256,11 +1266,13 @@ This is useful when you have many projects and want to keep the pull request cle
   Namespace for emitting stats/metrics. See [stats](stats.md) section.
 
 ### `--tf-distribution`
+
   ```bash
   atlantis server --tf-distribution="terraform"
   # or
   ATLANTIS_TF_DISTRIBUTION="terraform"
   ```
+
   Which TF distribution to use. Can be set to `terraform` or `opentofu`.
 
 ### `--tf-download`
