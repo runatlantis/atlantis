@@ -81,7 +81,7 @@ env:
   value: direct_value
   name: test`,
 			exp: raw.Step{
-				EnvOrRun: EnvOrRunType{
+				CommandMap: EnvType{
 					"env": {
 						"value": "direct_value",
 						"name":  "test",
@@ -96,7 +96,7 @@ env:
   command: echo 123
   name: test`,
 			exp: raw.Step{
-				EnvOrRun: EnvOrRunType{
+				CommandMap: EnvType{
 					"env": {
 						"command": "echo 123",
 						"name":    "test",
@@ -134,21 +134,21 @@ key: value`,
 			description: "empty",
 			input:       "",
 			exp: raw.Step{
-				Key:       nil,
-				Map:       nil,
-				StringVal: nil,
-				EnvOrRun:  nil,
+				Key:        nil,
+				Map:        nil,
+				StringVal:  nil,
+				CommandMap: nil,
 			},
 		},
 
 		// Errors
 		{
-			description: "extra args style no slice strings",
+			description: "extra args style no map strings",
 			input: `
 key:
-  value:
-    another: map`,
-			expErr: "yaml: unmarshal errors:\n  line 3: cannot unmarshal !!map into string",
+ - value:
+     another: map`,
+			expErr: "yaml: unmarshal errors:\n  line 3: cannot unmarshal !!seq into map[string]interface {}",
 		},
 	}
 
@@ -227,10 +227,51 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "env",
 			input: raw.Step{
-				EnvOrRun: EnvOrRunType{
+				CommandMap: EnvType{
 					"env": {
 						"name":    "test",
 						"command": "echo 123",
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "env shell",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":    "test",
+						"command": "echo 123",
+						"shell":   "bash",
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "env shellArgs string",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":      "test",
+						"command":   "echo 123",
+						"shell":     "bash",
+						"shellArgs": "-c",
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "env shellArgs list of strings",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":      "test",
+						"command":   "echo 123",
+						"shell":     "bash",
+						"shellArgs": []interface{}{"-c", "--debug"},
 					},
 				},
 			},
@@ -283,7 +324,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "multiple keys in env",
 			input: raw.Step{
-				EnvOrRun: EnvOrRunType{
+				CommandMap: EnvType{
 					"key1": nil,
 					"key2": nil,
 				},
@@ -312,7 +353,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "invalid key in env",
 			input: raw.Step{
-				EnvOrRun: EnvOrRunType{
+				CommandMap: EnvType{
 					"invalid": nil,
 				},
 			},
@@ -353,7 +394,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "env step with no name key set",
 			input: raw.Step{
-				EnvOrRun: EnvOrRunType{
+				CommandMap: EnvType{
 					"env": {
 						"value": "value",
 					},
@@ -364,19 +405,19 @@ func TestStep_Validate(t *testing.T) {
 		{
 			description: "env step with invalid key",
 			input: raw.Step{
-				EnvOrRun: EnvOrRunType{
+				CommandMap: EnvType{
 					"env": {
 						"abc":      "",
 						"invalid2": "",
 					},
 				},
 			},
-			expErr: "env steps only support keys \"name\", \"value\" and \"command\", found key \"abc\"",
+			expErr: "env steps only support keys \"name\", \"value\", \"command\", \"shell\" and \"shellArgs\", found key \"abc\"",
 		},
 		{
 			description: "env step with both command and value set",
 			input: raw.Step{
-				EnvOrRun: EnvOrRunType{
+				CommandMap: EnvType{
 					"env": {
 						"name":    "name",
 						"command": "command",
@@ -385,6 +426,58 @@ func TestStep_Validate(t *testing.T) {
 				},
 			},
 			expErr: "env steps only support one of the \"value\" or \"command\" keys, found both",
+		},
+		{
+			description: "env step with shell set but not command",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":  "name",
+						"shell": "bash",
+					},
+				},
+			},
+			expErr: "workflow steps only support \"shell\" key in combination with \"command\" key",
+		},
+		{
+			description: "env step with shellArgs set but not shell",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":      "name",
+						"shellArgs": "-c",
+					},
+				},
+			},
+			expErr: "workflow steps only support \"shellArgs\" key in combination with \"shell\" key",
+		},
+		{
+			description: "run step with shellArgs is not list of strings",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"run": {
+						"name":      "name",
+						"command":   "echo",
+						"shell":     "shell",
+						"shellArgs": []int{42, 42},
+					},
+				},
+			},
+			expErr: "\"run\" step \"shellArgs\" option must be a string or a list of strings, found [42 42]\n",
+		},
+		{
+			description: "run step with shellArgs contain not strings",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"run": {
+						"name":      "name",
+						"command":   "echo",
+						"shell":     "shell",
+						"shellArgs": []interface{}{"-c", 42},
+					},
+				},
+			},
+			expErr: "\"run\" step \"shellArgs\" option must contain only strings, found 42\n",
 		},
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should
@@ -454,7 +547,7 @@ func TestStep_ToValid(t *testing.T) {
 		{
 			description: "env step",
 			input: raw.Step{
-				EnvOrRun: EnvOrRunType{
+				CommandMap: EnvType{
 					"env": {
 						"name":    "test",
 						"command": "echo 123",
@@ -561,7 +654,7 @@ func TestStep_ToValid(t *testing.T) {
 		{
 			description: "run step with output",
 			input: raw.Step{
-				EnvOrRun: EnvOrRunType{
+				CommandMap: RunType{
 					"run": {
 						"command": "my 'run command'",
 						"output":  "hide",
@@ -574,6 +667,34 @@ func TestStep_ToValid(t *testing.T) {
 				Output:     "hide",
 			},
 		},
+		{
+			description: "multienv step",
+			input: raw.Step{
+				StringVal: map[string]string{
+					"multienv": "envs.sh",
+				},
+			},
+			exp: valid.Step{
+				StepName:   "multienv",
+				RunCommand: "envs.sh",
+			},
+		},
+		{
+			description: "multienv step with output",
+			input: raw.Step{
+				CommandMap: MultiEnvType{
+					"multienv": {
+						"command": "envs.sh",
+						"output":  "hide",
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:   "multienv",
+				RunCommand: "envs.sh",
+				Output:     "hide",
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
@@ -583,4 +704,6 @@ func TestStep_ToValid(t *testing.T) {
 }
 
 type MapType map[string]map[string][]string
-type EnvOrRunType map[string]map[string]string
+type EnvType map[string]map[string]interface{}
+type RunType map[string]map[string]interface{}
+type MultiEnvType map[string]map[string]interface{}

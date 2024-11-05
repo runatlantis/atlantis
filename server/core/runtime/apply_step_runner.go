@@ -12,6 +12,7 @@ import (
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 // ApplyStepRunner runs `terraform apply`.
@@ -56,7 +57,7 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 	// If the apply was successful, delete the plan.
 	if err == nil {
 		ctx.Log.Info("apply successful, deleting planfile")
-		if removeErr := os.Remove(planPath); removeErr != nil {
+		if removeErr := utils.RemoveIgnoreNonExistent(planPath); removeErr != nil {
 			ctx.Log.Warn("failed to delete planfile after successful apply: %s", removeErr)
 		}
 	}
@@ -116,7 +117,6 @@ func (a *ApplyStepRunner) runRemoteApply(
 	absPlanPath string,
 	tfVersion *version.Version,
 	envs map[string]string) (string, error) {
-
 	// The planfile contents are needed to ensure that the plan didn't change
 	// between plan and apply phases.
 	planfileBytes, err := os.ReadFile(absPlanPath)

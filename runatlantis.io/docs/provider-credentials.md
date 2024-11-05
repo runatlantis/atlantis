@@ -1,17 +1,19 @@
 # Provider Credentials
+
 Atlantis runs Terraform by simply executing `terraform plan` and `apply` commands
 on the server Atlantis is hosted on.
 Just like when you run Terraform locally, Atlantis needs credentials for your
 specific provider.
 
 It's up to you how you provide credentials for your specific provider to Atlantis:
-* The Atlantis [Helm Chart](deployment.html#kubernetes-helm-chart) and 
-    [AWS Fargate Module](deployment.html#aws-fargate) have their own mechanisms for provider
+
+* The Atlantis [Helm Chart](deployment.md#kubernetes-helm-chart) and
+    [AWS Fargate Module](deployment.md#aws-fargate) have their own mechanisms for provider
     credentials. Read their docs.
 * If you're running Atlantis in a cloud then many clouds have ways to give cloud API access
   to applications running on them, ex:
-    * [AWS EC2 Roles](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) (Search for "EC2 Role")
-    * [GCE Instance Service Accounts](https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference)
+  * [AWS EC2 Roles](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) (Search for "EC2 Role")
+  * [GCE Instance Service Accounts](https://registry.terraform.io/providers/hashicorp/google/latest/docs/guides/provider_reference)
 * Many users set environment variables, ex. `AWS_ACCESS_KEY`, where Atlantis is running.
 * Others create the necessary config files, ex. `~/.aws/credentials`, where Atlantis is running.
 * Use the [HashiCorp Vault Provider](https://registry.terraform.io/providers/hashicorp/vault/latest/docs)
@@ -22,10 +24,10 @@ As a general rule, if you can `ssh` or `exec` into the server where Atlantis is
 running and run `terraform` commands like you would locally, then Atlantis will work.
 :::
 
-
 ## AWS Specific Info
 
 ### Multiple AWS Accounts
+
 Atlantis supports multiple AWS accounts through the use of Terraform's
 [AWS Authentication](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) (Search for "Authentication").
 
@@ -41,6 +43,7 @@ won't work for multiple accounts since Atlantis wouldn't know which environment 
 Terraform with.
 
 ### Assume Role Session Names
+
 If you're using Terraform < 0.12, Atlantis injects 5 Terraform variables that can be used to dynamically name the assume role session name.
 Setting the `session_name` allows you to trace API calls made through Atlantis back to a specific
 user and repo via CloudWatch:
@@ -89,5 +92,6 @@ You can still set these variables yourself using the `extra_args` configuration.
 :::
 
 ## Next Steps
-* If you want to configure Atlantis further, read [Configuring Atlantis](configuring-atlantis.html)
-* If you're ready to use Atlantis, read [Using Atlantis](using-atlantis.html)
+
+* If you want to configure Atlantis further, read [Configuring Atlantis](configuring-atlantis.md)
+* If you're ready to use Atlantis, read [Using Atlantis](using-atlantis.md)

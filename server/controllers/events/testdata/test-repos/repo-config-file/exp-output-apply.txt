@@ -2,6 +2,7 @@ Ran Apply for 2 projects:
 
 1. dir: `infrastructure/production` workspace: `default`
 1. dir: `infrastructure/staging` workspace: `default`
+---
 
 ### 1. dir: `infrastructure/production` workspace: `default`
 ```diff

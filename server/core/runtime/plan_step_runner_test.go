@@ -357,7 +357,7 @@ locally at this time.
 			tfVersion: "1.1.0",
 			remoteOpsErr: `╷
 │ Error: Saving a generated plan is currently not supported
-│
+│ 
 │ Terraform Cloud does not support saving the generated execution plan
 │ locally at this time.
 ╵

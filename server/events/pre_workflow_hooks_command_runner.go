@@ -38,15 +38,9 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
 func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context, cmd *CommentCommand) error {
-	pull := ctx.Pull
-	baseRepo := pull.BaseRepo
-	headRepo := ctx.HeadRepo
-	user := ctx.User
-	log := ctx.Log
-
 	preWorkflowHooks := make([]*valid.WorkflowHook, 0)
 	for _, repo := range w.GlobalCfg.Repos {
-		if repo.IDMatches(baseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
+		if repo.IDMatches(ctx.Pull.BaseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
 			preWorkflowHooks = append(preWorkflowHooks, repo.PreWorkflowHooks...)
 		}
 	}
@@ -56,16 +50,16 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 		return nil
 	}
 
-	log.Debug("pre-hooks configured, running...")
+	ctx.Log.Debug("pre-hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, DefaultWorkspace, DefaultRepoRelDir)
+	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir)
 	if err != nil {
 		return err
 	}
-	log.Debug("got workspace lock")
+	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := w.WorkingDir.Clone(headRepo, pull, DefaultWorkspace)
+	repoDir, _, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 	if err != nil {
 		return err
 	}
@@ -78,25 +72,26 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 	// Update the plan or apply commit status to pending whilst the pre workflow hook is running
 	switch cmd.Name {
 	case command.Plan:
-		if err := w.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+		if err := w.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
 			ctx.Log.Warn("unable to update plan commit status: %s", err)
 		}
 	case command.Apply:
-		if err := w.CommitStatusUpdater.UpdateCombined(ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+		if err := w.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
 			ctx.Log.Warn("unable to update apply commit status: %s", err)
 		}
 	}
 
 	err = w.runHooks(
 		models.WorkflowHookCommandContext{
-			BaseRepo:           baseRepo,
-			HeadRepo:           headRepo,
-			Log:                log,
-			Pull:               pull,
-			User:               user,
+			BaseRepo:           ctx.Pull.BaseRepo,
+			HeadRepo:           ctx.HeadRepo,
+			Log:                ctx.Log,
+			Pull:               ctx.Pull,
+			User:               ctx.User,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
 			CommandName:        cmd.Name.String(),
+			API:                ctx.API,
 		},
 		preWorkflowHooks, repoDir)
 
@@ -132,36 +127,42 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 		ctx.HookID = uuid.NewString()
 		shell := hook.Shell
 		if shell == "" {
-			ctx.Log.Debug("Setting shell to default: %q", shell)
+			ctx.Log.Debug("Setting shell to default: '%s'", shell)
 			shell = "sh"
 		}
 		shellArgs := hook.ShellArgs
 		if shellArgs == "" {
-			ctx.Log.Debug("Setting shellArgs to default: %q", shellArgs)
+			ctx.Log.Debug("Setting shellArgs to default: '%s'", shellArgs)
 			shellArgs = "-c"
 		}
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
-		if err != nil {
+		if err != nil && !ctx.API {
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
+		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
 			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-			return err
+			ctx.Log.Info("is api? %v", ctx.API)
+			if !ctx.API {
+				ctx.Log.Info("is api? %v", ctx.API)
+				return err
+			}
 		}
 
 		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
 
 		if err != nil {
-			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
+			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
 				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 			}
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
+		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
 			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-			return err
+			if !ctx.API {
+				return err
+			}
 		}
 	}
 

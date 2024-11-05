@@ -8,13 +8,17 @@ This plan was not saved because one or more projects failed and automerge requir
 {{ else -}}
 {{ if not .DisableApply -}}
 * :arrow_forward: To **apply** this plan, comment:
-    * `{{ .ApplyCmd }}`
+  ```shell
+  {{ .ApplyCmd }}
+  ```
 {{ end -}}
 {{ if not .DisableRepoLocking -}}
-* :put_litter_in_its_place: To **delete** this plan click [here]({{ .LockURL }})
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here]({{ .LockURL }})
 {{ end -}}
 * :repeat: To **plan** this project again, comment:
-    * `{{ .RePlanCmd }}`
+  ```shell
+  {{ .RePlanCmd }}
+  ```
 {{ end -}}
-{{ template "mergedAgain" . }}
+{{ template "mergedAgain" . -}}
 {{ end -}}
