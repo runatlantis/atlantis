@@ -1281,6 +1281,7 @@ This is useful when you have many projects and want to keep the pull request cle
   # or
   ATLANTIS_TF_DISTRIBUTION="terraform"
   ```
+
   Which TF distribution to use. Can be set to `terraform` or `opentofu`.
 
 ### `--tf-download`
