@@ -189,6 +189,16 @@ type Stage struct {
 	Steps []Step
 }
 
+// CommandShell sets up the shell for command execution
+type CommandShell struct {
+	Shell     string
+	ShellArgs []string
+}
+
+func (s CommandShell) String() string {
+	return fmt.Sprintf("%s %s", s.Shell, strings.Join(s.ShellArgs, " "))
+}
+
 type Step struct {
 	StepName  string
 	ExtraArgs []string
@@ -202,6 +212,8 @@ type Step struct {
 	EnvVarName string
 	// EnvVarValue is the value to set EnvVarName to.
 	EnvVarValue string
+	// The Shell to use for RunCommand execution.
+	RunShell *CommandShell
 }
 
 type Workflow struct {
