@@ -32,7 +32,7 @@ jobs:
         with:
           filters: |
             src:
-              - '**.js'
+              - 'runatlantis.io/**'
               - 'package-lock.json'
               - 'package.json'
               - '.github/workflows/website.yml'
