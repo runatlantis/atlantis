@@ -560,6 +560,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
+		GithubTokenFile:    userConfig.GithubTokenFile,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
 		GiteaUser:          userConfig.GiteaUser,

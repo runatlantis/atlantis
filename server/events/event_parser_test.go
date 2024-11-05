@@ -36,6 +36,7 @@ import (
 var parser = events.EventParser{
 	GithubUser:         "github-user",
 	GithubToken:        "github-token",
+	GithubTokenFile:    "",
 	GitlabUser:         "gitlab-user",
 	GitlabToken:        "gitlab-token",
 	AllowDraftPRs:      false,
