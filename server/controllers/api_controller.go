@@ -78,7 +78,7 @@ func (a *APIController) apiReportError(w http.ResponseWriter, code int, err erro
 	response, _ := json.Marshal(map[string]string{
 		"error": err.Error(),
 	})
-	a.respond(w, logging.Warn, code, string(response))
+	a.respond(w, logging.Warn, code, "%s", string(response))
 }
 
 func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +106,7 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	a.respond(w, logging.Debug, code, string(response))
+	a.respond(w, logging.Warn, code, "%s", string(response))
 }
 
 func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +141,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	a.respond(w, logging.Debug, code, string(response))
+	a.respond(w, logging.Warn, code, "%s", string(response))
 }
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {

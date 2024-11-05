@@ -12,16 +12,18 @@ import (
 	"testing"
 	"time"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
-	gitlab "github.com/xanzy/go-gitlab"
+	"github.com/xanzy/go-gitlab"
 
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 var projectID = 4580910
+
+const gitlabPipelineSuccessMrID = 488598
 
 // Test that the base url gets set properly.
 func TestNewGitlabClient_BaseURL(t *testing.T) {
@@ -302,7 +304,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
-						exp := fmt.Sprintf(`{"state":"%s","ref":"patch-1-merger","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
+						exp := fmt.Sprintf(`{"state":"%s","context":"src","target_url":"https://google.com","description":"description","pipeline_id":%d}`, c.expState, gitlabPipelineSuccessMrID)
 						Equals(t, exp, string(body))
 						defer r.Body.Close()  // nolint: errcheck
 						w.Write([]byte("{}")) // nolint: errcheck
@@ -393,7 +395,7 @@ func TestGitlabClient_UpdateStatusRetryable(t *testing.T) {
 
 						body, err := io.ReadAll(r.Body)
 						Ok(t, err)
-						exp := fmt.Sprintf(`{"state":"%s","ref":"patch-1-merger","context":"src","target_url":"https://google.com","description":"description"}`, c.expState)
+						exp := fmt.Sprintf(`{"state":"%s","context":"src","target_url":"https://google.com","description":"description","pipeline_id":%d}`, c.expState, gitlabPipelineSuccessMrID)
 						Equals(t, exp, string(body))
 						defer r.Body.Close() // nolint: errcheck
 
@@ -657,7 +659,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 						Num:        c.mrID,
 						BaseRepo:   repo,
 						HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
-					}, vcsStatusName)
+					}, vcsStatusName, []string{})
 
 				Ok(t, err)
 				Equals(t, c.expState, mergeable)

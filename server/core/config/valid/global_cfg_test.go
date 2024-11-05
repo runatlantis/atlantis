@@ -89,6 +89,9 @@ func TestNewGlobalCfg(t *testing.T) {
 		Workflows: map[string]valid.Workflow{
 			"default": expDefaultWorkflow,
 		},
+		TeamAuthz: valid.TeamAuthz{
+			Args: make([]string, 0),
+		},
 	}
 
 	cases := []struct {

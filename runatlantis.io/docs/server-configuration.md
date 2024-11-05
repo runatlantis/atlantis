@@ -743,6 +743,16 @@ based on the organization or user that triggered the webhook.
 
   GitHub token of API user.
 
+### `--gh-token-file`
+
+  ```bash
+  atlantis server --gh-token-file="/path/to/token"
+  # or
+  ATLANTIS_GH_TOKEN_FILE="/path/to/token"
+  ```
+
+  GitHub token of API user. The token is loaded from disk regularly to allow for rotation of the token without the need to restart the Atlantis server.
+
 ### `--gh-user`
 
   ```bash
@@ -856,6 +866,20 @@ This is useful when you have many projects and want to keep the pull request cle
   Include git untracked files in the Atlantis modified file list.
   Used for example with CDKTF pre-workflow hooks that dynamically generate
   Terraform files.
+
+### `--ignore-vcs-status-names`
+
+   ```bash
+  atlantis server --ignore-vcs-status-names="status1,status2"
+  # or
+  ATLANTIS_IGNORE_VCS_STATUS_NAMES=status1,status2
+  ```
+
+   Comma separated list of VCS status names from other atlantis services.
+   When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks
+   (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
+   from other Atlantis services when checking if the PR is mergeable.
+   Currently only implemented for GitHub.
 
 ### `--locking-db-type`
 
@@ -1241,6 +1265,16 @@ This is useful when you have many projects and want to keep the pull request cle
 
   Namespace for emitting stats/metrics. See [stats](stats.md) section.
 
+### `--tf-distribution`
+
+  ```bash
+  atlantis server --tf-distribution="terraform"
+  # or
+  ATLANTIS_TF_DISTRIBUTION="terraform"
+  ```
+
+  Which TF distribution to use. Can be set to `terraform` or `opentofu`.
+
 ### `--tf-download`
 
   ```bash
@@ -1265,6 +1299,8 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   endpoint should match that of releases.hashicorp.com.
 
   This has no impact if `--tf-download` is set to `false`.
+
+  This setting is not yet supported when `--tf-distribution` is set to `opentofu`.
 
 ### `--tfe-hostname`
 

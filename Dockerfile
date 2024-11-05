@@ -1,15 +1,15 @@
-# syntax=docker/dockerfile:1@sha256:fe40cf4e92cd0c467be2cfc30657a680ae2398318afd50b0c80585784c604f28
+# syntax=docker/dockerfile:1@sha256:865e5dd094beca432e8c0a1d5e1c465db5f998dca4e439981029b3b81fb39ed5
 # what distro is the image being built for
-ARG ALPINE_TAG=3.20.1@sha256:b89d9c93e9ed3597455c90a0b88a8bbb5cb7188438f70953fede212a0c4394e0
-ARG DEBIAN_TAG=12.6-slim@sha256:f528891ab1aa484bf7233dbcc84f3c806c3e427571d75510a9d74bb5ec535b33
-ARG GOLANG_TAG=1.22.5-alpine@sha256:8c9183f715b0b4eca05b8b3dbf59766aaedb41ec07477b132ee2891ac0110a07
+ARG ALPINE_TAG=3.20.3@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d
+ARG DEBIAN_TAG=12.7-slim@sha256:36e591f228bb9b99348f584e83f16e012c33ba5cad44ef5981a1d7c0a93eca22
+ARG GOLANG_TAG=1.23.2-alpine@sha256:9dd2625a1ff2859b8d8b01d8f7822c0f528942fe56cfe7a1e7c38d3b8d72d679
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.9.2
+ARG DEFAULT_TERRAFORM_VERSION=1.9.8
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.7.3
+ARG DEFAULT_OPENTOFU_VERSION=1.8.4
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.54.0
+ARG DEFAULT_CONFTEST_VERSION=0.56.0
 
 # Stage 1: build artifact and download deps
 
@@ -44,7 +44,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
-FROM debian:${DEBIAN_TAG} as debian-base
+FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
@@ -64,7 +64,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-FROM debian-base as deps
+FROM debian-base AS deps
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM
@@ -154,17 +154,21 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+# renovate: datasource=repology depName=alpine_3_20/ca-certificates versioning=loose
+ENV CA_CERTIFICATES_VERSION="20240705-r0"
+
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
-        ca-certificates~=20240705-r0 \
+        ca-certificates~=${CA_CERTIFICATES_VERSION} \
         curl~=8 \
         git~=2 \
         unzip~=6 \
         bash~=5 \
         openssh~=9 \
         dumb-init~=1 \
-        gcompat~=1
+        gcompat~=1 \
+        coreutils-env~=9
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis

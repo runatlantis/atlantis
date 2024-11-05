@@ -130,7 +130,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	projectCmdContext := newProjectCommandContext(
 		ctx,
 		cmdName,
-		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled, prjCfg.AutoMergeMethod),
 		cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 		prjCfg,
@@ -145,6 +145,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		ctx.Scope,
 		ctx.PullRequestStatus,
 		ctx.PullStatus,
+		ctx.TeamAllowlistChecker,
 	)
 
 	projectCmds = append(projectCmds, projectCmdContext)
@@ -202,7 +203,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		projectCmds = append(projectCmds, newProjectCommandContext(
 			ctx,
 			command.PolicyCheck,
-			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled, prjCfg.AutoMergeMethod),
 			cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 			prjCfg,
@@ -217,6 +218,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			ctx.Scope,
 			ctx.PullRequestStatus,
 			ctx.PullStatus,
+			ctx.TeamAllowlistChecker,
 		))
 	}
 
@@ -242,6 +244,7 @@ func newProjectCommandContext(ctx *command.Context,
 	scope tally.Scope,
 	pullReqStatus models.PullReqStatus,
 	pullStatus *models.PullStatus,
+	teamAllowlistChecker command.TeamAllowlistChecker,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
@@ -307,6 +310,7 @@ func newProjectCommandContext(ctx *command.Context,
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
 		SilencePRComments:          projCfg.SilencePRComments,
+		TeamAllowlistChecker:       teamAllowlistChecker,
 	}
 }
 

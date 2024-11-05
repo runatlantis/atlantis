@@ -8,37 +8,40 @@ import (
 	"github.com/runatlantis/atlantis/server/scheduled"
 )
 
-// GitCredsTokenRotator continuously tries to rotate the github app access token every 30 seconds and writes the ~/.git-credentials file
-type GitCredsTokenRotator interface {
+// GithubTokenRotator continuously tries to rotate the github app access token every 30 seconds and writes the ~/.git-credentials file
+type GithubTokenRotator interface {
 	Run()
 	GenerateJob() (scheduled.JobDefinition, error)
 }
 
-type githubAppTokenRotator struct {
+type githubTokenRotator struct {
 	log               logging.SimpleLogging
 	githubCredentials GithubCredentials
 	githubHostname    string
+	gitUser           string
 	homeDirPath       string
 }
 
-func NewGithubAppTokenRotator(
+func NewGithubTokenRotator(
 	log logging.SimpleLogging,
 	githubCredentials GithubCredentials,
 	githubHostname string,
-	homeDirPath string) GitCredsTokenRotator {
+	gitUser string,
+	homeDirPath string) GithubTokenRotator {
 
-	return &githubAppTokenRotator{
+	return &githubTokenRotator{
 		log:               log,
 		githubCredentials: githubCredentials,
 		githubHostname:    githubHostname,
+		gitUser:           gitUser,
 		homeDirPath:       homeDirPath,
 	}
 }
 
 // make sure interface is implemented correctly
-var _ GitCredsTokenRotator = (*githubAppTokenRotator)(nil)
+var _ GithubTokenRotator = (*githubTokenRotator)(nil)
 
-func (r *githubAppTokenRotator) GenerateJob() (scheduled.JobDefinition, error) {
+func (r *githubTokenRotator) GenerateJob() (scheduled.JobDefinition, error) {
 
 	return scheduled.JobDefinition{
 		Job:    r,
@@ -46,7 +49,7 @@ func (r *githubAppTokenRotator) GenerateJob() (scheduled.JobDefinition, error) {
 	}, r.rotate()
 }
 
-func (r *githubAppTokenRotator) Run() {
+func (r *githubTokenRotator) Run() {
 	err := r.rotate()
 	if err != nil {
 		// at least log the error message here, as we want to notify the that user that the key rotation wasn't successful
@@ -54,17 +57,17 @@ func (r *githubAppTokenRotator) Run() {
 	}
 }
 
-func (r *githubAppTokenRotator) rotate() error {
-	r.log.Debug("Refreshing git tokens for Github App")
+func (r *githubTokenRotator) rotate() error {
+	r.log.Debug("Refreshing Github tokens for .git-credentials")
 
 	token, err := r.githubCredentials.GetToken()
 	if err != nil {
 		return errors.Wrap(err, "Getting github token")
 	}
-	r.log.Debug("token %s", token)
+	r.log.Debug("Token successfully refreshed")
 
 	// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#http-based-git-access-by-an-installation
-	if err := WriteGitCreds("x-access-token", token, r.githubHostname, r.homeDirPath, r.log, true); err != nil {
+	if err := WriteGitCreds(r.gitUser, token, r.githubHostname, r.homeDirPath, r.log, true); err != nil {
 		return errors.Wrap(err, "Writing ~/.git-credentials file")
 	}
 	return nil

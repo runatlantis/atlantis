@@ -47,6 +47,7 @@ type GlobalCfg struct {
 	Workflows  map[string]Workflow
 	PolicySets PolicySets
 	Metrics    Metrics
+	TeamAuthz  TeamAuthz
 }
 
 type Metrics struct {
@@ -103,6 +104,7 @@ type MergedProjectCfg struct {
 	Name                      string
 	AutoplanEnabled           bool
 	AutoMergeDisabled         bool
+	AutoMergeMethod           string
 	TerraformVersion          *version.Version
 	RepoCfgVersion            int
 	PolicySets                PolicySets
@@ -248,6 +250,9 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 		},
 		Workflows: map[string]Workflow{
 			DefaultWorkflowName: defaultWorkflow,
+		},
+		TeamAuthz: TeamAuthz{
+			Args: make([]string, 0),
 		},
 	}
 }

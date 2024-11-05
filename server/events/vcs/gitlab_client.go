@@ -22,14 +22,14 @@ import (
 	"strings"
 	"time"
 
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
 	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
-	gitlab "github.com/xanzy/go-gitlab"
+	"github.com/xanzy/go-gitlab"
 )
 
 // gitlabMaxCommentLength is the maximum number of chars allowed by Gitlab in a
@@ -300,7 +300,7 @@ func (g *GitlabClient) PullIsApproved(logger logging.SimpleLogging, repo models.
 // See:
 // - https://gitlab.com/gitlab-org/gitlab-ee/issues/3169
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
-func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (bool, error) {
 	logger.Debug("Checking if GitLab merge request %d is mergeable", pull.Num)
 	mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
 	if resp != nil {
@@ -406,17 +406,17 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		gitlabState = gitlab.Success
 	}
 
-	// refTarget is set to the head pipeline of the MR if it exists, or else it is set to the head branch
-	// of the MR. This is needed because the commit status is only shown in the MR if the pipeline is
-	// assigned to an MR reference.
-	// Try to get the MR details a couple of times in case the pipeline is not yet assigned to the MR
-	refTarget := pull.HeadBranch
+	// refTarget is only set to the head branch of the MR if HeadPipeline is not found
+	// when HeadPipeline is found we set the pipelineID for the request instead
+	var refTarget *string
+	var pipelineID *int
 
 	retries := 1
 	delay := 2 * time.Second
 	var mr *gitlab.MergeRequest
 	var err error
 
+	// Try to get the MR details a couple of times in case the pipeline is not yet assigned to the MR
 	for i := 0; i <= retries; i++ {
 		mr, err = g.GetMergeRequest(logger, pull.BaseRepo.FullName, pull.Num)
 		if err != nil {
@@ -425,7 +425,8 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		if mr.HeadPipeline != nil {
 			logger.Debug("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
 				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
-			refTarget = mr.HeadPipeline.Ref
+			// set pipeline ID for the req once found
+			pipelineID = gitlab.Ptr(mr.HeadPipeline.ID)
 			break
 		}
 		if i != retries {
@@ -433,6 +434,8 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 				pull.Num, delay)
 			time.Sleep(delay)
 		} else {
+			// set the ref target here if the pipeline wasn't found
+			refTarget = gitlab.Ptr(pull.HeadBranch)
 			logger.Debug("Head pipeline not found for merge request %d.",
 				pull.Num)
 		}
@@ -461,7 +464,9 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			Context:     gitlab.Ptr(src),
 			Description: gitlab.Ptr(description),
 			TargetURL:   &url,
-			Ref:         gitlab.Ptr(refTarget),
+			// only one of these should get sent in the request
+			PipelineID: pipelineID,
+			Ref:        refTarget,
 		})
 
 		if resp != nil {
