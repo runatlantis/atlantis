@@ -86,6 +86,7 @@ var testFlags = map[string]interface{}{
 	GHHostnameFlag:                   "ghhostname",
 	GHTeamAllowlistFlag:              "",
 	GHTokenFlag:                      "token",
+	GHTokenFileFlag:                  "",
 	GHUserFlag:                       "user",
 	GHAppIDFlag:                      int64(0),
 	GHAppKeyFlag:                     "",
@@ -145,6 +146,7 @@ var testFlags = map[string]interface{}{
 	UseTFPluginCache:                 true,
 	VarFileAllowlistFlag:             "/path",
 	VCSStatusName:                    "my-status",
+	IgnoreVCSStatusNames:             "",
 	WebBasicAuthFlag:                 false,
 	WebPasswordFlag:                  "atlantis",
 	WebUsernameFlag:                  "atlantis",
@@ -432,7 +434,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gh-app-id/--gh-app-key-file or --gh-app-id/--gh-app-key or --gitea-user/--gitea-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
+	expErr := "--gh-user/--gh-token or --gh-user/--gh-token-file or --gh-app-id/--gh-app-key-file or --gh-app-id/--gh-app-key or --gitea-user/--gitea-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
@@ -581,6 +583,23 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 				GHTokenFlag: "token",
 			},
 			false,
+		},
+		{
+			"github user and github token file and should be successful",
+			map[string]interface{}{
+				GHUserFlag:      "user",
+				GHTokenFileFlag: "/path/to/token",
+			},
+			false,
+		},
+		{
+			"github user, github token, and github token file and should fail",
+			map[string]interface{}{
+				GHUserFlag:      "user",
+				GHTokenFlag:     "token",
+				GHTokenFileFlag: "/path/to/token",
+			},
+			true,
 		},
 		{
 			"gitea user and gitea token set and should be successful",

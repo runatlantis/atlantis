@@ -787,7 +787,7 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 }
 
 // IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
-func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcsstatusname string) (bool, error) {
+func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
 	if pull.Number == nil {
 		return false, errors.New("pull request number is nil")
 	}
@@ -814,8 +814,8 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 			// Ignore atlantis apply check(s)
 			continue
 		}
-		if !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname) {
-			logger.Debug("%s: Expected Required Check: %s", notMergeablePrefix, requiredCheck)
+		if !slices.Contains(ignoreVCSStatusNames, GetVCSStatusNameFromRequiredCheck(requiredCheck)) && !ExpectedCheckPassed(requiredCheck, checkRuns, statusContexts, vcsstatusname) {
+			logger.Debug("%s: Expected Required Check: %s VCS Status Name: %s Ignore VCS Status Names: %s", notMergeablePrefix, requiredCheck, vcsstatusname, ignoreVCSStatusNames)
 			return false, nil
 		}
 	}
@@ -833,8 +833,12 @@ func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo 
 	return true, nil
 }
 
+func GetVCSStatusNameFromRequiredCheck(requiredCheck githubv4.String) string {
+	return strings.Split(string(requiredCheck), "/")[0]
+}
+
 // PullIsMergeable returns true if the pull request is mergeable.
-func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
 	logger.Debug("Checking if GitHub pull request %d is mergeable", pull.Num)
 	githubPR, err := g.GetPullRequest(logger, repo, pull.Num)
 	if err != nil {
@@ -856,7 +860,7 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 	case "blocked":
 		if g.config.AllowMergeableBypassApply {
 			logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
-			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname)
+			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname, ignoreVCSStatusNames)
 			if err != nil {
 				return false, errors.Wrap(err, "getting pull request status")
 			}
