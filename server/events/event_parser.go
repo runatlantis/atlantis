@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 
@@ -357,6 +358,7 @@ type EventParsing interface {
 type EventParser struct {
 	GithubUser         string
 	GithubToken        string
+	GithubTokenFile    string
 	GitlabUser         string
 	GitlabToken        string
 	GiteaUser          string
@@ -372,7 +374,15 @@ type EventParser struct {
 func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFullName string, cloneURL string) (models.Repo, error) {
 	switch vcsHostType {
 	case models.Github:
-		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, e.GithubToken)
+		token := e.GithubToken
+		if e.GithubTokenFile != "" {
+			content, err := os.ReadFile(e.GithubTokenFile)
+			if err != nil {
+				return models.Repo{}, fmt.Errorf("failed reading github token file: %w", err)
+			}
+			token = string(content)
+		}
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, token)
 	case models.Gitea:
 		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GiteaUser, e.GiteaToken)
 	case models.Gitlab:
@@ -626,7 +636,16 @@ func (e *EventParser) ParseGithubPull(logger logging.SimpleLogging, pull *github
 // returns a repo into the Atlantis model.
 // See EventParsing for return value docs.
 func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error) {
-	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
+	token := e.GithubToken
+	if e.GithubTokenFile != "" {
+		content, err := os.ReadFile(e.GithubTokenFile)
+		if err != nil {
+			return models.Repo{}, fmt.Errorf("failed reading github token file: %w", err)
+		}
+		token = string(content)
+	}
+
+	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, token)
 }
 
 // ParseGiteaRepo parses the response from the Gitea API endpoint that
