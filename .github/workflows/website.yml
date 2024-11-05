@@ -96,6 +96,7 @@ jobs:
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \
             -e 'https://confluence.atlassian.com/*' \
+            --header 'User-Agent: Curl' \
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
             http://localhost:8080/
