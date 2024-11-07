@@ -752,7 +752,7 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 }
 
 func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
-	// If there is no WorkflowRuns, we just skip evaluation for given CheckRun.
+	// If there's no WorkflowRun, we just skip evaluation for given CheckRun.
 	// If there is WorkflowRun, we assume there can be multiple checkRuns with the given name,
 	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckRun.
 	latestCheckRunNumber := 0
