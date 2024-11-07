@@ -35,7 +35,7 @@ require (
 	github.com/opentofu/tofudl v0.0.0-20240923062014-8c1e00f33ce6
 	github.com/petergtz/pegomock/v4 v4.1.0
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.6.2
+	github.com/redis/go-redis/v9 v9.7.0
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
 	github.com/slack-go/slack v0.15.0
@@ -45,7 +45,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/uber-go/tally/v4 v4.1.10
 	github.com/urfave/negroni/v3 v3.1.1
-	github.com/xanzy/go-gitlab v0.111.0
+	github.com/xanzy/go-gitlab v0.112.0
 	go.etcd.io/bbolt v1.3.11
 	go.uber.org/zap v1.27.0
 	golang.org/x/term v0.25.0
