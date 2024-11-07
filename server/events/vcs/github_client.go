@@ -710,24 +710,6 @@ pagination:
 	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, nil
 }
 
-// GetLatestCheckRun returns the checkRun with the highest runNumber, i.e., the latest checkRun whose status we need to evaluate.
-func GetLatestCheckRun(checkRuns []CheckRun) (CheckRun, error) {
-	latestCheckRunNumber := 0
-	for _, checkRun := range checkRuns {
-		if int(checkRun.CheckSuite.WorkflowRun.RunNumber) > latestCheckRunNumber {
-			latestCheckRunNumber = int(checkRun.CheckSuite.WorkflowRun.RunNumber)
-		}
-	}
-
-	for _, checkRun := range checkRuns {
-		if int(checkRun.CheckSuite.WorkflowRun.RunNumber) == latestCheckRunNumber {
-			return checkRun, nil
-		}
-	}
-
-	return CheckRun{}, errors.New("theres are not check runs passed")
-}
-
 func CheckRunPassed(checkRun CheckRun) bool {
 	return checkRun.Conclusion == "SUCCESS" || checkRun.Conclusion == "SKIPPED" || checkRun.Conclusion == "NEUTRAL"
 }
@@ -737,20 +719,27 @@ func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool
 }
 
 func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string) bool {
-	// If there are no WorkflowRuns, we assume there's only one checkRun with the given name.
-	// If there are WorkflowRuns, we assume there can be multiple checkRuns with the given name,
-	// so we retrieve the latest checkRun.
-	matchedCheckRuns := make([]CheckRun, 0)
+	// If there's no WorkflowRun, we assume there's only one CheckRun with the given name.
+	// In this case, we evaluate and return the status of this CheckRun.
+	// If there is WorkflowRun, we assume there can be multiple checkRuns with the given name,
+	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckRun.
+	latestCheckRunNumber := 0
+	var latestCheckRun *CheckRun
 	for _, checkRun := range checkRuns {
+		if checkRun.Name != expectedContext {
+			continue
+		}
 		if checkRun.CheckSuite.WorkflowRun == nil {
 			return CheckRunPassed(checkRun)
-		} else if checkRun.Name == expectedContext {
-			matchedCheckRuns = append(matchedCheckRuns, checkRun)
+		}
+		if int(checkRun.CheckSuite.WorkflowRun.RunNumber) > latestCheckRunNumber {
+			latestCheckRunNumber = int(checkRun.CheckSuite.WorkflowRun.RunNumber)
+			latestCheckRun = &checkRun
 		}
 	}
-	latestCheckRun, err := GetLatestCheckRun(matchedCheckRuns)
-	if err == nil {
-		return CheckRunPassed(latestCheckRun)
+
+	if latestCheckRun != nil {
+		return CheckRunPassed(*latestCheckRun)
 	}
 
 	for _, statusContext := range statusContexts {
@@ -763,24 +752,29 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 }
 
 func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
-	matchedCheckRuns := make([]CheckRun, 0)
+	// If there is no WorkflowRuns, we just skip evaluation for given CheckRun.
+	// If there is WorkflowRun, we assume there can be multiple checkRuns with the given name,
+	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckRun.
+	latestCheckRunNumber := 0
+	var latestCheckRun *CheckRun
 	for _, checkRun := range checkRuns {
 		if checkRun.CheckSuite.WorkflowRun == nil {
 			continue
-		} else {
-			match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun, expectedWorkflow)
-			if err != nil {
-				return false, err
-			}
-			if match {
-				matchedCheckRuns = append(matchedCheckRuns, checkRun)
+		}
+		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun, expectedWorkflow)
+		if err != nil {
+			return false, err
+		}
+		if match {
+			if int(checkRun.CheckSuite.WorkflowRun.RunNumber) > latestCheckRunNumber {
+				latestCheckRunNumber = int(checkRun.CheckSuite.WorkflowRun.RunNumber)
+				latestCheckRun = &checkRun
 			}
 		}
 	}
 
-	latestCheckRun, err := GetLatestCheckRun(matchedCheckRuns)
-	if err == nil {
-		return CheckRunPassed(latestCheckRun), nil
+	if latestCheckRun != nil {
+		return CheckRunPassed(*latestCheckRun), nil
 	}
 
 	return false, nil
