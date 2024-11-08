@@ -27,7 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v65/github"
 	. "github.com/petergtz/pegomock/v4"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -1149,7 +1149,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 		},
 	})
 
-	When(ch.VCSClient.PullIsMergeable(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq("atlantis-test"))).ThenReturn(true, nil)
+	When(ch.VCSClient.PullIsMergeable(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq("atlantis-test"), Eq([]string{}))).ThenReturn(true, nil)
 
 	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
 		return ReturnValues{
