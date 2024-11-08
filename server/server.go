@@ -230,8 +230,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
 			githubCredentials = &vcs.GithubUserCredentials{
-				User:  userConfig.GithubUser,
-				Token: userConfig.GithubToken,
+				User:      userConfig.GithubUser,
+				Token:     userConfig.GithubToken,
+				TokenFile: userConfig.GithubTokenFile,
 			}
 		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKeyFile != "" {
 			privateKey, err := os.ReadFile(userConfig.GithubAppKeyFile)
@@ -514,8 +515,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			GithubHostname: userConfig.GithubHostname,
 		}
 
-		githubAppTokenRotator := vcs.NewGithubAppTokenRotator(logger, githubCredentials, userConfig.GithubHostname, home)
+		githubAppTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, "x-access-token", home)
 		tokenJd, err := githubAppTokenRotator.GenerateJob()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not write credentials")
+		}
+		scheduledExecutorService.AddJob(tokenJd)
+	}
+
+	if userConfig.GithubUser != "" && userConfig.GithubTokenFile != "" && userConfig.WriteGitCreds {
+		githubTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, userConfig.GithubUser, home)
+		tokenJd, err := githubTokenRotator.GenerateJob()
 		if err != nil {
 			return nil, errors.Wrap(err, "could not write credentials")
 		}
@@ -550,6 +560,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
+		GithubTokenFile:    userConfig.GithubTokenFile,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
 		GiteaUser:          userConfig.GiteaUser,
@@ -722,7 +733,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.QuietPolicyChecks,
 	)
 
-	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName)
+	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName, strings.Split(userConfig.IgnoreVCSStatusNames, ","))
 	planCommandRunner := events.NewPlanCommandRunner(
 		userConfig.SilenceVCSStatusNoPlans,
 		userConfig.SilenceVCSStatusNoProjects,

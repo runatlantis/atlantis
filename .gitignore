@@ -1,7 +1,6 @@
 .idea
 ./atlantis
 *.iml
-.vscode
 atlantis.db
 output
 .DS_Store

@@ -13,7 +13,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func Test_githubAppTokenRotator_GenerateJob(t *testing.T) {
+func Test_githubTokenRotator_GenerateJob(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	defer disableSSLVerification()()
 	testServer, err := testdata.GithubAppTestServer(t)
@@ -68,10 +68,10 @@ func Test_githubAppTokenRotator_GenerateJob(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			t.Setenv("HOME", tmpDir)
-			r := vcs.NewGithubAppTokenRotator(logging.NewNoopLogger(t), tt.fields.githubCredentials, testServer, tmpDir)
+			r := vcs.NewGithubTokenRotator(logging.NewNoopLogger(t), tt.fields.githubCredentials, testServer, "x-access-token", tmpDir)
 			got, err := r.GenerateJob()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("githubAppTokenRotator.GenerateJob() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("githubTokenRotator.GenerateJob() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if tt.credsFileWritten {

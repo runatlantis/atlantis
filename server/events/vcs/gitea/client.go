@@ -283,7 +283,7 @@ func (c *GiteaClient) PullIsApproved(logger logging.SimpleLogging, repo models.R
 }
 
 // PullIsMergeable returns true if the pull request is mergeable
-func (c *GiteaClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (c *GiteaClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) {
 	logger.Debug("Checking if Gitea pull request %d is mergeable", pull.Num)
 
 	pullRequest, _, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pull.Num))

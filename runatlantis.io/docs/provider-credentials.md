@@ -58,6 +58,7 @@ provider "aws" {
 ```
 
 Atlantis runs `terraform` with the following variables:
+
 | `-var` Argument                      | Description                                                                                                                            |
 |--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | `atlantis_user=lkysow`               | The VCS username of who is running the plan command.                                                                                   |

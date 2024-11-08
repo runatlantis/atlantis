@@ -47,7 +47,7 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 				if err := fileLineReplace(config, gitUser, gitHostname, credsFile); err != nil {
 					return errors.Wrap(err, "replacing git credentials line for github app")
 				}
-				logger.Info("updated git app credentials in %s", credsFile)
+				logger.Info("updated git credentials in %s", credsFile)
 			} else {
 				if err := fileAppend(config, credsFile); err != nil {
 					return err

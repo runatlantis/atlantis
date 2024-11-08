@@ -9,6 +9,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 const (
@@ -27,45 +28,58 @@ const (
 	MultiEnvStepName    = "multienv"
 	ImportStepName      = "import"
 	StateRmStepName     = "state_rm"
+	ShellArgKey         = "shell"
+	ShellArgsArgKey     = "shellArgs"
 )
 
-// Step represents a single action/command to perform. In YAML, it can be set as
-// 1. A single string for a built-in command:
-//   - init
-//   - plan
-//   - policy_check
-//
-// 2. A map for an env step with name and command or value, or a run step with a command and output config
-//   - env:
-//     name: test
-//     command: echo 312
-//     value: value
-//   - multienv:
-//     command: envs.sh
-//     outpiut: hide
-//   - run:
-//     command: my custom command
-//     output: hide
-//
-// 3. A map for a built-in command and extra_args:
-//   - plan:
-//     extra_args: [-var-file=staging.tfvars]
-//
-// 4. A map for a custom run command:
-//   - run: my custom command
-//
-// Here we parse step in the most generic fashion possible. See fields for more
-// details.
+/*
+Step represents a single action/command to perform. In YAML, it can be set as
+1. A single string for a built-in command:
+  - init
+  - plan
+  - policy_check
+
+2. A map for an env step with name and command or value, or a run step with a command and output config
+  - env:
+    name: test_command
+    command: echo 312
+  - env:
+    name: test_value
+    value: value
+  - env:
+    name: test_bash_command
+    command: echo ${test_value::7}
+    shell: bash
+    shellArgs: ["--verbose", "-c"]
+  - multienv:
+    command: envs.sh
+    output: hide
+    shell: sh
+    shellArgs: -c
+  - run:
+    command: my custom command
+    output: hide
+
+3. A map for a built-in command and extra_args:
+  - plan:
+    extra_args: [-var-file=staging.tfvars]
+
+4. A map for a custom run command:
+  - run: my custom command
+
+Here we parse step in the most generic fashion possible. See fields for more
+details.
+*/
 type Step struct {
 	// Key will be set in case #1 and #3 above to the key. In case #2, there
 	// could be multiple keys (since the element is a map) so we don't set Key.
 	Key *string
-	// CommandMap will be set in case #2 above.
-	CommandMap map[string]map[string]string
-	// Map will be set in case #3 above.
-	Map map[string]map[string][]string
 	// StringVal will be set in case #4 above.
 	StringVal map[string]string
+	// Map will be set in case #3 above.
+	Map map[string]map[string][]string
+	// CommandMap will be set in case #2 above.
+	CommandMap map[string]map[string]interface{}
 }
 
 func (s *Step) UnmarshalYAML(unmarshal func(interface{}) error) error {
@@ -142,7 +156,8 @@ func (s Step) Validate() error {
 			}
 			for k := range args {
 				if k != ExtraArgsKey {
-					return fmt.Errorf("built-in steps only support a single %s key, found %q in step %s", ExtraArgsKey, k, stepName)
+					return fmt.Errorf("built-in steps only support a single %s key, found %q in step %s",
+						ExtraArgsKey, k, stepName)
 				}
 			}
 		}
@@ -150,7 +165,7 @@ func (s Step) Validate() error {
 	}
 
 	envOrRunOrMultiEnvStep := func(value interface{}) error {
-		elem := value.(map[string]map[string]string)
+		elem := value.(map[string]map[string]interface{})
 		var keys []string
 		for k := range elem {
 			keys = append(keys, k)
@@ -169,61 +184,98 @@ func (s Step) Validate() error {
 		stepName := keys[0]
 		args := elem[keys[0]]
 
+		var argKeys []string
+		for k := range args {
+			argKeys = append(argKeys, k)
+		}
+		argMap := make(map[string]interface{})
+		for k, v := range args {
+			argMap[k] = v
+		}
+		// Sort so tests can be deterministic.
+		sort.Strings(argKeys)
+
+		// Validate keys common for all the steps.
+		if utils.SlicesContains(argKeys, ShellArgKey) && !utils.SlicesContains(argKeys, CommandArgKey) {
+			return fmt.Errorf("workflow steps only support %q key in combination with %q key",
+				ShellArgKey, CommandArgKey)
+		}
+		if utils.SlicesContains(argKeys, ShellArgsArgKey) && !utils.SlicesContains(argKeys, ShellArgKey) {
+			return fmt.Errorf("workflow steps only support %q key in combination with %q key",
+				ShellArgsArgKey, ShellArgKey)
+		}
+
+		switch t := argMap[ShellArgsArgKey].(type) {
+		case nil:
+		case string:
+		case []interface{}:
+			for _, e := range t {
+				if _, ok := e.(string); !ok {
+					return fmt.Errorf("%q step %q option must contain only strings, found %v\n",
+						stepName, ShellArgsArgKey, e)
+				}
+			}
+		default:
+			return fmt.Errorf("%q step %q option must be a string or a list of strings, found %v\n",
+				stepName, ShellArgsArgKey, t)
+		}
+		delete(argMap, ShellArgsArgKey)
+		delete(argMap, ShellArgKey)
+
+		// Validate keys per step type.
 		switch stepName {
 		case EnvStepName:
-			var argKeys []string
-			for k := range args {
-				argKeys = append(argKeys, k)
-			}
-			// Sort so tests can be deterministic.
-			sort.Strings(argKeys)
-
 			foundNameKey := false
 			for _, k := range argKeys {
-				if k != NameArgKey && k != CommandArgKey && k != ValueArgKey {
-					return fmt.Errorf("env steps only support keys %q, %q and %q, found key %q", NameArgKey, ValueArgKey, CommandArgKey, k)
+				if k != NameArgKey && k != CommandArgKey && k != ValueArgKey && k != ShellArgKey && k != ShellArgsArgKey {
+					return fmt.Errorf("env steps only support keys %q, %q, %q, %q and %q, found key %q",
+						NameArgKey, ValueArgKey, CommandArgKey, ShellArgKey, ShellArgsArgKey, k)
 				}
 				if k == NameArgKey {
 					foundNameKey = true
 				}
 			}
+			delete(argMap, CommandArgKey)
 			if !foundNameKey {
 				return fmt.Errorf("env steps must have a %q key set", NameArgKey)
 			}
-			// If we have 3 keys at this point then they've set both command and value.
-			if len(argKeys) != 2 {
+			delete(argMap, NameArgKey)
+			if utils.SlicesContains(argKeys, ValueArgKey) && utils.SlicesContains(argKeys, CommandArgKey) {
 				return fmt.Errorf("env steps only support one of the %q or %q keys, found both",
 					ValueArgKey, CommandArgKey)
 			}
+			delete(argMap, ValueArgKey)
 		case RunStepName, MultiEnvStepName:
-			argsCopy := make(map[string]string)
-			for k, v := range args {
-				argsCopy[k] = v
-			}
-			args = argsCopy
-			if _, ok := args[CommandArgKey]; !ok {
+			if _, ok := argMap[CommandArgKey].(string); !ok {
 				return fmt.Errorf("%q step must have a %q key set", stepName, CommandArgKey)
 			}
-			delete(args, CommandArgKey)
-			if v, ok := args[OutputArgKey]; ok {
-				if stepName == RunStepName && !(v == valid.PostProcessRunOutputShow || v == valid.PostProcessRunOutputHide || v == valid.PostProcessRunOutputStripRefreshing) {
-					return fmt.Errorf("run step %q option must be one of %q, %q, or %q", OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide, valid.PostProcessRunOutputStripRefreshing)
-				} else if stepName == MultiEnvStepName && !(v == valid.PostProcessRunOutputShow || v == valid.PostProcessRunOutputHide) {
-					return fmt.Errorf("multienv step %q option must be %q or %q", OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide)
+			delete(argMap, CommandArgKey)
+			if v, ok := argMap[OutputArgKey].(string); ok {
+				if stepName == RunStepName && !(v == valid.PostProcessRunOutputShow ||
+					v == valid.PostProcessRunOutputHide || v == valid.PostProcessRunOutputStripRefreshing) {
+					return fmt.Errorf("run step %q option must be one of %q, %q, or %q",
+						OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide,
+						valid.PostProcessRunOutputStripRefreshing)
+				} else if stepName == MultiEnvStepName && !(v == valid.PostProcessRunOutputShow ||
+					v == valid.PostProcessRunOutputHide) {
+					return fmt.Errorf("multienv step %q option must be %q or %q",
+						OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide)
 				}
 			}
-			delete(args, OutputArgKey)
-			if len(args) > 0 {
-				var argKeys []string
-				for k := range args {
-					argKeys = append(argKeys, k)
-				}
-				// Sort so tests can be deterministic.
-				sort.Strings(argKeys)
-				return fmt.Errorf("%q steps only support keys %q and %q, found extra keys %q", stepName, CommandArgKey, OutputArgKey, strings.Join(argKeys, ","))
-			}
+			delete(argMap, OutputArgKey)
 		default:
 			return fmt.Errorf("%q is not a valid step type", stepName)
+		}
+
+		if len(argMap) > 0 {
+			var argKeys []string
+			for k := range argMap {
+				argKeys = append(argKeys, k)
+			}
+			// Sort so tests can be deterministic.
+			sort.Strings(argKeys)
+			return fmt.Errorf("%q steps only support keys %q, %q, %q and %q, found extra keys %q",
+				stepName, CommandArgKey, OutputArgKey, ShellArgKey, ShellArgsArgKey, strings.Join(argKeys, ","))
 		}
 
 		return nil
@@ -278,16 +330,40 @@ func (s Step) ToValid() valid.Step {
 		// After validation we assume there's only one key and it's a valid
 		// step name so we just use the first one.
 		for stepName, stepArgs := range s.CommandMap {
-			step := valid.Step{
-				StepName:    stepName,
-				EnvVarName:  stepArgs[NameArgKey],
-				RunCommand:  stepArgs[CommandArgKey],
-				EnvVarValue: stepArgs[ValueArgKey],
-				Output:      valid.PostProcessRunOutputOption(stepArgs[OutputArgKey]),
+			step := valid.Step{StepName: stepName}
+			if name, ok := stepArgs[NameArgKey].(string); ok {
+				step.EnvVarName = name
+			}
+			if command, ok := stepArgs[CommandArgKey].(string); ok {
+				step.RunCommand = command
+			}
+			if value, ok := stepArgs[ValueArgKey].(string); ok {
+				step.EnvVarValue = value
+			}
+			if output, ok := stepArgs[OutputArgKey].(string); ok {
+				step.Output = valid.PostProcessRunOutputOption(output)
+			}
+			if shell, ok := stepArgs[ShellArgKey].(string); ok {
+				step.RunShell = &valid.CommandShell{
+					Shell:     shell,
+					ShellArgs: []string{"-c"},
+				}
 			}
 			if step.StepName == RunStepName && step.Output == "" {
 				step.Output = valid.PostProcessRunOutputShow
 			}
+
+			switch t := stepArgs[ShellArgsArgKey].(type) {
+			case nil:
+			case string:
+				step.RunShell.ShellArgs = strings.Split(t, " ")
+			case []interface{}:
+				step.RunShell.ShellArgs = []string{}
+				for _, e := range t {
+					step.RunShell.ShellArgs = append(step.RunShell.ShellArgs, e.(string))
+				}
+			}
+
 			return step
 		}
 	}
@@ -341,6 +417,17 @@ func (s *Step) unmarshalGeneric(unmarshal func(interface{}) error) error {
 		return nil
 	}
 
+	// Try to unmarshal as a custom run step, ex.
+	// steps:
+	//   - run: my command
+	// We validate if the key is run later.
+	var runStep map[string]string
+	err = unmarshal(&runStep)
+	if err == nil {
+		s.StringVal = runStep
+		return nil
+	}
+
 	// This represents a step with extra_args, ex:
 	//   init:
 	//     extra_args: [a, b]
@@ -353,26 +440,20 @@ func (s *Step) unmarshalGeneric(unmarshal func(interface{}) error) error {
 		return nil
 	}
 
-	// This represents an env step, ex:
-	//   env:
-	//     name: k
-	//     value: hi //optional
-	//     command: exec
-	var envStep map[string]map[string]string
-	err = unmarshal(&envStep)
-	if err == nil {
-		s.CommandMap = envStep
-		return nil
-	}
-
-	// Try to unmarshal as a custom run step, ex.
+	// This represents a command steps env, run, and multienv, ex:
 	// steps:
-	// - run: my command
-	// We validate if the key is run later.
-	var runStep map[string]string
-	err = unmarshal(&runStep)
+	//   - env:
+	//       name: k
+	//       command: exec
+	//   - run:
+	//       name: test_bash_command
+	//       command: echo ${test_value::7}
+	//       shell: bash
+	//       shellArgs: ["--verbose", "-c"]
+	var commandStep map[string]map[string]interface{}
+	err = unmarshal(&commandStep)
 	if err == nil {
-		s.StringVal = runStep
+		s.CommandMap = commandStep
 		return nil
 	}
 

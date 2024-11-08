@@ -16,8 +16,15 @@ type MultiEnvStepRunner struct {
 
 // Run runs the multienv step command.
 // The command must return a json string containing the array of name-value pairs that are being added as extra environment variables
-func (r *MultiEnvStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
-	res, err := r.RunStepRunner.Run(ctx, command, path, envs, false, postProcessOutput)
+func (r *MultiEnvStepRunner) Run(
+	ctx command.ProjectContext,
+	shell *valid.CommandShell,
+	command string,
+	path string,
+	envs map[string]string,
+	postProcessOutput valid.PostProcessRunOutputOption,
+) (string, error) {
+	res, err := r.RunStepRunner.Run(ctx, shell, command, path, envs, false, postProcessOutput)
 	if err != nil {
 		return "", err
 	}

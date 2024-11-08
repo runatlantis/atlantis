@@ -1,4 +1,10 @@
-#!/usr/bin/dumb-init /bin/sh
+#!/usr/bin/env -S dumb-init --single-child /bin/sh
+
+# dumb-init is run in single child mode. By default dumb-init will forward
+# interrupts to all child processes, causing Terraform to cancel and Terraform
+# providers to exit uncleanly. We forward the signal to Atlantis only, allowing
+# it to trap the interrupt, and exit gracefully.
+
 set -e
 
 # Modified: https://github.com/hashicorp/docker-consul/blob/2c2873f9d619220d1eef0bc46ec78443f55a10b5/0.X/docker-entrypoint.sh

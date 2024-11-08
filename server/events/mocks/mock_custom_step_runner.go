@@ -26,7 +26,7 @@ func NewMockCustomStepRunner(options ...pegomock.Option) *MockCustomStepRunner {
 func (mock *MockCustomStepRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockCustomStepRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockCustomStepRunner) Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
+func (mock *MockCustomStepRunner) Run(ctx command.ProjectContext, shell *valid.CommandShell, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCustomStepRunner().")
 	}
@@ -82,7 +82,7 @@ type VerifierMockCustomStepRunner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockCustomStepRunner) Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) *MockCustomStepRunner_Run_OngoingVerification {
+func (verifier *VerifierMockCustomStepRunner) Run(ctx command.ProjectContext, shell *valid.CommandShell, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) *MockCustomStepRunner_Run_OngoingVerification {
 	params := []pegomock.Param{ctx, cmd, path, envs, streamOutput, postProcessOutput}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
 	return &MockCustomStepRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}

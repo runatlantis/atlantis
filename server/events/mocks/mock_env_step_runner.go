@@ -4,10 +4,12 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock/v4"
-	command "github.com/runatlantis/atlantis/server/events/command"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
+	command "github.com/runatlantis/atlantis/server/events/command"
 )
 
 type MockEnvStepRunner struct {
@@ -25,7 +27,7 @@ func NewMockEnvStepRunner(options ...pegomock.Option) *MockEnvStepRunner {
 func (mock *MockEnvStepRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockEnvStepRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockEnvStepRunner) Run(ctx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error) {
+func (mock *MockEnvStepRunner) Run(ctx command.ProjectContext, shell *valid.CommandShell, cmd string, value string, path string, envs map[string]string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockEnvStepRunner().")
 	}
@@ -81,7 +83,7 @@ type VerifierMockEnvStepRunner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockEnvStepRunner) Run(ctx command.ProjectContext, cmd string, value string, path string, envs map[string]string) *MockEnvStepRunner_Run_OngoingVerification {
+func (verifier *VerifierMockEnvStepRunner) Run(ctx command.ProjectContext, shell *valid.CommandShell, cmd string, value string, path string, envs map[string]string) *MockEnvStepRunner_Run_OngoingVerification {
 	params := []pegomock.Param{ctx, cmd, value, path, envs}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
 	return &MockEnvStepRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
