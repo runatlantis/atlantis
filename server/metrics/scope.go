@@ -28,6 +28,7 @@ func NewScope(cfg valid.Metrics, logger logging.SimpleLogging, statsNamespace st
 
 	scopeOpts := tally.ScopeOptions{
 		Prefix: statsNamespace,
+		SanitizeOptions: &tallyprom.DefaultSanitizerOpts,
 	}
 
 	if r, ok := reporter.(tally.StatsReporter); ok {
