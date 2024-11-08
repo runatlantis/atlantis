@@ -27,7 +27,7 @@ func NewScope(cfg valid.Metrics, logger logging.SimpleLogging, statsNamespace st
 	}
 
 	scopeOpts := tally.ScopeOptions{
-		Prefix: statsNamespace,
+		Prefix:          statsNamespace,
 		SanitizeOptions: &tallyprom.DefaultSanitizerOpts,
 	}
 
