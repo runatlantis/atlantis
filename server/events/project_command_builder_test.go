@@ -1696,6 +1696,7 @@ projects:
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 	cases := []struct {
 		AtlantisYAML   string
+		IsFork         bool
 		ExpectedCtxs   int
 		ExpectedClones InvocationCountMatcher
 		ModifiedFiles  []string
@@ -1705,6 +1706,16 @@ func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 version: 3
 projects:
 - dir: dir1`,
+			ExpectedCtxs:   0,
+			ExpectedClones: Never(),
+			ModifiedFiles:  []string{"dir2/main.tf"},
+		},
+		{
+			AtlantisYAML: `
+version: 3
+projects:
+- dir: dir1`,
+			IsFork:         true,
 			ExpectedCtxs:   0,
 			ExpectedClones: Never(),
 			ModifiedFiles:  []string{"dir2/main.tf"},
@@ -1778,20 +1789,32 @@ projects:
 
 		var actCtxs []command.ProjectContext
 		var err error
+
+		headRepo := models.Repo{Owner: "owner"}
+		baseRepo := headRepo
+		if c.IsFork {
+			baseRepo.Owner = "forkedOwner"
+		}
+
 		actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
-			HeadRepo: models.Repo{},
-			Pull:     models.PullRequest{},
-			User:     models.User{},
-			Log:      logger,
-			Scope:    scope,
+			HeadRepo: headRepo,
+			Pull: models.PullRequest{
+				BaseRepo: baseRepo,
+			},
+			User:  models.User{},
+			Log:   logger,
+			Scope: scope,
 			PullRequestStatus: models.PullReqStatus{
 				Mergeable: true,
 			},
 		})
+
 		Ok(t, err)
 		Equals(t, c.ExpectedCtxs, len(actCtxs))
 		workingDir.VerifyWasCalled(c.ExpectedClones).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
 			Any[models.PullRequest](), Any[string]())
+		_, actRepo, _, _ := vcsClient.VerifyWasCalled(Once()).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]()).GetCapturedArguments()
+		Equals(t, headRepo, actRepo)
 	}
 }
 
