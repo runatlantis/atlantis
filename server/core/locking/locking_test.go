@@ -28,7 +28,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var project = models.NewProject("owner/repo", "path")
+var project = models.NewProject("owner/repo", "path", "")
 var workspace = "workspace"
 var pull = models.PullRequest{}
 var user = models.User{}
@@ -196,7 +196,7 @@ func TestApplyLocker(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
 			When(backend.LockCommand(Any[command.Name](), Any[time.Time]())).ThenReturn(nil, errExpected)
-			l := locking.NewApplyClient(backend, false)
+			l := locking.NewApplyClient(backend, false, false)
 			lock, err := l.LockApply()
 			Equals(t, errExpected, err)
 			Assert(t, !lock.Locked, "exp false")
@@ -205,7 +205,7 @@ func TestApplyLocker(t *testing.T) {
 		t.Run("can't lock if apply is omitted from userConfig.AllowCommands", func(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
-			l := locking.NewApplyClient(backend, true)
+			l := locking.NewApplyClient(backend, true, false)
 			_, err := l.LockApply()
 			ErrEquals(t, "apply is omitted from AllowCommands; Apply commands are locked globally until flag is updated", err)
 
@@ -216,7 +216,7 @@ func TestApplyLocker(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
 			When(backend.LockCommand(Any[command.Name](), Any[time.Time]())).ThenReturn(applyLock, nil)
-			l := locking.NewApplyClient(backend, false)
+			l := locking.NewApplyClient(backend, false, false)
 			lock, _ := l.LockApply()
 			Assert(t, lock.Locked, "exp lock present")
 		})
@@ -227,7 +227,7 @@ func TestApplyLocker(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
 			When(backend.UnlockCommand(Any[command.Name]())).ThenReturn(errExpected)
-			l := locking.NewApplyClient(backend, false)
+			l := locking.NewApplyClient(backend, false, false)
 			err := l.UnlockApply()
 			Equals(t, errExpected, err)
 		})
@@ -235,7 +235,7 @@ func TestApplyLocker(t *testing.T) {
 		t.Run("can't lock if apply is omitted from userConfig.AllowCommands", func(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
-			l := locking.NewApplyClient(backend, true)
+			l := locking.NewApplyClient(backend, true, false)
 			err := l.UnlockApply()
 			ErrEquals(t, "apply commands are disabled until AllowCommands flag is updated", err)
 
@@ -246,7 +246,7 @@ func TestApplyLocker(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
 			When(backend.UnlockCommand(Any[command.Name]())).ThenReturn(nil)
-			l := locking.NewApplyClient(backend, false)
+			l := locking.NewApplyClient(backend, false, false)
 			err := l.UnlockApply()
 			Equals(t, nil, err)
 		})
@@ -258,7 +258,7 @@ func TestApplyLocker(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
 			When(backend.CheckCommandLock(Any[command.Name]())).ThenReturn(nil, errExpected)
-			l := locking.NewApplyClient(backend, false)
+			l := locking.NewApplyClient(backend, false, false)
 			lock, err := l.CheckApplyLock()
 			Equals(t, errExpected, err)
 			Equals(t, lock.Locked, false)
@@ -267,7 +267,7 @@ func TestApplyLocker(t *testing.T) {
 		t.Run("when apply is not in AllowCommands always return a lock", func(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
-			l := locking.NewApplyClient(backend, true)
+			l := locking.NewApplyClient(backend, true, false)
 			lock, err := l.CheckApplyLock()
 			Ok(t, err)
 			Equals(t, lock.Locked, true)
@@ -278,7 +278,7 @@ func TestApplyLocker(t *testing.T) {
 			backend := mocks.NewMockBackend()
 
 			When(backend.CheckCommandLock(Any[command.Name]())).ThenReturn(applyLock, nil)
-			l := locking.NewApplyClient(backend, false)
+			l := locking.NewApplyClient(backend, false, false)
 			lock, err := l.CheckApplyLock()
 			Equals(t, nil, err)
 			Assert(t, lock.Locked, "exp lock present")

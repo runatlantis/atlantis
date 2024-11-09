@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_pending_plan_finder.go PendingPlanFinder
@@ -58,8 +59,8 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 		lsCmd.Dir = repoDir
 		lsOut, err := lsCmd.CombinedOutput()
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "running git ls-files . "+
-				"--others: %s", string(lsOut))
+			return nil, nil, errors.Wrapf(err, "running 'git ls-files . --others' in '%s' directory: %s",
+				repoDir, string(lsOut))
 		}
 		for _, file := range strings.Split(string(lsOut), "\n") {
 			if filepath.Ext(file) == ".tfplan" {
@@ -92,7 +93,7 @@ func (p *DefaultPendingPlanFinder) DeletePlans(pullDir string) error {
 		return err
 	}
 	for _, path := range absPaths {
-		if err := os.Remove(path); err != nil {
+		if err := utils.RemoveIgnoreNonExistent(path); err != nil {
 			return errors.Wrapf(err, "delete plan at %s", path)
 		}
 	}

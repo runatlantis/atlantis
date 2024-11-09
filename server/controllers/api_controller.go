@@ -20,16 +20,19 @@ import (
 const atlantisTokenHeader = "X-Atlantis-Token"
 
 type APIController struct {
-	APISecret                 []byte
-	Locker                    locking.Locker
-	Logger                    logging.SimpleLogging
-	Parser                    events.EventParsing
-	ProjectCommandBuilder     events.ProjectCommandBuilder
-	ProjectPlanCommandRunner  events.ProjectPlanCommandRunner
-	ProjectApplyCommandRunner events.ProjectApplyCommandRunner
-	RepoAllowlistChecker      *events.RepoAllowlistChecker
-	Scope                     tally.Scope
-	VCSClient                 vcs.Client
+	APISecret                      []byte
+	Locker                         locking.Locker
+	Logger                         logging.SimpleLogging
+	Parser                         events.EventParsing
+	ProjectCommandBuilder          events.ProjectCommandBuilder
+	ProjectPlanCommandRunner       events.ProjectPlanCommandRunner
+	ProjectApplyCommandRunner      events.ProjectApplyCommandRunner
+	FailOnPreWorkflowHookError     bool
+	PreWorkflowHooksCommandRunner  events.PreWorkflowHooksCommandRunner
+	PostWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
+	RepoAllowlistChecker           *events.RepoAllowlistChecker
+	Scope                          tally.Scope
+	VCSClient                      vcs.Client
 }
 
 type APIRequest struct {
@@ -46,7 +49,7 @@ type APIRequest struct {
 	}
 }
 
-func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, error) {
+func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
 	cc := make([]*events.CommentCommand, 0)
 
 	for _, project := range a.Projects {
@@ -65,19 +68,19 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.
 	for _, commentCommand := range cc {
 		projectCmds, err := cmdBuilder(ctx, commentCommand)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build command: %v", err)
+			return nil, nil, fmt.Errorf("failed to build command: %v", err)
 		}
 		cmds = append(cmds, projectCmds...)
 	}
 
-	return cmds, nil
+	return cmds, cc, nil
 }
 
 func (a *APIController) apiReportError(w http.ResponseWriter, code int, err error) {
 	response, _ := json.Marshal(map[string]string{
 		"error": err.Error(),
 	})
-	a.respond(w, logging.Warn, code, string(response))
+	a.respond(w, logging.Warn, code, "%s", string(response))
 }
 
 func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +108,7 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	a.respond(w, logging.Debug, code, string(response))
+	a.respond(w, logging.Warn, code, "%s", string(response))
 }
 
 func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
@@ -140,19 +143,32 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	a.respond(w, logging.Debug, code, string(response))
+	a.respond(w, logging.Warn, code, "%s", string(response))
 }
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
-	cmds, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildPlanCommands)
+	cmds, cc, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildPlanCommands)
 	if err != nil {
 		return nil, err
 	}
 
 	var projectResults []command.ProjectResult
-	for _, cmd := range cmds {
+	for i, cmd := range cmds {
+		err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
+		if err != nil {
+			ctx.Log.Err("Error running pre-workflow hooks %s.", err)
+			if a.FailOnPreWorkflowHookError {
+				return nil, err
+			}
+		}
+
 		res := a.ProjectPlanCommandRunner.Plan(cmd)
 		projectResults = append(projectResults, res)
+
+		err = a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i])
+		if err != nil {
+			ctx.Log.Err("Error running post-workflow hooks %s.", err)
+		}
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
 }
@@ -165,15 +181,28 @@ func GetOrElse(val, def string) string {
 }
 
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
-	cmds, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildApplyCommands)
+	cmds, cc, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildApplyCommands)
 	if err != nil {
 		return nil, err
 	}
 
 	var projectResults []command.ProjectResult
-	for _, cmd := range cmds {
+	for i, cmd := range cmds {
+		err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
+		if err != nil {
+			ctx.Log.Err("Error running pre-workflow hooks %s.", err)
+			if a.FailOnPreWorkflowHookError {
+				return nil, err
+			}
+		}
+
 		res := a.ProjectApplyCommandRunner.Apply(cmd)
 		projectResults = append(projectResults, res)
+
+		err = a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i])
+		if err != nil {
+			ctx.Log.Err("Error running post-workflow hooks %s.", err)
+		}
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
 }
@@ -206,7 +235,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	if err != nil {
 		return nil, nil, http.StatusBadRequest, err
 	}
-	cloneURL, err := a.VCSClient.GetCloneURL(VCSHostType, request.Repository)
+	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, request.Repository)
 	if err != nil {
 		return nil, nil, http.StatusInternalServerError, err
 	}
@@ -235,6 +264,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		},
 		Scope: a.Scope,
 		Log:   a.Logger,
+		API:   true,
 	}, http.StatusOK, nil
 }
 

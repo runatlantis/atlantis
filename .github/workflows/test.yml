@@ -3,8 +3,8 @@ name: tester
 on:
   push:
     branches:
-      - 'main'
-      - 'release-**'
+      - "main"
+      - "release-**"
   pull_request:
     types:
       - opened
@@ -12,45 +12,60 @@ on:
       - synchronize
       - ready_for_review
     branches:
-      - 'main'
-      - 'release-**'
+      - "main"
+      - "release-**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   changes:
+    permissions:
+      contents: read  # for dorny/paths-filter to fetch a list of changed files
+      pull-requests: read  # for dorny/paths-filter to read pull requests
     outputs:
       should-run-tests: ${{ steps.changes.outputs.go == 'true' }}
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
           filters: |
             go:
               - '**.go'
+              - '**.txt' # golden file test output
               - 'go.*'
+              - '**.tmpl'
               - '.github/workflows/test.yml'
   test:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
-    runs-on: ubuntu-22.04
-    container: ghcr.io/runatlantis/testing-env:latest
+    runs-on: ubuntu-24.04
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:b176e5b60579b194bad6c1a19724c9f13021684397d0effa6b3746f6f56cbd02
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      # need to setup go toolchain explicitly
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+        with:
+          go-version-file: go.mod
+
       - run: make test-all
       - run: make check-fmt
+
       ###########################################################
       # Notifying #contributors about test failure on main branch
       ###########################################################
       - name: Slack failure notification
         if: ${{ github.ref == 'refs/heads/main' && failure() }}
-        uses: slackapi/slack-github-action@e28cf165c92ffef168d23c5c9000cffc8a25e117 # v1.24.0
+        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
         with:
           payload: |
             {
@@ -89,6 +104,81 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'false'
     name: Tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - run: 'echo "No build required"'
+
+  e2e-github:
+    runs-on: ubuntu-latest
+    # dont run e2e tests on forked PRs
+    if: github.event.pull_request.head.repo.fork == false
+    env:
+      TERRAFORM_VERSION: 1.9.2
+      ATLANTIS_GH_USER: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
+      ATLANTIS_GH_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
+      NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+        with:
+          go-version-file: go.mod
+
+      # This version of TF will be downloaded before Atlantis is started.
+      # We do this instead of setting --default-tf-version because setting
+      # that flag starts the download asynchronously so we'd have a race
+      # condition.
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Setup ngrok
+        run: |
+          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/4no1PS1PoRF/ngrok-v3-3.13.0-linux-amd64.tar.gz
+          tar -xzf ngrok.tar.gz
+          chmod +x ngrok
+          ./ngrok version
+      - name: Setup gitconfig
+        run: |
+          git config --global user.email "maintainers@runatlantis.io"
+          git config --global user.name "atlantisbot"
+
+      - run: |
+          make build-service
+          ./scripts/e2e.sh
+  e2e-gitlab:
+    runs-on: ubuntu-latest
+    # dont run e2e tests on forked PRs
+    if: github.event.pull_request.head.repo.fork == false
+    env:
+      TERRAFORM_VERSION: 1.9.2
+      ATLANTIS_GITLAB_USER: ${{ secrets.ATLANTISBOT_GITLAB_USERNAME }}
+      ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
+      NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+        with:
+          go-version-file: go.mod
+
+      # This version of TF will be downloaded before Atlantis is started.
+      # We do this instead of setting --default-tf-version because setting
+      # that flag starts the download asynchronously so we'd have a race
+      # condition.
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Setup ngrok
+        run: |
+          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/4no1PS1PoRF/ngrok-v3-3.13.0-linux-amd64.tar.gz
+          tar -xzf ngrok.tar.gz
+          chmod +x ngrok
+          ./ngrok version
+      - name: Setup gitconfig
+        run: |
+          git config --global user.email "maintainers@runatlantis.io"
+          git config --global user.name "atlantisbot"
+
+      - run: |
+          make build-service
+          ./scripts/e2e.sh

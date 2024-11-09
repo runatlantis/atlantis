@@ -24,7 +24,7 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
@@ -77,6 +77,7 @@ var testFlags = map[string]interface{}{
 	DisableApplyAllFlag:              true,
 	DisableMarkdownFoldingFlag:       true,
 	DisableRepoLockingFlag:           true,
+	DisableGlobalApplyLockFlag:       false,
 	DiscardApprovalOnPlanFlag:        true,
 	EmojiReaction:                    "eyes",
 	ExecutableName:                   "atlantis",
@@ -85,13 +86,20 @@ var testFlags = map[string]interface{}{
 	GHHostnameFlag:                   "ghhostname",
 	GHTeamAllowlistFlag:              "",
 	GHTokenFlag:                      "token",
+	GHTokenFileFlag:                  "",
 	GHUserFlag:                       "user",
 	GHAppIDFlag:                      int64(0),
 	GHAppKeyFlag:                     "",
 	GHAppKeyFileFlag:                 "",
 	GHAppSlugFlag:                    "atlantis",
+	GHAppInstallationIDFlag:          int64(0),
 	GHOrganizationFlag:               "",
 	GHWebhookSecretFlag:              "secret",
+	GiteaBaseURLFlag:                 "http://localhost",
+	GiteaTokenFlag:                   "gitea-token",
+	GiteaUserFlag:                    "gitea-user",
+	GiteaWebhookSecretFlag:           "gitea-secret",
+	GiteaPageSizeFlag:                30,
 	GitlabHostnameFlag:               "gitlab-hostname",
 	GitlabTokenFlag:                  "gitlab-token",
 	GitlabUserFlag:                   "gitlab-user",
@@ -102,6 +110,7 @@ var testFlags = map[string]interface{}{
 	LockingDBType:                    "boltdb",
 	LogLevelFlag:                     "debug",
 	MarkdownTemplateOverridesDirFlag: "/path2",
+	MaxCommentsPerCommand:            10,
 	StatsNamespace:                   "atlantis",
 	AllowDraftPRs:                    true,
 	PortFlag:                         8181,
@@ -119,6 +128,7 @@ var testFlags = map[string]interface{}{
 	RepoConfigFlag:                   "",
 	RepoConfigJSONFlag:               "",
 	SilenceNoProjectsFlag:            false,
+	SilenceVCSStatusNoProjectsFlag:   false,
 	SilenceForkPRErrorsFlag:          true,
 	SilenceAllowlistErrorsFlag:       true,
 	SilenceVCSStatusNoPlans:          true,
@@ -127,6 +137,7 @@ var testFlags = map[string]interface{}{
 	SSLCertFileFlag:                  "cert-file",
 	SSLKeyFileFlag:                   "key-file",
 	RestrictFileList:                 false,
+	TFDistributionFlag:               "terraform",
 	TFDownloadFlag:                   true,
 	TFDownloadURLFlag:                "https://my-hostname.com",
 	TFEHostnameFlag:                  "my-hostname",
@@ -135,6 +146,7 @@ var testFlags = map[string]interface{}{
 	UseTFPluginCache:                 true,
 	VarFileAllowlistFlag:             "/path",
 	VCSStatusName:                    "my-status",
+	IgnoreVCSStatusNames:             "",
 	WebBasicAuthFlag:                 false,
 	WebPasswordFlag:                  "atlantis",
 	WebUsernameFlag:                  "atlantis",
@@ -154,6 +166,7 @@ func TestExecute_Defaults(t *testing.T) {
 	c := setup(map[string]interface{}{
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
+		GiteaBaseURLFlag:  "http://localhost",
 		RepoAllowlistFlag: "*",
 	}, t)
 	err := c.Execute()
@@ -172,6 +185,7 @@ func TestExecute_Defaults(t *testing.T) {
 	strExceptions := map[string]string{
 		GHUserFlag:                       "user",
 		GHTokenFlag:                      "token",
+		GiteaBaseURLFlag:                 "http://localhost",
 		DataDirFlag:                      dataDir,
 		MarkdownTemplateOverridesDirFlag: markdownTemplateOverridesDir,
 		AtlantisURLFlag:                  "http://" + hostname + ":4141",
@@ -209,6 +223,32 @@ func TestExecute_Flags(t *testing.T) {
 	for flag, exp := range testFlags {
 		Equals(t, exp, configVal(t, passedConfig, flag))
 	}
+}
+
+func TestUserConfigAllTested(t *testing.T) {
+	t.Log("All settings in userConfig should be tested.")
+
+	u := reflect.TypeOf(server.UserConfig{})
+
+	for i := 0; i < u.NumField(); i++ {
+
+		userConfigKey := u.Field(i).Tag.Get("mapstructure")
+		t.Run(userConfigKey, func(t *testing.T) {
+			// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
+			// Some fields are too complicated to have flags, so are only expressible in the config yaml
+			flagKey := u.Field(i).Tag.Get("flag")
+			if flagKey == "false" {
+				return
+			}
+			// If a setting is configured in server.UserConfig, it should be tested here. If there is no corresponding const
+			// for specifying the flag, that probably means one *also* needs to be added to server.go
+			if _, ok := testFlags[userConfigKey]; !ok {
+				t.Errorf("server.UserConfig has field with mapstructure %s that is not tested, and potentially also not configured as a flag. Either add it to testFlags (and potentially as a const in cmd/server), or remove it from server.UserConfig", userConfigKey)
+			}
+		})
+
+	}
+
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
@@ -394,7 +434,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gh-app-id/--gh-app-key-file or --gh-app-id/--gh-app-key or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
+	expErr := "--gh-user/--gh-token or --gh-user/--gh-token-file or --gh-app-id/--gh-app-key-file or --gh-app-id/--gh-app-key or --gitea-user/--gitea-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
 	cases := []struct {
 		description string
 		flags       map[string]interface{}
@@ -409,6 +449,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"just github token set",
 			map[string]interface{}{
 				GHTokenFlag: "token",
+			},
+			true,
+		},
+		{
+			"just gitea token set",
+			map[string]interface{}{
+				GiteaTokenFlag: "token",
 			},
 			true,
 		},
@@ -437,6 +484,13 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"just github user set",
 			map[string]interface{}{
 				GHUserFlag: "user",
+			},
+			true,
+		},
+		{
+			"just gitea user set",
+			map[string]interface{}{
+				GiteaUserFlag: "user",
 			},
 			true,
 		},
@@ -507,10 +561,51 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			true,
 		},
 		{
+			"github user and gitea token set",
+			map[string]interface{}{
+				GHUserFlag:     "user",
+				GiteaTokenFlag: "token",
+			},
+			true,
+		},
+		{
+			"gitea user and github token set",
+			map[string]interface{}{
+				GiteaUserFlag: "user",
+				GHTokenFlag:   "token",
+			},
+			true,
+		},
+		{
 			"github user and github token set and should be successful",
 			map[string]interface{}{
 				GHUserFlag:  "user",
 				GHTokenFlag: "token",
+			},
+			false,
+		},
+		{
+			"github user and github token file and should be successful",
+			map[string]interface{}{
+				GHUserFlag:      "user",
+				GHTokenFileFlag: "/path/to/token",
+			},
+			false,
+		},
+		{
+			"github user, github token, and github token file and should fail",
+			map[string]interface{}{
+				GHUserFlag:      "user",
+				GHTokenFlag:     "token",
+				GHTokenFileFlag: "/path/to/token",
+			},
+			true,
+		},
+		{
+			"gitea user and gitea token set and should be successful",
+			map[string]interface{}{
+				GiteaUserFlag:  "user",
+				GiteaTokenFlag: "token",
 			},
 			false,
 		},
@@ -559,6 +654,8 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			map[string]interface{}{
 				GHUserFlag:         "user",
 				GHTokenFlag:        "token",
+				GiteaUserFlag:      "user",
+				GiteaTokenFlag:     "token",
 				GitlabUserFlag:     "user",
 				GitlabTokenFlag:    "token",
 				BitbucketUserFlag:  "user",
@@ -669,6 +766,34 @@ func TestExecute_GithubApp(t *testing.T) {
 	Ok(t, err)
 
 	Equals(t, int64(1), passedConfig.GithubAppID)
+}
+
+func TestExecute_GithubAppWithInstallationID(t *testing.T) {
+	t.Log("Should pass the installation ID to the config.")
+	c := setup(map[string]interface{}{
+		GHAppKeyFlag:            testdata.GithubPrivateKey,
+		GHAppIDFlag:             "1",
+		GHAppInstallationIDFlag: "2",
+		RepoAllowlistFlag:       "*",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+
+	Equals(t, int64(1), passedConfig.GithubAppID)
+	Equals(t, int64(2), passedConfig.GithubAppInstallationID)
+}
+
+func TestExecute_GiteaUser(t *testing.T) {
+	t.Log("Should remove the @ from the gitea username if it's passed.")
+	c := setup(map[string]interface{}{
+		GiteaUserFlag:     "@user",
+		GiteaTokenFlag:    "token",
+		RepoAllowlistFlag: "*",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+
+	Equals(t, "user", passedConfig.GiteaUser)
 }
 
 func TestExecute_GitlabUser(t *testing.T) {
@@ -905,4 +1030,46 @@ func configVal(t *testing.T, u server.UserConfig, tag string) interface{} {
 	}
 	t.Fatalf("no field with tag %q found", tag)
 	return nil
+}
+
+// Gitea base URL must have a scheme.
+func TestExecute_GiteaBaseURLScheme(t *testing.T) {
+	c := setup(map[string]interface{}{
+		GiteaUserFlag:     "user",
+		GiteaTokenFlag:    "token",
+		RepoAllowlistFlag: "*",
+		GiteaBaseURLFlag:  "mydomain.com",
+	}, t)
+	ErrEquals(t, "--gitea-base-url must have http:// or https://, got \"mydomain.com\"", c.Execute())
+
+	c = setup(map[string]interface{}{
+		GiteaUserFlag:     "user",
+		GiteaTokenFlag:    "token",
+		RepoAllowlistFlag: "*",
+		GiteaBaseURLFlag:  "://mydomain.com",
+	}, t)
+	ErrEquals(t, "error parsing --gitea-webhook-secret flag value \"://mydomain.com\": parse \"://mydomain.com\": missing protocol scheme", c.Execute())
+}
+
+func TestExecute_GiteaWithWebhookSecret(t *testing.T) {
+	c := setup(map[string]interface{}{
+		GiteaUserFlag:          "user",
+		GiteaTokenFlag:         "token",
+		RepoAllowlistFlag:      "*",
+		GiteaWebhookSecretFlag: "my secret",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+}
+
+// Port should be retained on base url.
+func TestExecute_GiteaBaseURLPort(t *testing.T) {
+	c := setup(map[string]interface{}{
+		GiteaUserFlag:     "user",
+		GiteaTokenFlag:    "token",
+		RepoAllowlistFlag: "*",
+		GiteaBaseURLFlag:  "http://mydomain.com:7990",
+	}, t)
+	Ok(t, c.Execute())
+	Equals(t, "http://mydomain.com:7990", passedConfig.GiteaBaseURL)
 }
