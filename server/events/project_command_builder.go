@@ -351,7 +351,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		var hasRepoCfg bool
 		var repoCfgData []byte
 		var err error
-		ctx.Log.Debug("Getting file content for pull request %d", ctx.Pull)
+		ctx.Log.Debug("Getting file content for pull request %+v", ctx.Pull)
 		if ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
 			hasRepoCfg, repoCfgData, err = p.VCSClient.GetFileContent(ctx.Log, ctx.HeadRepo, ctx.Pull.HeadBranch, repoCfgFile)
 		} else {
