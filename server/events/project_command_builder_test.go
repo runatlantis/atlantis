@@ -1790,10 +1790,10 @@ projects:
 		var actCtxs []command.ProjectContext
 		var err error
 
-		headRepo := models.Repo{Owner: "owner"}
-		baseRepo := headRepo
+		baseRepo := models.Repo{Owner: "owner"}
+		headRepo := baseRepo
 		if c.IsFork {
-			baseRepo.Owner = "forkedOwner"
+			headRepo.Owner = "repoForker"
 		}
 
 		actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
