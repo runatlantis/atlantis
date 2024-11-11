@@ -344,7 +344,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
 
 	out, err := waitCh(outCh)
-	ErrEquals(t, fmt.Sprintf(`running 'sh -c echo dying && exit 1' in '%s': exit status 1`, tmp), err)
+	ErrEquals(t, fmt.Sprintf(`running 'sh -c' 'echo dying && exit 1' in '%s': exit status 1`, tmp), err)
 	// Test that we still get our output.
 	Equals(t, "dying", out)
 
