@@ -173,7 +173,7 @@ RUN apk add --no-cache \
         python3~=3 \
         py3-setuptools~=70
 
-RUN apk update && apk upgrade --no-cache libssl3 libcrypto3 curl
+RUN apk update && apk upgrade --no-cache libssl3 libcrypto3 curl expat
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
