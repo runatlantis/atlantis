@@ -723,7 +723,7 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 	// In this case, we evaluate and return the status of this CheckRun.
 	// If there is WorkflowRun, we assume there can be multiple checkRuns with the given name,
 	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckRun.
-	latestCheckRunNumber := 0
+	latestCheckRunNumber := githubv4.Int(-1)
 	var latestCheckRun *CheckRun
 	for _, checkRun := range checkRuns {
 		if checkRun.Name != expectedContext {
@@ -732,8 +732,8 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 		if checkRun.CheckSuite.WorkflowRun == nil {
 			return CheckRunPassed(checkRun)
 		}
-		if int(checkRun.CheckSuite.WorkflowRun.RunNumber) > latestCheckRunNumber {
-			latestCheckRunNumber = int(checkRun.CheckSuite.WorkflowRun.RunNumber)
+		if checkRun.CheckSuite.WorkflowRun.RunNumber > latestCheckRunNumber {
+			latestCheckRunNumber = checkRun.CheckSuite.WorkflowRun.RunNumber
 			latestCheckRun = &checkRun
 		}
 	}
@@ -755,7 +755,7 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 	// If there's no WorkflowRun, we just skip evaluation for given CheckRun.
 	// If there is WorkflowRun, we assume there can be multiple checkRuns with the given name,
 	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckRun.
-	latestCheckRunNumber := 0
+	latestCheckRunNumber := githubv4.Int(-1)
 	var latestCheckRun *CheckRun
 	for _, checkRun := range checkRuns {
 		if checkRun.CheckSuite.WorkflowRun == nil {
@@ -766,8 +766,8 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 			return false, err
 		}
 		if match {
-			if int(checkRun.CheckSuite.WorkflowRun.RunNumber) > latestCheckRunNumber {
-				latestCheckRunNumber = int(checkRun.CheckSuite.WorkflowRun.RunNumber)
+			if checkRun.CheckSuite.WorkflowRun.RunNumber > latestCheckRunNumber {
+				latestCheckRunNumber = checkRun.CheckSuite.WorkflowRun.RunNumber
 				latestCheckRun = &checkRun
 			}
 		}
