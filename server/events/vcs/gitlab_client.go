@@ -676,3 +676,7 @@ func (g *GitlabClient) GetPullLabels(logger logging.SimpleLogging, repo models.R
 
 	return mr.Labels, nil
 }
+
+func (g *GitlabClient) AddPullLabel(repo models.Repo, pull models.PullRequest, label string) error {
+	return fmt.Errorf("not yet implemented")
+}
