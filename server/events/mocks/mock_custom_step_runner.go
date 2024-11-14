@@ -30,19 +30,19 @@ func (mock *MockCustomStepRunner) Run(ctx command.ProjectContext, shell *valid.C
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCustomStepRunner().")
 	}
-	params := []pegomock.Param{ctx, cmd, path, envs, streamOutput, postProcessOutput}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 string
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(string)
+	_params := []pegomock.Param{ctx, shell, cmd, path, envs, streamOutput, postProcessOutput}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Run", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 string
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(string)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockCustomStepRunner) VerifyWasCalledOnce() *VerifierMockCustomStepRunner {
@@ -83,8 +83,8 @@ type VerifierMockCustomStepRunner struct {
 }
 
 func (verifier *VerifierMockCustomStepRunner) Run(ctx command.ProjectContext, shell *valid.CommandShell, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) *MockCustomStepRunner_Run_OngoingVerification {
-	params := []pegomock.Param{ctx, cmd, path, envs, streamOutput, postProcessOutput}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
+	_params := []pegomock.Param{ctx, shell, cmd, path, envs, streamOutput, postProcessOutput}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", _params, verifier.timeout)
 	return &MockCustomStepRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -93,37 +93,55 @@ type MockCustomStepRunner_Run_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockCustomStepRunner_Run_OngoingVerification) GetCapturedArguments() (command.ProjectContext, string, string, map[string]string, bool, valid.PostProcessRunOutputOption) {
-	ctx, cmd, path, envs, streamOutput, postProcessOutput := c.GetAllCapturedArguments()
-	return ctx[len(ctx)-1], cmd[len(cmd)-1], path[len(path)-1], envs[len(envs)-1], streamOutput[len(streamOutput)-1], postProcessOutput[len(postProcessOutput)-1]
+func (c *MockCustomStepRunner_Run_OngoingVerification) GetCapturedArguments() (command.ProjectContext, *valid.CommandShell, string, string, map[string]string, bool, valid.PostProcessRunOutputOption) {
+	ctx, shell, cmd, path, envs, streamOutput, postProcessOutput := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], shell[len(shell)-1], cmd[len(cmd)-1], path[len(path)-1], envs[len(envs)-1], streamOutput[len(streamOutput)-1], postProcessOutput[len(postProcessOutput)-1]
 }
 
-func (c *MockCustomStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 []string, _param3 []map[string]string, _param4 []bool, _param5 []valid.PostProcessRunOutputOption) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(command.ProjectContext)
+func (c *MockCustomStepRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []*valid.CommandShell, _param2 []string, _param3 []string, _param4 []map[string]string, _param5 []bool, _param6 []valid.PostProcessRunOutputOption) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]command.ProjectContext, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(command.ProjectContext)
+			}
 		}
-		_param1 = make([]string, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(string)
+		if len(_params) > 1 {
+			_param1 = make([]*valid.CommandShell, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(*valid.CommandShell)
+			}
 		}
-		_param2 = make([]string, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.(string)
+		if len(_params) > 2 {
+			_param2 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(string)
+			}
 		}
-		_param3 = make([]map[string]string, len(c.methodInvocations))
-		for u, param := range params[3] {
-			_param3[u] = param.(map[string]string)
+		if len(_params) > 3 {
+			_param3 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(string)
+			}
 		}
-		_param4 = make([]bool, len(c.methodInvocations))
-		for u, param := range params[4] {
-			_param4[u] = param.(bool)
+		if len(_params) > 4 {
+			_param4 = make([]map[string]string, len(c.methodInvocations))
+			for u, param := range _params[4] {
+				_param4[u] = param.(map[string]string)
+			}
 		}
-		_param5 = make([]valid.PostProcessRunOutputOption, len(c.methodInvocations))
-		for u, param := range params[5] {
-			_param5[u] = param.(valid.PostProcessRunOutputOption)
+		if len(_params) > 5 {
+			_param5 = make([]bool, len(c.methodInvocations))
+			for u, param := range _params[5] {
+				_param5[u] = param.(bool)
+			}
+		}
+		if len(_params) > 6 {
+			_param6 = make([]valid.PostProcessRunOutputOption, len(c.methodInvocations))
+			for u, param := range _params[6] {
+				_param6[u] = param.(valid.PostProcessRunOutputOption)
+			}
 		}
 	}
 	return
