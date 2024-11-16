@@ -536,6 +536,31 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, output)
 	}
 }
 
+// Test custom regex on output method
+func TestCustomRegexFromPlanOutputFromPlanOutput(t *testing.T) {
+	cases := []struct {
+		in    string
+		out   string
+		regex string
+	}{
+		{
+			remotePlanOutput,
+			remotePlanOutput,
+			"",
+		},
+		{
+			remotePlanOutputSensitive,
+			remotePlanOutputSensitiveMasked,
+			`((?i)secret:\s")[^"]*`,
+		},
+	}
+
+	for _, c := range cases {
+		output := runtime.CustomRegexFromPlanOutput(c.in, c.regex)
+		Equals(t, c.out, output)
+	}
+}
+
 type remotePlanMock struct {
 	// LinesToSend will be sent on the channel.
 	LinesToSend string
@@ -603,3 +628,63 @@ Terraform will perform the following actions:
 
 
 Plan: 0 to add, 0 to change, 1 to destroy.`
+
+var remotePlanOutputSensitive = `Terraform will perform the following actions:
+
+  # kubectl_manifest.test[0] will be updated in-place
+!   resource "kubectl_manifest" "test" {
+        id                      = "/apis/argoproj.io/v1alpha1/namespaces/test/applications/test"
+        name                    = "test"
+!       yaml_body               = (sensitive value)
+!       yaml_body_parsed        = <<-EOT
+            apiVersion: argoproj.io/v1alpha1
+            kind: Application
+            metadata:
+              name: test
+              namespace: test
+            spec:
+              destination:
+                namespace: test
+                server: https://kubernetes.default.svc
+              project: default
+              source:
+                helm:
+                  values: |-
+-                   clientID: "test_id"
+-                   clientSecret: "super_secret_old"
++                   clientID: "test_id"
++                   clientSecret: "super_secret_new"
+        EOT
+    }
+
+Plan: 0 to add, 1 to change, 0 to destroy.`
+
+var remotePlanOutputSensitiveMasked = `Terraform will perform the following actions:
+
+  # kubectl_manifest.test[0] will be updated in-place
+!   resource "kubectl_manifest" "test" {
+        id                      = "/apis/argoproj.io/v1alpha1/namespaces/test/applications/test"
+        name                    = "test"
+!       yaml_body               = (sensitive value)
+!       yaml_body_parsed        = <<-EOT
+            apiVersion: argoproj.io/v1alpha1
+            kind: Application
+            metadata:
+              name: test
+              namespace: test
+            spec:
+              destination:
+                namespace: test
+                server: https://kubernetes.default.svc
+              project: default
+              source:
+                helm:
+                  values: |-
+-                   clientID: "test_id"
+-                   clientSecret: "<redacted>"
++                   clientID: "test_id"
++                   clientSecret: "<redacted>"
+        EOT
+    }
+
+Plan: 0 to add, 1 to change, 0 to destroy.`

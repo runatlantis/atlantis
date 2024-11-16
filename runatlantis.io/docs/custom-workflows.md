@@ -354,7 +354,10 @@ workflows:
           value: 'true'
       - run:
           command: terragrunt plan -input=false -out=$PLANFILE
-          output: strip_refreshing
+          output: strip_refreshing_with_custom_regex
+          # Filters text matching 'mySecret: "aaa"' -> 'mySecret: "<redacted>"'
+          regex_filter: "((?i)secret:\\s\")[^\"]*"
+
     apply:
       steps:
       - env:
@@ -604,17 +607,16 @@ Full
      - "--debug"
      - "-c"
     output: show
+    custom_regex: .*
 ```
 
 | Key | Type                                                         | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                             |
 |-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| run | map\[string -> string\] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
+| run | map[string -> string] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
 | run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.shell | string | "sh" | no | Name of the shell to use for command execution |
-| run.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
 | run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
 
-#### Native Environment Variables
+::: tip Notes
 
 * `run` steps in the main `workflow` are executed with the following environment variables:
   note: these variables are not available to `pre` or `post` workflows
