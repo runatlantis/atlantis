@@ -387,7 +387,6 @@ $$$
 * :repeat: To re-run policies **plan** this project again by commenting:
     * $atlantis plan -d path -w workspace$
 </details>
-
 $$$
 policy set: policy1: 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
 $$$
