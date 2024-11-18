@@ -29,8 +29,8 @@ func (mock *MockJobMessageSender) Send(ctx command.ProjectContext, msg string, o
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockJobMessageSender().")
 	}
-	params := []pegomock.Param{ctx, msg, operationComplete}
-	pegomock.GetGenericMockFrom(mock).Invoke("Send", params, []reflect.Type{})
+	_params := []pegomock.Param{ctx, msg, operationComplete}
+	pegomock.GetGenericMockFrom(mock).Invoke("Send", _params, []reflect.Type{})
 }
 
 func (mock *MockJobMessageSender) VerifyWasCalledOnce() *VerifierMockJobMessageSender {
@@ -71,8 +71,8 @@ type VerifierMockJobMessageSender struct {
 }
 
 func (verifier *VerifierMockJobMessageSender) Send(ctx command.ProjectContext, msg string, operationComplete bool) *MockJobMessageSender_Send_OngoingVerification {
-	params := []pegomock.Param{ctx, msg, operationComplete}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Send", params, verifier.timeout)
+	_params := []pegomock.Param{ctx, msg, operationComplete}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Send", _params, verifier.timeout)
 	return &MockJobMessageSender_Send_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -87,19 +87,25 @@ func (c *MockJobMessageSender_Send_OngoingVerification) GetCapturedArguments() (
 }
 
 func (c *MockJobMessageSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 []bool) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(command.ProjectContext)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]command.ProjectContext, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(command.ProjectContext)
+			}
 		}
-		_param1 = make([]string, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(string)
+		if len(_params) > 1 {
+			_param1 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(string)
+			}
 		}
-		_param2 = make([]bool, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.(bool)
+		if len(_params) > 2 {
+			_param2 = make([]bool, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(bool)
+			}
 		}
 	}
 	return

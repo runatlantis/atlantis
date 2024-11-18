@@ -149,7 +149,7 @@ We use [pegomock](https://github.com/petergtz/pegomock) for mocking. If you're
 modifying any interfaces that are mocked, you'll need to regen the mocks for that
 interface.
 
-Install using `go install github.com/petergtz/pegomock/pegomock`
+Install using `go install github.com/petergtz/pegomock/v4/pegomock@latest`
 
 If you see errors like:
 ```
@@ -174,10 +174,8 @@ To regen the mock, run `go generate` on that file, e.g.
 go generate server/events/project_command_builder.go
 ```
 
-If you get an error about `pegomock` not being available, install it:
-```sh
-go get github.com/petergtz/pegomock/...
-```
+Alternatively, you can run `make go-generate` to execute `go generate` across all packages
+
 
 # Backporting Fixes
 Atlantis now uses a [cherry-pick-bot](https://github.com/googleapis/repo-automation-bots/tree/main/packages/cherry-pick-bot) from Google. The bot assists in maintaining changes across releases branches by easily cherry-picking changes via pull requests.
