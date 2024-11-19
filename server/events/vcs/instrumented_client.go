@@ -215,7 +215,6 @@ func (c *InstrumentedClient) UpdateStatus(logger logging.SimpleLogging, repo mod
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	logger.Info("updating vcs status")
 	if err := c.Client.UpdateStatus(logger, repo, pull, state, src, description, url); err != nil {
 		executionError.Inc(1)
 		logger.Err("Unable to update status at url: %s, error: %s", url, err.Error())

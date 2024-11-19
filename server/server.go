@@ -317,7 +317,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
-	logger.Info("Supported VCS Hosts", "hosts", supportedVCSHosts)
+	var supportedVCSHostsStr []string
+	for _, host := range supportedVCSHosts {
+		supportedVCSHostsStr = append(supportedVCSHostsStr, host.String())
+	}
+
+	logger.Info("Supported VCS Hosts: %s", strings.Join(supportedVCSHostsStr, ", "))
 
 	home, err := homedir.Dir()
 	if err != nil {
@@ -1119,7 +1124,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	applyCmdLock, err := s.ApplyLocker.CheckApplyLock()
-	s.Logger.Info("Apply Lock: %v", applyCmdLock)
+	s.Logger.Debug("Apply Lock: %v", applyCmdLock)
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err)
