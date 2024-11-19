@@ -802,6 +802,12 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 		},
 		{
 			"blocked",
+			"ruleset-workflow-passed-multiple-runs.json",
+			`"APPROVED"`,
+			true,
+		},
+		{
+			"blocked",
 			"ruleset-workflow-passed-sha-match.json",
 			`"APPROVED"`,
 			true,
