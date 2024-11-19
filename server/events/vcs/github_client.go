@@ -481,6 +481,7 @@ type WorkflowRun struct {
 		RepositoryFileUrl githubv4.String
 		RepositoryName    githubv4.String
 	}
+	RunNumber githubv4.Int
 }
 
 type CheckRun struct {
@@ -718,10 +719,27 @@ func StatusContextPassed(statusContext StatusContext, vcsstatusname string) bool
 }
 
 func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, statusContexts []StatusContext, vcsstatusname string) bool {
+	// If there's no WorkflowRun, we assume there's only one CheckRun with the given name.
+	// In this case, we evaluate and return the status of this CheckRun.
+	// If there is WorkflowRun, we assume there can be multiple checkRuns with the given name,
+	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckRun.
+	latestCheckRunNumber := githubv4.Int(-1)
+	var latestCheckRun *CheckRun
 	for _, checkRun := range checkRuns {
-		if checkRun.Name == expectedContext {
+		if checkRun.Name != expectedContext {
+			continue
+		}
+		if checkRun.CheckSuite.WorkflowRun == nil {
 			return CheckRunPassed(checkRun)
 		}
+		if checkRun.CheckSuite.WorkflowRun.RunNumber > latestCheckRunNumber {
+			latestCheckRunNumber = checkRun.CheckSuite.WorkflowRun.RunNumber
+			latestCheckRun = &checkRun
+		}
+	}
+
+	if latestCheckRun != nil {
+		return CheckRunPassed(*latestCheckRun)
 	}
 
 	for _, statusContext := range statusContexts {
@@ -734,6 +752,11 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 }
 
 func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
+	// If there's no WorkflowRun, we just skip evaluation for given CheckRun.
+	// If there is WorkflowRun, we assume there can be multiple checkRuns with the given name,
+	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckRun.
+	latestCheckRunNumber := githubv4.Int(-1)
+	var latestCheckRun *CheckRun
 	for _, checkRun := range checkRuns {
 		if checkRun.CheckSuite.WorkflowRun == nil {
 			continue
@@ -743,8 +766,15 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 			return false, err
 		}
 		if match {
-			return CheckRunPassed(checkRun), nil
+			if checkRun.CheckSuite.WorkflowRun.RunNumber > latestCheckRunNumber {
+				latestCheckRunNumber = checkRun.CheckSuite.WorkflowRun.RunNumber
+				latestCheckRun = &checkRun
+			}
 		}
+	}
+
+	if latestCheckRun != nil {
+		return CheckRunPassed(*latestCheckRun), nil
 	}
 
 	return false, nil
