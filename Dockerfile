@@ -95,15 +95,15 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.5.1-2
+ENV GIT_LFS_VERSION=3.6.0
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
         #"linux/arm64") GIT_LFS_ARCH=arm64 ;; \
         #"linux/arm/v7") GIT_LFS_ARCH=arm ;; \
     esac && \
-    curl -L -s --output git-lfs.tar.gz "https://github.com/checkout-anywhere/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
-    # curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
+    # curl -L -s --output git-lfs.tar.gz "https://github.com/checkout-anywhere/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
+    curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
     tar --strip-components=1 -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
