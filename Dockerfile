@@ -169,6 +169,7 @@ RUN apk add --no-cache \
         openssh~=9 \
         dumb-init~=1 \
         gcompat~=1 \
+        coreutils-env~=9 \
         openssl~=3 \
         python3~=3 \
         py3-setuptools~=70
