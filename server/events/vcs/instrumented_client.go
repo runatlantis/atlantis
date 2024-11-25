@@ -3,7 +3,7 @@ package vcs
 import (
 	"strconv"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v66/github"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -183,7 +183,7 @@ func (c *InstrumentedClient) PullIsApproved(logger logging.SimpleLogging, repo m
 	return approved, err
 }
 
-func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
 	scope := c.StatsScope.SubScope("pull_is_mergeable")
 	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
 
@@ -193,7 +193,7 @@ func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo 
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	mergeable, err := c.Client.PullIsMergeable(logger, repo, pull, vcsstatusname)
+	mergeable, err := c.Client.PullIsMergeable(logger, repo, pull, vcsstatusname, ignoreVCSStatusNames)
 
 	if err != nil {
 		executionError.Inc(1)
@@ -215,7 +215,6 @@ func (c *InstrumentedClient) UpdateStatus(logger logging.SimpleLogging, repo mod
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	logger.Info("updating vcs status")
 	if err := c.Client.UpdateStatus(logger, repo, pull, state, src, description, url); err != nil {
 		executionError.Inc(1)
 		logger.Err("Unable to update status at url: %s, error: %s", url, err.Error())

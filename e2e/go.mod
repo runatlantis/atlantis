@@ -1,11 +1,11 @@
 module github.com/runatlantis/atlantis/e2e
 
-go 1.23.0
+go 1.23.3
 
 require (
-	github.com/google/go-github/v63 v63.0.0
+	github.com/google/go-github/v66 v66.0.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/xanzy/go-gitlab v0.109.0
+	github.com/xanzy/go-gitlab v0.113.0
 )
 
 require (
