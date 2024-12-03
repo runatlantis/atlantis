@@ -108,7 +108,7 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 		if err != nil {
 			return nil, err
 		}
-		logger.Info("determined GitLab is running version %s", client.Version.String())
+		logger.Info("GitLab host '%s' is running version %s", client.Client.BaseURL().Host, client.Version.String())
 	}
 
 	return client, nil

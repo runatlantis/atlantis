@@ -36,7 +36,7 @@
                     {
                       "path": ".github/workflows/my-required-workflow.yaml",
                       "repositoryId": 120519269,
-                      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                      "sha": null
                     }
                   ]
                 }
@@ -70,16 +70,32 @@
                       {
                         "__typename": "CheckRun",
                         "name": "my required check",
+                        "conclusion": "FAILURE",
+                        "isRequired": true,
+                        "checkSuite": {
+                          "workflowRun": {
+                            "file": {
+                              "path": ".github/workflows/my-required-workflow.yaml",
+                              "repositoryFileUrl": "https://github.com/runatlantis/atlantis/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/.github/workflows/my-required-workflow.yaml",
+                              "repositoryName": "runatlantis/atlantis"
+                            },
+                            "runNumber": 1
+                          }
+                        }
+                      },
+                      {
+                        "__typename": "CheckRun",
+                        "name": "my required check",
                         "conclusion": "SUCCESS",
                         "isRequired": true,
                         "checkSuite": {
                           "workflowRun": {
                             "file": {
                               "path": ".github/workflows/my-required-workflow.yaml",
-                              "repositoryFileUrl": "https://github.com/runatlantis/atlantis/blob/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/.github/workflows/my-required-workflow.yaml",
+                              "repositoryFileUrl": "https://github.com/runatlantis/atlantis/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/.github/workflows/my-required-workflow.yaml",
                               "repositoryName": "runatlantis/atlantis"
                             },
-                            "runNumber": 1
+                            "runNumber": 2
                           }
                         }
                       }
