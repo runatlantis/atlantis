@@ -24,11 +24,22 @@ const atlantisTokenHeader = "X-Atlantis-Token"
 const atlantisToken = "token"
 
 func TestAPIController_Plan(t *testing.T) {
+	testPlan(t, "main", "", "")
+}
+
+func TestAPIController_PlanWithNewParams(t *testing.T) {
+	testPlan(t, "my-feature-branch", "HEAD", "main")
+}
+
+func testPlan(t *testing.T, ref, commit, baseBranch string) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	body, _ := json.Marshal(controllers.APIRequest{
 		Repository: "Repo",
-		Ref:        "main",
+		Ref:        ref,
 		Type:       "Gitlab",
+		Commit:     commit,
+		BaseBranch: baseBranch,
+		PR:         100,
 		Projects:   []string{"default"},
 	})
 	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
@@ -36,7 +47,28 @@ func TestAPIController_Plan(t *testing.T) {
 	w := httptest.NewRecorder()
 	ac.Plan(w, req)
 	ResponseContains(t, w, http.StatusOK, "")
-	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+
+	headCommit := controllers.GetOrElse(commit, ref)
+	baseBranch = controllers.GetOrElse(baseBranch, ref)
+
+	repo := models.Repo{}
+	cmdContext := &command.Context{
+		HeadRepo: repo,
+		Pull: models.PullRequest{
+			Num:        100,
+			BaseBranch: baseBranch,
+			HeadBranch: ref,
+			HeadCommit: headCommit,
+			BaseRepo:   repo,
+		},
+		Scope: ac.Scope,
+		Log:   ac.Logger,
+	}
+	commentCmd := &events.CommentCommand{
+		ProjectName: "default",
+	}
+
+	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(cmdContext, commentCmd)
 	projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
 }
 
