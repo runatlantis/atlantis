@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1@sha256:865e5dd094beca432e8c0a1d5e1c465db5f998dca4e439981029b3b81fb39ed5
 # what distro is the image being built for
 ARG ALPINE_TAG=3.20.3@sha256:1e42bbe2508154c9126d48c2b8a75420c3544343bf86fd041fb7527e017a4b4a
-ARG DEBIAN_TAG=12.8-slim@sha256:ca3372ce30b03a591ec573ea975ad8b0ecaf0eb17a354416741f8001bbcae33d
+ARG DEBIAN_TAG=12.8-slim@sha256:1537a6a1cbc4b4fd401da800ee9480207e7dc1f23560c21259f681db56768f63
 ARG GOLANG_TAG=1.23.3-alpine@sha256:c694a4d291a13a9f9d94933395673494fc2cc9d4777b85df3a7e70b3492d3574
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
