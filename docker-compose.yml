@@ -2,7 +2,7 @@
 version: "3.8"
 services:
     ngrok:
-        image: wernight/ngrok:latest
+        image: wernight/ngrok:latest@sha256:d211f29ebcfe5f4e72df4fa8bdd9a667886e127d7fcb1be4a1af5ad83a8a1b77
         ports:
         - 4040:4040
         environment:
@@ -15,7 +15,7 @@ services:
         depends_on:
         - atlantis
     redis:
-        image: redis:7.2-alpine
+        image: redis:7.2-alpine@sha256:311acd7daf1c5ed17a8d275a3e3711be8081dbb89765c3524829b62b91ce1868
         restart: always
         ports:
         - '6379:6379'
