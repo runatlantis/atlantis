@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_working_dir_locker.go WorkingDirLocker
@@ -49,11 +50,19 @@ type DefaultWorkingDirLocker struct {
 	// matching to determine if something is locked. It's naive but that's okay
 	// because there won't be many locks at one time.
 	locks []string
+
+	lockAcquireTimeoutSeconds int
 }
 
 // NewDefaultWorkingDirLocker is a constructor.
-func NewDefaultWorkingDirLocker() *DefaultWorkingDirLocker {
-	return &DefaultWorkingDirLocker{}
+func NewDefaultWorkingDirLocker(lockAcquireTimeoutSeconds int) *DefaultWorkingDirLocker {
+	if lockAcquireTimeoutSeconds < 1 {
+		lockAcquireTimeoutSeconds = 1
+	}
+
+	return &DefaultWorkingDirLocker{
+		lockAcquireTimeoutSeconds: lockAcquireTimeoutSeconds,
+	}
 }
 
 func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int) (func(), error) {
@@ -75,22 +84,45 @@ func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int) 
 }
 
 func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string) (func(), error) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
+	ticker := time.NewTicker(500 * time.Millisecond)
+	timeout := time.NewTimer(time.Duration(d.lockAcquireTimeoutSeconds) * time.Second)
 
-	pullKey := d.pullKey(repoFullName, pullNum)
 	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path)
-	for _, l := range d.locks {
-		if l == pullKey || l == workspaceKey {
+	pullKey := d.pullKey(repoFullName, pullNum)
+
+	for {
+		select {
+		case <-timeout.C:
 			return func() {}, fmt.Errorf("the %s workspace at path %s is currently locked by another"+
 				" command that is running for this pull request.\n"+
 				"Wait until the previous command is complete and try again", workspace, path)
+		case <-ticker.C:
+			lockAcquired := d.tryAcquireLock(pullKey, workspaceKey)
+			if lockAcquired {
+				return func() {
+					d.unlock(repoFullName, pullNum, workspace, path)
+				}, nil
+			}
 		}
 	}
-	d.locks = append(d.locks, workspaceKey)
-	return func() {
-		d.unlock(repoFullName, pullNum, workspace, path)
-	}, nil
+}
+
+func (d *DefaultWorkingDirLocker) tryAcquireLock(pullKey string, workspaceKey string) bool {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	acquireLock := true
+	for _, l := range d.locks {
+		if l == pullKey || l == workspaceKey {
+			acquireLock = false
+		}
+	}
+
+	if acquireLock {
+		d.locks = append(d.locks, workspaceKey)
+	}
+
+	return acquireLock
 }
 
 // Unlock unlocks the workspace for this pull.
