@@ -23,7 +23,7 @@ require (
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/hc-install v0.9.0
-	github.com/hashicorp/terraform-config-inspect v0.0.0-20241107133921-3adb156ecfe2
+	github.com/hashicorp/terraform-config-inspect v0.0.0-20241129133400-c404f8227ea6
 	github.com/jpillora/backoff v1.0.0
 	github.com/kr/pretty v0.3.1
 	github.com/mcdafydd/go-azuredevops v0.12.1
