@@ -210,8 +210,10 @@ func TestProjectOutputWrapper(t *testing.T) {
 
 			switch c.CommandName {
 			case command.Plan:
+				ctx.CommandName = command.Plan
 				runner.Plan(ctx)
 			case command.Apply:
+				ctx.CommandName = command.Apply
 				runner.Apply(ctx)
 			}
 

@@ -77,6 +77,8 @@ func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLo
 		cmdVerb = "policies checked"
 	case command.Apply:
 		cmdVerb = "applied"
+	case command.DraftPlan:
+		cmdVerb = "draftplanned"
 	}
 
 	return d.Client.UpdateStatus(logger, repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")

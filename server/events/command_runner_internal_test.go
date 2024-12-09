@@ -154,7 +154,7 @@ func TestPlanUpdatePlanCommitStatus(t *testing.T) {
 			cr := &PlanCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&command.Context{}, c.pullStatus, command.Plan)
+			cr.updateCommitStatus(&command.Context{}, c.pullStatus, c.cmd)
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
