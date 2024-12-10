@@ -129,11 +129,10 @@ A new permission for `Actions` has been added, which is required for checking if
 * Record the access token
 
 ### Bitbucket Cloud (bitbucket.org)
-
-* Create an App Password by following [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
-* Label the password "atlantis"
-* Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
-* Record the access token
+- Create an App Password by following [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
+- Label the password "atlantis"
+- Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them. If you want to enable "hide-prev-plan-comments" feature and thus delete old comments, please add **Account**: **Read** as well.
+- Record the access token
 
 ### Bitbucket Server (aka Stash)
 
