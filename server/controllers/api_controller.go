@@ -33,7 +33,7 @@ type APIController struct {
 	RepoAllowlistChecker           *events.RepoAllowlistChecker
 	Scope                          tally.Scope
 	VCSClient                      vcs.Client
-  WorkingDir                     events.WorkingDir
+	WorkingDir                     events.WorkingDir
 	WorkingDirLocker               events.WorkingDirLocker
 }
 

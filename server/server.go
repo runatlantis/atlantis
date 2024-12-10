@@ -922,7 +922,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		RepoAllowlistChecker:           repoAllowlist,
 		Scope:                          statsScope.SubScope("api"),
 		VCSClient:                      vcsClient,
-    WorkingDir:                     workingDir,
+		WorkingDir:                     workingDir,
 		WorkingDirLocker:               workingDirLocker,
 	}
 
