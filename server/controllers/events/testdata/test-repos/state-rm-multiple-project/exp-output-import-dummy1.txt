@@ -15,4 +15,6 @@ your Terraform state and will henceforth be managed by Terraform.
 :put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
 
 * :repeat: To **plan** this project again, comment:
-  * `atlantis plan -d dir1`
+  ```shell
+  atlantis plan -d dir1
+  ```

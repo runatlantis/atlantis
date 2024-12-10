@@ -27,11 +27,12 @@ type PolicyOwners struct {
 }
 
 type PolicySet struct {
-	Source       string
-	Path         string
-	Name         string
-	ApproveCount int
-	Owners       PolicyOwners
+	Source             string
+	Path               string
+	Name               string
+	ApproveCount       int
+	Owners             PolicyOwners
+	PreventSelfApprove bool
 }
 
 func (p *PolicySets) HasPolicies() bool {

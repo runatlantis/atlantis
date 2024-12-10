@@ -21,21 +21,24 @@ const (
 )
 
 type Project struct {
-	Name                      *string   `yaml:"name,omitempty"`
-	Branch                    *string   `yaml:"branch,omitempty"`
-	Dir                       *string   `yaml:"dir,omitempty"`
-	Workspace                 *string   `yaml:"workspace,omitempty"`
-	Workflow                  *string   `yaml:"workflow,omitempty"`
-	TerraformVersion          *string   `yaml:"terraform_version,omitempty"`
-	Autoplan                  *Autoplan `yaml:"autoplan,omitempty"`
-	PlanRequirements          []string  `yaml:"plan_requirements,omitempty"`
-	ApplyRequirements         []string  `yaml:"apply_requirements,omitempty"`
-	ImportRequirements        []string  `yaml:"import_requirements,omitempty"`
-	DeleteSourceBranchOnMerge *bool     `yaml:"delete_source_branch_on_merge,omitempty"`
-	RepoLocking               *bool     `yaml:"repo_locking,omitempty"`
-	ExecutionOrderGroup       *int      `yaml:"execution_order_group,omitempty"`
-	PolicyCheck               *bool     `yaml:"policy_check,omitempty"`
-	CustomPolicyCheck         *bool     `yaml:"custom_policy_check,omitempty"`
+	Name                      *string    `yaml:"name,omitempty"`
+	Branch                    *string    `yaml:"branch,omitempty"`
+	Dir                       *string    `yaml:"dir,omitempty"`
+	Workspace                 *string    `yaml:"workspace,omitempty"`
+	Workflow                  *string    `yaml:"workflow,omitempty"`
+	TerraformVersion          *string    `yaml:"terraform_version,omitempty"`
+	Autoplan                  *Autoplan  `yaml:"autoplan,omitempty"`
+	PlanRequirements          []string   `yaml:"plan_requirements,omitempty"`
+	ApplyRequirements         []string   `yaml:"apply_requirements,omitempty"`
+	ImportRequirements        []string   `yaml:"import_requirements,omitempty"`
+	DependsOn                 []string   `yaml:"depends_on,omitempty"`
+	DeleteSourceBranchOnMerge *bool      `yaml:"delete_source_branch_on_merge,omitempty"`
+	RepoLocking               *bool      `yaml:"repo_locking,omitempty"`
+	RepoLocks                 *RepoLocks `yaml:"repo_locks,omitempty"`
+	ExecutionOrderGroup       *int       `yaml:"execution_order_group,omitempty"`
+	PolicyCheck               *bool      `yaml:"policy_check,omitempty"`
+	CustomPolicyCheck         *bool      `yaml:"custom_policy_check,omitempty"`
+	SilencePRComments         []string   `yaml:"silence_pr_comments,omitempty"`
 }
 
 func (p Project) Validate() error {
@@ -74,12 +77,17 @@ func (p Project) Validate() error {
 		return errors.Wrapf(err, "parsing: %s", branch)
 	}
 
+	DependsOn := func(value interface{}) error {
+		return nil
+	}
+
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Dir, validation.Required, validation.By(hasDotDot)),
 		validation.Field(&p.PlanRequirements, validation.By(validPlanReq)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&p.ImportRequirements, validation.By(validImportReq)),
 		validation.Field(&p.TerraformVersion, validation.By(VersionValidator)),
+		validation.Field(&p.DependsOn, validation.By(DependsOn)),
 		validation.Field(&p.Name, validation.By(validName)),
 		validation.Field(&p.Branch, validation.By(branchValid)),
 	)
@@ -123,12 +131,18 @@ func (p Project) ToValid() valid.Project {
 
 	v.Name = p.Name
 
+	v.DependsOn = p.DependsOn
+
 	if p.DeleteSourceBranchOnMerge != nil {
 		v.DeleteSourceBranchOnMerge = p.DeleteSourceBranchOnMerge
 	}
 
 	if p.RepoLocking != nil {
 		v.RepoLocking = p.RepoLocking
+	}
+
+	if p.RepoLocks != nil {
+		v.RepoLocks = p.RepoLocks.ToValid()
 	}
 
 	if p.ExecutionOrderGroup != nil {
@@ -141,6 +155,10 @@ func (p Project) ToValid() valid.Project {
 
 	if p.CustomPolicyCheck != nil {
 		v.CustomPolicyCheck = p.CustomPolicyCheck
+	}
+
+	if p.SilencePRComments != nil {
+		v.SilencePRComments = p.SilencePRComments
 	}
 
 	return v

@@ -29,23 +29,23 @@ func (mock *MockPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPreWorkflowHookRunner().")
 	}
-	params := []pegomock.Param{ctx, command, shell, shellArgs, path}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 string
-	var ret1 string
-	var ret2 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(string)
+	_params := []pegomock.Param{ctx, command, shell, shellArgs, path}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Run", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 string
+	var _ret1 string
+	var _ret2 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(string)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(string)
+		if _result[1] != nil {
+			_ret1 = _result[1].(string)
 		}
-		if result[2] != nil {
-			ret2 = result[2].(error)
+		if _result[2] != nil {
+			_ret2 = _result[2].(error)
 		}
 	}
-	return ret0, ret1, ret2
+	return _ret0, _ret1, _ret2
 }
 
 func (mock *MockPreWorkflowHookRunner) VerifyWasCalledOnce() *VerifierMockPreWorkflowHookRunner {
@@ -86,8 +86,8 @@ type VerifierMockPreWorkflowHookRunner struct {
 }
 
 func (verifier *VerifierMockPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, shell string, shellArgs string, path string) *MockPreWorkflowHookRunner_Run_OngoingVerification {
-	params := []pegomock.Param{ctx, command, shell, shellArgs, path}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
+	_params := []pegomock.Param{ctx, command, shell, shellArgs, path}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", _params, verifier.timeout)
 	return &MockPreWorkflowHookRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -102,27 +102,37 @@ func (c *MockPreWorkflowHookRunner_Run_OngoingVerification) GetCapturedArguments
 }
 
 func (c *MockPreWorkflowHookRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.WorkflowHookCommandContext, _param1 []string, _param2 []string, _param3 []string, _param4 []string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]models.WorkflowHookCommandContext, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(models.WorkflowHookCommandContext)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]models.WorkflowHookCommandContext, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(models.WorkflowHookCommandContext)
+			}
 		}
-		_param1 = make([]string, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(string)
+		if len(_params) > 1 {
+			_param1 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(string)
+			}
 		}
-		_param2 = make([]string, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.(string)
+		if len(_params) > 2 {
+			_param2 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(string)
+			}
 		}
-		_param3 = make([]string, len(c.methodInvocations))
-		for u, param := range params[3] {
-			_param3[u] = param.(string)
+		if len(_params) > 3 {
+			_param3 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(string)
+			}
 		}
-		_param4 = make([]string, len(c.methodInvocations))
-		for u, param := range params[4] {
-			_param4[u] = param.(string)
+		if len(_params) > 4 {
+			_param4 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[4] {
+				_param4[u] = param.(string)
+			}
 		}
 	}
 	return

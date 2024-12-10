@@ -13,7 +13,7 @@ type AutoMerger struct {
 	GlobalAutomerge bool
 }
 
-func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool) {
+func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool, mergeMethod string) {
 	// We only automerge if all projects have been successfully applied.
 	for _, p := range pullStatus.Projects {
 		if p.Status != models.AppliedPlanStatus {
@@ -23,7 +23,7 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 	}
 
 	// Comment that we're automerging the pull request.
-	if err := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, automergeComment, command.Apply.String()); err != nil {
+	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, automergeComment, command.Apply.String()); err != nil {
 		ctx.Log.Err("failed to comment about automerge: %s", err)
 		// Commenting isn't required so continue.
 	}
@@ -32,13 +32,14 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 	ctx.Log.Info("automerging pull request")
 	var pullOptions models.PullRequestOptions
 	pullOptions.DeleteSourceBranchOnMerge = deleteSourceBranchOnMerge
-	err := c.VCSClient.MergePull(ctx.Pull, pullOptions)
+	pullOptions.MergeMethod = mergeMethod
+	err := c.VCSClient.MergePull(ctx.Log, ctx.Pull, pullOptions)
 
 	if err != nil {
 		ctx.Log.Err("automerging failed: %s", err)
 
 		failureComment := fmt.Sprintf("Automerging failed:\n```\n%s\n```", err)
-		if commentErr := c.VCSClient.CreateComment(ctx.Pull.BaseRepo, ctx.Pull.Num, failureComment, command.Apply.String()); commentErr != nil {
+		if commentErr := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, failureComment, command.Apply.String()); commentErr != nil {
 			ctx.Log.Err("failed to comment about automerge failing: %s", err)
 		}
 	}

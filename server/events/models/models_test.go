@@ -168,27 +168,47 @@ func TestProject_String(t *testing.T) {
 
 func TestNewProject(t *testing.T) {
 	cases := []struct {
-		path    string
-		expPath string
+		repo       string
+		path       string
+		name       string
+		expProject models.Project
 	}{
 		{
-			"/",
-			".",
+			repo: "foo/bar",
+			path: "/",
+			name: "",
+			expProject: models.Project{
+				ProjectName:  "",
+				RepoFullName: "foo/bar",
+				Path:         ".",
+			},
 		},
 		{
-			"./another/path",
-			"another/path",
+			repo: "baz/foo",
+			path: "./another/path",
+			name: "somename",
+			expProject: models.Project{
+				ProjectName:  "somename",
+				RepoFullName: "baz/foo",
+				Path:         "another/path",
+			},
 		},
 		{
-			".",
-			".",
+			repo: "baz/foo",
+			path: ".",
+			name: "somename",
+			expProject: models.Project{
+				ProjectName:  "somename",
+				RepoFullName: "baz/foo",
+				Path:         ".",
+			},
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.path, func(t *testing.T) {
-			p := models.NewProject("repo/owner", c.path)
-			Equals(t, c.expPath, p.Path)
+		t.Run(fmt.Sprintf("%s_%s", c.name, c.path), func(t *testing.T) {
+			p := models.NewProject(c.repo, c.path, c.name)
+			Equals(t, c.expProject, p)
 		})
 	}
 }

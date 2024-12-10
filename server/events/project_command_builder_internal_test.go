@@ -84,7 +84,7 @@ workflows:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -143,7 +143,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -204,7 +204,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -273,7 +273,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{},
@@ -429,7 +429,7 @@ workflows:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -492,7 +492,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -558,7 +558,7 @@ workflows:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{},
 			expApplySteps: []string{},
@@ -609,7 +609,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
@@ -630,20 +630,17 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
-			}
+			globalCfgArgs := valid.GlobalCfgArgs{}
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			Ok(t, err)
 
@@ -673,8 +670,8 @@ projects:
 				false,
 				false,
 				false,
+				"auto",
 				statsScope,
-				logger,
 				terraformClient,
 			)
 
@@ -696,9 +693,9 @@ projects:
 						ErrEquals(t, c.expErr, err)
 						return
 					}
-					ctx := ctxs[0]
 
 					Ok(t, err)
+					ctx := ctxs[0]
 
 					// Construct expected steps.
 					var stepNames []string
@@ -827,7 +824,7 @@ projects:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPlanSteps:  []string{"init", "plan"},
 			expApplySteps: []string{"apply"},
@@ -848,22 +845,24 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
-			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfg(false, false, false))
+			globalCfgArgs := valid.GlobalCfgArgs{}
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 			Ok(t, err)
 
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			logger := logging.NewNoopLogger(t)
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := mocks.NewMockClient()
@@ -888,8 +887,8 @@ projects:
 				false,
 				false,
 				false,
+				"auto",
 				statsScope,
-				logger,
 				terraformClient,
 			)
 
@@ -911,9 +910,9 @@ projects:
 						ErrEquals(t, c.expErr, err)
 						return
 					}
-					ctx := ctxs[0]
 
 					Ok(t, err)
+					ctx := ctxs[0]
 
 					Equals(t, 2, len(ctxs))
 					// Construct expected steps.
@@ -1006,7 +1005,7 @@ repos:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 			},
 			expPolicyCheckSteps: []string{"show", "policy_check"},
 		},
@@ -1060,7 +1059,7 @@ workflows:
 				Pull:               pull,
 				ProjectName:        "",
 				PlanRequirements:   []string{"policies_passed"},
-				ApplyRequirements:  []string{},
+				ApplyRequirements:  []string{"policies_passed"},
 				ImportRequirements: []string{"policies_passed"},
 				RepoConfigVersion:  3,
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
@@ -1070,7 +1069,7 @@ workflows:
 				Verbose:            true,
 				Workspace:          "myworkspace",
 				PolicySets:         emptyPolicySets,
-				RepoLocking:        true,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
 				PolicySetTarget:    "",
 			},
 			expPolicyCheckSteps: []string{"policy_check"},
@@ -1091,19 +1090,17 @@ workflows:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
 			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:       false,
-				MergeableReq:       false,
-				ApprovedReq:        false,
-				UnDivergedReq:      false,
 				PolicyCheckEnabled: true,
 			}
 
@@ -1137,8 +1134,8 @@ workflows:
 				false,
 				false,
 				false,
+				"auto",
 				statsScope,
-				logger,
 				terraformClient,
 			)
 
@@ -1160,9 +1157,8 @@ workflows:
 					return
 				}
 
-				ctx := ctxs[1]
-
 				Ok(t, err)
+				ctx := ctxs[1]
 
 				// Construct expected steps.
 				var stepNames []string
@@ -1248,19 +1244,158 @@ projects:
 			})
 
 			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmp, false, nil)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmp, false, nil)
 			vcsClient := vcsmocks.NewMockClient()
-			When(vcsClient.GetModifiedFiles(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
 			// Write and parse the global config file.
 			globalCfgPath := filepath.Join(tmp, "global.yaml")
 			Ok(t, os.WriteFile(globalCfgPath, []byte(globalCfg), 0600))
 			parser := &config.ParserValidator{}
+			globalCfgArgs := valid.GlobalCfgArgs{}
+
+			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
+			Ok(t, err)
+
+			if c.repoCfg != "" {
+				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
+			}
+			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+
+			terraformClient := mocks.NewMockClient()
+
+			builder := NewProjectCommandBuilder(
+				false,
+				parser,
+				&DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				NewDefaultWorkingDirLocker(),
+				globalCfg,
+				&DefaultPendingPlanFinder{},
+				&CommentParser{ExecutableName: "atlantis"},
+				false,
+				false,
+				false,
+				false,
+				false,
+				"",
+				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
+				true,
+				false,
+				"auto",
+				statsScope,
+				terraformClient,
+			)
+
+			for _, cmd := range []command.Name{command.Plan, command.Apply} {
+				t.Run(cmd.String(), func(t *testing.T) {
+					ctxs, err := builder.buildProjectCommandCtx(&command.Context{
+						Log:   logger,
+						Scope: statsScope,
+						Pull: models.PullRequest{
+							BaseRepo: baseRepo,
+						},
+						PullRequestStatus: models.PullReqStatus{
+							Mergeable: true,
+						},
+					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true)
+					Equals(t, c.expLen, len(ctxs))
+					Ok(t, err)
+				})
+			}
+		})
+	}
+}
+
+func TestBuildProjectCmdCtx_AutoDiscoverRespectsRepoConfig(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := map[string]struct {
+		globalCfg     string
+		repoCfg       string
+		modifiedFiles []string
+		expLen        int
+	}{
+		"autodiscover disabled": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: disabled
+`,
+			repoCfg: `
+version: 3
+automerge: true
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        0,
+		},
+		"autodiscover auto": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: auto
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        1,
+		},
+		"autodiscover enabled": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        3,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			tmp := DirStructure(t, map[string]interface{}{
+				"project1": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project2": map[string]interface{}{
+					"main.tf": nil,
+				},
+				"project3": map[string]interface{}{
+					"main.tf": nil,
+				},
+			})
+
+			workingDir := NewMockWorkingDir()
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmp, false, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn(c.modifiedFiles, nil)
+
+			// Write and parse the global config file.
+			globalCfgPath := filepath.Join(tmp, "global.yaml")
+			Ok(t, os.WriteFile(globalCfgPath, []byte(c.globalCfg), 0600))
+			parser := &config.ParserValidator{}
 			globalCfgArgs := valid.GlobalCfgArgs{
-				AllowRepoCfg:  false,
-				MergeableReq:  false,
-				ApprovedReq:   false,
-				UnDivergedReq: false,
+				AllowAllRepoSettings: false,
 			}
 
 			globalCfg, err := parser.ParseGlobalCfg(globalCfgPath, valid.NewGlobalCfgFromArgs(globalCfgArgs))
@@ -1293,27 +1428,26 @@ projects:
 				false,
 				true,
 				false,
+				"auto",
 				statsScope,
-				logger,
 				terraformClient,
 			)
 
-			for _, cmd := range []command.Name{command.Plan, command.Apply} {
-				t.Run(cmd.String(), func(t *testing.T) {
-					ctxs, err := builder.buildProjectCommandCtx(&command.Context{
-						Log:   logger,
-						Scope: statsScope,
-						Pull: models.PullRequest{
-							BaseRepo: baseRepo,
-						},
-						PullRequestStatus: models.PullReqStatus{
-							Mergeable: true,
-						},
-					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true)
-					Equals(t, c.expLen, len(ctxs))
-					Ok(t, err)
-				})
-			}
+			ctxs, err := builder.BuildPlanCommands(
+				&command.Context{
+					Log:   logger,
+					Scope: statsScope,
+				},
+				&CommentCommand{
+					RepoRelDir: "",
+					Flags:      nil,
+					Name:       command.Plan,
+					Verbose:    false,
+				},
+			)
+			Equals(t, c.expLen, len(ctxs))
+			Ok(t, err)
+
 		})
 	}
 }

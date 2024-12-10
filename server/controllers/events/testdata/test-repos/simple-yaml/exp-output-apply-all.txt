@@ -2,6 +2,7 @@ Ran Apply for 2 projects:
 
 1. dir: `.` workspace: `default`
 1. dir: `.` workspace: `staging`
+---
 
 ### 1. dir: `.` workspace: `default`
 ```diff
@@ -39,3 +40,6 @@ postapply
 </details>
 
 ---
+### Apply Summary
+
+2 projects, 2 successful, 0 failed, 0 errored

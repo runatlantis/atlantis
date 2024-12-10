@@ -28,6 +28,7 @@ import (
 var commentParser = events.CommentParser{
 	GithubUser:     "github-user",
 	GitlabUser:     "gitlab-user",
+	GiteaUser:      "gitea-user",
 	ExecutableName: "atlantis",
 	AllowCommands:  command.AllCommentCommands,
 }
@@ -36,6 +37,7 @@ func TestNewCommentParser(t *testing.T) {
 	type args struct {
 		githubUser      string
 		gitlabUser      string
+		giteaUser       string
 		bitbucketUser   string
 		azureDevopsUser string
 		executableName  string
@@ -68,7 +70,7 @@ func TestNewCommentParser(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands), "NewCommentParser(%v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
+			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.giteaUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands), "NewCommentParser(%v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
 		})
 	}
 }
@@ -266,6 +268,7 @@ func TestParse_InvalidCommand(t *testing.T) {
 	cp := events.NewCommentParser(
 		"github-user",
 		"gitlab-user",
+		"gitea-user",
 		"bitbucket-user",
 		"azure-devops-user",
 		"atlantis",
@@ -726,6 +729,7 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 		workspace         string
 		project           string
 		autoMergeDisabled bool
+		autoMergeMethod   string
 		commentArgs       []string
 		expPlanFlags      string
 		expApplyFlags     string
@@ -821,6 +825,16 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 			expApplyFlags:     "-d dir -w workspace --auto-merge-disabled",
 			expVersionFlags:   "-d dir -w workspace",
 		},
+		{
+			repoRelDir:      "dir",
+			workspace:       "workspace",
+			project:         "",
+			autoMergeMethod: "squash",
+			commentArgs:     []string{`"arg1"`, `"arg2"`, `arg3`},
+			expPlanFlags:    "-d dir -w workspace -- arg1 arg2 arg3",
+			expApplyFlags:   "-d dir -w workspace --auto-merge-method squash",
+			expVersionFlags: "-d dir -w workspace",
+		},
 	}
 
 	for _, c := range cases {
@@ -831,7 +845,7 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 					actComment := commentParser.BuildPlanComment(c.repoRelDir, c.workspace, c.project, c.commentArgs)
 					Equals(t, fmt.Sprintf("atlantis plan %s", c.expPlanFlags), actComment)
 				case command.Apply:
-					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled)
+					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled, c.autoMergeMethod)
 					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
 				}
 			}
@@ -1017,14 +1031,18 @@ var PlanUsage = `Usage of plan:
 `
 
 var ApplyUsage = `Usage of apply:
-      --auto-merge-disabled   Disable automerge after apply.
-  -d, --dir string            Apply the plan for this directory, relative to root of
-                              repo, ex. 'child/dir'.
-  -p, --project string        Apply the plan for this project. Refers to the name of
-                              the project configured in a repo config file. Cannot
-                              be used at same time as workspace or dir flags.
-      --verbose               Append Atlantis log to comment.
-  -w, --workspace string      Apply the plan for this Terraform workspace.
+      --auto-merge-disabled        Disable automerge after apply.
+      --auto-merge-method string   Specifies the merge method for the VCS if
+                                   automerge is enabled. (Currently only implemented
+                                   for GitHub)
+  -d, --dir string                 Apply the plan for this directory, relative to
+                                   root of repo, ex. 'child/dir'.
+  -p, --project string             Apply the plan for this project. Refers to the
+                                   name of the project configured in a repo config
+                                   file. Cannot be used at same time as workspace or
+                                   dir flags.
+      --verbose                    Append Atlantis log to comment.
+  -w, --workspace string           Apply the plan for this Terraform workspace.
 `
 
 var ApprovePolicyUsage = `Usage of approve_policies:

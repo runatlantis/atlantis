@@ -2,6 +2,7 @@ Ran State for 2 projects:
 
 1. dir: `dir1` workspace: `default`
 1. dir: `dir2` workspace: `default`
+---
 
 ### 1. dir: `dir1` workspace: `default`
 ```diff
@@ -12,7 +13,9 @@ Successfully removed 1 resource instance(s).
 :put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
 
 * :repeat: To **plan** this project again, comment:
-  * `atlantis plan -d dir1`
+  ```shell
+  atlantis plan -d dir1
+  ```
 
 ---
 ### 2. dir: `dir2` workspace: `default`
@@ -24,6 +27,8 @@ Successfully removed 1 resource instance(s).
 :put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
 
 * :repeat: To **plan** this project again, comment:
-  * `atlantis plan -d dir2`
+  ```shell
+  atlantis plan -d dir2
+  ```
 
 ---

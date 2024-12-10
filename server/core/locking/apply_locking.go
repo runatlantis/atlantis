@@ -31,33 +31,36 @@ type ApplyLocker interface {
 // ApplyCommandLock contains information about apply command lock status.
 type ApplyCommandLock struct {
 	// Locked is true is when apply commands are locked
-	// Either by using DisableApply flag or creating a global ApplyCommandLock
+	// Either by using omitting apply from AllowCommands or creating a global ApplyCommandLock
 	// DisableApply lock take precedence when set
-	Locked  bool
-	Time    time.Time
-	Failure string
+	Locked                 bool
+	GlobalApplyLockEnabled bool
+	Time                   time.Time
+	Failure                string
 }
 
 type ApplyClient struct {
-	backend          Backend
-	disableApplyFlag bool
+	backend                Backend
+	disableApply           bool
+	disableGlobalApplyLock bool
 }
 
-func NewApplyClient(backend Backend, disableApplyFlag bool) ApplyLocker {
+func NewApplyClient(backend Backend, disableApply bool, disableGlobalApplyLock bool) ApplyLocker {
 	return &ApplyClient{
-		backend:          backend,
-		disableApplyFlag: disableApplyFlag,
+		backend:                backend,
+		disableApply:           disableApply,
+		disableGlobalApplyLock: disableGlobalApplyLock,
 	}
 }
 
 // LockApply acquires global apply lock.
-// DisableApplyFlag takes presedence to any existing locks, if it is set to true
+// DisableApply takes presedence to any existing locks, if it is set to true
 // this function returns an error
 func (c *ApplyClient) LockApply() (ApplyCommandLock, error) {
 	response := ApplyCommandLock{}
 
-	if c.disableApplyFlag {
-		return response, errors.New("DisableApplyFlag is set; Apply commands are locked globally until flag is unset")
+	if c.disableApply {
+		return response, errors.New("apply is omitted from AllowCommands; Apply commands are locked globally until flag is updated")
 	}
 
 	applyCmdLock, err := c.backend.LockCommand(command.Apply, time.Now())
@@ -73,11 +76,11 @@ func (c *ApplyClient) LockApply() (ApplyCommandLock, error) {
 }
 
 // UnlockApply releases a global apply lock.
-// DisableApplyFlag takes presedence to any existing locks, if it is set to true
+// DisableApply takes presedence to any existing locks, if it is set to true
 // this function returns an error
 func (c *ApplyClient) UnlockApply() error {
-	if c.disableApplyFlag {
-		return errors.New("apply commands are disabled until DisableApply flag is unset")
+	if c.disableApply {
+		return errors.New("apply commands are disabled until AllowCommands flag is updated")
 	}
 
 	err := c.backend.UnlockCommand(command.Apply)
@@ -89,11 +92,13 @@ func (c *ApplyClient) UnlockApply() error {
 }
 
 // CheckApplyLock retrieves an apply command lock if present.
-// If DisableApplyFlag is set it will always return a lock.
+// If DisableApply is set it will always return a lock.
 func (c *ApplyClient) CheckApplyLock() (ApplyCommandLock, error) {
-	response := ApplyCommandLock{}
+	response := ApplyCommandLock{
+		GlobalApplyLockEnabled: true,
+	}
 
-	if c.disableApplyFlag {
+	if c.disableApply {
 		return ApplyCommandLock{
 			Locked: true,
 		}, nil
@@ -107,6 +112,9 @@ func (c *ApplyClient) CheckApplyLock() (ApplyCommandLock, error) {
 	if applyCmdLock != nil {
 		response.Locked = true
 		response.Time = applyCmdLock.LockTime()
+	}
+	if c.disableGlobalApplyLock {
+		response.GlobalApplyLockEnabled = false
 	}
 
 	return response, nil

@@ -130,7 +130,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	projectCmdContext := newProjectCommandContext(
 		ctx,
 		cmdName,
-		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled, prjCfg.AutoMergeMethod),
 		cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 		prjCfg,
@@ -144,6 +144,8 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		abortOnExcecutionOrderFail,
 		ctx.Scope,
 		ctx.PullRequestStatus,
+		ctx.PullStatus,
+		ctx.TeamAllowlistChecker,
 	)
 
 	projectCmds = append(projectCmds, projectCmdContext)
@@ -201,7 +203,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		projectCmds = append(projectCmds, newProjectCommandContext(
 			ctx,
 			command.PolicyCheck,
-			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled),
+			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled, prjCfg.AutoMergeMethod),
 			cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 			prjCfg,
@@ -215,6 +217,8 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			abortOnExcecutionOrderFail,
 			ctx.Scope,
 			ctx.PullRequestStatus,
+			ctx.PullStatus,
+			ctx.TeamAllowlistChecker,
 		))
 	}
 
@@ -238,7 +242,9 @@ func newProjectCommandContext(ctx *command.Context,
 	verbose bool,
 	abortOnExcecutionOrderFail bool,
 	scope tally.Scope,
-	pullStatus models.PullReqStatus,
+	pullReqStatus models.PullReqStatus,
+	pullStatus *models.PullStatus,
+	teamAllowlistChecker command.TeamAllowlistChecker,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
@@ -270,11 +276,12 @@ func newProjectCommandContext(ctx *command.Context,
 		EscapedCommentArgs:         escapedCommentArgs,
 		AutomergeEnabled:           automergeEnabled,
 		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
-		RepoLocking:                projCfg.RepoLocking,
+		RepoLocksMode:              projCfg.RepoLocks.Mode,
 		CustomPolicyCheck:          projCfg.CustomPolicyCheck,
 		ParallelApplyEnabled:       parallelApplyEnabled,
 		ParallelPlanEnabled:        parallelPlanEnabled,
 		ParallelPolicyCheckEnabled: parallelPlanEnabled,
+		DependsOn:                  projCfg.DependsOn,
 		AutoplanEnabled:            projCfg.AutoplanEnabled,
 		Steps:                      steps,
 		HeadRepo:                   ctx.HeadRepo,
@@ -297,10 +304,13 @@ func newProjectCommandContext(ctx *command.Context,
 		PolicySets:                 policySets,
 		PolicySetTarget:            ctx.PolicySet,
 		ClearPolicyApproval:        ctx.ClearPolicyApproval,
-		PullReqStatus:              pullStatus,
+		PullReqStatus:              pullReqStatus,
+		PullStatus:                 pullStatus,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
+		SilencePRComments:          projCfg.SilencePRComments,
+		TeamAllowlistChecker:       teamAllowlistChecker,
 	}
 }
 

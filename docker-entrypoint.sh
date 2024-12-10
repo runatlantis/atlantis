@@ -1,4 +1,10 @@
-#!/usr/bin/dumb-init /bin/sh
+#!/usr/bin/env -S dumb-init --single-child /bin/sh
+
+# dumb-init is run in single child mode. By default dumb-init will forward
+# interrupts to all child processes, causing Terraform to cancel and Terraform
+# providers to exit uncleanly. We forward the signal to Atlantis only, allowing
+# it to trap the interrupt, and exit gracefully.
+
 set -e
 
 # Modified: https://github.com/hashicorp/docker-consul/blob/2c2873f9d619220d1eef0bc46ec78443f55a10b5/0.X/docker-entrypoint.sh
@@ -27,6 +33,31 @@ if ! whoami > /dev/null 2>&1; then
   if [ -w /etc/passwd ]; then
     echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:/home/atlantis:/sbin/nologin" >> /etc/passwd
   fi
+fi
+
+# If we need to install some tools at entrypoint level, we can add shell scripts
+# in folder /docker-entrypoint.d/ with extension .sh and this scripts will be executed
+# at entrypount level.
+if /usr/bin/find "/docker-entrypoint.d/" -mindepth 1 -maxdepth 1 -type f -print -quit 2>/dev/null | read v; then
+  echo "/docker-entrypoint.d/ is not empty, will attempt to perform script execition"
+  echo "Looking for shell scripts in /docker-entrypoint.d/"
+  find "/docker-entrypoint.d/" -follow -type f -print | sort -V | while read -r f; do
+    case "$f" in
+      *.sh)
+        if [ -x "$f" ]; then
+          echo "Launching $f";
+          "$f"
+        else
+          # warn on shell scripts without exec bit
+          echo "Ignoring $f, not executable";
+        fi
+        ;;
+      *) echo "Ignoring $f";;
+    esac
+  done
+  echo "Configuration complete; ready for start up"
+else
+  echo "No files found in /docker-entrypoint.d/, skipping"
 fi
 
 exec "$@"

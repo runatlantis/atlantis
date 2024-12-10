@@ -29,19 +29,19 @@ func (mock *MockSourceResolver) Resolve(policySet valid.PolicySet) (string, erro
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSourceResolver().")
 	}
-	params := []pegomock.Param{policySet}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Resolve", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 string
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(string)
+	_params := []pegomock.Param{policySet}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Resolve", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 string
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(string)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockSourceResolver) VerifyWasCalledOnce() *VerifierMockSourceResolver {
@@ -82,8 +82,8 @@ type VerifierMockSourceResolver struct {
 }
 
 func (verifier *VerifierMockSourceResolver) Resolve(policySet valid.PolicySet) *MockSourceResolver_Resolve_OngoingVerification {
-	params := []pegomock.Param{policySet}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Resolve", params, verifier.timeout)
+	_params := []pegomock.Param{policySet}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Resolve", _params, verifier.timeout)
 	return &MockSourceResolver_Resolve_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -98,11 +98,13 @@ func (c *MockSourceResolver_Resolve_OngoingVerification) GetCapturedArguments() 
 }
 
 func (c *MockSourceResolver_Resolve_OngoingVerification) GetAllCapturedArguments() (_param0 []valid.PolicySet) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]valid.PolicySet, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(valid.PolicySet)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]valid.PolicySet, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(valid.PolicySet)
+			}
 		}
 	}
 	return

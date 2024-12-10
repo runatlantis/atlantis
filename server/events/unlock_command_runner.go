@@ -1,9 +1,10 @@
 package events
 
 import (
+	"slices"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"slices"
 )
 
 func NewUnlockCommandRunner(
@@ -29,10 +30,7 @@ type UnlockCommandRunner struct {
 	DisableUnlockLabel string
 }
 
-func (u *UnlockCommandRunner) Run(
-	ctx *command.Context,
-	cmd *CommentCommand,
-) {
+func (u *UnlockCommandRunner) Run(ctx *command.Context, _ *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pullNum := ctx.Pull.Num
 	disableUnlockLabel := u.DisableUnlockLabel
@@ -44,7 +42,7 @@ func (u *UnlockCommandRunner) Run(
 	var err error
 	if disableUnlockLabel != "" {
 		var labels []string
-		labels, err = u.vcsClient.GetPullLabels(baseRepo, ctx.Pull)
+		labels, err = u.vcsClient.GetPullLabels(ctx.Log, baseRepo, ctx.Pull)
 		if err != nil {
 			vcsMessage = "Failed to retrieve PR labels... Not unlocking"
 			ctx.Log.Err("Failed to retrieve PR labels for pull %s", err.Error())
@@ -58,7 +56,7 @@ func (u *UnlockCommandRunner) Run(
 
 	var numLocks int
 	if err == nil && !hasLabel {
-		numLocks, err = u.deleteLockCommand.DeleteLocksByPull(baseRepo.FullName, pullNum)
+		numLocks, err = u.deleteLockCommand.DeleteLocksByPull(ctx.Log, baseRepo.FullName, pullNum)
 		if err != nil {
 			vcsMessage = "Failed to delete PR locks"
 			ctx.Log.Err("failed to delete locks by pull %s", err.Error())
@@ -73,7 +71,7 @@ func (u *UnlockCommandRunner) Run(
 		}
 	}
 
-	if commentErr := u.vcsClient.CreateComment(baseRepo, pullNum, vcsMessage, command.Unlock.String()); commentErr != nil {
+	if commentErr := u.vcsClient.CreateComment(ctx.Log, baseRepo, pullNum, vcsMessage, command.Unlock.String()); commentErr != nil {
 		ctx.Log.Err("unable to comment: %s", commentErr)
 	}
 }

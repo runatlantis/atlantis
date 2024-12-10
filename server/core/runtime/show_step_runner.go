@@ -27,7 +27,7 @@ type showStepRunner struct {
 	defaultTFVersion  *version.Version
 }
 
-func (p *showStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+func (p *showStepRunner) Run(ctx command.ProjectContext, _ []string, path string, envs map[string]string) (string, error) {
 	tfVersion := p.defaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -49,7 +49,7 @@ func (p *showStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 		return "", errors.Wrap(err, "running terraform show")
 	}
 
-	if err := os.WriteFile(showResultFile, []byte(output), os.ModePerm); err != nil {
+	if err := os.WriteFile(showResultFile, []byte(output), 0600); err != nil {
 		return "", errors.Wrap(err, "writing terraform show result")
 	}
 

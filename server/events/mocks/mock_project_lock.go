@@ -31,19 +31,19 @@ func (mock *MockProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectLocker().")
 	}
-	params := []pegomock.Param{log, pull, user, workspace, project, repoLocking}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", params, []reflect.Type{reflect.TypeOf((**events.TryLockResponse)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 *events.TryLockResponse
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(*events.TryLockResponse)
+	_params := []pegomock.Param{log, pull, user, workspace, project, repoLocking}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", _params, []reflect.Type{reflect.TypeOf((**events.TryLockResponse)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 *events.TryLockResponse
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(*events.TryLockResponse)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockProjectLocker) VerifyWasCalledOnce() *VerifierMockProjectLocker {
@@ -84,8 +84,8 @@ type VerifierMockProjectLocker struct {
 }
 
 func (verifier *VerifierMockProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) *MockProjectLocker_TryLock_OngoingVerification {
-	params := []pegomock.Param{log, pull, user, workspace, project, repoLocking}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLock", params, verifier.timeout)
+	_params := []pegomock.Param{log, pull, user, workspace, project, repoLocking}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLock", _params, verifier.timeout)
 	return &MockProjectLocker_TryLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -100,31 +100,43 @@ func (c *MockProjectLocker_TryLock_OngoingVerification) GetCapturedArguments() (
 }
 
 func (c *MockProjectLocker_TryLock_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.PullRequest, _param2 []models.User, _param3 []string, _param4 []models.Project, _param5 []bool) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(logging.SimpleLogging)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(logging.SimpleLogging)
+			}
 		}
-		_param1 = make([]models.PullRequest, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(models.PullRequest)
+		if len(_params) > 1 {
+			_param1 = make([]models.PullRequest, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(models.PullRequest)
+			}
 		}
-		_param2 = make([]models.User, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.(models.User)
+		if len(_params) > 2 {
+			_param2 = make([]models.User, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(models.User)
+			}
 		}
-		_param3 = make([]string, len(c.methodInvocations))
-		for u, param := range params[3] {
-			_param3[u] = param.(string)
+		if len(_params) > 3 {
+			_param3 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(string)
+			}
 		}
-		_param4 = make([]models.Project, len(c.methodInvocations))
-		for u, param := range params[4] {
-			_param4[u] = param.(models.Project)
+		if len(_params) > 4 {
+			_param4 = make([]models.Project, len(c.methodInvocations))
+			for u, param := range _params[4] {
+				_param4[u] = param.(models.Project)
+			}
 		}
-		_param5 = make([]bool, len(c.methodInvocations))
-		for u, param := range params[5] {
-			_param5[u] = param.(bool)
+		if len(_params) > 5 {
+			_param5 = make([]bool, len(c.methodInvocations))
+			for u, param := range _params[5] {
+				_param5[u] = param.(bool)
+			}
 		}
 	}
 	return

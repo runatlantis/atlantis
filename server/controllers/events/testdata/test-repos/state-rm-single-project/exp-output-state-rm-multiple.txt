@@ -9,4 +9,6 @@ Successfully removed 2 resource instance(s).
 :put_litter_in_its_place: A plan file was discarded. Re-plan would be required before applying.
 
 * :repeat: To **plan** this project again, comment:
-  * `atlantis plan -d .`
+  ```shell
+  atlantis plan -d .
+  ```

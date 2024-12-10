@@ -9,6 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -46,7 +47,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[string]())).ThenReturn(false)
+				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(false)
 			},
 			wantErr: assert.NoError,
 		},
@@ -76,7 +77,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 				PlanRequirements: []string{raw.UnDivergedRequirement},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[string]())).ThenReturn(true)
+				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running plan.",
 			wantErr:     assert.NoError,
@@ -130,7 +131,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[string]())).ThenReturn(false)
+				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(false)
 			},
 			wantErr: assert.NoError,
 		},
@@ -184,7 +185,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				ApplyRequirements: []string{raw.UnDivergedRequirement},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[string]())).ThenReturn(true)
+				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running apply.",
 			wantErr:     assert.NoError,
@@ -203,6 +204,132 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				return
 			}
 			assert.Equalf(t, tt.wantFailure, gotFailure, "ValidateApplyProject(%v, %v)", repoDir, tt.ctx)
+		})
+	}
+}
+
+func TestRequirements_ValidateProjectDependencies(t *testing.T) {
+	tests := []struct {
+		name        string
+		ctx         command.ProjectContext
+		setup       func(workingDir *mocks.MockWorkingDir)
+		wantFailure string
+		wantErr     assert.ErrorAssertionFunc
+	}{
+		{
+			name:    "pass no dependencies",
+			ctx:     command.ProjectContext{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "pass all dependencies applied",
+			ctx: command.ProjectContext{
+				DependsOn: []string{"project1"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.AppliedPlanStatus,
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "Fail all dependencies are not applied",
+			ctx: command.ProjectContext{
+				DependsOn: []string{"project1", "project2"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.PlannedPlanStatus,
+						},
+						{
+							ProjectName: "project2",
+							Status:      models.ErroredApplyStatus,
+						},
+					},
+				},
+			},
+			wantFailure: "Can't apply your project unless you apply its dependencies: [project1]",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "Fail one of dependencies is not applied",
+			ctx: command.ProjectContext{
+				DependsOn: []string{"project1", "project2"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.AppliedPlanStatus,
+						},
+						{
+							ProjectName: "project2",
+							Status:      models.ErroredApplyStatus,
+						},
+					},
+				},
+			},
+			wantFailure: "Can't apply your project unless you apply its dependencies: [project2]",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "Should not fail if one of dependencies is not applied but it has no changes to apply",
+			ctx: command.ProjectContext{
+				DependsOn: []string{"project1", "project2"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.AppliedPlanStatus,
+						},
+						{
+							ProjectName: "project2",
+							Status:      models.PlannedNoChangesPlanStatus,
+						},
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "In the case of more than one dependency, should not continue to check dependencies if one of them is not in applied status",
+			ctx: command.ProjectContext{
+				DependsOn: []string{"project1", "project2"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{
+						{
+							ProjectName: "project1",
+							Status:      models.AppliedPlanStatus,
+						},
+						{
+							ProjectName: "project2",
+							Status:      models.ErroredApplyStatus,
+						},
+						{
+							ProjectName: "project3",
+							Status:      models.PlannedPlanStatus,
+						},
+					},
+				},
+			},
+			wantFailure: "Can't apply your project unless you apply its dependencies: [project2]",
+			wantErr:     assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			workingDir := mocks.NewMockWorkingDir()
+			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
+			gotFailure, err := a.ValidateProjectDependencies(tt.ctx)
+			if !tt.wantErr(t, err, fmt.Sprintf("ValidateProjectDependencies(%v)", tt.ctx)) {
+				return
+			}
+			assert.Equalf(t, tt.wantFailure, gotFailure, "ValidateProjectDependencies(%v)", tt.ctx)
 		})
 	}
 }
@@ -237,7 +364,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[string]())).ThenReturn(false)
+				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(false)
 			},
 			wantErr: assert.NoError,
 		},
@@ -267,7 +394,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 				ImportRequirements: []string{raw.UnDivergedRequirement},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[string]())).ThenReturn(true)
+				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running import.",
 			wantErr:     assert.NoError,

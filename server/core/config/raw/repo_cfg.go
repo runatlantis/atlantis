@@ -19,6 +19,7 @@ type RepoCfg struct {
 	Projects                   []Project           `yaml:"projects,omitempty"`
 	Workflows                  map[string]Workflow `yaml:"workflows,omitempty"`
 	PolicySets                 PolicySets          `yaml:"policies,omitempty"`
+	AutoDiscover               *AutoDiscover       `yaml:"autodiscover,omitempty"`
 	Automerge                  *bool               `yaml:"automerge,omitempty"`
 	ParallelApply              *bool               `yaml:"parallel_apply,omitempty"`
 	ParallelPlan               *bool               `yaml:"parallel_plan,omitempty"`
@@ -26,6 +27,8 @@ type RepoCfg struct {
 	EmojiReaction              *string             `yaml:"emoji_reaction,omitempty"`
 	AllowedRegexpPrefixes      []string            `yaml:"allowed_regexp_prefixes,omitempty"`
 	AbortOnExcecutionOrderFail *bool               `yaml:"abort_on_execution_order_fail,omitempty"`
+	RepoLocks                  *RepoLocks          `yaml:"repo_locks,omitempty"`
+	SilencePRComments          []string            `yaml:"silence_pr_comments,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
@@ -71,10 +74,20 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		abortOnExcecutionOrderFail = *r.AbortOnExcecutionOrderFail
 	}
 
+	var autoDiscover *valid.AutoDiscover
+	if r.AutoDiscover != nil {
+		autoDiscover = r.AutoDiscover.ToValid()
+	}
+
+	var repoLocks *valid.RepoLocks
+	if r.RepoLocks != nil {
+		repoLocks = r.RepoLocks.ToValid()
+	}
 	return valid.RepoCfg{
 		Version:                    *r.Version,
 		Projects:                   validProjects,
 		Workflows:                  validWorkflows,
+		AutoDiscover:               autoDiscover,
 		Automerge:                  automerge,
 		ParallelApply:              parallelApply,
 		ParallelPlan:               parallelPlan,
@@ -83,5 +96,7 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		AllowedRegexpPrefixes:      r.AllowedRegexpPrefixes,
 		EmojiReaction:              emojiReaction,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
+		RepoLocks:                  repoLocks,
+		SilencePRComments:          r.SilencePRComments,
 	}
 }

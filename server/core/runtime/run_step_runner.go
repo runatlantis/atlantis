@@ -22,7 +22,15 @@ type RunStepRunner struct {
 	ProjectCmdOutputHandler jobs.ProjectCommandOutputHandler
 }
 
-func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
+func (r *RunStepRunner) Run(
+	ctx command.ProjectContext,
+	shell *valid.CommandShell,
+	command string,
+	path string,
+	envs map[string]string,
+	streamOutput bool,
+	postProcessOutput valid.PostProcessRunOutputOption,
+) (string, error) {
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
@@ -68,24 +76,28 @@ func (r *RunStepRunner) Run(ctx command.ProjectContext, command string, path str
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
 
-	runner := models.NewShellCommandRunner(command, finalEnvVars, path, streamOutput, r.ProjectCmdOutputHandler)
+	runner := models.NewShellCommandRunner(shell, command, finalEnvVars, path, streamOutput, r.ProjectCmdOutputHandler)
 	output, err := runner.Run(ctx)
+
+	if postProcessOutput == valid.PostProcessRunOutputStripRefreshing {
+		output = StripRefreshingFromPlanOutput(output, tfVersion)
+
+	}
 
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output)
 		if !ctx.CustomPolicyCheck {
 			ctx.Log.Debug("error: %s", err)
 			return "", err
-		} else {
-			ctx.Log.Debug("Treating custom policy tool error exit code as a policy failure.  Error output: %s", err)
 		}
+		ctx.Log.Debug("Treating custom policy tool error exit code as a policy failure.  Error output: %s", err)
 	}
 
 	switch postProcessOutput {
 	case valid.PostProcessRunOutputHide:
 		return "", nil
 	case valid.PostProcessRunOutputStripRefreshing:
-		return StripRefreshingFromPlanOutput(output, tfVersion), nil
+		return output, nil
 	case valid.PostProcessRunOutputShow:
 		return output, nil
 	default:

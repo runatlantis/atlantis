@@ -2,6 +2,7 @@ Ran Apply for 2 projects:
 
 1. dir: `infrastructure/production` workspace: `default`
 1. dir: `infrastructure/staging` workspace: `default`
+---
 
 ### 1. dir: `infrastructure/production` workspace: `default`
 ```diff
@@ -21,3 +22,6 @@ Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 ```
 
 ---
+### Apply Summary
+
+2 projects, 2 successful, 0 failed, 0 errored

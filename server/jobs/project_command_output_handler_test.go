@@ -161,10 +161,12 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		projectOutputHandler.Send(ctx, "Complete", false)
 
 		pullContext := jobs.PullInfo{
-			PullNum:     ctx.Pull.Num,
-			Repo:        ctx.BaseRepo.Name,
-			ProjectName: ctx.ProjectName,
-			Workspace:   ctx.Workspace,
+			PullNum:      ctx.Pull.Num,
+			Repo:         ctx.BaseRepo.Name,
+			RepoFullName: ctx.BaseRepo.FullName,
+			ProjectName:  ctx.ProjectName,
+			Path:         ctx.RepoRelDir,
+			Workspace:    ctx.Workspace,
 		}
 		wg.Wait() // Must finish reading messages before cleaning up
 		projectOutputHandler.CleanUp(pullContext)
@@ -191,7 +193,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		// read from channel
 		go func() {
-			for range ch {
+			for range ch { //revive:disable-line:empty-block
 			}
 		}()
 
@@ -225,7 +227,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		// read from channel
 		go func() {
-			for range ch {
+			for range ch { //revive:disable-line:empty-block
 			}
 		}()
 
@@ -240,7 +242,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		// buffer channel will be closed immediately after logs are streamed
 		go func() {
-			for range ch2 {
+			for range ch2 { //revive:disable-line:empty-block
 			}
 			opComplete <- true
 		}()
