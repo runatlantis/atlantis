@@ -35,7 +35,7 @@ import (
 )
 
 const hashicorpReleasesURL = "https://releases.hashicorp.com"
-const terraformVersion = "1.9.8" // renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
+const terraformVersion = "1.10.1" // renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 const ngrokDownloadURL = "https://bin.equinox.io/c/4VmDzA7iaHb"
 const ngrokAPIURL = "localhost:41414" // We hope this isn't used.
 const atlantisPort = 4141
