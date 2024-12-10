@@ -376,11 +376,11 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 	dur := time.Since(start)
 	log := ctx.Log.With("duration", dur)
 	if err != nil {
-		err = errors.Wrapf(err, "running %q in %q", tfCmd, path)
+		err = errors.Wrapf(err, "running '%s' in '%s'", tfCmd, path)
 		log.Err(err.Error())
 		return ansi.Strip(string(out)), err
 	}
-	log.Info("successfully ran %q in %q", tfCmd, path)
+	log.Info("Successfully ran '%s' in '%s'", tfCmd, path)
 
 	return ansi.Strip(string(out)), nil
 }

@@ -48,7 +48,7 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:5c56ee1df3dd9ea426bee50df43e2407df054e81f4b4eb183173e90a11f86922
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:827cac6ef5a21a13ce67fa50477477500e6574c2491f181fa6694fe985e3df50
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
@@ -65,7 +65,7 @@ jobs:
       ###########################################################
       - name: Slack failure notification
         if: ${{ github.ref == 'refs/heads/main' && failure() }}
-        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
+        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
         with:
           payload: |
             {
