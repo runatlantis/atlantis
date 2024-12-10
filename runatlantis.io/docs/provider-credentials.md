@@ -73,10 +73,12 @@ make sure to add the `role_arn` option:
 ```bash
 terraform {
   backend "s3" {
-    bucket   = "mybucket"
-    key      = "path/to/my/key"
-    region   = "us-east-1"
-    role_arn = "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
+    bucket      = "mybucket"
+    key         = "path/to/my/key"
+    region      = "us-east-1"
+    assume_role = {
+      role_arn = "arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME"
+    }
     # can't use var.atlantis_user as the session name because
     # interpolations are not allowed in backend configuration
     # session_name = "${var.atlantis_user}" WON'T WORK
