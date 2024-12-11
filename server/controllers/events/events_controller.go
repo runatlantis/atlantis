@@ -50,7 +50,7 @@ const giteaRequestIDHeader = "X-Gitea-Delivery"
 const bitbucketEventTypeHeader = "X-Event-Key"
 const bitbucketCloudRequestIDHeader = "X-Request-UUID"
 const bitbucketServerRequestIDHeader = "X-Request-ID"
-const bitbucketServerSignatureHeader = "X-Hub-Signature"
+const bitbucketSignatureHeader = "X-Hub-Signature"
 
 // The URL used for Azure DevOps test webhooks
 const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079"
@@ -223,7 +223,7 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r *http.Request) {
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
 	reqID := r.Header.Get(bitbucketCloudRequestIDHeader)
-	sig := r.Header.Get(bitbucketServerSignatureHeader)
+	sig := r.Header.Get(bitbucketSignatureHeader)
 	defer r.Body.Close() // nolint: errcheck
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -253,7 +253,7 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r *http.Request) {
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
 	reqID := r.Header.Get(bitbucketServerRequestIDHeader)
-	sig := r.Header.Get(bitbucketServerSignatureHeader)
+	sig := r.Header.Get(bitbucketSignatureHeader)
 	defer r.Body.Close() // nolint: errcheck
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
