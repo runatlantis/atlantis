@@ -30,6 +30,8 @@ const (
 	Import
 	// State is a command to run terraform state rm
 	State
+	// DraftPlan is a light-weight plan that cannot be applied
+	DraftPlan
 	// Adding more? Don't forget to update String() below
 )
 
@@ -47,6 +49,7 @@ var AllCommentCommands = []Name{
 	ApprovePolicies,
 	Import,
 	State,
+	DraftPlan,
 }
 
 // TitleString returns the string representation in title form.
@@ -74,6 +77,8 @@ func (c Name) String() string {
 		return "import"
 	case State:
 		return "state"
+	case DraftPlan:
+		return "draftplan"
 	}
 	return ""
 }
@@ -137,6 +142,8 @@ func ParseCommandName(name string) (Name, error) {
 		return Apply, nil
 	case "plan":
 		return Plan, nil
+	case "draftplan":
+		return DraftPlan, nil
 	case "unlock":
 		return Unlock, nil
 	case "policy_check":
