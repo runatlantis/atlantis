@@ -146,6 +146,10 @@ jobs:
         target: ${{ matrix.image_type }}
         labels: ${{ steps.meta.outputs.labels }}
         outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}
+    - name: "Attest Image"
+      uses: actions/attest-build-provenance@7668571508540a607bdfd90a87a560489fe372eb # v2.1.0
+      with:
+        subject-path: ${{ steps.meta.outputs.tags }}
 
   test:
     needs: [changes]
