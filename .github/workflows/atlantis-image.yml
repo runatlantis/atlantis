@@ -154,7 +154,9 @@ jobs:
     - name: "Sign and Attest Image"
       uses: actions/attest-build-provenance@7668571508540a607bdfd90a87a560489fe372eb # v2.1.0
       with:
-        subject-path: ${{ steps.meta.outputs.tags }}
+        subject-path: ${{ steps.build.outputs.name }}
+        subject-digest: ${{ steps.build.outputs.digest }}
+        push-to-registry: true
 
   test:
     needs: [changes]
