@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v65/github"
+	"github.com/google/go-github/v66/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 
@@ -1191,7 +1191,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
 			When(vcsClient.PullIsMergeable(
-				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq("atlantis-test"))).ThenReturn(true, nil)
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq("atlantis-test"), Eq([]string{}))).ThenReturn(true, nil)
 			When(vcsClient.PullIsApproved(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(models.ApprovalStatus{
 				IsApproved: true,
@@ -1505,7 +1505,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		userConfig.QuietPolicyChecks,
 	)
 
-	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient, "atlantis-test")
+	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient, "atlantis-test", []string{})
 
 	planCommandRunner := events.NewPlanCommandRunner(
 		false,

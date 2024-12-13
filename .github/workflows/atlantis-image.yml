@@ -29,7 +29,7 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -56,7 +56,7 @@ jobs:
       PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
 
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
     # Lint the Dockerfile first before setting anything up
     - name: Lint Dockerfile
@@ -85,7 +85,7 @@ jobs:
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81 # v5
+      uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96 # v5
       env:
         SUFFIX: ${{ format('-{0}', matrix.image_type) }}
       with:
@@ -130,7 +130,7 @@ jobs:
 
     - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-      uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6
+      uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6
       with:
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -160,7 +160,7 @@ jobs:
       DOCKER_REPO: ghcr.io/${{ github.repository }}
 
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3
@@ -171,7 +171,7 @@ jobs:
 
       - name: "Build and load into Docker"
         if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6
+        uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
