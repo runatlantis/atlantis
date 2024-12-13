@@ -144,6 +144,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				TerraformVersion:   projVersion,
 				ProjectName:        c.ProjectName,
 				EscapedCommentArgs: []string{"-target=resource1", "-target=resource2"},
+				CustomPolicyCheck:  true,
 			}
 			out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow)
 			if c.ExpErr != "" {
