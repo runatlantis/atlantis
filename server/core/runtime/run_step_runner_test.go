@@ -10,7 +10,9 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -103,8 +105,9 @@ func TestRunStepRunner_Run(t *testing.T) {
 		defaultVersion, _ := version.NewVersion("0.8")
 
 		RegisterMockTestingT(t)
-		terraform := mocks.NewMockClient()
-		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[*version.Version]())).
+		terraform := tfclientmocks.NewMockClient()
+		defaultDistribution := tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader())
+		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
 			ThenReturn(nil)
 
 		logger := logging.NewNoopLogger(t)
@@ -113,6 +116,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 
 		r := runtime.RunStepRunner{
 			TerraformExecutor:       terraform,
+			DefaultTFDistribution:   defaultDistribution,
 			DefaultTFVersion:        defaultVersion,
 			TerraformBinDir:         "/bin/dir",
 			ProjectCmdOutputHandler: projectCmdOutputHandler,
@@ -157,8 +161,8 @@ func TestRunStepRunner_Run(t *testing.T) {
 			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 			Equals(t, expOut, out)
 
-			terraform.VerifyWasCalledOnce().EnsureVersion(logger, projVersion)
-			terraform.VerifyWasCalled(Never()).EnsureVersion(logger, defaultVersion)
+			terraform.VerifyWasCalledOnce().EnsureVersion(logger, defaultDistribution, projVersion)
+			terraform.VerifyWasCalled(Never()).EnsureVersion(logger, defaultDistribution, defaultVersion)
 
 		})
 	}

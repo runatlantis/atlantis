@@ -12,7 +12,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -20,6 +22,8 @@ import (
 
 func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 	RegisterMockTestingT(t)
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	cases := []struct {
 		version string
 		expCmd  string
@@ -44,7 +48,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.version, func(t *testing.T) {
-			terraform := mocks.NewMockClient()
+			terraform := tfclientmocks.NewMockClient()
 
 			logger := logging.NewNoopLogger(t)
 			ctx := command.ProjectContext{
@@ -55,10 +59,11 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 
 			tfVersion, _ := version.NewVersion(c.version)
 			iso := runtime.InitStepRunner{
-				TerraformExecutor: terraform,
-				DefaultTFVersion:  tfVersion,
+				TerraformExecutor:     terraform,
+				DefaultTFDistribution: tfDistribution,
+				DefaultTFVersion:      tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+			When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 				ThenReturn("output", nil)
 
 			output, err := iso.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
@@ -71,7 +76,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			if c.expCmd == "get" {
 				expArgs = []string{c.expCmd, "-upgrade", "extra", "args"}
 			}
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 		})
 	}
 }
@@ -79,15 +84,17 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 func TestRun_ShowInitOutputOnError(t *testing.T) {
 	// If there was an error during init then we want the output to be returned.
 	RegisterMockTestingT(t)
-	tfClient := mocks.NewMockClient()
+	tfClient := tfclientmocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	When(tfClient.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+	When(tfClient.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", errors.New("error"))
-
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.11.0")
 	iso := runtime.InitStepRunner{
-		TerraformExecutor: tfClient,
-		DefaultTFVersion:  tfVersion,
+		TerraformExecutor:     tfClient,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
 	}
 
 	output, err := iso.Run(command.ProjectContext{
@@ -118,14 +125,16 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 	}
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
-
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.14.0")
 	iso := runtime.InitStepRunner{
-		TerraformExecutor: terraform,
-		DefaultTFVersion:  tfVersion,
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 
 	output, err := iso.Run(ctx, []string{"extra", "args"}, repoDir, map[string]string(nil))
@@ -134,27 +143,29 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 	Equals(t, "", output)
 
 	expectedArgs := []string{"init", "-input=false", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 }
 
 func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
 	}
-
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.14.0")
 	iso := runtime.InitStepRunner{
-		TerraformExecutor: terraform,
-		DefaultTFVersion:  tfVersion,
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 
 	output, err := iso.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
@@ -163,7 +174,7 @@ func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 	Equals(t, "", output)
 
 	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 }
 
 func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing.T) {
@@ -173,7 +184,7 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
 
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
@@ -181,13 +192,15 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 		RepoRelDir: ".",
 		Log:        logger,
 	}
-
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.13.0")
 	iso := runtime.InitStepRunner{
-		TerraformExecutor: terraform,
-		DefaultTFVersion:  tfVersion,
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 
 	output, err := iso.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
@@ -196,7 +209,7 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 	Equals(t, "", output)
 
 	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 }
 
 func TestRun_InitExtraArgsDeDupe(t *testing.T) {
@@ -240,7 +253,7 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			terraform := mocks.NewMockClient()
+			terraform := tfclientmocks.NewMockClient()
 
 			logger := logging.NewNoopLogger(t)
 			ctx := command.ProjectContext{
@@ -248,13 +261,15 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 				RepoRelDir: ".",
 				Log:        logger,
 			}
-
+			mockDownloader := mocks.NewMockDownloader()
+			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion("0.10.0")
 			iso := runtime.InitStepRunner{
-				TerraformExecutor: terraform,
-				DefaultTFVersion:  tfVersion,
+				TerraformExecutor:     terraform,
+				DefaultTFDistribution: tfDistribution,
+				DefaultTFVersion:      tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+			When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 				ThenReturn("output", nil)
 
 			output, err := iso.Run(ctx, c.extraArgs, "/path", map[string]string(nil))
@@ -262,7 +277,7 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
 
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", c.expectedArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", c.expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 		})
 	}
 }
@@ -276,17 +291,19 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
 
 	logger := logging.NewNoopLogger(t)
-
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.14.0")
 
 	iso := runtime.InitStepRunner{
-		TerraformExecutor: terraform,
-		DefaultTFVersion:  tfVersion,
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 
 	ctx := command.ProjectContext{
@@ -300,7 +317,7 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	Equals(t, "", output)
 
 	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {
