@@ -101,6 +101,7 @@ jobs:
             --header 'User-Agent: Muffet' \
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
+            --timeout 300 \
             http://localhost:8080/
 
   skip-link-check:
