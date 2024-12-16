@@ -157,8 +157,8 @@ jobs:
       if: env.PUSH == 'true'
       uses: actions/attest-build-provenance@7668571508540a607bdfd90a87a560489fe372eb # v2.1.0
       with:
-        subject-path: ${{ steps.build.outputs.image-name }}@${{ steps.build.outputs.digest }}
         subject-digest: ${{ steps.build.outputs.digest }}
+        subject-name: ghcr.io/${{ github.repository }}
         push-to-registry: true
 
   test:
