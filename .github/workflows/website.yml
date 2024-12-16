@@ -86,12 +86,14 @@ jobs:
       # medium.com => was being rate limited: HTTP 429
       # twitter.com => too many redirections
       # www.flaticon.com => 403 error
+      # www.freepik.com => 403 error
       - run: |
           ./muffet \
             -e 'https://medium.com/runatlantis' \
             -e 'https://dev.to/*' \
             -e 'https://twitter.com/*' \
             -e 'https://www.flaticon.com/*' \
+            -e 'https://www.freepik.com/*' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \
@@ -99,6 +101,7 @@ jobs:
             --header 'User-Agent: Muffet' \
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
+            --timeout 300 \
             http://localhost:8080/
 
   skip-link-check:
