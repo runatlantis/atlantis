@@ -76,6 +76,7 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
+	DisableCloneURLCheckFlag         = "disable-cloneurl-check"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
@@ -610,6 +611,10 @@ var boolFlags = map[string]boolFlag{
 	UseTFPluginCache: {
 		description:  "Enable the use of the Terraform plugin cache",
 		defaultValue: true,
+	},
+	DisableCloneURLCheckFlag: {
+		description:  "Disable the clone URL path check that verifies the clone URL matches the repo name.",
+		defaultValue: false,
 	},
 }
 var intFlags = map[string]intFlag{

@@ -32,6 +32,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// DisableCloneURLCheck controls whether to skip the clone URL path check.
+var DisableCloneURLCheck bool
+
 type PullReqStatus struct {
 	ApprovalStatus ApprovalStatus
 	Mergeable      bool
@@ -96,7 +99,8 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	// and because the caller in that case actually constructs the clone url
 	// from the repo name and so there's no point checking if they match.
 	// Azure DevOps also does not require .git at the end of clone urls.
-	if vcsHostType != BitbucketServer && vcsHostType != AzureDevops {
+	// We also skip this check if DisableCloneURLCheck is true.
+	if vcsHostType != BitbucketServer && vcsHostType != AzureDevops && !DisableCloneURLCheck {
 		expClonePath := fmt.Sprintf("/%s.git", repoFullName)
 		if expClonePath != cloneURLParsed.Path {
 			return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)

@@ -430,6 +430,16 @@ and set `--autoplan-modules` to `false`.
 
   If `disable-autoplan` property is `true`, this flag has no effect.
 
+### `--disable-cloneurl-check`
+
+  ```bash
+  atlantis server --disable-cloneurl-check
+  # or
+  ATLANTIS_DISABLE_CLONEURL_CHECK=true
+  ```
+
+  Disable the clone URL path check that verifies the clone URL matches the repo name. By default, Atlantis verifies that the clone URL path matches the repo name to avoid malicious URLs. This flag disables that check.
+
 ### `--disable-markdown-folding`
 
   ```bash

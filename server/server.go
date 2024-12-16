@@ -168,6 +168,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 
+	// Set the clone URL check flag based on user config
+	models.DisableCloneURLCheck = userConfig.DisableCloneURLCheck
+
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient vcs.IGithubClient
 	var githubAppEnabled bool
