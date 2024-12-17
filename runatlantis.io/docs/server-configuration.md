@@ -1269,7 +1269,7 @@ This is useful when you have many projects and want to keep the pull request cle
 
 ### `--tf-distribution`
   <Badge text="Deprecated" type="warn"/>
-  Deprecated for `--repo-allowlist`.
+  Deprecated for `--default-tf-distribution`.
 
 ### `--tf-download`
 
