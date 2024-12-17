@@ -405,6 +405,9 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					} else {
 						prjPolicyStatus[i].Approvals = 0
 					}
+					// User matches the author and prevent self approve is set to true
+				} else if isOwner && !ignorePolicy && ctx.User.Username == ctx.Pull.Author && policySet.PreventSelfApprove {
+					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s the author of pr %s matches the command commenter user %s - please contact another policy owners to approve failing policies", policySet.Name, ctx.Pull.Author, ctx.User.Username))
 					// User is not authorized to approve policy set.
 				} else if !ignorePolicy {
 					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
