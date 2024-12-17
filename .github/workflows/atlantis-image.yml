@@ -47,8 +47,6 @@ jobs:
     name: Build Image
     permissions:
       id-token: write
-      packages: write
-      contents: read
       attestations: write
     strategy:
       matrix:
