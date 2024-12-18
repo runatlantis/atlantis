@@ -46,6 +46,7 @@ jobs:
     if: needs.changes.outputs.should-run-build == 'true'
     name: Build Image
     permissions:
+      contents: read
       id-token: write
       packages: write
       attestations: write
