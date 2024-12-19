@@ -354,7 +354,7 @@ func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (
 	variables := map[string]interface{}{
 		"owner":        githubv4.String(repo.Owner),
 		"name":         githubv4.String(repo.Name),
-		"number":       githubv4.Int(pull.Num),
+		"number":       githubv4.Int(pull.Num), // #nosec G115: integer overflow conversion int -> int32
 		"entries":      githubv4.Int(10),
 		"reviewState":  []githubv4.PullRequestReviewState{githubv4.PullRequestReviewStateApproved},
 		"reviewCursor": (*githubv4.String)(nil), // initialize the reviewCursor with null
@@ -630,7 +630,7 @@ func (g *GithubClient) GetPullRequestMergeabilityInfo(
 	variables := map[string]interface{}{
 		"owner":         githubv4.String(repo.Owner),
 		"name":          githubv4.String(repo.Name),
-		"number":        githubv4.Int(*pull.Number),
+		"number":        githubv4.Int(*pull.Number), // #nosec G115: integer overflow conversion int -> int32
 		"ruleCursor":    (*githubv4.String)(nil),
 		"contextCursor": (*githubv4.String)(nil),
 	}
