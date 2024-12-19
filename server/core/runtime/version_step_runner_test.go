@@ -5,7 +5,9 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -33,18 +35,21 @@ func TestRunVersionStep(t *testing.T) {
 		},
 	}
 
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.15.0")
 	tmpDir := t.TempDir()
 
 	s := &VersionStepRunner{
-		TerraformExecutor: terraform,
-		DefaultTFVersion:  tfVersion,
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
 	}
 
 	t.Run("ensure runs", func(t *testing.T) {
 		_, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
-		terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, []string{"version"}, map[string]string(nil), tfVersion, "default")
+		terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, []string{"version"}, map[string]string(nil), tfDistribution, tfVersion, "default")
 		Ok(t, err)
 	})
 }

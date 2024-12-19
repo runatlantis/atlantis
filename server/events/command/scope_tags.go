@@ -7,12 +7,13 @@ import (
 )
 
 type ProjectScopeTags struct {
-	BaseRepo         string
-	PrNumber         string
-	Project          string
-	ProjectPath      string
-	TerraformVersion string
-	Workspace        string
+	BaseRepo              string
+	PrNumber              string
+	Project               string
+	ProjectPath           string
+	TerraformDistribution string
+	TerraformVersion      string
+	Workspace             string
 }
 
 func (s ProjectScopeTags) Loadtags() map[string]string {
