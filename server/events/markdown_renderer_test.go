@@ -60,7 +60,18 @@ func TestRenderErr(t *testing.T) {
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
 	logger.Info(logText)
@@ -124,7 +135,18 @@ func TestRenderFailure(t *testing.T) {
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
 	logger.Info(logText)
@@ -163,7 +185,18 @@ func TestRenderFailure(t *testing.T) {
 }
 
 func TestRenderErrAndFailure(t *testing.T) {
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	ctx := &command.Context{
 		Log: logger,
@@ -1159,7 +1192,18 @@ $$$
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
 	logger.Info(logText)
@@ -1218,7 +1262,6 @@ func TestRenderProjectResultsWithQuietPolicyChecks(t *testing.T) {
 						PolicySetResults: []models.PolicySetResult{
 							{
 								PolicySetName: "policy1",
-								// strings.Repeat require to get wrapped result
 								PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
@@ -1227,10 +1270,9 @@ func TestRenderProjectResultsWithQuietPolicyChecks(t *testing.T) {
 							},
 							{
 								PolicySetName: "policy2",
-								// strings.Repeat require to get wrapped result
-								PolicyOutput: "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
-								Passed:       true,
-								ReqApprovals: 1,
+								PolicyOutput:  "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+								Passed:        true,
+								ReqApprovals:  1,
 							},
 						},
 						LockURL:   "lock-url",
@@ -1524,7 +1566,18 @@ $$$
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, true)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		true,       // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
 	logger.Info(logText)
@@ -1721,7 +1774,7 @@ $$$
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
@@ -1906,7 +1959,7 @@ $$$
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
@@ -1965,7 +2018,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		tmpDir,     // MarkdownTemplateOverridesDir
+		tmpDir,     // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
@@ -2040,7 +2093,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 		true,       // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
@@ -2150,7 +2203,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 					false,                     // disableMarkdownFolding
 					false,                     // disableRepoLocking
 					false,                     // enableDiffMarkdownFormat
-					"",                        // MarkdownTemplateOverridesDir
+					"",                        // markdownTemplateOverridesDir
 					"atlantis",                // executableName
 					false,                     // hideUnchangedPlanComments
 					false,                     // quietPolicyChecks
@@ -2296,7 +2349,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 						false,                     // disableMarkdownFolding
 						false,                     // disableRepoLocking
 						false,                     // enableDiffMarkdownFormat
-						"",                        // MarkdownTemplateOverridesDir
+						"",                        // markdownTemplateOverridesDir
 						"atlantis",                // executableName
 						false,                     // hideUnchangedPlanComments
 						false,                     // quietPolicyChecks
@@ -2447,7 +2500,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
@@ -2527,7 +2580,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
@@ -2754,7 +2807,7 @@ This plan was not saved because one or more projects failed and automerge requir
 				false,      // disableMarkdownFolding
 				false,      // disableRepoLocking
 				false,      // enableDiffMarkdownFormat
-				"",         // MarkdownTemplateOverridesDir
+				"",         // markdownTemplateOverridesDir
 				"atlantis", // executableName
 				false,      // hideUnchangedPlanComments
 				false,      // quietPolicyChecks
@@ -3311,7 +3364,7 @@ $$$
 		false,      // disableMarkdownFolding
 		true,       // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
@@ -3449,7 +3502,7 @@ $$$
 		false,      // disableMarkdownFolding
 		true,       // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
@@ -3909,7 +3962,7 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		true,       // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
@@ -3965,7 +4018,7 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		true,       // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
@@ -4171,7 +4224,18 @@ Ran Plan for 3 projects:
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", true, false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		true,       // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
 	logger.Info(logText)

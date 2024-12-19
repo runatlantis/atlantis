@@ -1506,7 +1506,18 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	pullUpdater := &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            e2eVCSClient,
-		MarkdownRenderer:     events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, opt.userConfig.QuietPolicyChecks),
+		MarkdownRenderer: events.NewMarkdownRenderer(
+			false,                            // gitlabSupportsCommonMark
+			false,                            // disableApplyAll
+			false,                            // disableApply
+			false,                            // disableMarkdownFolding
+			false,                            // disableRepoLocking
+			false,                            // enableDiffMarkdownFormat
+			"",                               // markdownTemplateOverridesDir
+			"atlantis",                       // executableName
+			false,                            // hideUnchangedPlanComments
+			opt.userConfig.QuietPolicyChecks, // quietPolicyChecks
+		),
 	}
 
 	autoMerger := &events.AutoMerger{
