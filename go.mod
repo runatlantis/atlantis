@@ -1,6 +1,6 @@
 module github.com/runatlantis/atlantis
 
-go 1.23.3
+go 1.23.4
 
 require (
 	code.gitea.io/sdk/gitea v0.19.0
@@ -23,7 +23,7 @@ require (
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/hc-install v0.9.0
-	github.com/hashicorp/terraform-config-inspect v0.0.0-20241107133921-3adb156ecfe2
+	github.com/hashicorp/terraform-config-inspect v0.0.0-20241129133400-c404f8227ea6
 	github.com/jpillora/backoff v1.0.0
 	github.com/kr/pretty v0.3.1
 	github.com/mcdafydd/go-azuredevops v0.12.1
@@ -45,7 +45,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/uber-go/tally/v4 v4.1.16
 	github.com/urfave/negroni/v3 v3.1.1
-	github.com/xanzy/go-gitlab v0.113.0
+	github.com/xanzy/go-gitlab v0.114.0
 	go.etcd.io/bbolt v1.3.11
 	go.uber.org/zap v1.27.0
 	golang.org/x/term v0.27.0
@@ -133,7 +133,7 @@ require (
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/mod v0.21.0 // indirect
-	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
