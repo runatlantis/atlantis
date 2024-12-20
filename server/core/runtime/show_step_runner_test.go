@@ -9,7 +9,9 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -20,6 +22,8 @@ func TestShowStepRunnner(t *testing.T) {
 	path := t.TempDir()
 	resultPath := filepath.Join(path, "test-default.json")
 	envs := map[string]string{"key": "val"}
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.12")
 	context := command.ProjectContext{
 		Workspace:   "default",
@@ -29,17 +33,18 @@ func TestShowStepRunnner(t *testing.T) {
 
 	RegisterMockTestingT(t)
 
-	mockExecutor := mocks.NewMockClient()
+	mockExecutor := tfclientmocks.NewMockClient()
 
 	subject := showStepRunner{
-		terraformExecutor: mockExecutor,
-		defaultTFVersion:  tfVersion,
+		terraformExecutor:     mockExecutor,
+		defaultTfDistribution: tfDistribution,
+		defaultTFVersion:      tfVersion,
 	}
 
 	t.Run("success", func(t *testing.T) {
 
 		When(mockExecutor.RunCommandWithVersion(
-			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
+			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfDistribution, tfVersion, context.Workspace,
 		)).ThenReturn("success", nil)
 
 		r, err := subject.Run(context, []string{}, path, envs)
@@ -57,6 +62,8 @@ func TestShowStepRunnner(t *testing.T) {
 	t.Run("success w/ version override", func(t *testing.T) {
 
 		v, _ := version.NewVersion("0.13.0")
+		mockDownloader := mocks.NewMockDownloader()
+		d := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 
 		contextWithVersionOverride := command.ProjectContext{
 			Workspace:        "default",
@@ -66,7 +73,7 @@ func TestShowStepRunnner(t *testing.T) {
 		}
 
 		When(mockExecutor.RunCommandWithVersion(
-			contextWithVersionOverride, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, v, context.Workspace,
+			contextWithVersionOverride, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, d, v, context.Workspace,
 		)).ThenReturn("success", nil)
 
 		r, err := subject.Run(contextWithVersionOverride, []string{}, path, envs)
@@ -83,7 +90,7 @@ func TestShowStepRunnner(t *testing.T) {
 
 	t.Run("failure running command", func(t *testing.T) {
 		When(mockExecutor.RunCommandWithVersion(
-			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfVersion, context.Workspace,
+			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfDistribution, tfVersion, context.Workspace,
 		)).ThenReturn("success", errors.New("error"))
 
 		_, err := subject.Run(context, []string{}, path, envs)

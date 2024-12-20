@@ -9,7 +9,7 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -648,7 +648,7 @@ projects:
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			terraformClient := mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := NewProjectCommandBuilder(
 				false,
@@ -865,7 +865,7 @@ projects:
 
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := NewProjectCommandBuilder(
 				false,
@@ -1112,7 +1112,7 @@ workflows:
 			}
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := NewProjectCommandBuilder(
 				true,
@@ -1264,7 +1264,7 @@ projects:
 			}
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := NewProjectCommandBuilder(
 				false,
@@ -1406,7 +1406,7 @@ projects:
 			}
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := NewProjectCommandBuilder(
 				false,

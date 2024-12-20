@@ -73,6 +73,7 @@ var testFlags = map[string]interface{}{
 	CheckoutStrategyFlag:             CheckoutStrategyMerge,
 	CheckoutDepthFlag:                0,
 	DataDirFlag:                      "/path",
+	DefaultTFDistributionFlag:        "terraform",
 	DefaultTFVersionFlag:             "v0.11.0",
 	DisableApplyAllFlag:              true,
 	DisableMarkdownFoldingFlag:       true,

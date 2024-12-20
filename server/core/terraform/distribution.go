@@ -18,6 +18,14 @@ type Distribution interface {
 	ResolveConstraint(context.Context, string) (*version.Version, error)
 }
 
+func NewDistribution(distribution string) Distribution {
+	tfDistribution := NewDistributionTerraform()
+	if distribution == "opentofu" {
+		tfDistribution = NewDistributionOpenTofu()
+	}
+	return tfDistribution
+}
+
 type DistributionOpenTofu struct {
 	downloader Downloader
 }
