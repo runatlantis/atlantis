@@ -128,6 +128,67 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 	}
 }
 
+func TestRun_SwitchesWorkspaceDistribution(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+
+	cases := []struct {
+		tfVersion       string
+		tfDistribution  string
+		expWorkspaceCmd string
+	}{
+		{
+			"0.9.0",
+			"opentofu",
+			"env",
+		},
+		{
+			"0.9.11",
+			"terraform",
+			"env",
+		},
+		{
+			"0.10.0",
+			"terraform",
+			"workspace",
+		},
+		{
+			"0.11.0",
+			"opentofu",
+			"workspace",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.tfVersion, func(t *testing.T) {
+			terraform := tfclientmocks.NewMockClient()
+			tfVersion, _ := version.NewVersion(c.tfVersion)
+			logger := logging.NewNoopLogger(t)
+			ctx := command.ProjectContext{
+				Log:                   logger,
+				Workspace:             "workspace",
+				TerraformDistribution: &c.tfDistribution,
+			}
+			s := NewWorkspaceStepRunnerDelegate(terraform, tfDistribution, tfVersion, &NullRunner{})
+
+			_, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
+			Ok(t, err)
+
+			// Verify that env select was called as well as plan.
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx),
+				Eq("/path"),
+				Eq([]string{c.expWorkspaceCmd,
+					"select",
+					"workspace"}),
+				Eq(map[string]string(nil)),
+				NotEq(tfDistribution),
+				Eq(tfVersion),
+				Eq("workspace"))
+		})
+	}
+}
+
 func TestRun_CreatesWorkspace(t *testing.T) {
 	// Test that if `workspace select` fails, we call `workspace new`.
 	RegisterMockTestingT(t)

@@ -211,7 +211,7 @@ func validImportReq(value interface{}) error {
 func validDistribution(value interface{}) error {
 	distribution := value.(*string)
 	if distribution != nil && *distribution != "terraform" && *distribution != "opentofu" {
-		return fmt.Errorf("%q is not a valid terraform_distribution, only %q and %q are supported", *distribution, "terraform", "opentofu")
+		return fmt.Errorf("'%s' is not a valid terraform_distribution, only '%s' and '%s' are supported", *distribution, "terraform", "opentofu")
 	}
 	return nil
 }

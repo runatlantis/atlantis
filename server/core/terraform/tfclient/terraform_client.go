@@ -13,7 +13,7 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
-// Package terraform handles the actual running of terraform commands.
+// Package tfclient handles the actual running of terraform commands.
 package tfclient
 
 import (
@@ -32,9 +32,8 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 
-	"github.com/runatlantis/atlantis/server/core/terraform"
-
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/jobs"

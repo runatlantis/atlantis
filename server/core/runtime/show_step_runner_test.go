@@ -88,6 +88,36 @@ func TestShowStepRunnner(t *testing.T) {
 
 	})
 
+	t.Run("success w/ distribution override", func(t *testing.T) {
+
+		v, _ := version.NewVersion("0.13.0")
+		mockDownloader := mocks.NewMockDownloader()
+		d := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+		projTFDistribution := "opentofu"
+
+		contextWithDistributionOverride := command.ProjectContext{
+			Workspace:             "default",
+			ProjectName:           "test",
+			Log:                   logger,
+			TerraformDistribution: &projTFDistribution,
+		}
+
+		When(mockExecutor.RunCommandWithVersion(
+			Eq(contextWithDistributionOverride), Eq(path), Eq([]string{"show", "-json", filepath.Join(path, "test-default.tfplan")}), Eq(envs), NotEq(d), NotEq(v), Eq(context.Workspace),
+		)).ThenReturn("success", nil)
+
+		r, err := subject.Run(contextWithDistributionOverride, []string{}, path, envs)
+
+		Ok(t, err)
+
+		actual, _ := os.ReadFile(resultPath)
+
+		actualStr := string(actual)
+		Assert(t, actualStr == "success", "got expected result")
+		Assert(t, r == "success", "returned expected result")
+
+	})
+
 	t.Run("failure running command", func(t *testing.T) {
 		When(mockExecutor.RunCommandWithVersion(
 			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfDistribution, tfVersion, context.Workspace,

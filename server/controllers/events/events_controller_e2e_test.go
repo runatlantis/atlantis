@@ -1474,6 +1474,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
+			DefaultTFDistribution:   defaultTFDistribution,
 			DefaultTFVersion:        defaultTFVersion,
 			ProjectCmdOutputHandler: projectCmdOutputHandler,
 		},

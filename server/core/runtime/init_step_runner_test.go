@@ -81,6 +81,73 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 	}
 }
 
+func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	cases := []struct {
+		version      string
+		distribution string
+		expCmd       string
+	}{
+		{
+			"0.8.9",
+			"opentofu",
+			"get",
+		},
+		{
+			"0.8.9",
+			"terraform",
+			"get",
+		},
+		{
+			"0.9.0",
+			"opentofu",
+			"init",
+		},
+		{
+			"0.9.1",
+			"terraform",
+			"init",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.version, func(t *testing.T) {
+			terraform := tfclientmocks.NewMockClient()
+
+			logger := logging.NewNoopLogger(t)
+			ctx := command.ProjectContext{
+				Workspace:             "workspace",
+				RepoRelDir:            ".",
+				Log:                   logger,
+				TerraformDistribution: &c.distribution,
+			}
+
+			tfVersion, _ := version.NewVersion(c.version)
+			iso := runtime.InitStepRunner{
+				TerraformExecutor:     terraform,
+				DefaultTFDistribution: tfDistribution,
+				DefaultTFVersion:      tfVersion,
+			}
+			When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+				ThenReturn("output", nil)
+
+			output, err := iso.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
+			Ok(t, err)
+			// When there is no error, should not return init output to PR.
+			Equals(t, "", output)
+
+			// If using init then we specify -input=false but not for get.
+			expArgs := []string{c.expCmd, "-input=false", "-upgrade", "extra", "args"}
+			if c.expCmd == "get" {
+				expArgs = []string{c.expCmd, "-upgrade", "extra", "args"}
+			}
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq("/path"), Eq(expArgs), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq("workspace"))
+		})
+	}
+}
+
 func TestRun_ShowInitOutputOnError(t *testing.T) {
 	// If there was an error during init then we want the output to be returned.
 	RegisterMockTestingT(t)

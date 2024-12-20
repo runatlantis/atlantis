@@ -554,6 +554,82 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, output)
 	}
 }
 
+func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	expPlanArgs := []string{
+		"plan",
+		"-input=false",
+		"-refresh",
+		"-out",
+		fmt.Sprintf("%q", "/path/default.tfplan"),
+		"extra",
+		"args",
+		"comment",
+		"args",
+	}
+
+	cases := []struct {
+		name           string
+		tfVersion      string
+		tfDistribution string
+	}{
+		{
+			"stable version",
+			"0.12.0",
+			"terraform",
+		},
+		{
+			"with prerelease",
+			"0.14.0-rc1",
+			"opentofu",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			terraform := tfclientmocks.NewMockClient()
+			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
+			asyncTfExec := runtimemocks.NewMockAsyncTFExec()
+			When(terraform.RunCommandWithVersion(
+				Any[command.ProjectContext](),
+				Any[string](),
+				Any[[]string](),
+				Any[map[string]string](),
+				Any[tf.Distribution](),
+				Any[*version.Version](),
+				Any[string]())).ThenReturn("output", nil)
+
+			mockDownloader := mocks.NewMockDownloader()
+			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+			tfVersion, _ := version.NewVersion(c.tfVersion)
+			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
+			ctx := command.ProjectContext{
+				Workspace:          "default",
+				RepoRelDir:         ".",
+				User:               models.User{Username: "username"},
+				EscapedCommentArgs: []string{"comment", "args"},
+				Pull: models.PullRequest{
+					Num: 2,
+				},
+				BaseRepo: models.Repo{
+					FullName: "owner/repo",
+					Owner:    "owner",
+					Name:     "repo",
+				},
+				TerraformDistribution: &c.tfDistribution,
+			}
+
+			output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
+			Ok(t, err)
+			Equals(t, "output", output)
+
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq("/path"), Eq(expPlanArgs), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq("default"))
+		})
+	}
+
+}
+
 type remotePlanMock struct {
 	// LinesToSend will be sent on the channel.
 	LinesToSend string

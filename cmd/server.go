@@ -142,22 +142,21 @@ const (
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
 	RestrictFileList                 = "restrict-file-list"
-	// TFDistributionFlag is deprecated for DefaultTFDistributionFlag
-	TFDistributionFlag        = "tf-distribution"
-	TFDownloadFlag            = "tf-download"
-	TFDownloadURLFlag         = "tf-download-url"
-	UseTFPluginCache          = "use-tf-plugin-cache"
-	VarFileAllowlistFlag      = "var-file-allowlist"
-	VCSStatusName             = "vcs-status-name"
-	IgnoreVCSStatusNames      = "ignore-vcs-status-names"
-	TFEHostnameFlag           = "tfe-hostname"
-	TFELocalExecutionModeFlag = "tfe-local-execution-mode"
-	TFETokenFlag              = "tfe-token"
-	WriteGitCredsFlag         = "write-git-creds" // nolint: gosec
-	WebBasicAuthFlag          = "web-basic-auth"
-	WebUsernameFlag           = "web-username"
-	WebPasswordFlag           = "web-password"
-	WebsocketCheckOrigin      = "websocket-check-origin"
+	TFDistributionFlag               = "tf-distribution" // deprecated for DefaultTFDistributionFlag
+	TFDownloadFlag                   = "tf-download"
+	TFDownloadURLFlag                = "tf-download-url"
+	UseTFPluginCache                 = "use-tf-plugin-cache"
+	VarFileAllowlistFlag             = "var-file-allowlist"
+	VCSStatusName                    = "vcs-status-name"
+	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
+	TFEHostnameFlag                  = "tfe-hostname"
+	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
+	TFETokenFlag                     = "tfe-token"
+	WriteGitCredsFlag                = "write-git-creds" // nolint: gosec
+	WebBasicAuthFlag                 = "web-basic-auth"
+	WebUsernameFlag                  = "web-username"
+	WebPasswordFlag                  = "web-password"
+	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser                  = ""

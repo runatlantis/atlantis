@@ -978,6 +978,46 @@ func TestExecute_AutoplanFileList(t *testing.T) {
 	}
 }
 
+func TestExecute_ValidateDefaultTFDistribution(t *testing.T) {
+	cases := []struct {
+		description string
+		flags       map[string]interface{}
+		expectErr   string
+	}{
+		{
+			"terraform",
+			map[string]interface{}{
+				DefaultTFDistributionFlag: "terraform",
+			},
+			"",
+		},
+		{
+			"opentofu",
+			map[string]interface{}{
+				DefaultTFDistributionFlag: "opentofu",
+			},
+			"",
+		},
+		{
+			"errs on invalid distribution",
+			map[string]interface{}{
+				DefaultTFDistributionFlag: "invalid_distribution",
+			},
+			"invalid tf distribution: expected one of terraform or opentofu",
+		},
+	}
+	for _, testCase := range cases {
+		t.Log("Should validate default tf distribution when " + testCase.description)
+		c := setupWithDefaults(testCase.flags, t)
+		err := c.Execute()
+		if testCase.expectErr != "" {
+			ErrEquals(t, testCase.expectErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
 func setup(flags map[string]interface{}, t *testing.T) *cobra.Command {
 	vipr := viper.New()
 	for k, v := range flags {
