@@ -73,6 +73,7 @@ var testFlags = map[string]interface{}{
 	CheckoutStrategyFlag:             CheckoutStrategyMerge,
 	CheckoutDepthFlag:                0,
 	DataDirFlag:                      "/path",
+	DefaultTFDistributionFlag:        "terraform",
 	DefaultTFVersionFlag:             "v0.11.0",
 	DisableApplyAllFlag:              true,
 	DisableMarkdownFoldingFlag:       true,
@@ -967,6 +968,46 @@ func TestExecute_AutoplanFileList(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Log("Should validate autoplan file list when " + testCase.description)
+		c := setupWithDefaults(testCase.flags, t)
+		err := c.Execute()
+		if testCase.expectErr != "" {
+			ErrEquals(t, testCase.expectErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
+func TestExecute_ValidateDefaultTFDistribution(t *testing.T) {
+	cases := []struct {
+		description string
+		flags       map[string]interface{}
+		expectErr   string
+	}{
+		{
+			"terraform",
+			map[string]interface{}{
+				DefaultTFDistributionFlag: "terraform",
+			},
+			"",
+		},
+		{
+			"opentofu",
+			map[string]interface{}{
+				DefaultTFDistributionFlag: "opentofu",
+			},
+			"",
+		},
+		{
+			"errs on invalid distribution",
+			map[string]interface{}{
+				DefaultTFDistributionFlag: "invalid_distribution",
+			},
+			"invalid tf distribution: expected one of terraform or opentofu",
+		},
+	}
+	for _, testCase := range cases {
+		t.Log("Should validate default tf distribution when " + testCase.description)
 		c := setupWithDefaults(testCase.flags, t)
 		err := c.Execute()
 		if testCase.expectErr != "" {
