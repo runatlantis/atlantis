@@ -39,6 +39,7 @@ type APIRequest struct {
 	Repository string `validate:"required"`
 	Ref        string `validate:"required"`
 	Type       string `validate:"required"`
+	Sha        string `validate:"required"`
 	PR         int
 	Projects   []string
 	Paths      []struct {
@@ -239,7 +240,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 			Num:        request.PR,
 			BaseBranch: request.Ref,
 			HeadBranch: request.Ref,
-			HeadCommit: request.Ref,
+			HeadCommit: request.Sha,
 			BaseRepo:   baseRepo,
 		},
 		Scope: a.Scope,
