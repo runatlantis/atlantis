@@ -280,7 +280,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	l := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := events.NewDefaultWorkingDirLocker(1)
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: repoName},
 	}
@@ -345,7 +345,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	}, nil)
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := events.NewDefaultWorkingDirLocker(1)
 	var backend locking.Backend
 	tmp := t.TempDir()
 	backend, err := db.New(tmp)
@@ -372,7 +372,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	dlc := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := events.NewDefaultWorkingDirLocker(1)
 	var backend locking.Backend
 	tmp := t.TempDir()
 	backend, err := db.New(tmp)
