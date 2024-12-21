@@ -60,7 +60,18 @@ func TestRenderErr(t *testing.T) {
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
 	logger.Info(logText)
@@ -124,7 +135,18 @@ func TestRenderFailure(t *testing.T) {
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
 	logger.Info(logText)
@@ -163,7 +185,18 @@ func TestRenderFailure(t *testing.T) {
 }
 
 func TestRenderErrAndFailure(t *testing.T) {
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	ctx := &command.Context{
 		Log: logger,
@@ -1159,7 +1192,392 @@ $$$
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			res := command.Result{
+				ProjectResults: c.ProjectResults,
+			}
+			for _, verbose := range []bool{true, false} {
+				t.Run(c.Description, func(t *testing.T) {
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						SubName: c.SubCommand,
+						Verbose: verbose,
+					}
+					s := r.Render(ctx, res, cmd)
+					if !verbose {
+						Equals(t, normalize(c.Expected), normalize(s))
+					} else {
+						log := fmt.Sprintf("[INFO] %s", logText)
+						Equals(t, normalize(c.Expected+
+							fmt.Sprintf("<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log)), normalize(s))
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestRenderProjectResultsWithQuietPolicyChecks(t *testing.T) {
+	cases := []struct {
+		Description    string
+		Command        command.Name
+		SubCommand     string
+		ProjectResults []command.ProjectResult
+		VCSHost        models.VCSHostType
+		Expected       string
+	}{
+		{
+			"single successful policy check with multiple policy sets and project name",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
+								Passed:       false,
+								ReqApprovals: 1,
+							},
+							{
+								PolicySetName: "policy2",
+								PolicyOutput:  "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+								Passed:        true,
+								ReqApprovals:  1,
+							},
+						},
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+
+#### Policy Set: $policy2$
+$$$diff
+2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+policy set: policy2: passed.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+  $$$shell
+  
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"single successful policy check with project name",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								// strings.Repeat require to get wrapped result
+								PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
+								Passed:       false,
+								ReqApprovals: 1,
+							},
+						},
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+<details><summary>Show Output</summary>
+
+#### Policy Set: $policy1$
+$$$diff
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+
+
+</details>
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+  $$$shell
+  
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+$$$
+policy set: policy1: 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"multiple successful policy checks",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
+							},
+						},
+						LockURL:   "lock-url",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
+							},
+						}, LockURL: "lock-url2",
+						ApplyCmd:  "atlantis apply -d path2 -w workspace",
+						RePlanCmd: "atlantis plan -d path2 -w workspace",
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for 2 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. project: $projectname$ dir: $path2$ workspace: $workspace$
+---
+
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"successful, failed, and errored policy check",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
+							},
+						}, LockURL: "lock-url",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
+				},
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path2",
+					Failure:    "failure",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+								Passed:        false,
+								ReqApprovals:  1,
+							},
+						}, LockURL: "lock-url",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path3",
+					ProjectName: "projectname",
+					Error:       errors.New("error"),
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for 3 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. dir: $path2$ workspace: $workspace$
+1. project: $projectname$ dir: $path3$ workspace: $workspace$
+---
+
+### 2. dir: $path2$ workspace: $workspace$
+**Policy Check Failed**: failure
+#### Policy Set: $policy1$
+$$$diff
+4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+  $$$shell
+  
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+### 3. project: $projectname$ dir: $path3$ workspace: $workspace$
+**Policy Check Error**
+$$$
+error
+$$$
+
+---
+* :heavy_check_mark: To **approve** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis approve_policies
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan
+  $$$
+`,
+		},
+	}
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		true,       // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
 	logger.Info(logText)
@@ -1356,9 +1774,10 @@ $$$
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -1540,9 +1959,10 @@ $$$
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -1598,9 +2018,10 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		tmpDir,     // MarkdownTemplateOverridesDir
+		tmpDir,     // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -1672,9 +2093,10 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 		true,       // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -1781,9 +2203,10 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 					false,                     // disableMarkdownFolding
 					false,                     // disableRepoLocking
 					false,                     // enableDiffMarkdownFormat
-					"",                        // MarkdownTemplateOverridesDir
+					"",                        // markdownTemplateOverridesDir
 					"atlantis",                // executableName
 					false,                     // hideUnchangedPlanComments
+					false,                     // quietPolicyChecks
 				)
 				logger := logging.NewNoopLogger(t).WithHistory()
 				logText := "log"
@@ -1926,9 +2349,10 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 						false,                     // disableMarkdownFolding
 						false,                     // disableRepoLocking
 						false,                     // enableDiffMarkdownFormat
-						"",                        // MarkdownTemplateOverridesDir
+						"",                        // markdownTemplateOverridesDir
 						"atlantis",                // executableName
 						false,                     // hideUnchangedPlanComments
+						false,                     // quietPolicyChecks
 					)
 					logger := logging.NewNoopLogger(t).WithHistory()
 					logText := "log"
@@ -2076,9 +2500,10 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2155,9 +2580,10 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2381,9 +2807,10 @@ This plan was not saved because one or more projects failed and automerge requir
 				false,      // disableMarkdownFolding
 				false,      // disableRepoLocking
 				false,      // enableDiffMarkdownFormat
-				"",         // MarkdownTemplateOverridesDir
+				"",         // markdownTemplateOverridesDir
 				"atlantis", // executableName
 				false,      // hideUnchangedPlanComments
+				false,      // quietPolicyChecks
 			)
 			logger := logging.NewNoopLogger(t).WithHistory()
 			logText := "log"
@@ -2937,9 +3364,10 @@ $$$
 		false,      // disableMarkdownFolding
 		true,       // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -3074,9 +3502,10 @@ $$$
 		false,      // disableMarkdownFolding
 		true,       // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -3533,9 +3962,10 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		true,       // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -3588,9 +4018,10 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		true,       // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(b).WithHistory()
 	logText := "log"
@@ -3793,7 +4224,18 @@ Ran Plan for 3 projects:
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", true)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		true,       // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
 	logger.Info(logText)
