@@ -1,6 +1,6 @@
 module github.com/runatlantis/atlantis
 
-go 1.23.3
+go 1.23.4
 
 require (
 	code.gitea.io/sdk/gitea v0.19.0
@@ -133,7 +133,7 @@ require (
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/mod v0.21.0 // indirect
-	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
