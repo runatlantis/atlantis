@@ -48,7 +48,7 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:ec1a93a2c4a259b0b1c624f459903f46bb10d98e6ad0b23e20774a0f1f809b88
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:0797cca916cee27d54c1375aa0395d212f0f73493170cdd0ed8d97cc003c4a72
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
