@@ -66,6 +66,7 @@ projects:
   branch: /main/
   dir: .
   workspace: default
+  terraform_distribution: terraform
   terraform_version: v0.11.0
   delete_source_branch_on_merge: true
   repo_locking: true # deprecated: use repo_locks instead
@@ -261,6 +262,20 @@ See [Custom Workflow Use Cases: Terragrunt](custom-workflows.md#terragrunt)
 ### Running custom commands
 
 See [Custom Workflow Use Cases: Running custom commands](custom-workflows.md#running-custom-commands)
+
+### Terraform Distributions
+
+If you'd like to use a different distribution of Terraform than what is set
+by the `--default-tf-version` flag, then set the `terraform_distribution` key:
+
+```yaml
+version: 3
+projects:
+- dir: project1
+  terraform_distribution: opentofu
+```
+
+Atlantis will automatically download and use this distribution. Valid values are `terraform` and `opentofu`.
 
 ### Terraform Versions
 
