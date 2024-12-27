@@ -157,8 +157,8 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}
 
-    - name: "Sign and Attest Image"
-      if: env.PUSH == 'true'
+    - name: "Create Image Attestation"
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
       uses: actions/attest-build-provenance@7668571508540a607bdfd90a87a560489fe372eb # v2.1.0
       with:
         subject-digest: ${{ steps.build.outputs.digest }}
