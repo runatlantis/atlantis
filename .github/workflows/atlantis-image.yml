@@ -171,6 +171,7 @@ jobs:
       run: | 
         echo "${TAGS}" | xargs -I {} cosign sign \
           --yes \
+          -r \ # recursively sign each image in an architecture
           -a actor=${{ github.actor}} \
           -a ref_name=${{ github.ref_name}} \
           -a ref=${{ github.sha }} \
