@@ -165,6 +165,20 @@ jobs:
         subject-name: ghcr.io/${{ github.repository }}
         push-to-registry: true
 
+    - name: "Sign images with environment annotations"
+      # no key needed, we're using the GitHub OIDC flow
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
+      run: | 
+        echo "${TAGS}" | xargs -I {} cosign sign \
+          --yes \
+          -a actor=${{ github.actor}} \
+          -a ref_name=${{ github.ref_name}} \
+          -a ref=${{ github.sha }} \
+          {}@${DIGEST}
+      env:
+        TAGS: ${{ steps.meta.outputs.tags }}
+        DIGEST: ${{ steps.build.outputs.digest }}
+
   test:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'true'
