@@ -11,7 +11,7 @@ back to the PR as a comment.
 Post workflow hooks can only be specified in the Server-Side Repo Config under
 the `repos` key.
 
-## Atlantis Command Targetting
+## Atlantis Command Targeting
 
 By default, the workflow hook will run when any command is processed by Atlantis.
 This can be modified by specifying the `commands` key in the workflow hook containing a comma delimited list
