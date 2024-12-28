@@ -10,25 +10,25 @@ import (
 // DefaultEmojiReaction is the default emoji reaction for repos
 const DefaultEmojiReaction = ""
 
-// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failures
-const DefaultAbortOnExcecutionOrderFail = false
+// DefaultAbortOnExecutionOrderFail being false is the default setting for abort on execution group failures
+const DefaultAbortOnExecutionOrderFail = false
 
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
 type RepoCfg struct {
-	Version                    *int                `yaml:"version,omitempty"`
-	Projects                   []Project           `yaml:"projects,omitempty"`
-	Workflows                  map[string]Workflow `yaml:"workflows,omitempty"`
-	PolicySets                 PolicySets          `yaml:"policies,omitempty"`
-	AutoDiscover               *AutoDiscover       `yaml:"autodiscover,omitempty"`
-	Automerge                  *bool               `yaml:"automerge,omitempty"`
-	ParallelApply              *bool               `yaml:"parallel_apply,omitempty"`
-	ParallelPlan               *bool               `yaml:"parallel_plan,omitempty"`
-	DeleteSourceBranchOnMerge  *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
-	EmojiReaction              *string             `yaml:"emoji_reaction,omitempty"`
-	AllowedRegexpPrefixes      []string            `yaml:"allowed_regexp_prefixes,omitempty"`
-	AbortOnExcecutionOrderFail *bool               `yaml:"abort_on_execution_order_fail,omitempty"`
-	RepoLocks                  *RepoLocks          `yaml:"repo_locks,omitempty"`
-	SilencePRComments          []string            `yaml:"silence_pr_comments,omitempty"`
+	Version                   *int                `yaml:"version,omitempty"`
+	Projects                  []Project           `yaml:"projects,omitempty"`
+	Workflows                 map[string]Workflow `yaml:"workflows,omitempty"`
+	PolicySets                PolicySets          `yaml:"policies,omitempty"`
+	AutoDiscover              *AutoDiscover       `yaml:"autodiscover,omitempty"`
+	Automerge                 *bool               `yaml:"automerge,omitempty"`
+	ParallelApply             *bool               `yaml:"parallel_apply,omitempty"`
+	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
+	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
+	EmojiReaction             *string             `yaml:"emoji_reaction,omitempty"`
+	AllowedRegexpPrefixes     []string            `yaml:"allowed_regexp_prefixes,omitempty"`
+	AbortOnExecutionOrderFail *bool               `yaml:"abort_on_execution_order_fail,omitempty"`
+	RepoLocks                 *RepoLocks          `yaml:"repo_locks,omitempty"`
+	SilencePRComments         []string            `yaml:"silence_pr_comments,omitempty"`
 }
 
 func (r RepoCfg) Validate() error {
@@ -69,9 +69,9 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		emojiReaction = *r.EmojiReaction
 	}
 
-	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
-	if r.AbortOnExcecutionOrderFail != nil {
-		abortOnExcecutionOrderFail = *r.AbortOnExcecutionOrderFail
+	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
+	if r.AbortOnExecutionOrderFail != nil {
+		abortOnExecutionOrderFail = *r.AbortOnExecutionOrderFail
 	}
 
 	var autoDiscover *valid.AutoDiscover
@@ -84,19 +84,19 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		repoLocks = r.RepoLocks.ToValid()
 	}
 	return valid.RepoCfg{
-		Version:                    *r.Version,
-		Projects:                   validProjects,
-		Workflows:                  validWorkflows,
-		AutoDiscover:               autoDiscover,
-		Automerge:                  automerge,
-		ParallelApply:              parallelApply,
-		ParallelPlan:               parallelPlan,
-		ParallelPolicyCheck:        parallelPlan,
-		DeleteSourceBranchOnMerge:  r.DeleteSourceBranchOnMerge,
-		AllowedRegexpPrefixes:      r.AllowedRegexpPrefixes,
-		EmojiReaction:              emojiReaction,
-		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
-		RepoLocks:                  repoLocks,
-		SilencePRComments:          r.SilencePRComments,
+		Version:                   *r.Version,
+		Projects:                  validProjects,
+		Workflows:                 validWorkflows,
+		AutoDiscover:              autoDiscover,
+		Automerge:                 automerge,
+		ParallelApply:             parallelApply,
+		ParallelPlan:              parallelPlan,
+		ParallelPolicyCheck:       parallelPlan,
+		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
+		AllowedRegexpPrefixes:     r.AllowedRegexpPrefixes,
+		EmojiReaction:             emojiReaction,
+		AbortOnExecutionOrderFail: abortOnExecutionOrderFail,
+		RepoLocks:                 repoLocks,
+		SilencePRComments:         r.SilencePRComments,
 	}
 }
