@@ -10,7 +10,7 @@ import (
 // DefaultEmojiReaction is the default emoji reaction for repos
 const DefaultEmojiReaction = ""
 
-// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
+// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failures
 const DefaultAbortOnExcecutionOrderFail = false
 
 // RepoCfg is the raw schema for repo-level atlantis.yaml config.
