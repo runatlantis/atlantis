@@ -32,7 +32,7 @@ const (
 	DefaultWorkspace = "default"
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
-	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
+	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failures
 	DefaultAbortOnExcecutionOrderFail = false
 )
 
@@ -238,7 +238,7 @@ type DefaultProjectCommandBuilder struct {
 	AutoDetectModuleFiles string
 	// User config option: List of file patterns to to to check if a directory contains modified files.
 	AutoplanFileList string
-	// User config option: Format Terraform plan output into a markdown-diff friendy format for color-coding purposes.
+	// User config option: Format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 	EnableDiffMarkdownFormat bool
 	// User config option: Block plan requests from projects outside the files modified in the pull request.
 	RestrictFileList bool

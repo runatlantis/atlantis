@@ -124,7 +124,7 @@ type ProjectApplyCommandRunner interface {
 }
 
 type ProjectPolicyCheckCommandRunner interface {
-	// PolicyCheck runs OPA defined policies for the project desribed by ctx.
+	// PolicyCheck runs OPA defined policies for the project described by ctx.
 	PolicyCheck(ctx command.ProjectContext) command.ProjectResult
 }
 
