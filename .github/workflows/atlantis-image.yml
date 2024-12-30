@@ -177,7 +177,7 @@ jobs:
       if: env.PUSH == 'true' && github.event_name != 'pull_request' && matrix.image_type == 'alpine' && matrix.platform == 'linux/amd64'
       run: |
         # Sign dev tags, version tags, and latest tags
-        echo "${TAGS}" | grep -E ':(dev-|v[0-9]+\.[0-9]+\.[0-9]+|latest)$' | xargs -I {} cosign sign \
+        echo "${TAGS}" | xargs -I {} cosign sign \
           --yes \
           --recursive=true \
           -a actor=${{ github.actor}} \
