@@ -669,7 +669,7 @@ type TeamAllowlistCheckerContext struct {
 	API bool
 }
 
-// WorkflowHookCommandContext defines the context for a pre and post worklfow_hooks that will
+// WorkflowHookCommandContext defines the context for a pre and post workflow_hooks that will
 // be executed before workflows.
 type WorkflowHookCommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.

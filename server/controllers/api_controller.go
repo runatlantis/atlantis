@@ -156,7 +156,6 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	for i, cmd := range cmds {
 		err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
 		if err != nil {
-			ctx.Log.Err("Error running pre-workflow hooks %s.", err)
 			if a.FailOnPreWorkflowHookError {
 				return nil, err
 			}
@@ -165,10 +164,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		res := a.ProjectPlanCommandRunner.Plan(cmd)
 		projectResults = append(projectResults, res)
 
-		err = a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i])
-		if err != nil {
-			ctx.Log.Err("Error running post-workflow hooks %s.", err)
-		}
+		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
 }
@@ -190,7 +186,6 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 	for i, cmd := range cmds {
 		err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
 		if err != nil {
-			ctx.Log.Err("Error running pre-workflow hooks %s.", err)
 			if a.FailOnPreWorkflowHookError {
 				return nil, err
 			}
@@ -199,10 +194,7 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 		res := a.ProjectApplyCommandRunner.Apply(cmd)
 		projectResults = append(projectResults, res)
 
-		err = a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i])
-		if err != nil {
-			ctx.Log.Err("Error running post-workflow hooks %s.", err)
-		}
+		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
 }
