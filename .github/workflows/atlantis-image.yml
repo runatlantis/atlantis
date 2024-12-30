@@ -170,8 +170,9 @@ jobs:
       # no key needed, we're using the GitHub OIDC flow
       # Only run on alpine/amd64 build to avoid signing multiple times
       if: env.PUSH == 'true' && github.event_name != 'pull_request' && matrix.image_type == 'alpine' && matrix.platform == 'linux/amd64'
-      run: | 
-        echo "${TAGS}" | xargs -I {} cosign sign \
+      run: |
+        # Sign dev tags, version tags, and latest tags
+        echo "${TAGS}" | grep -E ':(dev-|v[0-9]+\.[0-9]+\.[0-9]+|latest)$' | xargs -I {} cosign sign \
           --yes \
           --recursive=true \
           -a actor=${{ github.actor}} \
