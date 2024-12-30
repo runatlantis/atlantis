@@ -52,9 +52,29 @@ jobs:
       attestations: write
     strategy:
       matrix:
-        image_type: [alpine, debian]
-        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
-    runs-on: ubuntu-24.04
+        include:
+          # ARM64 builds
+          - image_type: alpine
+            platform: linux/arm64/v8
+            runs_on: buildjet-8vcpu-ubuntu-2204-arm
+          - image_type: debian
+            platform: linux/arm64/v8
+            runs_on: buildjet-8vcpu-ubuntu-2204-arm
+          # ARMv7 builds
+          - image_type: alpine
+            platform: linux/arm/v7
+            runs_on: buildjet-8vcpu-ubuntu-2204-arm
+          - image_type: debian
+            platform: linux/arm/v7
+            runs_on: buildjet-8vcpu-ubuntu-2204-arm
+          # AMD64 builds
+          - image_type: alpine
+            platform: linux/amd64
+            runs_on: ubuntu-24.04
+          - image_type: debian
+            platform: linux/amd64
+            runs_on: ubuntu-24.04
+    runs-on: ${{ matrix.runs_on }}
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ghcr.io/${{ github.repository }}
@@ -151,7 +171,7 @@ jobs:
           ATLANTIS_VERSION=${{ env.RELEASE_VERSION }}
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-        platforms: ${{ matrix.platform }}
+        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
         push: ${{ env.PUSH }}
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ matrix.image_type }}
@@ -168,7 +188,8 @@ jobs:
 
     - name: "Sign images with environment annotations"
       # no key needed, we're using the GitHub OIDC flow
-      if: env.PUSH == 'true' && github.event_name != 'pull_request'
+      # Only run on alpine/amd64 build to avoid signing multiple times
+      if: env.PUSH == 'true' && github.event_name != 'pull_request' && matrix.image_type == 'alpine' && matrix.platform == 'linux/amd64'
       run: | 
         echo "${TAGS}" | xargs -I {} cosign sign \
           --yes \
@@ -189,7 +210,6 @@ jobs:
     strategy:
       matrix:
         image_type: [alpine, debian]
-        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ghcr.io/${{ github.repository }}
@@ -234,7 +254,7 @@ jobs:
     strategy:
       matrix:
         image_type: [alpine, debian]
-        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     runs-on: ubuntu-24.04
     steps:
       - run: 'echo "No build required"'
+
