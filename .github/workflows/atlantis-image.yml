@@ -52,29 +52,9 @@ jobs:
       attestations: write
     strategy:
       matrix:
-        include:
-          # ARM64 builds
-          - image_type: alpine
-            platform: linux/arm64/v8
-            runs_on: buildjet-8vcpu-ubuntu-2204-arm
-          - image_type: debian
-            platform: linux/arm64/v8
-            runs_on: buildjet-8vcpu-ubuntu-2204-arm
-          # ARMv7 builds
-          - image_type: alpine
-            platform: linux/arm/v7
-            runs_on: buildjet-8vcpu-ubuntu-2204-arm
-          - image_type: debian
-            platform: linux/arm/v7
-            runs_on: buildjet-8vcpu-ubuntu-2204-arm
-          # AMD64 builds
-          - image_type: alpine
-            platform: linux/amd64
-            runs_on: ubuntu-24.04
-          - image_type: debian
-            platform: linux/amd64
-            runs_on: ubuntu-24.04
-    runs-on: ${{ matrix.runs_on }}
+        image_type: [alpine, debian]
+        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
+    runs-on: ubuntu-24.04
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ghcr.io/${{ github.repository }}
@@ -210,6 +190,7 @@ jobs:
     strategy:
       matrix:
         image_type: [alpine, debian]
+        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ghcr.io/${{ github.repository }}
