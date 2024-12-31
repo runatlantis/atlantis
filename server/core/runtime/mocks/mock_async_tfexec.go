@@ -31,27 +31,27 @@ func (mock *MockAsyncTFExec) RunCommandAsync(ctx command.ProjectContext, path st
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockAsyncTFExec().")
 	}
-	params := []pegomock.Param{ctx, path, args, envs, v, workspace}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("RunCommandAsync", params, []reflect.Type{reflect.TypeOf((*chan<- string)(nil)).Elem(), reflect.TypeOf((*<-chan models.Line)(nil)).Elem()})
-	var ret0 chan<- string
-	var ret1 <-chan models.Line
-	if len(result) != 0 {
-		if result[0] != nil {
+	_params := []pegomock.Param{ctx, path, args, envs, v, workspace}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("RunCommandAsync", _params, []reflect.Type{reflect.TypeOf((*chan<- string)(nil)).Elem(), reflect.TypeOf((*<-chan models.Line)(nil)).Elem()})
+	var _ret0 chan<- string
+	var _ret1 <-chan models.Line
+	if len(_result) != 0 {
+		if _result[0] != nil {
 			var ok bool
-			ret0, ok = result[0].(chan string)
+			_ret0, ok = _result[0].(chan string)
 			if !ok {
-				ret0 = result[0].(chan<- string)
+				_ret0 = _result[0].(chan<- string)
 			}
 		}
-		if result[1] != nil {
+		if _result[1] != nil {
 			var ok bool
-			ret1, ok = result[1].(chan models.Line)
+			_ret1, ok = _result[1].(chan models.Line)
 			if !ok {
-				ret1 = result[1].(<-chan models.Line)
+				_ret1 = _result[1].(<-chan models.Line)
 			}
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockAsyncTFExec) VerifyWasCalledOnce() *VerifierMockAsyncTFExec {
@@ -92,8 +92,8 @@ type VerifierMockAsyncTFExec struct {
 }
 
 func (verifier *VerifierMockAsyncTFExec) RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *go_version.Version, workspace string) *MockAsyncTFExec_RunCommandAsync_OngoingVerification {
-	params := []pegomock.Param{ctx, path, args, envs, v, workspace}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunCommandAsync", params, verifier.timeout)
+	_params := []pegomock.Param{ctx, path, args, envs, v, workspace}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunCommandAsync", _params, verifier.timeout)
 	return &MockAsyncTFExec_RunCommandAsync_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -108,31 +108,43 @@ func (c *MockAsyncTFExec_RunCommandAsync_OngoingVerification) GetCapturedArgumen
 }
 
 func (c *MockAsyncTFExec_RunCommandAsync_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []string, _param2 [][]string, _param3 []map[string]string, _param4 []*go_version.Version, _param5 []string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(command.ProjectContext)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]command.ProjectContext, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(command.ProjectContext)
+			}
 		}
-		_param1 = make([]string, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(string)
+		if len(_params) > 1 {
+			_param1 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(string)
+			}
 		}
-		_param2 = make([][]string, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.([]string)
+		if len(_params) > 2 {
+			_param2 = make([][]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.([]string)
+			}
 		}
-		_param3 = make([]map[string]string, len(c.methodInvocations))
-		for u, param := range params[3] {
-			_param3[u] = param.(map[string]string)
+		if len(_params) > 3 {
+			_param3 = make([]map[string]string, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(map[string]string)
+			}
 		}
-		_param4 = make([]*go_version.Version, len(c.methodInvocations))
-		for u, param := range params[4] {
-			_param4[u] = param.(*go_version.Version)
+		if len(_params) > 4 {
+			_param4 = make([]*go_version.Version, len(c.methodInvocations))
+			for u, param := range _params[4] {
+				_param4[u] = param.(*go_version.Version)
+			}
 		}
-		_param5 = make([]string, len(c.methodInvocations))
-		for u, param := range params[5] {
-			_param5[u] = param.(string)
+		if len(_params) > 5 {
+			_param5 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[5] {
+				_param5[u] = param.(string)
+			}
 		}
 	}
 	return
