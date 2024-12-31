@@ -252,8 +252,8 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		VCSClient:                      vcsClient,
 		RepoAllowlistChecker:           repoAllowlistChecker,
-		WorkingDir:                workingDir,
-		WorkingDirLocker:          workingDirLocker,
+		WorkingDir:                     workingDir,
+		WorkingDirLocker:               workingDirLocker,
 	}
 	return ac, projectCommandBuilder, projectCommandRunner
 }
