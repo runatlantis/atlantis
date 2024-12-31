@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v68/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 
@@ -1695,26 +1695,26 @@ func GitHubPullRequestParsed(headSHA string) *github.PullRequest {
 		headSHA = "13940d121be73f656e2132c6d7b4c8e87878ac8d"
 	}
 	return &github.PullRequest{
-		Number:  github.Int(2),
-		State:   github.String("open"),
-		HTMLURL: github.String("htmlurl"),
+		Number:  github.Ptr(2),
+		State:   github.Ptr("open"),
+		HTMLURL: github.Ptr("htmlurl"),
 		Head: &github.PullRequestBranch{
 			Repo: &github.Repository{
-				FullName: github.String("runatlantis/atlantis-tests"),
-				CloneURL: github.String("https://github.com/runatlantis/atlantis-tests.git"),
+				FullName: github.Ptr("runatlantis/atlantis-tests"),
+				CloneURL: github.Ptr("https://github.com/runatlantis/atlantis-tests.git"),
 			},
-			SHA: github.String(headSHA),
-			Ref: github.String("branch"),
+			SHA: github.Ptr(headSHA),
+			Ref: github.Ptr("branch"),
 		},
 		Base: &github.PullRequestBranch{
 			Repo: &github.Repository{
-				FullName: github.String("runatlantis/atlantis-tests"),
-				CloneURL: github.String("https://github.com/runatlantis/atlantis-tests.git"),
+				FullName: github.Ptr("runatlantis/atlantis-tests"),
+				CloneURL: github.Ptr("https://github.com/runatlantis/atlantis-tests.git"),
 			},
-			Ref: github.String("main"),
+			Ref: github.Ptr("main"),
 		},
 		User: &github.User{
-			Login: github.String("atlantisbot"),
+			Login: github.Ptr("atlantisbot"),
 		},
 	}
 }

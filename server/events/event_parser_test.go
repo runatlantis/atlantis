@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v68/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
@@ -68,12 +68,12 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 	comment := github.IssueCommentEvent{
 		Repo: &Repo,
 		Issue: &github.Issue{
-			Number:  github.Int(1),
-			User:    &github.User{Login: github.String("issue_user")},
-			HTMLURL: github.String("https://github.com/runatlantis/atlantis/issues/1"),
+			Number:  github.Ptr(1),
+			User:    &github.User{Login: github.Ptr("issue_user")},
+			HTMLURL: github.Ptr("https://github.com/runatlantis/atlantis/issues/1"),
 		},
 		Comment: &github.IssueComment{
-			User: &github.User{Login: github.String("comment_user")},
+			User: &github.User{Login: github.Ptr("comment_user")},
 		},
 	}
 
@@ -170,8 +170,8 @@ func TestParseGithubPullEventFromDraft(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	// verify that close event treated as 'close' events by default
 	closeEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	closeEvent.Action = github.String("closed")
-	closeEvent.PullRequest.Draft = github.Bool(true)
+	closeEvent.Action = github.Ptr("closed")
+	closeEvent.PullRequest.Draft = github.Ptr(true)
 
 	_, evType, _, _, _, err := parser.ParseGithubPullEvent(logger, &closeEvent)
 	Ok(t, err)
@@ -179,7 +179,7 @@ func TestParseGithubPullEventFromDraft(t *testing.T) {
 
 	// verify that draft PRs are treated as 'other' events by default
 	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	testEvent.PullRequest.Draft = github.Bool(true)
+	testEvent.PullRequest.Draft = github.Ptr(true)
 	_, evType, _, _, _, err = parser.ParseGithubPullEvent(logger, &testEvent)
 	Ok(t, err)
 	Equals(t, models.OtherPullEvent, evType)

@@ -13,7 +13,7 @@ require (
 	github.com/go-playground/validator/v10 v10.23.0
 	github.com/go-test/deep v1.1.1
 	github.com/golang-jwt/jwt/v5 v5.2.1
-	github.com/google/go-github/v66 v66.0.0
+	github.com/google/go-github/v68 v68.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -144,3 +144,6 @@ require (
 	google.golang.org/protobuf v1.36.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
+
+// upstream pr to patch go-github to use v68, https://github.com/bradleyfalzon/ghinstallation/pull/137
+replace github.com/bradleyfalzon/ghinstallation/v2 => github.com/chenrui333/ghinstallation/v2 v2.12.1-0.20241231170237-36dcfb064b2f
