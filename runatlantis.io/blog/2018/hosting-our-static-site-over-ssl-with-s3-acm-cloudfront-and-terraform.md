@@ -52,7 +52,7 @@ Because I'm going to host the site on AWS services, I need requests to <www.runa
 
 At this point, we've generated an SSL certificate for <www.runatlantis.io> and our website is available on the internet via its S3 url so can't we just CNAME to the S3 bucket and call it a day? Unfortunately not.
 
-Since we generated our own certificate, we would need S3 to sign its responses using our certificiate. S3 doesn't support this and thus we need CloudFront. CloudFront supports using our own SSL cert and will just pull its data from the S3 bucket.
+Since we generated our own certificate, we would need S3 to sign its responses using our certificate. S3 doesn't support this and thus we need CloudFront. CloudFront supports using our own SSL cert and will just pull its data from the S3 bucket.
 
 # Terraform Time
 

@@ -126,8 +126,8 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	applyReqs := defaultCfg.Repos[0].ApplyRequirements
 	var globalApplyReqs []string
 	for _, req := range applyReqs {
-		for _, nonOverrideableReq := range valid.NonOverrideableApplyReqs {
-			if req == nonOverrideableReq {
+		for _, nonOverridableReq := range valid.NonOverridableApplyReqs {
+			if req == nonOverridableReq {
 				globalApplyReqs = append(globalApplyReqs, req)
 			}
 		}
