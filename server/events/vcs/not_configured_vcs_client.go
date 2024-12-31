@@ -78,3 +78,7 @@ func (a *NotConfiguredVCSClient) GetCloneURL(_ logging.SimpleLogging, _ models.V
 func (a *NotConfiguredVCSClient) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, a.err()
 }
+
+func (a *NotConfiguredVCSClient) AddPullLabel(repo models.Repo, pull models.PullRequest, label string) error {
+	return a.err()
+}
