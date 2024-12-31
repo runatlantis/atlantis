@@ -181,6 +181,8 @@ func (b *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 		bbState = "FAILED"
 	}
 
+	logger.Info("Updating BitBucket commit status for '%s' to '%s'", src, bbState)
+
 	// URL is a required field for bitbucket statuses. We default to the
 	// Atlantis server's URL.
 	if url == "" {

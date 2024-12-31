@@ -249,6 +249,8 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 		adState = azuredevops.GitFailed.String()
 	}
 
+	logger.Info("Updating Azure DevOps commit status for '%s' to '%s'", src, adState)
+
 	status := azuredevops.GitPullRequestStatus{}
 	status.Context = GitStatusContextFromSrc(src)
 	status.Description = &description

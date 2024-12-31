@@ -482,7 +482,7 @@ func TestStep_Validate(t *testing.T) {
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should
 			// be no error.
-			description: "unparseable shell command",
+			description: "unparsable shell command",
 			input: raw.Step{
 				StringVal: map[string]string{
 					"run": "my 'c",

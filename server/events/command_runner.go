@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v65/github"
+	"github.com/google/go-github/v66/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -159,13 +159,13 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
 		err := c.fetchUserTeams(baseRepo, &user)
 		if err != nil {
-			c.Logger.Err("Unable to fetch user teams: %s", err)
+			log.Err("Unable to fetch user teams: %s", err)
 			return
 		}
 
 		ok, err := c.checkUserPermissions(baseRepo, user, "plan")
 		if err != nil {
-			c.Logger.Err("Unable to check user permissions: %s", err)
+			log.Err("Unable to check user permissions: %s", err)
 			return
 		}
 		if !ok {
@@ -191,32 +191,32 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	if len(c.DisableAutoplanLabel) > 0 {
 		labels, err := c.VCSClient.GetPullLabels(ctx.Log, baseRepo, pull)
 		if err != nil {
-			ctx.Log.Err("Unable to get pull labels. Proceeding with %s command.", err, command.Plan)
+			ctx.Log.Err("Unable to get VCS pull/merge request labels: %s. Proceeding with autoplan.", err)
 		} else if utils.SlicesContains(labels, c.DisableAutoplanLabel) {
+			ctx.Log.Info("Pull/merge request has disable auto plan label '%s' so not running autoplan.", c.DisableAutoplanLabel)
 			return
 		}
 	}
 
+	ctx.Log.Info("Running autoplan...")
 	cmd := &CommentCommand{
 		Name: command.Autoplan,
 	}
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
-
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
 
-			// Update the plan or apply commit status to pending whilst the pre workflow hook is running so that the PR can't be merged.
+			// Update the plan or apply commit status to failed
 			switch cmd.Name {
 			case command.Plan:
 				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
-					ctx.Log.Warn("unable to update plan commit status: %s", err)
+					ctx.Log.Warn("Unable to update plan commit status: %s", err)
 				}
 			case command.Apply:
 				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
-					ctx.Log.Warn("unable to update apply commit status: %s", err)
+					ctx.Log.Warn("Unable to update apply commit status: %s", err)
 				}
 			}
 
@@ -230,11 +230,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	autoPlanRunner.Run(ctx, nil)
 
-	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd)
-
-	if err != nil {
-		ctx.Log.Err("Error running post-workflow hooks %s.", err)
-	}
+	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
 }
 
 // commentUserDoesNotHavePermissions comments on the pull request that the user
@@ -361,12 +357,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
-		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
-
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
 
-			// Update the plan or apply commit status to pending whilst the pre workflow hook is running so that the PR can't be merged.
+			// Update the plan or apply commit status to failed
 			switch cmd.Name {
 			case command.Plan:
 				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
@@ -388,11 +382,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	cmdRunner.Run(ctx, cmd)
 
-	err = c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd)
-
-	if err != nil {
-		ctx.Log.Err("Error running post-workflow hooks %s.", err)
-	}
+	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
 }
 
 func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {

@@ -200,7 +200,7 @@ Maintenance release for security patches with atlantis-base image
 * docker: bump git-lfs and gosu dependencies by @hi-artem in https://github.com/runatlantis/atlantis/pull/2096
 * fix(docker): fix base image for multi-platform build by @Tenzer in https://github.com/runatlantis/atlantis/pull/2099
 * fix(docker): fix installation of git-lfs in armv7 image by @Tenzer in https://github.com/runatlantis/atlantis/pull/2100
-* fix(docker): download Terraform and conftest versions maching image architecture by @Tenzer in https://github.com/runatlantis/atlantis/pull/2101
+* fix(docker): download Terraform and conftest versions matching image architecture by @Tenzer in https://github.com/runatlantis/atlantis/pull/2101
 
 # v0.18.3
 
@@ -237,7 +237,7 @@ Maintenance release for security patches with atlantis-base image
 * build(deps): bump github.com/hashicorp/go-version from 1.3.0 to 1.4.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1987
 * build(deps): bump go.uber.org/zap from 1.19.1 to 1.20.0 by @dependabot in https://github.com/runatlantis/atlantis/pull/1988
 * docs: document `undiverged` apply requirement in more places by @fishpen0 in https://github.com/runatlantis/atlantis/pull/1992
-* fix: fix autoplan when .terraform.lock.hcl is modifed by @gezb in https://github.com/runatlantis/atlantis/pull/1991
+* fix: fix autoplan when .terraform.lock.hcl is modified by @gezb in https://github.com/runatlantis/atlantis/pull/1991
 * feat: add XTerm JS to the server static files by @Ka1wa in https://github.com/runatlantis/atlantis/pull/1985
 * feat: post workflow hooks by @tim775 in https://github.com/runatlantis/atlantis/pull/1990
 * docs: add colon to policy checking yaml by @williamlord-wise in https://github.com/runatlantis/atlantis/pull/1996

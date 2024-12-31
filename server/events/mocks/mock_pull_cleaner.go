@@ -30,15 +30,15 @@ func (mock *MockPullCleaner) CleanUpPull(logger logging.SimpleLogging, repo mode
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPullCleaner().")
 	}
-	params := []pegomock.Param{logger, repo, pull}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("CleanUpPull", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(error)
+	_params := []pegomock.Param{logger, repo, pull}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("CleanUpPull", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(error)
 		}
 	}
-	return ret0
+	return _ret0
 }
 
 func (mock *MockPullCleaner) VerifyWasCalledOnce() *VerifierMockPullCleaner {
@@ -79,8 +79,8 @@ type VerifierMockPullCleaner struct {
 }
 
 func (verifier *VerifierMockPullCleaner) CleanUpPull(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) *MockPullCleaner_CleanUpPull_OngoingVerification {
-	params := []pegomock.Param{logger, repo, pull}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CleanUpPull", params, verifier.timeout)
+	_params := []pegomock.Param{logger, repo, pull}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CleanUpPull", _params, verifier.timeout)
 	return &MockPullCleaner_CleanUpPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -95,19 +95,25 @@ func (c *MockPullCleaner_CleanUpPull_OngoingVerification) GetCapturedArguments()
 }
 
 func (c *MockPullCleaner_CleanUpPull_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []models.PullRequest) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(logging.SimpleLogging)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(logging.SimpleLogging)
+			}
 		}
-		_param1 = make([]models.Repo, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(models.Repo)
+		if len(_params) > 1 {
+			_param1 = make([]models.Repo, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(models.Repo)
+			}
 		}
-		_param2 = make([]models.PullRequest, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.(models.PullRequest)
+		if len(_params) > 2 {
+			_param2 = make([]models.PullRequest, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(models.PullRequest)
+			}
 		}
 	}
 	return

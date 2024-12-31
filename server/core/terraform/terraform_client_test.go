@@ -78,9 +78,9 @@ is 0.11.13. You can update by downloading from developer.hashicorp.com/terraform
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
 	mockDownloader := mocks.NewMockDownloader()
-	distibution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
 
-	c, err := terraform.NewClient(logger, distibution, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, true, true, projectCmdOutputHandler)
+	c, err := terraform.NewClient(logger, distribution, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, true, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Ok(t, err)
@@ -301,10 +301,10 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	mockDownloader := mocks.NewMockDownloader()
-	distibution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
 
 	downloadsAllowed := true
-	c, err := terraform.NewTestClient(logger, distibution, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, downloadsAllowed, true, projectCmdOutputHandler)
+	c, err := terraform.NewTestClient(logger, distribution, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, downloadsAllowed, true, projectCmdOutputHandler)
 	Ok(t, err)
 
 	Equals(t, "0.11.10", c.DefaultVersion().String())

@@ -24,7 +24,7 @@ import (
 	giteasdk "code.gitea.io/sdk/gitea"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v65/github"
+	"github.com/google/go-github/v66/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"

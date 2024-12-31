@@ -50,7 +50,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 		return nil
 	}
 
-	ctx.Log.Debug("post-hooks configured, running...")
+	ctx.Log.Info("Post-workflow hooks configured, running...")
 
 	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir)
 	if err != nil {
@@ -84,6 +84,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 		postWorkflowHooks, repoDir)
 
 	if err != nil {
+		ctx.Log.Err("Error running post-workflow hooks %s.", err)
 		return err
 	}
 
@@ -146,5 +147,8 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 			ctx.Log.Warn("unable to update post workflow hook status: %s", err)
 		}
 	}
+
+	ctx.Log.Info("Post-workflow hooks completed")
+
 	return nil
 }

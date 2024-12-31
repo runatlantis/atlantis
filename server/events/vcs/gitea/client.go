@@ -316,7 +316,7 @@ func (c *GiteaClient) UpdateStatus(logger logging.SimpleLogging, repo models.Rep
 		giteaState = gitea.StatusFailure
 	}
 
-	logger.Debug("Updating status on Gitea pull request %d for '%s' to '%s'", pull.Num, description, state)
+	logger.Info("Updating Gitea check status for '%s' to '%s'", src, state)
 
 	newStatusOption := gitea.CreateStatusOption{
 		State:       giteaState,

@@ -30,15 +30,15 @@ func (mock *MockCommentParsing) Parse(comment string, vcsHost models.VCSHostType
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommentParsing().")
 	}
-	params := []pegomock.Param{comment, vcsHost}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Parse", params, []reflect.Type{reflect.TypeOf((*events.CommentParseResult)(nil)).Elem()})
-	var ret0 events.CommentParseResult
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(events.CommentParseResult)
+	_params := []pegomock.Param{comment, vcsHost}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Parse", _params, []reflect.Type{reflect.TypeOf((*events.CommentParseResult)(nil)).Elem()})
+	var _ret0 events.CommentParseResult
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(events.CommentParseResult)
 		}
 	}
-	return ret0
+	return _ret0
 }
 
 func (mock *MockCommentParsing) VerifyWasCalledOnce() *VerifierMockCommentParsing {
@@ -79,8 +79,8 @@ type VerifierMockCommentParsing struct {
 }
 
 func (verifier *VerifierMockCommentParsing) Parse(comment string, vcsHost models.VCSHostType) *MockCommentParsing_Parse_OngoingVerification {
-	params := []pegomock.Param{comment, vcsHost}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Parse", params, verifier.timeout)
+	_params := []pegomock.Param{comment, vcsHost}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Parse", _params, verifier.timeout)
 	return &MockCommentParsing_Parse_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -95,15 +95,19 @@ func (c *MockCommentParsing_Parse_OngoingVerification) GetCapturedArguments() (s
 }
 
 func (c *MockCommentParsing_Parse_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []models.VCSHostType) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(string)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
 		}
-		_param1 = make([]models.VCSHostType, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(models.VCSHostType)
+		if len(_params) > 1 {
+			_param1 = make([]models.VCSHostType, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(models.VCSHostType)
+			}
 		}
 	}
 	return
