@@ -354,6 +354,12 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 		if err := w.wrappedGit(logger, c, "fetch", "--unshallow"); err != nil {
 			return err
 		}
+
+		// fetch once more, otherwise `FETCH_HEAD` was reset to base when we ran
+		// fetch --unshallow
+		if err := w.wrappedGit(logger, c, "fetch", fetchRemote, fetchRef); err != nil {
+			return err
+		}
 	}
 
 	// We use --no-ff because we always want there to be a merge commit.

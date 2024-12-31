@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v66/github"
 	"github.com/pkg/errors"
 )
 
@@ -42,17 +43,45 @@ func (c *GithubAnonymousCredentials) GetToken() (string, error) {
 
 // GithubUserCredentials implements GithubCredentials for the personal auth token flow.
 type GithubUserCredentials struct {
-	User  string
-	Token string
+	User      string
+	Token     string
+	TokenFile string
+}
+
+type GitHubUserTransport struct {
+	Credentials *GithubUserCredentials
+	Transport   *github.BasicAuthTransport
+}
+
+func (t *GitHubUserTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// update token
+	token, err := t.Credentials.GetToken()
+	if err != nil {
+		return nil, err
+	}
+	t.Transport.Password = token
+
+	// defer to the underlying transport
+	return t.Transport.RoundTrip(req)
 }
 
 // Client returns a client for basic auth user credentials.
 func (c *GithubUserCredentials) Client() (*http.Client, error) {
-	tr := &github.BasicAuthTransport{
-		Username: strings.TrimSpace(c.User),
-		Password: strings.TrimSpace(c.Token),
+	password, err := c.GetToken()
+	if err != nil {
+		return nil, err
 	}
-	return tr.Client(), nil
+
+	client := &http.Client{
+		Transport: &GitHubUserTransport{
+			Credentials: c,
+			Transport: &github.BasicAuthTransport{
+				Username: strings.TrimSpace(c.User),
+				Password: strings.TrimSpace(password),
+			},
+		},
+	}
+	return client, nil
 }
 
 // GetUser returns the username for these credentials.
@@ -62,6 +91,15 @@ func (c *GithubUserCredentials) GetUser() (string, error) {
 
 // GetToken returns the user token.
 func (c *GithubUserCredentials) GetToken() (string, error) {
+	if c.TokenFile != "" {
+		content, err := os.ReadFile(c.TokenFile)
+		if err != nil {
+			return "", fmt.Errorf("failed reading github token file: %w", err)
+		}
+
+		return string(content), nil
+	}
+
 	return c.Token, nil
 }
 

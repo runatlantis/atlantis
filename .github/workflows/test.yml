@@ -32,7 +32,7 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -48,12 +48,12 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:af0b45be2e53fe0762e51adb9493d049fe947b35c0f8c3ad79f89200d6c303ca
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:79991418aec4e5dcb1f18dc7b7bdf6ee37302a30a1e374c7bcf3eba9aadef68d
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       # need to setup go toolchain explicitly
-      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
         with:
           go-version-file: go.mod
 
@@ -65,7 +65,7 @@ jobs:
       ###########################################################
       - name: Slack failure notification
         if: ${{ github.ref == 'refs/heads/main' && failure() }}
-        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
+        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
         with:
           payload: |
             {
@@ -118,8 +118,8 @@ jobs:
       ATLANTIS_GH_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
-      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
         with:
           go-version-file: go.mod
 
@@ -155,8 +155,8 @@ jobs:
       ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
-      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
         with:
           go-version-file: go.mod
 

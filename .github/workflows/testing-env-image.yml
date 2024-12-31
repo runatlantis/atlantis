@@ -25,7 +25,7 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -40,7 +40,7 @@ jobs:
     name: Build Testing Env Image
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3
@@ -49,7 +49,7 @@ jobs:
         platforms: arm64,arm
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3
+      uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3
 
     - name: Login to Packages Container registry
       uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
@@ -60,7 +60,7 @@ jobs:
 
     - run: echo "TODAY=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
     - name: Build and push testing-env:${{env.TODAY}} image
-      uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6
+      uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6
       with:
         cache-from: type=gha
         cache-to: type=gha,mode=max

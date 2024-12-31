@@ -26,13 +26,13 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
           filters: |
             src:
-              - '**.js'
+              - 'runatlantis.io/**'
               - 'package-lock.json'
               - 'package.json'
               - '.github/workflows/website.yml'
@@ -46,16 +46,16 @@ jobs:
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: markdown-lint
-        uses: DavidAnson/markdownlint-cli2-action@b4c9feab76d8025d1e83c653fa3990936df0e6c8 # v16
+        uses: DavidAnson/markdownlint-cli2-action@eb5ca3ab411449c66620fe7f1b3c9e10547144b0 # v18
         with:
           config: .markdownlint.yaml
           globs: 'runatlantis.io/**/*.md'
 
       - name: setup npm
-        uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6 # v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -63,7 +63,7 @@ jobs:
       - name: run http-server
         env:
           # renovate: datasource=github-releases depName=raviqqe/muffet
-          MUFFET_VERSION: 2.10.3
+          MUFFET_VERSION: 2.10.6
         run: |
           # install raviqqe/muffet to check for broken links.
           curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
@@ -86,18 +86,22 @@ jobs:
       # medium.com => was being rate limited: HTTP 429
       # twitter.com => too many redirections
       # www.flaticon.com => 403 error
+      # www.freepik.com => 403 error
       - run: |
           ./muffet \
             -e 'https://medium.com/runatlantis' \
             -e 'https://dev.to/*' \
             -e 'https://twitter.com/*' \
             -e 'https://www.flaticon.com/*' \
+            -e 'https://www.freepik.com/*' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \
             -e 'https://confluence.atlassian.com/*' \
+            --header 'User-Agent: Muffet' \
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
+            --timeout 300 \
             http://localhost:8080/
 
   skip-link-check:

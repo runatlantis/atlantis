@@ -185,6 +185,9 @@ type PullRequestOptions struct {
 	// When DeleteSourceBranchOnMerge flag is set to true VCS deletes the source branch after the PR is merged
 	// Applied by GitLab & AzureDevops
 	DeleteSourceBranchOnMerge bool
+	// MergeMethod specifies the merge method for the VCS
+	// Implemented only for Github
+	MergeMethod string
 }
 
 type PullRequestState int
@@ -666,7 +669,7 @@ type TeamAllowlistCheckerContext struct {
 	API bool
 }
 
-// WorkflowHookCommandContext defines the context for a pre and post worklfow_hooks that will
+// WorkflowHookCommandContext defines the context for a pre and post workflow_hooks that will
 // be executed before workflows.
 type WorkflowHookCommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.

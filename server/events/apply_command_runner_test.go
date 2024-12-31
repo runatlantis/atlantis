@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v66/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -234,16 +234,16 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When first apply fails, the second don't run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Second",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Second",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -268,16 +268,16 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When first apply fails, the second not will run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Second",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Second",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -300,25 +300,25 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When both in a group of two succeeds, the following two will run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "Second",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "Second",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Third",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Third",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Fourth",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Fourth",
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -353,25 +353,25 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When one out of two fails, the following two will not run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "Second",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "Second",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Third",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Third",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					AbortOnExcecutionOrderFail: true,
-					ProjectName:                "Fourth",
+					ExecutionOrderGroup:       1,
+					AbortOnExecutionOrderFail: true,
+					ProjectName:               "Fourth",
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -408,14 +408,14 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "Don't block when parallel is not set",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Second",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Second",
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -437,7 +437,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
-			Description: "Don't block when abortOnExcecutionOrderFail is not set",
+			Description: "Don't block when abortOnExecutionOrderFail is not set",
 			ProjectContexts: []command.ProjectContext{
 				{
 					ExecutionOrderGroup: 0,
