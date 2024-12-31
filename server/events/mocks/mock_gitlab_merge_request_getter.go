@@ -6,7 +6,7 @@ package mocks
 import (
 	pegomock "github.com/petergtz/pegomock/v4"
 	logging "github.com/runatlantis/atlantis/server/logging"
-	go_gitlab "github.com/xanzy/go-gitlab"
+	go_gitlab "gitlab.com/gitlab-org/api/client-go"
 	"reflect"
 	"time"
 )
