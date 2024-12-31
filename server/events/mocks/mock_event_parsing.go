@@ -11,7 +11,7 @@ import (
 	models "github.com/runatlantis/atlantis/server/events/models"
 	gitea0 "github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	logging "github.com/runatlantis/atlantis/server/logging"
-	go_gitlab "github.com/xanzy/go-gitlab"
+	go_gitlab "gitlab.com/gitlab-org/api/client-go"
 	"reflect"
 	"time"
 )
