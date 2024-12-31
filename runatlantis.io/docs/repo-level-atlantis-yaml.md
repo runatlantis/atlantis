@@ -44,7 +44,7 @@ in your repo.
 If you have many directories with Terraform configuration, each directory will
 need to be defined.
 
-This behavior can be overriden by setting `autodiscover.mode` to
+This behavior can be overridden by setting `autodiscover.mode` to
 `enabled` in which case Atlantis will still try to discover projects which were not
 explicitly configured. If the directory of any discovered project conflicts with a
 manually configured project, the manually configured project will take precedence.

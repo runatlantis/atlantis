@@ -292,7 +292,7 @@ locally at this time.
 
 `
 
-// remoteOpsErr100 is the error terraform plan will retrun if this project is
+// remoteOpsErr100 is the error terraform plan will return if this project is
 // using TFE remote operations in TF 1.0.{0,1}.
 var remoteOpsErr100 = `Error: Saving a generated plan is currently not supported
 

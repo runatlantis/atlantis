@@ -54,7 +54,7 @@ func NewApplyClient(backend Backend, disableApply bool, disableGlobalApplyLock b
 }
 
 // LockApply acquires global apply lock.
-// DisableApply takes presedence to any existing locks, if it is set to true
+// DisableApply takes precedence to any existing locks, if it is set to true
 // this function returns an error
 func (c *ApplyClient) LockApply() (ApplyCommandLock, error) {
 	response := ApplyCommandLock{}
@@ -76,7 +76,7 @@ func (c *ApplyClient) LockApply() (ApplyCommandLock, error) {
 }
 
 // UnlockApply releases a global apply lock.
-// DisableApply takes presedence to any existing locks, if it is set to true
+// DisableApply takes precedence to any existing locks, if it is set to true
 // this function returns an error
 func (c *ApplyClient) UnlockApply() error {
 	if c.disableApply {
