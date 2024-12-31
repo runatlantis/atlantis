@@ -7,7 +7,7 @@ ARG GOLANG_TAG=1.23.4-alpine@sha256:6c5c9590f169f77c8046e45c611d3b28fe477789acd8
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.10.3
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.8.7
+ARG DEFAULT_OPENTOFU_VERSION=1.8.8
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.56.0
 
@@ -122,7 +122,7 @@ RUN ./download-release.sh \
         "terraform" \
         "${TARGETPLATFORM}" \
         "${DEFAULT_TERRAFORM_VERSION}" \
-        "1.6.6 1.7.5 1.8.5 ${DEFAULT_TERRAFORM_VERSION}" \
+        "1.6.6 1.7.5 1.8.5 1.9.8 ${DEFAULT_TERRAFORM_VERSION}" \
     && ./download-release.sh \
         "tofu" \
         "${TARGETPLATFORM}" \
