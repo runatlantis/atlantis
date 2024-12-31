@@ -82,7 +82,7 @@ func runProjectCmdsParallelGroups(
 	for _, group := range groups {
 		res := runProjectCmdsParallel(group, runnerFunc, poolSize)
 		results = append(results, res.ProjectResults...)
-		if res.HasErrors() && group[0].AbortOnExcecutionOrderFail {
+		if res.HasErrors() && group[0].AbortOnExecutionOrderFail {
 			ctx.Log.Info("abort on execution order when failed")
 			break
 		}
