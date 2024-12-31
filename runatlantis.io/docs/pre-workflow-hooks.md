@@ -21,7 +21,7 @@ behavior can be changed by setting the [fail-on-pre-workflow-hook-error](server-
 flag in the Atlantis server configuration.
 :::
 
-## Atlantis Command Targetting
+## Atlantis Command Targeting
 
 By default, the workflow hook will run when any command is processed by Atlantis.
 This can be modified by specifying the `commands` key in the workflow hook containing a comma delimited list

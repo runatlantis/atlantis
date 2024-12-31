@@ -241,4 +241,4 @@ Another company uses Atlantis to manage 600+ Terraform repos collaborated on by 
 
 - Thanks to [Seth Vargo](https://medium.com/@sethvargo) for his talk [Version-Controlled Infrastructure with GitHub](https://www.youtube.com/watch?v=2TWqi7dLSro) that inspired a lot of this post.
 - Thanks to Isha for reading drafts of this post.
-- Icons in graphics from made by [Freepik](http://freepik.com/) from [Flaticon](https://www.flaticon.com/) and licensed by [CC 3.0](https://creativecommons.org/licenses/by/3.0/)
+- Icons in graphics from made by [Freepik](https://www.freepik.com/) from [Flaticon](https://www.flaticon.com/) and licensed by [CC 3.0](https://creativecommons.org/licenses/by/3.0/)

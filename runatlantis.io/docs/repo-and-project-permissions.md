@@ -157,7 +157,7 @@ checking if the external command exited with code `0` and if the last line
 of output is `pass`.
 
 ```text
-# Psuedo-code of Atlantis evaluation of external commands
+# Pseudo-code of Atlantis evaluation of external commands
 
 user_authorized =
   external_command.exit_code == 0

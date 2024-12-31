@@ -1039,21 +1039,21 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash: false,
 			expMethod:   "rebase",
 		},
-		"all true: merge with merge: overrided by command": {
+		"all true: merge with merge: overridden by command": {
 			allowMerge:        true,
 			allowRebase:       true,
 			allowSquash:       true,
 			mergeMethodOption: "merge",
 			expMethod:         "merge",
 		},
-		"all true: merge with rebase: overrided by command": {
+		"all true: merge with rebase: overridden by command": {
 			allowMerge:        true,
 			allowRebase:       true,
 			allowSquash:       true,
 			mergeMethodOption: "rebase",
 			expMethod:         "rebase",
 		},
-		"all true: merge with squash: overrided by command": {
+		"all true: merge with squash: overridden by command": {
 			allowMerge:        true,
 			allowRebase:       true,
 			allowSquash:       true,
