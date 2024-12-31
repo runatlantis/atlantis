@@ -29,57 +29,57 @@ func (mock *MockGithubCredentials) Client() (*http.Client, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGithubCredentials().")
 	}
-	params := []pegomock.Param{}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Client", params, []reflect.Type{reflect.TypeOf((**http.Client)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 *http.Client
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(*http.Client)
+	_params := []pegomock.Param{}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Client", _params, []reflect.Type{reflect.TypeOf((**http.Client)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 *http.Client
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(*http.Client)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockGithubCredentials) GetToken() (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGithubCredentials().")
 	}
-	params := []pegomock.Param{}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("GetToken", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 string
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(string)
+	_params := []pegomock.Param{}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetToken", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 string
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(string)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockGithubCredentials) GetUser() (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGithubCredentials().")
 	}
-	params := []pegomock.Param{}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("GetUser", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 string
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(string)
+	_params := []pegomock.Param{}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetUser", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 string
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(string)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockGithubCredentials) VerifyWasCalledOnce() *VerifierMockGithubCredentials {
@@ -120,8 +120,8 @@ type VerifierMockGithubCredentials struct {
 }
 
 func (verifier *VerifierMockGithubCredentials) Client() *MockGithubCredentials_Client_OngoingVerification {
-	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Client", params, verifier.timeout)
+	_params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Client", _params, verifier.timeout)
 	return &MockGithubCredentials_Client_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -137,8 +137,8 @@ func (c *MockGithubCredentials_Client_OngoingVerification) GetAllCapturedArgumen
 }
 
 func (verifier *VerifierMockGithubCredentials) GetToken() *MockGithubCredentials_GetToken_OngoingVerification {
-	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetToken", params, verifier.timeout)
+	_params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetToken", _params, verifier.timeout)
 	return &MockGithubCredentials_GetToken_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -154,8 +154,8 @@ func (c *MockGithubCredentials_GetToken_OngoingVerification) GetAllCapturedArgum
 }
 
 func (verifier *VerifierMockGithubCredentials) GetUser() *MockGithubCredentials_GetUser_OngoingVerification {
-	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetUser", params, verifier.timeout)
+	_params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetUser", _params, verifier.timeout)
 	return &MockGithubCredentials_GetUser_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 

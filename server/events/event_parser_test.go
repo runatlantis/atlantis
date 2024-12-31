@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v65/github"
+	"github.com/google/go-github/v66/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
@@ -36,6 +36,7 @@ import (
 var parser = events.EventParser{
 	GithubUser:         "github-user",
 	GithubToken:        "github-token",
+	GithubTokenFile:    "",
 	GitlabUser:         "gitlab-user",
 	GitlabToken:        "gitlab-token",
 	AllowDraftPRs:      false,
