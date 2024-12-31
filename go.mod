@@ -63,8 +63,6 @@ require (
 
 require github.com/twmb/murmur3 v1.1.8 // indirect
 
-require github.com/google/go-github/v66 v66.0.0
-
 require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -145,3 +143,6 @@ require (
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
+
+// upstream pr to patch go-github to use v68, https://github.com/bradleyfalzon/ghinstallation/pull/137
+replace github.com/bradleyfalzon/ghinstallation/v2 => github.com/chenrui333/ghinstallation/v2 v2.12.1-0.20241231170237-36dcfb064b2f
