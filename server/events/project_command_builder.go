@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -31,8 +32,8 @@ const (
 	DefaultWorkspace = "default"
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
-	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
-	DefaultAbortOnExcecutionOrderFail = false
+	// DefaultAbortOnExecutionOrderFail being false is the default setting for abort on execution group failures
+	DefaultAbortOnExecutionOrderFail = false
 )
 
 func NewInstrumentedProjectCommandBuilder(
@@ -237,7 +238,7 @@ type DefaultProjectCommandBuilder struct {
 	AutoDetectModuleFiles string
 	// User config option: List of file patterns to to to check if a directory contains modified files.
 	AutoplanFileList string
-	// User config option: Format Terraform plan output into a markdown-diff friendy format for color-coding purposes.
+	// User config option: Format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 	EnableDiffMarkdownFormat bool
 	// User config option: Block plan requests from projects outside the files modified in the pull request.
 	RestrictFileList bool
@@ -439,7 +440,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
-	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
+	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
 	if hasRepoCfg {
 		if repoCfg.Automerge != nil {
 			automerge = *repoCfg.Automerge
@@ -450,7 +451,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		if repoCfg.ParallelPlan != nil {
 			parallelPlan = *repoCfg.ParallelPlan
 		}
-		abortOnExcecutionOrderFail = repoCfg.AbortOnExcecutionOrderFail
+		abortOnExecutionOrderFail = repoCfg.AbortOnExecutionOrderFail
 	}
 
 	if len(repoCfg.Projects) > 0 {
@@ -476,7 +477,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
-					abortOnExcecutionOrderFail,
+					abortOnExecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -521,7 +522,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			absProjectDir := filepath.Join(repoDir, mp.Path)
 			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir)
 			if err != nil {
-				return nil, errors.Wrapf(err, "looking for Terraform Cloud workspace from configuration %s", absProjectDir)
+				return nil, errors.Wrapf(err, "Looking for Terraform Cloud workspace from configuration in '%s'", absProjectDir)
 			}
 
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)
@@ -538,7 +539,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
-					abortOnExcecutionOrderFail,
+					abortOnExecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -546,6 +547,30 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 
 	sort.Slice(projCtxs, func(i, j int) bool {
 		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
+	})
+
+	// Filter projects to only include ones the user is authorized for
+	projCtxs = slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
+		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
+			// allowlist restriction is not enabled
+			return false
+		}
+		ctx := models.TeamAllowlistCheckerContext{
+			BaseRepo:           projCtx.BaseRepo,
+			CommandName:        projCtx.CommandName.String(),
+			EscapedCommentArgs: projCtx.EscapedCommentArgs,
+			HeadRepo:           projCtx.HeadRepo,
+			Log:                projCtx.Log,
+			Pull:               projCtx.Pull,
+			ProjectName:        projCtx.ProjectName,
+			RepoDir:            repoDir,
+			RepoRelDir:         projCtx.RepoRelDir,
+			User:               projCtx.User,
+			Verbose:            projCtx.Verbose,
+			Workspace:          projCtx.Workspace,
+			API:                false,
+		}
+		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
 	})
 
 	return projCtxs, nil
@@ -835,7 +860,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
-	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
+	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
 	if repoCfgPtr != nil {
 		if repoCfgPtr.Automerge != nil {
 			automerge = *repoCfgPtr.Automerge
@@ -846,7 +871,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		if repoCfgPtr.ParallelPlan != nil {
 			parallelPlan = *repoCfgPtr.ParallelPlan
 		}
-		abortOnExcecutionOrderFail = repoCfgPtr.AbortOnExcecutionOrderFail
+		abortOnExecutionOrderFail = repoCfgPtr.AbortOnExecutionOrderFail
 	}
 
 	if len(matchingProjects) > 0 {
@@ -871,7 +896,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					parallelApply,
 					parallelPlan,
 					verbose,
-					abortOnExcecutionOrderFail,
+					abortOnExecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -895,7 +920,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				parallelApply,
 				parallelPlan,
 				verbose,
-				abortOnExcecutionOrderFail,
+				abortOnExecutionOrderFail,
 				p.TerraformExecutor,
 			)...)
 	}
@@ -903,6 +928,30 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	if err := p.validateWorkspaceAllowed(repoCfgPtr, repoRelDir, workspace); err != nil {
 		return []command.ProjectContext{}, err
 	}
+
+	// Filter projects to only include ones the user is authorized for
+	projCtxs = slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
+		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
+			// allowlist restriction is not enabled
+			return false
+		}
+		ctx := models.TeamAllowlistCheckerContext{
+			BaseRepo:           projCtx.BaseRepo,
+			CommandName:        projCtx.CommandName.String(),
+			EscapedCommentArgs: projCtx.EscapedCommentArgs,
+			HeadRepo:           projCtx.HeadRepo,
+			Log:                projCtx.Log,
+			Pull:               projCtx.Pull,
+			ProjectName:        projCtx.ProjectName,
+			RepoDir:            repoDir,
+			RepoRelDir:         projCtx.RepoRelDir,
+			User:               projCtx.User,
+			Verbose:            projCtx.Verbose,
+			Workspace:          projCtx.Workspace,
+			API:                false,
+		}
+		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
+	})
 
 	return projCtxs, nil
 }

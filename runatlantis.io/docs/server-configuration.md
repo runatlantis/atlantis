@@ -185,10 +185,6 @@ Values are chosen in this order:
 By default, changes to modules will not trigger autoplanning. See the flags below.
 :::
 
-::: warning NOTE
-If any projects are defined in a repo atlantis.yaml file, the logic for this flag will not execute. See issue [#3122](https://github.com/runatlantis/atlantis/issues/3122).
-:::
-
 ### `--autoplan-modules`
 
 ```bash
@@ -201,10 +197,6 @@ Defaults to `false`. When set to `true`, Atlantis will trace the local modules o
 Included project are projects with files included by `--autoplan-file-list`.
 After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
 `--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
-
-::: warning NOTE
-If any projects are defined in a repo atlantis.yaml file, the logic for this flag will not execute. See issue [#3122](https://github.com/runatlantis/atlantis/issues/3122).
-:::
 
 ### `--autoplan-modules-from-projects`
 
@@ -517,7 +509,7 @@ and set `--autoplan-modules` to `false`.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
-  This will bypass `--restrict-file-list` if regex is used, normal commands will stil be blocked if necessary.
+  This will bypass `--restrict-file-list` if regex is used, normal commands will still be blocked if necessary.
 
   ::: warning SECURITY WARNING
   It's not supposed to be used with `--disable-apply-all`.
@@ -743,6 +735,16 @@ based on the organization or user that triggered the webhook.
 
   GitHub token of API user.
 
+### `--gh-token-file`
+
+  ```bash
+  atlantis server --gh-token-file="/path/to/token"
+  # or
+  ATLANTIS_GH_TOKEN_FILE="/path/to/token"
+  ```
+
+  GitHub token of API user. The token is loaded from disk regularly to allow for rotation of the token without the need to restart the Atlantis server.
+
 ### `--gh-user`
 
   ```bash
@@ -856,6 +858,20 @@ This is useful when you have many projects and want to keep the pull request cle
   Include git untracked files in the Atlantis modified file list.
   Used for example with CDKTF pre-workflow hooks that dynamically generate
   Terraform files.
+
+### `--ignore-vcs-status-names`
+
+   ```bash
+  atlantis server --ignore-vcs-status-names="status1,status2"
+  # or
+  ATLANTIS_IGNORE_VCS_STATUS_NAMES=status1,status2
+  ```
+
+   Comma separated list of VCS status names from other atlantis services.
+   When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks
+   (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
+   from other Atlantis services when checking if the PR is mergeable.
+   Currently only implemented for GitHub.
 
 ### `--locking-db-type`
 
@@ -1124,7 +1140,7 @@ This is useful when you have many projects and want to keep the pull request cle
 
   `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
   This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
-  like `atlantis plan -p .*` will still work if used. normal commands will stil be blocked if necessary.
+  like `atlantis plan -p .*` will still work if used. normal commands will still be blocked if necessary.
   Defaults to `false`.
 
 ### `--silence-allowlist-errors`
@@ -1241,6 +1257,16 @@ This is useful when you have many projects and want to keep the pull request cle
 
   Namespace for emitting stats/metrics. See [stats](stats.md) section.
 
+### `--tf-distribution`
+
+  ```bash
+  atlantis server --tf-distribution="terraform"
+  # or
+  ATLANTIS_TF_DISTRIBUTION="terraform"
+  ```
+
+  Which TF distribution to use. Can be set to `terraform` or `opentofu`.
+
 ### `--tf-download`
 
   ```bash
@@ -1265,6 +1291,8 @@ Setting this to `false` can be useful in an air-gapped environment where a downl
   endpoint should match that of releases.hashicorp.com.
 
   This has no impact if `--tf-download` is set to `false`.
+
+  This setting is not yet supported when `--tf-distribution` is set to `opentofu`.
 
 ### `--tfe-hostname`
 
@@ -1314,7 +1342,7 @@ This flag is useful when having multiple projects that need to run a plan and ap
 * [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
 * [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
 
-The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient managment of the PRs.
+The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
 
 ### `--var-file-allowlist`
 

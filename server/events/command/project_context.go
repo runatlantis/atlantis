@@ -122,10 +122,13 @@ type ProjectContext struct {
 	// The index of order group. Before planning/applying it will use to sort projects. Default is 0.
 	ExecutionOrderGroup int
 	// If plans/applies should be aborted if any prior plan/apply fails
-	AbortOnExcecutionOrderFail bool
+	AbortOnExecutionOrderFail bool
 	// Allows custom policy check tools outside of Conftest to run in checks
 	CustomPolicyCheck bool
 	SilencePRComments []string
+
+	// TeamAllowlistChecker is used to check authorization on a project-level
+	TeamAllowlistChecker TeamAllowlistChecker
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

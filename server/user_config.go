@@ -50,6 +50,7 @@ type UserConfig struct {
 	GithubAllowMergeableBypassApply bool   `mapstructure:"gh-allow-mergeable-bypass-apply"`
 	GithubHostname                  string `mapstructure:"gh-hostname"`
 	GithubToken                     string `mapstructure:"gh-token"`
+	GithubTokenFile                 string `mapstructure:"gh-token-file"`
 	GithubUser                      string `mapstructure:"gh-user"`
 	GithubWebhookSecret             string `mapstructure:"gh-webhook-secret"`
 	GithubOrg                       string `mapstructure:"gh-org"`
@@ -75,6 +76,7 @@ type UserConfig struct {
 	LogLevel                        string `mapstructure:"log-level"`
 	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
 	MaxCommentsPerCommand           int    `mapstructure:"max-comments-per-command"`
+	IgnoreVCSStatusNames            string `mapstructure:"ignore-vcs-status-names"`
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`
@@ -107,6 +109,7 @@ type UserConfig struct {
 	SSLCertFile                string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile                 string          `mapstructure:"ssl-key-file"`
 	RestrictFileList           bool            `mapstructure:"restrict-file-list"`
+	TFDistribution             string          `mapstructure:"tf-distribution"`
 	TFDownload                 bool            `mapstructure:"tf-download"`
 	TFDownloadURL              string          `mapstructure:"tf-download-url"`
 	TFEHostname                string          `mapstructure:"tfe-hostname"`

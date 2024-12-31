@@ -65,20 +65,42 @@ type StepRunner interface {
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
+	Run(
+		ctx command.ProjectContext,
+		shell *valid.CommandShell,
+		cmd string,
+		path string,
+		envs map[string]string,
+		streamOutput bool,
+		postProcessOutput valid.PostProcessRunOutputOption,
+	) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
 
 // EnvStepRunner runs env steps.
 type EnvStepRunner interface {
-	Run(ctx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error)
+	Run(
+		ctx command.ProjectContext,
+		shell *valid.CommandShell,
+		cmd string,
+		value string,
+		path string,
+		envs map[string]string,
+	) (string, error)
 }
 
 // MultiEnvStepRunner runs multienv steps.
 type MultiEnvStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
+	Run(
+		ctx command.ProjectContext,
+		shell *valid.CommandShell,
+		cmd string,
+		path string,
+		envs map[string]string,
+		postProcessOutput valid.PostProcessRunOutputOption,
+	) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -102,7 +124,7 @@ type ProjectApplyCommandRunner interface {
 }
 
 type ProjectPolicyCheckCommandRunner interface {
-	// PolicyCheck runs OPA defined policies for the project desribed by ctx.
+	// PolicyCheck runs OPA defined policies for the project described by ctx.
 	PolicyCheck(ctx command.ProjectContext) command.ProjectResult
 }
 
@@ -377,12 +399,15 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					ignorePolicy = true
 				}
 				// Increment approval if user is owner.
-				if isOwner && !ignorePolicy {
+				if isOwner && !ignorePolicy && (ctx.User.Username != ctx.Pull.Author || !policySet.PreventSelfApprove) {
 					if !ctx.ClearPolicyApproval {
 						prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
 					} else {
 						prjPolicyStatus[i].Approvals = 0
 					}
+					// User matches the author and prevent self approve is set to true
+				} else if isOwner && !ignorePolicy && ctx.User.Username == ctx.Pull.Author && policySet.PreventSelfApprove {
+					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s the author of pr %s matches the command commenter user %s - please contact another policy owners to approve failing policies", policySet.Name, ctx.Pull.Author, ctx.User.Username))
 					// User is not authorized to approve policy set.
 				} else if !ignorePolicy {
 					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
@@ -391,6 +416,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 				if !policyStatus.Passed && (prjPolicyStatus[i].Approvals != policySet.ApproveCount) {
 					allPassed = false
 				}
+
 				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
 					PolicySetName: policySet.Name,
 					Passed:        policyStatus.Passed,
@@ -800,15 +826,15 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs, true, step.Output)
+			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, true, step.Output)
 		case "env":
-			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
+			out, err = p.EnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out
 			// We reset out to the empty string because we don't want it to
 			// be printed to the PR, it's solely to set the environment variable.
 			out = ""
 		case "multienv":
-			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs, step.Output)
+			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, step.Output)
 		}
 
 		if out != "" {

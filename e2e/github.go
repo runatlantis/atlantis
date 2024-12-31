@@ -21,7 +21,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/google/go-github/v59/github"
+	"github.com/google/go-github/v66/github"
 )
 
 type GithubClient struct {
@@ -81,13 +81,15 @@ func (g GithubClient) Clone(cloneDir string) error {
 }
 
 func (g GithubClient) CreateAtlantisWebhook(ctx context.Context, hookURL string) (int64, error) {
+	contentType := "json"
+	hookConfig := &github.HookConfig{
+		ContentType: &contentType,
+		URL:         &hookURL,
+	}
 	// create atlantis hook
 	atlantisHook := &github.Hook{
 		Events: []string{"issue_comment", "pull_request", "push"},
-		Config: map[string]interface{}{
-			"url":          hookURL,
-			"content_type": "json",
-		},
+		Config: hookConfig,
 		Active: github.Bool(true),
 	}
 
@@ -153,9 +155,23 @@ func (g GithubClient) ClosePullRequest(ctx context.Context, pullRequestNumber in
 }
 func (g GithubClient) DeleteBranch(ctx context.Context, branchName string) error {
 
-	_, err := g.client.Git.DeleteRef(ctx, g.ownerName, g.repoName, branchName)
+	deleteBranchName := fmt.Sprintf("%s/%s", "heads", branchName)
+	_, err := g.client.Git.DeleteRef(ctx, g.ownerName, g.repoName, deleteBranchName)
 	if err != nil {
 		return fmt.Errorf("error while deleting branch %s: %v", branchName, err)
 	}
 	return nil
+}
+
+func (g GithubClient) IsAtlantisInProgress(state string) bool {
+	for _, s := range []string{"success", "error", "failure"} {
+		if state == s {
+			return false
+		}
+	}
+	return true
+}
+
+func (g GithubClient) DidAtlantisSucceed(state string) bool {
+	return state == "success"
 }
