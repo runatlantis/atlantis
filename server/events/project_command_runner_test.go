@@ -99,7 +99,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 	When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-	When(mockRun.Run(ctx, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
+	When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
@@ -115,7 +115,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		case "apply":
 			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 		case "run":
-			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs, true, "")
+			mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, "")
 		}
 	}
 }
@@ -424,6 +424,17 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
 
 			ctx := command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
@@ -444,8 +455,8 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 			When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
-			When(mockEnv.Run(ctx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
+			When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
+			When(mockEnv.Run(ctx, nil, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
 
 			res := runner.Apply(ctx)
 			Equals(t, c.expOut, res.ApplySuccess)
@@ -460,9 +471,9 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				case "apply":
 					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs, true, "")
+					mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, "")
 				case "env":
-					mockEnv.VerifyWasCalledOnce().Run(ctx, "", "value", repoDir, expEnvs)
+					mockEnv.VerifyWasCalledOnce().Run(ctx, nil, "", "value", repoDir, expEnvs)
 				}
 			}
 		})
@@ -495,6 +506,17 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		Any[models.PullRequest](),
 		Any[string](),
 	)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+	}, nil)
 
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
@@ -823,7 +845,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			expFailure: "One or more policy sets require additional approval.",
 		},
 		{
-			description: "When user is a top-level ownner through membership, increment approval on all policies.",
+			description: "When user is a top-level owner through membership, increment approval on all policies.",
 			userTeams:   []string{"someuserteam"},
 			policySetCfg: valid.PolicySets{
 				Owners: valid.PolicyOwners{
@@ -1146,6 +1168,56 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			expFailure: `One or more policy sets require additional approval.`,
 			hasErr:     false,
 		},
+		{
+			description:         "Policy Approval should not be the Author of the PR",
+			userTeams:           []string{"someuserteam"},
+			clearPolicyApproval: false,
+			policySetCfg: valid.PolicySets{
+				PolicySets: []valid.PolicySet{
+					{
+						Owners: valid.PolicyOwners{
+							Users: []string{"lkysow"},
+						},
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+					{
+						Owners: valid.PolicyOwners{
+							Users: []string{"lkysow"},
+						},
+						Name:               "policy2",
+						ApproveCount:       1,
+						PreventSelfApprove: true,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Approvals:     0,
+					Passed:        false,
+				},
+				{
+					PolicySetName: "policy2",
+					Approvals:     0,
+					Passed:        false,
+				},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					ReqApprovals:  1,
+					CurApprovals:  1,
+				},
+				{
+					PolicySetName: "policy2",
+					ReqApprovals:  1,
+					CurApprovals:  0,
+				},
+			},
+			expFailure: `One or more policy sets require additional approval.`,
+			hasErr:     true,
+		},
 	}
 
 	for _, c := range cases {
@@ -1203,7 +1275,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				projPolicyStatus = c.policySetStatus
 			}
 
-			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, Author: testdata.User.Username}
 			When(runner.VcsClient.GetTeamNamesForUser(testdata.GithubRepo, testdata.User)).ThenReturn(c.userTeams, nil)
 			ctx := command.ProjectContext{
 				User:                testdata.User,

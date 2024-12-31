@@ -22,15 +22,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/vcs/common"
-
-	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/go-version"
+	"github.com/jpillora/backoff"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/logging"
-
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	gitlab "github.com/xanzy/go-gitlab"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
+	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/xanzy/go-gitlab"
 )
 
 // gitlabMaxCommentLength is the maximum number of chars allowed by Gitlab in a
@@ -109,7 +108,7 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 		if err != nil {
 			return nil, err
 		}
-		logger.Info("determined GitLab is running version %s", client.Version.String())
+		logger.Info("GitLab host '%s' is running version %s", client.Client.BaseURL().Host, client.Version.String())
 	}
 
 	return client, nil
@@ -178,7 +177,7 @@ func (g *GitlabClient) CreateComment(logger logging.SimpleLogging, repo models.R
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
 		"```diff\n"
-	comments := common.SplitComment(comment, gitlabMaxCommentLength, sepEnd, sepStart)
+	comments := common.SplitComment(comment, gitlabMaxCommentLength, sepEnd, sepStart, 0, "")
 	for _, c := range comments {
 		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(c)})
 		if resp != nil {
@@ -301,7 +300,7 @@ func (g *GitlabClient) PullIsApproved(logger logging.SimpleLogging, repo models.
 // See:
 // - https://gitlab.com/gitlab-org/gitlab-ee/issues/3169
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
-func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (bool, error) {
 	logger.Debug("Checking if GitLab merge request %d is mergeable", pull.Num)
 	mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
 	if resp != nil {
@@ -396,7 +395,6 @@ func (g *GitlabClient) SupportsDetailedMergeStatus(logger logging.SimpleLogging)
 
 // UpdateStatus updates the build status of a commit.
 func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
-	logger.Debug("Updating GitLab commit status for '%s' to '%s'", src, state)
 	gitlabState := gitlab.Pending
 	switch state {
 	case models.PendingCommitStatus:
@@ -407,49 +405,99 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		gitlabState = gitlab.Success
 	}
 
-	// refTarget is set to the head pipeline of the MR if it exists, or else it is set to the head branch
-	// of the MR. This is needed because the commit status is only shown in the MR if the pipeline is
-	// assigned to an MR reference.
-	// Try to get the MR details a couple of times in case the pipeline is not yet assigned to the MR
-	refTarget := pull.HeadBranch
+	logger.Info("Updating GitLab commit status for '%s' to '%s'", src, gitlabState)
 
-	retries := 1
-	delay := 2 * time.Second
-	var mr *gitlab.MergeRequest
-	var err error
-
-	for i := 0; i <= retries; i++ {
-		mr, err = g.GetMergeRequest(logger, pull.BaseRepo.FullName, pull.Num)
-		if err != nil {
-			return err
-		}
-		if mr.HeadPipeline != nil {
-			logger.Debug("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
-				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
-			refTarget = mr.HeadPipeline.Ref
-			break
-		}
-		if i != retries {
-			logger.Debug("Head pipeline not found for merge request %d. Retrying in %s",
-				pull.Num, delay)
-			time.Sleep(delay)
-		} else {
-			logger.Debug("Head pipeline not found for merge request %d.",
-				pull.Num)
-		}
-	}
-
-	_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
+	setCommitStatusOptions := &gitlab.SetCommitStatusOptions{
 		State:       gitlabState,
 		Context:     gitlab.Ptr(src),
 		Description: gitlab.Ptr(description),
 		TargetURL:   &url,
-		Ref:         gitlab.Ptr(refTarget),
-	})
-	if resp != nil {
-		logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
 	}
-	return err
+
+	retries := 1
+	delay := 2 * time.Second
+	var commit *gitlab.Commit
+	var resp *gitlab.Response
+	var err error
+
+	// Try a couple of times to get the pipeline ID for the commit
+	for i := 0; i <= retries; i++ {
+		commit, resp, err = g.Client.Commits.GetCommit(repo.FullName, pull.HeadCommit, nil)
+		if resp != nil {
+			logger.Debug("GET /projects/%s/repository/commits/%d: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
+		}
+		if err != nil {
+			return err
+		}
+		if commit.LastPipeline != nil {
+			logger.Info("Pipeline found for commit %s, setting pipeline ID to %d", pull.HeadCommit, commit.LastPipeline.ID)
+			// Set the pipeline ID to the last pipeline that ran for the commit
+			setCommitStatusOptions.PipelineID = gitlab.Ptr(commit.LastPipeline.ID)
+			break
+		}
+		if i != retries {
+			logger.Info("No pipeline found for commit %s, retrying in %s", pull.HeadCommit, delay)
+			time.Sleep(delay)
+		} else {
+			// If we've exhausted all retries, set the Ref to the branch name
+			logger.Info("No pipeline found for commit %s, setting Ref to %s", pull.HeadCommit, pull.HeadBranch)
+			setCommitStatusOptions.Ref = gitlab.Ptr(pull.HeadBranch)
+		}
+	}
+
+	var (
+		maxAttempts = 10
+		retryer     = &backoff.Backoff{
+			Jitter: true,
+			Max:    g.PollingInterval,
+		}
+	)
+
+	for i := 0; i < maxAttempts; i++ {
+		logger := logger.With(
+			"attempt", i+1,
+			"max_attempts", maxAttempts,
+			"repo", repo.FullName,
+			"commit", commit.ShortID,
+			"state", state.String(),
+		)
+
+		_, resp, err = g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, setCommitStatusOptions)
+
+		if resp != nil {
+			logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
+
+			// GitLab returns a `409 Conflict` status when the commit pipeline status is being changed/locked by another request,
+			// which is likely to happen if you use [`--parallel-pool-size > 1`] and [`parallel-plan|apply`].
+			//
+			// The likelihood of this happening is increased when the number of parallel apply jobs is increased.
+			//
+			// Returning the [err] without retrying will permanently leave the GitLab commit status in a "running" state,
+			// which would prevent Atlantis from merging the merge request on [apply].
+			//
+			// GitLab does not allow merge requests to be merged when the pipeline status is "running."
+
+			if resp.StatusCode == http.StatusConflict {
+				sleep := retryer.ForAttempt(float64(i))
+
+				logger.With("retry_in", sleep).Warn("GitLab returned HTTP [409 Conflict] when updating commit status")
+				time.Sleep(sleep)
+
+				continue
+			}
+		}
+
+		// Log we got a 200 OK response from GitLab after at least one retry to help with debugging/understanding delays/errors.
+		if err == nil && i > 0 {
+			logger.Info("GitLab returned HTTP [200 OK] after updating commit status")
+		}
+
+		// Return the err, which might be nil if everything worked out
+		return err
+	}
+
+	// If we got here, we've exhausted all attempts to update the commit status and still failed, so return the error upstream
+	return errors.Wrap(err, fmt.Sprintf("failed to update commit status for '%s' @ '%s' to '%s' after %d attempts", repo.FullName, pull.HeadCommit, src, maxAttempts))
 }
 
 func (g *GitlabClient) GetMergeRequest(logger logging.SimpleLogging, repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
@@ -471,7 +519,7 @@ func (g *GitlabClient) WaitForSuccessPipeline(logger logging.SimpleLogging, ctx 
 		case <-ctx.Done():
 			// validation check time out
 			cancel()
-			return //ctx.Err()
+			return // ctx.Err()
 
 		default:
 			mr, _ := g.GetMergeRequest(logger, pull.BaseRepo.FullName, pull.Num)

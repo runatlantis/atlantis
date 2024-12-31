@@ -37,6 +37,12 @@ const (
 	CheckoutStrategyMerge  = "merge"
 )
 
+// TF distributions
+const (
+	TFDistributionTerraform = "terraform"
+	TFDistributionOpenTofu  = "opentofu"
+)
+
 // To add a new flag you must:
 // 1. Add a const with the flag name (in alphabetic order).
 // 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
@@ -76,20 +82,22 @@ const (
 	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
+	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
-	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	ExecutableName                   = "executable-name"
 	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
 	GHTokenFlag                      = "gh-token"
+	GHTokenFileFlag                  = "gh-token-file" // nolint: gosec
 	GHUserFlag                       = "gh-user"
 	GHAppIDFlag                      = "gh-app-id"
 	GHAppKeyFlag                     = "gh-app-key"
 	GHAppKeyFileFlag                 = "gh-app-key-file"
 	GHAppSlugFlag                    = "gh-app-slug"
+	GHAppInstallationIDFlag          = "gh-app-installation-id"
 	GHOrganizationFlag               = "gh-org"
 	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
 	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
@@ -109,6 +117,7 @@ const (
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
+	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
@@ -132,11 +141,13 @@ const (
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
 	RestrictFileList                 = "restrict-file-list"
+	TFDistributionFlag               = "tf-distribution"
 	TFDownloadFlag                   = "tf-download"
 	TFDownloadURLFlag                = "tf-download-url"
 	UseTFPluginCache                 = "use-tf-plugin-cache"
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
+	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
 	TFEHostnameFlag                  = "tfe-hostname"
 	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
 	TFETokenFlag                     = "tfe-token"
@@ -157,7 +168,7 @@ const (
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
 	DefaultDataDir                      = "~/.atlantis"
-	DefaultEmojiReaction                = "eyes"
+	DefaultEmojiReaction                = ""
 	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
 	DefaultGHHostname                   = "github.com"
@@ -166,6 +177,8 @@ const (
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
+	DefaultIgnoreVCSStatusNames         = ""
+	DefaultMaxCommentsPerCommand        = 100
 	DefaultParallelPoolSize             = 15
 	DefaultStatsNamespace               = "atlantis"
 	DefaultPort                         = 4141
@@ -173,6 +186,7 @@ const (
 	DefaultRedisPort                    = 6379
 	DefaultRedisTLSEnabled              = false
 	DefaultRedisInsecureSkipVerify      = false
+	DefaultTFDistribution               = TFDistributionTerraform
 	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
 	DefaultTFDownload                   = true
 	DefaultTFEHostname                  = "app.terraform.io"
@@ -275,7 +289,7 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: "",
 	},
 	EmojiReaction: {
-		description:  "Emoji Reaction to use to react to comments",
+		description:  "Emoji Reaction to use to react to comments.",
 		defaultValue: DefaultEmojiReaction,
 	},
 	ExecutableName: {
@@ -303,6 +317,9 @@ var stringFlags = map[string]stringFlag{
 	},
 	GHTokenFlag: {
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
+	},
+	GHTokenFileFlag: {
+		description: "A path to a file containing the GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN_FILE environment variable.",
 	},
 	GHAppKeyFlag: {
 		description:  "The GitHub App's private key",
@@ -403,6 +420,10 @@ var stringFlags = map[string]stringFlag{
 	SSLKeyFileFlag: {
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
 	},
+	TFDistributionFlag: {
+		description:  fmt.Sprintf("Which TF distribution to use. Can be set to %s or %s.", TFDistributionTerraform, TFDistributionOpenTofu),
+		defaultValue: DefaultTFDistribution,
+	},
 	TFDownloadURLFlag: {
 		description:  "Base URL to download Terraform versions from.",
 		defaultValue: DefaultTFDownloadURL,
@@ -423,6 +444,12 @@ var stringFlags = map[string]stringFlag{
 	VarFileAllowlistFlag: {
 		description: "Comma-separated list of additional paths where variable definition files can be read from." +
 			" If this argument is not provided, it defaults to Atlantis' data directory, determined by the --data-dir argument.",
+	},
+	IgnoreVCSStatusNames: {
+		description: "Comma separated list of VCS status names from other atlantis services." +
+			" When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) from other Atlantis services when checking if the PR is mergeable." +
+			" Currently only implemented for GitHub.",
+		defaultValue: DefaultIgnoreVCSStatusNames,
 	},
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
@@ -459,6 +486,7 @@ var boolFlags = map[string]boolFlag{
 		description:  "Disable atlantis auto planning feature",
 		defaultValue: false,
 	},
+
 	DisableRepoLockingFlag: {
 		description: "Disable atlantis locking repos",
 	},
@@ -591,6 +619,10 @@ var intFlags = map[string]intFlag{
 			" If merge base is further behind than this number of commits from any of branches heads, full fetch will be performed.",
 		defaultValue: DefaultCheckoutDepth,
 	},
+	MaxCommentsPerCommand: {
+		description:  "If non-zero, the maximum number of comments to split command output into before truncating.",
+		defaultValue: DefaultMaxCommentsPerCommand,
+	},
 	GiteaPageSizeFlag: {
 		description:  "Optional value that specifies the number of results per page to expect from Gitea.",
 		defaultValue: DefaultGiteaPageSize,
@@ -616,6 +648,13 @@ var intFlags = map[string]intFlag{
 var int64Flags = map[string]int64Flag{
 	GHAppIDFlag: {
 		description:  "GitHub App Id. If defined, initializes the GitHub client with app-based credentials",
+		defaultValue: 0,
+	},
+	GHAppInstallationIDFlag: {
+		description: "GitHub App Installation Id. If defined, initializes the GitHub client with app-based credentials " +
+			"using this specific GitHub Application Installation ID, otherwise it attempts to auto-detect it. " +
+			"Note that this value must be set if you want to have one App and multiple installations of that same " +
+			"application.",
 		defaultValue: 0,
 	},
 }
@@ -774,7 +813,7 @@ func (s *ServerCmd) run() error {
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
 	}
-	s.setDefaults(&userConfig)
+	s.setDefaults(&userConfig, s.Viper)
 
 	// Now that we've parsed the config we can set our local logger to the
 	// right level.
@@ -815,7 +854,7 @@ func (s *ServerCmd) run() error {
 	return server.Start()
 }
 
-func (s *ServerCmd) setDefaults(c *server.UserConfig) {
+func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.AzureDevOpsHostname == "" {
 		c.AzureDevOpsHostname = DefaultADHostname
 	}
@@ -864,6 +903,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.MarkdownTemplateOverridesDir == "" {
 		c.MarkdownTemplateOverridesDir = DefaultMarkdownTemplateOverridesDir
 	}
+	if !v.IsSet("max-comments-per-command") {
+		c.MaxCommentsPerCommand = DefaultMaxCommentsPerCommand
+	}
 	if c.ParallelPoolSize == 0 {
 		c.ParallelPoolSize = DefaultParallelPoolSize
 	}
@@ -879,11 +921,17 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig) {
 	if c.RedisPort == 0 {
 		c.RedisPort = DefaultRedisPort
 	}
+	if c.TFDistribution == "" {
+		c.TFDistribution = DefaultTFDistribution
+	}
 	if c.TFDownloadURL == "" {
 		c.TFDownloadURL = DefaultTFDownloadURL
 	}
 	if c.VCSStatusName == "" {
 		c.VCSStatusName = DefaultVCSStatusName
+	}
+	if c.IgnoreVCSStatusNames == "" {
+		c.IgnoreVCSStatusNames = DefaultIgnoreVCSStatusNames
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname
@@ -905,6 +953,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
 	}
 
+	if userConfig.TFDistribution != TFDistributionTerraform && userConfig.TFDistribution != TFDistributionOpenTofu {
+		return fmt.Errorf("invalid tf distribution: expected one of %s or %s",
+			TFDistributionTerraform, TFDistributionOpenTofu)
+	}
+
 	checkoutStrategy := userConfig.CheckoutStrategy
 	if checkoutStrategy != CheckoutStrategyBranch && checkoutStrategy != CheckoutStrategyMerge {
 		return fmt.Errorf("invalid checkout strategy: not one of %s or %s",
@@ -916,26 +969,29 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 
 	// The following combinations are valid.
-	// 1. github user and token set
+	// 1. github user and (token or token file)
 	// 2. github app ID and (key file set or key set)
 	// 3. gitea user and token set
 	// 4. gitlab user and token set
 	// 5. bitbucket user and token set
 	// 6. azuredevops user and token set
 	// 7. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GiteaUserFlag, GiteaTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) ||
-		((userConfig.GiteaUser == "") != (userConfig.GiteaToken == "")) ||
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHUserFlag, GHTokenFileFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GiteaUserFlag, GiteaTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	if ((userConfig.GiteaUser == "") != (userConfig.GiteaToken == "")) ||
 		((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) ||
 		((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) ||
 		((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
 		return vcsErr
 	}
-	if (userConfig.GithubAppID != 0) && ((userConfig.GithubAppKey == "") && (userConfig.GithubAppKeyFile == "")) {
-		return vcsErr
+	if userConfig.GithubUser != "" {
+		if (userConfig.GithubToken == "") == (userConfig.GithubTokenFile == "") {
+			return vcsErr
+		}
 	}
-	if (userConfig.GithubAppID == 0) && ((userConfig.GithubAppKey != "") || (userConfig.GithubAppKeyFile != "")) {
-		return vcsErr
+	if userConfig.GithubAppID != 0 {
+		if (userConfig.GithubAppKey == "") == (userConfig.GithubAppKeyFile == "") {
+			return vcsErr
+		}
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
@@ -977,6 +1033,7 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// Warn if any tokens have newlines.
 	for name, token := range map[string]string{
 		GHTokenFlag:                userConfig.GithubToken,
+		GHTokenFileFlag:            userConfig.GithubTokenFile,
 		GHWebhookSecretFlag:        userConfig.GithubWebhookSecret,
 		GitlabTokenFlag:            userConfig.GitlabToken,
 		GitlabWebhookSecretFlag:    userConfig.GitlabWebhookSecret,

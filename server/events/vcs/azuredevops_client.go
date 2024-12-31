@@ -107,7 +107,7 @@ func (g *AzureDevopsClient) CreateComment(logger logging.SimpleLogging, repo mod
 	// or tested limit in Azure DevOps.
 	const maxCommentLength = 150000
 
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart)
+	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, 0, "")
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	for i := range comments {
@@ -177,7 +177,7 @@ func (g *AzureDevopsClient) DiscardReviews(repo models.Repo, pull models.PullReq
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) { //nolint: revive
+func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) { //nolint: revive
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
@@ -249,6 +249,8 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 		adState = azuredevops.GitFailed.String()
 	}
 
+	logger.Info("Updating Azure DevOps commit status for '%s' to '%s'", src, adState)
+
 	status := azuredevops.GitPullRequestStatus{}
 	status.Context = GitStatusContextFromSrc(src)
 	status.Description = &description
@@ -316,7 +318,7 @@ func (g *AzureDevopsClient) MergePull(logger logging.SimpleLogging, pull models.
 		return fmt.Errorf("the user %s is not found in the organization %s", g.UserName, owner)
 	}
 
-	imageURL := "https://github.com/runatlantis/atlantis/raw/main/runatlantis.io/.vuepress/public/hero.png"
+	imageURL := "https://raw.githubusercontent.com/runatlantis/atlantis/main/runatlantis.io/public/hero.png"
 	id := azuredevops.IdentityRef{
 		Descriptor: &descriptor,
 		ID:         userID,

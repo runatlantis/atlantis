@@ -22,7 +22,6 @@ Terraform will perform the following actions:
       + dec         = (known after apply)
       + hex         = (known after apply)
       + id          = (known after apply)
-      + keepers     = {}
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.
@@ -59,7 +58,6 @@ Terraform will perform the following actions:
       + dec         = (known after apply)
       + hex         = (known after apply)
       + id          = (known after apply)
-      + keepers     = {}
     }
 
 Plan: 1 to add, 0 to change, 0 to destroy.

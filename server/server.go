@@ -230,8 +230,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
 			githubCredentials = &vcs.GithubUserCredentials{
-				User:  userConfig.GithubUser,
-				Token: userConfig.GithubToken,
+				User:      userConfig.GithubUser,
+				Token:     userConfig.GithubToken,
+				TokenFile: userConfig.GithubTokenFile,
 			}
 		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKeyFile != "" {
 			privateKey, err := os.ReadFile(userConfig.GithubAppKeyFile)
@@ -239,24 +240,26 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				return nil, err
 			}
 			githubCredentials = &vcs.GithubAppCredentials{
-				AppID:    userConfig.GithubAppID,
-				Key:      privateKey,
-				Hostname: userConfig.GithubHostname,
-				AppSlug:  userConfig.GithubAppSlug,
+				AppID:          userConfig.GithubAppID,
+				InstallationID: userConfig.GithubAppInstallationID,
+				Key:            privateKey,
+				Hostname:       userConfig.GithubHostname,
+				AppSlug:        userConfig.GithubAppSlug,
 			}
 			githubAppEnabled = true
 		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKey != "" {
 			githubCredentials = &vcs.GithubAppCredentials{
-				AppID:    userConfig.GithubAppID,
-				Key:      []byte(userConfig.GithubAppKey),
-				Hostname: userConfig.GithubHostname,
-				AppSlug:  userConfig.GithubAppSlug,
+				AppID:          userConfig.GithubAppID,
+				InstallationID: userConfig.GithubAppInstallationID,
+				Key:            []byte(userConfig.GithubAppKey),
+				Hostname:       userConfig.GithubHostname,
+				AppSlug:        userConfig.GithubAppSlug,
 			}
 			githubAppEnabled = true
 		}
 
 		var err error
-		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, logger)
+		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -314,7 +317,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
-	logger.Info("Supported VCS Hosts", "hosts", supportedVCSHosts)
+	var supportedVCSHostsStr []string
+	for _, host := range supportedVCSHosts {
+		supportedVCSHostsStr = append(supportedVCSHostsStr, host.String())
+	}
+
+	logger.Info("Supported VCS Hosts: %s", strings.Join(supportedVCSHostsStr, ", "))
 
 	home, err := homedir.Dir()
 	if err != nil {
@@ -419,8 +427,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		)
 	}
 
+	distribution := terraform.NewDistributionTerraform()
+	if userConfig.TFDistribution == "opentofu" {
+		distribution = terraform.NewDistributionOpenTofu()
+	}
+
 	terraformClient, err := terraform.NewClient(
 		logger,
+		distribution,
 		binDir,
 		cacheDir,
 		userConfig.TFEToken,
@@ -428,7 +442,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DefaultTFVersion,
 		config.DefaultTFVersionFlag,
 		userConfig.TFDownloadURL,
-		&terraform.DefaultDownloader{},
 		userConfig.TFDownload,
 		userConfig.UseTFPluginCache,
 		projectCmdOutputHandler)
@@ -436,7 +449,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
 	if err != nil && flag.Lookup("test.v") == nil {
-		return nil, errors.Wrap(err, "initializing terraform")
+		return nil, errors.Wrap(err, fmt.Sprintf("initializing %s", userConfig.TFDistribution))
 	}
 	markdownRenderer := events.NewMarkdownRenderer(
 		gitlabClient.SupportsCommonMark(),
@@ -507,8 +520,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			GithubHostname: userConfig.GithubHostname,
 		}
 
-		githubAppTokenRotator := vcs.NewGithubAppTokenRotator(logger, githubCredentials, userConfig.GithubHostname, home)
+		githubAppTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, "x-access-token", home)
 		tokenJd, err := githubAppTokenRotator.GenerateJob()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not write credentials")
+		}
+		scheduledExecutorService.AddJob(tokenJd)
+	}
+
+	if userConfig.GithubUser != "" && userConfig.GithubTokenFile != "" && userConfig.WriteGitCreds {
+		githubTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, userConfig.GithubUser, home)
+		tokenJd, err := githubTokenRotator.GenerateJob()
 		if err != nil {
 			return nil, errors.Wrap(err, "could not write credentials")
 		}
@@ -543,6 +565,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
+		GithubTokenFile:    userConfig.GithubTokenFile,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
 		GiteaUser:          userConfig.GiteaUser,
@@ -600,6 +623,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Router:              router,
 	}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
+		logger,
 		policyChecksEnabled,
 		validator,
 		&events.DefaultProjectFinder{},
@@ -632,7 +656,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	policyCheckStepRunner, err := runtime.NewPolicyCheckStepRunner(
 		defaultTfVersion,
-		policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
+		policy.NewConfTestExecutorWorkflow(logger, binDir, &policy.ConfTestGoGetterVersionDownloader{}),
 	)
 
 	if err != nil {
@@ -714,7 +738,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.QuietPolicyChecks,
 	)
 
-	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName)
+	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName, strings.Split(userConfig.IgnoreVCSStatusNames, ","))
 	planCommandRunner := events.NewPlanCommandRunner(
 		userConfig.SilenceVCSStatusNoPlans,
 		userConfig.SilenceVCSStatusNoProjects,
@@ -803,10 +827,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		command.State:           stateCommandRunner,
 	}
 
-	githubTeamAllowlistChecker, err := events.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
-	if err != nil {
-		return nil, err
+	var teamAllowlistChecker command.TeamAllowlistChecker
+	if globalCfg.TeamAuthz.Command != "" {
+		teamAllowlistChecker = &events.ExternalTeamAllowlistChecker{
+			Command:                     globalCfg.TeamAuthz.Command,
+			ExtraArgs:                   globalCfg.TeamAuthz.Args,
+			ExternalTeamAllowlistRunner: &runtime.DefaultExternalTeamAllowlistRunner{},
+		}
+	} else {
+		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	varFileAllowlistChecker, err := events.NewVarFileAllowlistChecker(userConfig.VarFileAllowlist)
 	if err != nil {
 		return nil, err
@@ -834,7 +868,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              backend,
-		TeamAllowlistChecker:           githubTeamAllowlistChecker,
+		TeamAllowlistChecker:           teamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}
@@ -875,16 +909,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatsScope:               statsScope.SubScope("api"),
 	}
 	apiController := &controllers.APIController{
-		APISecret:                 []byte(userConfig.APISecret),
-		Locker:                    lockingClient,
-		Logger:                    logger,
-		Parser:                    eventParser,
-		ProjectCommandBuilder:     projectCommandBuilder,
-		ProjectPlanCommandRunner:  instrumentedProjectCmdRunner,
-		ProjectApplyCommandRunner: instrumentedProjectCmdRunner,
-		RepoAllowlistChecker:      repoAllowlist,
-		Scope:                     statsScope.SubScope("api"),
-		VCSClient:                 vcsClient,
+		APISecret:                      []byte(userConfig.APISecret),
+		Locker:                         lockingClient,
+		Logger:                         logger,
+		Parser:                         eventParser,
+		ProjectCommandBuilder:          projectCommandBuilder,
+		ProjectPlanCommandRunner:       instrumentedProjectCmdRunner,
+		ProjectApplyCommandRunner:      instrumentedProjectCmdRunner,
+		FailOnPreWorkflowHookError:     userConfig.FailOnPreWorkflowHookError,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		RepoAllowlistChecker:           repoAllowlist,
+		Scope:                          statsScope.SubScope("api"),
+		VCSClient:                      vcsClient,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -1080,12 +1117,12 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			Path:          v.Project.Path,
 			Workspace:     v.Workspace,
 			Time:          v.Time,
-			TimeFormatted: v.Time.Format("02-01-2006 15:04:05"),
+			TimeFormatted: v.Time.Format("2006-01-02 15:04:05"),
 		})
 	}
 
 	applyCmdLock, err := s.ApplyLocker.CheckApplyLock()
-	s.Logger.Info("Apply Lock: %v", applyCmdLock)
+	s.Logger.Debug("Apply Lock: %v", applyCmdLock)
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err)
@@ -1096,7 +1133,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		Time:                   applyCmdLock.Time,
 		Locked:                 applyCmdLock.Locked,
 		GlobalApplyLockEnabled: applyCmdLock.GlobalApplyLockEnabled,
-		TimeFormatted:          applyCmdLock.Time.Format("02-01-2006 15:04:05"),
+		TimeFormatted:          applyCmdLock.Time.Format("2006-01-02 15:04:05"),
 	}
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
@@ -1121,7 +1158,7 @@ func preparePullToJobMappings(s *Server) []jobs.PullInfoWithJobIDs {
 		for j := range pullToJobMappings[i].JobIDInfos {
 			jobUrl, _ := s.Router.Get(ProjectJobsViewRouteName).URL("job-id", pullToJobMappings[i].JobIDInfos[j].JobID)
 			pullToJobMappings[i].JobIDInfos[j].JobIDUrl = jobUrl.String()
-			pullToJobMappings[i].JobIDInfos[j].TimeFormatted = pullToJobMappings[i].JobIDInfos[j].Time.Format("02-01-2006 15:04:05")
+			pullToJobMappings[i].JobIDInfos[j].TimeFormatted = pullToJobMappings[i].JobIDInfos[j].Time.Format("2006-01-02 15:04:05")
 		}
 
 		//Sort by date - newest to oldest.

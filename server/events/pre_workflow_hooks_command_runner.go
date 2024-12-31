@@ -50,7 +50,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 		return nil
 	}
 
-	ctx.Log.Debug("pre-hooks configured, running...")
+	ctx.Log.Info("Pre-workflow hooks configured, running...")
 
 	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir)
 	if err != nil {
@@ -91,12 +91,16 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
 			CommandName:        cmd.Name.String(),
+			API:                ctx.API,
 		},
 		preWorkflowHooks, repoDir)
 
 	if err != nil {
+		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
 		return err
 	}
+
+	ctx.Log.Info("Pre-workflow hooks completed successfully")
 
 	return nil
 }
@@ -135,13 +139,17 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			shellArgs = "-c"
 		}
 		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
-		if err != nil {
+		if err != nil && !ctx.API {
 			return err
 		}
 
 		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
 			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-			return err
+			ctx.Log.Info("is api? %v", ctx.API)
+			if !ctx.API {
+				ctx.Log.Info("is api? %v", ctx.API)
+				return err
+			}
 		}
 
 		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
@@ -155,7 +163,9 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 
 		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
 			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-			return err
+			if !ctx.API {
+				return err
+			}
 		}
 	}
 

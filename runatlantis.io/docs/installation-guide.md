@@ -1,6 +1,8 @@
 # Installation Guide
+
 This guide is for installing a **production-ready** instance of Atlantis onto your
 infrastructure:
+
 1. First, ensure your Terraform setup meets the Atlantis **requirements**
     * See [Requirements](requirements.md)
 1. Create **access credentials** for your Git host (GitHub, GitLab, Gitea, Bitbucket, Azure DevOps)
