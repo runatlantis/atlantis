@@ -17,13 +17,16 @@ concurrency:
 
 jobs:
   changes:
+    permissions:
+      contents: read  # for dorny/paths-filter to fetch a list of changed files
+      pull-requests: read  # for dorny/paths-filter to read pull requests
     outputs:
       should-run-build: ${{ steps.changes.outputs.src == 'true' }}
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
           filters: |
@@ -35,21 +38,21 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'true'
     name: Build Testing Env Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+      uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3
       with:
         image: tonistiigi/binfmt:latest
         platforms: arm64,arm
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3
 
     - name: Login to Packages Container registry
-      uses: docker/login-action@v3
+      uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -57,7 +60,7 @@ jobs:
 
     - run: echo "TODAY=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
     - name: Build and push testing-env:${{env.TODAY}} image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6
       with:
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -72,6 +75,6 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'false'
     name: Build Testing Env Image
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - run: 'echo "No build required"'

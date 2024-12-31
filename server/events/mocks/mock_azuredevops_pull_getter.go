@@ -7,6 +7,7 @@ import (
 	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
+	logging "github.com/runatlantis/atlantis/server/logging"
 	"reflect"
 	"time"
 )
@@ -26,23 +27,23 @@ func NewMockAzureDevopsPullGetter(options ...pegomock.Option) *MockAzureDevopsPu
 func (mock *MockAzureDevopsPullGetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockAzureDevopsPullGetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockAzureDevopsPullGetter) GetPullRequest(repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error) {
+func (mock *MockAzureDevopsPullGetter) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockAzureDevopsPullGetter().")
 	}
-	params := []pegomock.Param{repo, pullNum}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("GetPullRequest", params, []reflect.Type{reflect.TypeOf((**azuredevops.GitPullRequest)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 *azuredevops.GitPullRequest
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(*azuredevops.GitPullRequest)
+	_params := []pegomock.Param{logger, repo, pullNum}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetPullRequest", _params, []reflect.Type{reflect.TypeOf((**azuredevops.GitPullRequest)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 *azuredevops.GitPullRequest
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(*azuredevops.GitPullRequest)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockAzureDevopsPullGetter) VerifyWasCalledOnce() *VerifierMockAzureDevopsPullGetter {
@@ -82,9 +83,9 @@ type VerifierMockAzureDevopsPullGetter struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockAzureDevopsPullGetter) GetPullRequest(repo models.Repo, pullNum int) *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification {
-	params := []pegomock.Param{repo, pullNum}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullRequest", params, verifier.timeout)
+func (verifier *VerifierMockAzureDevopsPullGetter) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification {
+	_params := []pegomock.Param{logger, repo, pullNum}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetPullRequest", _params, verifier.timeout)
 	return &MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -93,21 +94,31 @@ type MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification) GetCapturedArguments() (models.Repo, int) {
-	repo, pullNum := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], pullNum[len(pullNum)-1]
+func (c *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.Repo, int) {
+	logger, repo, pullNum := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], repo[len(repo)-1], pullNum[len(pullNum)-1]
 }
 
-func (c *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []int) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]models.Repo, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(models.Repo)
+func (c *MockAzureDevopsPullGetter_GetPullRequest_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []int) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(logging.SimpleLogging)
+			}
 		}
-		_param1 = make([]int, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(int)
+		if len(_params) > 1 {
+			_param1 = make([]models.Repo, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(models.Repo)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]int, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(int)
+			}
 		}
 	}
 	return

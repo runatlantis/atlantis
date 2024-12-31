@@ -43,4 +43,10 @@ type Context struct {
 	ClearPolicyApproval bool
 
 	Trigger Trigger
+
+	// API is true if plan/apply by API endpoints
+	API bool
+
+	// TeamAllowlistChecker is used to check authorization on a project-level
+	TeamAllowlistChecker TeamAllowlistChecker
 }

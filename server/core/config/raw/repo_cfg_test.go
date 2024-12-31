@@ -7,11 +7,12 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v2"
 )
 
 func TestConfig_UnmarshalYAML(t *testing.T) {
 	autoDiscoverEnabled := valid.AutoDiscoverEnabledMode
+	repoLocksDisabled := valid.RepoLocksDisabledMode
+	repoLocksOnApply := valid.RepoLocksOnApplyMode
 	cases := []struct {
 		description string
 		input       string
@@ -131,6 +132,8 @@ autodiscover:
   mode: enabled
 parallel_apply: true
 parallel_plan: false
+repo_locks:
+  mode: on_apply
 projects:
 - dir: mydir
   workspace: myworkspace
@@ -140,6 +143,8 @@ projects:
     enabled: false
     when_modified: []
   apply_requirements: [mergeable]
+  repo_locks:
+    mode: disabled
 workflows:
   default:
     plan:
@@ -157,6 +162,7 @@ allowed_regexp_prefixes:
 				Automerge:     Bool(true),
 				ParallelApply: Bool(true),
 				ParallelPlan:  Bool(false),
+				RepoLocks:     &raw.RepoLocks{Mode: &repoLocksOnApply},
 				Projects: []raw.Project{
 					{
 						Dir:              String("mydir"),
@@ -168,6 +174,7 @@ allowed_regexp_prefixes:
 							Enabled:      Bool(false),
 						},
 						ApplyRequirements: []string{"mergeable"},
+						RepoLocks:         &raw.RepoLocks{Mode: &repoLocksDisabled},
 					},
 				},
 				Workflows: map[string]raw.Workflow{
@@ -190,7 +197,7 @@ allowed_regexp_prefixes:
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var conf raw.RepoCfg
-			err := yaml.UnmarshalStrict([]byte(c.input), &conf)
+			err := unmarshalString(c.input, &conf)
 			if c.expErr != "" {
 				ErrEquals(t, c.expErr, err)
 				return
@@ -237,6 +244,7 @@ func TestConfig_Validate(t *testing.T) {
 
 func TestConfig_ToValid(t *testing.T) {
 	autoDiscoverEnabled := valid.AutoDiscoverEnabledMode
+	repoLocksOnApply := valid.RepoLocksOnApplyMode
 	cases := []struct {
 		description string
 		input       raw.RepoCfg
@@ -257,12 +265,14 @@ func TestConfig_ToValid(t *testing.T) {
 				AutoDiscover: &raw.AutoDiscover{},
 				Workflows:    map[string]raw.Workflow{},
 				Projects:     []raw.Project{},
+				RepoLocks:    &raw.RepoLocks{},
 			},
 			exp: valid.RepoCfg{
 				Version:      2,
 				AutoDiscover: raw.DefaultAutoDiscover(),
 				Workflows:    map[string]valid.Workflow{},
 				Projects:     nil,
+				RepoLocks:    &valid.DefaultRepoLocks,
 			},
 		},
 		{
@@ -271,43 +281,43 @@ func TestConfig_ToValid(t *testing.T) {
 				Version: Int(2),
 			},
 			exp: valid.RepoCfg{
-				Version:                    2,
-				Automerge:                  nil,
-				ParallelApply:              nil,
-				AbortOnExcecutionOrderFail: false,
-				Workflows:                  map[string]valid.Workflow{},
+				Version:                   2,
+				Automerge:                 nil,
+				ParallelApply:             nil,
+				AbortOnExecutionOrderFail: false,
+				Workflows:                 map[string]valid.Workflow{},
 			},
 		},
 		{
 			description: "automerge, parallel_apply, abort_on_execution_order_fail true",
 			input: raw.RepoCfg{
-				Version:                    Int(2),
-				Automerge:                  Bool(true),
-				ParallelApply:              Bool(true),
-				AbortOnExcecutionOrderFail: Bool(true),
+				Version:                   Int(2),
+				Automerge:                 Bool(true),
+				ParallelApply:             Bool(true),
+				AbortOnExecutionOrderFail: Bool(true),
 			},
 			exp: valid.RepoCfg{
-				Version:                    2,
-				Automerge:                  Bool(true),
-				ParallelApply:              Bool(true),
-				AbortOnExcecutionOrderFail: true,
-				Workflows:                  map[string]valid.Workflow{},
+				Version:                   2,
+				Automerge:                 Bool(true),
+				ParallelApply:             Bool(true),
+				AbortOnExecutionOrderFail: true,
+				Workflows:                 map[string]valid.Workflow{},
 			},
 		},
 		{
 			description: "automerge, parallel_apply, abort_on_execution_order_fail false",
 			input: raw.RepoCfg{
-				Version:                    Int(2),
-				Automerge:                  Bool(false),
-				ParallelApply:              Bool(false),
-				AbortOnExcecutionOrderFail: Bool(false),
+				Version:                   Int(2),
+				Automerge:                 Bool(false),
+				ParallelApply:             Bool(false),
+				AbortOnExecutionOrderFail: Bool(false),
 			},
 			exp: valid.RepoCfg{
-				Version:                    2,
-				Automerge:                  Bool(false),
-				ParallelApply:              Bool(false),
-				AbortOnExcecutionOrderFail: false,
-				Workflows:                  map[string]valid.Workflow{},
+				Version:                   2,
+				Automerge:                 Bool(false),
+				ParallelApply:             Bool(false),
+				AbortOnExecutionOrderFail: false,
+				Workflows:                 map[string]valid.Workflow{},
 			},
 		},
 		{
@@ -330,6 +340,30 @@ func TestConfig_ToValid(t *testing.T) {
 				Version: 2,
 				AutoDiscover: &valid.AutoDiscover{
 					Mode: valid.AutoDiscoverEnabledMode,
+				},
+				Workflows: map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "repo_locks omitted",
+			input: raw.RepoCfg{
+				Version: Int(2),
+			},
+			exp: valid.RepoCfg{
+				Version:   2,
+				Workflows: map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "repo_locks included",
+			input: raw.RepoCfg{
+				Version:   Int(2),
+				RepoLocks: &raw.RepoLocks{Mode: &repoLocksOnApply},
+			},
+			exp: valid.RepoCfg{
+				Version: 2,
+				RepoLocks: &valid.RepoLocks{
+					Mode: valid.RepoLocksOnApplyMode,
 				},
 				Workflows: map[string]valid.Workflow{},
 			},
@@ -372,6 +406,9 @@ func TestConfig_ToValid(t *testing.T) {
 				ParallelApply: Bool(true),
 				AutoDiscover: &raw.AutoDiscover{
 					Mode: &autoDiscoverEnabled,
+				},
+				RepoLocks: &raw.RepoLocks{
+					Mode: &repoLocksOnApply,
 				},
 				Workflows: map[string]raw.Workflow{
 					"myworkflow": {
@@ -424,6 +461,9 @@ func TestConfig_ToValid(t *testing.T) {
 				ParallelApply: Bool(true),
 				AutoDiscover: &valid.AutoDiscover{
 					Mode: valid.AutoDiscoverEnabledMode,
+				},
+				RepoLocks: &valid.RepoLocks{
+					Mode: valid.RepoLocksOnApplyMode,
 				},
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": {

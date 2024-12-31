@@ -27,8 +27,8 @@ import (
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/controllers/templates"
-	tMocks "github.com/runatlantis/atlantis/server/controllers/templates/mocks"
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
+	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -113,19 +113,19 @@ func TestIndex_Success(t *testing.T) {
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s.Index(w, req)
-	it.VerifyWasCalledOnce().Execute(w, templates.IndexData{
-		ApplyLock: templates.ApplyLockData{
+	it.VerifyWasCalledOnce().Execute(w, web_templates.IndexData{
+		ApplyLock: web_templates.ApplyLockData{
 			Locked:        false,
 			Time:          time.Time{},
-			TimeFormatted: "01-01-0001 00:00:00",
+			TimeFormatted: "0001-01-01 00:00:00",
 		},
-		Locks: []templates.LockIndexData{
+		Locks: []web_templates.LockIndexData{
 			{
 				LockPath:      "/lock?id=lkysow%252Fatlantis-example%252F.%252Fdefault",
 				RepoFullName:  "lkysow/atlantis-example",
 				PullNum:       9,
 				Time:          now,
-				TimeFormatted: now.Format("02-01-2006 15:04:05"),
+				TimeFormatted: now.Format("2006-01-02 15:04:05"),
 			},
 		},
 		PullToJobMapping: []jobs.PullInfoWithJobIDs{},
@@ -139,9 +139,12 @@ func TestHealthz(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/healthz", bytes.NewBuffer(nil))
 	w := httptest.NewRecorder()
 	s.Healthz(w, req)
-	Equals(t, http.StatusOK, w.Result().StatusCode)
-	body, _ := io.ReadAll(w.Result().Body)
-	Equals(t, "application/json", w.Result().Header["Content-Type"][0])
+
+	resp := w.Result()
+	defer resp.Body.Close()
+	Equals(t, http.StatusOK, resp.StatusCode)
+	body, _ := io.ReadAll(resp.Body)
+	Equals(t, "application/json", resp.Header["Content-Type"][0])
 	Equals(t,
 		`{
   "status": "ok"

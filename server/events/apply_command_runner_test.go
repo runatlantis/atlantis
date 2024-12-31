@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v57/github"
+	"github.com/google/go-github/v66/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -57,8 +57,8 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 				State: github.String("open"),
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-			When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 			ctx := &command.Context{
 				User:     testdata.User,
@@ -72,7 +72,8 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			When(applyLockChecker.CheckApplyLock()).ThenReturn(locking.ApplyCommandLock{Locked: c.ApplyLocked}, c.ApplyLockError)
 			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
 
-			vcsClient.VerifyWasCalledOnce().CreateComment(testdata.GithubRepo, modelPull.Num, c.ExpComment, "apply")
+			vcsClient.VerifyWasCalledOnce().CreateComment(
+				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(c.ExpComment), Eq("apply"))
 		})
 	}
 }
@@ -191,9 +192,11 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				timesComment = 0
 			}
 
-			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 			if c.ExpVCSStatusSet {
 				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
 					Any[models.Repo](),
 					Any[models.PullRequest](),
 					Eq[models.CommitStatus](models.SuccessCommitStatus),
@@ -203,6 +206,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				)
 			} else {
 				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
 					Any[models.Repo](),
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
@@ -230,16 +234,16 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When first apply fails, the second don't run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Second",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Second",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -257,23 +261,23 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "When first apply fails, the second not will run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Second",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Second",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -296,25 +300,25 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When both in a group of two succeeds, the following two will run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "Second",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "Second",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Third",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Third",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Fourth",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Fourth",
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -342,32 +346,32 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Never(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "When one out of two fails, the following two will not run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelApplyEnabled:       true,
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelApplyEnabled:      true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "Second",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "Second",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Third",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Third",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					AbortOnExcecutionOrderFail: true,
-					ProjectName:                "Fourth",
+					ExecutionOrderGroup:       1,
+					AbortOnExecutionOrderFail: true,
+					ProjectName:               "Fourth",
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -395,7 +399,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 4 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"3. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"4. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n4 projects, 3 successful, 0 failed, 1 errored",
@@ -404,14 +408,14 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "Don't block when parallel is not set",
 			ProjectContexts: []command.ProjectContext{
 				{
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Second",
-					AbortOnExcecutionOrderFail: true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Second",
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -429,11 +433,11 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
-			Description: "Don't block when abortOnExcecutionOrderFail is not set",
+			Description: "Don't block when abortOnExecutionOrderFail is not set",
 			ProjectContexts: []command.ProjectContext{
 				{
 					ExecutionOrderGroup: 0,
@@ -459,7 +463,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 			},
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 	}
@@ -486,8 +490,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 
-			When(githubGetter.GetPullRequest(testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
 			for i := range c.ProjectContexts {
@@ -502,7 +506,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			}
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
-				testdata.GithubRepo, modelPull.Num, c.ExpComment, "apply",
+				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(c.ExpComment), Eq("apply"),
 			)
 		})
 	}

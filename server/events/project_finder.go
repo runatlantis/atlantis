@@ -76,7 +76,7 @@ var cloudBlockSchema = &hcl.BodySchema{
 }
 
 func (p *DefaultProjectFinder) DetermineWorkspaceFromHCL(log logging.SimpleLogging, absRepoDir string) (string, error) {
-	log.Info("looking for Terraform Cloud workspace from configuration in %q", absRepoDir)
+	log.Info("Looking for Terraform Cloud workspace from configuration in '%s'", absRepoDir)
 	infos, err := os.ReadDir(absRepoDir)
 	if err != nil {
 		return "", err
@@ -167,7 +167,11 @@ func (p *DefaultProjectFinder) DetermineProjects(log logging.SimpleLogging, modi
 	exists := p.removeNonExistingDirs(uniqueDirs, absRepoDir)
 
 	for _, p := range exists {
-		projects = append(projects, models.NewProject(repoFullName, p))
+		// It's unclear how we are supposed to determine the project name at this point
+		// For now, we'll just add the default projectName
+		// TODO: Add support for non-default projectName
+		projectName := ""
+		projects = append(projects, models.NewProject(repoFullName, p, projectName))
 	}
 	log.Info("there are %d modified project(s) at path(s): %v",
 		len(projects), strings.Join(exists, ", "))

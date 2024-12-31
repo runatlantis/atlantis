@@ -1,14 +1,12 @@
 .idea
 ./atlantis
 *.iml
-.vscode
 atlantis.db
 output
 .DS_Store
 .cover
 .terraform/
 node_modules/
-**/.vuepress/*
 helm/test-values.yaml
 *.swp
 golangci-lint
@@ -16,7 +14,6 @@ atlantis
 .devcontainer
 atlantis.env
 *.act
-package-lock.json
 Dockerfile.local
 
 # gitreleaser
@@ -27,3 +24,14 @@ tmp-CHANGELOG.md
 
 # IDE files
 *.code-workspace
+
+# draw.io backup files
+*.bkp
+
+# VitePress build output & cache directory
+**/.vitepress/cache
+**/.vitepress/dist
+**/.vitepress/config.ts.timestamp-*
+
+# playwright
+test-results/

@@ -14,21 +14,22 @@ import (
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
 type RepoCfg struct {
 	// Version is the version of the atlantis YAML file.
-	Version                    int
-	Projects                   []Project
-	Workflows                  map[string]Workflow
-	PolicySets                 PolicySets
-	Automerge                  *bool
-	AutoDiscover               *AutoDiscover
-	ParallelApply              *bool
-	ParallelPlan               *bool
-	ParallelPolicyCheck        *bool
-	DeleteSourceBranchOnMerge  *bool
-	RepoLocking                *bool
-	CustomPolicyCheck          *bool
-	EmojiReaction              string
-	AllowedRegexpPrefixes      []string
-	AbortOnExcecutionOrderFail bool
+	Version                   int
+	Projects                  []Project
+	Workflows                 map[string]Workflow
+	PolicySets                PolicySets
+	Automerge                 *bool
+	AutoDiscover              *AutoDiscover
+	ParallelApply             *bool
+	ParallelPlan              *bool
+	ParallelPolicyCheck       *bool
+	DeleteSourceBranchOnMerge *bool
+	RepoLocks                 *RepoLocks
+	CustomPolicyCheck         *bool
+	EmojiReaction             string
+	AllowedRegexpPrefixes     []string
+	AbortOnExecutionOrderFail bool
+	SilencePRComments         []string
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
@@ -154,9 +155,11 @@ type Project struct {
 	DependsOn                 []string
 	DeleteSourceBranchOnMerge *bool
 	RepoLocking               *bool
+	RepoLocks                 *RepoLocks
 	ExecutionOrderGroup       int
 	PolicyCheck               *bool
 	CustomPolicyCheck         *bool
+	SilencePRComments         []string
 }
 
 // GetName returns the name of the project or an empty string if there is no
@@ -187,6 +190,16 @@ type Stage struct {
 	Steps []Step
 }
 
+// CommandShell sets up the shell for command execution
+type CommandShell struct {
+	Shell     string
+	ShellArgs []string
+}
+
+func (s CommandShell) String() string {
+	return fmt.Sprintf("%s %s", s.Shell, strings.Join(s.ShellArgs, " "))
+}
+
 type Step struct {
 	StepName  string
 	ExtraArgs []string
@@ -200,6 +213,8 @@ type Step struct {
 	EnvVarName string
 	// EnvVarValue is the value to set EnvVarName to.
 	EnvVarValue string
+	// The Shell to use for RunCommand execution.
+	RunShell *CommandShell
 }
 
 type Workflow struct {
