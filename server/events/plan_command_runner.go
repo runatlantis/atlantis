@@ -291,7 +291,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	// This step does not approve any policies that require approval.
 	if cmd.Name == command.Plan && len(result.ProjectResults) > 0 &&
 		!(result.HasErrors() || result.PlansDeleted) {
-		ctx.Log.Info("Running policy check for %s", cmd.String())
+		ctx.Log.Info("Running policy check for '%s'", cmd.CommandName())
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	} else if len(projectCmds) == 0 && cmd.Name == command.Plan && !cmd.IsForSpecificProject() {
 		// If there were no projects modified, we set successful commit statuses

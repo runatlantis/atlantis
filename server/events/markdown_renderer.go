@@ -326,7 +326,7 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
 			}
 			// Error out if no template was found, only if there are no errors or failures.
-			// This is because some errors and failures rely on additional context rendered by templtes, but not all errors or failures.
+			// This is because some errors and failures rely on additional context rendered by templates, but not all errors or failures.
 		} else if !(result.Error != nil || result.Failure != "") {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}

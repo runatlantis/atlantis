@@ -847,7 +847,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			expFailure: "One or more policy sets require additional approval.",
 		},
 		{
-			description: "When user is a top-level ownner through membership, increment approval on all policies.",
+			description: "When user is a top-level owner through membership, increment approval on all policies.",
 			userTeams:   []string{"someuserteam"},
 			policySetCfg: valid.PolicySets{
 				Owners: valid.PolicyOwners{
