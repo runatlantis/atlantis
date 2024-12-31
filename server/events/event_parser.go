@@ -24,7 +24,7 @@ import (
 	giteasdk "code.gitea.io/sdk/gitea"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v68/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
@@ -34,7 +34,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 const gitlabPullOpened = "opened"
