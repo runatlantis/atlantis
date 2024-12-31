@@ -43,13 +43,12 @@ webhooks:
   workspace-regex: .*
   branch-regex: .*
   kind: slack
-  channel: my-channel
+  channel: my-channel-id
 ```
 
 If you are deploying Atlantis as a Helm chart, this can be implemented via the `config` parameter available for [chart customizations](https://github.com/runatlantis/helm-charts#customization):
 
-```
-
+```yaml
 ## Use Server Side Config,
 ## ref: https://www.runatlantis.io/docs/server-configuration.html
 config: |
@@ -59,9 +58,7 @@ config: |
        workspace-regex: .*
        branch-regex: .*
        kind: slack
-       channel: my-channel
+       channel: my-channel-id
 ```
 
-
-
-The `apply` event information will be sent to the `my-channel` Slack channel.
+The `apply` event information will be sent to the `my-channel-id` Slack channel.

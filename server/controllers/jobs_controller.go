@@ -41,7 +41,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 	jobID, err := j.KeyGenerator.Generate(r)
 
 	if err != nil {
-		j.respond(w, logging.Error, http.StatusBadRequest, err.Error())
+		j.respond(w, logging.Error, http.StatusBadRequest, "%s", err.Error())
 		return err
 	}
 
@@ -67,7 +67,7 @@ func (j *JobsController) getProjectJobsWS(w http.ResponseWriter, r *http.Request
 	err := j.WsMux.Handle(w, r)
 
 	if err != nil {
-		j.respond(w, logging.Error, http.StatusInternalServerError, err.Error())
+		j.respond(w, logging.Error, http.StatusInternalServerError, "%s", err.Error())
 		return err
 	}
 

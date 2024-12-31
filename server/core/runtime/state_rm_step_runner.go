@@ -6,6 +6,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 type stateRmStepRunner struct {
@@ -37,7 +38,7 @@ func (p *stateRmStepRunner) Run(ctx command.ProjectContext, extraArgs []string, 
 	if err == nil {
 		if _, planPathErr := os.Stat(planPath); !os.IsNotExist(planPathErr) {
 			ctx.Log.Info("state rm successful, deleting planfile")
-			if removeErr := os.Remove(planPath); removeErr != nil {
+			if removeErr := utils.RemoveIgnoreNonExistent(planPath); removeErr != nil {
 				ctx.Log.Warn("failed to delete planfile after successful state rm: %s", removeErr)
 			}
 		}

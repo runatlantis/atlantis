@@ -59,7 +59,7 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, shell+" "+shellArgs+" "+command, path, out)
+		err = fmt.Errorf("%s: running '%s' in '%s': \n%s", err, shell+" "+shellArgs+" "+command, path, out)
 		ctx.Log.Debug("error: %s", err)
 		return string(out), "", err
 	}
@@ -71,12 +71,12 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		var customStatusErr error
 		customStatusOut, customStatusErr = os.ReadFile(outputFilePath)
 		if customStatusErr != nil {
-			err = fmt.Errorf("%s: running %q in %q: \n%s", err, shell+" "+shellArgs+" "+command, path, out)
+			err = fmt.Errorf("%s: running '%s' in '%s': \n%s", err, shell+" "+shellArgs+" "+command, path, out)
 			ctx.Log.Debug("error: %s", err)
 			return string(out), "", err
 		}
 	}
 
-	ctx.Log.Info("successfully ran %q in %q", shell+" "+shellArgs+" "+command, path)
+	ctx.Log.Info("Successfully ran '%s' in '%s'", shell+" "+shellArgs+" "+command, path)
 	return string(out), strings.Trim(string(customStatusOut), "\n"), nil
 }

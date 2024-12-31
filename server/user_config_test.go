@@ -8,6 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUserConfig_ToAllowCommandNames(t *testing.T) {
@@ -61,7 +62,7 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 			}
 			got, err := u.ToAllowCommandNames()
 			if err != nil {
-				assert.ErrorContains(t, err, tt.wantErr, "ToAllowCommandNames()")
+				require.ErrorContains(t, err, tt.wantErr, "ToAllowCommandNames()")
 			}
 			assert.Equalf(t, tt.want, got, "ToAllowCommandNames()")
 		})

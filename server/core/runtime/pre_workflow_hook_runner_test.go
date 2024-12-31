@@ -39,7 +39,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 
 	defaultShell := "sh"
 	defaultShellArgs := "-c"
-	defautShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell)
+	defaultShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell)
 	defaultUnterminatedStringError := unterminatedStringError(defaultShell, defaultShellArgs)
 
 	cases := []struct {
@@ -102,7 +102,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 			Command:        "lkjlkj",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
-			ExpOut:         fmt.Sprintf(defautShellCommandNotFoundErrorFormat, "lkjlkj"),
+			ExpOut:         fmt.Sprintf(defaultShellCommandNotFoundErrorFormat, "lkjlkj"),
 			ExpErr:         "exit status 127: running \"sh -c lkjlkj\" in",
 			ExpDescription: "",
 		},

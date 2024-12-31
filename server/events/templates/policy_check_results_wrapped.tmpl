@@ -2,9 +2,11 @@
 <details><summary>Show Output</summary>
 {{- if eq .Command "Policy Check" }}
 {{- if ne .PreConftestOutput "" }}
+
 ```diff
 {{ .PreConftestOutput }}
 ```
+
 {{- end -}}
 {{ template "policyCheck" .PolicySetResults }}
 {{- if ne .PostConftestOutput "" }}
@@ -20,6 +22,7 @@
   ```
 {{- else }}
 </details>
+
 #### Policy Approval Status:
 ```
 {{ .PolicyApprovalSummary }}

@@ -77,6 +77,6 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		}
 	}
 
-	ctx.Log.Info("successfully ran %q in %q", shell+" "+shellArgs+" "+command, path)
+	ctx.Log.Info("Successfully ran '%s' in '%s'", shell+" "+shellArgs+" "+command, path)
 	return string(out), strings.Trim(string(customStatusOut), "\n"), nil
 }

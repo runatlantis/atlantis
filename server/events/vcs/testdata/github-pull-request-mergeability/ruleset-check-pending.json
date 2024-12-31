@@ -1,0 +1,74 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewDecision": null,
+        "baseRef": {
+          "branchProtectionRule": {
+            "requiredStatusChecks": []
+          },
+          "rules": {
+            "pageInfo": {
+              "endCursor": "QWERTY",
+              "hasNextPage": false
+            },
+            "nodes": [
+              {
+                "type": "REQUIRED_STATUS_CHECKS",
+                "repositoryRuleset": {
+                  "enforcement": "ACTIVE"
+                },
+                "parameters": {
+                  "requiredStatusChecks": [
+                    {
+                      "context": "atlantis/apply"
+                    },
+                    {
+                      "context": "my-required-expected-check"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "contexts": {
+                    "pageInfo": {
+                      "endCursor": "QWERTY",
+                      "hasNextPage": false
+                    },
+                    "nodes": [
+                      {
+                        "__typename": "StatusContext",
+                        "context": "atlantis/apply",
+                        "state": "PENDING",
+                        "isRequired": true
+                      },
+                      {
+                        "__typename": "StatusContext",
+                        "context": "atlantis/plan",
+                        "state": "SUCCESS",
+                        "isRequired": false
+                      },
+                      {
+                        "__typename": "StatusContext",
+                        "context": "my-required-expected-check",
+                        "state": "PENDING",
+                        "isRequired": true
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

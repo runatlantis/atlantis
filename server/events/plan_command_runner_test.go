@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v59/github"
+	"github.com/google/go-github/v66/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events"
@@ -170,20 +170,20 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When first plan fails, the second don't run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        0,
-					Workspace:                  "first",
-					ProjectName:                "First",
-					ParallelPlanEnabled:        true,
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       0,
+					Workspace:                 "first",
+					ProjectName:               "First",
+					ParallelPlanEnabled:       true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        1,
-					Workspace:                  "second",
-					ProjectName:                "Second",
-					ParallelPlanEnabled:        true,
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       1,
+					Workspace:                 "second",
+					ProjectName:               "Second",
+					ParallelPlanEnabled:       true,
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -207,18 +207,18 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When first fails, the second will not run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelPlanEnabled:        true,
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelPlanEnabled:       true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Second",
-					ParallelPlanEnabled:        true,
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Second",
+					ParallelPlanEnabled:       true,
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -240,20 +240,20 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When first fails by autorun, the second will not run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:                command.Plan,
-					AutoplanEnabled:            true,
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelPlanEnabled:        true,
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					AutoplanEnabled:           true,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelPlanEnabled:       true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					CommandName:                command.Plan,
-					AutoplanEnabled:            true,
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Second",
-					ParallelPlanEnabled:        true,
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					AutoplanEnabled:           true,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Second",
+					ParallelPlanEnabled:       true,
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -275,29 +275,29 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When both in a group of two succeeds, the following two will run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelPlanEnabled:        true,
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelPlanEnabled:       true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        0,
-					ProjectName:                "Second",
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "Second",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Third",
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Third",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Fourth",
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Fourth",
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -335,29 +335,29 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When one out of two fails, the following two will not run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					ParallelPlanEnabled:        true,
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					ParallelPlanEnabled:       true,
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        0,
-					ProjectName:                "Second",
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "Second",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Third",
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Third",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        1,
-					AbortOnExcecutionOrderFail: true,
-					ProjectName:                "Fourth",
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       1,
+					AbortOnExecutionOrderFail: true,
+					ProjectName:               "Fourth",
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -395,16 +395,16 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "Don't block when parallel is not set",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        0,
-					ProjectName:                "First",
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       0,
+					ProjectName:               "First",
+					AbortOnExecutionOrderFail: true,
 				},
 				{
-					CommandName:                command.Plan,
-					ExecutionOrderGroup:        1,
-					ProjectName:                "Second",
-					AbortOnExcecutionOrderFail: true,
+					CommandName:               command.Plan,
+					ExecutionOrderGroup:       1,
+					ProjectName:               "Second",
+					AbortOnExecutionOrderFail: true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -425,7 +425,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 		},
 		{
-			Description: "Don't block when abortOnExcecutionOrderFail is not set",
+			Description: "Don't block when abortOnExecutionOrderFail is not set",
 			ProjectContexts: []command.ProjectContext{
 				{
 					CommandName:         command.Plan,

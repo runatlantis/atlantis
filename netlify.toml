@@ -1,0 +1,32 @@
+# Netlify Config, https://www.netlify.com/docs/netlify-toml-reference/
+[build]
+base = "/"
+command = "npm install && npm run website:build"
+publish = "runatlantis.io/.vitepress/dist/"
+
+[[redirects]]
+force = true
+from = "/guide/getting-started.html"
+status = 301
+to = "/guide/"
+
+[[redirects]]
+force = true
+from = "/docs/atlantis-yaml-reference.html"
+status = 301
+to = "/docs/repo-level-atlantis-yaml.html"
+
+[[headers]]
+for = "/*"
+[headers.values]
+Cache-Control = "public, max-age=86400"
+Referrer-Policy = "no-referrer"
+Strict-Transport-Security = "max-age=86400; includeSubDomains; preload"
+X-Content-Type-Options = "nosniff"
+X-Frame-Options = "DENY"
+X-XSS-Protection = "1; mode=block"
+
+[[headers]]
+for = "*.html"
+[headers.values]
+Content-Type = "text/html; charset=UTF-8"

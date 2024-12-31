@@ -45,7 +45,7 @@ func (a *NotConfiguredVCSClient) PullIsApproved(_ logging.SimpleLogging, _ model
 func (a *NotConfiguredVCSClient) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 	return nil
 }
-func (a *NotConfiguredVCSClient) PullIsMergeable(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ string) (bool, error) {
+func (a *NotConfiguredVCSClient) PullIsMergeable(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ string, _ []string) (bool, error) {
 	return false, a.err()
 }
 func (a *NotConfiguredVCSClient) UpdateStatus(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ models.CommitStatus, _ string, _ string, _ string) error {

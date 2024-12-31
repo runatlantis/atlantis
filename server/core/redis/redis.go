@@ -238,7 +238,7 @@ func (r *RedisDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) 
 	return &cmdLock, err
 }
 
-// UpdatePullWithResults updates pull's status with the latest project results.
+// UpdateProjectStatus updates pull's status with the latest project results.
 // It returns the new PullStatus object.
 func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
 	key, err := r.pullKey(pull)

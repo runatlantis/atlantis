@@ -1,0 +1,37 @@
+# See: https://github.com/goss-org/goss/blob/master/docs/gossfile.md
+
+command:
+  # ensure atlantis is available
+  atlantis-available:
+    exec: "atlantis version"
+    exit-status: 0
+    stdout: []
+    stderr: []
+
+  # ensure conftest is available
+  conftest-available:
+    exec: "conftest -v"
+    exit-status: 0
+    stdout: []
+    stderr: []
+
+  # ensure git-lfs is available
+  git-lfs-available:
+    exec: "git-lfs -v"
+    exit-status: 0
+    stdout: []
+    stderr: []
+
+  # ensure terraform is available
+  terraform-available:
+    exec: "terraform version"
+    exit-status: 0
+    stdout: []
+    stderr: []
+
+  # ensure tofu binary is available
+  tofu-available:
+    exec: "tofu version"
+    exit-status: 0
+    stdout: []
+    stderr: []

@@ -20,9 +20,9 @@ Any failures need to either be addressed in a successive commit, or approved by 
 
 ![Policy Check Approval](./images/policy-check-approval.png)
 
-
 Policy approvals may be cleared either by re-planing, or by issuing the following command:
-```
+
+```shell
 atlantis approve_policies --clear-policy-approval
 ```
 
@@ -48,7 +48,7 @@ Policy Configuration is defined in the [server-side repo configuration](server-s
 
 In this example we will define one policy set with one owner:
 
-```
+```yaml
 policies:
   owners:
     users:
@@ -71,12 +71,13 @@ policies:
 - `source` - Tells atlantis where to fetch the policies from. Currently you can only host policies locally by using `local`.
 - `owners` - Defines the users/teams which are able to approve a specific policy set.
 - `approve_count` - Defines the number of approvals needed to bypass policy checks. Defaults to the top-level policies configuration, if not specified.
+- `prevent_self_approve` - Defines whether the PR author can approve policies
 
 By default conftest is configured to only run the `main` package. If you wish to run specific/multiple policies consider passing `--namespace` or `--all-namespaces` to conftest with [`extra_args`](custom-workflows.md#adding-extra-arguments-to-terraform-commands) via a custom workflow as shown in the below example.
 
 Example Server Side Repo configuration using `--all-namespaces` and a local src dir.
 
-```
+```yaml
 repos:
   - id: github.com/myorg/example-repo
     workflow: custom
@@ -104,7 +105,7 @@ workflows:
 
 Conftest policies are based on [Open Policy Agent (OPA)](https://www.openpolicyagent.org/) and written in [rego](https://www.openpolicyagent.org/docs/latest/policy-language/#what-is-rego). Following our example, simply create a `rego` file in `null_resource_warning` folder with following code, the code below a simple policy that will fail for plans containing newly created `null_resource`s.
 
-```
+```rego
 package main
 
 resource_types = {"null_resource"}
@@ -171,13 +172,12 @@ workflows:
     policy_check:
       steps:
         - show
-        - run: conftest test $SHOWFILE *.tf
+        - run: conftest test $SHOWFILE *.tf --no-fail
 ```
 
 ### Quiet policy checks
 
 By default, Atlantis will add a comment to all pull requests with the policy check result - both successes and failures. Version 0.21.0 added the [`--quiet-policy-checks`](server-configuration.md#quiet-policy-checks) option, which will instead only add comments when policy checks fail, significantly reducing the number of comments when most policy check results succeed.
-
 
 ### Data for custom run steps
 
@@ -201,6 +201,7 @@ When the policy check workflow runs, a file is created in the working directory 
 When policy checking is enabled it will be enforced on all repositories, in order to disable policy checking on some repositories first [enable policy checks](policy-checking.md#getting-started) and then disable it explicitly on each repository with the `policy_check` flag.
 
 For server side config:
+
 ```yml
 # repos.yaml
 repos:
@@ -216,6 +217,7 @@ repos:
 ```
 
 For repo level `atlantis.yaml` config:
+
 ```yml
 version: 3
 projects:

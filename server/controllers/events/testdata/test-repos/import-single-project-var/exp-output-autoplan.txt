@@ -17,7 +17,6 @@ Terraform will perform the following actions:
       + dec         = (known after apply)
       + hex         = (known after apply)
       + id          = (known after apply)
-      + keepers     = {}
     }
 
   # random_id.for_each["default"] will be created
@@ -28,7 +27,6 @@ Terraform will perform the following actions:
       + dec         = (known after apply)
       + hex         = (known after apply)
       + id          = (known after apply)
-      + keepers     = {}
     }
 
 Plan: 2 to add, 0 to change, 0 to destroy.

@@ -139,7 +139,7 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string) (bool, error) {
+func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) {
 	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
 	// We'll only loop 1000 times as a safety measure.
 	maxLoops := 1000
@@ -180,6 +180,8 @@ func (b *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 	case models.FailedCommitStatus:
 		bbState = "FAILED"
 	}
+
+	logger.Info("Updating BitBucket commit status for '%s' to '%s'", src, bbState)
 
 	// URL is a required field for bitbucket statuses. We default to the
 	// Atlantis server's URL.

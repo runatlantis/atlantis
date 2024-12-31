@@ -29,19 +29,19 @@ func (mock *MockAzureDevopsRequestValidator) Validate(r *http.Request, user []by
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockAzureDevopsRequestValidator().")
 	}
-	params := []pegomock.Param{r, user, pass}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Validate", params, []reflect.Type{reflect.TypeOf((*[]byte)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 []byte
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].([]byte)
+	_params := []pegomock.Param{r, user, pass}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Validate", _params, []reflect.Type{reflect.TypeOf((*[]byte)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 []byte
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].([]byte)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockAzureDevopsRequestValidator) VerifyWasCalledOnce() *VerifierMockAzureDevopsRequestValidator {
@@ -82,8 +82,8 @@ type VerifierMockAzureDevopsRequestValidator struct {
 }
 
 func (verifier *VerifierMockAzureDevopsRequestValidator) Validate(r *http.Request, user []byte, pass []byte) *MockAzureDevopsRequestValidator_Validate_OngoingVerification {
-	params := []pegomock.Param{r, user, pass}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Validate", params, verifier.timeout)
+	_params := []pegomock.Param{r, user, pass}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Validate", _params, verifier.timeout)
 	return &MockAzureDevopsRequestValidator_Validate_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -98,19 +98,25 @@ func (c *MockAzureDevopsRequestValidator_Validate_OngoingVerification) GetCaptur
 }
 
 func (c *MockAzureDevopsRequestValidator_Validate_OngoingVerification) GetAllCapturedArguments() (_param0 []*http.Request, _param1 [][]byte, _param2 [][]byte) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]*http.Request, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(*http.Request)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]*http.Request, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(*http.Request)
+			}
 		}
-		_param1 = make([][]byte, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.([]byte)
+		if len(_params) > 1 {
+			_param1 = make([][]byte, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.([]byte)
+			}
 		}
-		_param2 = make([][]byte, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.([]byte)
+		if len(_params) > 2 {
+			_param2 = make([][]byte, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.([]byte)
+			}
 		}
 	}
 	return

@@ -28,8 +28,8 @@ func (mock *MockJob) Run() {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockJob().")
 	}
-	params := []pegomock.Param{}
-	pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{})
+	_params := []pegomock.Param{}
+	pegomock.GetGenericMockFrom(mock).Invoke("Run", _params, []reflect.Type{})
 }
 
 func (mock *MockJob) VerifyWasCalledOnce() *VerifierMockJob {
@@ -70,8 +70,8 @@ type VerifierMockJob struct {
 }
 
 func (verifier *VerifierMockJob) Run() *MockJob_Run_OngoingVerification {
-	params := []pegomock.Param{}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
+	_params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", _params, verifier.timeout)
 	return &MockJob_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 

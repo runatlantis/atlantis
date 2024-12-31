@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 type PullUpdater struct {
@@ -23,10 +24,27 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 	// clutter in a pull/merge request. This will not delete the comment, since the
 	// comment trail may be useful in auditing or backtracing problems.
 	if c.HidePrevPlanComments {
-		ctx.Log.Debug("Hiding previous plan comments for command: '%v', directory: '%v'", cmd.CommandName().TitleString(), cmd.Dir())
+		ctx.Log.Debug("hiding previous plan comments for command: '%v', directory: '%v'", cmd.CommandName().TitleString(), cmd.Dir())
 		if err := c.VCSClient.HidePrevCommandComments(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cmd.CommandName().TitleString(), cmd.Dir()); err != nil {
 			ctx.Log.Err("unable to hide old comments: %s", err)
 		}
+	}
+
+	if len(res.ProjectResults) > 0 {
+		var commentOnProjects []command.ProjectResult
+		for _, result := range res.ProjectResults {
+			if utils.SlicesContains(result.SilencePRComments, cmd.CommandName().String()) {
+				ctx.Log.Debug("silenced command '%s' comment for project '%s'", cmd.CommandName().String(), result.ProjectName)
+				continue
+			}
+			commentOnProjects = append(commentOnProjects, result)
+		}
+
+		if len(commentOnProjects) == 0 {
+			return
+		}
+
+		res.ProjectResults = commentOnProjects
 	}
 
 	comment := c.MarkdownRenderer.Render(ctx, res, cmd)

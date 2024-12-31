@@ -28,19 +28,19 @@ func (mock *MockPostWorkflowHookURLGenerator) GenerateProjectWorkflowHookURL(hoo
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPostWorkflowHookURLGenerator().")
 	}
-	params := []pegomock.Param{hookID}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("GenerateProjectWorkflowHookURL", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 string
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(string)
+	_params := []pegomock.Param{hookID}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GenerateProjectWorkflowHookURL", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 string
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(string)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockPostWorkflowHookURLGenerator) VerifyWasCalledOnce() *VerifierMockPostWorkflowHookURLGenerator {
@@ -81,8 +81,8 @@ type VerifierMockPostWorkflowHookURLGenerator struct {
 }
 
 func (verifier *VerifierMockPostWorkflowHookURLGenerator) GenerateProjectWorkflowHookURL(hookID string) *MockPostWorkflowHookURLGenerator_GenerateProjectWorkflowHookURL_OngoingVerification {
-	params := []pegomock.Param{hookID}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GenerateProjectWorkflowHookURL", params, verifier.timeout)
+	_params := []pegomock.Param{hookID}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GenerateProjectWorkflowHookURL", _params, verifier.timeout)
 	return &MockPostWorkflowHookURLGenerator_GenerateProjectWorkflowHookURL_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -97,11 +97,13 @@ func (c *MockPostWorkflowHookURLGenerator_GenerateProjectWorkflowHookURL_Ongoing
 }
 
 func (c *MockPostWorkflowHookURLGenerator_GenerateProjectWorkflowHookURL_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(string)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
 		}
 	}
 	return

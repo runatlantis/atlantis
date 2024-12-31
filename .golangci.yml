@@ -19,14 +19,14 @@ linters:
     - gofmt
     - gosec
     - gosimple
+    - govet
     - ineffassign
     - misspell
     - revive
     - staticcheck
+    - testifylint
     - typecheck
     - unconvert
     - unused
-    - vet
-    - vetshadow
 run:
   timeout: 10m

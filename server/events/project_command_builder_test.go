@@ -234,7 +234,6 @@ terraform {
 	userConfig := defaultUserConfig
 
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -618,7 +617,6 @@ projects:
 				}
 
 				terraformClient := terraform_mocks.NewMockClient()
-				When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 				builder := events.NewProjectCommandBuilder(
 					false,
@@ -807,7 +805,6 @@ projects:
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1137,7 +1134,6 @@ projects:
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1236,7 +1232,6 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1323,7 +1318,6 @@ projects:
 	userConfig := defaultUserConfig
 
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1412,7 +1406,6 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1685,7 +1678,6 @@ projects:
 		}
 		scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 		terraformClient := terraform_mocks.NewMockClient()
-		When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 		builder := events.NewProjectCommandBuilder(
 			false,
@@ -1755,7 +1747,6 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 
 	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		true,
@@ -1844,7 +1835,6 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		AllowAllRepoSettings: false,
 	}
 	terraformClient := terraform_mocks.NewMockClient()
-	When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1975,7 +1965,6 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 			builder := events.NewProjectCommandBuilder(
 				false, // policyChecksSupported
@@ -2087,7 +2076,6 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 			}
 
 			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.ListAvailableVersions(Any[logging.SimpleLogging]())).ThenReturn([]string{}, nil)
 
 			builder := events.NewProjectCommandBuilder(
 				false, // policyChecksSupported
