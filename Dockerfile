@@ -1,13 +1,13 @@
-# syntax=docker/dockerfile:1@sha256:865e5dd094beca432e8c0a1d5e1c465db5f998dca4e439981029b3b81fb39ed5
+# syntax=docker/dockerfile:1@sha256:93bfd3b68c109427185cd78b4779fc82b484b0b7618e36d0f104d4d801e66d25
 # what distro is the image being built for
-ARG ALPINE_TAG=3.20.3@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d
-ARG DEBIAN_TAG=12.7-slim@sha256:36e591f228bb9b99348f584e83f16e012c33ba5cad44ef5981a1d7c0a93eca22
-ARG GOLANG_TAG=1.23.2-alpine@sha256:9dd2625a1ff2859b8d8b01d8f7822c0f528942fe56cfe7a1e7c38d3b8d72d679
+ARG ALPINE_TAG=3.21.0@sha256:21dc6063fd678b478f57c0e13f47560d0ea4eeba26dfc947b2a4f81f686b9f45
+ARG DEBIAN_TAG=12.8-slim@sha256:d365f4920711a9074c4bcd178e8f457ee59250426441ab2a5f8106ed8fe948eb
+ARG GOLANG_TAG=1.23.4-alpine@sha256:6c5c9590f169f77c8046e45c611d3b28fe477789acd8d3762d23d4744de69812
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.9.8
+ARG DEFAULT_TERRAFORM_VERSION=1.10.3
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.8.4
+ARG DEFAULT_OPENTOFU_VERSION=1.8.7
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.56.0
 
@@ -94,7 +94,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.5.1
+ENV GIT_LFS_VERSION=3.6.0
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
@@ -154,8 +154,8 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# renovate: datasource=repology depName=alpine_3_20/ca-certificates versioning=loose
-ENV CA_CERTIFICATES_VERSION="20240705-r0"
+# renovate: datasource=repology depName=alpine_3_21/ca-certificates versioning=loose
+ENV CA_CERTIFICATES_VERSION="20241010"
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update

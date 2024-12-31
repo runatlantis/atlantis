@@ -50,7 +50,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 		return nil
 	}
 
-	ctx.Log.Debug("pre-hooks configured, running...")
+	ctx.Log.Info("Pre-workflow hooks configured, running...")
 
 	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir)
 	if err != nil {
@@ -96,8 +96,11 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 		preWorkflowHooks, repoDir)
 
 	if err != nil {
+		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
 		return err
 	}
+
+	ctx.Log.Info("Pre-workflow hooks completed successfully")
 
 	return nil
 }

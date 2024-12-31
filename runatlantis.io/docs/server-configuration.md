@@ -185,10 +185,6 @@ Values are chosen in this order:
 By default, changes to modules will not trigger autoplanning. See the flags below.
 :::
 
-::: warning NOTE
-If any projects are defined in a repo atlantis.yaml file, the logic for this flag will not execute. See issue [#3122](https://github.com/runatlantis/atlantis/issues/3122).
-:::
-
 ### `--autoplan-modules`
 
 ```bash
@@ -201,10 +197,6 @@ Defaults to `false`. When set to `true`, Atlantis will trace the local modules o
 Included project are projects with files included by `--autoplan-file-list`.
 After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
 `--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
-
-::: warning NOTE
-If any projects are defined in a repo atlantis.yaml file, the logic for this flag will not execute. See issue [#3122](https://github.com/runatlantis/atlantis/issues/3122).
-:::
 
 ### `--autoplan-modules-from-projects`
 
@@ -517,7 +509,7 @@ and set `--autoplan-modules` to `false`.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
-  This will bypass `--restrict-file-list` if regex is used, normal commands will stil be blocked if necessary.
+  This will bypass `--restrict-file-list` if regex is used, normal commands will still be blocked if necessary.
 
   ::: warning SECURITY WARNING
   It's not supposed to be used with `--disable-apply-all`.
@@ -1148,7 +1140,7 @@ This is useful when you have many projects and want to keep the pull request cle
 
   `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
   This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
-  like `atlantis plan -p .*` will still work if used. normal commands will stil be blocked if necessary.
+  like `atlantis plan -p .*` will still work if used. normal commands will still be blocked if necessary.
   Defaults to `false`.
 
 ### `--silence-allowlist-errors`
@@ -1350,7 +1342,7 @@ This flag is useful when having multiple projects that need to run a plan and ap
 * [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
 * [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
 
-The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient managment of the PRs.
+The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
 
 ### `--var-file-allowlist`
 

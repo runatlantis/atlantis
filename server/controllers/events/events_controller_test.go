@@ -25,7 +25,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v65/github"
+	"github.com/google/go-github/v66/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	. "github.com/petergtz/pegomock/v4"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"

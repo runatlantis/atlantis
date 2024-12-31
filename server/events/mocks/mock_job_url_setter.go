@@ -30,15 +30,15 @@ func (mock *MockJobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cm
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockJobURLSetter().")
 	}
-	params := []pegomock.Param{ctx, cmdName, status, res}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("SetJobURLWithStatus", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(error)
+	_params := []pegomock.Param{ctx, cmdName, status, res}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("SetJobURLWithStatus", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(error)
 		}
 	}
-	return ret0
+	return _ret0
 }
 
 func (mock *MockJobURLSetter) VerifyWasCalledOnce() *VerifierMockJobURLSetter {
@@ -79,8 +79,8 @@ type VerifierMockJobURLSetter struct {
 }
 
 func (verifier *VerifierMockJobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectResult) *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification {
-	params := []pegomock.Param{ctx, cmdName, status, res}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "SetJobURLWithStatus", params, verifier.timeout)
+	_params := []pegomock.Param{ctx, cmdName, status, res}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "SetJobURLWithStatus", _params, verifier.timeout)
 	return &MockJobURLSetter_SetJobURLWithStatus_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -95,23 +95,31 @@ func (c *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification) GetCapturedAr
 }
 
 func (c *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []command.Name, _param2 []models.CommitStatus, _param3 []*command.ProjectResult) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(command.ProjectContext)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]command.ProjectContext, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(command.ProjectContext)
+			}
 		}
-		_param1 = make([]command.Name, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(command.Name)
+		if len(_params) > 1 {
+			_param1 = make([]command.Name, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(command.Name)
+			}
 		}
-		_param2 = make([]models.CommitStatus, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.(models.CommitStatus)
+		if len(_params) > 2 {
+			_param2 = make([]models.CommitStatus, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(models.CommitStatus)
+			}
 		}
-		_param3 = make([]*command.ProjectResult, len(c.methodInvocations))
-		for u, param := range params[3] {
-			_param3[u] = param.(*command.ProjectResult)
+		if len(_params) > 3 {
+			_param3 = make([]*command.ProjectResult, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(*command.ProjectResult)
+			}
 		}
 	}
 	return
