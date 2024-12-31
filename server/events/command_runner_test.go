@@ -506,7 +506,7 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	vcsClient := setup(t)
 	applyCommandRunner.DisableApplyAll = true
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
@@ -594,7 +594,7 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 		" comment saying that this is not allowed")
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("closed"),
+		State: github.Ptr("closed"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.ClosedPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
@@ -647,12 +647,12 @@ func TestRunUnlockCommand_VCSComment(t *testing.T) {
 	}{
 		{
 			name:    "PR open",
-			prState: github.String("open"),
+			prState: github.Ptr("open"),
 		},
 
 		{
 			name:    "PR closed",
-			prState: github.String("closed"),
+			prState: github.Ptr("closed"),
 		},
 	}
 
@@ -689,7 +689,7 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -713,7 +713,7 @@ func TestRunUnlockCommandFail_DisableUnlockLabel(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -737,7 +737,7 @@ func TestRunUnlockCommandFail_GetLabelsFail(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -763,7 +763,7 @@ func TestRunUnlockCommandDoesntRetrieveLabelsIfDisableUnlockLabelNotSet(t *testi
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -865,7 +865,7 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	pull := &github.PullRequest{State: github.String("open")}
+	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
@@ -907,7 +907,7 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	pull := &github.PullRequest{State: github.String("open")}
+	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
@@ -1001,7 +1001,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	pull := &github.PullRequest{State: github.String("open")}
+	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
@@ -1025,7 +1025,7 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 
 	modelPull := models.PullRequest{
@@ -1071,7 +1071,7 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 
 	modelPull := models.PullRequest{
@@ -1127,7 +1127,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 
 	modelPull := models.PullRequest{
@@ -1174,7 +1174,7 @@ func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
@@ -1217,7 +1217,7 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	Ok(t, err)
 	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus))
 	ghPull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(ghPull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(ghPull))).ThenReturn(pull, pull.BaseRepo, testdata.GithubRepo, nil)

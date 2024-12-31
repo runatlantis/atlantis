@@ -90,7 +90,7 @@ func (g GithubClient) CreateAtlantisWebhook(ctx context.Context, hookURL string)
 	atlantisHook := &github.Hook{
 		Events: []string{"issue_comment", "pull_request", "push"},
 		Config: hookConfig,
-		Active: github.Bool(true),
+		Active: github.Ptr(true),
 	}
 
 	hook, _, err := g.client.Repositories.CreateHook(ctx, g.ownerName, g.repoName, atlantisHook)
@@ -146,7 +146,7 @@ func (g GithubClient) GetAtlantisStatus(ctx context.Context, branchName string) 
 
 func (g GithubClient) ClosePullRequest(ctx context.Context, pullRequestNumber int) error {
 	// clean up
-	_, _, err := g.client.PullRequests.Edit(ctx, g.ownerName, g.repoName, pullRequestNumber, &github.PullRequest{State: github.String("closed")})
+	_, _, err := g.client.PullRequests.Edit(ctx, g.ownerName, g.repoName, pullRequestNumber, &github.PullRequest{State: github.Ptr("closed")})
 	if err != nil {
 		return fmt.Errorf("error while closing new pull request: %v", err)
 	}

@@ -268,8 +268,8 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 	nextPage := 0
 	for {
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
-			Sort:        github.String("created"),
-			Direction:   github.String("asc"),
+			Sort:        github.Ptr("created"),
+			Direction:   github.Ptr("asc"),
 			ListOptions: github.ListOptions{Page: nextPage},
 		})
 		if resp != nil {
@@ -913,9 +913,9 @@ func (g *GithubClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	logger.Info("Updating GitHub Check status for '%s' to '%s'", src, ghState)
 
 	status := &github.RepoStatus{
-		State:       github.String(ghState),
-		Description: github.String(description),
-		Context:     github.String(src),
+		State:       github.Ptr(ghState),
+		Description: github.Ptr(description),
+		Context:     github.Ptr(src),
 		TargetURL:   &url,
 	}
 	_, resp, err := g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, status)

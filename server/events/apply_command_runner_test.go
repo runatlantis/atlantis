@@ -54,7 +54,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 			pull := &github.PullRequest{
-				State: github.String("open"),
+				State: github.Ptr("open"),
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
@@ -475,7 +475,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 			pull := &github.PullRequest{
-				State: github.String("open"),
+				State: github.Ptr("open"),
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
