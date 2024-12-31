@@ -122,7 +122,7 @@ RUN ./download-release.sh \
         "terraform" \
         "${TARGETPLATFORM}" \
         "${DEFAULT_TERRAFORM_VERSION}" \
-        "1.6.6 1.7.5 1.8.5 1.9.8 ${DEFAULT_TERRAFORM_VERSION}" \
+        "1.7.5 1.8.5 1.9.8 ${DEFAULT_TERRAFORM_VERSION}" \
     && ./download-release.sh \
         "tofu" \
         "${TARGETPLATFORM}" \
