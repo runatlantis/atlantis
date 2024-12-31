@@ -80,10 +80,10 @@ func TestWriteGitCreds_ReplaceApp(t *testing.T) {
 
 	err = vcs.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
-	expContets := "line1\nhttps://x-access-token:token@github.com\nline2"
+	expContents := "line1\nhttps://x-access-token:token@github.com\nline2"
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
-	Equals(t, expContets, string(actContents))
+	Equals(t, expContents, string(actContents))
 }
 
 // Test that the github app credential gets added even if there are other credentials.
@@ -99,10 +99,10 @@ func TestWriteGitCreds_AppendAppWhenFileNotEmpty(t *testing.T) {
 
 	err = vcs.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
-	expContets := "line1\nhttps://user:token@host.com\nline2\nhttps://x-access-token:token@github.com"
+	expContents := "line1\nhttps://user:token@host.com\nline2\nhttps://x-access-token:token@github.com"
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
-	Equals(t, expContets, string(actContents))
+	Equals(t, expContents, string(actContents))
 }
 
 // Test that the github app credentials get updated when cred file is empty.
@@ -118,10 +118,10 @@ func TestWriteGitCreds_AppendApp(t *testing.T) {
 
 	err = vcs.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
-	expContets := "https://x-access-token:token@github.com"
+	expContents := "https://x-access-token:token@github.com"
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
-	Equals(t, expContets, string(actContents))
+	Equals(t, expContents, string(actContents))
 }
 
 // Test that if we can't read the existing file to see if the contents will be

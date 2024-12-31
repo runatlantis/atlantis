@@ -108,7 +108,7 @@ func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging
 		if err != nil {
 			return nil, err
 		}
-		logger.Info("determined GitLab is running version %s", client.Version.String())
+		logger.Info("GitLab host '%s' is running version %s", client.Client.BaseURL().Host, client.Version.String())
 	}
 
 	return client, nil
@@ -395,7 +395,6 @@ func (g *GitlabClient) SupportsDetailedMergeStatus(logger logging.SimpleLogging)
 
 // UpdateStatus updates the build status of a commit.
 func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
-	logger.Debug("Updating GitLab commit status for '%s' to '%s'", src, state)
 	gitlabState := gitlab.Pending
 	switch state {
 	case models.PendingCommitStatus:
@@ -406,43 +405,47 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		gitlabState = gitlab.Success
 	}
 
-	// refTarget is only set to the head branch of the MR if HeadPipeline is not found
-	// when HeadPipeline is found we set the pipelineID for the request instead
-	var refTarget *string
-	var pipelineID *int
+	logger.Info("Updating GitLab commit status for '%s' to '%s'", src, gitlabState)
+
+	setCommitStatusOptions := &gitlab.SetCommitStatusOptions{
+		State:       gitlabState,
+		Context:     gitlab.Ptr(src),
+		Description: gitlab.Ptr(description),
+		TargetURL:   &url,
+	}
 
 	retries := 1
 	delay := 2 * time.Second
-	var mr *gitlab.MergeRequest
+	var commit *gitlab.Commit
+	var resp *gitlab.Response
 	var err error
 
-	// Try to get the MR details a couple of times in case the pipeline is not yet assigned to the MR
+	// Try a couple of times to get the pipeline ID for the commit
 	for i := 0; i <= retries; i++ {
-		mr, err = g.GetMergeRequest(logger, pull.BaseRepo.FullName, pull.Num)
+		commit, resp, err = g.Client.Commits.GetCommit(repo.FullName, pull.HeadCommit, nil)
+		if resp != nil {
+			logger.Debug("GET /projects/%s/repository/commits/%d: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
+		}
 		if err != nil {
 			return err
 		}
-		if mr.HeadPipeline != nil {
-			logger.Debug("Head pipeline found for merge request %d, source '%s'. refTarget '%s'",
-				pull.Num, mr.HeadPipeline.Source, mr.HeadPipeline.Ref)
-			// set pipeline ID for the req once found
-			pipelineID = gitlab.Ptr(mr.HeadPipeline.ID)
+		if commit.LastPipeline != nil {
+			logger.Info("Pipeline found for commit %s, setting pipeline ID to %d", pull.HeadCommit, commit.LastPipeline.ID)
+			// Set the pipeline ID to the last pipeline that ran for the commit
+			setCommitStatusOptions.PipelineID = gitlab.Ptr(commit.LastPipeline.ID)
 			break
 		}
 		if i != retries {
-			logger.Debug("Head pipeline not found for merge request %d. Retrying in %s",
-				pull.Num, delay)
+			logger.Info("No pipeline found for commit %s, retrying in %s", pull.HeadCommit, delay)
 			time.Sleep(delay)
 		} else {
-			// set the ref target here if the pipeline wasn't found
-			refTarget = gitlab.Ptr(pull.HeadBranch)
-			logger.Debug("Head pipeline not found for merge request %d.",
-				pull.Num)
+			// If we've exhausted all retries, set the Ref to the branch name
+			logger.Info("No pipeline found for commit %s, setting Ref to %s", pull.HeadCommit, pull.HeadBranch)
+			setCommitStatusOptions.Ref = gitlab.Ptr(pull.HeadBranch)
 		}
 	}
 
 	var (
-		resp        *gitlab.Response
 		maxAttempts = 10
 		retryer     = &backoff.Backoff{
 			Jitter: true,
@@ -455,19 +458,11 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			"attempt", i+1,
 			"max_attempts", maxAttempts,
 			"repo", repo.FullName,
-			"commit", pull.HeadCommit,
+			"commit", commit.ShortID,
 			"state", state.String(),
 		)
 
-		_, resp, err = g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, &gitlab.SetCommitStatusOptions{
-			State:       gitlabState,
-			Context:     gitlab.Ptr(src),
-			Description: gitlab.Ptr(description),
-			TargetURL:   &url,
-			// only one of these should get sent in the request
-			PipelineID: pipelineID,
-			Ref:        refTarget,
-		})
+		_, resp, err = g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, setCommitStatusOptions)
 
 		if resp != nil {
 			logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)

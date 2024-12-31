@@ -14,12 +14,12 @@ jobs:
       with:
         submodules: true
 
-    - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+    - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
       with:
         go-version-file: go.mod
 
     - name: Run GoReleaser for stable release
-      uses: goreleaser/goreleaser-action@286f3b13b1b49da4ac219696163fb8c1c93e1200 # v6
+      uses: goreleaser/goreleaser-action@9ed2f89a662bf1735a48bc8557fd212fa902bebf # v6
       if: (!contains(github.ref, 'pre'))
       with:
         # You can pass flags to goreleaser via GORELEASER_ARGS
