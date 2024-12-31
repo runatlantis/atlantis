@@ -99,7 +99,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 
 	var steps []valid.Step
 	switch cmdName {
-	case command.Plan:
+	case command.Plan, command.DraftPlan:
 		steps = prjCfg.Workflow.Plan.Steps
 	case command.Apply:
 		steps = prjCfg.Workflow.Apply.Steps

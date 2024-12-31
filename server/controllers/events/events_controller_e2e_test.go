@@ -1587,6 +1587,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
+		command.DraftPlan:       planCommandRunner,
 		command.Apply:           applyCommandRunner,
 		command.ApprovePolicies: approvePoliciesCommandRunner,
 		command.Unlock:          unlockCommandRunner,

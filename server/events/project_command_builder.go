@@ -685,7 +685,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 
 	return p.buildProjectCommandCtx(
 		ctx,
-		command.Plan,
+		cmd.Name,
 		"",
 		cmd.ProjectName,
 		cmd.Flags,
