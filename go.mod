@@ -45,7 +45,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/uber-go/tally/v4 v4.1.16
 	github.com/urfave/negroni/v3 v3.1.1
-	github.com/xanzy/go-gitlab v0.115.0
 	gitlab.com/gitlab-org/api/client-go v0.118.0
 	go.etcd.io/bbolt v1.3.11
 	go.uber.org/zap v1.27.0
@@ -91,6 +90,7 @@ require (
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-github/v67 v67.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -146,4 +146,4 @@ require (
 )
 
 // upstream pr to patch go-github to use v68, https://github.com/bradleyfalzon/ghinstallation/pull/137
-replace github.com/bradleyfalzon/ghinstallation/v2 => github.com/chenrui333/ghinstallation/v2 v2.12.1-0.20241231170237-36dcfb064b2f
+replace github.com/bradleyfalzon/ghinstallation/v2 => github.com/chenrui333/ghinstallation/v2 v2.12.1-0.20241203142322-20d40cc4a7b7
