@@ -53,6 +53,7 @@ jobs:
     strategy:
       matrix:
         image_type: [alpine, debian]
+        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     runs-on: ubuntu-24.04
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
@@ -69,6 +70,11 @@ jobs:
       with:
         dockerfile: "Dockerfile"
 
+    - name: Set up Go
+      uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+      with:
+        go-version-file: "go.mod"
+
     - name: Set up QEMU
       uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3
       with:
@@ -81,6 +87,10 @@ jobs:
       with:
         driver-opts: |
           image=moby/buildkit:v0.14.0
+
+    - name: "Install cosign"
+      uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
 
     # release version is the name of the tag i.e. v0.10.0
     # release version also has the image type appended i.e. v0.10.0-alpine
@@ -146,20 +156,37 @@ jobs:
           ATLANTIS_VERSION=${{ env.RELEASE_VERSION }}
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        platforms: ${{ matrix.platform }}
         push: ${{ env.PUSH }}
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ matrix.image_type }}
         labels: ${{ steps.meta.outputs.labels }}
         outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}
 
-    - name: "Sign and Attest Image"
-      if: env.PUSH == 'true'
+    - name: "Create Image Attestation"
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
       uses: actions/attest-build-provenance@7668571508540a607bdfd90a87a560489fe372eb # v2.1.0
       with:
         subject-digest: ${{ steps.build.outputs.digest }}
         subject-name: ghcr.io/${{ github.repository }}
         push-to-registry: true
+
+    - name: "Sign images with environment annotations"
+      # no key needed, we're using the GitHub OIDC flow
+      # Only run on alpine/amd64 build to avoid signing multiple times
+      if: env.PUSH == 'true' && github.event_name != 'pull_request' && matrix.image_type == 'alpine' && matrix.platform == 'linux/amd64'
+      run: |
+        # Sign dev tags, version tags, and latest tags
+        echo "${TAGS}" | xargs -I {} cosign sign \
+          --yes \
+          --recursive=true \
+          -a actor=${{ github.actor}} \
+          -a ref_name=${{ github.ref_name}} \
+          -a ref=${{ github.sha }} \
+          {}@${DIGEST}
+      env:
+        TAGS: ${{ steps.meta.outputs.tags }}
+        DIGEST: ${{ steps.build.outputs.digest }}
 
   test:
     needs: [changes]
@@ -169,6 +196,7 @@ jobs:
     strategy:
       matrix:
         image_type: [alpine, debian]
+        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ghcr.io/${{ github.repository }}
@@ -216,3 +244,4 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - run: 'echo "No build required"'
+
