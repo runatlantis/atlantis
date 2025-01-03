@@ -1,0 +1,33 @@
+{
+  "display_name": "bb bot",
+  "links": {
+    "self": {
+      "href": "https://api.bitbucket.org/2.0/users/%7B00000000-0000-0000-0000-000000000001%7D"
+    },
+    "avatar": {
+      "href": "https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/initials/RR-3.png"
+    },
+    "repositories": {
+      "href": "https://api.bitbucket.org/2.0/repositories/%7B00000000-0000-0000-0000-000000000001%7D"
+    },
+    "snippets": {
+      "href": "https://api.bitbucket.org/2.0/snippets/%7B00000000-0000-0000-0000-000000000001%7D"
+    },
+    "html": {
+      "href": "https://bitbucket.org/%7B00000000-0000-0000-0000-000000000001%7D/"
+    },
+    "hooks": {
+      "href": "https://api.bitbucket.org/2.0/workspaces/%7B00000000-0000-0000-0000-000000000001%7D/hooks"
+    }
+  },
+  "created_on": "2024-02-01T12:08:46.355300+00:00",
+  "type": "user",
+  "uuid": "{00000000-0000-0000-0000-000000000001}",
+  "has_2fa_enabled": null,
+  "username": "bb-bot",
+  "is_staff": false,
+  "account_id": "000000:00000000-0000-0000-0000-000000000001",
+  "nickname": "bb bot",
+  "account_status": "active",
+  "location": null
+}
