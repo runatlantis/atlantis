@@ -28,6 +28,8 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 | Type       | string  | Yes      | Type of the VCS provider (Github/Gitlab) |
 | Paths      | Path    | Yes      | Paths to the projects to run the plan    |
 | PR         | int     | No       | Pull Request number                      |
+| BaseBranch | string  | No       | The branch where the PR will be merged   |
+| Commit     | string  | No       | The commit to checkout in the PR         |
 
 #### Path
 
