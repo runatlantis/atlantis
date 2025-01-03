@@ -259,6 +259,7 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 	}
 	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmdName)
 	if !ok {
+		ctx.Log.Info("User '%s' in team '%s' does not have permissions to execute the '%s' command", user.Username, user.Teams, cmdName)
 		return false, nil
 	}
 	return true, nil
