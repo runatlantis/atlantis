@@ -3,6 +3,7 @@ package runtime
 import (
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
@@ -13,7 +14,7 @@ type policyCheckStepRunner struct {
 }
 
 // NewPolicyCheckStepRunner creates a new step runner from an executor workflow
-func NewPolicyCheckStepRunner(defaultTfVersion *version.Version, executorWorkflow VersionedExecutorWorkflow) (Runner, error) {
+func NewPolicyCheckStepRunner(defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, executorWorkflow VersionedExecutorWorkflow) (Runner, error) {
 	policyCheckStepRunner := &policyCheckStepRunner{
 		versionEnsurer: executorWorkflow,
 		executor:       executorWorkflow,

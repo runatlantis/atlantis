@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/utils"
@@ -18,12 +19,13 @@ import (
 
 // ApplyStepRunner runs `terraform apply`.
 type ApplyStepRunner struct {
-	TerraformExecutor   TerraformExec
-	DefaultTFVersion    *version.Version
-	CommitStatusUpdater StatusUpdater
-	AsyncTFExec         AsyncTFExec
-	ApplyErrorLabel     string
-	VcsClient           vcs.Client
+	TerraformExecutor     TerraformExec
+	DefaultTFDistribution terraform.Distribution
+	DefaultTFVersion      *version.Version
+	CommitStatusUpdater   StatusUpdater
+	AsyncTFExec           AsyncTFExec
+	ApplyErrorLabel       string
+	VcsClient             vcs.Client
 }
 
 func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
@@ -42,11 +44,19 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 
 	ctx.Log.Info("starting apply")
 	var out string
+	tfDistribution := a.DefaultTFDistribution
+	if ctx.TerraformDistribution != nil {
+		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
+	}
+	tfVersion := a.DefaultTFVersion
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion
+	}
 
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
 		args := append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...)
-		out, err = a.runRemoteApply(ctx, args, path, planPath, ctx.TerraformVersion, envs)
+		out, err = a.runRemoteApply(ctx, args, path, planPath, tfDistribution, tfVersion, envs)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
 		}
@@ -54,7 +64,7 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
 		args := append(append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
-		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, ctx.TerraformVersion, ctx.Workspace)
+		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, tfDistribution, tfVersion, ctx.Workspace)
 	}
 
 	// If apply was successful, delete the plan.
@@ -100,7 +110,7 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 	applyStartText := `  Terraform will perform the actions described above.
   Only 'yes' will be accepted to approve.
 
-  Enter a value: 
+  Enter a value:
 `
 	applyStartIdx := strings.Index(out, applyStartText)
 	if applyStartIdx < 0 {
@@ -123,6 +133,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 	applyArgs []string,
 	path string,
 	absPlanPath string,
+	tfDistribution terraform.Distribution,
 	tfVersion *version.Version,
 	envs map[string]string) (string, error) {
 	// The planfile contents are needed to ensure that the plan didn't change
@@ -141,7 +152,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), applyArgs, envs, tfVersion, ctx.Workspace)
+	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), applyArgs, envs, tfDistribution, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string

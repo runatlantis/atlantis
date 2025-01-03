@@ -5,33 +5,40 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 // workspaceStepRunnerDelegate ensures that a given step runner run on switched workspace
 type workspaceStepRunnerDelegate struct {
-	terraformExecutor TerraformExec
-	defaultTfVersion  *version.Version
-	delegate          Runner
+	terraformExecutor     TerraformExec
+	defaultTfDistribution terraform.Distribution
+	defaultTfVersion      *version.Version
+	delegate              Runner
 }
 
-func NewWorkspaceStepRunnerDelegate(terraformExecutor TerraformExec, defaultTfVersion *version.Version, delegate Runner) Runner {
+func NewWorkspaceStepRunnerDelegate(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, delegate Runner) Runner {
 	return &workspaceStepRunnerDelegate{
-		terraformExecutor: terraformExecutor,
-		defaultTfVersion:  defaultTfVersion,
-		delegate:          delegate,
+		terraformExecutor:     terraformExecutor,
+		defaultTfDistribution: defaultTfDistribution,
+		defaultTfVersion:      defaultTfVersion,
+		delegate:              delegate,
 	}
 }
 
 func (r *workspaceStepRunnerDelegate) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	tfDistribution := r.defaultTfDistribution
 	tfVersion := r.defaultTfVersion
+	if ctx.TerraformDistribution != nil {
+		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
+	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}
 
 	// We only need to switch workspaces in version 0.9.*. In older versions,
 	// there is no such thing as a workspace so we don't need to do anything.
-	if err := r.switchWorkspace(ctx, path, tfVersion, envs); err != nil {
+	if err := r.switchWorkspace(ctx, path, tfDistribution, tfVersion, envs); err != nil {
 		return "", err
 	}
 
@@ -40,7 +47,7 @@ func (r *workspaceStepRunnerDelegate) Run(ctx command.ProjectContext, extraArgs 
 
 // switchWorkspace changes the terraform workspace if necessary and will create
 // it if it doesn't exist. It handles differences between versions.
-func (r *workspaceStepRunnerDelegate) switchWorkspace(ctx command.ProjectContext, path string, tfVersion *version.Version, envs map[string]string) error {
+func (r *workspaceStepRunnerDelegate) switchWorkspace(ctx command.ProjectContext, path string, tfDistribution terraform.Distribution, tfVersion *version.Version, envs map[string]string) error {
 	// In versions less than 0.9 there is no support for workspaces.
 	noWorkspaceSupport := MustConstraint("<0.9").Check(tfVersion)
 	// If the user tried to set a specific workspace in the comment but their
@@ -63,7 +70,7 @@ func (r *workspaceStepRunnerDelegate) switchWorkspace(ctx command.ProjectContext
 	// already in the right workspace then no need to switch. This will save us
 	// about ten seconds. This command is only available in > 0.10.
 	if !runningZeroPointNine {
-		workspaceShowOutput, err := r.terraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "show"}, envs, tfVersion, ctx.Workspace)
+		workspaceShowOutput, err := r.terraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "show"}, envs, tfDistribution, tfVersion, ctx.Workspace)
 		if err != nil {
 			return err
 		}
@@ -78,11 +85,11 @@ func (r *workspaceStepRunnerDelegate) switchWorkspace(ctx command.ProjectContext
 	// To do this we can either select and catch the error or use list and then
 	// look for the workspace. Both commands take the same amount of time so
 	// that's why we're running select here.
-	_, err := r.terraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "select", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
+	_, err := r.terraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "select", ctx.Workspace}, envs, tfDistribution, tfVersion, ctx.Workspace)
 	if err != nil {
 		// If terraform workspace select fails we run terraform workspace
 		// new to create a new workspace automatically.
-		out, err := r.terraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "new", ctx.Workspace}, envs, tfVersion, ctx.Workspace)
+		out, err := r.terraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "new", ctx.Workspace}, envs, tfDistribution, tfVersion, ctx.Workspace)
 		if err != nil {
 			return fmt.Errorf("%s: %s", err, out)
 		}

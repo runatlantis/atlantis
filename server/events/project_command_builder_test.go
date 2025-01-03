@@ -9,7 +9,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
-	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -233,7 +233,7 @@ terraform {
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 	userConfig := defaultUserConfig
 
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -616,7 +616,7 @@ projects:
 					AllowAllRepoSettings: true,
 				}
 
-				terraformClient := terraform_mocks.NewMockClient()
+				terraformClient := tfclientmocks.NewMockClient()
 
 				builder := events.NewProjectCommandBuilder(
 					false,
@@ -804,7 +804,7 @@ projects:
 				AllowAllRepoSettings: true,
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1133,7 +1133,7 @@ projects:
 				AllowAllRepoSettings: true,
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1231,7 +1231,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	globalCfgArgs := valid.GlobalCfgArgs{}
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1317,7 +1317,7 @@ projects:
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 	userConfig := defaultUserConfig
 
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1405,7 +1405,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				AllowAllRepoSettings: true,
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1558,7 +1558,7 @@ projects:
 				AllowAllRepoSettings: true,
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 			When(terraformClient.DetectVersion(Any[logging.SimpleLogging](), Any[string]())).Then(func(params []Param) ReturnValues {
 				projectName := filepath.Base(params[1].(string))
 				testVersion := testCase.Exp[projectName]
@@ -1677,7 +1677,7 @@ projects:
 			AllowAllRepoSettings: true,
 		}
 		scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
-		terraformClient := terraform_mocks.NewMockClient()
+		terraformClient := tfclientmocks.NewMockClient()
 
 		builder := events.NewProjectCommandBuilder(
 			false,
@@ -1746,7 +1746,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		true,
@@ -1834,7 +1834,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowAllRepoSettings: false,
 	}
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1964,7 +1964,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				Ok(t, err)
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false, // policyChecksSupported
@@ -2075,7 +2075,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				Ok(t, err)
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false, // policyChecksSupported
