@@ -6,7 +6,7 @@ require (
 	code.gitea.io/sdk/gitea v0.19.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/alicebob/miniredis/v2 v2.34.0
-	github.com/bradleyfalzon/ghinstallation/v2 v2.12.0
+	github.com/bradleyfalzon/ghinstallation/v2 v2.13.0
 	github.com/briandowns/spinner v1.23.1
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
@@ -90,7 +90,6 @@ require (
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/go-github/v67 v67.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -144,6 +143,3 @@ require (
 	google.golang.org/protobuf v1.36.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
-
-// upstream pr to patch go-github to use v68, https://github.com/bradleyfalzon/ghinstallation/pull/137
-replace github.com/bradleyfalzon/ghinstallation/v2 => github.com/chenrui333/ghinstallation/v2 v2.12.1-0.20241203142322-20d40cc4a7b7
