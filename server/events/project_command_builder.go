@@ -11,7 +11,7 @@ import (
 	tally "github.com/uber-go/tally/v4"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
@@ -59,7 +59,7 @@ func NewInstrumentedProjectCommandBuilder(
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
 	scope tally.Scope,
-	terraformClient terraform.Client,
+	terraformClient tfclient.Client,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -119,7 +119,7 @@ func NewProjectCommandBuilder(
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
 	scope tally.Scope,
-	terraformClient terraform.Client,
+	terraformClient tfclient.Client,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
 		ParserValidator:          parserValidator,
@@ -249,7 +249,7 @@ type DefaultProjectCommandBuilder struct {
 	// User config option: Controls auto-discovery of projects in a repository.
 	AutoDiscoverMode string
 	// Handles the actual running of Terraform commands.
-	TerraformExecutor terraform.Client
+	TerraformExecutor tfclient.Client
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
