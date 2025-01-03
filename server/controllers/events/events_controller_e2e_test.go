@@ -949,6 +949,25 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			},
 		},
 		{
+			Description:                "1 failing policy and 1 passing policy with --quiet-policy-checks",
+			RepoDir:                    "policy-checks-multi-projects",
+			ModifiedFiles:              []string{"dir1/main.tf,", "dir2/main.tf"},
+			PolicyCheck:                true,
+			ExpAutoplan:                true,
+			ExpPolicyChecks:            true,
+			ExpQuietPolicyChecks:       true,
+			ExpQuietPolicyCheckFailure: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check-quiet.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
 			Description:     "failing policy without policies passing using extra args",
 			RepoDir:         "policy-checks-extra-args",
 			ModifiedFiles:   []string{"main.tf"},
@@ -1183,7 +1202,7 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			userConfig.EnablePolicyChecksFlag = c.PolicyCheck
 			userConfig.QuietPolicyChecks = c.ExpQuietPolicyChecks
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, setupOption{})
+			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, setupOption{userConfig: userConfig})
 
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
@@ -1274,13 +1293,13 @@ type setupOption struct {
 	allowCommands           []command.Name
 	disableAutoplan         bool
 	disablePreWorkflowHooks bool
+	userConfig              server.UserConfig
 }
 
 func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
 	allowForkPRs := false
 	discardApprovalOnPlan := true
 	dataDir, binDir, cacheDir := mkSubDirs(t)
-
 	// Mocks.
 	e2eVCSClient := vcsmocks.NewMockClient()
 	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
@@ -1493,7 +1512,18 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	pullUpdater := &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            e2eVCSClient,
-		MarkdownRenderer:     events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false),
+		MarkdownRenderer: events.NewMarkdownRenderer(
+			false,                            // gitlabSupportsCommonMark
+			false,                            // disableApplyAll
+			false,                            // disableApply
+			false,                            // disableMarkdownFolding
+			false,                            // disableRepoLocking
+			false,                            // enableDiffMarkdownFormat
+			"",                               // markdownTemplateOverridesDir
+			"atlantis",                       // executableName
+			false,                            // hideUnchangedPlanComments
+			opt.userConfig.QuietPolicyChecks, // quietPolicyChecks
+		),
 	}
 
 	autoMerger := &events.AutoMerger{
