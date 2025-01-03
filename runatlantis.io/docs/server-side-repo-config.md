@@ -592,12 +592,12 @@ mode: on_apply
 
 ### Policies
 
-| Key                    | Type            | Default | Required  | Description                                              |
-|------------------------|-----------------|---------|-----------|----------------------------------------------------------|
-| conftest_version       | string          | none    | no        | conftest version to run all policy sets                  |
-| owners                 | Owners(#Owners) | none    | yes       | owners that can approve failing policies                 |
-| approve_count          | int             | 1       | no        | number of approvals required to bypass failing policies. |
-| policy_sets            | []PolicySet     | none    | yes       | set of policies to run on a plan output                  |
+| Key                    | Type            | Default | Required  | Description                                             |
+|------------------------|-----------------|---------|-----------|---------------------------------------------------------|
+| conftest_version       | string          | none    | no        | conftest version to run all policy sets                 |
+| owners                 | Owners(#Owners) | none    | yes       | owners that can approve failing policies                |
+| approve_count          | int             | 1       | no        | number of approvals required to bypass failing policies |
+| policy_sets            | []PolicySet     | none    | yes       | set of policies to run on a plan output                 |
 
 ### Owners
 

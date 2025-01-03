@@ -136,11 +136,11 @@ func (mock *MockClient) GetPullLabels(logger logging.SimpleLogging, repo models.
 	return _ret0, _ret1
 }
 
-func (mock *MockClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (mock *MockClient) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	_params := []pegomock.Param{repo, user}
+	_params := []pegomock.Param{logger, repo, user}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetTeamNamesForUser", _params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 []string
 	var _ret1 error
@@ -576,8 +576,8 @@ func (c *MockClient_GetPullLabels_OngoingVerification) GetAllCapturedArguments()
 	return
 }
 
-func (verifier *VerifierMockClient) GetTeamNamesForUser(repo models.Repo, user models.User) *MockClient_GetTeamNamesForUser_OngoingVerification {
-	_params := []pegomock.Param{repo, user}
+func (verifier *VerifierMockClient) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) *MockClient_GetTeamNamesForUser_OngoingVerification {
+	_params := []pegomock.Param{logger, repo, user}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetTeamNamesForUser", _params, verifier.timeout)
 	return &MockClient_GetTeamNamesForUser_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -587,24 +587,30 @@ type MockClient_GetTeamNamesForUser_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockClient_GetTeamNamesForUser_OngoingVerification) GetCapturedArguments() (models.Repo, models.User) {
-	repo, user := c.GetAllCapturedArguments()
-	return repo[len(repo)-1], user[len(user)-1]
+func (c *MockClient_GetTeamNamesForUser_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.Repo, models.User) {
+	logger, repo, user := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], repo[len(repo)-1], user[len(user)-1]
 }
 
-func (c *MockClient_GetTeamNamesForUser_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Repo, _param1 []models.User) {
+func (c *MockClient_GetTeamNamesForUser_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []models.User) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
-			_param0 = make([]models.Repo, len(c.methodInvocations))
+			_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
 			for u, param := range _params[0] {
-				_param0[u] = param.(models.Repo)
+				_param0[u] = param.(logging.SimpleLogging)
 			}
 		}
 		if len(_params) > 1 {
-			_param1 = make([]models.User, len(c.methodInvocations))
+			_param1 = make([]models.Repo, len(c.methodInvocations))
 			for u, param := range _params[1] {
-				_param1[u] = param.(models.User)
+				_param1[u] = param.(models.Repo)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]models.User, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(models.User)
 			}
 		}
 	}
