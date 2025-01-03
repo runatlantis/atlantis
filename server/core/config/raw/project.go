@@ -26,6 +26,7 @@ type Project struct {
 	Dir                       *string    `yaml:"dir,omitempty"`
 	Workspace                 *string    `yaml:"workspace,omitempty"`
 	Workflow                  *string    `yaml:"workflow,omitempty"`
+	TerraformDistribution     *string    `yaml:"terraform_distribution,omitempty"`
 	TerraformVersion          *string    `yaml:"terraform_version,omitempty"`
 	Autoplan                  *Autoplan  `yaml:"autoplan,omitempty"`
 	PlanRequirements          []string   `yaml:"plan_requirements,omitempty"`
@@ -86,6 +87,7 @@ func (p Project) Validate() error {
 		validation.Field(&p.PlanRequirements, validation.By(validPlanReq)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&p.ImportRequirements, validation.By(validImportReq)),
+		validation.Field(&p.TerraformDistribution, validation.By(validDistribution)),
 		validation.Field(&p.TerraformVersion, validation.By(VersionValidator)),
 		validation.Field(&p.DependsOn, validation.By(DependsOn)),
 		validation.Field(&p.Name, validation.By(validName)),
@@ -117,6 +119,9 @@ func (p Project) ToValid() valid.Project {
 	v.WorkflowName = p.Workflow
 	if p.TerraformVersion != nil {
 		v.TerraformVersion, _ = version.NewVersion(*p.TerraformVersion)
+	}
+	if p.TerraformDistribution != nil {
+		v.TerraformDistribution = p.TerraformDistribution
 	}
 	if p.Autoplan == nil {
 		v.Autoplan = DefaultAutoPlan()
@@ -199,6 +204,14 @@ func validImportReq(value interface{}) error {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
 			return fmt.Errorf("%q is not a valid import_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
 		}
+	}
+	return nil
+}
+
+func validDistribution(value interface{}) error {
+	distribution := value.(*string)
+	if distribution != nil && *distribution != "terraform" && *distribution != "opentofu" {
+		return fmt.Errorf("'%s' is not a valid terraform_distribution, only '%s' and '%s' are supported", *distribution, "terraform", "opentofu")
 	}
 	return nil
 }

@@ -7,7 +7,9 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	"github.com/runatlantis/atlantis/server/core/terraform"
+	terraformmocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -45,12 +47,15 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 		},
 	}
 	RegisterMockTestingT(t)
-	tfClient := mocks.NewMockClient()
+	tfClient := tfclientmocks.NewMockClient()
+	mockDownloader := terraformmocks.NewMockDownloader()
+	tfDistribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, err := version.NewVersion("0.12.0")
 	Ok(t, err)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	runStepRunner := runtime.RunStepRunner{
 		TerraformExecutor:       tfClient,
+		DefaultTFDistribution:   tfDistribution,
 		DefaultTFVersion:        tfVersion,
 		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}

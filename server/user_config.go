@@ -109,7 +109,7 @@ type UserConfig struct {
 	SSLCertFile                string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile                 string          `mapstructure:"ssl-key-file"`
 	RestrictFileList           bool            `mapstructure:"restrict-file-list"`
-	TFDistribution             string          `mapstructure:"tf-distribution"`
+	TFDistribution             string          `mapstructure:"tf-distribution"` // deprecated in favor of DefaultTFDistribution
 	TFDownload                 bool            `mapstructure:"tf-download"`
 	TFDownloadURL              string          `mapstructure:"tf-download-url"`
 	TFEHostname                string          `mapstructure:"tfe-hostname"`
@@ -117,6 +117,7 @@ type UserConfig struct {
 	TFEToken                   string          `mapstructure:"tfe-token"`
 	VarFileAllowlist           string          `mapstructure:"var-file-allowlist"`
 	VCSStatusName              string          `mapstructure:"vcs-status-name"`
+	DefaultTFDistribution      string          `mapstructure:"default-tf-distribution"`
 	DefaultTFVersion           string          `mapstructure:"default-tf-version"`
 	Webhooks                   []WebhookConfig `mapstructure:"webhooks" flag:"false"`
 	WebBasicAuth               bool            `mapstructure:"web-basic-auth"`
