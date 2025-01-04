@@ -2,7 +2,6 @@ package runtime_test
 
 import (
 	"fmt"
-	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	. "github.com/runatlantis/atlantis/testing"
@@ -93,7 +93,7 @@ func TestRun_Success_WithApplyErrorLabel(t *testing.T) {
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
 	applyErrorLabel := "some-label"
 	vcsClient := vcsmocks.NewMockClient()
 	o := runtime.ApplyStepRunner{
@@ -102,12 +102,12 @@ func TestRun_Success_WithApplyErrorLabel(t *testing.T) {
 		VcsClient:         vcsClient,
 	}
 
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, nil, "workspace")
 	vcsClient.VerifyWasCalled(Never()).AddPullLabel(ctx.Pull.BaseRepo, ctx.Pull, applyErrorLabel)
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
@@ -127,7 +127,7 @@ func TestRun_Fail_WithApplyErrorLabel(t *testing.T) {
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
 	applyErrorLabel := "some-label"
 	vcsClient := vcsmocks.NewMockClient()
 	o := runtime.ApplyStepRunner{
@@ -136,7 +136,7 @@ func TestRun_Fail_WithApplyErrorLabel(t *testing.T) {
 		VcsClient:         vcsClient,
 	}
 	errString := "some-error"
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("", errors.New(errString))
 	_, err = o.Run(ctx, nil, tmpDir, map[string]string(nil))
 	ErrEquals(t, errString, err)
