@@ -13,6 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/utils"
 )
 
@@ -23,6 +24,8 @@ type ApplyStepRunner struct {
 	DefaultTFVersion      *version.Version
 	CommitStatusUpdater   StatusUpdater
 	AsyncTFExec           AsyncTFExec
+	ApplyErrorLabel       string
+	VcsClient             vcs.Client
 }
 
 func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
@@ -64,11 +67,16 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, tfDistribution, tfVersion, ctx.Workspace)
 	}
 
-	// If the apply was successful, delete the plan.
+	// If apply was successful, delete the plan.
 	if err == nil {
 		ctx.Log.Info("apply successful, deleting planfile")
 		if removeErr := utils.RemoveIgnoreNonExistent(planPath); removeErr != nil {
 			ctx.Log.Warn("failed to delete planfile after successful apply: %s", removeErr)
+		}
+	} else if a.ApplyErrorLabel != "" {
+		ctx.Log.Info("apply errored, applying configured label to PR")
+		if errorLabelErr := a.VcsClient.AddPullLabel(ctx.Pull.BaseRepo, ctx.Pull, a.ApplyErrorLabel); errorLabelErr != nil {
+			ctx.Log.Warn("failed to add PR label to %s#%s: %s", ctx.Pull.BaseRepo, ctx.Pull.Num, errorLabelErr)
 		}
 	}
 	return out, err
