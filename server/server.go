@@ -690,7 +690,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			ApplyErrorLabel:       userConfig.ApplyErrorLabel,
 			VcsClient:             vcsClient,
 		},
-		},
 		RunStepRunner: runStepRunner,
 		EnvStepRunner: &runtime.EnvStepRunner{
 			RunStepRunner: runStepRunner,
