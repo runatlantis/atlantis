@@ -173,22 +173,22 @@ jobs:
     #     subject-name: ghcr.io/${{ github.repository }}
     #     push-to-registry: true
 
-    - name: "Sign images with environment annotations"
-      # no key needed, we're using the GitHub OIDC flow
-      # Only run on alpine/amd64 build to avoid signing multiple times
-      if: env.PUSH == 'true' && github.event_name != 'pull_request' && matrix.image_type == 'alpine' && matrix.platform == 'linux/amd64'
-      run: |
-        # Sign dev tags, version tags, and latest tags
-        echo "${TAGS}" | xargs -I {} cosign sign \
-          --yes \
-          --recursive=true \
-          -a actor=${{ github.actor}} \
-          -a ref_name=${{ github.ref_name}} \
-          -a ref=${{ github.sha }} \
-          {}@${DIGEST}
-      env:
-        TAGS: ${{ steps.meta.outputs.tags }}
-        DIGEST: ${{ steps.build.outputs.digest }}
+    # - name: "Sign images with environment annotations"
+    #   # no key needed, we're using the GitHub OIDC flow
+    #   # Only run on alpine/amd64 build to avoid signing multiple times
+    #   if: env.PUSH == 'true' && github.event_name != 'pull_request' && matrix.image_type == 'alpine' && matrix.platform == 'linux/amd64'
+    #   run: |
+    #     # Sign dev tags, version tags, and latest tags
+    #     echo "${TAGS}" | xargs -I {} cosign sign \
+    #       --yes \
+    #       --recursive=true \
+    #       -a actor=${{ github.actor}} \
+    #       -a ref_name=${{ github.ref_name}} \
+    #       -a ref=${{ github.sha }} \
+    #       {}@${DIGEST}
+    #   env:
+    #     TAGS: ${{ steps.meta.outputs.tags }}
+    #     DIGEST: ${{ steps.build.outputs.digest }}
 
   test:
     needs: [changes]
