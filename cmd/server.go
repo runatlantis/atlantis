@@ -72,6 +72,7 @@ const (
 	CheckoutStrategyFlag             = "checkout-strategy"
 	ConfigFlag                       = "config"
 	DataDirFlag                      = "data-dir"
+	DefaultTFDistributionFlag        = "default-tf-distribution"
 	DefaultTFVersionFlag             = "default-tf-version"
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableAutoplanFlag              = "disable-autoplan"
@@ -141,7 +142,7 @@ const (
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
 	RestrictFileList                 = "restrict-file-list"
-	TFDistributionFlag               = "tf-distribution"
+	TFDistributionFlag               = "tf-distribution" // deprecated for DefaultTFDistributionFlag
 	TFDownloadFlag                   = "tf-download"
 	TFDownloadURLFlag                = "tf-download-url"
 	UseTFPluginCache                 = "use-tf-plugin-cache"
@@ -421,8 +422,8 @@ var stringFlags = map[string]stringFlag{
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
 	},
 	TFDistributionFlag: {
-		description:  fmt.Sprintf("Which TF distribution to use. Can be set to %s or %s.", TFDistributionTerraform, TFDistributionOpenTofu),
-		defaultValue: DefaultTFDistribution,
+		description: "[Deprecated for --default-tf-distribution].",
+		hidden:      true,
 	},
 	TFDownloadURLFlag: {
 		description:  "Base URL to download Terraform versions from.",
@@ -436,6 +437,10 @@ var stringFlags = map[string]stringFlag{
 		description: "API token for Terraform Cloud/Enterprise. This will be used to generate a ~/.terraformrc file." +
 			" Only set if using TFC/E as a remote backend." +
 			" Should be specified via the ATLANTIS_TFE_TOKEN environment variable for security.",
+	},
+	DefaultTFDistributionFlag: {
+		description:  fmt.Sprintf("Which TF distribution to use. Can be set to %s or %s.", TFDistributionTerraform, TFDistributionOpenTofu),
+		defaultValue: DefaultTFDistribution,
 	},
 	DefaultTFVersionFlag: {
 		description: "Terraform version to default to (ex. v0.12.0). Will download if not yet on disk." +
@@ -840,12 +845,13 @@ func (s *ServerCmd) run() error {
 
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
-		AllowForkPRsFlag:        AllowForkPRsFlag,
-		AtlantisURLFlag:         AtlantisURLFlag,
-		AtlantisVersion:         s.AtlantisVersion,
-		DefaultTFVersionFlag:    DefaultTFVersionFlag,
-		RepoConfigJSONFlag:      RepoConfigJSONFlag,
-		SilenceForkPRErrorsFlag: SilenceForkPRErrorsFlag,
+		AllowForkPRsFlag:          AllowForkPRsFlag,
+		AtlantisURLFlag:           AtlantisURLFlag,
+		AtlantisVersion:           s.AtlantisVersion,
+		DefaultTFDistributionFlag: DefaultTFDistributionFlag,
+		DefaultTFVersionFlag:      DefaultTFVersionFlag,
+		RepoConfigJSONFlag:        RepoConfigJSONFlag,
+		SilenceForkPRErrorsFlag:   SilenceForkPRErrorsFlag,
 	})
 
 	if err != nil {
@@ -921,8 +927,11 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.RedisPort == 0 {
 		c.RedisPort = DefaultRedisPort
 	}
-	if c.TFDistribution == "" {
-		c.TFDistribution = DefaultTFDistribution
+	if c.TFDistribution != "" && c.DefaultTFDistribution == "" {
+		c.DefaultTFDistribution = c.TFDistribution
+	}
+	if c.DefaultTFDistribution == "" {
+		c.DefaultTFDistribution = DefaultTFDistribution
 	}
 	if c.TFDownloadURL == "" {
 		c.TFDownloadURL = DefaultTFDownloadURL
@@ -953,7 +962,7 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
 	}
 
-	if userConfig.TFDistribution != TFDistributionTerraform && userConfig.TFDistribution != TFDistributionOpenTofu {
+	if userConfig.DefaultTFDistribution != TFDistributionTerraform && userConfig.DefaultTFDistribution != TFDistributionOpenTofu {
 		return fmt.Errorf("invalid tf distribution: expected one of %s or %s",
 			TFDistributionTerraform, TFDistributionOpenTofu)
 	}
@@ -1171,6 +1180,10 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	//               deprecatedFlags = append(deprecatedFlags, SomeDeprecatedFlag)
 	//       }
 	//
+
+	if userConfig.TFDistribution != "" {
+		deprecatedFlags = append(deprecatedFlags, TFDistributionFlag)
+	}
 
 	if len(deprecatedFlags) > 0 {
 		warning := "WARNING: "

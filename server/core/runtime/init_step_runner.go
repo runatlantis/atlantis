@@ -5,14 +5,16 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/runtime/common"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/utils"
 )
 
 // InitStep runs `terraform init`.
 type InitStepRunner struct {
-	TerraformExecutor TerraformExec
-	DefaultTFVersion  *version.Version
+	TerraformExecutor     TerraformExec
+	DefaultTFDistribution terraform.Distribution
+	DefaultTFVersion      *version.Version
 }
 
 func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
@@ -31,6 +33,11 @@ func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 		if delErr != nil {
 			ctx.Log.Info("Error Deleting `%s`", lockFileName)
 		}
+	}
+
+	tfDistribution := i.DefaultTFDistribution
+	if ctx.TerraformDistribution != nil {
+		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
 	}
 
 	tfVersion := i.DefaultTFVersion
@@ -56,7 +63,7 @@ func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 
 	terraformInitCmd := append(terraformInitVerb, finalArgs...)
 
-	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx, path, terraformInitCmd, envs, tfVersion, ctx.Workspace)
+	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 	// Only include the init output if there was an error. Otherwise it's
 	// unnecessary and lengthens the comment.
 	if err != nil {

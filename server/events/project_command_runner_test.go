@@ -23,7 +23,9 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	tmocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -542,12 +544,14 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 // not running any Terraform.
 func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	RegisterMockTestingT(t)
-	tfClient := tmocks.NewMockClient()
+	tfClient := tfclientmocks.NewMockClient()
+	tfDistribution := terraform.NewDistributionTerraformWithDownloader(tmocks.NewMockDownloader())
 	tfVersion, err := version.NewVersion("0.12.0")
 	Ok(t, err)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	run := runtime.RunStepRunner{
 		TerraformExecutor:       tfClient,
+		DefaultTFDistribution:   tfDistribution,
 		DefaultTFVersion:        tfVersion,
 		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}
@@ -845,7 +849,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			expFailure: "One or more policy sets require additional approval.",
 		},
 		{
-			description: "When user is a top-level ownner through membership, increment approval on all policies.",
+			description: "When user is a top-level owner through membership, increment approval on all policies.",
 			userTeams:   []string{"someuserteam"},
 			policySetCfg: valid.PolicySets{
 				Owners: valid.PolicyOwners{

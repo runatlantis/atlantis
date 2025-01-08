@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1@sha256:93bfd3b68c109427185cd78b4779fc82b484b0b7618e36d0f104d4d801e66d25
 # what distro is the image being built for
 ARG ALPINE_TAG=3.21.0@sha256:21dc6063fd678b478f57c0e13f47560d0ea4eeba26dfc947b2a4f81f686b9f45
-ARG DEBIAN_TAG=12.8-slim@sha256:1537a6a1cbc4b4fd401da800ee9480207e7dc1f23560c21259f681db56768f63
+ARG DEBIAN_TAG=12.8-slim@sha256:d365f4920711a9074c4bcd178e8f457ee59250426441ab2a5f8106ed8fe948eb
 ARG GOLANG_TAG=1.23.4-alpine@sha256:6c5c9590f169f77c8046e45c611d3b28fe477789acd8d3762d23d4744de69812
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.10.4
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.8.7
+ARG DEFAULT_OPENTOFU_VERSION=1.8.8
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 # ARG DEFAULT_CONFTEST_VERSION=0.56.0-1
 ARG DEFAULT_CONFTEST_VERSION=0.56.0-1

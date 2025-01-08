@@ -386,6 +386,16 @@ and set `--autoplan-modules` to `false`.
   Note that the atlantis user is restricted to `~/.atlantis`.
   If you set the `--data-dir` flag to a path outside of Atlantis its home directory, ensure that you grant the atlantis user the correct permissions.
 
+### `--default-tf-distribution`
+
+  ```bash
+  atlantis server --default-tf-distribution="terraform"
+  # or
+  ATLANTIS_DEFAULT_TF_DISTRIBUTION="terraform"
+  ```
+
+  Which TF distribution to use. Can be set to `terraform` or `opentofu`.
+
 ### `--default-tf-version`
 
   ```bash
@@ -509,7 +519,7 @@ and set `--autoplan-modules` to `false`.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
-  This will bypass `--restrict-file-list` if regex is used, normal commands will stil be blocked if necessary.
+  This will bypass `--restrict-file-list` if regex is used, normal commands will still be blocked if necessary.
 
   ::: warning SECURITY WARNING
   It's not supposed to be used with `--disable-apply-all`.
@@ -1140,7 +1150,7 @@ This is useful when you have many projects and want to keep the pull request cle
 
   `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
   This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
-  like `atlantis plan -p .*` will still work if used. normal commands will stil be blocked if necessary.
+  like `atlantis plan -p .*` will still work if used. normal commands will still be blocked if necessary.
   Defaults to `false`.
 
 ### `--silence-allowlist-errors`
@@ -1259,13 +1269,8 @@ This is useful when you have many projects and want to keep the pull request cle
 
 ### `--tf-distribution`
 
-  ```bash
-  atlantis server --tf-distribution="terraform"
-  # or
-  ATLANTIS_TF_DISTRIBUTION="terraform"
-  ```
-
-  Which TF distribution to use. Can be set to `terraform` or `opentofu`.
+  <Badge text="Deprecated" type="warn"/>
+  Deprecated for `--default-tf-distribution`.
 
 ### `--tf-download`
 
@@ -1342,7 +1347,7 @@ This flag is useful when having multiple projects that need to run a plan and ap
 * [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
 * [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
 
-The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient managment of the PRs.
+The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
 
 ### `--var-file-allowlist`
 

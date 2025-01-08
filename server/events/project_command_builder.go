@@ -11,7 +11,7 @@ import (
 	tally "github.com/uber-go/tally/v4"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
@@ -32,8 +32,8 @@ const (
 	DefaultWorkspace = "default"
 	// DefaultDeleteSourceBranchOnMerge being false is the default setting whether or not to remove a source branch on merge
 	DefaultDeleteSourceBranchOnMerge = false
-	// DefaultAbortOnExcecutionOrderFail being false is the default setting for abort on execution group failiures
-	DefaultAbortOnExcecutionOrderFail = false
+	// DefaultAbortOnExecutionOrderFail being false is the default setting for abort on execution group failures
+	DefaultAbortOnExecutionOrderFail = false
 )
 
 func NewInstrumentedProjectCommandBuilder(
@@ -59,7 +59,7 @@ func NewInstrumentedProjectCommandBuilder(
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
 	scope tally.Scope,
-	terraformClient terraform.Client,
+	terraformClient tfclient.Client,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -119,7 +119,7 @@ func NewProjectCommandBuilder(
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
 	scope tally.Scope,
-	terraformClient terraform.Client,
+	terraformClient tfclient.Client,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
 		ParserValidator:          parserValidator,
@@ -238,7 +238,7 @@ type DefaultProjectCommandBuilder struct {
 	AutoDetectModuleFiles string
 	// User config option: List of file patterns to to to check if a directory contains modified files.
 	AutoplanFileList string
-	// User config option: Format Terraform plan output into a markdown-diff friendy format for color-coding purposes.
+	// User config option: Format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 	EnableDiffMarkdownFormat bool
 	// User config option: Block plan requests from projects outside the files modified in the pull request.
 	RestrictFileList bool
@@ -249,7 +249,7 @@ type DefaultProjectCommandBuilder struct {
 	// User config option: Controls auto-discovery of projects in a repository.
 	AutoDiscoverMode string
 	// Handles the actual running of Terraform commands.
-	TerraformExecutor terraform.Client
+	TerraformExecutor tfclient.Client
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -440,7 +440,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
-	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
+	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
 	if hasRepoCfg {
 		if repoCfg.Automerge != nil {
 			automerge = *repoCfg.Automerge
@@ -451,7 +451,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		if repoCfg.ParallelPlan != nil {
 			parallelPlan = *repoCfg.ParallelPlan
 		}
-		abortOnExcecutionOrderFail = repoCfg.AbortOnExcecutionOrderFail
+		abortOnExecutionOrderFail = repoCfg.AbortOnExecutionOrderFail
 	}
 
 	if len(repoCfg.Projects) > 0 {
@@ -477,7 +477,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
-					abortOnExcecutionOrderFail,
+					abortOnExecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -539,7 +539,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 					parallelApply,
 					parallelPlan,
 					verbose,
-					abortOnExcecutionOrderFail,
+					abortOnExecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -860,7 +860,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
-	abortOnExcecutionOrderFail := DefaultAbortOnExcecutionOrderFail
+	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
 	if repoCfgPtr != nil {
 		if repoCfgPtr.Automerge != nil {
 			automerge = *repoCfgPtr.Automerge
@@ -871,7 +871,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		if repoCfgPtr.ParallelPlan != nil {
 			parallelPlan = *repoCfgPtr.ParallelPlan
 		}
-		abortOnExcecutionOrderFail = repoCfgPtr.AbortOnExcecutionOrderFail
+		abortOnExecutionOrderFail = repoCfgPtr.AbortOnExecutionOrderFail
 	}
 
 	if len(matchingProjects) > 0 {
@@ -896,7 +896,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					parallelApply,
 					parallelPlan,
 					verbose,
-					abortOnExcecutionOrderFail,
+					abortOnExecutionOrderFail,
 					p.TerraformExecutor,
 				)...)
 		}
@@ -920,7 +920,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				parallelApply,
 				parallelPlan,
 				verbose,
-				abortOnExcecutionOrderFail,
+				abortOnExecutionOrderFail,
 				p.TerraformExecutor,
 			)...)
 	}
