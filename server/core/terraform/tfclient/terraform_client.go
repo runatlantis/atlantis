@@ -13,8 +13,8 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
-// Package terraform handles the actual running of terraform commands.
-package terraform
+// Package tfclient handles the actual running of terraform commands.
+package tfclient
 
 import (
 	"context"
@@ -33,8 +33,9 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
+	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/core/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -47,10 +48,10 @@ type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
 	// workspace which should be set as an environment variable.
-	RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
+	RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, d terraform.Distribution, v *version.Version, workspace string) (string, error)
 
 	// EnsureVersion makes sure that terraform version `v` is available to use
-	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
+	EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error
 
 	// DetectVersion Extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
 	DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version
@@ -58,7 +59,7 @@ type Client interface {
 
 type DefaultClient struct {
 	// Distribution handles logic specific to the TF distribution being used by Atlantis
-	distribution Distribution
+	distribution terraform.Distribution
 
 	// defaultVersion is the default version of terraform to use if another
 	// version isn't specified.
@@ -102,7 +103,7 @@ var versionRegex = regexp.MustCompile("(?:Terraform|OpenTofu) v(.*?)(\\s.*)?\n")
 // NewClientWithDefaultVersion creates a new terraform client and pre-fetches the default version
 func NewClientWithDefaultVersion(
 	log logging.SimpleLogging,
-	distribution Distribution,
+	distribution terraform.Distribution,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -189,7 +190,7 @@ func NewClientWithDefaultVersion(
 
 func NewTestClient(
 	log logging.SimpleLogging,
-	distribution Distribution,
+	distribution terraform.Distribution,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -227,7 +228,7 @@ func NewTestClient(
 // Will asynchronously download the required version if it doesn't exist already.
 func NewClient(
 	log logging.SimpleLogging,
-	distribution Distribution,
+	distribution terraform.Distribution,
 	binDir string,
 	cacheDir string,
 	tfeToken string,
@@ -254,6 +255,10 @@ func NewClient(
 		true,
 		projectCmdOutputHandler,
 	)
+}
+
+func (c *DefaultClient) DefaultDistribution() terraform.Distribution {
+	return c.distribution
 }
 
 // Version returns the default version of Terraform we use if no other version
@@ -326,14 +331,14 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 }
 
 // See Client.EnsureVersion.
-func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Version) error {
+func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error {
 	if v == nil {
 		v = c.defaultVersion
 	}
 
 	var err error
 	c.versionsLock.Lock()
-	_, err = ensureVersion(log, c.distribution, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
+	_, err = ensureVersion(log, d, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
 	c.versionsLock.Unlock()
 	if err != nil {
 		return err
@@ -343,9 +348,9 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, v *version.Vers
 }
 
 // See Client.RunCommandWithVersion.
-func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (string, error) {
+func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, d terraform.Distribution, v *version.Version, workspace string) (string, error) {
 	if isAsyncEligibleCommand(args[0]) {
-		_, outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, v, workspace)
+		_, outCh := c.RunCommandAsync(ctx, path, args, customEnvVars, d, v, workspace)
 
 		var lines []string
 		var err error
@@ -362,7 +367,7 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 		output = ansi.Strip(output)
 		return fmt.Sprintf("%s\n", output), err
 	}
-	tfCmd, cmd, err := c.prepExecCmd(ctx.Log, v, workspace, path, args)
+	tfCmd, cmd, err := c.prepExecCmd(ctx.Log, d, v, workspace, path, args)
 	if err != nil {
 		return "", err
 	}
@@ -388,8 +393,8 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 // prepExecCmd builds a ready to execute command based on the version of terraform
 // v, and args. It returns a printable representation of the command that will
 // be run and the actual command.
-func (c *DefaultClient) prepExecCmd(log logging.SimpleLogging, v *version.Version, workspace string, path string, args []string) (string, *exec.Cmd, error) {
-	tfCmd, envVars, err := c.prepCmd(log, v, workspace, path, args)
+func (c *DefaultClient) prepExecCmd(log logging.SimpleLogging, d terraform.Distribution, v *version.Version, workspace string, path string, args []string) (string, *exec.Cmd, error) {
+	tfCmd, envVars, err := c.prepCmd(log, d, v, workspace, path, args)
 	if err != nil {
 		return "", nil, err
 	}
@@ -401,7 +406,8 @@ func (c *DefaultClient) prepExecCmd(log logging.SimpleLogging, v *version.Versio
 
 // prepCmd prepares a shell command (to be interpreted with `sh -c <cmd>`) and set of environment
 // variables for running terraform.
-func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, workspace string, path string, args []string) (string, []string, error) {
+func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribution, v *version.Version, workspace string, path string, args []string) (string, []string, error) {
+
 	if v == nil {
 		v = c.defaultVersion
 	}
@@ -413,7 +419,7 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, w
 	} else {
 		var err error
 		c.versionsLock.Lock()
-		binPath, err = ensureVersion(log, c.distribution, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
+		binPath, err = ensureVersion(log, d, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
 		c.versionsLock.Unlock()
 		if err != nil {
 			return "", nil, err
@@ -446,8 +452,8 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, v *version.Version, w
 // Callers can use the input channel to pass stdin input to the command.
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
-func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, v *version.Version, workspace string) (chan<- string, <-chan models.Line) {
-	cmd, envVars, err := c.prepCmd(ctx.Log, v, workspace, path, args)
+func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, d terraform.Distribution, v *version.Version, workspace string) (chan<- string, <-chan models.Line) {
+	cmd, envVars, err := c.prepCmd(ctx.Log, d, v, workspace, path, args)
 	if err != nil {
 		// The signature of `RunCommandAsync` doesn't provide for returning an immediate error, only one
 		// once reading the output. Since we won't be spawning a process, simulate that by sending the
@@ -486,7 +492,7 @@ func MustConstraint(v string) version.Constraints {
 // It will download this version if we don't have it.
 func ensureVersion(
 	log logging.SimpleLogging,
-	dist Distribution,
+	dist terraform.Distribution,
 	versions map[string]string,
 	v *version.Version,
 	binDir string,

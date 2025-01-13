@@ -9,7 +9,8 @@
   automerge: true,
   baseBranches: [
     'main',
-    '/^release-.*/',
+    'release-0.31',
+    'release-0.32',
   ],
   platformAutomerge: true,
   labels: [

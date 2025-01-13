@@ -20,7 +20,7 @@ import (
 	"io"
 	"net/http"
 
-	gitlab "github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 const secretHeader = "X-Gitlab-Token" // #nosec

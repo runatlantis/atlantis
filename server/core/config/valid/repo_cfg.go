@@ -147,6 +147,7 @@ type Project struct {
 	Workspace                 string
 	Name                      *string
 	WorkflowName              *string
+	TerraformDistribution     *string
 	TerraformVersion          *version.Version
 	Autoplan                  Autoplan
 	PlanRequirements          []string
