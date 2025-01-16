@@ -12,6 +12,7 @@ require (
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-playground/validator/v10 v10.23.0
 	github.com/go-test/deep v1.1.1
+	github.com/gofri/go-github-ratelimit v1.1.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/go-github/v68 v68.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
