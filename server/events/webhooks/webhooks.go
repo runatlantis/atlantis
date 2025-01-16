@@ -15,6 +15,7 @@ package webhooks
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
 
 	"errors"
@@ -24,6 +25,7 @@ import (
 )
 
 const SlackKind = "slack"
+const HttpKind = "http"
 const ApplyEvent = "apply"
 
 //go:generate pegomock generate --package mocks -o mocks/mock_sender.go Sender
@@ -36,12 +38,13 @@ type Sender interface {
 
 // ApplyResult is the result of a terraform apply.
 type ApplyResult struct {
-	Workspace string
-	Repo      models.Repo
-	Pull      models.PullRequest
-	User      models.User
-	Success   bool
-	Directory string
+	Workspace   string
+	Repo        models.Repo
+	Pull        models.PullRequest
+	User        models.User
+	Success     bool
+	Directory   string
+	ProjectName string
 }
 
 // MultiWebhookSender sends multiple webhooks for each one it's configured for.
@@ -55,9 +58,15 @@ type Config struct {
 	BranchRegex    string
 	Kind           string
 	Channel        string
+	URL            string
 }
 
-func NewMultiWebhookSender(configs []Config, client SlackClient) (*MultiWebhookSender, error) {
+type Clients struct {
+	Slack SlackClient
+	Http  *http.Client
+}
+
+func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSender, error) {
 	var webhooks []Sender
 	for _, c := range configs {
 		wr, err := regexp.Compile(c.WorkspaceRegex)
@@ -76,19 +85,34 @@ func NewMultiWebhookSender(configs []Config, client SlackClient) (*MultiWebhookS
 		}
 		switch c.Kind {
 		case SlackKind:
-			if !client.TokenIsSet() {
+			if !clients.Slack.TokenIsSet() {
 				return nil, errors.New("must specify top-level \"slack-token\" if using a webhook of \"kind: slack\"")
 			}
 			if c.Channel == "" {
 				return nil, errors.New("must specify \"channel\" if using a webhook of \"kind: slack\"")
 			}
-			slack, err := NewSlack(wr, br, c.Channel, client)
+			slack, err := NewSlack(wr, br, c.Channel, clients.Slack)
 			if err != nil {
 				return nil, err
 			}
 			webhooks = append(webhooks, slack)
+		case HttpKind:
+			if c.URL == "" {
+				return nil, errors.New("must specify \"url\" if using a webhook of \"kind: http\"")
+			}
+			httpClient := http.DefaultClient
+			if clients.Http != nil {
+				httpClient = clients.Http
+			}
+			httpWebhook := &HttpWebhook{
+				Client:         httpClient,
+				WorkspaceRegex: wr,
+				BranchRegex:    br,
+				URL:            c.URL,
+			}
+			webhooks = append(webhooks, httpWebhook)
 		default:
-			return nil, fmt.Errorf("\"kind: %s\" not supported. Only \"kind: %s\" is supported right now", c.Kind, SlackKind)
+			return nil, fmt.Errorf("\"kind: %s\" not supported. Only \"kind: %s\" and \"kind: %s\" are supported right now", c.Kind, SlackKind, HttpKind)
 		}
 	}
 
@@ -101,7 +125,7 @@ func NewMultiWebhookSender(configs []Config, client SlackClient) (*MultiWebhookS
 func (w *MultiWebhookSender) Send(log logging.SimpleLogging, result ApplyResult) error {
 	for _, w := range w.Webhooks {
 		if err := w.Send(log, result); err != nil {
-			log.Warn("error sending slack webhook: %s", err)
+			log.Warn("error sending webhook: %s", err)
 		}
 	}
 	return nil
