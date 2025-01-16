@@ -230,8 +230,6 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	gotMinimizeCalls := make([]graphQLCall, 0, 2)
 	testServer := httptest.NewTLSServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			t.Log(r.Method + " " + r.RequestURI)
-
 			var gqlRequest graphQLCall
 			if err := json.NewDecoder(r.Body).Decode(&gqlRequest); err != nil {
 				t.Errorf("parse body error: %v", err)
