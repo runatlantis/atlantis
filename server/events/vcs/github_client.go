@@ -360,7 +360,7 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 			Classifier: githubv4.ReportedContentClassifiersOutdated,
 			SubjectID:  commentID,
 		}
-		logger.Debug("Hiding commentID %s", commentID)
+		logger.Debug("Hiding comment %s", commentID)
 		if err := g.v4Client.Mutate(g.ctx, &m, input, nil); err != nil {
 			return errors.Wrapf(err, "minimize comment %s", commentID)
 		}
