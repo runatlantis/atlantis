@@ -39,6 +39,7 @@ type APIRequest struct {
 	Repository string `validate:"required"`
 	Ref        string `validate:"required"`
 	Type       string `validate:"required"`
+	Sha        string
 	PR         int
 	Projects   []string
 	Paths      []struct {
@@ -233,13 +234,22 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusForbidden, fmt.Errorf("repo not allowlisted")
 	}
 
+	commit := request.Sha
+	if commit == "" {
+		// DEPRECATED: To maintain legacy behaviour, we set the commit to the ref. However,
+		//   using the ref does not work in many cases and can also yield unexpected results
+		//   as a ref is a moving target while a SHA is a static target.
+		commit = request.Ref
+		a.Logger.Warn("API was called with an empty SHA, this is deprecated. When calling the Atlantis API, the SHA should be specified explicitly.")
+	}
+
 	return &request, &command.Context{
 		HeadRepo: baseRepo,
 		Pull: models.PullRequest{
 			Num:        request.PR,
 			BaseBranch: request.Ref,
 			HeadBranch: request.Ref,
-			HeadCommit: request.Ref,
+			HeadCommit: commit,
 			BaseRepo:   baseRepo,
 		},
 		Scope: a.Scope,
