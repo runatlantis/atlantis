@@ -94,7 +94,7 @@ func TestNewGitlabClient_BaseURL(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Hostname, func(t *testing.T) {
 			log := logging.NewNoopLogger(t)
-			client, err := NewGitlabClient(c.Hostname, "token", log)
+			client, err := NewGitlabClient(c.Hostname, "token", []string{}, log)
 			Ok(t, err)
 			Equals(t, c.ExpBaseURL, client.Client.BaseURL().String())
 		})
@@ -887,7 +887,7 @@ func TestGitlabClient_MarkdownPullLink(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	gitlabClientUnderTest = true
 	defer func() { gitlabClientUnderTest = false }()
-	client, err := NewGitlabClient("gitlab.com", "token", logger)
+	client, err := NewGitlabClient("gitlab.com", "token", []string{}, logger)
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
@@ -1039,7 +1039,7 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 	}
 }
 
-func TestGithubClient_GetPullLabels(t *testing.T) {
+func TestGitlabClient_GetPullLabels(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	mergeSuccessWithLabel, err := os.ReadFile("testdata/gitlab-merge-success-with-label.json")
 	Ok(t, err)
@@ -1076,7 +1076,7 @@ func TestGithubClient_GetPullLabels(t *testing.T) {
 	Equals(t, []string{"work in progress"}, labels)
 }
 
-func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
+func TestGitlabClient_GetPullLabels_EmptyResponse(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
 	Ok(t, err)
@@ -1109,4 +1109,52 @@ func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
 		})
 	Ok(t, err)
 	Equals(t, 0, len(labels))
+}
+
+// GetTeamNamesForUser returns the names of the GitLab groups that the user belongs to.
+func TestGitlabClient_GetTeamNamesForUser(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
+	groupMembershipSuccess, err := os.ReadFile("testdata/gitlab-group-membership-success.json")
+	Ok(t, err)
+
+	userSuccess, err := os.ReadFile("testdata/gitlab-user-success.json")
+	Ok(t, err)
+
+	configuredGroups := []string{"someorg/group1", "someorg/group2", "someorg/group3", "someorg/group4"}
+	testServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v4/users?username=testuser":
+				w.WriteHeader(http.StatusOK)
+				w.Write(userSuccess) // nolint: errcheck
+			case "/api/v4/groups/someorg%2Fgroup1/members/123", "/api/v4/groups/someorg%2Fgroup2/members/123":
+				w.WriteHeader(http.StatusOK)
+				w.Write(groupMembershipSuccess) // nolint: errcheck
+			case "/api/v4/groups/someorg%2Fgroup3/members/123":
+				http.Error(w, "forbidden", http.StatusForbidden)
+			case "/api/v4/groups/someorg%2Fgroup4/members/123":
+				http.Error(w, "not found", http.StatusNotFound)
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		}))
+	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+	Ok(t, err)
+	client := &GitlabClient{
+		Client:           internalClient,
+		Version:          nil,
+		ConfiguredGroups: configuredGroups,
+	}
+
+	teams, err := client.GetTeamNamesForUser(
+		logger,
+		models.Repo{
+			Owner: "someorg",
+		}, models.User{
+			Username: "testuser",
+		})
+	Ok(t, err)
+	Equals(t, []string{"someorg/group1", "someorg/group2"}, teams)
 }

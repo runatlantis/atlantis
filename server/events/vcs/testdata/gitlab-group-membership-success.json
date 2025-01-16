@@ -1,0 +1,22 @@
+{
+  "access_level": 50,
+  "created_at": "2023-11-28T01:23:45.789Z",
+  "created_by": {
+    "id": 456,
+    "username": "someone",
+    "name": "Someone",
+    "state": "active",
+    "locked": false,
+    "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/456/avatar.png",
+    "web_url": "https://gitlab.com/someone"
+  },
+  "expires_at": null,
+  "id": 123,
+  "username": "testuser",
+  "name": "Test User",
+  "state": "active",
+  "locked": false,
+  "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/123/avatar.png",
+  "web_url": "https://gitlab.com/testuser",
+  "membership_state": "active"
+}
