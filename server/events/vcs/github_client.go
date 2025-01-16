@@ -307,9 +307,9 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 		}
 
 		for _, comment := range query.Repository.PullRequest.Comments.Nodes {
-			logger.Debug("Processing commentID %s, %s, %s", comment.Author.Login, comment.IsMinimized, comment.ID)
+			logger.Debug("Processing comment user: %s, commentID: %s", comment.Author.Login, comment.ID)
 			if comment.IsMinimized {
-				logger.Debug("Skipping minimized commentID %s, %s, %s", comment.Author.Login, comment.IsMinimized, comment.ID)
+				logger.Debug("Skipping already minimized comment user: %s, commentID: %s", comment.Author.Login, comment.ID)
 				continue
 			}
 
