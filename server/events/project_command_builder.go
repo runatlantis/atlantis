@@ -347,7 +347,10 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 
 	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
 		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.Pull, repoCfgFile)
+
+		ctx.Log.Debug("Getting file content for pull request %+v", ctx.Pull)
+		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.HeadRepo, ctx.Pull.HeadBranch, repoCfgFile)
+
 		if err != nil {
 			return nil, errors.Wrapf(err, "downloading %s", repoCfgFile)
 		}
