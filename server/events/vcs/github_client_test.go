@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -240,14 +239,16 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 				return
 			}
 
-			re := regexp.MustCompile(`(?i)^\s*(query|mutation)\b`)
-			matches := re.FindStringSubmatch(gqlRequest.Query)
-			if len(matches) < 2 {
+			operationType := ""
+			if strings.HasPrefix(strings.TrimSpace(gqlRequest.Query), "query") {
+				operationType = "query"
+			} else if strings.HasPrefix(strings.TrimSpace(gqlRequest.Query), "mutation") {
+				operationType = "mutation"
+			} else {
 				t.Errorf("unexpected query: %q", gqlRequest.Query)
 				http.Error(w, "server error", http.StatusInternalServerError)
 				return
 			}
-			operationType := strings.ToLower(matches[1])
 
 			switch operationType {
 			case "mutation":
@@ -369,15 +370,17 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 						return
 					}
 
-					re := regexp.MustCompile(`(?i)^\s*(query|mutation)\b`)
-					matches := re.FindStringSubmatch(gqlRequest.Query)
-					if len(matches) < 2 {
+					operationType := ""
+					if strings.HasPrefix(strings.TrimSpace(gqlRequest.Query), "query") {
+						operationType = "query"
+					} else if strings.HasPrefix(strings.TrimSpace(gqlRequest.Query), "mutation") {
+						operationType = "mutation"
+					} else {
 						t.Errorf("unexpected query: %q", gqlRequest.Query)
 						http.Error(w, "server error", http.StatusInternalServerError)
 						return
 					}
 
-					operationType := strings.ToLower(matches[1])
 					switch operationType {
 					case "mutation":
 						gotMinimizeCalls = append(gotMinimizeCalls, gqlRequest)
