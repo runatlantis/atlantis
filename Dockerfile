@@ -13,7 +13,11 @@ ARG DEFAULT_CONFTEST_VERSION=0.56.0
 
 # Stage 1: build artifact and download deps
 
-FROM golang:${GOLANG_TAG} AS builder
+FROM --platform=$BUILDPLATFORM golang:${GOLANG_TAG} AS builder
+
+# These are automatically populated by Docker
+ARG TARGETOS
+ARG TARGETARCH
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -42,7 +46,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY . /app
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
 FROM debian:${DEBIAN_TAG} AS debian-base
 
