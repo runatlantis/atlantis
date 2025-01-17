@@ -29,6 +29,7 @@ import (
 	mock_policy "github.com/runatlantis/atlantis/server/core/runtime/policy/mocks"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -1338,7 +1339,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	mockDownloader := terraform_mocks.NewMockDownloader()
 	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
 
-	terraformClient, err := terraform.NewClient(logger, distribution, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", true, false, projectCmdOutputHandler)
+	terraformClient, err := tfclient.NewClient(logger, distribution, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", true, false, projectCmdOutputHandler)
 	Ok(t, err)
 	boltdb, err := db.New(dataDir)
 	Ok(t, err)
@@ -1365,6 +1366,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		}
 	}
 
+	defaultTFDistribution := terraformClient.DefaultDistribution()
 	defaultTFVersion := terraformClient.DefaultVersion()
 	locker := events.NewDefaultWorkingDirLocker()
 	parser := &config.ParserValidator{}
@@ -1448,7 +1450,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		terraformClient,
 	)
 
-	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFVersion)
+	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion)
 
 	Ok(t, err)
 
@@ -1459,6 +1461,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	conftextExec.VersionCache = &LocalConftestCache{}
 
 	policyCheckRunner, err := runtime.NewPolicyCheckStepRunner(
+		defaultTFDistribution,
 		defaultTFVersion,
 		conftextExec,
 	)
@@ -1470,11 +1473,13 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		Locker:           projectLocker,
 		LockURLGenerator: &mockLockURLGenerator{},
 		InitStepRunner: &runtime.InitStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTFVersion,
+			TerraformExecutor:     terraformClient,
+			DefaultTFDistribution: defaultTFDistribution,
+			DefaultTFVersion:      defaultTFVersion,
 		},
 		PlanStepRunner: runtime.NewPlanStepRunner(
 			terraformClient,
+			defaultTFDistribution,
 			defaultTFVersion,
 			statusUpdater,
 			asyncTfExec,
@@ -1484,10 +1489,11 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
 		},
-		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFVersion),
-		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFVersion),
+		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
+		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
+			DefaultTFDistribution:   defaultTFDistribution,
 			DefaultTFVersion:        defaultTFVersion,
 			ProjectCmdOutputHandler: projectCmdOutputHandler,
 		},
