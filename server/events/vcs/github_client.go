@@ -295,7 +295,7 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 	commentsQueryVariables := map[string]interface{}{
 		"owner":    githubv4.String(repo.Owner),
 		"name":     githubv4.String(repo.Name),
-		"number":   githubv4.Int(pullNum),
+		"number":   githubv4.Int(pullNum), //nolint:gosec
 		"pageSize": githubv4.Int(100),
 		"after":    (*githubv4.String)(nil),
 	}
