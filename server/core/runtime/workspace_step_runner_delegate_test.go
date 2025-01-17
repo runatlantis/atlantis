@@ -6,7 +6,9 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -16,7 +18,9 @@ import (
 func TestRun_NoWorkspaceIn08(t *testing.T) {
 	// We don't want any workspace commands to be run in 0.8.
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.8")
 	workspace := "default"
 	logger := logging.NewNoopLogger(t)
@@ -24,7 +28,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 		Log:       logger,
 		Workspace: workspace,
 	}
-	s := NewWorkspaceStepRunnerDelegate(terraform, tfVersion, &NullRunner{})
+	s := NewWorkspaceStepRunnerDelegate(terraform, tfDistribution, tfVersion, &NullRunner{})
 
 	_, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 	Ok(t, err)
@@ -36,6 +40,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			"select",
 			"workspace"},
 		map[string]string(nil),
+		tfDistribution,
 		tfVersion,
 		workspace)
 	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(ctx,
@@ -44,6 +49,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 			"select",
 			"workspace"},
 		map[string]string(nil),
+		tfDistribution,
 		tfVersion,
 		workspace)
 }
@@ -52,11 +58,13 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 	// If they attempt to use a workspace other than default in 0.8
 	// we should error.
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.8")
 	logger := logging.NewNoopLogger(t)
 	workspace := "notdefault"
-	s := NewWorkspaceStepRunnerDelegate(terraform, tfVersion, &NullRunner{})
+	s := NewWorkspaceStepRunnerDelegate(terraform, tfDistribution, tfVersion, &NullRunner{})
 
 	_, err := s.Run(command.ProjectContext{
 		Log:       logger,
@@ -67,6 +75,8 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 
 func TestRun_SwitchesWorkspace(t *testing.T) {
 	RegisterMockTestingT(t)
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 
 	cases := []struct {
 		tfVersion       string
@@ -92,14 +102,14 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.tfVersion, func(t *testing.T) {
-			terraform := mocks.NewMockClient()
+			terraform := tfclientmocks.NewMockClient()
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger(t)
 			ctx := command.ProjectContext{
 				Log:       logger,
 				Workspace: "workspace",
 			}
-			s := NewWorkspaceStepRunnerDelegate(terraform, tfVersion, &NullRunner{})
+			s := NewWorkspaceStepRunnerDelegate(terraform, tfDistribution, tfVersion, &NullRunner{})
 
 			_, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
@@ -111,8 +121,70 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 					"select",
 					"workspace"},
 				map[string]string(nil),
+				tfDistribution,
 				tfVersion,
 				"workspace")
+		})
+	}
+}
+
+func TestRun_SwitchesWorkspaceDistribution(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+
+	cases := []struct {
+		tfVersion       string
+		tfDistribution  string
+		expWorkspaceCmd string
+	}{
+		{
+			"0.9.0",
+			"opentofu",
+			"env",
+		},
+		{
+			"0.9.11",
+			"terraform",
+			"env",
+		},
+		{
+			"0.10.0",
+			"terraform",
+			"workspace",
+		},
+		{
+			"0.11.0",
+			"opentofu",
+			"workspace",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.tfVersion, func(t *testing.T) {
+			terraform := tfclientmocks.NewMockClient()
+			tfVersion, _ := version.NewVersion(c.tfVersion)
+			logger := logging.NewNoopLogger(t)
+			ctx := command.ProjectContext{
+				Log:                   logger,
+				Workspace:             "workspace",
+				TerraformDistribution: &c.tfDistribution,
+			}
+			s := NewWorkspaceStepRunnerDelegate(terraform, tfDistribution, tfVersion, &NullRunner{})
+
+			_, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
+			Ok(t, err)
+
+			// Verify that env select was called as well as plan.
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx),
+				Eq("/path"),
+				Eq([]string{c.expWorkspaceCmd,
+					"select",
+					"workspace"}),
+				Eq(map[string]string(nil)),
+				NotEq(tfDistribution),
+				Eq(tfVersion),
+				Eq("workspace"))
 		})
 	}
 }
@@ -145,7 +217,9 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.tfVersion, func(t *testing.T) {
-			terraform := mocks.NewMockClient()
+			terraform := tfclientmocks.NewMockClient()
+			mockDownloader := mocks.NewMockDownloader()
+			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger(t)
 			ctx := command.ProjectContext{
@@ -163,20 +237,20 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 					Name:     "repo",
 				},
 			}
-			s := NewWorkspaceStepRunnerDelegate(terraform, tfVersion, &NullRunner{})
+			s := NewWorkspaceStepRunnerDelegate(terraform, tfDistribution, tfVersion, &NullRunner{})
 
 			// Ensure that we actually try to switch workspaces by making the
 			// output of `workspace show` to be a different name.
-			When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("diffworkspace\n", nil)
+			When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, "workspace")).ThenReturn("diffworkspace\n", nil)
 
 			expWorkspaceArgs := []string{c.expWorkspaceCommand, "select", "workspace"}
-			When(terraform.RunCommandWithVersion(ctx, "/path", expWorkspaceArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("", errors.New("workspace does not exist"))
+			When(terraform.RunCommandWithVersion(ctx, "/path", expWorkspaceArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")).ThenReturn("", errors.New("workspace does not exist"))
 
 			_, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 
 			// Verify that env select was called as well as plan.
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expWorkspaceArgs, map[string]string(nil), tfVersion, "workspace")
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expWorkspaceArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 		})
 	}
 }
@@ -185,7 +259,9 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	// Tests that if workspace show says we're on the right workspace we don't
 	// switch.
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
@@ -203,12 +279,12 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 			Name:     "repo",
 		},
 	}
-	s := NewWorkspaceStepRunnerDelegate(terraform, tfVersion, &NullRunner{})
-	When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfVersion, "workspace")).ThenReturn("workspace\n", nil)
+	s := NewWorkspaceStepRunnerDelegate(terraform, tfDistribution, tfVersion, &NullRunner{})
+	When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, "workspace")).ThenReturn("workspace\n", nil)
 
 	_, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 	Ok(t, err)
 
 	// Verify that workspace select was never called.
-	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(ctx, "/path", []string{"workspace", "select", "workspace"}, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(ctx, "/path", []string{"workspace", "select", "workspace"}, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 }
