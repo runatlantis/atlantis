@@ -611,6 +611,31 @@ workflows:
 			},
 		},
 		{
+			description: "project field with terraform_distribution set to opentofu",
+			input: `
+version: 3
+projects:
+- dir: .
+  workspace: myworkspace
+  terraform_distribution: opentofu
+`,
+			exp: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:                   ".",
+						Workspace:             "myworkspace",
+						TerraformDistribution: String("opentofu"),
+						Autoplan: valid.Autoplan{
+							WhenModified: raw.DefaultAutoPlanWhenModified,
+							Enabled:      true,
+						},
+					},
+				},
+				Workflows: make(map[string]valid.Workflow),
+			},
+		},
+		{
 			description: "project dir with ..",
 			input: `
 version: 3
