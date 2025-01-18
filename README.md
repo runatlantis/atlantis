@@ -13,6 +13,7 @@
   <b>Terraform Pull Request Automation</b>
 </p>
 
+
 - [Resources](#resources)
 - [What is Atlantis?](#what-is-atlantis)
 - [What does it do?](#what-does-it-do)
