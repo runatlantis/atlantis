@@ -318,141 +318,75 @@ func (p *DefaultProjectCommandBuilder) BuildStateRmCommands(ctx *command.Context
 	return p.buildProjectCommand(ctx, cmd)
 }
 
-// buildAllCommandsByCfg builds init contexts for all projects we determine were
-// modified in this ctx.
-func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Context, cmdName command.Name, subCmdName string, commentFlags []string, verbose bool) ([]command.ProjectContext, error) {
-	// We'll need the list of modified files.
-	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
+// shouldSkipClone determines whether we should skip cloning for a given context
+func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, modifiedFiles []string) (bool, error) {
+	// NOTE: We discard this work here and end up doing it again after
+	// cloning to ensure all the return values are set properly with
+	// the actual clone directory.
+
+	if !p.SkipCloneNoChanges || !p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
+		return false, nil
+	}
+	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+	hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.Pull, repoCfgFile)
 	if err != nil {
-		return nil, err
+		return false, errors.Wrapf(err, "downloading %s", repoCfgFile)
+	}
+	// We can only skip if we determine that none of the modified files belong to projects configured in a repo config
+	if !hasRepoCfg {
+		return false, nil
+	}
+	repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+	if err != nil {
+		return false, errors.Wrapf(err, "parsing %s", repoCfgFile)
+	}
+	ctx.Log.Info("successfully parsed remote %s file", repoCfgFile)
+
+	// If auto discover is enabled, we never want to skip cloning
+	if p.autoDiscoverModeEnabled(ctx, repoCfg) {
+		ctx.Log.Info("automatic project discovery enabled. Will resume automatic detection")
+		return false, nil
 	}
 
-	if p.IncludeGitUntrackedFiles {
-		ctx.Log.Debug(("'include-git-untracked-files' option is set, getting untracked files"))
-		untrackedFiles, err := p.WorkingDir.GetGitUntrackedFiles(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
-		if err != nil {
-			return nil, err
-		}
-		modifiedFiles = append(modifiedFiles, untrackedFiles...)
+	if len(repoCfg.Projects) == 0 {
+		ctx.Log.Info("no projects are defined in %s. Will resume automatic detection", repoCfgFile)
+		return false, nil
 	}
 
-	ctx.Log.Debug("%d files were modified in this pull request. Modified files: %v", len(modifiedFiles), modifiedFiles)
+	matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
+	if err != nil {
+		return false, err
+	}
 
-	// Get default AutoDiscoverMode from userConfig/globalConfig
+	ctx.Log.Info("%d projects are changed on MR %d based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
+	if len(matchingProjects) == 0 {
+		ctx.Log.Info("skipping repo clone since no project was modified")
+		return true, nil
+	}
+
+	return false, nil
+
+}
+
+// autoDiscoverModeEnabled determines whether to use autodiscover
+func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Context, repoCfg valid.RepoCfg) bool {
 	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
 	globalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
 	if globalAutoDiscover != nil {
 		defaultAutoDiscoverMode = globalAutoDiscover.Mode
 	}
+	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
+}
 
-	if p.SkipCloneNoChanges && p.VCSClient.SupportsSingleFileDownload(ctx.Pull.BaseRepo) {
-		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.Pull, repoCfgFile)
-		if err != nil {
-			return nil, errors.Wrapf(err, "downloading %s", repoCfgFile)
-		}
-
-		if hasRepoCfg {
-			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
-			if err != nil {
-				return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
-			}
-			ctx.Log.Info("successfully parsed remote %s file", repoCfgFile)
-
-			if repoCfg.AutoDiscover != nil {
-				defaultAutoDiscoverMode = repoCfg.AutoDiscover.Mode
-			}
-			// If auto discover is enabled, we never want to skip cloning
-			if !repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode) {
-				if len(repoCfg.Projects) > 0 {
-					matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, "", nil)
-					if err != nil {
-						return nil, err
-					}
-					ctx.Log.Info("%d projects are changed on MR %d based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
-					if len(matchingProjects) == 0 {
-						ctx.Log.Info("skipping repo clone since no project was modified")
-						return []command.ProjectContext{}, nil
-					}
-				} else {
-					ctx.Log.Info("no projects are defined in %s. Will resume automatic detection", repoCfgFile)
-				}
-			} else {
-				ctx.Log.Info("automatic project discovery enabled. Will resume automatic detection")
-			}
-			// NOTE: We discard this work here and end up doing it again after
-			// cloning to ensure all the return values are set properly with
-			// the actual clone directory.
-		}
-	}
-
-	// Need to lock the workspace we're about to clone to.
-	workspace := DefaultWorkspace
-
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
-	if err != nil {
-		ctx.Log.Warn("workspace was locked")
-		return nil, err
-	}
-	ctx.Log.Debug("got workspace lock")
-	defer unlockFn()
-
-	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse config file if it exists.
-	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
-	if err != nil {
-		return nil, errors.Wrapf(err, "looking for '%s' file in '%s'", repoCfgFile, repoDir)
-	}
-
-	var projCtxs []command.ProjectContext
-	var repoCfg valid.RepoCfg
-
-	if hasRepoCfg {
-		// If there's a repo cfg with projects then we'll use it to figure out which projects
-		// should be planed.
-		repoCfg, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
-		if err != nil {
-			return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
-		}
-		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
-		// It's possible we've already set defaultAutoDiscoverMode
-		// from the config file while checking whether we can skip
-		// cloning. We still need to set it here in the case that
-		// we were not able to check whether we can skip cloning
-		// and thus were not able to previously fetch the repo
-		// config.
-		if repoCfg.AutoDiscover != nil {
-			defaultAutoDiscoverMode = repoCfg.AutoDiscover.Mode
-		}
-	}
+// getMergedProjectCfgs gets all merged project configs for building commands given a context and a clone repo
+func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context, repoDir string, modifiedFiles []string, repoCfg valid.RepoCfg, hasRepoCfg bool, repoCfgFile string) ([]valid.MergedProjectCfg, error) {
+	mergedCfgs := make([]valid.MergedProjectCfg, 0)
 
 	moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
 	if err != nil {
 		ctx.Log.Warn("error(s) loading project module dependencies: %s", err)
 	}
 	ctx.Log.Debug("moduleInfo for '%s' (matching '%s') = %v", repoDir, p.AutoDetectModuleFiles, moduleInfo)
-
-	automerge := p.EnableAutoMerge
-	parallelApply := p.EnableParallelApply
-	parallelPlan := p.EnableParallelPlan
-	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
-	if hasRepoCfg {
-		if repoCfg.Automerge != nil {
-			automerge = *repoCfg.Automerge
-		}
-		if repoCfg.ParallelApply != nil {
-			parallelApply = *repoCfg.ParallelApply
-		}
-		if repoCfg.ParallelPlan != nil {
-			parallelPlan = *repoCfg.ParallelPlan
-		}
-		abortOnExecutionOrderFail = repoCfg.AbortOnExecutionOrderFail
-	}
 
 	if len(repoCfg.Projects) > 0 {
 		matchingProjects, err := p.ProjectFinder.DetermineProjectsViaConfig(ctx.Log, modifiedFiles, repoCfg, repoDir, moduleInfo)
@@ -464,26 +398,11 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("determining config for project at dir: '%s' workspace: '%s'", mp.Dir, mp.Workspace)
 			mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, repoCfg)
-
-			projCtxs = append(projCtxs,
-				p.ProjectCommandContextBuilder.BuildProjectContext(
-					ctx,
-					cmdName,
-					subCmdName,
-					mergedCfg,
-					commentFlags,
-					repoDir,
-					automerge,
-					parallelApply,
-					parallelPlan,
-					verbose,
-					abortOnExecutionOrderFail,
-					p.TerraformExecutor,
-				)...)
+			mergedCfgs = append(mergedCfgs, mergedCfg)
 		}
 	}
 
-	if repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode) {
+	if p.autoDiscoverModeEnabled(ctx, repoCfg) {
 		// If there is no config file or it specified no projects, then we'll plan each project that
 		// our algorithm determines was modified.
 		if hasRepoCfg {
@@ -526,23 +445,114 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			}
 
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)
-
-			projCtxs = append(projCtxs,
-				p.ProjectCommandContextBuilder.BuildProjectContext(
-					ctx,
-					cmdName,
-					subCmdName,
-					pCfg,
-					commentFlags,
-					repoDir,
-					automerge,
-					parallelApply,
-					parallelPlan,
-					verbose,
-					abortOnExecutionOrderFail,
-					p.TerraformExecutor,
-				)...)
+			mergedCfgs = append(mergedCfgs, pCfg)
 		}
+	}
+	return mergedCfgs, nil
+}
+
+// buildAllCommandsByCfg builds init contexts for all projects we determine were
+// modified in this ctx.
+func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Context, cmdName command.Name, subCmdName string, commentFlags []string, verbose bool) ([]command.ProjectContext, error) {
+	// We'll need the list of modified files.
+	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		return nil, err
+	}
+
+	if p.IncludeGitUntrackedFiles {
+		ctx.Log.Debug(("'include-git-untracked-files' option is set, getting untracked files"))
+		untrackedFiles, err := p.WorkingDir.GetGitUntrackedFiles(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+		if err != nil {
+			return nil, err
+		}
+		modifiedFiles = append(modifiedFiles, untrackedFiles...)
+	}
+
+	ctx.Log.Debug("%d files were modified in this pull request. Modified files: %v", len(modifiedFiles), modifiedFiles)
+
+	shouldSkipClone, err := p.shouldSkipClone(ctx, modifiedFiles)
+	if err != nil {
+		return nil, err
+	}
+	if shouldSkipClone {
+		return []command.ProjectContext{}, nil
+	}
+
+	// Need to lock the workspace we're about to clone to.
+	workspace := DefaultWorkspace
+
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir)
+	if err != nil {
+		ctx.Log.Warn("workspace was locked")
+		return nil, err
+	}
+	ctx.Log.Debug("got workspace lock")
+	defer unlockFn()
+
+	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse config file if it exists.
+	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
+	if err != nil {
+		return nil, errors.Wrapf(err, "looking for '%s' file in '%s'", repoCfgFile, repoDir)
+	}
+
+	var projCtxs []command.ProjectContext
+	var repoCfg valid.RepoCfg
+
+	if hasRepoCfg {
+		// If there's a repo cfg with projects then we'll use it to figure out which projects
+		// should be planed.
+		repoCfg, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+		if err != nil {
+			return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
+		}
+		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+	}
+
+	mergedProjectCfgs, err := p.getMergedProjectCfgs(ctx, repoDir, modifiedFiles, repoCfg, hasRepoCfg, repoCfgFile)
+	if err != nil {
+		return nil, err
+	}
+
+	automerge := p.EnableAutoMerge
+	parallelApply := p.EnableParallelApply
+	parallelPlan := p.EnableParallelPlan
+	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
+	if hasRepoCfg {
+		if repoCfg.Automerge != nil {
+			automerge = *repoCfg.Automerge
+		}
+		if repoCfg.ParallelApply != nil {
+			parallelApply = *repoCfg.ParallelApply
+		}
+		if repoCfg.ParallelPlan != nil {
+			parallelPlan = *repoCfg.ParallelPlan
+		}
+		abortOnExecutionOrderFail = repoCfg.AbortOnExecutionOrderFail
+	}
+
+	for _, mergedProjectCfg := range mergedProjectCfgs {
+		projCtxs = append(projCtxs,
+			p.ProjectCommandContextBuilder.BuildProjectContext(
+				ctx,
+				cmdName,
+				subCmdName,
+				mergedProjectCfg,
+				commentFlags,
+				repoDir,
+				automerge,
+				parallelApply,
+				parallelPlan,
+				verbose,
+				abortOnExecutionOrderFail,
+				p.TerraformExecutor,
+			)...)
 	}
 
 	sort.Slice(projCtxs, func(i, j int) bool {
