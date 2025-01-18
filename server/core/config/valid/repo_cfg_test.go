@@ -1,6 +1,7 @@
 package valid_test
 
 import (
+	"regexp"
 	"testing"
 
 	validation "github.com/go-ozzo/ozzo-validation"
@@ -316,10 +317,73 @@ func TestConfig_AutoDiscoverEnabled(t *testing.T) {
 				AutoDiscover: nil,
 			}
 			if c.repoAutoDiscover != "" {
-				r.AutoDiscover = &valid.AutoDiscover{c.repoAutoDiscover}
+				r.AutoDiscover = &valid.AutoDiscover{
+					Mode: c.repoAutoDiscover,
+				}
 			}
 			enabled := r.AutoDiscoverEnabled(c.defaultAutoDiscover)
 			Equals(t, c.expEnabled, enabled)
+		})
+	}
+}
+
+func TestConfig_IsPathIgnoredForAutoDiscover(t *testing.T) {
+	cases := []struct {
+		description string
+		repoCfg     valid.RepoCfg
+		path        string
+		expIgnored  bool
+	}{
+		{
+			description: "auto discover unconfigured",
+			repoCfg:     valid.RepoCfg{},
+			path:        "foo",
+			expIgnored:  false,
+		},
+		{
+			description: "auto discover configured, but not path",
+			repoCfg: valid.RepoCfg{
+				AutoDiscover: &valid.AutoDiscover{},
+			},
+			path:       "foo",
+			expIgnored: false,
+		},
+		{
+			description: "path does not match regex",
+			repoCfg: valid.RepoCfg{
+				AutoDiscover: &valid.AutoDiscover{
+					Ignore: regexp.MustCompile("bar"),
+				},
+			},
+			path:       "foo",
+			expIgnored: false,
+		},
+		{
+			description: "path does match regex",
+			repoCfg: valid.RepoCfg{
+				AutoDiscover: &valid.AutoDiscover{
+					Ignore: regexp.MustCompile("fo.*"),
+				},
+			},
+			path:       "foo",
+			expIgnored: true,
+		},
+		{
+			description: "long path does match regex",
+			repoCfg: valid.RepoCfg{
+				AutoDiscover: &valid.AutoDiscover{
+					Ignore: regexp.MustCompile(`foo\/.*\/baz`),
+				},
+			},
+			path:       "foo/bar/baz",
+			expIgnored: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+
+			enabled := c.repoCfg.IsPathIgnoredForAutoDiscover(c.path)
+			Equals(t, c.expIgnored, enabled)
 		})
 	}
 }

@@ -130,6 +130,7 @@ version: 3
 automerge: true
 autodiscover:
   mode: enabled
+  ignore: /foo.*/
 parallel_apply: true
 parallel_plan: false
 repo_locks:

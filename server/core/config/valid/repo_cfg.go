@@ -111,6 +111,13 @@ func (r RepoCfg) AutoDiscoverEnabled(defaultAutoDiscoverMode AutoDiscoverMode) b
 	return autoDiscoverMode == AutoDiscoverEnabledMode
 }
 
+func (r RepoCfg) IsPathIgnoredForAutoDiscover(path string) bool {
+	if r.AutoDiscover == nil || r.AutoDiscover.Ignore == nil {
+		return false
+	}
+	return r.AutoDiscover.Ignore.MatchString(path)
+}
+
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in
 // repoRelDir but none of them use workspace. We want this to be an error
 // because if users have gone to the trouble of defining projects in repoRelDir

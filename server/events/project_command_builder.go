@@ -420,7 +420,11 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 			configuredProjDirs[filepath.Clean(configProj.Dir)] = true
 		}
 		for _, mp := range allModifiedProjects {
-			_, dirExists := configuredProjDirs[filepath.Clean(mp.Path)]
+			path := filepath.Clean(mp.Path)
+			if repoCfg.IsPathIgnoredForAutoDiscover(path) {
+				continue
+			}
+			_, dirExists := configuredProjDirs[path]
 			if !dirExists {
 				modifiedProjects = append(modifiedProjects, mp)
 			}

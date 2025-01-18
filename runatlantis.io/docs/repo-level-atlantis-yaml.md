@@ -57,6 +57,7 @@ version: 3
 automerge: true
 autodiscover:
   mode: auto
+  ignore: /some\/path/
 delete_source_branch_on_merge: true
 parallel_plan: true
 parallel_apply: true
@@ -404,6 +405,14 @@ the manual configuration will take precedence.
 
 Use this feature when some projects require specific configuration in a repo with many projects yet
 it's still desirable for Atlantis to plan/apply for projects not enumerated in the config.
+
+```yaml
+autodiscover:
+  mode: "enabled"
+  ignore: /dir.*/
+```
+
+Autodiscover can be configured to skip over directories that match a regex.
 
 ### Custom Backend Config
 

@@ -1,5 +1,7 @@
 package valid
 
+import "regexp"
+
 // AutoDiscoverMode enum
 type AutoDiscoverMode string
 
@@ -10,5 +12,6 @@ const (
 )
 
 type AutoDiscover struct {
-	Mode AutoDiscoverMode
+	Mode   AutoDiscoverMode
+	Ignore *regexp.Regexp
 }
