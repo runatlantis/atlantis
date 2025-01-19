@@ -8,6 +8,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/runatlantis/atlantis/badge)](https://scorecard.dev/viewer/?uri=github.com/runatlantis/atlantis)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9428/badge)](https://www.bestpractices.dev/projects/9428)
 
+
 <p align="center">
   <img src="./runatlantis.io/public/hero.png" alt="Atlantis Logo"/><br><br>
   <b>Terraform Pull Request Automation</b>
