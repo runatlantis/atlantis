@@ -5,7 +5,7 @@ ARG DEBIAN_TAG=12.8-slim@sha256:d365f4920711a9074c4bcd178e8f457ee59250426441ab2a
 ARG GOLANG_TAG=1.23.4-alpine@sha256:c23339199a08b0e12032856908589a6d41a0dab141b8b3b21f156fc571a3f1d3
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.10.3
+ARG DEFAULT_TERRAFORM_VERSION=1.10.4
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.8.8
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
@@ -13,7 +13,11 @@ ARG DEFAULT_CONFTEST_VERSION=0.56.0
 
 # Stage 1: build artifact and download deps
 
-FROM golang:${GOLANG_TAG} AS builder
+FROM --platform=$BUILDPLATFORM golang:${GOLANG_TAG} AS builder
+
+# These are automatically populated by Docker
+ARG TARGETOS
+ARG TARGETARCH
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -42,7 +46,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY . /app
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
 FROM debian:${DEBIAN_TAG} AS debian-base
 
