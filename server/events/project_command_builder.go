@@ -504,6 +504,8 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 		}
 		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+	} else {
+		ctx.Log.Info("repo config file %s is absent, using global defaults", repoCfg)
 	}
 
 	mergedProjectCfgs, err := p.getMergedProjectCfgs(ctx, repoDir, modifiedFiles, repoCfg)
