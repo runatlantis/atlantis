@@ -474,6 +474,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.MarkdownTemplateOverridesDir,
 		userConfig.ExecutableName,
 		userConfig.HideUnchangedPlanComments,
+		userConfig.QuietPolicyChecks,
 	)
 
 	var lockingClient locking.Locker
