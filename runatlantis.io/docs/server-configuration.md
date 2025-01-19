@@ -386,6 +386,16 @@ and set `--autoplan-modules` to `false`.
   Note that the atlantis user is restricted to `~/.atlantis`.
   If you set the `--data-dir` flag to a path outside of Atlantis its home directory, ensure that you grant the atlantis user the correct permissions.
 
+### `--default-tf-distribution`
+
+  ```bash
+  atlantis server --default-tf-distribution="terraform"
+  # or
+  ATLANTIS_DEFAULT_TF_DISTRIBUTION="terraform"
+  ```
+
+  Which TF distribution to use. Can be set to `terraform` or `opentofu`.
+
 ### `--default-tf-version`
 
   ```bash
@@ -1259,13 +1269,8 @@ This is useful when you have many projects and want to keep the pull request cle
 
 ### `--tf-distribution`
 
-  ```bash
-  atlantis server --tf-distribution="terraform"
-  # or
-  ATLANTIS_TF_DISTRIBUTION="terraform"
-  ```
-
-  Which TF distribution to use. Can be set to `terraform` or `opentofu`.
+  <Badge text="Deprecated" type="warn"/>
+  Deprecated for `--default-tf-distribution`.
 
 ### `--tf-download`
 
