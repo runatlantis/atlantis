@@ -379,7 +379,7 @@ func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Cont
 }
 
 // getMergedProjectCfgs gets all merged project configs for building commands given a context and a clone repo
-func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context, repoDir string, modifiedFiles []string, repoCfg valid.RepoCfg, hasRepoCfg bool, repoCfgFile string) ([]valid.MergedProjectCfg, error) {
+func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context, repoDir string, modifiedFiles []string, repoCfg valid.RepoCfg) ([]valid.MergedProjectCfg, error) {
 	mergedCfgs := make([]valid.MergedProjectCfg, 0)
 
 	moduleInfo, err := FindModuleProjects(repoDir, p.AutoDetectModuleFiles)
@@ -403,17 +403,8 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 	}
 
 	if p.autoDiscoverModeEnabled(ctx, repoCfg) {
-		// If there is no config file or it specified no projects, then we'll plan each project that
-		// our algorithm determines was modified.
-		if hasRepoCfg {
-			if len(repoCfg.Projects) == 0 {
-				ctx.Log.Info("no projects are defined in %s. Will resume automatic detection", repoCfgFile)
-			} else {
-				ctx.Log.Info("automatic project discovery enabled. Will resume automatic detection")
-			}
-		} else {
-			ctx.Log.Info("found no %s file", repoCfgFile)
-		}
+		ctx.Log.Info("automatic project discovery enabled. Will run automatic detection")
+
 		// build a module index for projects that are explicitly included
 		allModifiedProjects := p.ProjectFinder.DetermineProjects(
 			ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
@@ -513,9 +504,11 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			return nil, errors.Wrapf(err, "parsing %s", repoCfgFile)
 		}
 		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+	} else {
+		ctx.Log.Info("repo config file %s is absent, using global defaults", repoCfg)
 	}
 
-	mergedProjectCfgs, err := p.getMergedProjectCfgs(ctx, repoDir, modifiedFiles, repoCfg, hasRepoCfg, repoCfgFile)
+	mergedProjectCfgs, err := p.getMergedProjectCfgs(ctx, repoDir, modifiedFiles, repoCfg)
 	if err != nil {
 		return nil, err
 	}
