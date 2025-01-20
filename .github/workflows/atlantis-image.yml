@@ -53,7 +53,6 @@ jobs:
     strategy:
       matrix:
         image_type: [alpine, debian]
-        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     runs-on: ubuntu-24.04
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
@@ -156,7 +155,7 @@ jobs:
           ATLANTIS_VERSION=${{ env.RELEASE_VERSION }}
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-        platforms: ${{ matrix.platform }}
+        platforms: linux/arm64/v8, linux/amd64, linux/arm/v7
         push: ${{ env.PUSH }}
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ matrix.image_type }}
@@ -173,13 +172,11 @@ jobs:
 
     - name: "Sign images with environment annotations"
       # no key needed, we're using the GitHub OIDC flow
-      # Only run on alpine/amd64 build to avoid signing multiple times
-      if: env.PUSH == 'true' && github.event_name != 'pull_request' && matrix.image_type == 'alpine' && matrix.platform == 'linux/amd64'
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
       run: |
         # Sign dev tags, version tags, and latest tags
         echo "${TAGS}" | xargs -I {} cosign sign \
           --yes \
-          --recursive=true \
           -a actor=${{ github.actor}} \
           -a ref_name=${{ github.ref_name}} \
           -a ref=${{ github.sha }} \
@@ -203,7 +200,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3
         # https://github.com/docker/build-push-action/issues/761#issuecomment-1575006515

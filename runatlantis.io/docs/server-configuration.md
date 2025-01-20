@@ -763,7 +763,7 @@ based on the organization or user that triggered the webhook.
   ATLANTIS_GH_USER="myuser"
   ```
 
-   GitHub username of API user.
+   GitHub username of API user. This user is also used by the flag `--hide-user-plan-comments` and will need to be updated if migrating to github EMU.
 
 ### `--gh-webhook-secret`
 
@@ -844,6 +844,7 @@ based on the organization or user that triggered the webhook.
 
   Hide previous plan comments to declutter PRs. This is only supported in
   GitHub and GitLab currently. This is not enabled by default. When using Github App, you need to set `--gh-app-slug` to enable this feature.
+  For github, ensure the `--gh-user` is set appropriately or comments will not be hidden.
 
 ### `--hide-unchanged-plan-comments`
 
