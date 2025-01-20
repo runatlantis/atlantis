@@ -57,7 +57,8 @@ version: 3
 automerge: true
 autodiscover:
   mode: auto
-  ignore: /some\/path/
+  ignore_paths:
+  - /some\/path/
 delete_source_branch_on_merge: true
 parallel_plan: true
 parallel_apply: true
