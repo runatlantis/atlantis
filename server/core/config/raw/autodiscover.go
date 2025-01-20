@@ -12,8 +12,8 @@ import (
 var DefaultAutoDiscoverMode = valid.AutoDiscoverAutoMode
 
 type AutoDiscover struct {
-	Mode   *valid.AutoDiscoverMode `yaml:"mode,omitempty"`
-	Ignore *string                 `yaml:"ignore,omitempty"`
+	Mode        *valid.AutoDiscoverMode `yaml:"mode,omitempty"`
+	IgnorePaths []string                `yaml:"ignore_paths,omitempty"`
 }
 
 func (a AutoDiscover) ToValid() *valid.AutoDiscover {
@@ -25,11 +25,14 @@ func (a AutoDiscover) ToValid() *valid.AutoDiscover {
 		v.Mode = DefaultAutoDiscoverMode
 	}
 
-	if a.Ignore != nil {
-		ignore := *a.Ignore
-		withoutSlashes := ignore[1 : len(ignore)-1]
-		// Safe to use MustCompile because we test it in Validate().
-		v.Ignore = regexp.MustCompile(withoutSlashes)
+	var ignorePaths []*regexp.Regexp
+	if a.IgnorePaths != nil {
+		for _, ignore := range a.IgnorePaths {
+			withoutSlashes := ignore[1 : len(ignore)-1]
+			// Safe to use MustCompile because we test it in Validate().
+			ignorePaths = append(ignorePaths, regexp.MustCompile(withoutSlashes))
+		}
+		v.IgnorePaths = ignorePaths
 	}
 
 	return &v
@@ -38,30 +41,34 @@ func (a AutoDiscover) ToValid() *valid.AutoDiscover {
 func (a AutoDiscover) Validate() error {
 
 	ignoreValid := func(value interface{}) error {
-		strPtr := value.(*string)
-		if strPtr == nil {
+		strSlice := value.([]string)
+		if strSlice == nil {
 			return nil
 		}
-		ignore := *strPtr
-		if !strings.HasPrefix(ignore, "/") || !strings.HasSuffix(ignore, "/") {
-			return errors.New("regex must begin and end with a slash '/'")
+		for _, ignore := range strSlice {
+			if !strings.HasPrefix(ignore, "/") || !strings.HasSuffix(ignore, "/") {
+				return errors.New("regex must begin and end with a slash '/'")
+			}
+			withoutSlashes := ignore[1 : len(ignore)-1]
+			_, err := regexp.Compile(withoutSlashes)
+			if err != nil {
+				return errors.Wrapf(err, "parsing: %s", ignore)
+			}
 		}
-		withoutSlashes := ignore[1 : len(ignore)-1]
-		_, err := regexp.Compile(withoutSlashes)
-		return errors.Wrapf(err, "parsing: %s", ignore)
+		return nil
 	}
 
 	res := validation.ValidateStruct(&a,
 		// If a.Mode is nil, this should still pass validation.
 		validation.Field(&a.Mode, validation.In(valid.AutoDiscoverAutoMode, valid.AutoDiscoverDisabledMode, valid.AutoDiscoverEnabledMode)),
-		validation.Field(&a.Ignore, validation.By(ignoreValid)),
+		validation.Field(&a.IgnorePaths, validation.By(ignoreValid)),
 	)
 	return res
 }
 
 func DefaultAutoDiscover() *valid.AutoDiscover {
 	return &valid.AutoDiscover{
-		Mode:   DefaultAutoDiscoverMode,
-		Ignore: nil,
+		Mode:        DefaultAutoDiscoverMode,
+		IgnorePaths: nil,
 	}
 }

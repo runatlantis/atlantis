@@ -12,6 +12,6 @@ const (
 )
 
 type AutoDiscover struct {
-	Mode   AutoDiscoverMode
-	Ignore *regexp.Regexp
+	Mode        AutoDiscoverMode
+	IgnorePaths []*regexp.Regexp
 }

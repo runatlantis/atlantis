@@ -409,10 +409,11 @@ it's still desirable for Atlantis to plan/apply for projects not enumerated in t
 ```yaml
 autodiscover:
   mode: "enabled"
-  ignore: /dir.*/
+  ignore_paths:
+  - /dir.*/
 ```
 
-Autodiscover can be configured to skip over directories that match a regex.
+Autodiscover can also be configured to skip over directories that match any of a list of regexes.
 
 ### Custom Backend Config
 

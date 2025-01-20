@@ -112,10 +112,15 @@ func (r RepoCfg) AutoDiscoverEnabled(defaultAutoDiscoverMode AutoDiscoverMode) b
 }
 
 func (r RepoCfg) IsPathIgnoredForAutoDiscover(path string) bool {
-	if r.AutoDiscover == nil || r.AutoDiscover.Ignore == nil {
+	if r.AutoDiscover == nil || r.AutoDiscover.IgnorePaths == nil {
 		return false
 	}
-	return r.AutoDiscover.Ignore.MatchString(path)
+	for i := 0; i < len(r.AutoDiscover.IgnorePaths); i++ {
+		if r.AutoDiscover.IgnorePaths[i].MatchString(path) {
+			return true
+		}
+	}
+	return false
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in

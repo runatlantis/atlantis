@@ -100,7 +100,8 @@ repos:
   autodiscover:
     mode: auto
     # Optionally ignore some paths for autodiscovery by regex
-    ignore: /foo.*/
+    ignore_paths:
+      - /foo.*/
 
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo

@@ -11,7 +11,6 @@ import (
 
 func TestAutoDiscover_UnmarshalYAML(t *testing.T) {
 	autoDiscoverEnabled := valid.AutoDiscoverEnabledMode
-	ignoreString := "foobar"
 	cases := []struct {
 		description string
 		input       string
@@ -21,19 +20,20 @@ func TestAutoDiscover_UnmarshalYAML(t *testing.T) {
 			description: "omit unset fields",
 			input:       "",
 			exp: raw.AutoDiscover{
-				Mode:   nil,
-				Ignore: nil,
+				Mode:        nil,
+				IgnorePaths: nil,
 			},
 		},
 		{
 			description: "all fields set",
 			input: `
 mode: enabled
-ignore: foobar
+ignore_paths:
+  - foobar
 `,
 			exp: raw.AutoDiscover{
-				Mode:   &autoDiscoverEnabled,
-				Ignore: &ignoreString,
+				Mode:        &autoDiscoverEnabled,
+				IgnorePaths: []string{"foobar"},
 			},
 		},
 	}
@@ -53,10 +53,6 @@ func TestAutoDiscover_Validate(t *testing.T) {
 	autoDiscoverEnabled := valid.AutoDiscoverEnabledMode
 	autoDiscoverDisabled := valid.AutoDiscoverDisabledMode
 	randomString := valid.AutoDiscoverMode("random_string")
-	regexWithoutSlahes := ".*"
-	invalidRegexString := "/***/"
-	validRegexString := "/.*/"
-	validRegexPath := `/some\/path\//`
 	cases := []struct {
 		description string
 		input       raw.AutoDiscover
@@ -98,34 +94,53 @@ func TestAutoDiscover_Validate(t *testing.T) {
 		{
 			description: "ignore set to regex without slashes",
 			input: raw.AutoDiscover{
-				Mode:   &autoDiscoverAuto,
-				Ignore: &regexWithoutSlahes,
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					".*",
+				},
 			},
 			errContains: String("regex must begin and end with a slash '/'"),
 		},
 		{
 			description: "ignore set to broken regex",
 			input: raw.AutoDiscover{
-				Mode:   &autoDiscoverAuto,
-				Ignore: &invalidRegexString,
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					"/***/",
+				},
 			},
 			errContains: String("error parsing regexp: missing argument to repetition operator: `*`"),
 		},
 		{
 			description: "ignore set to valid regex",
 			input: raw.AutoDiscover{
-				Mode:   &autoDiscoverAuto,
-				Ignore: &validRegexString,
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					"/.*/",
+				},
 			},
 			errContains: nil,
 		},
 		{
 			description: "ignore set to valid regex path",
 			input: raw.AutoDiscover{
-				Mode:   &autoDiscoverAuto,
-				Ignore: &validRegexPath,
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					`/some\/path\//`,
+				},
 			},
 			errContains: nil,
+		},
+		{
+			description: "ignore set to one valid and one invalid regex",
+			input: raw.AutoDiscover{
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					"/foo/",
+					"foo",
+				},
+			},
+			errContains: String("regex must begin and end with a slash '/'"),
 		},
 	}
 	for _, c := range cases {
@@ -141,8 +156,6 @@ func TestAutoDiscover_Validate(t *testing.T) {
 
 func TestAutoDiscover_ToValid(t *testing.T) {
 	autoDiscoverEnabled := valid.AutoDiscoverEnabledMode
-	ignoreString := ".*"
-	ignoreRegex := regexp.MustCompile(".*")
 	cases := []struct {
 		description string
 		input       raw.AutoDiscover
@@ -152,19 +165,25 @@ func TestAutoDiscover_ToValid(t *testing.T) {
 			description: "nothing set",
 			input:       raw.AutoDiscover{},
 			exp: &valid.AutoDiscover{
-				Mode:   valid.AutoDiscoverAutoMode,
-				Ignore: nil,
+				Mode:        valid.AutoDiscoverAutoMode,
+				IgnorePaths: nil,
 			},
 		},
 		{
 			description: "value set",
 			input: raw.AutoDiscover{
-				Mode:   &autoDiscoverEnabled,
-				Ignore: &ignoreString,
+				Mode: &autoDiscoverEnabled,
+				IgnorePaths: []string{
+					"/foo/",
+					"/bar.*/",
+				},
 			},
 			exp: &valid.AutoDiscover{
-				Mode:   valid.AutoDiscoverEnabledMode,
-				Ignore: ignoreRegex,
+				Mode: valid.AutoDiscoverEnabledMode,
+				IgnorePaths: []*regexp.Regexp{
+					regexp.MustCompile("foo"),
+					regexp.MustCompile("bar.*"),
+				},
 			},
 		},
 	}

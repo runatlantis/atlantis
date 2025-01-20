@@ -349,10 +349,12 @@ func TestConfig_IsPathIgnoredForAutoDiscover(t *testing.T) {
 			expIgnored: false,
 		},
 		{
-			description: "path does not match regex",
+			description: "paths do not match regex",
 			repoCfg: valid.RepoCfg{
 				AutoDiscover: &valid.AutoDiscover{
-					Ignore: regexp.MustCompile("bar"),
+					IgnorePaths: []*regexp.Regexp{
+						regexp.MustCompile("bar"),
+					},
 				},
 			},
 			path:       "foo",
@@ -362,8 +364,21 @@ func TestConfig_IsPathIgnoredForAutoDiscover(t *testing.T) {
 			description: "path does match regex",
 			repoCfg: valid.RepoCfg{
 				AutoDiscover: &valid.AutoDiscover{
-					Ignore: regexp.MustCompile("fo.*"),
-				},
+					IgnorePaths: []*regexp.Regexp{
+						regexp.MustCompile("fo.*"),
+					}},
+			},
+			path:       "foo",
+			expIgnored: true,
+		},
+		{
+			description: "one path matches regex, another doesn't",
+			repoCfg: valid.RepoCfg{
+				AutoDiscover: &valid.AutoDiscover{
+					IgnorePaths: []*regexp.Regexp{
+						regexp.MustCompile("fo.*"),
+						regexp.MustCompile("ba.*"),
+					}},
 			},
 			path:       "foo",
 			expIgnored: true,
@@ -372,7 +387,9 @@ func TestConfig_IsPathIgnoredForAutoDiscover(t *testing.T) {
 			description: "long path does match regex",
 			repoCfg: valid.RepoCfg{
 				AutoDiscover: &valid.AutoDiscover{
-					Ignore: regexp.MustCompile(`foo\/.*\/baz`),
+					IgnorePaths: []*regexp.Regexp{
+						regexp.MustCompile(`foo\/.*\/baz`),
+					},
 				},
 			},
 			path:       "foo/bar/baz",

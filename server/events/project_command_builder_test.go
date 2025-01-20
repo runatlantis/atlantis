@@ -1093,7 +1093,8 @@ projects:
 			AtlantisYAML: `version: 3
 autodiscover:
   mode: enabled
-  ignore: /project3/
+  ignore_paths:
+  - /project3/
 projects:
 - name: project1-custom-name
   dir: project1`,
@@ -1128,7 +1129,8 @@ projects:
 			AtlantisYAML: `version: 3
 autodiscover:
   mode: enabled
-  ignore: /project1/
+  ignore_paths:
+  - /project1/
 projects:
 - name: project1-custom-name
   dir: project1`,
