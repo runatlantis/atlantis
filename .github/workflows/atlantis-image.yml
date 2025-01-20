@@ -172,13 +172,11 @@ jobs:
 
     - name: "Sign images with environment annotations"
       # no key needed, we're using the GitHub OIDC flow
-      # Only run on alpine/amd64 build to avoid signing multiple times
       if: env.PUSH == 'true' && github.event_name != 'pull_request'
       run: |
         # Sign dev tags, version tags, and latest tags
         echo "${TAGS}" | xargs -I {} cosign sign \
           --yes \
-          --recursive=true \
           -a actor=${{ github.actor}} \
           -a ref_name=${{ github.ref_name}} \
           -a ref=${{ github.sha }} \
