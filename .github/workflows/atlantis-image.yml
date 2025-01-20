@@ -220,8 +220,7 @@ jobs:
           context: .
           build-args: |
             ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
-          push: false
-          load: true
+          push: true
           tags: "${{ env.DOCKER_REPO }}:goss-test"
           target: ${{ matrix.image_type }}
 
