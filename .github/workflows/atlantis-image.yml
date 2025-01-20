@@ -53,7 +53,6 @@ jobs:
     strategy:
       matrix:
         image_type: [alpine, debian]
-        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     runs-on: ubuntu-24.04
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
@@ -156,7 +155,7 @@ jobs:
           ATLANTIS_VERSION=${{ env.RELEASE_VERSION }}
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-        platforms: ${{ matrix.platform }}
+        platforms: linux/arm64/v8, linux/amd64, linux/arm/v7
         push: ${{ env.PUSH }}
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ matrix.image_type }}
