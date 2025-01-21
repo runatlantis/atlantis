@@ -353,7 +353,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 						getCommitResponse := GetCommitResponse{
 							LastPipeline: GetCommitResponseLastPipeline{
-								ID: gitlabPipelineSuccessMrID,
+								ID:  gitlabPipelineSuccessMrID,
 								Ref: updateStatusHeadBranch,
 							},
 						}
@@ -485,7 +485,7 @@ func TestGitlabClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 						} else {
 							getCommitResponse := GetCommitResponse{
 								LastPipeline: GetCommitResponseLastPipeline{
-									ID: gitlabPipelineSuccessMrID,
+									ID:  gitlabPipelineSuccessMrID,
 									Ref: updateStatusHeadBranch,
 								},
 							}
@@ -613,7 +613,7 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 
 						getCommitResponse := GetCommitResponse{
 							LastPipeline: GetCommitResponseLastPipeline{
-								ID: gitlabPipelineSuccessMrID,
+								ID:  gitlabPipelineSuccessMrID,
 								Ref: updateStatusHeadBranch,
 							},
 						}
@@ -726,7 +726,7 @@ func TestGitlabClient_UpdateStatusDifferentRef(t *testing.T) {
 
 						getCommitResponse := GetCommitResponse{
 							LastPipeline: GetCommitResponseLastPipeline{
-								ID: gitlabPipelineSuccessMrID,
+								ID:  gitlabPipelineSuccessMrID,
 								Ref: updateStatusHeadBranchDuplicate,
 							},
 						}
