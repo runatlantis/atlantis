@@ -14,7 +14,7 @@ import (
 
 // HttpWebhook sends webhooks to any HTTP destination.
 type HttpWebhook struct {
-	Client         *http.Client
+	Client         *HttpClient
 	WorkspaceRegex *regexp.Regexp
 	BranchRegex    *regexp.Regexp
 	URL            string
@@ -41,7 +41,12 @@ func (h *HttpWebhook) doSend(applyResult ApplyResult) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := h.Client.Do(req)
+	for header, values := range h.Client.Headers {
+		for _, value := range values {
+			req.Header.Add(header, value)
+		}
+	}
+	resp, err := h.Client.Client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -53,29 +58,8 @@ func (h *HttpWebhook) doSend(applyResult ApplyResult) error {
 	return nil
 }
 
-// NewHttpClient creates a new HTTP client that will add arbitrary headers to every request.
-func NewHttpClient(headers map[string][]string) *http.Client {
-	return &http.Client{
-		Transport: &AuthedTransport{
-			Base:    http.DefaultTransport,
-			Headers: headers,
-		},
-	}
-}
-
-// AuthedTransport is a http.RoundTripper which wraps Base
-// adding arbitrary Headers to each request.
-type AuthedTransport struct {
-	Base    http.RoundTripper
+// HttpClient wraps http.Client allowing to add arbitrary Headers to a request.
+type HttpClient struct {
+	Client  *http.Client
 	Headers map[string][]string
-}
-
-// RoundTrip handles each http request.
-func (t *AuthedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	for header, values := range t.Headers {
-		for _, value := range values {
-			req.Header.Add(header, value)
-		}
-	}
-	return t.Base.RoundTrip(req)
 }

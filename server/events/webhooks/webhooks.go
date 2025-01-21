@@ -15,7 +15,6 @@ package webhooks
 
 import (
 	"fmt"
-	"net/http"
 	"regexp"
 
 	"errors"
@@ -63,7 +62,7 @@ type Config struct {
 
 type Clients struct {
 	Slack SlackClient
-	Http  *http.Client
+	Http  *HttpClient
 }
 
 func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSender, error) {
@@ -100,12 +99,8 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 			if c.URL == "" {
 				return nil, errors.New("must specify \"url\" if using a webhook of \"kind: http\"")
 			}
-			httpClient := http.DefaultClient
-			if clients.Http != nil {
-				httpClient = clients.Http
-			}
 			httpWebhook := &HttpWebhook{
-				Client:         httpClient,
+				Client:         clients.Http,
 				WorkspaceRegex: wr,
 				BranchRegex:    br,
 				URL:            c.URL,

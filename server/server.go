@@ -394,7 +394,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		webhooksConfig,
 		webhooks.Clients{
 			Slack: webhooks.NewSlackClient(userConfig.SlackToken),
-			Http:  webhooks.NewHttpClient(webhookHeaders),
+			Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
 		},
 	)
 	if err != nil {

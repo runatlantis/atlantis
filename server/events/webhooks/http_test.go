@@ -44,7 +44,7 @@ func TestHttpWebhookWithHeaders(t *testing.T) {
 	defer server.Close()
 
 	webhook := webhooks.HttpWebhook{
-		Client:         webhooks.NewHttpClient(expectedHeaders),
+		Client:         &webhooks.HttpClient{Client: http.DefaultClient, Headers: expectedHeaders},
 		URL:            server.URL,
 		WorkspaceRegex: regexp.MustCompile(".*"),
 		BranchRegex:    regexp.MustCompile(".*"),
@@ -62,25 +62,7 @@ func TestHttpWebhookNoHeaders(t *testing.T) {
 	defer server.Close()
 
 	webhook := webhooks.HttpWebhook{
-		Client:         webhooks.NewHttpClient(nil),
-		URL:            server.URL,
-		WorkspaceRegex: regexp.MustCompile(".*"),
-		BranchRegex:    regexp.MustCompile(".*"),
-	}
-
-	err := webhook.Send(logging.NewNoopLogger(t), httpApplyResult)
-	Ok(t, err)
-}
-
-func TestHttpWebhookDefaultClient(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		Equals(t, r.Header.Get("Content-Type"), "application/json")
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	webhook := webhooks.HttpWebhook{
-		Client:         http.DefaultClient,
+		Client:         &webhooks.HttpClient{Client: http.DefaultClient},
 		URL:            server.URL,
 		WorkspaceRegex: regexp.MustCompile(".*"),
 		BranchRegex:    regexp.MustCompile(".*"),
@@ -97,7 +79,7 @@ func TestHttpWebhook500(t *testing.T) {
 	defer server.Close()
 
 	webhook := webhooks.HttpWebhook{
-		Client:         webhooks.NewHttpClient(nil),
+		Client:         &webhooks.HttpClient{Client: http.DefaultClient},
 		URL:            server.URL,
 		WorkspaceRegex: regexp.MustCompile(".*"),
 		BranchRegex:    regexp.MustCompile(".*"),
@@ -133,7 +115,7 @@ func TestHttpNoRegexMatch(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			webhook := webhooks.HttpWebhook{
-				Client:         webhooks.NewHttpClient(nil),
+				Client:         &webhooks.HttpClient{Client: http.DefaultClient},
 				URL:            server.URL,
 				WorkspaceRegex: tc.wr,
 				BranchRegex:    tc.br,
