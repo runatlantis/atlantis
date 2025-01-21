@@ -432,7 +432,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		if err != nil {
 			return err
 		}
-		if commit.LastPipeline != nil {
+		if commit.LastPipeline != nil && commit.LastPipeline.Ref == pull.HeadBranch {
 			logger.Info("Pipeline found for commit %s, setting pipeline ID to %d", pull.HeadCommit, commit.LastPipeline.ID)
 			// Set the pipeline ID to the last pipeline that ran for the commit
 			setCommitStatusOptions.PipelineID = gitlab.Ptr(commit.LastPipeline.ID)

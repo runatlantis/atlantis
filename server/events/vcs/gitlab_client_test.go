@@ -28,6 +28,7 @@ const updateStatusDescription = "description"
 const updateStatusTargetUrl = "https://google.com"
 const updateStatusSrc = "src"
 const updateStatusHeadBranch = "test"
+const updateStatusHeadBranchDuplicate = "test_duplicate"
 
 /* UpdateStatus request JSON body object */
 type UpdateStatusJsonBody struct {
@@ -41,7 +42,8 @@ type UpdateStatusJsonBody struct {
 
 /* GetCommit response last_pipeline JSON object */
 type GetCommitResponseLastPipeline struct {
-	ID int `json:"id"`
+	ID  int    `json:"id"`
+	Ref string `json:"ref"`
 }
 
 /* GetCommit response JSON object */
@@ -352,6 +354,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 						getCommitResponse := GetCommitResponse{
 							LastPipeline: GetCommitResponseLastPipeline{
 								ID: gitlabPipelineSuccessMrID,
+								Ref: updateStatusHeadBranch,
 							},
 						}
 						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
@@ -483,6 +486,7 @@ func TestGitlabClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 							getCommitResponse := GetCommitResponse{
 								LastPipeline: GetCommitResponseLastPipeline{
 									ID: gitlabPipelineSuccessMrID,
+									Ref: updateStatusHeadBranch,
 								},
 							}
 							getCommitJsonResponse, err := json.Marshal(getCommitResponse)
@@ -610,6 +614,7 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 						getCommitResponse := GetCommitResponse{
 							LastPipeline: GetCommitResponseLastPipeline{
 								ID: gitlabPipelineSuccessMrID,
+								Ref: updateStatusHeadBranch,
 							},
 						}
 						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
@@ -665,6 +670,110 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 
 			Assert(t, c.expNumberOfRequests == handledNumberOfRequests,
 				fmt.Sprintf("expected %d number of requests, but processed %d", c.expNumberOfRequests, handledNumberOfRequests))
+		})
+	}
+}
+
+func TestGitlabClient_UpdateStatusDifferentRef(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
+	cases := []struct {
+		status   models.CommitStatus
+		expState string
+	}{
+		{
+			models.PendingCommitStatus,
+			"running",
+		},
+		{
+			models.SuccessCommitStatus,
+			"success",
+		},
+		{
+			models.FailedCommitStatus,
+			"failed",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.expState, func(t *testing.T) {
+			gotRequest := false
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+						gotRequest = true
+
+						var updateStatusJsonBody UpdateStatusJsonBody
+						err := json.NewDecoder(r.Body).Decode(&updateStatusJsonBody)
+						Ok(t, err)
+
+						Equals(t, c.expState, updateStatusJsonBody.State)
+						Equals(t, updateStatusSrc, updateStatusJsonBody.Context)
+						Equals(t, updateStatusTargetUrl, updateStatusJsonBody.TargetUrl)
+						Equals(t, updateStatusDescription, updateStatusJsonBody.Description)
+						Equals(t, updateStatusHeadBranch, updateStatusJsonBody.Ref)
+
+						defer r.Body.Close() // nolint: errcheck
+
+						setStatusJsonResponse, err := json.Marshal(EmptyStruct{})
+						Ok(t, err)
+
+						_, err = w.Write(setStatusJsonResponse)
+						Ok(t, err)
+
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha":
+						w.WriteHeader(http.StatusOK)
+
+						getCommitResponse := GetCommitResponse{
+							LastPipeline: GetCommitResponseLastPipeline{
+								ID: gitlabPipelineSuccessMrID,
+								Ref: updateStatusHeadBranchDuplicate,
+							},
+						}
+						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
+						Ok(t, err)
+
+						_, err = w.Write(getCommitJsonResponse)
+						Ok(t, err)
+
+					case "/api/v4/":
+						// Rate limiter requests.
+						w.WriteHeader(http.StatusOK)
+
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &GitlabClient{
+				Client:  internalClient,
+				Version: nil,
+			}
+
+			repo := models.Repo{
+				FullName: "runatlantis/atlantis",
+				Owner:    "runatlantis",
+				Name:     "atlantis",
+			}
+			err = client.UpdateStatus(
+				logger,
+				repo,
+				models.PullRequest{
+					Num:        1,
+					BaseRepo:   repo,
+					HeadCommit: "sha",
+					HeadBranch: updateStatusHeadBranch,
+				},
+				c.status,
+				updateStatusSrc,
+				updateStatusDescription,
+				updateStatusTargetUrl,
+			)
+			Ok(t, err)
+			Assert(t, gotRequest, "expected to get the request")
 		})
 	}
 }
