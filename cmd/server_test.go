@@ -325,7 +325,7 @@ func testIsSorted[S ~[]E, E cmp.Ordered](t *testing.T, x S) {
 func TestAllFlagsDocumented(t *testing.T) {
 	// This is not a unit test per se, but is a helpful way of making sure when flags are added/removed
 	// the corresponding documentation is kept up-to-date.
-	t.Log("All flags in userConfig should have documentation.")
+	t.Log("All flags in userConfig should have documentation in server-configuration.md.")
 
 	userConfigKeys := getUserConfigKeysWithFlags()
 	documentedFlags := getDocumentedFlags(t)
