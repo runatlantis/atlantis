@@ -443,13 +443,13 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			return err
 		}
 		if len(commitStatuses) > 0 {
-			logger.Info("Pipeline found for commit %s, setting pipeline ID to %d", pull.HeadCommit, commitStatuses[0].PipelineId)
+			logger.Info("Pipeline found for commit %s and ref %s, setting pipeline ID to %d", pull.HeadCommit, pull.HeadBranch, commitStatuses[0].PipelineId)
 			// Set the pipeline ID to the last pipeline that ran for the commit
 			setCommitStatusOptions.PipelineID = gitlab.Ptr(commitStatuses[0].PipelineId)
 			break
 		}
 		if i != retries {
-			logger.Info("No pipeline found for commit %s, retrying in %s", pull.HeadCommit, delay)
+			logger.Info("No pipeline found for commit %s and ref %s, retrying in %s", pull.HeadCommit, pull.HeadBranch, delay)
 			time.Sleep(delay)
 		} else {
 			// If we've exhausted all retries, set the Ref to the branch name
