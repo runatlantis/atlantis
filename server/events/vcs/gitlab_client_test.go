@@ -40,16 +40,13 @@ type UpdateStatusJsonBody struct {
 	Ref         string `json:"ref"`
 }
 
-/* GetCommit response last_pipeline JSON object */
-type GetCommitResponseLastPipeline struct {
-	ID  int    `json:"id"`
+type CommitStatus struct {
 	Ref string `json:"ref"`
+	PipelineID int `json:"pipeline_id"`
 }
 
-/* GetCommit response JSON object */
-type GetCommitResponse struct {
-	LastPipeline GetCommitResponseLastPipeline `json:"last_pipeline"`
-}
+/* GetCommitStatuses response JSON object */
+type GetCommitStatusesResponse []CommitStatus
 
 /* Empty struct for JSON marshalling */
 type EmptyStruct struct{}
@@ -348,19 +345,19 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 						_, err = w.Write(setStatusJsonResponse)
 						Ok(t, err)
 
-					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha":
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?per_page=1&ref=test&sort=desc":
 						w.WriteHeader(http.StatusOK)
 
-						getCommitResponse := GetCommitResponse{
-							LastPipeline: GetCommitResponseLastPipeline{
-								ID:  gitlabPipelineSuccessMrID,
+						getCommitStatusesResponse := GetCommitStatusesResponse{
+							CommitStatus{
 								Ref: updateStatusHeadBranch,
+								PipelineID: gitlabPipelineSuccessMrID,
 							},
 						}
-						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
+						getCommitStatusesJsonResponse, err := json.Marshal(getCommitStatusesResponse)
 						Ok(t, err)
 
-						_, err = w.Write(getCommitJsonResponse)
+						_, err = w.Write(getCommitStatusesJsonResponse)
 						Ok(t, err)
 
 					case "/api/v4/":
@@ -471,25 +468,25 @@ func TestGitlabClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 						_, err = w.Write(getCommitJsonResponse)
 						Ok(t, err)
 
-					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha":
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?per_page=1&ref=test&sort=desc":
 						handledNumberOfRequests++
 						noCommitLastPipeline := handledNumberOfRequests <= c.commitsWithNoLastPipeline
 
 						w.WriteHeader(http.StatusOK)
 						if noCommitLastPipeline {
-							getCommitJsonResponse, err := json.Marshal(EmptyStruct{})
+							getCommitStatusesJsonResponse, err := json.Marshal([]EmptyStruct{})
 							Ok(t, err)
 
-							_, err = w.Write(getCommitJsonResponse)
+							_, err = w.Write(getCommitStatusesJsonResponse)
 							Ok(t, err)
 						} else {
-							getCommitResponse := GetCommitResponse{
-								LastPipeline: GetCommitResponseLastPipeline{
-									ID:  gitlabPipelineSuccessMrID,
+							getCommitStatusesResponse := GetCommitStatusesResponse{
+								CommitStatus{
 									Ref: updateStatusHeadBranch,
+									PipelineID: gitlabPipelineSuccessMrID,
 								},
 							}
-							getCommitJsonResponse, err := json.Marshal(getCommitResponse)
+							getCommitJsonResponse, err := json.Marshal(getCommitStatusesResponse)
 							Ok(t, err)
 
 							_, err = w.Write(getCommitJsonResponse)
@@ -608,19 +605,19 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 						_, err = w.Write(getCommitJsonResponse)
 						Ok(t, err)
 
-					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha":
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?per_page=1&ref=test&sort=desc":
 						w.WriteHeader(http.StatusOK)
 
-						getCommitResponse := GetCommitResponse{
-							LastPipeline: GetCommitResponseLastPipeline{
-								ID:  gitlabPipelineSuccessMrID,
+						getCommitStatusesResponse := GetCommitStatusesResponse{
+							CommitStatus{
 								Ref: updateStatusHeadBranch,
+								PipelineID: gitlabPipelineSuccessMrID,
 							},
 						}
-						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
+						getCommitStatusesJsonResponse, err := json.Marshal(getCommitStatusesResponse)
 						Ok(t, err)
 
-						_, err = w.Write(getCommitJsonResponse)
+						_, err = w.Write(getCommitStatusesJsonResponse)
 						Ok(t, err)
 
 					case "/api/v4/":
@@ -721,19 +718,13 @@ func TestGitlabClient_UpdateStatusDifferentRef(t *testing.T) {
 						_, err = w.Write(setStatusJsonResponse)
 						Ok(t, err)
 
-					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha":
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?per_page=1&ref=test&sort=desc":
 						w.WriteHeader(http.StatusOK)
 
-						getCommitResponse := GetCommitResponse{
-							LastPipeline: GetCommitResponseLastPipeline{
-								ID:  gitlabPipelineSuccessMrID,
-								Ref: updateStatusHeadBranchDuplicate,
-							},
-						}
-						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
+						getCommitStatusesJsonResponse, err := json.Marshal([]EmptyStruct{})
 						Ok(t, err)
 
-						_, err = w.Write(getCommitJsonResponse)
+						_, err = w.Write(getCommitStatusesJsonResponse)
 						Ok(t, err)
 
 					case "/api/v4/":

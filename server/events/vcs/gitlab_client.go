@@ -419,41 +419,34 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 
 	retries := 1
 	delay := 2 * time.Second
-	var commit *gitlab.Commit
-	var statuses []*gitlab.CommitStatus
+	var commitStatuses []*gitlab.CommitStatus
 	var resp *gitlab.Response
 	var err error
 
+	// get the last commit status with the same ref
+	getCommitStatusesOptions := &gitlab.GetCommitStatusesOptions{
+		ListOptions: gitlab.ListOptions{
+			Sort:    "desc",
+			PerPage: 1,
+		},
+		Ref:     gitlab.Ptr(pull.HeadBranch),
+	}
+
 	// Try a couple of times to get the pipeline ID for the commit
 	for i := 0; i <= retries; i++ {
-		commit, resp, err = g.Client.Commits.GetCommit(repo.FullName, pull.HeadCommit, nil)
+		commitStatuses, resp, err = g.Client.Commits.GetCommitStatuses(repo.FullName, pull.HeadCommit, getCommitStatusesOptions)
+
 		if resp != nil {
 			logger.Debug("GET /projects/%s/repository/commits/%d: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
 		}
 		if err != nil {
 			return err
 		}
-		if commit.LastPipeline != nil {
-			if commit.LastPipeline.Ref == pull.HeadBranch {
-				logger.Info("Pipeline found for commit %s, setting pipeline ID to %d", pull.HeadCommit, commit.LastPipeline.ID)
-				// Set the pipeline ID to the last pipeline that ran for the commit
-				setCommitStatusOptions.PipelineID = gitlab.Ptr(commit.LastPipeline.ID)
-				break
-			} else {
-				getCommitStatusesOptions := &gitlab.GetCommitStatusesOptions{
-					Ref: gitlab.Ptr(pull.HeadBranch),
-					Sort: gitlab.Ptr("desc"),
-					PerPage: gitlab.Ptr(1)
-				}
-
-				statuses, resp, err = g.Client.Commits.GetCommitStatus(repo.FullName, pull.HeadCommit, getCommitStatusesOptions)
-				if len(statuses) > 0 {
-					logger.Info("Pipeline found for commit %s, setting pipeline ID to %d", pull.HeadCommit, statuses[0].PipelineId)
-					// Set the pipeline ID to the last pipeline that ran for the commit
-					setCommitStatusOptions.PipelineID = gitlab.Ptr(statuses[0].PipelineId)
-					break
-				}
-			}
+		if len(commitStatuses) > 0 {
+			logger.Info("Pipeline found for commit %s, setting pipeline ID to %d", pull.HeadCommit, commitStatuses[0].PipelineId)
+			// Set the pipeline ID to the last pipeline that ran for the commit
+			setCommitStatusOptions.PipelineID = gitlab.Ptr(commitStatuses[0].PipelineId)
+			break
 		}
 		if i != retries {
 			logger.Info("No pipeline found for commit %s, retrying in %s", pull.HeadCommit, delay)
@@ -479,7 +472,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			"attempt", attempt,
 			"max_attempts", maxAttempts,
 			"repo", repo.FullName,
-			"commit", commit.ShortID,
+			"commit", pull.HeadCommit,
 			"state", state.String(),
 		)
 
