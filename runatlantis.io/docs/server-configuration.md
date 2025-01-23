@@ -1254,7 +1254,7 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_SLACK_TOKEN='token'
   ```
 
-  API token for Slack notifications. See [Using Slack hooks](using-slack-hooks.md).
+  API token for Slack notifications. See [Using Slack hooks](sending-notifications-via-webhooks.md#using-slack-hooks).
 
 ### `--ssl-cert-file`
 
@@ -1424,6 +1424,18 @@ The effect of the race condition is more evident when using parallel configurati
   ```
 
   Username used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--webhook-http-headers`
+
+  ```bash
+  atlantis server --webhook-http-headers='{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}'
+  # or
+  ATLANTIS_WEBHOOK_HTTP_HEADERS='{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}'
+  ```
+
+  Additional headers added to each HTTP POST payload when using [http webhooks](sending-notifications-via-webhooks.md#using-http-webhooks)
+  provided as a JSON string. The map key is the header name and the value is the header value
+  (string) or values (array of string).
 
 ### `--websocket-check-origin`
 

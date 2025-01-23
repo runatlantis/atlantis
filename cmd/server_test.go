@@ -151,6 +151,7 @@ var testFlags = map[string]interface{}{
 	VarFileAllowlistFlag:             "/path",
 	VCSStatusName:                    "my-status",
 	IgnoreVCSStatusNames:             "",
+	WebhookHttpHeaders:               `{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}`,
 	WebBasicAuthFlag:                 false,
 	WebPasswordFlag:                  "atlantis",
 	WebUsernameFlag:                  "atlantis",
