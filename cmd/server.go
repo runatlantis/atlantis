@@ -153,6 +153,7 @@ const (
 	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
 	TFETokenFlag                     = "tfe-token"
 	WriteGitCredsFlag                = "write-git-creds" // nolint: gosec
+	WebhookHttpHeaders               = "webhook-http-headers"
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
@@ -459,6 +460,12 @@ var stringFlags = map[string]stringFlag{
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
 		defaultValue: DefaultVCSStatusName,
+	},
+	WebhookHttpHeaders: {
+		description: "Additional headers added to each HTTP POST payload when using HTTP webhooks provided as a JSON string." +
+			" The map key is the header name and the value is the header value (string) or values (array of string)." +
+			" For example: `{\"Authorization\":\"Bearer some-token\",\"X-Custom-Header\":[\"value1\",\"value2\"]}`.",
+		defaultValue: "",
 	},
 	WebUsernameFlag: {
 		description:  "Username used for Web Basic Authentication on Atlantis HTTP Middleware",
@@ -1067,6 +1074,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if _, err := userConfig.ToAllowCommandNames(); err != nil {
 		return errors.Wrapf(err, "invalid --%s", AllowCommandsFlag)
+	}
+
+	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {
+		return errors.Wrapf(err, "invalid --%s", WebhookHttpHeaders)
 	}
 
 	return nil
