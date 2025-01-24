@@ -629,7 +629,6 @@ func (g *GitlabClient) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]stri
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
 func (g *GitlabClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
-	logger.Debug("Getting GitLab file content for file '%s'", fileName)
 	opt := gitlab.GetRawFileOptions{Ref: gitlab.Ptr(branch)}
 
 	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(repo.FullName, fileName, &opt)
