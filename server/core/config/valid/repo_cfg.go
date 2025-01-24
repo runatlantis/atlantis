@@ -8,7 +8,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	version "github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 )
 
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
@@ -109,6 +111,24 @@ func (r RepoCfg) AutoDiscoverEnabled(defaultAutoDiscoverMode AutoDiscoverMode) b
 	}
 
 	return autoDiscoverMode == AutoDiscoverEnabledMode
+}
+
+func (r RepoCfg) IsPathIgnoredForAutoDiscover(path string) (bool, error) {
+	if r.AutoDiscover == nil || r.AutoDiscover.IgnorePaths == nil {
+		return false, nil
+	}
+	for i := 0; i < len(r.AutoDiscover.IgnorePaths); i++ {
+		matches, err := doublestar.Match(r.AutoDiscover.IgnorePaths[i], path)
+		if err != nil {
+			// Per documentation https://pkg.go.dev/github.com/bmatcuk/doublestar, this only
+			// occurs if the pattern itself is invalid, and we already checked this when parsing raw config
+			return false, errors.Wrap(err, "unexpectedly found invalid ignore pattern (this is a bug, should have been validated at startup)")
+		}
+		if matches {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in

@@ -49,7 +49,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: markdown-lint
-        uses: DavidAnson/markdownlint-cli2-action@a23dae216ce3fee4db69da41fed90d2a4af801cf # v19
+        uses: DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265 # v19
         with:
           config: .markdownlint.yaml
           globs: 'runatlantis.io/**/*.md'
@@ -87,6 +87,7 @@ jobs:
       # twitter.com => too many redirections
       # www.flaticon.com => 403 error
       # www.freepik.com => 403 error
+      # ngrok.com => 406 error
       - run: |
           ./muffet \
             -e 'https://medium.com/runatlantis' \
@@ -94,6 +95,7 @@ jobs:
             -e 'https://twitter.com/*' \
             -e 'https://www.flaticon.com/*' \
             -e 'https://www.freepik.com/*' \
+            -e 'https://ngrok.com/*' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \
