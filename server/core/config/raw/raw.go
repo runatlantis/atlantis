@@ -4,8 +4,9 @@
 package raw
 
 import (
+	"fmt"
+
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 )
 
 // VersionValidator helper function to validate binary version.
@@ -16,5 +17,5 @@ func VersionValidator(value interface{}) error {
 		return nil
 	}
 	_, err := version.NewVersion(*strPtr)
-	return errors.Wrapf(err, "version %q could not be parsed", *strPtr)
+	return fmt.Errorf("version %q could not be parsed: %w", *strPtr, err)
 }

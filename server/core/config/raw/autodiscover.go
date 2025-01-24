@@ -1,6 +1,7 @@
 package raw
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 

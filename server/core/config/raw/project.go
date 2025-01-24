@@ -1,6 +1,7 @@
 package raw
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"path/filepath"
@@ -9,7 +10,6 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
@@ -75,7 +75,10 @@ func (p Project) Validate() error {
 		}
 		withoutSlashes := branch[1 : len(branch)-1]
 		_, err := regexp.Compile(withoutSlashes)
-		return errors.Wrapf(err, "parsing: %s", branch)
+		if err != nil {
+			return fmt.Errorf("parsing: %s: %v", branch, err)
+		}
+		return nil
 	}
 
 	DependsOn := func(value interface{}) error {

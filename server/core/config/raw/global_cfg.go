@@ -1,12 +1,12 @@
 package raw
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/utils"
 )
@@ -184,7 +184,10 @@ func (r Repo) Validate() error {
 			return nil
 		}
 		_, err := regexp.Compile(id[1 : len(id)-1])
-		return errors.Wrapf(err, "parsing: %s", id)
+		if err != nil {
+			return fmt.Errorf("parsing: %s: %v", id, err)
+		}
+		return nil
 	}
 
 	branchValid := func(value interface{}) error {
@@ -197,7 +200,10 @@ func (r Repo) Validate() error {
 		}
 		withoutSlashes := branch[1 : len(branch)-1]
 		_, err := regexp.Compile(withoutSlashes)
-		return errors.Wrapf(err, "parsing: %s", branch)
+		if err != nil {
+			return fmt.Errorf("parsing: %s: %v", branch, err)
+		}
+		return nil
 	}
 
 	repoConfigFileValid := func(value interface{}) error {
