@@ -410,9 +410,8 @@ func TestConfig_IsPathIgnoredForAutoDiscover(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 
-			enabled, err := c.repoCfg.IsPathIgnoredForAutoDiscover(c.path)
-			Ok(t, err)
-			Equals(t, c.expIgnored, enabled)
+			ignored := c.repoCfg.IsPathIgnoredForAutoDiscover(c.path)
+			Equals(t, c.expIgnored, ignored)
 		})
 	}
 }
