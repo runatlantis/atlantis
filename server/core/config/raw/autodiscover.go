@@ -7,7 +7,6 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	validation "github.com/go-ozzo/ozzo-validation"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 

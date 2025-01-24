@@ -185,7 +185,7 @@ func (r Repo) Validate() error {
 		}
 		_, err := regexp.Compile(id[1 : len(id)-1])
 		if err != nil {
-			return fmt.Errorf("parsing: %s: %v", id, err)
+			return fmt.Errorf("parsing: %s: %w", id, err)
 		}
 		return nil
 	}
@@ -201,7 +201,7 @@ func (r Repo) Validate() error {
 		withoutSlashes := branch[1 : len(branch)-1]
 		_, err := regexp.Compile(withoutSlashes)
 		if err != nil {
-			return fmt.Errorf("parsing: %s: %v", branch, err)
+			return fmt.Errorf("parsing: %s: %w", branch, err)
 		}
 		return nil
 	}

@@ -76,7 +76,7 @@ func (p Project) Validate() error {
 		withoutSlashes := branch[1 : len(branch)-1]
 		_, err := regexp.Compile(withoutSlashes)
 		if err != nil {
-			return fmt.Errorf("parsing: %s: %v", branch, err)
+			return fmt.Errorf("parsing: %s: %w", branch, err)
 		}
 		return nil
 	}

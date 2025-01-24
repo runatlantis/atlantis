@@ -111,7 +111,7 @@ func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.G
 func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.GlobalCfg) (valid.GlobalCfg, error) {
 	configData, err := os.ReadFile(configFile) // nolint: gosec
 	if err != nil {
-		return valid.GlobalCfg{}, fmt.Errorf("unable to read %s file: %v", configFile, err)
+		return valid.GlobalCfg{}, fmt.Errorf("unable to read %s file: %w", configFile, err)
 	}
 	if len(configData) == 0 {
 		return valid.GlobalCfg{}, fmt.Errorf("file %s was empty", configFile)
@@ -200,7 +200,7 @@ func (p *ParserValidator) applyLegacyShellParsing(cfg *valid.RepoCfg) error {
 		if s.StepName == "run" {
 			split, err := shlex.Split(s.RunCommand)
 			if err != nil {
-				return fmt.Errorf("unable to parse %q: %v", s.RunCommand, err)
+				return fmt.Errorf("unable to parse %q: %w", s.RunCommand, err)
 			}
 			s.RunCommand = strings.Join(split, " ")
 		}
