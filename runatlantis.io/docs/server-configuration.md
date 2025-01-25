@@ -799,6 +799,21 @@ based on the organization or user that triggered the webhook.
   This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
   :::
 
+### `--gitlab-group-allowlist`
+
+  ```bash
+  atlantis server --gitlab-group-allowlist="myorg/mygroup:plan, myorg/secteam:apply, myorg/devops:apply, myorg/devops:import"
+  # or
+  ATLANTIS_GITLAB_GROUP_ALLOWLIST="myorg/mygroup:plan, myorg/secteam:apply, myorg/devops:apply, myorg/devops:import"
+  ```
+
+  Comma-separated list of GitLab groups and permission pairs.
+
+  By default, any group can plan and apply.
+
+  ::: warning NOTE
+  Atlantis needs to be able to view the listed group members, inaccessible or non-existent groups are silently ignored.
+
 ### `--gitlab-hostname`
 
   ```bash
