@@ -5,25 +5,32 @@ import (
 	"path/filepath"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/utils"
 )
 
 type importStepRunner struct {
-	terraformExecutor TerraformExec
-	defaultTFVersion  *version.Version
+	terraformExecutor     TerraformExec
+	defaultTFDistribution terraform.Distribution
+	defaultTFVersion      *version.Version
 }
 
-func NewImportStepRunner(terraformExecutor TerraformExec, defaultTfVersion *version.Version) Runner {
+func NewImportStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version) Runner {
 	runner := &importStepRunner{
-		terraformExecutor: terraformExecutor,
-		defaultTFVersion:  defaultTfVersion,
+		terraformExecutor:     terraformExecutor,
+		defaultTFDistribution: defaultTfDistribution,
+		defaultTFVersion:      defaultTfVersion,
 	}
-	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfVersion, runner)
+	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfDistribution, defaultTfVersion, runner)
 }
 
 func (p *importStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	tfDistribution := p.defaultTFDistribution
 	tfVersion := p.defaultTFVersion
+	if ctx.TerraformDistribution != nil {
+		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
+	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}
@@ -31,7 +38,7 @@ func (p *importStepRunner) Run(ctx command.ProjectContext, extraArgs []string, p
 	importCmd := []string{"import"}
 	importCmd = append(importCmd, extraArgs...)
 	importCmd = append(importCmd, ctx.EscapedCommentArgs...)
-	out, err := p.terraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), importCmd, envs, tfVersion, ctx.Workspace)
+	out, err := p.terraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), importCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 
 	// If the import was successful and a plan file exists, delete the plan.
 	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))

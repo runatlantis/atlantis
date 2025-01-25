@@ -99,6 +99,9 @@ repos:
   # autodiscover defines how atlantis should automatically discover projects in this repository.
   autodiscover:
     mode: auto
+    # Optionally ignore some paths for autodiscovery by a glob path
+    ignore_paths:
+      - foo/*
 
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
