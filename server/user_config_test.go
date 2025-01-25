@@ -3,6 +3,8 @@ package server_test
 import (
 	"testing"
 
+	"github.com/pkg/errors"
+
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -65,6 +67,49 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 				require.ErrorContains(t, err, tt.wantErr, "ToAllowCommandNames()")
 			}
 			assert.Equalf(t, tt.want, got, "ToAllowCommandNames()")
+		})
+	}
+}
+
+func TestUserConfig_ToWebhookHttpHeaders(t *testing.T) {
+	tcs := []struct {
+		name  string
+		given string
+		want  map[string][]string
+		err   error
+	}{
+		{
+			name:  "empty",
+			given: "",
+			want:  nil,
+		},
+		{
+			name:  "happy path",
+			given: `{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}`,
+			want: map[string][]string{
+				"Authorization":   {"Bearer some-token"},
+				"X-Custom-Header": {"value1", "value2"},
+			},
+		},
+		{
+			name:  "invalid json",
+			given: `{"X-Custom-Header":true}`,
+			err:   errors.New("expected string or array, got bool"),
+		},
+		{
+			name:  "invalid json array element",
+			given: `{"X-Custom-Header":[1, 2]}`,
+			err:   errors.New("expected string array element, got float64"),
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			u := server.UserConfig{
+				WebhookHttpHeaders: tc.given,
+			}
+			got, err := u.ToWebhookHttpHeaders()
+			Equals(t, tc.want, got)
+			Equals(t, tc.err, err)
 		})
 	}
 }
