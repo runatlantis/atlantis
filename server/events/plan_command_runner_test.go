@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v68/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events"
@@ -472,7 +472,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 			pull := &github.PullRequest{
-				State: github.String("open"),
+				State: github.Ptr("open"),
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
