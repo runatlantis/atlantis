@@ -232,7 +232,7 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 	}
 	if len(e.BitbucketWebhookSecret) > 0 {
 		if err := bitbucketcloud.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
-			e.respond(w, logging.Warn, http.StatusBadRequest, errors.Wrap(err, "request did not pass validation").Error())
+			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", errors.Wrap(err, "request did not pass validation").Error())
 			return
 		}
 	}
