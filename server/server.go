@@ -149,11 +149,14 @@ type WebhookConfig struct {
 	// that is being modified for this event. If the regex matches, we'll
 	// send the webhook, ex. "main.*".
 	BranchRegex string `mapstructure:"branch-regex"`
-	// Kind is the type of webhook we should send, ex. slack.
+	// Kind is the type of webhook we should send, ex. slack or http.
 	Kind string `mapstructure:"kind"`
 	// Channel is the channel to send this webhook to. It only applies to
 	// slack webhooks. Should be without '#'.
 	Channel string `mapstructure:"channel"`
+	// URL is the URL where to deliver this webhook. It only applies to
+	// http webhooks.
+	URL string `mapstructure:"url"`
 }
 
 //go:embed static
@@ -379,10 +382,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			Event:          c.Event,
 			Kind:           c.Kind,
 			WorkspaceRegex: c.WorkspaceRegex,
+			URL:            c.URL,
 		}
 		webhooksConfig = append(webhooksConfig, config)
 	}
-	webhooksManager, err := webhooks.NewMultiWebhookSender(webhooksConfig, webhooks.NewSlackClient(userConfig.SlackToken))
+	webhookHeaders, err := userConfig.ToWebhookHttpHeaders()
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing webhook http headers")
+	}
+	webhooksManager, err := webhooks.NewMultiWebhookSender(
+		webhooksConfig,
+		webhooks.Clients{
+			Slack: webhooks.NewSlackClient(userConfig.SlackToken),
+			Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
+		},
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
@@ -460,6 +474,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.MarkdownTemplateOverridesDir,
 		userConfig.ExecutableName,
 		userConfig.HideUnchangedPlanComments,
+		userConfig.QuietPolicyChecks,
 	)
 
 	var lockingClient locking.Locker
