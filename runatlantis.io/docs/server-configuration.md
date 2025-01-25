@@ -863,9 +863,14 @@ based on the organization or user that triggered the webhook.
   ```
 
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub and GitLab currently. This is not enabled by default. When using Github App, you need to set `--gh-app-slug` to enable this feature.
-  For github, ensure the `--gh-user` is set appropriately or comments will not be hidden.
+  GitHub and GitLab and Bitbucket currently and is not enabled by default.
+  
+  For Bitbucket, the comments are deleted rather than hidden as Bitbucket does not support hiding comments.
+  
+  For GitHub, ensure the `--gh-user` is set appropriately or comments will not be hidden.
 
+  When using the GitHub App, you need to set `--gh-app-slug` to enable this feature.
+  
 ### `--hide-unchanged-plan-comments`
 
   ```bash
