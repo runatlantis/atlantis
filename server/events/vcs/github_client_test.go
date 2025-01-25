@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -1712,4 +1713,55 @@ func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
 		})
 	Ok(t, err)
 	Equals(t, 0, len(labels))
+}
+
+func TestGithubClient_SecondaryRateLimitHandling_CreateComment(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	calls := 0
+	maxCalls := 2
+
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost || r.URL.Path != "/api/v3/repos/owner/repo/issues/1/comments" {
+				t.Errorf("Unexpected request: %s %s", r.Method, r.URL.Path)
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+
+			if calls < maxCalls {
+				// Secondary rate limiting, x-ratelimit-remaining must be > 0
+				w.Header().Set("x-ratelimit-remaining", "1")
+				w.Header().Set("x-ratelimit-reset", fmt.Sprintf("%d", time.Now().Unix()+1))
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"message": "You have exceeded a secondary rate limit"}`)) // nolint: errcheck
+			} else {
+				w.WriteHeader(http.StatusCreated)
+				w.Write([]byte(`{"id": 1, "body": "Test comment"}`)) // nolint: errcheck
+			}
+			calls++
+		}),
+	)
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{User: "user", Token: "pass"}, vcs.GithubConfig{}, 0, logger)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	// Simulate creating a comment
+	repo := models.Repo{
+		FullName: "owner/repo",
+		Owner:    "owner",
+		Name:     "repo",
+	}
+	pullNum := 1
+	comment := "Test comment"
+
+	err = client.CreateComment(logger, repo, pullNum, comment, "")
+	Ok(t, err)
+
+	// Verify that the number of calls is greater than maxCalls, indicating that retries occurred
+	Assert(t, calls > maxCalls, "Expected more than %d calls due to rate limiting, but got %d", maxCalls, calls)
+
 }

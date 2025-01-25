@@ -14,10 +14,13 @@
 package cmd
 
 import (
+	"bufio"
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -73,6 +76,7 @@ var testFlags = map[string]interface{}{
 	CheckoutStrategyFlag:             CheckoutStrategyMerge,
 	CheckoutDepthFlag:                0,
 	DataDirFlag:                      "/path",
+	DefaultTFDistributionFlag:        "terraform",
 	DefaultTFVersionFlag:             "v0.11.0",
 	DisableApplyAllFlag:              true,
 	DisableMarkdownFoldingFlag:       true,
@@ -147,6 +151,7 @@ var testFlags = map[string]interface{}{
 	VarFileAllowlistFlag:             "/path",
 	VCSStatusName:                    "my-status",
 	IgnoreVCSStatusNames:             "",
+	WebhookHttpHeaders:               `{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}`,
 	WebBasicAuthFlag:                 false,
 	WebPasswordFlag:                  "atlantis",
 	WebUsernameFlag:                  "atlantis",
@@ -225,21 +230,32 @@ func TestExecute_Flags(t *testing.T) {
 	}
 }
 
-func TestUserConfigAllTested(t *testing.T) {
-	t.Log("All settings in userConfig should be tested.")
-
+func getUserConfigKeysWithFlags() []string {
+	var ret []string
 	u := reflect.TypeOf(server.UserConfig{})
 
 	for i := 0; i < u.NumField(); i++ {
 
 		userConfigKey := u.Field(i).Tag.Get("mapstructure")
+		// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
+		// Some fields are too complicated to have flags, so are only expressible in the config yaml
+		flagKey := u.Field(i).Tag.Get("flag")
+		if flagKey == "false" {
+			continue
+		}
+		ret = append(ret, userConfigKey)
+
+	}
+	return ret
+
+}
+
+func TestUserConfigAllTested(t *testing.T) {
+	t.Log("All settings in userConfig should be tested.")
+
+	for _, userConfigKey := range getUserConfigKeysWithFlags() {
+
 		t.Run(userConfigKey, func(t *testing.T) {
-			// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
-			// Some fields are too complicated to have flags, so are only expressible in the config yaml
-			flagKey := u.Field(i).Tag.Get("flag")
-			if flagKey == "false" {
-				return
-			}
 			// If a setting is configured in server.UserConfig, it should be tested here. If there is no corresponding const
 			// for specifying the flag, that probably means one *also* needs to be added to server.go
 			if _, ok := testFlags[userConfigKey]; !ok {
@@ -247,6 +263,94 @@ func TestUserConfigAllTested(t *testing.T) {
 			}
 		})
 
+	}
+
+}
+
+func getDocumentedFlags(t *testing.T) []string {
+
+	var ret []string
+	docFile := "../runatlantis.io/docs/server-configuration.md"
+
+	file, err := os.Open(docFile)
+	Ok(t, err)
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "### ") {
+			continue
+		}
+		split := strings.Split(line, "`")
+		if len(split) != 3 {
+			t.Errorf("Unexpected line in %s: %s", docFile, line)
+			continue
+		}
+		flag := split[1]
+		if !strings.HasPrefix(flag, "--") {
+			t.Errorf("Unexpected line in %s: %s", docFile, line)
+			continue
+		}
+		flag = strings.TrimPrefix(flag, "--")
+		ret = append(ret, flag)
+	}
+
+	err = scanner.Err()
+	Ok(t, err)
+
+	return ret
+}
+
+func testIsSorted[S ~[]E, E cmp.Ordered](t *testing.T, x S) {
+	// TODO: This is n^2, probably a better algorithm for this
+	// Also, this works best for lists that are mostly sorted, if the whole thing is wrong, it's just
+	// going to say that every individual element is out of order
+	for i, elem := range x {
+		for j, compareTo := range x {
+			if i == j {
+				continue
+			}
+			if i > j && cmp.Less(elem, compareTo) {
+				t.Errorf("%v is out of order (should be before %v)", elem, compareTo)
+				break
+			}
+			if i < j && cmp.Less(compareTo, elem) {
+				t.Errorf("%v is out of order (should be after %v)", elem, compareTo)
+				break
+			}
+		}
+	}
+}
+
+func TestAllFlagsDocumented(t *testing.T) {
+	// This is not a unit test per se, but is a helpful way of making sure when flags are added/removed
+	// the corresponding documentation is kept up-to-date.
+	t.Log("All flags in userConfig should have documentation in server-configuration.md.")
+
+	userConfigKeys := getUserConfigKeysWithFlags()
+	documentedFlags := getDocumentedFlags(t)
+
+	testIsSorted(t, documentedFlags)
+	slices.Sort(userConfigKeys)
+	slices.Sort(documentedFlags)
+
+	for _, userConfigKey := range userConfigKeys {
+		_, found := slices.BinarySearch(documentedFlags, userConfigKey)
+		if !found {
+			t.Errorf("Found undocumented config key: %s", userConfigKey)
+		}
+	}
+
+	for _, documentedFlag := range documentedFlags {
+		// --help and --config are documented but don't have a setting on userConfig
+		if documentedFlag == "help" || documentedFlag == "config" {
+			continue
+		}
+		_, found := slices.BinarySearch(userConfigKeys, documentedFlag)
+		if !found {
+			t.Errorf("Found documentation for flag that doesn't exist: %s", documentedFlag)
+		}
 	}
 
 }
@@ -955,6 +1059,46 @@ func TestExecute_AutoplanFileList(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Log("Should validate autoplan file list when " + testCase.description)
+		c := setupWithDefaults(testCase.flags, t)
+		err := c.Execute()
+		if testCase.expectErr != "" {
+			ErrEquals(t, testCase.expectErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
+func TestExecute_ValidateDefaultTFDistribution(t *testing.T) {
+	cases := []struct {
+		description string
+		flags       map[string]interface{}
+		expectErr   string
+	}{
+		{
+			"terraform",
+			map[string]interface{}{
+				DefaultTFDistributionFlag: "terraform",
+			},
+			"",
+		},
+		{
+			"opentofu",
+			map[string]interface{}{
+				DefaultTFDistributionFlag: "opentofu",
+			},
+			"",
+		},
+		{
+			"errs on invalid distribution",
+			map[string]interface{}{
+				DefaultTFDistributionFlag: "invalid_distribution",
+			},
+			"invalid tf distribution: expected one of terraform or opentofu",
+		},
+	}
+	for _, testCase := range cases {
+		t.Log("Should validate default tf distribution when " + testCase.description)
 		c := setupWithDefaults(testCase.flags, t)
 		err := c.Execute()
 		if testCase.expectErr != "" {

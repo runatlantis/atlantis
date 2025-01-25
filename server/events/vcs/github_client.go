@@ -25,7 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v66/github"
+	"github.com/gofri/go-github-ratelimit/github_ratelimit"
+	"github.com/google/go-github/v68/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -124,15 +125,24 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
 	}
 
+	transportWithRateLimit, err := github_ratelimit.NewRateLimitWaiterClient(
+		transport.Transport,
+		github_ratelimit.WithTotalSleepLimit(time.Minute, func(callbackContext *github_ratelimit.CallbackContext) {
+			logger.Warn("github rate limit exceeded total sleep time, requests will fail to avoid penalties from github")
+		}))
+	if err != nil {
+		return nil, errors.Wrap(err, "error initializing github rate limit transport")
+	}
+
 	var graphqlURL string
 	var client *github.Client
 	if hostname == "github.com" {
-		client = github.NewClient(transport)
+		client = github.NewClient(transportWithRateLimit)
 		graphqlURL = "https://api.github.com/graphql"
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
 		// TODO: Deprecated: Use NewClient(httpClient).WithEnterpriseURLs(baseURL, uploadURL) instead
-		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport) //nolint:staticcheck
+		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transportWithRateLimit) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +150,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 	}
 
 	// Use the client from shurcooL's githubv4 library for queries.
-	v4Client := githubv4.NewEnterpriseClient(graphqlURL, transport)
+	v4Client := githubv4.NewEnterpriseClient(graphqlURL, transportWithRateLimit)
 
 	user, err := credentials.GetUser()
 	logger.Debug("GH User: %s", user)
@@ -268,8 +278,8 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 	nextPage := 0
 	for {
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
-			Sort:        github.String("created"),
-			Direction:   github.String("asc"),
+			Sort:        github.Ptr("created"),
+			Direction:   github.Ptr("asc"),
 			ListOptions: github.ListOptions{Page: nextPage},
 		})
 		if resp != nil {
@@ -913,9 +923,9 @@ func (g *GithubClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	logger.Info("Updating GitHub Check status for '%s' to '%s'", src, ghState)
 
 	status := &github.RepoStatus{
-		State:       github.String(ghState),
-		Description: github.String(description),
-		Context:     github.String(src),
+		State:       github.Ptr(ghState),
+		Description: github.Ptr(description),
+		Context:     github.Ptr(src),
 		TargetURL:   &url,
 	}
 	_, resp, err := g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, status)

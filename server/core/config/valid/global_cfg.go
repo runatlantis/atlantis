@@ -105,6 +105,7 @@ type MergedProjectCfg struct {
 	AutoplanEnabled           bool
 	AutoMergeDisabled         bool
 	AutoMergeMethod           string
+	TerraformDistribution     *string
 	TerraformVersion          *version.Version
 	RepoCfgVersion            int
 	PolicySets                PolicySets
@@ -412,6 +413,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		DependsOn:                 proj.DependsOn,
 		Name:                      proj.GetName(),
 		AutoplanEnabled:           proj.Autoplan.Enabled,
+		TerraformDistribution:     proj.TerraformDistribution,
 		TerraformVersion:          proj.TerraformVersion,
 		RepoCfgVersion:            rCfg.Version,
 		PolicySets:                g.PolicySets,
@@ -438,6 +440,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		Workspace:                 workspace,
 		Name:                      "",
 		AutoplanEnabled:           DefaultAutoPlanEnabled,
+		TerraformDistribution:     nil,
 		TerraformVersion:          nil,
 		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,

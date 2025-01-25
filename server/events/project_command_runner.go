@@ -660,12 +660,13 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
-		Workspace: ctx.Workspace,
-		User:      ctx.User,
-		Repo:      ctx.Pull.BaseRepo,
-		Pull:      ctx.Pull,
-		Success:   err == nil,
-		Directory: ctx.RepoRelDir,
+		Workspace:   ctx.Workspace,
+		User:        ctx.User,
+		Repo:        ctx.Pull.BaseRepo,
+		Pull:        ctx.Pull,
+		Success:     err == nil,
+		Directory:   ctx.RepoRelDir,
+		ProjectName: ctx.ProjectName,
 	})
 
 	if err != nil {
