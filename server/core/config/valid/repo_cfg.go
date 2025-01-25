@@ -10,7 +10,6 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 )
 
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
@@ -113,22 +112,19 @@ func (r RepoCfg) AutoDiscoverEnabled(defaultAutoDiscoverMode AutoDiscoverMode) b
 	return autoDiscoverMode == AutoDiscoverEnabledMode
 }
 
-func (r RepoCfg) IsPathIgnoredForAutoDiscover(path string) (bool, error) {
+func (r RepoCfg) IsPathIgnoredForAutoDiscover(path string) bool {
 	if r.AutoDiscover == nil || r.AutoDiscover.IgnorePaths == nil {
-		return false, nil
+		return false
 	}
 	for i := 0; i < len(r.AutoDiscover.IgnorePaths); i++ {
-		matches, err := doublestar.Match(r.AutoDiscover.IgnorePaths[i], path)
-		if err != nil {
-			// Per documentation https://pkg.go.dev/github.com/bmatcuk/doublestar, this only
-			// occurs if the pattern itself is invalid, and we already checked this when parsing raw config
-			return false, errors.Wrap(err, "unexpectedly found invalid ignore pattern (this is a bug, should have been validated at startup)")
-		}
-		if matches {
-			return true, nil
+		// Per documentation https://pkg.go.dev/github.com/bmatcuk/doublestar, if you run ValidatePattern()
+		// against a pattern, which we do, you can run MatchUnvalidated for a slight performance gain,
+		// and also no need to explicitly check for an error
+		if doublestar.MatchUnvalidated(r.AutoDiscover.IgnorePaths[i], path) {
+			return true
 		}
 	}
-	return false, nil
+	return false
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in
