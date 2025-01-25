@@ -95,10 +95,10 @@ func (r *RunStepRunner) Run(
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output)
 		if !ctx.CustomPolicyCheck {
 			ctx.Log.Debug("error: %s", err)
-			} else {
-				ctx.Log.Debug("Treating custom policy tool error exit code as a policy failure.  Error output: %s", err)
-			}
-			return "", err
+		} else {
+			ctx.Log.Debug("Treating custom policy tool error exit code as a policy failure.  Error output: %s", err)
+		}
+		return "", err
 	}
 
 	switch postProcessOutput {
