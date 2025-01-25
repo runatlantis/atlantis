@@ -17,5 +17,8 @@ func VersionValidator(value interface{}) error {
 		return nil
 	}
 	_, err := version.NewVersion(*strPtr)
-	return fmt.Errorf("version %q could not be parsed: %w", *strPtr, err)
+	if err != nil {
+		return fmt.Errorf("version %q could not be parsed: %w", *strPtr, err)
+	}
+	return nil
 }
