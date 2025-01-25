@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -149,11 +150,14 @@ type WebhookConfig struct {
 	// that is being modified for this event. If the regex matches, we'll
 	// send the webhook, ex. "main.*".
 	BranchRegex string `mapstructure:"branch-regex"`
-	// Kind is the type of webhook we should send, ex. slack.
+	// Kind is the type of webhook we should send, ex. slack or http.
 	Kind string `mapstructure:"kind"`
 	// Channel is the channel to send this webhook to. It only applies to
 	// slack webhooks. Should be without '#'.
 	Channel string `mapstructure:"channel"`
+	// URL is the URL where to deliver this webhook. It only applies to
+	// http webhooks.
+	URL string `mapstructure:"url"`
 }
 
 //go:embed static
@@ -271,7 +275,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
 		var err error
-		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, logger)
+
+		gitlabGroupAllowlistChecker, err := command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+		if err != nil {
+			return nil, err
+		}
+
+		gitlabGroups := slices.Concat(gitlabGroupAllowlistChecker.AllTeams(), globalCfg.PolicySets.AllTeams())
+		slices.Sort(gitlabGroups)
+		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
 		if err != nil {
 			return nil, err
 		}
@@ -379,10 +391,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			Event:          c.Event,
 			Kind:           c.Kind,
 			WorkspaceRegex: c.WorkspaceRegex,
+			URL:            c.URL,
 		}
 		webhooksConfig = append(webhooksConfig, config)
 	}
-	webhooksManager, err := webhooks.NewMultiWebhookSender(webhooksConfig, webhooks.NewSlackClient(userConfig.SlackToken))
+	webhookHeaders, err := userConfig.ToWebhookHttpHeaders()
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing webhook http headers")
+	}
+	webhooksManager, err := webhooks.NewMultiWebhookSender(
+		webhooksConfig,
+		webhooks.Clients{
+			Slack: webhooks.NewSlackClient(userConfig.SlackToken),
+			Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
+		},
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
@@ -674,6 +697,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VcsClient:        vcsClient,
 		Locker:           projectLocker,
 		LockURLGenerator: router,
+		Logger:           logger,
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor:     terraformClient,
 			DefaultTFDistribution: defaultTfDistribution,
@@ -838,6 +862,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			Command:                     globalCfg.TeamAuthz.Command,
 			ExtraArgs:                   globalCfg.TeamAuthz.Args,
 			ExternalTeamAllowlistRunner: &runtime.DefaultExternalTeamAllowlistRunner{},
+		}
+	} else if userConfig.GitlabUser != "" {
+		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+		if err != nil {
+			return nil, err
 		}
 	} else {
 		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)

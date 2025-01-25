@@ -157,7 +157,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	// Check if the user who triggered the autoplan has permissions to run 'plan'.
 	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
-		err := c.fetchUserTeams(baseRepo, &user)
+		err := c.fetchUserTeams(log, baseRepo, &user)
 		if err != nil {
 			log.Err("Unable to fetch user teams: %s", err)
 			return
@@ -306,7 +306,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
 	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
-		err := c.fetchUserTeams(baseRepo, &user)
+		err := c.fetchUserTeams(log, baseRepo, &user)
 		if err != nil {
 			c.Logger.Err("Unable to fetch user teams: %s", err)
 			return
@@ -515,8 +515,8 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	return
 }
 
-func (c *DefaultCommandRunner) fetchUserTeams(repo models.Repo, user *models.User) error {
-	teams, err := c.VCSClient.GetTeamNamesForUser(repo, *user)
+func (c *DefaultCommandRunner) fetchUserTeams(logger logging.SimpleLogging, repo models.Repo, user *models.User) error {
+	teams, err := c.VCSClient.GetTeamNamesForUser(logger, repo, *user)
 	if err != nil {
 		return err
 	}
