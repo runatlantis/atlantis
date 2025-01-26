@@ -252,7 +252,6 @@ jobs:
     strategy:
       matrix:
         image_type: [alpine, debian]
-        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
