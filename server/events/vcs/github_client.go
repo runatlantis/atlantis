@@ -303,9 +303,10 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 	)
 
 	commentsQueryVariables := map[string]interface{}{
-		"owner":    githubv4.String(repo.Owner),
-		"name":     githubv4.String(repo.Name),
-		"number":   githubv4.Int(pullNum), //nolint:gosec
+		"owner": githubv4.String(repo.Owner),
+		"name":  githubv4.String(repo.Name),
+		// TODO: This is a potential integer overflow. We should fix this.
+		"number":   githubv4.Int(pullNum), // #nosec G115: integer overflow conversion int -> int32
 		"pageSize": githubv4.Int(100),
 		"after":    (*githubv4.String)(nil),
 	}
