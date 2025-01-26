@@ -360,7 +360,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-// Update the combined plan or apply commit status to pending
+	// Update the combined plan or apply commit status to pending
 	switch cmd.Name {
 	case command.Plan:
 		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
@@ -370,7 +370,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
 			ctx.Log.Warn("unable to update apply commit status: %s", err)
 		}
-}
+	}
 
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
