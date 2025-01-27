@@ -330,8 +330,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_BITBUCKET_WEBHOOK_SECRET="secret"
   ```
 
-  Secret used to validate Bitbucket webhooks. Only Bitbucket Server supports webhook secrets.
-  For Bitbucket.org, see [Security](security.md#bitbucket-cloud-bitbucket-org) for mitigations.
+  Secret used to validate Bitbucket webhooks.
 
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from Bitbucket.
@@ -800,6 +799,21 @@ based on the organization or user that triggered the webhook.
   This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
   :::
 
+### `--gitlab-group-allowlist`
+
+  ```bash
+  atlantis server --gitlab-group-allowlist="myorg/mygroup:plan, myorg/secteam:apply, myorg/devops:apply, myorg/devops:import"
+  # or
+  ATLANTIS_GITLAB_GROUP_ALLOWLIST="myorg/mygroup:plan, myorg/secteam:apply, myorg/devops:apply, myorg/devops:import"
+  ```
+
+  Comma-separated list of GitLab groups and permission pairs.
+
+  By default, any group can plan and apply.
+
+  ::: warning NOTE
+  Atlantis needs to be able to view the listed group members, inaccessible or non-existent groups are silently ignored.
+
 ### `--gitlab-hostname`
 
   ```bash
@@ -863,9 +877,14 @@ based on the organization or user that triggered the webhook.
   ```
 
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub and GitLab currently. This is not enabled by default. When using Github App, you need to set `--gh-app-slug` to enable this feature.
-  For github, ensure the `--gh-user` is set appropriately or comments will not be hidden.
+  GitHub and GitLab and Bitbucket currently and is not enabled by default.
+  
+  For Bitbucket, the comments are deleted rather than hidden as Bitbucket does not support hiding comments.
+  
+  For GitHub, ensure the `--gh-user` is set appropriately or comments will not be hidden.
 
+  When using the GitHub App, you need to set `--gh-app-slug` to enable this feature.
+  
 ### `--hide-unchanged-plan-comments`
 
   ```bash
