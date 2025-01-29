@@ -101,8 +101,8 @@ func (d *ClientProxy) GetTeamNamesForUser(logger logging.SimpleLogging, repo mod
 	return d.clients[repo.VCSHost.Type].GetTeamNamesForUser(logger, repo, user)
 }
 
-func (d *ClientProxy) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {
-	return d.clients[pull.BaseRepo.VCSHost.Type].GetFileContent(logger, pull, fileName)
+func (d *ClientProxy) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+	return d.clients[repo.VCSHost.Type].GetFileContent(logger, repo, branch, fileName)
 }
 
 func (d *ClientProxy) SupportsSingleFileDownload(repo models.Repo) bool {
