@@ -117,10 +117,6 @@ echo -n "yoursecret" > webhook-secret
 kubectl create secret generic atlantis-vcs --from-file=token --from-file=webhook-secret
 ```
 
-::: tip Note
-If you're using Bitbucket Cloud then there is no webhook secret since it's not supported.
-:::
-
 Next, edit the manifests below as follows:
 
 1. Replace `<VERSION>` in `image: ghcr.io/runatlantis/atlantis:<VERSION>` with the most recent version from [GitHub: Atlantis latest release](https://github.com/runatlantis/atlantis/releases/latest).
@@ -231,6 +227,11 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: token
+        - name: ATLANTIS_BITBUCKET_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: webhook-secret
         ### End Bitbucket Config ###
 
         ### Azure DevOps Config ###
@@ -742,6 +743,7 @@ atlantis server \
 --atlantis-url="$URL" \
 --bitbucket-user="$USERNAME" \
 --bitbucket-token="$TOKEN" \
+--bitbucket-webhook-secret="$SECRET" \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
 

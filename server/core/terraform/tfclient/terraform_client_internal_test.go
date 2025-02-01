@@ -1,4 +1,4 @@
-package terraform
+package tfclient
 
 import (
 	"fmt"
@@ -10,6 +10,8 @@ import (
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
+	"github.com/runatlantis/atlantis/server/core/terraform"
+	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -120,7 +122,9 @@ func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
 		"DIR=$DIR",
 	}
 	customEnvVars := map[string]string{}
-	out, err := client.RunCommandWithVersion(ctx, tmp, args, customEnvVars, nil, "workspace")
+	mockDownloader := terraform_mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	out, err := client.RunCommandWithVersion(ctx, tmp, args, customEnvVars, distribution, nil, "workspace")
 	Ok(t, err)
 	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s\n", tmp, tmp)
 	Equals(t, exp, out)
@@ -163,8 +167,10 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 		"exit",
 		"1",
 	}
-	out, err := client.RunCommandWithVersion(ctx, tmp, args, map[string]string{}, nil, "workspace")
-	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
+	mockDownloader := terraform_mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	out, err := client.RunCommandWithVersion(ctx, tmp, args, map[string]string{}, distribution, nil, "workspace")
+	ErrEquals(t, fmt.Sprintf(`running 'echo dying && exit 1' in '%s': exit status 1`, tmp), err)
 	// Test that we still get our output.
 	Equals(t, "dying\n", out)
 }
@@ -209,7 +215,9 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 		"ATLANTIS_TERRAFORM_VERSION=$ATLANTIS_TERRAFORM_VERSION",
 		"DIR=$DIR",
 	}
-	_, outCh := client.RunCommandAsync(ctx, tmp, args, map[string]string{}, nil, "workspace")
+	mockDownloader := terraform_mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	_, outCh := client.RunCommandAsync(ctx, tmp, args, map[string]string{}, distribution, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -261,7 +269,9 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		_, err = f.WriteString(s)
 		Ok(t, err)
 	}
-	_, outCh := client.RunCommandAsync(ctx, tmp, []string{filename}, map[string]string{}, nil, "workspace")
+	mockDownloader := terraform_mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	_, outCh := client.RunCommandAsync(ctx, tmp, []string{filename}, map[string]string{}, distribution, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -301,7 +311,9 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 		overrideTF:              "echo",
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"stderr", ">&2"}, map[string]string{}, nil, "workspace")
+	mockDownloader := terraform_mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"stderr", ">&2"}, map[string]string{}, distribution, nil, "workspace")
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
@@ -341,10 +353,12 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 		overrideTF:              "echo",
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
-	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, nil, "workspace")
+	mockDownloader := terraform_mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"dying", "&&", "exit", "1"}, map[string]string{}, distribution, nil, "workspace")
 
 	out, err := waitCh(outCh)
-	ErrEquals(t, fmt.Sprintf(`running "echo dying && exit 1" in %q: exit status 1`, tmp), err)
+	ErrEquals(t, fmt.Sprintf(`running 'sh -c' 'echo dying && exit 1' in '%s': exit status 1`, tmp), err)
 	// Test that we still get our output.
 	Equals(t, "dying", out)
 
@@ -383,7 +397,9 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 
-	inCh, outCh := client.RunCommandAsync(ctx, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, nil, "workspace")
+	mockDownloader := terraform_mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	inCh, outCh := client.RunCommandAsync(ctx, tmp, []string{"a", "&&", "echo", "$a"}, map[string]string{}, distribution, nil, "workspace")
 	inCh <- "echo me\n"
 
 	out, err := waitCh(outCh)

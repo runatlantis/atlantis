@@ -2,11 +2,21 @@ name: pr-size
 
 on: [pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   labeler:
+    permissions:
+      pull-requests: write  # for codelytv/pr-size-labeler to add labels & comment on PRs
     runs-on: ubuntu-latest
     name: Label the PR size
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        with:
+          egress-policy: audit
+
       - uses: codelytv/pr-size-labeler@c7a55a022747628b50f3eb5bf863b9e796b8f274 # v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -26,13 +26,18 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - name: Harden Runner
+        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
           filters: |
             src:
-              - '**.js'
+              - 'runatlantis.io/**'
               - 'package-lock.json'
               - 'package.json'
               - '.github/workflows/website.yml'
@@ -46,16 +51,21 @@ jobs:
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - name: Harden Runner
+        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: markdown-lint
-        uses: DavidAnson/markdownlint-cli2-action@b4c9feab76d8025d1e83c653fa3990936df0e6c8 # v16
+        uses: DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265 # v19
         with:
           config: .markdownlint.yaml
           globs: 'runatlantis.io/**/*.md'
 
       - name: setup npm
-        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -63,7 +73,7 @@ jobs:
       - name: run http-server
         env:
           # renovate: datasource=github-releases depName=raviqqe/muffet
-          MUFFET_VERSION: 2.10.3
+          MUFFET_VERSION: 2.10.6
         run: |
           # install raviqqe/muffet to check for broken links.
           curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
@@ -85,17 +95,25 @@ jobs:
 
       # medium.com => was being rate limited: HTTP 429
       # twitter.com => too many redirections
+      # www.flaticon.com => 403 error
+      # www.freepik.com => 403 error
+      # ngrok.com => 406 error
       - run: |
           ./muffet \
             -e 'https://medium.com/runatlantis' \
             -e 'https://dev.to/*' \
             -e 'https://twitter.com/*' \
+            -e 'https://www.flaticon.com/*' \
+            -e 'https://www.freepik.com/*' \
+            -e 'https://ngrok.com/*' \
             -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \
             -e 'https://confluence.atlassian.com/*' \
+            --header 'User-Agent: Muffet' \
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
+            --timeout 300 \
             http://localhost:8080/
 
   skip-link-check:
@@ -104,4 +122,9 @@ jobs:
     name: Website Link Check
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        with:
+          egress-policy: audit
+
       - run: 'echo "No build required"'

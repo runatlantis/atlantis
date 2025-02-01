@@ -30,7 +30,7 @@ type Client interface {
 	ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error
 	HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error
 	PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error)
-	PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error)
+	PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error)
 	// UpdateStatus updates the commit status to state for pull. src is the
 	// source of this status. This should be relatively static across runs,
 	// ex. atlantis/plan or atlantis/apply.
@@ -42,7 +42,7 @@ type Client interface {
 	DiscardReviews(repo models.Repo, pull models.PullRequest) error
 	MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error
 	MarkdownPullLink(pull models.PullRequest) (string, error)
-	GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error)
+	GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error)
 
 	// GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 	// The first return value indicates whether the repo contains a file or not

@@ -17,13 +17,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 
 	giteasdk "code.gitea.io/sdk/gitea"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v68/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
@@ -33,7 +34,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 const gitlabPullOpened = "opened"
@@ -128,6 +129,8 @@ type CommentCommand struct {
 	SubName string
 	// AutoMergeDisabled is true if the command should not automerge after apply.
 	AutoMergeDisabled bool
+	// AutoMergeMethod specified the merge method for the VCS if automerge enabled.
+	AutoMergeMethod string
 	// Verbose is true if the command should output verbosely.
 	Verbose bool
 	// Workspace is the name of the Terraform workspace to run the command in.
@@ -177,11 +180,11 @@ func (c CommentCommand) IsAutoplan() bool {
 
 // String returns a string representation of the command.
 func (c CommentCommand) String() string {
-	return fmt.Sprintf("command=%q verbose=%t dir=%q workspace=%q project=%q policyset=%q, clear-policy-approval=%t, flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.PolicySet, c.ClearPolicyApproval, strings.Join(c.Flags, ","))
+	return fmt.Sprintf("command=%q, verbose=%t, dir=%q, workspace=%q, project=%q, policyset=%q, auto-merge-disabled=%t, auto-merge-method=%s, clear-policy-approval=%t, flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.PolicySet, c.AutoMergeDisabled, c.AutoMergeMethod, c.ClearPolicyApproval, strings.Join(c.Flags, ","))
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, workspace string, project string, policySet string, clearPolicyApproval bool) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, autoMergeMethod string, workspace string, project string, policySet string, clearPolicyApproval bool) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -198,6 +201,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, sub
 		Verbose:             verbose,
 		Workspace:           workspace,
 		AutoMergeDisabled:   autoMergeDisabled,
+		AutoMergeMethod:     autoMergeMethod,
 		ProjectName:         project,
 		PolicySet:           policySet,
 		ClearPolicyApproval: clearPolicyApproval,
@@ -354,6 +358,7 @@ type EventParsing interface {
 type EventParser struct {
 	GithubUser         string
 	GithubToken        string
+	GithubTokenFile    string
 	GitlabUser         string
 	GitlabToken        string
 	GiteaUser          string
@@ -369,7 +374,15 @@ type EventParser struct {
 func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFullName string, cloneURL string) (models.Repo, error) {
 	switch vcsHostType {
 	case models.Github:
-		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, e.GithubToken)
+		token := e.GithubToken
+		if e.GithubTokenFile != "" {
+			content, err := os.ReadFile(e.GithubTokenFile)
+			if err != nil {
+				return models.Repo{}, fmt.Errorf("failed reading github token file: %w", err)
+			}
+			token = string(content)
+		}
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, token)
 	case models.Gitea:
 		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GiteaUser, e.GiteaToken)
 	case models.Gitlab:
@@ -623,7 +636,16 @@ func (e *EventParser) ParseGithubPull(logger logging.SimpleLogging, pull *github
 // returns a repo into the Atlantis model.
 // See EventParsing for return value docs.
 func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, error) {
-	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, e.GithubToken)
+	token := e.GithubToken
+	if e.GithubTokenFile != "" {
+		content, err := os.ReadFile(e.GithubTokenFile)
+		if err != nil {
+			return models.Repo{}, fmt.Errorf("failed reading github token file: %w", err)
+		}
+		token = string(content)
+	}
+
+	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, token)
 }
 
 // ParseGiteaRepo parses the response from the Gitea API endpoint that

@@ -283,7 +283,7 @@ func (c *GiteaClient) PullIsApproved(logger logging.SimpleLogging, repo models.R
 }
 
 // PullIsMergeable returns true if the pull request is mergeable
-func (c *GiteaClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+func (c *GiteaClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) {
 	logger.Debug("Checking if Gitea pull request %d is mergeable", pull.Num)
 
 	pullRequest, _, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pull.Num))
@@ -316,7 +316,7 @@ func (c *GiteaClient) UpdateStatus(logger logging.SimpleLogging, repo models.Rep
 		giteaState = gitea.StatusFailure
 	}
 
-	logger.Debug("Updating status on Gitea pull request %d for '%s' to '%s'", pull.Num, description, state)
+	logger.Info("Updating Gitea check status for '%s' to '%s'", src, state)
 
 	newStatusOption := gitea.CreateStatusOption{
 		State:       giteaState,
@@ -413,7 +413,7 @@ func (c *GiteaClient) MarkdownPullLink(pull models.PullRequest) (string, error) 
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (c *GiteaClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (c *GiteaClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) {
 	// TODO: implement
 	return nil, errors.New("GetTeamNamesForUser not (yet) implemented for Gitea client")
 }

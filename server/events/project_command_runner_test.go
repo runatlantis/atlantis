@@ -23,7 +23,9 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	tmocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -99,7 +101,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 	When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-	When(mockRun.Run(ctx, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
+	When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
@@ -115,7 +117,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		case "apply":
 			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 		case "run":
-			mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs, true, "")
+			mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, "")
 		}
 	}
 }
@@ -455,8 +457,8 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 			When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
-			When(mockEnv.Run(ctx, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
+			When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
+			When(mockEnv.Run(ctx, nil, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
 
 			res := runner.Apply(ctx)
 			Equals(t, c.expOut, res.ApplySuccess)
@@ -471,9 +473,9 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				case "apply":
 					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, "", repoDir, expEnvs, true, "")
+					mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, "")
 				case "env":
-					mockEnv.VerifyWasCalledOnce().Run(ctx, "", "value", repoDir, expEnvs)
+					mockEnv.VerifyWasCalledOnce().Run(ctx, nil, "", "value", repoDir, expEnvs)
 				}
 			}
 		})
@@ -542,12 +544,14 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 // not running any Terraform.
 func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	RegisterMockTestingT(t)
-	tfClient := tmocks.NewMockClient()
+	tfClient := tfclientmocks.NewMockClient()
+	tfDistribution := terraform.NewDistributionTerraformWithDownloader(tmocks.NewMockDownloader())
 	tfVersion, err := version.NewVersion("0.12.0")
 	Ok(t, err)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	run := runtime.RunStepRunner{
 		TerraformExecutor:       tfClient,
+		DefaultTFDistribution:   tfDistribution,
 		DefaultTFVersion:        tfVersion,
 		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}
@@ -845,7 +849,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			expFailure: "One or more policy sets require additional approval.",
 		},
 		{
-			description: "When user is a top-level ownner through membership, increment approval on all policies.",
+			description: "When user is a top-level owner through membership, increment approval on all policies.",
 			userTeams:   []string{"someuserteam"},
 			policySetCfg: valid.PolicySets{
 				Owners: valid.PolicyOwners{
@@ -1276,7 +1280,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			}
 
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, Author: testdata.User.Username}
-			When(runner.VcsClient.GetTeamNamesForUser(testdata.GithubRepo, testdata.User)).ThenReturn(c.userTeams, nil)
+			When(runner.VcsClient.GetTeamNamesForUser(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.User))).ThenReturn(c.userTeams, nil)
 			ctx := command.ProjectContext{
 				User:                testdata.User,
 				Log:                 logging.NewNoopLogger(t),

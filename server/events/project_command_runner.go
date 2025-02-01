@@ -65,20 +65,42 @@ type StepRunner interface {
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
+	Run(
+		ctx command.ProjectContext,
+		shell *valid.CommandShell,
+		cmd string,
+		path string,
+		envs map[string]string,
+		streamOutput bool,
+		postProcessOutput valid.PostProcessRunOutputOption,
+	) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
 
 // EnvStepRunner runs env steps.
 type EnvStepRunner interface {
-	Run(ctx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error)
+	Run(
+		ctx command.ProjectContext,
+		shell *valid.CommandShell,
+		cmd string,
+		value string,
+		path string,
+		envs map[string]string,
+	) (string, error)
 }
 
 // MultiEnvStepRunner runs multienv steps.
 type MultiEnvStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
+	Run(
+		ctx command.ProjectContext,
+		shell *valid.CommandShell,
+		cmd string,
+		path string,
+		envs map[string]string,
+		postProcessOutput valid.PostProcessRunOutputOption,
+	) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -102,7 +124,7 @@ type ProjectApplyCommandRunner interface {
 }
 
 type ProjectPolicyCheckCommandRunner interface {
-	// PolicyCheck runs OPA defined policies for the project desribed by ctx.
+	// PolicyCheck runs OPA defined policies for the project described by ctx.
 	PolicyCheck(ctx command.ProjectContext) command.ProjectResult
 }
 
@@ -203,6 +225,7 @@ type DefaultProjectCommandRunner struct {
 	VcsClient                 vcs.Client
 	Locker                    ProjectLocker
 	LockURLGenerator          LockURLGenerator
+	Logger                    logging.SimpleLogging
 	InitStepRunner            StepRunner
 	PlanStepRunner            StepRunner
 	ShowStepRunner            StepRunner
@@ -345,7 +368,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	// Only query the users team membership if any teams have been configured as owners on any policy set(s).
 	if policySetCfg.HasTeamOwners() {
 		// A convenient way to access vcsClient. Not sure if best way.
-		userTeams, err := p.VcsClient.GetTeamNamesForUser(ctx.Pull.BaseRepo, ctx.User)
+		userTeams, err := p.VcsClient.GetTeamNamesForUser(p.Logger, ctx.Pull.BaseRepo, ctx.User)
 		if err != nil {
 			ctx.Log.Err("unable to get team membership for user: %s", err)
 			return nil, "", err
@@ -383,6 +406,9 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					} else {
 						prjPolicyStatus[i].Approvals = 0
 					}
+					// User matches the author and prevent self approve is set to true
+				} else if isOwner && !ignorePolicy && ctx.User.Username == ctx.Pull.Author && policySet.PreventSelfApprove {
+					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s the author of pr %s matches the command commenter user %s - please contact another policy owners to approve failing policies", policySet.Name, ctx.Pull.Author, ctx.User.Username))
 					// User is not authorized to approve policy set.
 				} else if !ignorePolicy {
 					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
@@ -635,12 +661,13 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
-		Workspace: ctx.Workspace,
-		User:      ctx.User,
-		Repo:      ctx.Pull.BaseRepo,
-		Pull:      ctx.Pull,
-		Success:   err == nil,
-		Directory: ctx.RepoRelDir,
+		Workspace:   ctx.Workspace,
+		User:        ctx.User,
+		Repo:        ctx.Pull.BaseRepo,
+		Pull:        ctx.Pull,
+		Success:     err == nil,
+		Directory:   ctx.RepoRelDir,
+		ProjectName: ctx.ProjectName,
 	})
 
 	if err != nil {
@@ -790,15 +817,15 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs, true, step.Output)
+			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, true, step.Output)
 		case "env":
-			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
+			out, err = p.EnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out
 			// We reset out to the empty string because we don't want it to
 			// be printed to the PR, it's solely to set the environment variable.
 			out = ""
 		case "multienv":
-			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs, step.Output)
+			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, step.Output)
 		}
 
 		if out != "" {

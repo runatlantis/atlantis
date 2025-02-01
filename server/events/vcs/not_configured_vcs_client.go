@@ -45,7 +45,7 @@ func (a *NotConfiguredVCSClient) PullIsApproved(_ logging.SimpleLogging, _ model
 func (a *NotConfiguredVCSClient) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
 	return nil
 }
-func (a *NotConfiguredVCSClient) PullIsMergeable(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ string) (bool, error) {
+func (a *NotConfiguredVCSClient) PullIsMergeable(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ string, _ []string) (bool, error) {
 	return false, a.err()
 }
 func (a *NotConfiguredVCSClient) UpdateStatus(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ models.CommitStatus, _ string, _ string, _ string) error {
@@ -60,7 +60,7 @@ func (a *NotConfiguredVCSClient) MarkdownPullLink(_ models.PullRequest) (string,
 func (a *NotConfiguredVCSClient) err() error {
 	return fmt.Errorf("atlantis was not configured to support repos from %s", a.Host.String())
 }
-func (a *NotConfiguredVCSClient) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]string, error) {
+func (a *NotConfiguredVCSClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) {
 	return nil, a.err()
 }
 

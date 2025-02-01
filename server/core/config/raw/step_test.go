@@ -143,12 +143,12 @@ key: value`,
 
 		// Errors
 		{
-			description: "extra args style no slice strings",
+			description: "extra args style no map strings",
 			input: `
 key:
-  value:
-    another: map`,
-			expErr: "yaml: unmarshal errors:\n  line 3: cannot unmarshal !!map into string",
+ - value:
+     another: map`,
+			expErr: "yaml: unmarshal errors:\n  line 3: cannot unmarshal !!seq into map[string]interface {}",
 		},
 	}
 
@@ -231,6 +231,47 @@ func TestStep_Validate(t *testing.T) {
 					"env": {
 						"name":    "test",
 						"command": "echo 123",
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "env shell",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":    "test",
+						"command": "echo 123",
+						"shell":   "bash",
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "env shellArgs string",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":      "test",
+						"command":   "echo 123",
+						"shell":     "bash",
+						"shellArgs": "-c",
+					},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "env shellArgs list of strings",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":      "test",
+						"command":   "echo 123",
+						"shell":     "bash",
+						"shellArgs": []interface{}{"-c", "--debug"},
 					},
 				},
 			},
@@ -371,7 +412,7 @@ func TestStep_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "env steps only support keys \"name\", \"value\" and \"command\", found key \"abc\"",
+			expErr: "env steps only support keys \"name\", \"value\", \"command\", \"shell\" and \"shellArgs\", found key \"abc\"",
 		},
 		{
 			description: "env step with both command and value set",
@@ -387,9 +428,61 @@ func TestStep_Validate(t *testing.T) {
 			expErr: "env steps only support one of the \"value\" or \"command\" keys, found both",
 		},
 		{
+			description: "env step with shell set but not command",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":  "name",
+						"shell": "bash",
+					},
+				},
+			},
+			expErr: "workflow steps only support \"shell\" key in combination with \"command\" key",
+		},
+		{
+			description: "env step with shellArgs set but not shell",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"env": {
+						"name":      "name",
+						"shellArgs": "-c",
+					},
+				},
+			},
+			expErr: "workflow steps only support \"shellArgs\" key in combination with \"shell\" key",
+		},
+		{
+			description: "run step with shellArgs is not list of strings",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"run": {
+						"name":      "name",
+						"command":   "echo",
+						"shell":     "shell",
+						"shellArgs": []int{42, 42},
+					},
+				},
+			},
+			expErr: "\"run\" step \"shellArgs\" option must be a string or a list of strings, found [42 42]\n",
+		},
+		{
+			description: "run step with shellArgs contain not strings",
+			input: raw.Step{
+				CommandMap: EnvType{
+					"run": {
+						"name":      "name",
+						"command":   "echo",
+						"shell":     "shell",
+						"shellArgs": []interface{}{"-c", 42},
+					},
+				},
+			},
+			expErr: "\"run\" step \"shellArgs\" option must contain only strings, found 42\n",
+		},
+		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should
 			// be no error.
-			description: "unparseable shell command",
+			description: "unparsable shell command",
 			input: raw.Step{
 				StringVal: map[string]string{
 					"run": "my 'c",
@@ -611,6 +704,6 @@ func TestStep_ToValid(t *testing.T) {
 }
 
 type MapType map[string]map[string][]string
-type EnvType map[string]map[string]string
-type RunType map[string]map[string]string
-type MultiEnvType map[string]map[string]string
+type EnvType map[string]map[string]interface{}
+type RunType map[string]map[string]interface{}
+type MultiEnvType map[string]map[string]interface{}

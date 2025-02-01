@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -42,6 +43,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/redis"
+	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
@@ -127,12 +129,13 @@ type Server struct {
 
 // Config holds config for server that isn't passed in by the user.
 type Config struct {
-	AllowForkPRsFlag        string
-	AtlantisURLFlag         string
-	AtlantisVersion         string
-	DefaultTFVersionFlag    string
-	RepoConfigJSONFlag      string
-	SilenceForkPRErrorsFlag string
+	AllowForkPRsFlag          string
+	AtlantisURLFlag           string
+	AtlantisVersion           string
+	DefaultTFDistributionFlag string
+	DefaultTFVersionFlag      string
+	RepoConfigJSONFlag        string
+	SilenceForkPRErrorsFlag   string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -147,11 +150,14 @@ type WebhookConfig struct {
 	// that is being modified for this event. If the regex matches, we'll
 	// send the webhook, ex. "main.*".
 	BranchRegex string `mapstructure:"branch-regex"`
-	// Kind is the type of webhook we should send, ex. slack.
+	// Kind is the type of webhook we should send, ex. slack or http.
 	Kind string `mapstructure:"kind"`
 	// Channel is the channel to send this webhook to. It only applies to
 	// slack webhooks. Should be without '#'.
 	Channel string `mapstructure:"channel"`
+	// URL is the URL where to deliver this webhook. It only applies to
+	// http webhooks.
+	URL string `mapstructure:"url"`
 }
 
 //go:embed static
@@ -230,8 +236,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
 			githubCredentials = &vcs.GithubUserCredentials{
-				User:  userConfig.GithubUser,
-				Token: userConfig.GithubToken,
+				User:      userConfig.GithubUser,
+				Token:     userConfig.GithubToken,
+				TokenFile: userConfig.GithubTokenFile,
 			}
 		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKeyFile != "" {
 			privateKey, err := os.ReadFile(userConfig.GithubAppKeyFile)
@@ -268,7 +275,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
 		var err error
-		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, logger)
+
+		gitlabGroupAllowlistChecker, err := command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+		if err != nil {
+			return nil, err
+		}
+
+		gitlabGroups := slices.Concat(gitlabGroupAllowlistChecker.AllTeams(), globalCfg.PolicySets.AllTeams())
+		slices.Sort(gitlabGroups)
+		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
 		if err != nil {
 			return nil, err
 		}
@@ -316,7 +331,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
-	logger.Info("Supported VCS Hosts", "hosts", supportedVCSHosts)
+	var supportedVCSHostsStr []string
+	for _, host := range supportedVCSHosts {
+		supportedVCSHostsStr = append(supportedVCSHostsStr, host.String())
+	}
+
+	logger.Info("Supported VCS Hosts: %s", strings.Join(supportedVCSHostsStr, ", "))
 
 	home, err := homedir.Dir()
 	if err != nil {
@@ -371,10 +391,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			Event:          c.Event,
 			Kind:           c.Kind,
 			WorkspaceRegex: c.WorkspaceRegex,
+			URL:            c.URL,
 		}
 		webhooksConfig = append(webhooksConfig, config)
 	}
-	webhooksManager, err := webhooks.NewMultiWebhookSender(webhooksConfig, webhooks.NewSlackClient(userConfig.SlackToken))
+	webhookHeaders, err := userConfig.ToWebhookHttpHeaders()
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing webhook http headers")
+	}
+	webhooksManager, err := webhooks.NewMultiWebhookSender(
+		webhooksConfig,
+		webhooks.Clients{
+			Slack: webhooks.NewSlackClient(userConfig.SlackToken),
+			Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
+		},
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
@@ -421,8 +452,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		)
 	}
 
-	terraformClient, err := terraform.NewClient(
+	distribution := terraform.NewDistribution(userConfig.DefaultTFDistribution)
+
+	terraformClient, err := tfclient.NewClient(
 		logger,
+		distribution,
 		binDir,
 		cacheDir,
 		userConfig.TFEToken,
@@ -430,7 +464,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DefaultTFVersion,
 		config.DefaultTFVersionFlag,
 		userConfig.TFDownloadURL,
-		&terraform.DefaultDownloader{},
 		userConfig.TFDownload,
 		userConfig.UseTFPluginCache,
 		projectCmdOutputHandler)
@@ -438,7 +471,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
 	if err != nil && flag.Lookup("test.v") == nil {
-		return nil, errors.Wrap(err, "initializing terraform")
+		return nil, errors.Wrap(err, fmt.Sprintf("initializing %s", userConfig.DefaultTFDistribution))
 	}
 	markdownRenderer := events.NewMarkdownRenderer(
 		gitlabClient.SupportsCommonMark(),
@@ -450,6 +483,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.MarkdownTemplateOverridesDir,
 		userConfig.ExecutableName,
 		userConfig.HideUnchangedPlanComments,
+		userConfig.QuietPolicyChecks,
 	)
 
 	var lockingClient locking.Locker
@@ -509,8 +543,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			GithubHostname: userConfig.GithubHostname,
 		}
 
-		githubAppTokenRotator := vcs.NewGithubAppTokenRotator(logger, githubCredentials, userConfig.GithubHostname, home)
+		githubAppTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, "x-access-token", home)
 		tokenJd, err := githubAppTokenRotator.GenerateJob()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not write credentials")
+		}
+		scheduledExecutorService.AddJob(tokenJd)
+	}
+
+	if userConfig.GithubUser != "" && userConfig.GithubTokenFile != "" && userConfig.WriteGitCreds {
+		githubTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, userConfig.GithubUser, home)
+		tokenJd, err := githubTokenRotator.GenerateJob()
 		if err != nil {
 			return nil, errors.Wrap(err, "could not write credentials")
 		}
@@ -545,6 +588,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
+		GithubTokenFile:    userConfig.GithubTokenFile,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
 		GiteaUser:          userConfig.GiteaUser,
@@ -565,10 +609,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ExecutableName,
 		allowCommands,
 	)
+	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	runStepRunner := &runtime.RunStepRunner{
 		TerraformExecutor:       terraformClient,
+		DefaultTFDistribution:   defaultTfDistribution,
 		DefaultTFVersion:        defaultTfVersion,
 		TerraformBinDir:         terraformClient.TerraformBinDir(),
 		ProjectCmdOutputHandler: projectCmdOutputHandler,
@@ -627,15 +673,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		terraformClient,
 	)
 
-	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
+	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing show step runner")
 	}
 
 	policyCheckStepRunner, err := runtime.NewPolicyCheckStepRunner(
+		defaultTfDistribution,
 		defaultTfVersion,
-		policy.NewConfTestExecutorWorkflow(logger, binDir, &terraform.DefaultDownloader{}),
+		policy.NewConfTestExecutorWorkflow(logger, binDir, &policy.ConfTestGoGetterVersionDownloader{}),
 	)
 
 	if err != nil {
@@ -650,18 +697,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VcsClient:        vcsClient,
 		Locker:           projectLocker,
 		LockURLGenerator: router,
+		Logger:           logger,
 		InitStepRunner: &runtime.InitStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTfVersion,
+			TerraformExecutor:     terraformClient,
+			DefaultTFDistribution: defaultTfDistribution,
+			DefaultTFVersion:      defaultTfVersion,
 		},
-		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfVersion, commitStatusUpdater, terraformClient),
+		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, commitStatusUpdater, terraformClient),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckStepRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
-			TerraformExecutor:   terraformClient,
-			DefaultTFVersion:    defaultTfVersion,
-			CommitStatusUpdater: commitStatusUpdater,
-			AsyncTFExec:         terraformClient,
+			TerraformExecutor:     terraformClient,
+			DefaultTFDistribution: defaultTfDistribution,
+			DefaultTFVersion:      defaultTfVersion,
+			CommitStatusUpdater:   commitStatusUpdater,
+			AsyncTFExec:           terraformClient,
 		},
 		RunStepRunner: runStepRunner,
 		EnvStepRunner: &runtime.EnvStepRunner{
@@ -674,8 +724,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfVersion),
-		StateRmStepRunner:         runtime.NewStateRmStepRunner(terraformClient, defaultTfVersion),
+		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
+		StateRmStepRunner:         runtime.NewStateRmStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
 		WorkingDir:                workingDir,
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,
@@ -717,7 +767,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.QuietPolicyChecks,
 	)
 
-	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName)
+	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName, strings.Split(userConfig.IgnoreVCSStatusNames, ","))
 	planCommandRunner := events.NewPlanCommandRunner(
 		userConfig.SilenceVCSStatusNoPlans,
 		userConfig.SilenceVCSStatusNoProjects,
@@ -812,6 +862,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			Command:                     globalCfg.TeamAuthz.Command,
 			ExtraArgs:                   globalCfg.TeamAuthz.Args,
 			ExternalTeamAllowlistRunner: &runtime.DefaultExternalTeamAllowlistRunner{},
+		}
+	} else if userConfig.GitlabUser != "" {
+		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+		if err != nil {
+			return nil, err
 		}
 	} else {
 		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
@@ -1101,7 +1156,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	applyCmdLock, err := s.ApplyLocker.CheckApplyLock()
-	s.Logger.Info("Apply Lock: %v", applyCmdLock)
+	s.Logger.Debug("Apply Lock: %v", applyCmdLock)
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err)

@@ -19,16 +19,20 @@ func TestAutoDiscover_UnmarshalYAML(t *testing.T) {
 			description: "omit unset fields",
 			input:       "",
 			exp: raw.AutoDiscover{
-				Mode: nil,
+				Mode:        nil,
+				IgnorePaths: nil,
 			},
 		},
 		{
 			description: "all fields set",
 			input: `
 mode: enabled
+ignore_paths:
+  - foobar
 `,
 			exp: raw.AutoDiscover{
-				Mode: &autoDiscoverEnabled,
+				Mode:        &autoDiscoverEnabled,
+				IgnorePaths: []string{"foobar"},
 			},
 		},
 	}
@@ -86,6 +90,67 @@ func TestAutoDiscover_Validate(t *testing.T) {
 			},
 			errContains: String("valid value"),
 		},
+		{
+			description: "ignore set with leading slash",
+			input: raw.AutoDiscover{
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					"/foo",
+				},
+			},
+			errContains: String("pattern must not begin with a slash '/'"),
+		},
+		{
+			description: `ignore set to broken pattern \`,
+			input: raw.AutoDiscover{
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					`\`,
+				},
+			},
+			errContains: String(`invalid pattern: \`),
+		},
+		{
+			description: "ignore set to broken pattern [",
+			input: raw.AutoDiscover{
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					"[",
+				},
+			},
+			errContains: String("invalid pattern: ["),
+		},
+		{
+			description: "ignore set to valid pattern",
+			input: raw.AutoDiscover{
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					"foo*",
+				},
+			},
+			errContains: nil,
+		},
+		{
+			description: "ignore set to long pattern",
+			input: raw.AutoDiscover{
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					"foo/**/bar/baz/??",
+				},
+			},
+			errContains: nil,
+		},
+		{
+			description: "ignore set to one valid and one invalid pattern",
+			input: raw.AutoDiscover{
+				Mode: &autoDiscoverAuto,
+				IgnorePaths: []string{
+					"foo",
+					"foo[",
+				},
+			},
+			errContains: String("invalid pattern: foo["),
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
@@ -109,16 +174,25 @@ func TestAutoDiscover_ToValid(t *testing.T) {
 			description: "nothing set",
 			input:       raw.AutoDiscover{},
 			exp: &valid.AutoDiscover{
-				Mode: valid.AutoDiscoverAutoMode,
+				Mode:        valid.AutoDiscoverAutoMode,
+				IgnorePaths: nil,
 			},
 		},
 		{
 			description: "value set",
 			input: raw.AutoDiscover{
 				Mode: &autoDiscoverEnabled,
+				IgnorePaths: []string{
+					"foo",
+					"bar/*",
+				},
 			},
 			exp: &valid.AutoDiscover{
 				Mode: valid.AutoDiscoverEnabledMode,
+				IgnorePaths: []string{
+					"foo",
+					"bar/*",
+				},
 			},
 		},
 	}

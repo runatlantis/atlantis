@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v68/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
@@ -30,12 +30,13 @@ import (
 	. "github.com/runatlantis/atlantis/server/events/vcs/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
-	gitlab "github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 var parser = events.EventParser{
 	GithubUser:         "github-user",
 	GithubToken:        "github-token",
+	GithubTokenFile:    "",
 	GitlabUser:         "gitlab-user",
 	GitlabToken:        "gitlab-token",
 	AllowDraftPRs:      false,
@@ -67,12 +68,12 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 	comment := github.IssueCommentEvent{
 		Repo: &Repo,
 		Issue: &github.Issue{
-			Number:  github.Int(1),
-			User:    &github.User{Login: github.String("issue_user")},
-			HTMLURL: github.String("https://github.com/runatlantis/atlantis/issues/1"),
+			Number:  github.Ptr(1),
+			User:    &github.User{Login: github.Ptr("issue_user")},
+			HTMLURL: github.Ptr("https://github.com/runatlantis/atlantis/issues/1"),
 		},
 		Comment: &github.IssueComment{
-			User: &github.User{Login: github.String("comment_user")},
+			User: &github.User{Login: github.Ptr("comment_user")},
 		},
 	}
 
@@ -169,8 +170,8 @@ func TestParseGithubPullEventFromDraft(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	// verify that close event treated as 'close' events by default
 	closeEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	closeEvent.Action = github.String("closed")
-	closeEvent.PullRequest.Draft = github.Bool(true)
+	closeEvent.Action = github.Ptr("closed")
+	closeEvent.PullRequest.Draft = github.Ptr(true)
 
 	_, evType, _, _, _, err := parser.ParseGithubPullEvent(logger, &closeEvent)
 	Ok(t, err)
@@ -178,7 +179,7 @@ func TestParseGithubPullEventFromDraft(t *testing.T) {
 
 	// verify that draft PRs are treated as 'other' events by default
 	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	testEvent.PullRequest.Draft = github.Bool(true)
+	testEvent.PullRequest.Draft = github.Ptr(true)
 	_, evType, _, _, _, err = parser.ParseGithubPullEvent(logger, &testEvent)
 	Ok(t, err)
 	Equals(t, models.OtherPullEvent, evType)
@@ -750,14 +751,14 @@ func TestNewCommand_CleansDir(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.RepoRelDir, func(t *testing.T) {
-			cmd := events.NewCommentCommand(c.RepoRelDir, nil, command.Plan, "", false, false, "workspace", "", "", false)
+			cmd := events.NewCommentCommand(c.RepoRelDir, nil, command.Plan, "", false, false, "", "workspace", "", "", false)
 			Equals(t, c.ExpDir, cmd.RepoRelDir)
 		})
 	}
 }
 
 func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
-	cmd := events.NewCommentCommand("", nil, command.Plan, "", false, false, "", "", "", false)
+	cmd := events.NewCommentCommand("", nil, command.Plan, "", false, false, "", "", "", "", false)
 	Equals(t, events.CommentCommand{
 		RepoRelDir:  "",
 		Flags:       nil,
@@ -769,7 +770,7 @@ func TestNewCommand_EmptyDirWorkspaceProject(t *testing.T) {
 }
 
 func TestNewCommand_AllFieldsSet(t *testing.T) {
-	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, command.Plan, "", true, false, "workspace", "project", "policyset", false)
+	cmd := events.NewCommentCommand("dir", []string{"a", "b"}, command.Plan, "", true, false, "", "workspace", "project", "policyset", false)
 	Equals(t, events.CommentCommand{
 		Workspace:   "workspace",
 		RepoRelDir:  "dir",
@@ -816,7 +817,7 @@ func TestCommentCommand_IsAutoplan(t *testing.T) {
 }
 
 func TestCommentCommand_String(t *testing.T) {
-	exp := `command="plan" verbose=true dir="mydir" workspace="myworkspace" project="myproject" policyset="", clear-policy-approval=false, flags="flag1,flag2"`
+	exp := `command="plan", verbose=true, dir="mydir", workspace="myworkspace", project="myproject", policyset="", auto-merge-disabled=false, auto-merge-method=, clear-policy-approval=false, flags="flag1,flag2"`
 	Equals(t, exp, (events.CommentCommand{
 		RepoRelDir:  "mydir",
 		Flags:       []string{"flag1", "flag2"},

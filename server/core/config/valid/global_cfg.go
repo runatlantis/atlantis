@@ -34,12 +34,12 @@ var AllowedSilencePRComments = []string{"plan", "apply"}
 // DefaultAtlantisFile is the default name of the config file for each repo.
 const DefaultAtlantisFile = "atlantis.yaml"
 
-// NonOverrideableApplyReqs will get applied across all "repos" in the server side config.
+// NonOverridableApplyReqs will get applied across all "repos" in the server side config.
 // If repo config is allowed overrides, they can override this.
 // TODO: Make this more customizable, not everyone wants this rigid workflow
-// maybe something along the lines of defining overridable/non-overrideable apply
+// maybe something along the lines of defining overridable/non-overridable apply
 // requirements in the config and removing the flag to enable policy checking.
-var NonOverrideableApplyReqs = []string{PoliciesPassedCommandReq}
+var NonOverridableApplyReqs = []string{PoliciesPassedCommandReq}
 
 // GlobalCfg is the final parsed version of server-side repo config.
 type GlobalCfg struct {
@@ -104,6 +104,8 @@ type MergedProjectCfg struct {
 	Name                      string
 	AutoplanEnabled           bool
 	AutoMergeDisabled         bool
+	AutoMergeMethod           string
+	TerraformDistribution     *string
 	TerraformVersion          *version.Version
 	RepoCfgVersion            int
 	PolicySets                PolicySets
@@ -411,6 +413,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		DependsOn:                 proj.DependsOn,
 		Name:                      proj.GetName(),
 		AutoplanEnabled:           proj.Autoplan.Enabled,
+		TerraformDistribution:     proj.TerraformDistribution,
 		TerraformVersion:          proj.TerraformVersion,
 		RepoCfgVersion:            rCfg.Version,
 		PolicySets:                g.PolicySets,
@@ -437,6 +440,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		Workspace:                 workspace,
 		Name:                      "",
 		AutoplanEnabled:           DefaultAutoPlanEnabled,
+		TerraformDistribution:     nil,
 		TerraformVersion:          nil,
 		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,

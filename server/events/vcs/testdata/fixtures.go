@@ -22,43 +22,43 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v68/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 )
 
 var PullEvent = github.PullRequestEvent{
 	Sender: &github.User{
-		Login: github.String("user"),
+		Login: github.Ptr("user"),
 	},
 	Repo:        &Repo,
 	PullRequest: &Pull,
-	Action:      github.String("opened"),
+	Action:      github.Ptr("opened"),
 }
 
 var Pull = github.PullRequest{
 	Head: &github.PullRequestBranch{
-		SHA:  github.String("sha256"),
-		Ref:  github.String("ref"),
+		SHA:  github.Ptr("sha256"),
+		Ref:  github.Ptr("ref"),
 		Repo: &Repo,
 	},
 	Base: &github.PullRequestBranch{
-		SHA:  github.String("sha256"),
+		SHA:  github.Ptr("sha256"),
 		Repo: &Repo,
-		Ref:  github.String("basebranch"),
+		Ref:  github.Ptr("basebranch"),
 	},
-	HTMLURL: github.String("html-url"),
+	HTMLURL: github.Ptr("html-url"),
 	User: &github.User{
-		Login: github.String("user"),
+		Login: github.Ptr("user"),
 	},
-	Number: github.Int(1),
-	State:  github.String("open"),
+	Number: github.Ptr(1),
+	State:  github.Ptr("open"),
 }
 
 var Repo = github.Repository{
-	FullName: github.String("owner/repo"),
-	Owner:    &github.User{Login: github.String("owner")},
-	Name:     github.String("repo"),
-	CloneURL: github.String("https://github.com/owner/repo.git"),
+	FullName: github.Ptr("owner/repo"),
+	Owner:    &github.User{Login: github.Ptr("owner")},
+	Name:     github.Ptr("repo"),
+	CloneURL: github.Ptr("https://github.com/owner/repo.git"),
 }
 
 var ADPullEvent = azuredevops.Event{

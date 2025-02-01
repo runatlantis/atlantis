@@ -1,7 +1,9 @@
 package config_test
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -50,14 +52,14 @@ func TestHasRepoCfg_InvalidFileExtension(t *testing.T) {
 func TestParseRepoCfg_DirDoesNotExist(t *testing.T) {
 	r := config.ParserValidator{}
 	_, err := r.ParseRepoCfg("/not/exist", globalCfg, "", "")
-	Assert(t, os.IsNotExist(err), "exp not exist err")
+	Assert(t, errors.Is(err, fs.ErrNotExist), "exp not exist err")
 }
 
 func TestParseRepoCfg_FileDoesNotExist(t *testing.T) {
 	tmpDir := t.TempDir()
 	r := config.ParserValidator{}
 	_, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
-	Assert(t, os.IsNotExist(err), "exp not exist err")
+	Assert(t, errors.Is(err, fs.ErrNotExist), "exp not exist err")
 }
 
 func TestParseRepoCfg_BadPermissions(t *testing.T) {
@@ -608,6 +610,31 @@ workflows:
 				Workflows: map[string]valid.Workflow{
 					"myworkflow": defaultWorkflow("myworkflow"),
 				},
+			},
+		},
+		{
+			description: "project field with terraform_distribution set to opentofu",
+			input: `
+version: 3
+projects:
+- dir: .
+  workspace: myworkspace
+  terraform_distribution: opentofu
+`,
+			exp: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:                   ".",
+						Workspace:             "myworkspace",
+						TerraformDistribution: String("opentofu"),
+						Autoplan: valid.Autoplan{
+							WhenModified: raw.DefaultAutoPlanWhenModified,
+							Enabled:      true,
+						},
+					},
+				},
+				Workflows: make(map[string]valid.Workflow),
 			},
 		},
 		{

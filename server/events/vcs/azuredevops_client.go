@@ -177,7 +177,7 @@ func (g *AzureDevopsClient) DiscardReviews(repo models.Repo, pull models.PullReq
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) { //nolint: revive
+func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) { //nolint: revive
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
@@ -248,6 +248,8 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 	case models.FailedCommitStatus:
 		adState = azuredevops.GitFailed.String()
 	}
+
+	logger.Info("Updating Azure DevOps commit status for '%s' to '%s'", src, adState)
 
 	status := azuredevops.GitPullRequestStatus{}
 	status.Context = GitStatusContextFromSrc(src)
@@ -391,7 +393,7 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *AzureDevopsClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) { //nolint: revive
+func (g *AzureDevopsClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) { //nolint: revive
 	return nil, nil
 }
 
