@@ -1695,10 +1695,10 @@ projects:
 // Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 	cases := []struct {
-		AtlantisYAML   string
-		ExpectedCtxs   int
-		ExpectedClones InvocationCountMatcher
-		ModifiedFiles  []string
+		AtlantisYAML             string
+		ExpectedCtxs             int
+		ExpectedClones           InvocationCountMatcher
+		ModifiedFiles            []string
 		IncludeGitUntrackedFiles bool
 	}{
 		{
@@ -1706,9 +1706,9 @@ func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 version: 3
 projects:
 - dir: dir1`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Never(),
-			ModifiedFiles:  []string{"dir2/main.tf"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           Never(),
+			ModifiedFiles:            []string{"dir2/main.tf"},
 			IncludeGitUntrackedFiles: false,
 		},
 		{
@@ -1716,18 +1716,18 @@ projects:
 version: 3
 projects:
 - dir: dir1`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Once(),
-			ModifiedFiles:  []string{"dir2/main.tf"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           Once(),
+			ModifiedFiles:            []string{"dir2/main.tf"},
 			IncludeGitUntrackedFiles: true,
 		},
 		{
 			AtlantisYAML: `
 version: 3
 parallel_plan: true`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Once(),
-			ModifiedFiles:  []string{"README.md"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           Once(),
+			ModifiedFiles:            []string{"README.md"},
 			IncludeGitUntrackedFiles: false,
 		},
 		{
@@ -1737,9 +1737,9 @@ autodiscover:
   mode: enabled
 projects:
 - dir: dir1`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Once(),
-			ModifiedFiles:  []string{"dir2/main.tf"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           Once(),
+			ModifiedFiles:            []string{"dir2/main.tf"},
 			IncludeGitUntrackedFiles: false,
 		},
 	}
