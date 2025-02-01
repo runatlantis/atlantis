@@ -86,6 +86,9 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	// create an empty DB
 	tmp := t.TempDir()
 	defaultBoltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		defaultBoltDB.Close()
+	})
 	Ok(t, err)
 
 	testConfig := &TestConfig{
@@ -786,6 +789,9 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -813,6 +819,9 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 	setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -837,6 +846,9 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -859,6 +871,9 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 	setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -881,6 +896,9 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True
 	setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -899,6 +917,9 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -921,6 +942,9 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -941,6 +965,9 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -993,6 +1020,9 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -1018,6 +1048,9 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -1064,6 +1097,9 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -1120,6 +1156,9 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB
@@ -1198,6 +1237,9 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	defer func() { autoMerger.GlobalAutomerge = false }()
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
 	applyCommandRunner.Backend = boltDB

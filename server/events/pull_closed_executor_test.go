@@ -43,6 +43,9 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	w := mocks.NewMockWorkingDir()
 	tmp := t.TempDir()
 	db, err := db.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
 		WorkingDir:         w,
@@ -63,6 +66,9 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	l := lockmocks.NewMockLocker()
 	tmp := t.TempDir()
 	db, err := db.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
 		Locker:             l,
@@ -85,6 +91,9 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	tmp := t.TempDir()
 	db, err := db.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
 		Locker:     l,
@@ -182,7 +191,10 @@ func TestCleanUpPullComments(t *testing.T) {
 			l := lockmocks.NewMockLocker()
 			tmp := t.TempDir()
 			db, err := db.New(tmp)
-			Ok(t, err)
+			t.Cleanup(func() {
+				db.Close()
+			})
+            Ok(t, err)
 			pce := events.PullClosedExecutor{
 				Locker:     l,
 				VCSClient:  cp,
