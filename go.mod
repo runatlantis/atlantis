@@ -1,17 +1,19 @@
 module github.com/runatlantis/atlantis
 
-go 1.23.4
+go 1.23.5
 
 require (
 	code.gitea.io/sdk/gitea v0.19.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/alicebob/miniredis/v2 v2.34.0
-	github.com/bradleyfalzon/ghinstallation/v2 v2.12.0
+	github.com/bmatcuk/doublestar/v4 v4.8.0
+	github.com/bradleyfalzon/ghinstallation/v2 v2.13.0
 	github.com/briandowns/spinner v1.23.1
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-playground/validator/v10 v10.23.0
 	github.com/go-test/deep v1.1.1
+	github.com/gofri/go-github-ratelimit v1.1.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/go-github/v68 v68.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
@@ -45,7 +47,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/uber-go/tally/v4 v4.1.16
 	github.com/urfave/negroni/v3 v3.1.1
-	github.com/xanzy/go-gitlab v0.115.0
 	gitlab.com/gitlab-org/api/client-go v0.118.0
 	go.etcd.io/bbolt v1.3.11
 	go.uber.org/zap v1.27.0
@@ -144,6 +145,3 @@ require (
 	google.golang.org/protobuf v1.36.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
-
-// upstream pr to patch go-github to use v68, https://github.com/bradleyfalzon/ghinstallation/pull/137
-replace github.com/bradleyfalzon/ghinstallation/v2 => github.com/chenrui333/ghinstallation/v2 v2.12.1-0.20241231170237-36dcfb064b2f

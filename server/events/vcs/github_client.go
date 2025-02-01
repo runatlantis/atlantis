@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofri/go-github-ratelimit/github_ratelimit"
 	"github.com/google/go-github/v68/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -124,15 +125,24 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
 	}
 
+	transportWithRateLimit, err := github_ratelimit.NewRateLimitWaiterClient(
+		transport.Transport,
+		github_ratelimit.WithTotalSleepLimit(time.Minute, func(callbackContext *github_ratelimit.CallbackContext) {
+			logger.Warn("github rate limit exceeded total sleep time, requests will fail to avoid penalties from github")
+		}))
+	if err != nil {
+		return nil, errors.Wrap(err, "error initializing github rate limit transport")
+	}
+
 	var graphqlURL string
 	var client *github.Client
 	if hostname == "github.com" {
-		client = github.NewClient(transport)
+		client = github.NewClient(transportWithRateLimit)
 		graphqlURL = "https://api.github.com/graphql"
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
 		// TODO: Deprecated: Use NewClient(httpClient).WithEnterpriseURLs(baseURL, uploadURL) instead
-		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transport) //nolint:staticcheck
+		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transportWithRateLimit) //nolint:staticcheck
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +150,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 	}
 
 	// Use the client from shurcooL's githubv4 library for queries.
-	v4Client := githubv4.NewEnterpriseClient(graphqlURL, transport)
+	v4Client := githubv4.NewEnterpriseClient(graphqlURL, transportWithRateLimit)
 
 	user, err := credentials.GetUser()
 	logger.Debug("GH User: %s", user)
@@ -1009,7 +1019,8 @@ func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
 // https://docs.github.com/en/graphql/reference/objects#organization
-func (g *GithubClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (g *GithubClient) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) {
+	logger.Debug("Getting GitHub team names for user '%s'", user)
 	orgName := repo.Owner
 	variables := map[string]interface{}{
 		"orgName":    githubv4.String(orgName),

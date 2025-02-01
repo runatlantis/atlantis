@@ -126,7 +126,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	pullUpdater = &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            vcsClient,
-		MarkdownRenderer:     events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false),
+		MarkdownRenderer:     events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false),
 	}
 
 	autoMerger = &events.AutoMerger{
@@ -313,7 +313,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(testdata.GithubRepo, testdata.User)
+		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(ch.Logger, testdata.GithubRepo, testdata.User)
 		vcsClient.VerifyWasCalledOnce().CreateComment(
 			Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Ran Plan for 0 projects:"), Eq("plan"))
 	})
@@ -331,7 +331,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(testdata.GithubRepo, testdata.User)
+		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(ch.Logger, testdata.GithubRepo, testdata.User)
 		vcsClient.VerifyWasCalledOnce().CreateComment(
 			Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Ran Plan for 0 projects:"), Eq("plan"))
 	})
