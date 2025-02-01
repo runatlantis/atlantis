@@ -194,7 +194,7 @@ func TestCleanUpPullComments(t *testing.T) {
 			t.Cleanup(func() {
 				db.Close()
 			})
-            Ok(t, err)
+			Ok(t, err)
 			pce := events.PullClosedExecutor{
 				Locker:     l,
 				VCSClient:  cp,
