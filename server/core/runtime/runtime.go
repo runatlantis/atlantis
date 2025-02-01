@@ -11,6 +11,7 @@ import (
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -26,8 +27,8 @@ const (
 // TerraformExec brings the interface from TerraformClient into this package
 // without causing circular imports.
 type TerraformExec interface {
-	RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
-	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
+	RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, d terraform.Distribution, v *version.Version, workspace string) (string, error)
+	EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error
 }
 
 // AsyncTFExec brings the interface from TerraformClient into this package
@@ -43,7 +44,7 @@ type AsyncTFExec interface {
 	// Callers can use the input channel to pass stdin input to the command.
 	// If any error is passed on the out channel, there will be no
 	// further output (so callers are free to exit).
-	RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line)
+	RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, d terraform.Distribution, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line)
 }
 
 // StatusUpdater brings the interface from CommitStatusUpdater into this package

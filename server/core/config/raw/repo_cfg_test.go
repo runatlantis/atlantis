@@ -130,6 +130,8 @@ version: 3
 automerge: true
 autodiscover:
   mode: enabled
+  ignore_paths:
+  - foo/*
 parallel_apply: true
 parallel_plan: false
 repo_locks:
@@ -157,8 +159,11 @@ allowed_regexp_prefixes:
 - dev/
 - staging/`,
 			exp: raw.RepoCfg{
-				Version:       Int(3),
-				AutoDiscover:  &raw.AutoDiscover{Mode: &autoDiscoverEnabled},
+				Version: Int(3),
+				AutoDiscover: &raw.AutoDiscover{
+					Mode:        &autoDiscoverEnabled,
+					IgnorePaths: []string{"foo/*"},
+				},
 				Automerge:     Bool(true),
 				ParallelApply: Bool(true),
 				ParallelPlan:  Bool(false),
