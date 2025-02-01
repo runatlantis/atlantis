@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,7 +12,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	shlex "github.com/google/shlex"
-	"github.com/pkg/errors"
+
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	yaml "gopkg.in/yaml.v3"
@@ -29,11 +30,11 @@ func (p *ParserValidator) HasRepoCfg(absRepoDir, repoConfigFile string) (bool, e
 	const invalidExtensionFilename = "atlantis.yml"
 	_, err := os.Stat(p.repoCfgPath(absRepoDir, invalidExtensionFilename))
 	if err == nil {
-		return false, errors.Errorf("found %q as config file; rename using the .yaml extension", invalidExtensionFilename)
+		return false, fmt.Errorf("found %q as config file; rename using the .yaml extension", invalidExtensionFilename)
 	}
 
 	_, err = os.Stat(p.repoCfgPath(absRepoDir, repoConfigFile))
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
 	return err == nil, err
@@ -48,12 +49,7 @@ func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.Global
 	configData, err := os.ReadFile(configFile) // nolint: gosec
 
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", repoConfigFile)
-		}
-		// Don't wrap os.IsNotExist errors because we want our callers to be
-		// able to detect if it's a NotExist err.
-		return valid.RepoCfg{}, err
+		return valid.RepoCfg{}, fmt.Errorf("unable to read %s file: %w", repoConfigFile, err)
 	}
 	return p.ParseRepoCfgData(configData, globalCfg, repoID, branch)
 }
@@ -115,7 +111,7 @@ func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.G
 func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.GlobalCfg) (valid.GlobalCfg, error) {
 	configData, err := os.ReadFile(configFile) // nolint: gosec
 	if err != nil {
-		return valid.GlobalCfg{}, errors.Wrapf(err, "unable to read %s file", configFile)
+		return valid.GlobalCfg{}, fmt.Errorf("unable to read %s file: %w", configFile, err)
 	}
 	if len(configData) == 0 {
 		return valid.GlobalCfg{}, fmt.Errorf("file %s was empty", configFile)
@@ -204,7 +200,7 @@ func (p *ParserValidator) applyLegacyShellParsing(cfg *valid.RepoCfg) error {
 		if s.StepName == "run" {
 			split, err := shlex.Split(s.RunCommand)
 			if err != nil {
-				return errors.Wrapf(err, "unable to parse %q", s.RunCommand)
+				return fmt.Errorf("unable to parse %q: %w", s.RunCommand, err)
 			}
 			s.RunCommand = strings.Join(split, " ")
 		}
