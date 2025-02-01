@@ -45,7 +45,7 @@ var defaultUserConfig = struct {
 	AutoplanFileList:         "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	RestrictFileList:         false,
 	SilenceNoProjects:        false,
-	IncludeGitUntrackedFiles: true,
+	IncludeGitUntrackedFiles: false,
 	AutoDiscoverMode:         "auto",
 }
 
@@ -1699,6 +1699,7 @@ func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 		ExpectedCtxs   int
 		ExpectedClones InvocationCountMatcher
 		ModifiedFiles  []string
+		IncludeGitUntrackedFiles bool
 	}{
 		{
 			AtlantisYAML: `
@@ -1708,6 +1709,17 @@ projects:
 			ExpectedCtxs:   0,
 			ExpectedClones: Never(),
 			ModifiedFiles:  []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: false,
+		},
+		{
+			AtlantisYAML: `
+version: 3
+projects:
+- dir: dir1`,
+			ExpectedCtxs:   0,
+			ExpectedClones: Once(),
+			ModifiedFiles:  []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: true,
 		},
 		{
 			AtlantisYAML: `
@@ -1716,6 +1728,7 @@ parallel_plan: true`,
 			ExpectedCtxs:   0,
 			ExpectedClones: Once(),
 			ModifiedFiles:  []string{"README.md"},
+			IncludeGitUntrackedFiles: false,
 		},
 		{
 			AtlantisYAML: `
@@ -1727,6 +1740,7 @@ projects:
 			ExpectedCtxs:   0,
 			ExpectedClones: Once(),
 			ModifiedFiles:  []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: false,
 		},
 	}
 
@@ -1770,7 +1784,7 @@ projects:
 			userConfig.AutoplanFileList,
 			userConfig.RestrictFileList,
 			userConfig.SilenceNoProjects,
-			userConfig.IncludeGitUntrackedFiles,
+			c.IncludeGitUntrackedFiles,
 			userConfig.AutoDiscoverMode,
 			scope,
 			terraformClient,
