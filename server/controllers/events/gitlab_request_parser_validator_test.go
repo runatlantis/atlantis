@@ -22,7 +22,7 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers/events"
 	. "github.com/runatlantis/atlantis/testing"
-	gitlab "github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 var parser = events.DefaultGitlabRequestParserValidator{}

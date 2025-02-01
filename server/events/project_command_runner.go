@@ -225,6 +225,7 @@ type DefaultProjectCommandRunner struct {
 	VcsClient                 vcs.Client
 	Locker                    ProjectLocker
 	LockURLGenerator          LockURLGenerator
+	Logger                    logging.SimpleLogging
 	InitStepRunner            StepRunner
 	PlanStepRunner            StepRunner
 	ShowStepRunner            StepRunner
@@ -367,7 +368,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	// Only query the users team membership if any teams have been configured as owners on any policy set(s).
 	if policySetCfg.HasTeamOwners() {
 		// A convenient way to access vcsClient. Not sure if best way.
-		userTeams, err := p.VcsClient.GetTeamNamesForUser(ctx.Pull.BaseRepo, ctx.User)
+		userTeams, err := p.VcsClient.GetTeamNamesForUser(p.Logger, ctx.Pull.BaseRepo, ctx.User)
 		if err != nil {
 			ctx.Log.Err("unable to get team membership for user: %s", err)
 			return nil, "", err
@@ -671,12 +672,13 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
-		Workspace: ctx.Workspace,
-		User:      ctx.User,
-		Repo:      ctx.Pull.BaseRepo,
-		Pull:      ctx.Pull,
-		Success:   err == nil,
-		Directory: ctx.RepoRelDir,
+		Workspace:   ctx.Workspace,
+		User:        ctx.User,
+		Repo:        ctx.Pull.BaseRepo,
+		Pull:        ctx.Pull,
+		Success:     err == nil,
+		Directory:   ctx.RepoRelDir,
+		ProjectName: ctx.ProjectName,
 	})
 
 	if err != nil {
