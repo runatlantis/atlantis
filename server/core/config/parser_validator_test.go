@@ -1,7 +1,9 @@
 package config_test
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -50,14 +52,14 @@ func TestHasRepoCfg_InvalidFileExtension(t *testing.T) {
 func TestParseRepoCfg_DirDoesNotExist(t *testing.T) {
 	r := config.ParserValidator{}
 	_, err := r.ParseRepoCfg("/not/exist", globalCfg, "", "")
-	Assert(t, os.IsNotExist(err), "exp not exist err")
+	Assert(t, errors.Is(err, fs.ErrNotExist), "exp not exist err")
 }
 
 func TestParseRepoCfg_FileDoesNotExist(t *testing.T) {
 	tmpDir := t.TempDir()
 	r := config.ParserValidator{}
 	_, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
-	Assert(t, os.IsNotExist(err), "exp not exist err")
+	Assert(t, errors.Is(err, fs.ErrNotExist), "exp not exist err")
 }
 
 func TestParseRepoCfg_BadPermissions(t *testing.T) {
