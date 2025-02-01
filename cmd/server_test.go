@@ -58,6 +58,8 @@ var testFlags = map[string]interface{}{
 	ADHostnameFlag:                   "dev.azure.com",
 	ADTokenFlag:                      "ad-token",
 	ADUserFlag:                       "ad-user",
+	ADDiffTop:                        100,
+	ADDiffSkip:                       0,
 	ADWebhookPasswordFlag:            "ad-wh-pass",
 	ADWebhookUserFlag:                "ad-wh-user",
 	AtlantisURLFlag:                  "url",

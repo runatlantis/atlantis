@@ -314,7 +314,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
 
 		var err error
-		azuredevopsClient, err = vcs.NewAzureDevopsClient(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
+		azuredevopsClient, err = vcs.NewAzureDevopsClient(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, vcs.WithDiffTop(userConfig.AzureDevOpsDiffTop), vcs.WithDiffSkip(userConfig.AzureDevOpsDiffSkip))
 		if err != nil {
 			return nil, err
 		}

@@ -231,6 +231,26 @@ This flag overrides `--autoplan-modules`. If you wish to disable auto-planning o
 and set `--autoplan-modules` to `false`.
 :::
 
+### `--azuredevops-diff-skip`
+
+  ```bash
+  atlantis server --azuredevops-diff-skip="50"
+  # or
+  ATLANTIS_AZUREDEVOPS_DIFF_SKIP="50"
+  ```
+
+  Number of items on a single page in Azure DevOps paged responses. Defaults to `0`.
+
+### `--azuredevops-diff-top`
+
+  ```bash
+  atlantis server --azuredevops-diff-top="1000"
+  # or
+  ATLANTIS_AZUREDEVOPS_DIFF_TOP="1000"
+  ```
+
+  Number of items on a single page in Azure DevOps paged responses. Defaults to `100`.
+
 ### `--azuredevops-hostname`
 
   ```bash

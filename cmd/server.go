@@ -54,6 +54,8 @@ const (
 	ADTokenFlag                      = "azuredevops-token" // nolint: gosec
 	ADUserFlag                       = "azuredevops-user"
 	ADHostnameFlag                   = "azuredevops-hostname"
+	ADDiffTop                        = "azuredevops-diff-top"
+	ADDiffSkip                       = "azuredevops-diff-skip"
 	AllowCommandsFlag                = "allow-commands"
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AtlantisURLFlag                  = "atlantis-url"
@@ -164,6 +166,8 @@ const (
 	DefaultADBasicUser                  = ""
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
+	DefaultADDiffTop                    = 100
+	DefaultADDiffSkip                   = 0
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
@@ -637,6 +641,14 @@ var boolFlags = map[string]boolFlag{
 	},
 }
 var intFlags = map[string]intFlag{
+	ADDiffTop: {
+		description:  "Azure DevOps maximum number of changes to return in diff",
+		defaultValue: 100,
+	},
+	ADDiffSkip: {
+		description:  "Azure DevOps number of changes to skip in diff.",
+		defaultValue: 0,
+	},
 	CheckoutDepthFlag: {
 		description: fmt.Sprintf("Used only if --%s=%s.", CheckoutStrategyFlag, CheckoutStrategyMerge) +
 			" How many commits to include in each of base and feature branches when cloning repository." +
@@ -882,6 +894,12 @@ func (s *ServerCmd) run() error {
 func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.AzureDevOpsHostname == "" {
 		c.AzureDevOpsHostname = DefaultADHostname
+	}
+	if c.AzureDevOpsDiffTop == 0 {
+		c.AzureDevOpsDiffTop = DefaultADDiffTop
+	}
+	if c.AzureDevOpsDiffSkip == 0 {
+		c.AzureDevOpsDiffSkip = DefaultADDiffSkip
 	}
 	if c.AutoplanFileList == "" {
 		c.AutoplanFileList = DefaultAutoplanFileList

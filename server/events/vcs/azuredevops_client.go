@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -21,10 +21,26 @@ type AzureDevopsClient struct {
 	Client   *azuredevops.Client
 	ctx      context.Context
 	UserName string
+	DiffTop  int
+	DiffSkip int
+}
+
+// Option for setting DiffTop
+func WithDiffTop(diffTop int) func(*AzureDevopsClient) {
+	return func(client *AzureDevopsClient) {
+		client.DiffTop = diffTop
+	}
+}
+
+// Option for setting DiffSkip
+func WithDiffSkip(diffSkip int) func(*AzureDevopsClient) {
+	return func(client *AzureDevopsClient) {
+		client.DiffSkip = diffSkip
+	}
 }
 
 // NewAzureDevopsClient returns a valid Azure DevOps client.
-func NewAzureDevopsClient(hostname string, userName string, token string) (*AzureDevopsClient, error) {
+func NewAzureDevopsClient(hostname string, userName string, token string, options ...func(*AzureDevopsClient)) (*AzureDevopsClient, error) {
 	tp := azuredevops.BasicAuthTransport{
 		Username: "",
 		Password: strings.TrimSpace(token),
@@ -49,6 +65,12 @@ func NewAzureDevopsClient(hostname string, userName string, token string) (*Azur
 		Client:   adClient,
 		UserName: userName,
 		ctx:      context.Background(),
+		DiffTop:  100,
+		DiffSkip: 0,
+	}
+
+	for _, option := range options {
+		option(client)
 	}
 
 	return client, nil
@@ -63,12 +85,17 @@ func (g *AzureDevopsClient) GetModifiedFiles(logger logging.SimpleLogging, repo 
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
+
 	pullRequest, _, _ := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 
 	targetRefName := strings.Replace(pullRequest.GetTargetRefName(), "refs/heads/", "", 1)
 	sourceRefName := strings.Replace(pullRequest.GetSourceRefName(), "refs/heads/", "", 1)
 
-	r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName)
+	diffArguments := azuredevops.GitDiffListOptions{
+		Top:  g.DiffTop,
+		Skip: g.DiffSkip,
+	}
+	r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName, &diffArguments)
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
 	}
