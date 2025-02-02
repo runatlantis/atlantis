@@ -413,8 +413,8 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 
 	baseRepo, user, pullNum, err := e.Parser.ParseGithubIssueCommentEvent(logger, event)
 
-	wrapped := errors.Wrapf(err, "Failed parsing event: %s", githubReqID)
 	if err != nil {
+		wrapped := errors.Wrapf(err, "Failed parsing event: %s", githubReqID)
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{

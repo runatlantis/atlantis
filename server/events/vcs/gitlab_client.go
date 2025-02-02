@@ -566,7 +566,10 @@ func (g *GitlabClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 	if resp != nil {
 		logger.Debug("PUT /projects/%s/merge_requests/%d/merge returned: %d", pull.BaseRepo.FullName, pull.Num, resp.StatusCode)
 	}
-	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
+	if err != nil {
+		return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
+	}
+	return nil
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
