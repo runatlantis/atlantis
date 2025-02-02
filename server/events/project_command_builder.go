@@ -825,7 +825,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
-	if os.IsNotExist(errors.Cause(err)) {
+	if errors.Is(err, os.ErrNotExist) {
 		return projCtx, errors.New("no working directory found–did you run plan?")
 	} else if err != nil {
 		return projCtx, err
