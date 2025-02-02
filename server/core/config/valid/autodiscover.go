@@ -10,5 +10,6 @@ const (
 )
 
 type AutoDiscover struct {
-	Mode AutoDiscoverMode
+	Mode        AutoDiscoverMode
+	IgnorePaths []string
 }

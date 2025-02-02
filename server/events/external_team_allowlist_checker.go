@@ -51,6 +51,10 @@ func (checker *ExternalTeamAllowlistChecker) IsCommandAllowedForAnyTeam(ctx mode
 	return outputResults
 }
 
+func (checker *ExternalTeamAllowlistChecker) AllTeams() []string {
+	return []string{}
+}
+
 func (checker *ExternalTeamAllowlistChecker) buildCommandString(ctx models.TeamAllowlistCheckerContext, teams []string, command string) string {
 	// Build command string
 	// Format is "$external_cmd $external_args $command $repo $teams"
