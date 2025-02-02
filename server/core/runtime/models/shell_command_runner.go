@@ -127,7 +127,8 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 				ctx.Log.Debug("writing %q to remote command's stdin", line)
 				_, err := io.WriteString(stdin, line)
 				if err != nil {
-					ctx.Log.Err(errors.Wrapf(err, "writing %q to process", line).Error())
+					err = errors.Wrapf(err, "writing %q to process", line)
+					ctx.Log.Err(err.Error())
 				}
 			}
 		}()
