@@ -426,8 +426,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
-		return nil, errors.Wrapf(err,
-			"parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
+		return nil, errors.Wrapf(err, "parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
 	}
 
 	underlyingRouter := mux.NewRouter()
