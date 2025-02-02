@@ -93,6 +93,10 @@ type ProjectContext struct {
 	// Steps are the sequence of commands we need to run for this project and this
 	// stage.
 	Steps []valid.Step
+	// TerraformDistribution is the distribution of terraform we should use when
+	// executing commands for this project. This can be set to nil in which case
+	// we will use the default Atlantis terraform distribution.
+	TerraformDistribution *string
 	// TerraformVersion is the version of terraform we should use when executing
 	// commands for this project. This can be set to nil in which case we will
 	// use the default Atlantis terraform version.

@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v68/github"
 	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -30,7 +30,7 @@ import (
 	"github.com/runatlantis/atlantis/server/recovery"
 	"github.com/runatlantis/atlantis/server/utils"
 	tally "github.com/uber-go/tally/v4"
-	gitlab "github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 const (
@@ -157,7 +157,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	// Check if the user who triggered the autoplan has permissions to run 'plan'.
 	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
-		err := c.fetchUserTeams(baseRepo, &user)
+		err := c.fetchUserTeams(log, baseRepo, &user)
 		if err != nil {
 			log.Err("Unable to fetch user teams: %s", err)
 			return
@@ -202,6 +202,12 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	cmd := &CommentCommand{
 		Name: command.Autoplan,
 	}
+
+	// Update the combined plan commit status to pending
+	if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+		ctx.Log.Warn("unable to update plan commit status: %s", err)
+	}
+
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
@@ -300,7 +306,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
 	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
-		err := c.fetchUserTeams(baseRepo, &user)
+		err := c.fetchUserTeams(log, baseRepo, &user)
 		if err != nil {
 			c.Logger.Err("Unable to fetch user teams: %s", err)
 			return
@@ -352,6 +358,18 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	if !c.validateCtxAndComment(ctx, cmd.Name) {
 		return
+	}
+
+	// Update the combined plan or apply commit status to pending
+	switch cmd.Name {
+	case command.Plan:
+		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+			ctx.Log.Warn("unable to update plan commit status: %s", err)
+		}
+	case command.Apply:
+		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+			ctx.Log.Warn("unable to update apply commit status: %s", err)
+		}
 	}
 
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
@@ -491,8 +509,8 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	return
 }
 
-func (c *DefaultCommandRunner) fetchUserTeams(repo models.Repo, user *models.User) error {
-	teams, err := c.VCSClient.GetTeamNamesForUser(repo, *user)
+func (c *DefaultCommandRunner) fetchUserTeams(logger logging.SimpleLogging, repo models.Repo, user *models.User) error {
+	teams, err := c.VCSClient.GetTeamNamesForUser(logger, repo, *user)
 	if err != nil {
 		return err
 	}
