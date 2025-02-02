@@ -33,6 +33,7 @@ type APIController struct {
 	RepoAllowlistChecker           *events.RepoAllowlistChecker
 	Scope                          tally.Scope
 	VCSClient                      vcs.Client
+	CommitStatusUpdater            events.CommitStatusUpdater
 }
 
 type APIRequest struct {
@@ -152,6 +153,11 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		return nil, err
 	}
 
+	// Update the combined plan commit status to pending
+	if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+		ctx.Log.Warn("unable to update plan commit status: %s", err)
+	}
+
 	var projectResults []command.ProjectResult
 	for i, cmd := range cmds {
 		err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
@@ -180,6 +186,11 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 	cmds, cc, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildApplyCommands)
 	if err != nil {
 		return nil, err
+	}
+
+	// Update the combined apply commit status to pending
+	if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+		ctx.Log.Warn("unable to update apply commit status: %s", err)
 	}
 
 	var projectResults []command.ProjectResult

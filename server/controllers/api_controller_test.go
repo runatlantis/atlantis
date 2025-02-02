@@ -126,6 +126,10 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 
 	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
 
+	commitStatusUpdater := NewMockCommitStatusUpdater()
+
+	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).ThenReturn(nil)
+
 	ac := controllers.APIController{
 		APISecret:                      []byte(atlantisToken),
 		Locker:                         locker,
@@ -139,6 +143,7 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		VCSClient:                      vcsClient,
 		RepoAllowlistChecker:           repoAllowlistChecker,
+		CommitStatusUpdater:            commitStatusUpdater,
 	}
 	return ac, projectCommandBuilder, projectCommandRunner
 }

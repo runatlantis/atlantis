@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	tally "github.com/uber-go/tally/v4"
@@ -38,7 +38,7 @@ type ProjectCommandContextBuilder interface {
 		prjCfg valid.MergedProjectCfg,
 		commentFlags []string,
 		repoDir string,
-		automerge, parallelApply, parallelPlan, verbose, abortOnExecutionOrderFail bool, terraformClient terraform.Client,
+		automerge, parallelApply, parallelPlan, verbose, abortOnExecutionOrderFail bool, terraformClient tfclient.Client,
 	) []command.ProjectContext
 }
 
@@ -59,7 +59,7 @@ func (cb *CommandScopedStatsProjectCommandContextBuilder) BuildProjectContext(
 	commentFlags []string,
 	repoDir string,
 	automerge, parallelApply, parallelPlan, verbose, abortOnExecutionOrderFail bool,
-	terraformClient terraform.Client,
+	terraformClient tfclient.Client,
 ) (projectCmds []command.ProjectContext) {
 	cb.ProjectCounter.Inc(1)
 
@@ -93,7 +93,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	commentFlags []string,
 	repoDir string,
 	automerge, parallelApply, parallelPlan, verbose, abortOnExecutionOrderFail bool,
-	terraformClient terraform.Client,
+	terraformClient tfclient.Client,
 ) (projectCmds []command.ProjectContext) {
 	ctx.Log.Debug("Building project command context for %s", cmdName)
 
@@ -166,7 +166,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	commentFlags []string,
 	repoDir string,
 	automerge, parallelApply, parallelPlan, verbose, abortOnExecutionOrderFail bool,
-	terraformClient terraform.Client,
+	terraformClient tfclient.Client,
 ) (projectCmds []command.ProjectContext) {
 	if prjCfg.PolicyCheck {
 		ctx.Log.Debug("PolicyChecks are enabled")
@@ -297,6 +297,7 @@ func newProjectCommandContext(ctx *command.Context,
 		RePlanCmd:                  planCmd,
 		RepoRelDir:                 projCfg.RepoRelDir,
 		RepoConfigVersion:          projCfg.RepoCfgVersion,
+		TerraformDistribution:      projCfg.TerraformDistribution,
 		TerraformVersion:           projCfg.TerraformVersion,
 		User:                       ctx.User,
 		Verbose:                    verbose,
