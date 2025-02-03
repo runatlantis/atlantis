@@ -102,6 +102,16 @@ const en = [
     collapsed: false,
     items: [
       {
+        text: "2025",
+        collapsed: true,
+        items: [
+          {
+            text: "Introducing Atlantis 1.0!",
+            link: "/blog/2025/introducing-atlantis-1"
+          },
+        ]
+      },
+      {
         text: "2024",
         collapsed: true,
         items: [
