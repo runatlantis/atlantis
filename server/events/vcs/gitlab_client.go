@@ -637,10 +637,10 @@ func (g *GitlabClient) GetTeamNamesForUser(logger logging.SimpleLogging, _ model
 	if err != nil {
 		return nil, errors.Wrapf(err, "GET /users returned: %d", resp.StatusCode)
 	} else if len(users) == 0 {
-		return nil, errors.Wrap(err, "GET /users returned no user")
+		return nil, errors.New("GET /users returned no user")
 	} else if len(users) > 1 {
 		// Theoretically impossible, just being extra safe
-		return nil, errors.Wrap(err, "GET /users returned more than 1 user")
+		return nil, errors.New("GET /users returned more than 1 user")
 	}
 	userID := users[0].ID
 	for _, groupName := range g.ConfiguredGroups {
