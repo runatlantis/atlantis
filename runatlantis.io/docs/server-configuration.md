@@ -234,7 +234,7 @@ and set `--autoplan-modules` to `false`.
 ### `--azuredevops-diff-skip`
 
   ```bash
-  atlantis server --azuredevops-diff-skip="50"
+  atlantis server --azuredevops-diff-skip=50
   # or
   ATLANTIS_AZUREDEVOPS_DIFF_SKIP="50"
   ```
@@ -244,7 +244,7 @@ and set `--autoplan-modules` to `false`.
 ### `--azuredevops-diff-top`
 
   ```bash
-  atlantis server --azuredevops-diff-top="1000"
+  atlantis server --azuredevops-diff-top=1000
   # or
   ATLANTIS_AZUREDEVOPS_DIFF_TOP="1000"
   ```
