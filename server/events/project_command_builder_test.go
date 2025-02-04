@@ -45,7 +45,7 @@ var defaultUserConfig = struct {
 	AutoplanFileList:         "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	RestrictFileList:         false,
 	SilenceNoProjects:        false,
-	IncludeGitUntrackedFiles: true,
+	IncludeGitUntrackedFiles: false,
 	AutoDiscoverMode:         "auto",
 }
 
@@ -1695,27 +1695,40 @@ projects:
 // Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 	cases := []struct {
-		AtlantisYAML   string
-		ExpectedCtxs   int
-		ExpectedClones InvocationCountMatcher
-		ModifiedFiles  []string
+		AtlantisYAML             string
+		ExpectedCtxs             int
+		ExpectedClones           InvocationCountMatcher
+		ModifiedFiles            []string
+		IncludeGitUntrackedFiles bool
 	}{
 		{
 			AtlantisYAML: `
 version: 3
 projects:
 - dir: dir1`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Never(),
-			ModifiedFiles:  []string{"dir2/main.tf"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           Never(),
+			ModifiedFiles:            []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: false,
+		},
+		{
+			AtlantisYAML: `
+version: 3
+projects:
+- dir: dir1`,
+			ExpectedCtxs:             0,
+			ExpectedClones:           Once(),
+			ModifiedFiles:            []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: true,
 		},
 		{
 			AtlantisYAML: `
 version: 3
 parallel_plan: true`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Once(),
-			ModifiedFiles:  []string{"README.md"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           Once(),
+			ModifiedFiles:            []string{"README.md"},
+			IncludeGitUntrackedFiles: false,
 		},
 		{
 			AtlantisYAML: `
@@ -1724,9 +1737,10 @@ autodiscover:
   mode: enabled
 projects:
 - dir: dir1`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Once(),
-			ModifiedFiles:  []string{"dir2/main.tf"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           Once(),
+			ModifiedFiles:            []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: false,
 		},
 	}
 
@@ -1770,7 +1784,7 @@ projects:
 			userConfig.AutoplanFileList,
 			userConfig.RestrictFileList,
 			userConfig.SilenceNoProjects,
-			userConfig.IncludeGitUntrackedFiles,
+			c.IncludeGitUntrackedFiles,
 			userConfig.AutoDiscoverMode,
 			scope,
 			terraformClient,
