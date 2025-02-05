@@ -25,48 +25,193 @@ const atlantisToken = "token"
 
 func TestAPIController_Plan(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
-	body, _ := json.Marshal(controllers.APIRequest{
-		Repository: "Repo",
-		Ref:        "main",
-		Type:       "Gitlab",
-		Projects:   []string{"default"},
-	})
-	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
-	req.Header.Set(atlantisTokenHeader, atlantisToken)
-	w := httptest.NewRecorder()
-	ac.Plan(w, req)
-	ResponseContains(t, w, http.StatusOK, "")
-	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
-	projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
+
+	cases := []struct {
+		repository string
+		ref        string
+		vcsType    string
+		pr         int
+		projects   []string
+		paths      []struct {
+			Directory string
+			Workspace string
+		}
+	}{
+		{
+			repository: "Repo",
+			ref:        "main",
+			vcsType:    "Gitlab",
+			projects:   []string{"default"},
+		},
+		{
+			repository: "Repo",
+			ref:        "main",
+			vcsType:    "Gitlab",
+			pr:         1,
+		},
+		{
+			repository: "Repo",
+			ref:        "main",
+			vcsType:    "Gitlab",
+			paths: []struct {
+				Directory string
+				Workspace string
+			}{
+				{
+					Directory: ".",
+					Workspace: "myworkspace",
+				},
+				{
+					Directory: "./myworkspace2",
+					Workspace: "myworkspace2",
+				},
+			},
+		},
+		{
+			repository: "Repo",
+			ref:        "main",
+			vcsType:    "Gitlab",
+			pr:         1,
+			projects:   []string{"test"},
+			paths: []struct {
+				Directory string
+				Workspace string
+			}{
+				{
+					Directory: ".",
+					Workspace: "myworkspace",
+				},
+			},
+		},
+	}
+
+	expectedCalls := 0
+	for _, c := range cases {
+		body, _ := json.Marshal(controllers.APIRequest{
+			Repository: c.repository,
+			Ref:        c.ref,
+			Type:       c.vcsType,
+			PR:         c.pr,
+			Projects:   c.projects,
+			Paths:      c.paths,
+		})
+
+		req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+		req.Header.Set(atlantisTokenHeader, atlantisToken)
+		w := httptest.NewRecorder()
+		ac.Plan(w, req)
+		ResponseContains(t, w, http.StatusOK, "")
+
+		expectedCalls += len(c.projects)
+		expectedCalls += len(c.paths)
+	}
+
+	projectCommandBuilder.VerifyWasCalled(Times(expectedCalls)).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
 }
 
 func TestAPIController_Apply(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
-	body, _ := json.Marshal(controllers.APIRequest{
-		Repository: "Repo",
-		Ref:        "main",
-		Type:       "Gitlab",
-		Projects:   []string{"default"},
-	})
-	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
-	req.Header.Set(atlantisTokenHeader, atlantisToken)
-	w := httptest.NewRecorder()
-	ac.Apply(w, req)
-	ResponseContains(t, w, http.StatusOK, "")
-	projectCommandBuilder.VerifyWasCalledOnce().BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
-	projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
-	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+
+	cases := []struct {
+		repository string
+		ref        string
+		vcsType    string
+		pr         int
+		projects   []string
+		paths      []struct {
+			Directory string
+			Workspace string
+		}
+	}{
+		{
+			repository: "Repo",
+			ref:        "main",
+			vcsType:    "Gitlab",
+			projects:   []string{"default"},
+		},
+		{
+			repository: "Repo",
+			ref:        "main",
+			vcsType:    "Gitlab",
+			pr:         1,
+		},
+		{
+			repository: "Repo",
+			ref:        "main",
+			vcsType:    "Gitlab",
+			paths: []struct {
+				Directory string
+				Workspace string
+			}{
+				{
+					Directory: ".",
+					Workspace: "myworkspace",
+				},
+				{
+					Directory: "./myworkspace2",
+					Workspace: "myworkspace2",
+				},
+			},
+		},
+		{
+			repository: "Repo",
+			ref:        "main",
+			vcsType:    "Gitlab",
+			pr:         1,
+			projects:   []string{"test"},
+			paths: []struct {
+				Directory string
+				Workspace string
+			}{
+				{
+					Directory: ".",
+					Workspace: "myworkspace",
+				},
+			},
+		},
+	}
+
+	expectedCalls := 0
+	for _, c := range cases {
+		body, _ := json.Marshal(controllers.APIRequest{
+			Repository: c.repository,
+			Ref:        c.ref,
+			Type:       c.vcsType,
+			PR:         c.pr,
+			Projects:   c.projects,
+			Paths:      c.paths,
+		})
+
+		req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+		req.Header.Set(atlantisTokenHeader, atlantisToken)
+		w := httptest.NewRecorder()
+		ac.Apply(w, req)
+		ResponseContains(t, w, http.StatusOK, "")
+
+		expectedCalls += len(c.projects)
+		expectedCalls += len(c.paths)
+	}
+
+	projectCommandBuilder.VerifyWasCalled(Times(expectedCalls)).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Apply(Any[command.ProjectContext]())
 }
 
 func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
 	RegisterMockTestingT(t)
 	locker := NewMockLocker()
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	parser := NewMockEventParsing()
-	vcsClient := NewMockClient()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
+	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	vcsClient := NewMockClient()
+	workingDir := NewMockWorkingDir()
 	Ok(t, err)
+
+	workingDirLocker := NewMockWorkingDirLocker()
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir))).
+		ThenReturn(func() {}, nil)
 
 	projectCommandBuilder := NewMockProjectCommandBuilder()
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -111,6 +256,8 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		VCSClient:                      vcsClient,
 		RepoAllowlistChecker:           repoAllowlistChecker,
+		WorkingDir:                     workingDir,
+		WorkingDirLocker:               workingDirLocker,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}
 	return ac, projectCommandBuilder, projectCommandRunner
