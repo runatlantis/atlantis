@@ -4,7 +4,8 @@ Aside from interacting via pull request comments, Atlantis could respond to a li
 
 ## Main Endpoints
 
-The API endpoints in this section are disabled by default, since these API endpoints could change the infrastructure directly.
+The API endpoints in this section are disabled by default, since these API endpoints could change the infrastructure
+directly.
 To enable the API endpoints, `api-secret` should be configured.
 
 :::tip Prerequisites
@@ -21,13 +22,14 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 
 #### Parameters
 
-| Name       | Type    | Required | Description                              |
-|------------|---------|----------|------------------------------------------|
-| Repository | string  | Yes      | Name of the Terraform repository         |
-| Ref        | string  | Yes      | Git reference, like a branch name        |
-| Type       | string  | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Paths      | Path    | Yes      | Paths to the projects to run the plan    |
-| PR         | int     | No       | Pull Request number                      |
+| Name       | Type   | Required | Description                                                                          |
+|------------|--------|----------|--------------------------------------------------------------------------------------|
+| Repository | string | Yes      | Name of the Terraform repository                                                     |
+| Ref        | string | Yes      | Git reference, like a branch name                                                    |
+| Type       | string | Yes      | Type of the VCS provider (Github/Gitlab)                                             |
+| Paths      | Path   | Yes      | Paths to the projects to run the plan                                                |
+| Sha        | string | No       | SHA of the specific commit to checkout. This is not required but heavily encouraged. |
+| PR         | int    | No       | Pull Request number                                                                  |
 
 #### Path
 
@@ -49,6 +51,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
 --data-raw '{
     "Repository": "repo-name",
     "Ref": "main",
+    "Sha": "940222c757012e0922c5fc1e03d5574c5ce79994",
     "Type": "Github",
     "Paths": [{
       "Directory": ".",
@@ -62,29 +65,29 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
 
 ```json
 {
-  "Error": null,
-  "Failure": "",
-  "ProjectResults": [
-    {
-      "Command": 1,
-      "RepoRelDir": ".",
-      "Workspace": "default",
-      "Error": null,
-      "Failure": "",
-      "PlanSuccess": {
-        "TerraformOutput": "<redacted>",
-        "LockURL": "<redacted>",
-        "RePlanCmd": "atlantis plan -d .",
-        "ApplyCmd": "atlantis apply -d .",
-        "HasDiverged": false
-      },
-      "PolicyCheckSuccess": null,
-      "ApplySuccess": "",
-      "VersionSuccess": "",
-      "ProjectName": ""
-    }
-  ],
-  "PlansDeleted": false
+   "Error": null,
+   "Failure": "",
+   "ProjectResults": [
+      {
+         "Command": 1,
+         "RepoRelDir": ".",
+         "Workspace": "default",
+         "Error": null,
+         "Failure": "",
+         "PlanSuccess": {
+            "TerraformOutput": "<redacted>",
+            "LockURL": "<redacted>",
+            "RePlanCmd": "atlantis plan -d .",
+            "ApplyCmd": "atlantis apply -d .",
+            "HasDiverged": false
+         },
+         "PolicyCheckSuccess": null,
+         "ApplySuccess": "",
+         "VersionSuccess": "",
+         "ProjectName": ""
+      }
+   ],
+   "PlansDeleted": false
 }
 ```
 
@@ -96,13 +99,14 @@ Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repo
 
 #### Parameters
 
-| Name       | Type   | Required | Description                              |
-|------------|--------|----------|------------------------------------------|
-| Repository | string | Yes      | Name of the Terraform repository         |
-| Ref        | string | Yes      | Git reference, like a branch name        |
-| Type       | string | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Paths      | Path   | Yes      | Paths to the projects to run the apply   |
-| PR         | int    | No       | Pull Request number                      |
+| Name       | Type   | Required | Description                                                                          |
+|------------|--------|----------|--------------------------------------------------------------------------------------|
+| Repository | string | Yes      | Name of the Terraform repository                                                     |
+| Ref        | string | Yes      | Git reference, like a branch name                                                    |
+| Type       | string | Yes      | Type of the VCS provider (Github/Gitlab)                                             |
+| Paths      | Path   | Yes      | Paths to the projects to run the apply                                               |
+| Sha        | string | No       | SHA of the specific commit to checkout. This is not required but heavily encouraged. |
+| PR         | int    | No       | Pull Request number                                                                  |
 
 #### Path
 
@@ -124,6 +128,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 --data-raw '{
     "Repository": "repo-name",
     "Ref": "main",
+    "Sha": "940222c757012e0922c5fc1e03d5574c5ce79994",
     "Type": "Github",
     "Paths": [{
       "Directory": ".",
@@ -137,29 +142,30 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 
 ```json
 {
-  "Error": null,
-  "Failure": "",
-  "ProjectResults": [
-    {
-      "Command": 0,
-      "RepoRelDir": ".",
-      "Workspace": "default",
-      "Error": null,
-      "Failure": "",
-      "PlanSuccess": null,
-      "PolicyCheckSuccess": null,
-      "ApplySuccess": "<redacted>",
-      "VersionSuccess": "",
-      "ProjectName": ""
-    }
-  ],
-  "PlansDeleted": false
+   "Error": null,
+   "Failure": "",
+   "ProjectResults": [
+      {
+         "Command": 0,
+         "RepoRelDir": ".",
+         "Workspace": "default",
+         "Error": null,
+         "Failure": "",
+         "PlanSuccess": null,
+         "PolicyCheckSuccess": null,
+         "ApplySuccess": "<redacted>",
+         "VersionSuccess": "",
+         "ProjectName": ""
+      }
+   ],
+   "PlansDeleted": false
 }
 ```
 
 ## Other Endpoints
 
-The endpoints listed in this section are non-destructive and therefore don't require authentication nor special secret token.
+The endpoints listed in this section are non-destructive and therefore don't require authentication nor special secret
+token.
 
 ### GET /status
 
@@ -177,9 +183,9 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/status'
 
 ```json
 {
-  "shutting_down": false,
-  "in_progress_operations": 0,
-  "version": "0.22.3"
+   "shutting_down": false,
+   "in_progress_operations": 0,
+   "version": "0.22.3"
 }
 ```
 
@@ -199,6 +205,6 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/healthz'
 
 ```json
 {
-  "status": "ok"
+   "status": "ok"
 }
 ```

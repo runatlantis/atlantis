@@ -28,6 +28,7 @@ func TestAPIController_Plan(t *testing.T) {
 	body, _ := json.Marshal(controllers.APIRequest{
 		Repository: "Repo",
 		Ref:        "main",
+		Sha:        "abc123",
 		Type:       "Gitlab",
 		Projects:   []string{"default"},
 	})
@@ -45,6 +46,7 @@ func TestAPIController_Apply(t *testing.T) {
 	body, _ := json.Marshal(controllers.APIRequest{
 		Repository: "Repo",
 		Ref:        "main",
+		Sha:        "abc123",
 		Type:       "Gitlab",
 		Projects:   []string{"default"},
 	})
