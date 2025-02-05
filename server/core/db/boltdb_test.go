@@ -489,6 +489,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 			Status:      models.ErroredPlanStatus,
 		},
 	}, status.Projects)
+	b.Close()
 }
 
 // Test we can create a status, delete it, and then we shouldn't be able to getCommandLock
@@ -533,6 +534,7 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 	maybeStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, maybeStatus == nil, "exp nil")
+	b.Close()
 }
 
 // Test we can create a status, update a specific project's status within that
@@ -597,6 +599,7 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 			Status:      models.AppliedPlanStatus,
 		},
 	}, status.Projects) // nolint: staticcheck
+	b.Close()
 }
 
 // Test that if we update an existing pull status and our new status is for a
@@ -659,6 +662,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			Status:      models.AppliedPlanStatus,
 		},
 	}, maybeStatus.Projects)
+	b.Close()
 }
 
 // Test that if we update an existing pull status via Apply and our new status is for a
@@ -771,6 +775,7 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 			},
 		}, updateStatus.Projects)
 	}
+	b.Close()
 }
 
 // Test that if we update one existing policy status via approve_policies and our new status is for a
@@ -885,6 +890,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 			},
 		}, updateStatus.Projects)
 	}
+	b.Close()
 }
 
 // newTestDB returns a TestDB using a temporary path.
@@ -925,6 +931,6 @@ func newTestDB2(t *testing.T) *db.BoltDB {
 }
 
 func cleanupDB(db *bolt.DB) {
-	os.Remove(db.Path()) // nolint: errcheck
 	db.Close()           // nolint: errcheck
+	os.Remove(db.Path()) // nolint: errcheck
 }
