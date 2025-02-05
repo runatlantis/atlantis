@@ -140,6 +140,9 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
 			db, err := db.New(tmp)
+			t.Cleanup(func() {
+				db.Close()
+			})
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {

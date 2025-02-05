@@ -504,3 +504,7 @@ func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectS
 		Status:       p.PlanStatus(),
 	}
 }
+
+func (b *BoltDB) Close() error {
+	return b.db.Close()
+}

@@ -42,7 +42,7 @@ type Client interface {
 	DiscardReviews(repo models.Repo, pull models.PullRequest) error
 	MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error
 	MarkdownPullLink(pull models.PullRequest) (string, error)
-	GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error)
+	GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error)
 
 	// GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 	// The first return value indicates whether the repo contains a file or not

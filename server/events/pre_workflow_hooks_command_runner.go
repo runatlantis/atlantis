@@ -69,18 +69,6 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 		escapedArgs = escapeArgs(cmd.Flags)
 	}
 
-	// Update the plan or apply commit status to pending whilst the pre workflow hook is running
-	switch cmd.Name {
-	case command.Plan:
-		if err := w.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-			ctx.Log.Warn("unable to update plan commit status: %s", err)
-		}
-	case command.Apply:
-		if err := w.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
-			ctx.Log.Warn("unable to update apply commit status: %s", err)
-		}
-	}
-
 	err = w.runHooks(
 		models.WorkflowHookCommandContext{
 			BaseRepo:           ctx.Pull.BaseRepo,
