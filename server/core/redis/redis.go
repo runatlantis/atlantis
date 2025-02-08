@@ -268,7 +268,7 @@ func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string,
 
 	err = r.writePull(key, currStatus)
 	if err != nil {
-		errors.Wrap(err, "db transaction failed")
+		return errors.Wrap(err, "db transaction failed")
 	}
 	return nil
 }
