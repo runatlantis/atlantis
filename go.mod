@@ -27,7 +27,7 @@ require (
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20241129133400-c404f8227ea6
 	github.com/jpillora/backoff v1.0.0
 	github.com/kr/pretty v0.3.1
-	github.com/mcdafydd/go-azuredevops v0.12.1
+	github.com/drmaxgit/go-azuredevops v0.13.1
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
 	github.com/mitchellh/go-homedir v1.1.0

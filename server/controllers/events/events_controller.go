@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v68/github"
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
