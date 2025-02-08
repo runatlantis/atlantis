@@ -200,7 +200,10 @@ func (r *RedisDB) LockCommand(cmdName command.Name, lockTime time.Time) (*comman
 	_, err := r.client.Get(ctx, cmdLockKey).Result()
 	if err == redis.Nil {
 		err = r.client.Set(ctx, cmdLockKey, newLockSerialized, 0).Err()
-		return &lock, errors.Wrap(err, "db transaction failed")
+		if err != nil {
+			return nil, errors.Wrap(err, "db transaction failed")
+		}
+		return &lock, nil
 	} else if err != nil {
 		return nil, errors.Wrap(err, "db transaction failed")
 	}
