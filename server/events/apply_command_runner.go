@@ -162,6 +162,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	} else {
 		result = runProjectCmds(projectCmds, a.prjCmdRunner.Apply)
 	}
+	ctx.CommandHasErrors = result.HasErrors()
 
 	a.pullUpdater.updatePull(
 		ctx,
