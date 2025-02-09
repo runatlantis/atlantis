@@ -3,7 +3,7 @@ title: Introducing Atlantis 1.0.0!
 lang: en-US
 ---
 
-# Atlantis User Survey Results
+# Atlantis 1.0.0
 
 The core team is excited to announce the release of Atlantis 1.0.0! This release is many years in the making, and we're excited to be bringing Atlantis into this next chapter.
 
