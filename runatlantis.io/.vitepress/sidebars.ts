@@ -111,7 +111,7 @@ const en = [
           },
           {
             text: "Introducing Atlantis 1.0.0!",
-            link: "/blog/2025/introducing-atlantis-1"
+            link: "/blog/2025/introducing-atlantis-1-0-0"
           },
         ]
       },
