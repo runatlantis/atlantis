@@ -106,8 +106,8 @@ const en = [
         collapsed: true,
         items: [
           {
-            text: "Introducing Atlantis 1.0!",
-            link: "/blog/2025/introducing-atlantis-1"
+            text: "Introducing Atlantis 1.0.0!",
+            link: "/blog/2025/introducing-atlantis-1-0-0"
           },
         ]
       },
