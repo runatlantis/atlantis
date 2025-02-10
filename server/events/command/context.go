@@ -49,4 +49,7 @@ type Context struct {
 
 	// TeamAllowlistChecker is used to check authorization on a project-level
 	TeamAllowlistChecker TeamAllowlistChecker
+
+	// Set true if there were any errors during the command execution
+	CommandHasErrors bool
 }
