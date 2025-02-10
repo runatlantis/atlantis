@@ -76,11 +76,8 @@ func (g *AzureDevopsClient) GetModifiedFiles(logger logging.SimpleLogging, repo 
 			Top:  pageSize,
 			Skip: skip,
 		})
-		if err != nil {
-			return nil, errors.Wrapf(err, "error while getting diff %s -> %s", sourceRefName, targetRefName)
-		}
 		if resp.StatusCode != http.StatusOK {
-			return nil, errors.Errorf("http response code %d while getting diff %s -> %s", resp.StatusCode, sourceRefName, targetRefName)
+			return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
 		}
 
 		for _, change := range r.Changes {
