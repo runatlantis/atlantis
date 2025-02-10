@@ -44,6 +44,7 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		"USER_NAME":          ctx.User.Username,
 		"OUTPUT_STATUS_FILE": outputFilePath,
 		"COMMAND_NAME":       ctx.CommandName,
+		"COMMAND_HAS_ERRORS": fmt.Sprintf("%t", ctx.CommandHasErrors),
 	}
 
 	finalEnvVars := baseEnvVars
