@@ -172,7 +172,7 @@ func (a *APIController) apiSetup(ctx *command.Context) error {
 	defer unlockFn()
 
 	// ensure workingDir is present
-	_, _, err = a.WorkingDir.Clone(ctx.Log, headRepo, pull, events.DefaultWorkspace)
+	_, err = a.WorkingDir.Clone(ctx.Log, headRepo, pull, events.DefaultWorkspace)
 	if err != nil {
 		return err
 	}
