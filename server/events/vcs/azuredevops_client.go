@@ -76,6 +76,9 @@ func (g *AzureDevopsClient) GetModifiedFiles(logger logging.SimpleLogging, repo 
 			Top:  pageSize,
 			Skip: skip,
 		})
+    if err != nil {
+		  return nil, errors.Wrap(err, "getting pull request")
+	  }
 		if resp.StatusCode != http.StatusOK {
 			return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
 		}

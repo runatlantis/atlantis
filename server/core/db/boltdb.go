@@ -136,7 +136,9 @@ func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock
 		}
 		return bucket.Delete([]byte(key))
 	})
-	err = errors.Wrap(err, "DB transaction failed")
+	if err != nil {
+		err = errors.Wrap(err, "DB transaction failed")
+	}
 	if foundLock {
 		return &lock, err
 	}
@@ -387,7 +389,10 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 		// Now, we overwrite the key with our new status.
 		return b.writePullToBucket(bucket, key, newStatus)
 	})
-	return newStatus, errors.Wrap(err, "DB transaction failed")
+	if err != nil {
+		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return newStatus, nil
 }
 
 // GetPullStatus returns the status for pull.
@@ -404,7 +409,10 @@ func (b *BoltDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, err
 		s, txErr = b.getPullFromBucket(bucket, key)
 		return txErr
 	})
-	return s, errors.Wrap(err, "DB transaction failed")
+	if err != nil {
+		return nil, errors.Wrap(err, "DB transaction failed")
+	}
+	return s, nil
 }
 
 // DeletePullStatus deletes the status for pull.
@@ -417,7 +425,10 @@ func (b *BoltDB) DeletePullStatus(pull models.PullRequest) error {
 		bucket := tx.Bucket(b.pullsBucketName)
 		return bucket.Delete(key)
 	})
-	return errors.Wrap(err, "DB transaction failed")
+	if err != nil {
+		return errors.Wrap(err, "DB transaction failed")
+	}
+	return nil
 }
 
 // UpdateProjectStatus updates project status.
@@ -449,7 +460,10 @@ func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, 
 		}
 		return b.writePullToBucket(bucket, key, currStatus)
 	})
-	return errors.Wrap(err, "DB transaction failed")
+	if err != nil {
+		return errors.Wrap(err, "DB transaction failed")
+	}
+	return nil
 }
 
 func (b *BoltDB) pullKey(pull models.PullRequest) ([]byte, error) {
