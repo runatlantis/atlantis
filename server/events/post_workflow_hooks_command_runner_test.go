@@ -209,7 +209,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, nil)
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
 		When(whPostWorkflowHookRunner.Run(
 			ArgThat[models.WorkflowHookCommandContext](WorkflowHookCommandContextMatcher{expected: expectedCtx}),
 			Eq(testHook.RunCommand),
