@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -274,7 +275,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
 		var err error
-		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, logger)
+
+		gitlabGroupAllowlistChecker, err := command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+		if err != nil {
+			return nil, err
+		}
+
+		gitlabGroups := slices.Concat(gitlabGroupAllowlistChecker.AllTeams(), globalCfg.PolicySets.AllTeams())
+		slices.Sort(gitlabGroups)
+		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
 		if err != nil {
 			return nil, err
 		}
@@ -688,6 +697,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VcsClient:        vcsClient,
 		Locker:           projectLocker,
 		LockURLGenerator: router,
+		Logger:           logger,
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor:     terraformClient,
 			DefaultTFDistribution: defaultTfDistribution,
@@ -853,6 +863,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			ExtraArgs:                   globalCfg.TeamAuthz.Args,
 			ExternalTeamAllowlistRunner: &runtime.DefaultExternalTeamAllowlistRunner{},
 		}
+	} else if userConfig.GitlabUser != "" {
+		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
 		if err != nil {
@@ -941,6 +956,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		RepoAllowlistChecker:           repoAllowlist,
 		Scope:                          statsScope.SubScope("api"),
 		VCSClient:                      vcsClient,
+		WorkingDir:                     workingDir,
+		WorkingDirLocker:               workingDirLocker,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{

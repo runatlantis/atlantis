@@ -267,7 +267,7 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 		return errors.Wrap(err, "getting pull request")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.Wrapf(err, "http response code %d getting pull request", resp.StatusCode)
+		return errors.Errorf("http response code %d getting pull request", resp.StatusCode)
 	}
 	if source.GetSupportsIterations() {
 		opts := azuredevops.PullRequestIterationsListOptions{}
@@ -276,7 +276,7 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 			return errors.Wrap(err, "listing pull request iterations")
 		}
 		if resp.StatusCode != http.StatusOK {
-			return errors.Wrapf(err, "http response code %d listing pull request iterations", resp.StatusCode)
+			return errors.Errorf("http response code %d listing pull request iterations", resp.StatusCode)
 		}
 		for _, iteration := range iterations {
 			if sourceRef := iteration.GetSourceRefCommit(); sourceRef != nil {
@@ -297,7 +297,7 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 		return errors.Wrap(err, "creating pull request status")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.Wrapf(err, "http response code %d creating pull request status", resp.StatusCode)
+		return errors.Errorf("http response code %d creating pull request status", resp.StatusCode)
 	}
 	return err
 }
@@ -393,7 +393,7 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *AzureDevopsClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) { //nolint: revive
+func (g *AzureDevopsClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) { //nolint: revive
 	return nil, nil
 }
 

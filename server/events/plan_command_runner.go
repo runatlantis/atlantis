@@ -114,11 +114,6 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		return
 	}
 
-	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	if err := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-		ctx.Log.Warn("unable to update plan commit status: %s", err)
-	}
-
 	// discard previous plans that might not be relevant anymore
 	ctx.Log.Debug("deleting previous plans and locks")
 	p.deletePlans(ctx)
@@ -186,10 +181,6 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		if err = p.pullUpdater.VCSClient.DiscardReviews(baseRepo, pull); err != nil {
 			ctx.Log.Err("failed to remove approvals: %s", err)
 		}
-	}
-
-	if err = p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.PendingCommitStatus, command.Plan); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
 	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
@@ -262,6 +253,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
+	ctx.CommandHasErrors = result.HasErrors()
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")

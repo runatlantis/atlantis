@@ -1398,11 +1398,13 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	teams, err := client.GetTeamNamesForUser(models.Repo{
-		Owner: "testrepo",
-	}, models.User{
-		Username: "testuser",
-	})
+	teams, err := client.GetTeamNamesForUser(
+		logger,
+		models.Repo{
+			Owner: "testrepo",
+		}, models.User{
+			Username: "testuser",
+		})
 	Ok(t, err)
 	Equals(t, []string{"Frontend Developers", "frontend-developers", "Employees", "employees"}, teams)
 }
