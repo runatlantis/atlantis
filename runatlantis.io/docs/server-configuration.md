@@ -502,7 +502,8 @@ and set `--autoplan-modules` to `false`.
 
   ::: warning NOTE
   Git provider API may be limiting the list of allowed emojis you can use
-  [List for Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
+  [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
+  [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
   :::
 
 ### `--enable-diff-markdown-format`
