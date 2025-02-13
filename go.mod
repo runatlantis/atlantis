@@ -1,6 +1,6 @@
 module github.com/runatlantis/atlantis
 
-go 1.23.5
+go 1.24.0
 
 require (
 	code.gitea.io/sdk/gitea v0.19.0
