@@ -505,7 +505,7 @@ and set `--autoplan-modules` to `false`.
   
 * [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
 * [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
-* [Azure DevPps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
+* [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
 
   :::
 
