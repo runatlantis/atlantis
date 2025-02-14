@@ -161,19 +161,19 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 }
 
 type LockDetail struct {
-	Name            string    `json:"name"`
-	ProjectName     string    `json:"projectName"`
-	ProjectRepo     string    `json:"projectRepo"`
-	ProjectRepoPath string    `json:"projectRepoPath"`
-	PullID          int       `json:"pullID,string"`
-	PullURL         string    `json:"pullURL"`
-	User            string    `json:"user"`
-	Workspace       string    `json:"workspace"`
-	Time            time.Time `json:"time"`
+	Name            string
+	ProjectName     string
+	ProjectRepo     string
+	ProjectRepoPath string
+	PullID          int `json:",string"`
+	PullURL         string
+	User            string
+	Workspace       string
+	Time            time.Time
 }
 
 type ListLocksResult struct {
-	Locks []LockDetail `json:"locks"`
+	Locks []LockDetail
 }
 
 func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {

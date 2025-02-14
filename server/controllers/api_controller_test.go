@@ -208,7 +208,7 @@ func TestAPIController_ListLocks(t *testing.T) {
 			Name:            "lock-id",
 			ProjectName:     "terraform",
 			ProjectRepo:     "owner/repo",
-			ProjectRepoPath: "path",
+			ProjectRepoPath: "/path",
 			PullID:          123,
 			PullURL:         "url",
 			User:            "jdoe",
@@ -218,7 +218,7 @@ func TestAPIController_ListLocks(t *testing.T) {
 	},
 	}
 	mockLock := models.ProjectLock{
-		Project:   models.Project{ProjectName: "terraform", RepoFullName: "owner/repo", Path: "path"},
+		Project:   models.Project{ProjectName: "terraform", RepoFullName: "owner/repo", Path: "/path"},
 		Pull:      models.PullRequest{Num: 123, URL: "url", Author: "lkysow"},
 		User:      models.User{Username: "jdoe"},
 		Workspace: "default",
@@ -234,7 +234,8 @@ func TestAPIController_ListLocks(t *testing.T) {
 	ac.ListLocks(w, req)
 	response, _ := io.ReadAll(w.Result().Body)
 	var result controllers.ListLocksResult
-	json.Unmarshal(response, &result)
+	err := json.Unmarshal(response, &result)
+	Ok(t, err)
 	Equals(t, expected, result)
 }
 
@@ -250,7 +251,8 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 	ac.ListLocks(w, req)
 	response, _ := io.ReadAll(w.Result().Body)
 	var result controllers.ListLocksResult
-	json.Unmarshal(response, &result)
+	err := json.Unmarshal(response, &result)
+	Ok(t, err)
 	Equals(t, expected, result)
 }
 
