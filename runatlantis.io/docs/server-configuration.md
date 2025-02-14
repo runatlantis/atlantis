@@ -501,9 +501,12 @@ and set `--autoplan-modules` to `false`.
   Defaults to "" (empty string).
 
   ::: warning NOTE
-  Each VCS provider supports a different lists of emojis:
-  * [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
-  * [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
+  Each VCS provider supports a different list of emojis:
+  
+* [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
+* [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
+* [Azure DevPps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
+
   :::
 
 ### `--enable-diff-markdown-format`
