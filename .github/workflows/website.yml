@@ -110,6 +110,7 @@ jobs:
             -e 'https://github.com/runatlantis/helm-charts#customization' \
             -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \
             -e 'https://confluence.atlassian.com/*' \
+            -e 'https://communityinviter.com/apps/cloud-native/cncf' \
             --header 'User-Agent: Muffet' \
             --header 'Accept-Encoding:deflate, gzip' \
             --buffer-size 8192 \
