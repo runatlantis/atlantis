@@ -65,10 +65,10 @@ jobs:
           go-version-file: go.mod
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@e60da84bfae8c7920a47be973d75e15710aa8bd7 # v6
+        uses: golangci/golangci-lint-action@2226d7cb06a077cd73e56eedd38eecad18e5d837 # v6
         with:
           # renovate: datasource=github-releases depName=golangci/golangci-lint
-          version: v1.62.2
+          version: v1.64.4
 
   skip-lint:
     needs: [changes]
