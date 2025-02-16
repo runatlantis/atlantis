@@ -5,8 +5,8 @@ package mocks
 
 import (
 	gitea "code.gitea.io/sdk/gitea"
-	github "github.com/google/go-github/v68/github"
 	azuredevops "github.com/drmaxgit/go-azuredevops/azuredevops"
+	github "github.com/google/go-github/v68/github"
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	gitea0 "github.com/runatlantis/atlantis/server/events/vcs/gitea"
