@@ -21,9 +21,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/go-github/v68/github"
-	"github.com/drmaxgit/go-azuredevops/azuredevops"
 )
 
 var PullEvent = github.PullRequestEvent{
