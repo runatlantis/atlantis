@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -157,6 +158,55 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.respond(w, logging.Warn, code, "%s", string(response))
+}
+
+type LockDetail struct {
+	Name            string
+	ProjectName     string
+	ProjectRepo     string
+	ProjectRepoPath string
+	PullID          int `json:",string"`
+	PullURL         string
+	User            string
+	Workspace       string
+	Time            time.Time
+}
+
+type ListLocksResult struct {
+	Locks []LockDetail
+}
+
+func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	locks, err := a.Locker.List()
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	result := ListLocksResult{}
+	for name, lock := range locks {
+		lockDetail := LockDetail{
+			name,
+			lock.Project.ProjectName,
+			lock.Project.RepoFullName,
+			lock.Project.Path,
+			lock.Pull.Num,
+			lock.Pull.URL,
+			lock.User.Username,
+			lock.Workspace,
+			lock.Time,
+		}
+		result.Locks = append(result.Locks, lockDetail)
+	}
+
+	response, err := json.Marshal(result)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+	a.respond(w, logging.Warn, http.StatusOK, "%s", string(response))
 }
 
 func (a *APIController) apiSetup(ctx *command.Context) error {

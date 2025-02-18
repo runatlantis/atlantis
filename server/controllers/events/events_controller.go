@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/google/go-github/v68/github"
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
@@ -413,8 +413,8 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 
 	baseRepo, user, pullNum, err := e.Parser.ParseGithubIssueCommentEvent(logger, event)
 
-	wrapped := errors.Wrapf(err, "Failed parsing event: %s", githubReqID)
 	if err != nil {
+		wrapped := errors.Wrapf(err, "Failed parsing event: %s", githubReqID)
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{

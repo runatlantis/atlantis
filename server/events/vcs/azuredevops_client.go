@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -68,25 +68,40 @@ func (g *AzureDevopsClient) GetModifiedFiles(logger logging.SimpleLogging, repo 
 	targetRefName := strings.Replace(pullRequest.GetTargetRefName(), "refs/heads/", "", 1)
 	sourceRefName := strings.Replace(pullRequest.GetSourceRefName(), "refs/heads/", "", 1)
 
-	r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName)
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
-	}
+	const pageSize = 100 // Number of files from diff call
+	var skip int
 
-	for _, change := range r.Changes {
-		item := change.GetItem()
-		// Convert the path to a relative path from the repo's root.
-		relativePath := filepath.Clean("./" + item.GetPath())
-		files = append(files, relativePath)
-
-		// If the file was renamed, we'll want to run plan in the directory
-		// it was moved from as well.
-		changeType := azuredevops.Rename.String()
-		if change.ChangeType == &changeType {
-			// Convert the path to a relative path from the repo's root.
-			relativePath = filepath.Clean("./" + change.GetSourceServerItem())
-			files = append(files, relativePath)
+	for {
+		r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName, &azuredevops.GitDiffListOptions{
+			Top:  pageSize,
+			Skip: skip,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "getting pull request")
 		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
+		}
+
+		for _, change := range r.Changes {
+			item := change.GetItem()
+			// Convert the path to a relative path from the repo's root.
+			relativePath := filepath.Clean("./" + item.GetPath())
+			files = append(files, relativePath)
+
+			// If the file was renamed, we'll want to run plan in the directory
+			// it was moved from as well.
+			changeType := azuredevops.Rename.String()
+			if change.ChangeType == &changeType {
+				relativePath = filepath.Clean("./" + change.GetSourceServerItem())
+				files = append(files, relativePath)
+			}
+		}
+
+		if len(r.Changes) < pageSize {
+			break // Break if we have reached the end
+		}
+		skip += pageSize // Move to next page
 	}
 
 	return files, nil
