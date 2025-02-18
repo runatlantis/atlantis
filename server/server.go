@@ -426,8 +426,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
-		return nil, errors.Wrapf(err,
-			"parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
+		return nil, errors.Wrapf(err, "parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
 	}
 
 	underlyingRouter := mux.NewRouter()
@@ -1039,6 +1038,7 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
+	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")

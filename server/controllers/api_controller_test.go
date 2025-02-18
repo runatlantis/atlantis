@@ -3,9 +3,11 @@ package controllers_test
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers"
@@ -241,6 +243,62 @@ func TestAPIController_Apply(t *testing.T) {
 	projectCommandBuilder.VerifyWasCalled(Times(expectedCalls)).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_ListLocks(t *testing.T) {
+	ac, _, _ := setup(t)
+	time := time.Now()
+	expected := controllers.ListLocksResult{[]controllers.LockDetail{
+		{
+			Name:            "lock-id",
+			ProjectName:     "terraform",
+			ProjectRepo:     "owner/repo",
+			ProjectRepoPath: "/path",
+			PullID:          123,
+			PullURL:         "url",
+			User:            "jdoe",
+			Workspace:       "default",
+			Time:            time,
+		},
+	},
+	}
+	mockLock := models.ProjectLock{
+		Project:   models.Project{ProjectName: "terraform", RepoFullName: "owner/repo", Path: "/path"},
+		Pull:      models.PullRequest{Num: 123, URL: "url", Author: "lkysow"},
+		User:      models.User{Username: "jdoe"},
+		Workspace: "default",
+		Time:      time,
+	}
+	mockLocks := map[string]models.ProjectLock{
+		"lock-id": mockLock,
+	}
+	When(ac.Locker.List()).ThenReturn(mockLocks, nil)
+
+	req, _ := http.NewRequest("GET", "", nil)
+	w := httptest.NewRecorder()
+	ac.ListLocks(w, req)
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.ListLocksResult
+	err := json.Unmarshal(response, &result)
+	Ok(t, err)
+	Equals(t, expected, result)
+}
+
+func TestAPIController_ListLocksEmpty(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	expected := controllers.ListLocksResult{}
+	mockLocks := map[string]models.ProjectLock{}
+	When(ac.Locker.List()).ThenReturn(mockLocks, nil)
+
+	req, _ := http.NewRequest("GET", "", nil)
+	w := httptest.NewRecorder()
+	ac.ListLocks(w, req)
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.ListLocksResult
+	err := json.Unmarshal(response, &result)
+	Ok(t, err)
+	Equals(t, expected, result)
 }
 
 func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {

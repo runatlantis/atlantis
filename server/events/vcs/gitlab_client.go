@@ -456,16 +456,27 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		}
 	)
 
-	for i := 0; i < maxAttempts; i++ {
+	for {
+		attempt := int(retryer.Attempt()) + 1
 		logger := logger.With(
-			"attempt", i+1,
+			"attempt", attempt,
 			"max_attempts", maxAttempts,
 			"repo", repo.FullName,
 			"commit", commit.ShortID,
 			"state", state.String(),
 		)
 
-		_, resp, err = g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, setCommitStatusOptions)
+		_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, setCommitStatusOptions)
+		if err == nil {
+			if retryer.Attempt() > 0 {
+				logger.Info("GitLab returned HTTP [200 OK] after updating commit status")
+			}
+
+			return nil
+		}
+		if attempt == maxAttempts {
+			return errors.Wrap(err, fmt.Sprintf("failed to update commit status for '%s' @ '%s' to '%s' after %d attempts", repo.FullName, pull.HeadCommit, src, attempt))
+		}
 
 		if resp != nil {
 			logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
@@ -481,26 +492,15 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			// GitLab does not allow merge requests to be merged when the pipeline status is "running."
 
 			if resp.StatusCode == http.StatusConflict {
-				sleep := retryer.ForAttempt(float64(i))
-
-				logger.With("retry_in", sleep).Warn("GitLab returned HTTP [409 Conflict] when updating commit status")
-				time.Sleep(sleep)
-
-				continue
+				logger.Warn("GitLab returned HTTP [409 Conflict] when updating commit status")
 			}
 		}
 
-		// Log we got a 200 OK response from GitLab after at least one retry to help with debugging/understanding delays/errors.
-		if err == nil && i > 0 {
-			logger.Info("GitLab returned HTTP [200 OK] after updating commit status")
-		}
+		sleep := retryer.Duration()
 
-		// Return the err, which might be nil if everything worked out
-		return err
+		logger.With("retry_in", sleep).Warn("GitLab errored when updating commit status: %w", err)
+		time.Sleep(sleep)
 	}
-
-	// If we got here, we've exhausted all attempts to update the commit status and still failed, so return the error upstream
-	return errors.Wrap(err, fmt.Sprintf("failed to update commit status for '%s' @ '%s' to '%s' after %d attempts", repo.FullName, pull.HeadCommit, src, maxAttempts))
 }
 
 func (g *GitlabClient) GetMergeRequest(logger logging.SimpleLogging, repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
@@ -542,16 +542,14 @@ func (g *GitlabClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 
 	mr, err := g.GetMergeRequest(logger, pull.BaseRepo.FullName, pull.Num)
 	if err != nil {
-		return errors.Wrap(
-			err, "unable to merge merge request, it was not possible to retrieve the merge request")
+		return errors.Wrap(err, "unable to merge merge request, it was not possible to retrieve the merge request")
 	}
 	project, resp, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
 	if resp != nil {
 		logger.Debug("GET /projects/%d returned: %d", mr.ProjectID, resp.StatusCode)
 	}
 	if err != nil {
-		return errors.Wrap(
-			err, "unable to merge merge request, it was not possible to check the project requirements")
+		return errors.Wrap(err, "unable to merge merge request, it was not possible to check the project requirements")
 	}
 
 	if project != nil && project.OnlyAllowMergeIfPipelineSucceeds {
@@ -568,7 +566,10 @@ func (g *GitlabClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 	if resp != nil {
 		logger.Debug("PUT /projects/%s/merge_requests/%d/merge returned: %d", pull.BaseRepo.FullName, pull.Num, resp.StatusCode)
 	}
-	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
+	if err != nil {
+		return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
+	}
+	return nil
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.

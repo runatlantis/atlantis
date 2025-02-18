@@ -68,7 +68,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         defaultUnterminatedStringError,
-			ExpErr:         "exit status 2: running \"sh -c echo 'a\" in",
+			ExpErr:         "exit status 2: running 'sh -c echo 'a' in",
 			ExpDescription: "",
 		},
 		{
@@ -84,7 +84,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         fmt.Sprintf(defaultShellCommandNotFoundErrorFormat, "lkjlkj"),
-			ExpErr:         "exit status 127: running \"sh -c lkjlkj\" in",
+			ExpErr:         "exit status 127: running 'sh -c lkjlkj' in",
 			ExpDescription: "",
 		},
 		{
@@ -100,6 +100,14 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         "user_name=acme-user\r\n",
+			ExpErr:         "",
+			ExpDescription: "",
+		},
+		{
+			Command:        "echo command_name=$COMMAND_NAME command_has_errors=$COMMAND_HAS_ERRORS",
+			Shell:          defaultShell,
+			ShellArgs:      defaultShellArgs,
+			ExpOut:         "command_name=plan command_has_errors=false\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
@@ -151,7 +159,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-		r := runtime.DefaultPreWorkflowHookRunner{
+		r := runtime.DefaultPostWorkflowHookRunner{
 			OutputHandler: projectCmdOutputHandler,
 		}
 		t.Run(c.Command, func(t *testing.T) {
@@ -175,8 +183,9 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 				User: models.User{
 					Username: "acme-user",
 				},
-				Log:         logger,
-				CommandName: "plan",
+				Log:              logger,
+				CommandName:      "plan",
+				CommandHasErrors: false,
 			}
 			_, desc, err := r.Run(ctx, c.Command, c.Shell, c.ShellArgs, tmpDir)
 			if c.ExpErr != "" {

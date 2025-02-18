@@ -15,6 +15,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/stretchr/testify/require"
 )
 
 func TestApplyCommandRunner_IsLocked(t *testing.T) {
@@ -232,6 +233,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 		ProjectResults    []command.ProjectResult
 		RunnerInvokeMatch []*EqMatcher
 		ExpComment        string
+		ApplyFailed       bool
 	}{
 		{
 			Description: "When first apply fails, the second don't run",
@@ -263,6 +265,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Once(),
 			},
+			ApplyFailed: true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
@@ -297,7 +300,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Never(),
 			},
-			ExpComment: "Ran Apply for dir: `` workspace: ``\n\n**Apply Error**\n```\nshabang\n```",
+			ApplyFailed: true,
+			ExpComment:  "Ran Apply for dir: `` workspace: ``\n\n**Apply Error**\n```\nshabang\n```",
 		},
 		{
 			Description: "When both in a group of two succeeds, the following two will run",
@@ -348,6 +352,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Never(),
 				Never(),
 			},
+			ApplyFailed: true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
@@ -401,6 +406,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Once(),
 			},
+			ApplyFailed: true,
 			ExpComment: "Ran Apply for 4 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
@@ -435,6 +441,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Once(),
 			},
+			ApplyFailed: true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
@@ -465,9 +472,41 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Once(),
 			},
+			ApplyFailed: true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
 				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
+		},
+		{
+			Description: "All project finished successfully",
+			ProjectContexts: []command.ProjectContext{
+				{
+					ExecutionOrderGroup: 0,
+					ProjectName:         "First",
+				},
+				{
+					ExecutionOrderGroup: 1,
+					ProjectName:         "Second",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+				{
+					Command:      command.Apply,
+					ApplySuccess: "Great success!",
+				},
+			},
+			RunnerInvokeMatch: []*EqMatcher{
+				Once(),
+				Once(),
+			},
+			ApplyFailed: false,
+			ExpComment: "Ran Apply for 2 projects:\n\n" +
+				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
+				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 2 successful, 0 failed, 0 errored",
 		},
 	}
 
@@ -505,8 +544,9 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 
 			for i := range c.ProjectContexts {
 				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Apply(c.ProjectContexts[i])
-
 			}
+
+			require.Equal(t, c.ApplyFailed, ctx.CommandHasErrors)
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
 				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(c.ExpComment), Eq("apply"),
