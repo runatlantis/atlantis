@@ -522,6 +522,9 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 
 	inputPolicySets := ctx.PolicySets.PolicySets
 	for i, output := range outputs {
+		if i >= len(inputPolicySets) {
+			break
+		}
 		index = i
 		policySetName := inputPolicySets[index].Name
 		if !ctx.CustomPolicyCheck {
