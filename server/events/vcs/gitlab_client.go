@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -427,7 +428,6 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	getCommitStatusesOptions := &gitlab.GetCommitStatusesOptions{
 		ListOptions: gitlab.ListOptions{
 			Sort:    "desc",
-			PerPage: 1,
 		},
 		Ref:     gitlab.Ptr(pull.HeadBranch),
 	}
@@ -437,15 +437,34 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		commitStatuses, resp, err = g.Client.Commits.GetCommitStatuses(repo.FullName, pull.HeadCommit, getCommitStatusesOptions)
 
 		if resp != nil {
-			logger.Debug("GET /projects/%s/repository/commits/%d: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
+			logger.Debug("GET /projects/%s/repository/commits/%d/statuses: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
 		}
 		if err != nil {
 			return err
 		}
 		if len(commitStatuses) > 0 {
-			logger.Info("Pipeline found for commit %s and ref %s, setting pipeline ID to %d", pull.HeadCommit, pull.HeadBranch, commitStatuses[0].PipelineId)
-			// Set the pipeline ID to the last pipeline that ran for the commit
-			setCommitStatusOptions.PipelineID = gitlab.Ptr(commitStatuses[0].PipelineId)
+			var pipelineIds []int
+
+			// Loop through the commitStatuses and collect unique pipelineId
+			for _, commitStatus := range commitStatuses {
+				if !(slices.Contains(pipelineIds, commitStatus.PipelineId)) {
+					pipelineIds = append(pipelineIds, commitStatus.PipelineId)
+				}
+			}
+
+			// Check that all commit statuses has identical pipeline ID reflected by only one item in pipelineIds
+			if len(pipelineIds) == 1 {
+				logger.Info("Exactly one PipelineID found for commit %s and ref %s, setting new status PipelineID to %d", pull.HeadCommit, pull.HeadBranch, pipelineIds[0])
+
+				// Set the pipeline ID to the only item in pipelineIds
+				setCommitStatusOptions.PipelineID = gitlab.Ptr(pipelineIds[0])
+			} else {
+				logger.Warn("Commit %s has statuses from more than one PipelineID (ids=%v) for ref %s. Set PipelineID from the last commit status: %s", pull.HeadCommit, pipelineIds, pull.HeadBranch, commitStatuses[0].PipelineId)
+
+				// Set the pipeline ID from the latest commit status
+				setCommitStatusOptions.PipelineID = gitlab.Ptr(commitStatuses[0].PipelineId)
+			}
+
 			break
 		}
 		if i != retries {
