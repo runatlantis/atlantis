@@ -153,7 +153,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/4no1PS1PoRF/ngrok-v3-3.13.0-linux-amd64.tar.gz
+          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/9VU6NY9RyvK/ngrok-v3-3.19.1-linux-amd64.tar.gz
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version

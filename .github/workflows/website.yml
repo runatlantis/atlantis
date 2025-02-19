@@ -22,7 +22,7 @@ concurrency:
 jobs:
   changes:
     outputs:
-      should-run-link-check: ${{ steps.changes.outputs.src == 'true' }}
+      should-run-website-check: ${{ steps.changes.outputs.src == 'true' }}
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
@@ -43,12 +43,10 @@ jobs:
               - '.github/workflows/website.yml'
 
   # Check that the website builds and there's no missing links.
-  # This job builds the website, starts a server to serve it, and then uses
-  # muffet (https://github.com/raviqqe/muffet) to perform the link check.
-  link-check:
+  website-check:
     needs: [changes]
-    if: github.event.pull_request.draft == false && needs.changes.outputs.should-run-link-check == 'true'
-    name: Website Link Check
+    if: github.event.pull_request.draft == false && needs.changes.outputs.should-run-website-check == 'true'
+    name: Website Check
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -64,6 +62,12 @@ jobs:
           config: .markdownlint.yaml
           globs: 'runatlantis.io/**/*.md'
 
+      - name: Link Checker
+        id: lychee
+        uses: lycheeverse/lychee-action@f613c4a64e50d792e0b31ec34bbcbba12263c6a6 # v2.3.0
+        with:
+          args: --verbose --no-progress ./runatlantis.io
+
       - name: setup npm
         uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4
         with:
@@ -71,13 +75,7 @@ jobs:
           cache: 'npm'
 
       - name: run http-server
-        env:
-          # renovate: datasource=github-releases depName=raviqqe/muffet
-          MUFFET_VERSION: 2.10.7
         run: |
-          # install raviqqe/muffet to check for broken links.
-          curl -Ls https://github.com/raviqqe/muffet/releases/download/v${MUFFET_VERSION}/muffet_linux_amd64.tar.gz | tar -xz
-
           # build site
           npm install
           npm run website:build
@@ -90,36 +88,10 @@ jobs:
           npx playwright install --with-deps
           npm run e2e
 
-      - name: wait until server listened
-        run: curl --retry-delay 1 --retry 30 --retry-all-error http://localhost:8080
-
-      # medium.com => was being rate limited: HTTP 429
-      # twitter.com => too many redirections
-      # www.flaticon.com => 403 error
-      # www.freepik.com => 403 error
-      # ngrok.com => 406 error
-      - run: |
-          ./muffet \
-            -e 'https://medium.com/runatlantis' \
-            -e 'https://dev.to/*' \
-            -e 'https://twitter.com/*' \
-            -e 'https://www.flaticon.com/*' \
-            -e 'https://www.freepik.com/*' \
-            -e 'https://ngrok.com/*' \
-            -e 'https://github\.com/runatlantis/atlantis/edit/main/.*' \
-            -e 'https://github.com/runatlantis/helm-charts#customization' \
-            -e 'https://github.com/sethvargo/atlantis-on-gke/blob/master/terraform/tls.tf#L64-L84' \
-            -e 'https://confluence.atlassian.com/*' \
-            --header 'User-Agent: Muffet' \
-            --header 'Accept-Encoding:deflate, gzip' \
-            --buffer-size 8192 \
-            --timeout 300 \
-            http://localhost:8080/
-
-  skip-link-check:
+  skip-website-check:
     needs: [changes]
-    if: needs.changes.outputs.should-run-link-check == 'false'
-    name: Website Link Check
+    if: needs.changes.outputs.should-run-website-check == 'false'
+    name: Website Check
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
