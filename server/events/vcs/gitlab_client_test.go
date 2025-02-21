@@ -28,7 +28,6 @@ const updateStatusDescription = "description"
 const updateStatusTargetUrl = "https://google.com"
 const updateStatusSrc = "src"
 const updateStatusHeadBranch = "test"
-const updateStatusHeadBranchDuplicate = "test_duplicate"
 
 /* UpdateStatus request JSON body object */
 type UpdateStatusJsonBody struct {
@@ -41,8 +40,8 @@ type UpdateStatusJsonBody struct {
 }
 
 type CommitStatus struct {
-	Ref string `json:"ref"`
-	PipelineID int `json:"pipeline_id"`
+	Ref        string `json:"ref"`
+	PipelineID int    `json:"pipeline_id"`
 }
 
 /* GetCommitStatuses response JSON object */
@@ -350,7 +349,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 						getCommitStatusesResponse := GetCommitStatusesResponse{
 							CommitStatus{
-								Ref: updateStatusHeadBranch,
+								Ref:        updateStatusHeadBranch,
 								PipelineID: gitlabPipelineSuccessMrID,
 							},
 						}
@@ -482,7 +481,7 @@ func TestGitlabClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 						} else {
 							getCommitStatusesResponse := GetCommitStatusesResponse{
 								CommitStatus{
-									Ref: updateStatusHeadBranch,
+									Ref:        updateStatusHeadBranch,
 									PipelineID: gitlabPipelineSuccessMrID,
 								},
 							}
@@ -610,7 +609,7 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 
 						getCommitStatusesResponse := GetCommitStatusesResponse{
 							CommitStatus{
-								Ref: updateStatusHeadBranch,
+								Ref:        updateStatusHeadBranch,
 								PipelineID: gitlabPipelineSuccessMrID,
 							},
 						}
