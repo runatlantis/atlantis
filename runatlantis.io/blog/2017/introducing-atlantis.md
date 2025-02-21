@@ -17,7 +17,7 @@ functionality of Atlantis enables developers and operators to run `terraform pla
 `apply` directly from Terraform pull requests. Atlantis then comments back on the pull
 request with the output of the commands:
 
-![](/blog/intro/intro1.gif)
+![](intro/intro1.gif)
 
 This is a simple feature, however it has had a massive effect on how our team writes Terraform.
 By bringing a Terraform workflow to pull requests, Atlantis helped our Ops team collaborate
@@ -37,23 +37,23 @@ How can we enable our developers to write and apply Terraform safely?
 
 When writing Terraform, there are a number of workflows you can follow. The simplest workflow is just using `master`:
 
-![](/blog/intro/intro2.webp)
+![](intro/intro2.webp)
 
 In this workflow, you work on `master` and run `terraform` locally.
 The problem with this workflow is that there is no collaboration or code review.
 So we start to use pull requests:
 
-![](/blog/intro/intro3.webp)
+![](intro/intro3.webp)
 
 We still run `terraform plan` locally, but once we're satisfied with the changes we create a pull request for review. When the pull request is approved, we run `apply` locally.
 
 This workflow is an improvement, but there are still problems. The first problem is that it's hard to review just the diff on the pull request. To properly review a change, you really need to see the output from `terraform plan`.
 
-![](/blog/intro/intro4.webp)
+![](intro/intro4.webp)
 
 What looks like a small change...
 
-![](/blog/intro/intro5.webp)
+![](intro/intro5.webp)
 
 ...can have a big plan
 
@@ -61,17 +61,17 @@ The second problem is that now it's easy for `master` to get out of sync with wh
 
 With the Atlantis workflow, these problems are solved:
 
-![](/blog/intro/intro6.webp)
+![](intro/intro6.webp)
 
 Now it's easy to review changes because you see the `terraform plan` output on the pull request.
 
-![](/blog/intro/intro7.webp)
+![](intro/intro7.webp)
 
 Pull requests are easy to review since you can see the plan
 
 It's also easy to ensure that the pull request is `terraform apply`'d before merging to master because you can see the actual `apply` output on the pull request.
 
-![](/blog/intro/intro8.webp)
+![](intro/intro8.webp)
 
 So, Atlantis makes working on Terraform within an operations team much easier, but how does it help with getting your whole team to write Terraform?
 
@@ -88,7 +88,7 @@ With Atlantis, these problems are solved. All `terraform plan` and `apply` comma
 
 Since Atlantis comments back with the `plan` output directly on the pull request, it's easy for an operations engineer to review exactly what changes will be applied. And Atlantis can run in `require-approval` mode, that will require a GitHub pull request approval before allowing `apply` to be run:
 
-![](/blog/intro/intro9.webp)
+![](intro/intro9.webp)
 
 With Atlantis, developers are able to write and apply Terraform safely. They submit pull requests, can run `atlantis plan` until their change looks good and then get approval from Ops to `apply`.
 
