@@ -427,9 +427,9 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 	// get the last commit status with the same ref
 	getCommitStatusesOptions := &gitlab.GetCommitStatusesOptions{
 		ListOptions: gitlab.ListOptions{
-			Sort:    "desc",
+			Sort: "desc",
 		},
-		Ref:     gitlab.Ptr(pull.HeadBranch),
+		Ref: gitlab.Ptr(pull.HeadBranch),
 	}
 
 	// Try a couple of times to get the pipeline ID for the commit
