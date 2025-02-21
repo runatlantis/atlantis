@@ -345,7 +345,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 						_, err = w.Write(setStatusJsonResponse)
 						Ok(t, err)
 
-					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?per_page=1&ref=test&sort=desc":
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?ref=test&sort=desc":
 						w.WriteHeader(http.StatusOK)
 
 						getCommitStatusesResponse := GetCommitStatusesResponse{
@@ -468,7 +468,7 @@ func TestGitlabClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 						_, err = w.Write(getCommitJsonResponse)
 						Ok(t, err)
 
-					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?per_page=1&ref=test&sort=desc":
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?ref=test&sort=desc":
 						handledNumberOfRequests++
 						noCommitLastPipeline := handledNumberOfRequests <= c.commitsWithNoLastPipeline
 
@@ -605,7 +605,7 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 						_, err = w.Write(getCommitJsonResponse)
 						Ok(t, err)
 
-					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?per_page=1&ref=test&sort=desc":
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?ref=test&sort=desc":
 						w.WriteHeader(http.StatusOK)
 
 						getCommitStatusesResponse := GetCommitStatusesResponse{
@@ -718,7 +718,7 @@ func TestGitlabClient_UpdateStatusDifferentRef(t *testing.T) {
 						_, err = w.Write(setStatusJsonResponse)
 						Ok(t, err)
 
-					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?per_page=1&ref=test&sort=desc":
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha/statuses?ref=test&sort=desc":
 						w.WriteHeader(http.StatusOK)
 
 						getCommitStatusesJsonResponse, err := json.Marshal([]EmptyStruct{})
