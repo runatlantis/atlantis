@@ -76,5 +76,9 @@ func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 	go m.registry.Register(key, buffer)
 	defer m.registry.Deregister(key, buffer)
 
-	return errors.Wrapf(m.writer.Write(w, r, buffer), "writing to ws %s", key)
+	err = m.writer.Write(w, r, buffer)
+	if err != nil {
+		return errors.Wrapf(err, "writing to ws %s", key)
+	}
+	return nil
 }

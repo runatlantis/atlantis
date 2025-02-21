@@ -145,6 +145,7 @@ type CommentParseResult struct {
 // - atlantis import ADDRESS ID
 func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) CommentParseResult {
 	comment := strings.TrimSpace(rawComment)
+	comment = strings.Trim(comment, "`")
 
 	if multiLineRegex.MatchString(comment) {
 		return CommentParseResult{Ignore: true}

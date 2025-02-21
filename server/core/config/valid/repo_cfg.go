@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	version "github.com/hashicorp/go-version"
 )
 
@@ -111,6 +112,21 @@ func (r RepoCfg) AutoDiscoverEnabled(defaultAutoDiscoverMode AutoDiscoverMode) b
 	return autoDiscoverMode == AutoDiscoverEnabledMode
 }
 
+func (r RepoCfg) IsPathIgnoredForAutoDiscover(path string) bool {
+	if r.AutoDiscover == nil || r.AutoDiscover.IgnorePaths == nil {
+		return false
+	}
+	for i := 0; i < len(r.AutoDiscover.IgnorePaths); i++ {
+		// Per documentation https://pkg.go.dev/github.com/bmatcuk/doublestar, if you run ValidatePattern()
+		// against a pattern, which we do, you can run MatchUnvalidated for a slight performance gain,
+		// and also no need to explicitly check for an error
+		if doublestar.MatchUnvalidated(r.AutoDiscover.IgnorePaths[i], path) {
+			return true
+		}
+	}
+	return false
+}
+
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in
 // repoRelDir but none of them use workspace. We want this to be an error
 // because if users have gone to the trouble of defining projects in repoRelDir
@@ -147,6 +163,7 @@ type Project struct {
 	Workspace                 string
 	Name                      *string
 	WorkflowName              *string
+	TerraformDistribution     *string
 	TerraformVersion          *version.Version
 	Autoplan                  Autoplan
 	PlanRequirements          []string

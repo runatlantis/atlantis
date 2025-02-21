@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-github/v66/github"
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
+	"github.com/google/go-github/v68/github"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
@@ -34,7 +34,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
-	gitlab "github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 const githubHeader = "X-Github-Event"
@@ -50,7 +50,7 @@ const giteaRequestIDHeader = "X-Gitea-Delivery"
 const bitbucketEventTypeHeader = "X-Event-Key"
 const bitbucketCloudRequestIDHeader = "X-Request-UUID"
 const bitbucketServerRequestIDHeader = "X-Request-ID"
-const bitbucketServerSignatureHeader = "X-Hub-Signature"
+const bitbucketSignatureHeader = "X-Hub-Signature"
 
 // The URL used for Azure DevOps test webhooks
 const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/_apis/git/repositories/4bc14d40-c903-45e2-872e-0462c7748079"
@@ -223,11 +223,18 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r *http.Request) {
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
 	reqID := r.Header.Get(bitbucketCloudRequestIDHeader)
+	sig := r.Header.Get(bitbucketSignatureHeader)
 	defer r.Body.Close() // nolint: errcheck
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
+	}
+	if len(e.BitbucketWebhookSecret) > 0 {
+		if err := bitbucketcloud.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
+			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", errors.Wrap(err, "request did not pass validation").Error())
+			return
+		}
 	}
 	switch eventType {
 	case bitbucketcloud.PullCreatedHeader, bitbucketcloud.PullUpdatedHeader, bitbucketcloud.PullFulfilledHeader, bitbucketcloud.PullRejectedHeader:
@@ -246,7 +253,7 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r *http.Request) {
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
 	reqID := r.Header.Get(bitbucketServerRequestIDHeader)
-	sig := r.Header.Get(bitbucketServerSignatureHeader)
+	sig := r.Header.Get(bitbucketSignatureHeader)
 	defer r.Body.Close() // nolint: errcheck
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -406,8 +413,8 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 
 	baseRepo, user, pullNum, err := e.Parser.ParseGithubIssueCommentEvent(logger, event)
 
-	wrapped := errors.Wrapf(err, "Failed parsing event: %s", githubReqID)
 	if err != nil {
+		wrapped := errors.Wrapf(err, "Failed parsing event: %s", githubReqID)
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{

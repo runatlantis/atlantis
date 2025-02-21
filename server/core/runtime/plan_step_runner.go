@@ -9,6 +9,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
@@ -26,34 +27,40 @@ var (
 )
 
 type planStepRunner struct {
-	TerraformExecutor   TerraformExec
-	DefaultTFVersion    *version.Version
-	CommitStatusUpdater StatusUpdater
-	AsyncTFExec         AsyncTFExec
+	TerraformExecutor     TerraformExec
+	DefaultTFDistribution terraform.Distribution
+	DefaultTFVersion      *version.Version
+	CommitStatusUpdater   StatusUpdater
+	AsyncTFExec           AsyncTFExec
 }
 
-func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec) Runner {
+func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec) Runner {
 	runner := &planStepRunner{
-		TerraformExecutor:   terraformExecutor,
-		DefaultTFVersion:    defaultTfVersion,
-		CommitStatusUpdater: commitStatusUpdater,
-		AsyncTFExec:         asyncTFExec,
+		TerraformExecutor:     terraformExecutor,
+		DefaultTFDistribution: defaultTfDistribution,
+		DefaultTFVersion:      defaultTfVersion,
+		CommitStatusUpdater:   commitStatusUpdater,
+		AsyncTFExec:           asyncTFExec,
 	}
-	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfVersion, runner)
+	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfDistribution, defaultTfVersion, runner)
 }
 
 func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	tfDistribution := p.DefaultTFDistribution
 	tfVersion := p.DefaultTFVersion
+	if ctx.TerraformDistribution != nil {
+		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
+	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}
 
 	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
-	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfVersion, ctx.Workspace)
+	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 	if p.isRemoteOpsErr(output, err) {
 		ctx.Log.Debug("detected that this project is using TFE remote ops")
-		return p.remotePlan(ctx, extraArgs, path, tfVersion, planFile, envs)
+		return p.remotePlan(ctx, extraArgs, path, tfDistribution, tfVersion, planFile, envs)
 	}
 	if err != nil {
 		return output, err
@@ -72,14 +79,14 @@ func (p *planStepRunner) isRemoteOpsErr(output string, err error) bool {
 
 // remotePlan runs a terraform plan command compatible with TFE remote
 // operations.
-func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []string, path string, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
+func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []string, path string, tfDistribution terraform.Distribution, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
 	argList := [][]string{
 		{"plan", "-input=false", "-refresh", "-no-color"},
 		extraArgs,
 		ctx.EscapedCommentArgs,
 	}
 	args := p.flatten(argList)
-	output, err := p.runRemotePlan(ctx, args, path, tfVersion, envs)
+	output, err := p.runRemotePlan(ctx, args, path, tfDistribution, tfVersion, envs)
 	if err != nil {
 		return output, err
 	}
@@ -193,6 +200,7 @@ func (p *planStepRunner) runRemotePlan(
 	ctx command.ProjectContext,
 	cmdArgs []string,
 	path string,
+	tfDistribution terraform.Distribution,
 	tfVersion *version.Version,
 	envs map[string]string) (string, error) {
 
@@ -205,7 +213,7 @@ func (p *planStepRunner) runRemotePlan(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfVersion, ctx.Workspace)
+	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfDistribution, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string
