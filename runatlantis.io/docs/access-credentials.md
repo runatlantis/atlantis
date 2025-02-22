@@ -114,7 +114,7 @@ Since v0.30.0, a new permission for `Actions` has been added, which is required 
 
 ### GitLab
 
-* Follow: [GitLab: Create a personal access token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
+* Follow: [GitLab: Create a personal access token](https://docs.gitlab.com/user/profile/personal_access_tokens/#create-a-personal-access-token)
 * Create a token with **api** scope
 * Record the access token
 
@@ -132,7 +132,7 @@ Since v0.30.0, a new permission for `Actions` has been added, which is required 
 
 * Create an App Password by following [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 * Label the password "atlantis"
-* Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them. If you want to enable the [hide-prev-plan-comments](./server-configuration#hide-prev-plan-comments) feature and thus delete old comments, please add **Account**: **Read** as well.
+* Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them. If you want to enable the [hide-prev-plan-comments](server-configuration.md#hide-prev-plan-comments) feature and thus delete old comments, please add **Account**: **Read** as well.
 * Record the access token
 
 ### Bitbucket Server (aka Stash)

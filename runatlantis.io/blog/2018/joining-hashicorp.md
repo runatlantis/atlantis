@@ -15,7 +15,7 @@ Dear Atlantis Community,
 
 My name is Luke and I'm the maintainer of [Atlantis](https://www.runatlantis.io/), an open source tool for Terraform collaboration. Today I'm excited to announce that I'm joining HashiCorp!
 
-![](/blog/joining-hashicorp/pic1.webp)
+![](joining-hashicorp/pic1.webp)
 
 ## What Does This Mean For Atlantis?
 
@@ -45,6 +45,6 @@ This was a compelling offer versus solo-founding a company around Atlantis: I wo
 
 Atlantis has been a passion of mine for almost two years now. I deeply care about the future of the project and its community and I know that this move will ensure that that future is bright.
 
-There are probably some questions I haven't answered in this post so please don't hesitate to reach out, either via [Twitter](https://twitter.com/lkysow) or on the [Atlantis Slack](https://join.slack.com/t/atlantis-community/shared_invite/zt-9xlxtxtc-CUSKB1ATt_sQy6um~LDPNw).
+There are probably some questions I haven't answered in this post so please don't hesitate to reach out, either via [Twitter](https://twitter.com/lkysow) or on the [Atlantis Slack](https://slack.cncf.io/).
 
 I'm excited for the future of Atlantis and Terraform collaboration and I hope you are too.
