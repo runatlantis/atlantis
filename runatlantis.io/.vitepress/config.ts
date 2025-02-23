@@ -56,6 +56,9 @@ const config = defineConfig({
           { icon: "twitter", link: "https://twitter.com/runatlantis" },
           { icon: "github", link: "https://github.com/runatlantis/atlantis" },
         ],
+        footer: {
+            message: 'The Linux Foundation® (TLF) has registered trademarks and uses trademarks. For a list of TLF trademarks, see <a href="https://www.linuxfoundation.org/legal/trademark-usage">Trademark Usage</a>.',
+        },
     },
     // SEO Improvement - sitemap.xml & robots.txt
     buildEnd: async ({ outDir }) => {
