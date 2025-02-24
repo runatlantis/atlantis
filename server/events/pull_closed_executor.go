@@ -87,7 +87,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	if pullStatus != nil {
 		for _, project := range pullStatus.Projects {
 			jobContext := jobs.PullInfo{
- 				PullNum:      pull.Num,
+				PullNum:      pull.Num,
 				Repo:         pull.BaseRepo.Name,
 				RepoFullName: pull.BaseRepo.FullName,
 				ProjectName:  project.ProjectName,
