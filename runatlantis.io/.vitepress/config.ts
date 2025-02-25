@@ -93,7 +93,7 @@ const config = defineConfig({
         // google analytics
         [
             'script',
-            { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=UA-6850151-3' }
+            { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=G-PGYBJTZMP2' }
         ],
         [
             'script',
@@ -102,7 +102,7 @@ const config = defineConfig({
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
 
-            gtag('config', 'UA-6850151-3');`
+            gtag('config', 'G-PGYBJTZMP2');`
         ],
         [
             'script',
