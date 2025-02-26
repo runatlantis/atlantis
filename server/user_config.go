@@ -45,6 +45,7 @@ type UserConfig struct {
 	EmojiReaction               string `mapstructure:"emoji-reaction"`
 	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
+	EnableProfilingRoutes       bool   `mapstructure:"enable-profiling-routes"`
 	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
 	ExecutableName              string `mapstructure:"executable-name"`
 	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
