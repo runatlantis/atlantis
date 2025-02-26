@@ -200,7 +200,10 @@ func (r *RedisDB) LockCommand(cmdName command.Name, lockTime time.Time) (*comman
 	_, err := r.client.Get(ctx, cmdLockKey).Result()
 	if err == redis.Nil {
 		err = r.client.Set(ctx, cmdLockKey, newLockSerialized, 0).Err()
-		return &lock, errors.Wrap(err, "db transaction failed")
+		if err != nil {
+			return nil, errors.Wrap(err, "db transaction failed")
+		}
+		return &lock, nil
 	} else if err != nil {
 		return nil, errors.Wrap(err, "db transaction failed")
 	}
@@ -267,7 +270,10 @@ func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string,
 	}
 
 	err = r.writePull(key, currStatus)
-	return errors.Wrap(err, "db transaction failed")
+	if err != nil {
+		return errors.Wrap(err, "db transaction failed")
+	}
+	return nil
 }
 
 func (r *RedisDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
@@ -277,8 +283,10 @@ func (r *RedisDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, er
 	}
 
 	pullStatus, err := r.getPull(key)
-
-	return pullStatus, errors.Wrap(err, "db transaction failed")
+	if err != nil {
+		return nil, errors.Wrap(err, "db transaction failed")
+	}
+	return pullStatus, nil
 }
 
 func (r *RedisDB) DeletePullStatus(pull models.PullRequest) error {
@@ -286,7 +294,11 @@ func (r *RedisDB) DeletePullStatus(pull models.PullRequest) error {
 	if err != nil {
 		return err
 	}
-	return errors.Wrap(r.deletePull(key), "db transaction failed")
+	err = r.deletePull(key)
+	if err != nil {
+		return errors.Wrap(err, "db transaction failed")
+	}
+	return nil
 }
 
 func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
@@ -359,7 +371,11 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 	}
 
 	// Now, we overwrite the key with our new status.
-	return newStatus, errors.Wrap(r.writePull(key, newStatus), "db transaction failed")
+	err = r.writePull(key, newStatus)
+	if err != nil {
+		return models.PullStatus{}, errors.Wrap(err, "db transaction failed")
+	}
+	return newStatus, nil
 }
 
 func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
@@ -383,12 +399,18 @@ func (r *RedisDB) writePull(key string, pull models.PullStatus) error {
 		return errors.Wrap(err, "serializing")
 	}
 	err = r.client.Set(ctx, key, serialized, 0).Err()
-	return errors.Wrap(err, "DB Transaction failed")
+	if err != nil {
+		return errors.Wrap(err, "DB Transaction failed")
+	}
+	return nil
 }
 
 func (r *RedisDB) deletePull(key string) error {
 	err := r.client.Del(ctx, key).Err()
-	return errors.Wrap(err, "DB Transaction failed")
+	if err != nil {
+		return errors.Wrap(err, "DB Transaction failed")
+	}
+	return nil
 }
 
 func (r *RedisDB) lockKey(p models.Project, workspace string) string {

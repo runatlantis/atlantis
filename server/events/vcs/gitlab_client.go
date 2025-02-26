@@ -41,6 +41,8 @@ type GitlabClient struct {
 	Client *gitlab.Client
 	// Version is set to the server version.
 	Version *version.Version
+	// All GitLab groups configured in allowlists and policies
+	ConfiguredGroups []string
 	// PollingInterval is the time between successive polls, where applicable.
 	PollingInterval time.Duration
 	// PollingInterval is the total duration for which to poll, where applicable.
@@ -56,11 +58,12 @@ var commonMarkSupported = MustConstraint(">=11.1")
 var gitlabClientUnderTest = false
 
 // NewGitlabClient returns a valid GitLab client.
-func NewGitlabClient(hostname string, token string, logger logging.SimpleLogging) (*GitlabClient, error) {
+func NewGitlabClient(hostname string, token string, configuredGroups []string, logger logging.SimpleLogging) (*GitlabClient, error) {
 	logger.Debug("Creating new GitLab client for %s", hostname)
 	client := &GitlabClient{
-		PollingInterval: time.Second,
-		PollingTimeout:  time.Second * 30,
+		ConfiguredGroups: configuredGroups,
+		PollingInterval:  time.Second,
+		PollingTimeout:   time.Second * 30,
 	}
 
 	// Create the client differently depending on the base URL.
@@ -461,16 +464,27 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		}
 	)
 
-	for i := 0; i < maxAttempts; i++ {
+	for {
+		attempt := int(retryer.Attempt()) + 1
 		logger := logger.With(
-			"attempt", i+1,
+			"attempt", attempt,
 			"max_attempts", maxAttempts,
 			"repo", repo.FullName,
 			"commit", commit.ShortID,
 			"state", state.String(),
 		)
 
-		_, resp, err = g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, setCommitStatusOptions)
+		_, resp, err := g.Client.Commits.SetCommitStatus(repo.FullName, pull.HeadCommit, setCommitStatusOptions)
+		if err == nil {
+			if retryer.Attempt() > 0 {
+				logger.Info("GitLab returned HTTP [200 OK] after updating commit status")
+			}
+
+			return nil
+		}
+		if attempt == maxAttempts {
+			return errors.Wrap(err, fmt.Sprintf("failed to update commit status for '%s' @ '%s' to '%s' after %d attempts", repo.FullName, pull.HeadCommit, src, attempt))
+		}
 
 		if resp != nil {
 			logger.Debug("POST /projects/%s/statuses/%s returned: %d", repo.FullName, pull.HeadCommit, resp.StatusCode)
@@ -486,26 +500,15 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			// GitLab does not allow merge requests to be merged when the pipeline status is "running."
 
 			if resp.StatusCode == http.StatusConflict {
-				sleep := retryer.ForAttempt(float64(i))
-
-				logger.With("retry_in", sleep).Warn("GitLab returned HTTP [409 Conflict] when updating commit status")
-				time.Sleep(sleep)
-
-				continue
+				logger.Warn("GitLab returned HTTP [409 Conflict] when updating commit status")
 			}
 		}
 
-		// Log we got a 200 OK response from GitLab after at least one retry to help with debugging/understanding delays/errors.
-		if err == nil && i > 0 {
-			logger.Info("GitLab returned HTTP [200 OK] after updating commit status")
-		}
+		sleep := retryer.Duration()
 
-		// Return the err, which might be nil if everything worked out
-		return err
+		logger.With("retry_in", sleep).Warn("GitLab errored when updating commit status: %w", err)
+		time.Sleep(sleep)
 	}
-
-	// If we got here, we've exhausted all attempts to update the commit status and still failed, so return the error upstream
-	return errors.Wrap(err, fmt.Sprintf("failed to update commit status for '%s' @ '%s' to '%s' after %d attempts", repo.FullName, pull.HeadCommit, src, maxAttempts))
 }
 
 func (g *GitlabClient) GetMergeRequest(logger logging.SimpleLogging, repoFullName string, pullNum int) (*gitlab.MergeRequest, error) {
@@ -547,16 +550,14 @@ func (g *GitlabClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 
 	mr, err := g.GetMergeRequest(logger, pull.BaseRepo.FullName, pull.Num)
 	if err != nil {
-		return errors.Wrap(
-			err, "unable to merge merge request, it was not possible to retrieve the merge request")
+		return errors.Wrap(err, "unable to merge merge request, it was not possible to retrieve the merge request")
 	}
 	project, resp, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
 	if resp != nil {
 		logger.Debug("GET /projects/%d returned: %d", mr.ProjectID, resp.StatusCode)
 	}
 	if err != nil {
-		return errors.Wrap(
-			err, "unable to merge merge request, it was not possible to check the project requirements")
+		return errors.Wrap(err, "unable to merge merge request, it was not possible to check the project requirements")
 	}
 
 	if project != nil && project.OnlyAllowMergeIfPipelineSucceeds {
@@ -573,7 +574,10 @@ func (g *GitlabClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 	if resp != nil {
 		logger.Debug("PUT /projects/%s/merge_requests/%d/merge returned: %d", pull.BaseRepo.FullName, pull.Num, resp.StatusCode)
 	}
-	return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
+	if err != nil {
+		return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
+	}
+	return nil
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
@@ -628,9 +632,39 @@ func MustConstraint(constraint string) version.Constraints {
 	return c
 }
 
-// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *GitlabClient) GetTeamNamesForUser(_ models.Repo, _ models.User) ([]string, error) {
-	return nil, nil
+// GetTeamNamesForUser returns the names of the GitLab groups that the user belongs to.
+// The user membership is checked in each group from configuredTeams, groups
+// that the Atlantis user doesn't have access to are silently ignored.
+func (g *GitlabClient) GetTeamNamesForUser(logger logging.SimpleLogging, _ models.Repo, user models.User) ([]string, error) {
+	logger.Debug("Getting GitLab group names for user '%s'", user)
+	var teamNames []string
+
+	users, resp, err := g.Client.Users.ListUsers(&gitlab.ListUsersOptions{Username: &user.Username})
+	if resp.StatusCode == http.StatusNotFound {
+		return teamNames, nil
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "GET /users returned: %d", resp.StatusCode)
+	} else if len(users) == 0 {
+		return nil, errors.New("GET /users returned no user")
+	} else if len(users) > 1 {
+		// Theoretically impossible, just being extra safe
+		return nil, errors.New("GET /users returned more than 1 user")
+	}
+	userID := users[0].ID
+	for _, groupName := range g.ConfiguredGroups {
+		membership, resp, err := g.Client.GroupMembers.GetGroupMember(groupName, userID)
+		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden {
+			continue
+		}
+		if err != nil {
+			return nil, errors.Wrapf(err, "GET /groups/%s/members/%d returned: %d", groupName, userID, resp.StatusCode)
+		}
+		if resp.StatusCode == http.StatusOK && membership.State == "active" {
+			teamNames = append(teamNames, groupName)
+		}
+	}
+	return teamNames, nil
 }
 
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)

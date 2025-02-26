@@ -4,7 +4,7 @@
 package mocks
 
 import (
-	azuredevops "github.com/mcdafydd/go-azuredevops/azuredevops"
+	azuredevops "github.com/drmaxgit/go-azuredevops/azuredevops"
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	logging "github.com/runatlantis/atlantis/server/logging"

@@ -14,7 +14,7 @@ services:
     depends_on:
       - atlantis
   redis:
-    image: redis:7.4-alpine@sha256:c1e88455c85225310bbea54816e9c3f4b5295815e6dbf80c34d40afc6df28275
+    image: redis:7.4-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952
     restart: always
     ports:
       - 6379:6379

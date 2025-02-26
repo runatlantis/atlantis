@@ -57,6 +57,8 @@ version: 3
 automerge: true
 autodiscover:
   mode: auto
+  ignore_paths:
+  - some/path
 delete_source_branch_on_merge: true
 parallel_plan: true
 parallel_apply: true
@@ -66,6 +68,7 @@ projects:
   branch: /main/
   dir: .
   workspace: default
+  terraform_distribution: terraform
   terraform_version: v0.11.0
   delete_source_branch_on_merge: true
   repo_locking: true # deprecated: use repo_locks instead
@@ -262,6 +265,20 @@ See [Custom Workflow Use Cases: Terragrunt](custom-workflows.md#terragrunt)
 
 See [Custom Workflow Use Cases: Running custom commands](custom-workflows.md#running-custom-commands)
 
+### Terraform Distributions
+
+If you'd like to use a different distribution of Terraform than what is set
+by the `--default-tf-version` flag, then set the `terraform_distribution` key:
+
+```yaml
+version: 3
+projects:
+- dir: project1
+  terraform_distribution: opentofu
+```
+
+Atlantis will automatically download and use this distribution. Valid values are `terraform` and `opentofu`.
+
 ### Terraform Versions
 
 If you'd like to use a different version of Terraform than what is in Atlantis'
@@ -389,6 +406,15 @@ the manual configuration will take precedence.
 
 Use this feature when some projects require specific configuration in a repo with many projects yet
 it's still desirable for Atlantis to plan/apply for projects not enumerated in the config.
+
+```yaml
+autodiscover:
+  mode: "enabled"
+  ignore_paths:
+  - dir/*
+```
+
+Autodiscover can also be configured to skip over directories that match a path glob (as defined [here](https://pkg.go.dev/github.com/bmatcuk/doublestar/v4))
 
 ### Custom Backend Config
 
