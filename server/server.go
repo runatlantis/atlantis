@@ -125,6 +125,7 @@ type Server struct {
 	ProjectCmdOutputHandler        jobs.ProjectCommandOutputHandler
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
+	EnableProfilingRoutes          bool
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -1024,6 +1025,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebUsername:                    userConfig.WebUsername,
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
+		EnableProfilingRoutes:          userConfig.EnableProfilingRoutes,
 	}, nil
 }
 
