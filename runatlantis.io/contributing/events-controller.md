@@ -85,7 +85,7 @@ documentation.
 - [Azure DevOps Pull Request Created](https://learn.microsoft.com/en-us/azure/devops/service-hooks/events?view=azure-devops#pull-request-created)
 - [BitBucket Pull Request](https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Pull-request-events)
 - [GitHub Pull Request](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request)
-- [GitLab Merge Request](https://docs.gitlab.com/ee/user/project/integrations/webhook_events.html#merge-request-events)
+- [GitLab Merge Request](https://docs.gitlab.com/user/project/integrations/webhook_events/#merge-request-events)
 - [Gitea Webhooks](https://docs.gitea.com/next/usage/webhooks)
 
 </details>

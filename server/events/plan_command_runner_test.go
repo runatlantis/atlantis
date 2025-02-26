@@ -14,6 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPlanCommandRunner_IsSilenced(t *testing.T) {
@@ -78,6 +79,9 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
 			db, err := db.New(tmp)
+			t.Cleanup(func() {
+				db.Close()
+			})
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {
@@ -165,6 +169,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 		ProjectResults    []command.ProjectResult
 		RunnerInvokeMatch []*EqMatcher
 		PrevPlanStored    bool
+		PlanFailed        bool
 	}{
 		{
 			Description: "When first plan fails, the second don't run",
@@ -202,6 +207,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Once(),
 			},
+			PlanFailed: true,
 		},
 		{
 			Description: "When first fails, the second will not run",
@@ -235,6 +241,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Never(),
 			},
+			PlanFailed: true,
 		},
 		{
 			Description: "When first fails by autorun, the second will not run",
@@ -270,6 +277,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Never(),
 			},
+			PlanFailed: true,
 		},
 		{
 			Description: "When both in a group of two succeeds, the following two will run",
@@ -330,6 +338,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				Never(),
 				Never(),
 			},
+			PlanFailed: true,
 		},
 		{
 			Description: "When one out of two fails, the following two will not run",
@@ -390,6 +399,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Once(),
 			},
+			PlanFailed: true,
 		},
 		{
 			Description: "Don't block when parallel is not set",
@@ -423,6 +433,41 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Once(),
 			},
+			PlanFailed: true,
+		},
+		{
+			Description: "All project finished successfully",
+			ProjectContexts: []command.ProjectContext{
+				{
+					CommandName:         command.Plan,
+					ExecutionOrderGroup: 0,
+					ProjectName:         "First",
+				},
+				{
+					CommandName:         command.Plan,
+					ExecutionOrderGroup: 1,
+					ProjectName:         "Second",
+				},
+			},
+			ProjectResults: []command.ProjectResult{
+				{
+					Command: command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "true",
+					},
+				},
+				{
+					Command: command.Plan,
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "true",
+					},
+				},
+			},
+			RunnerInvokeMatch: []*EqMatcher{
+				Once(),
+				Once(),
+			},
+			PlanFailed: false,
 		},
 		{
 			Description: "Don't block when abortOnExecutionOrderFail is not set",
@@ -454,6 +499,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				Once(),
 				Once(),
 			},
+			PlanFailed: true,
 		},
 	}
 
@@ -463,6 +509,9 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 
 			tmp := t.TempDir()
 			db, err := db.New(tmp)
+			t.Cleanup(func() {
+				db.Close()
+			})
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {
@@ -503,6 +552,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			for i := range c.ProjectContexts {
 				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Plan(c.ProjectContexts[i])
 			}
+
+			require.Equal(t, c.PlanFailed, ctx.CommandHasErrors)
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Eq(modelPull.Num), Any[string](), Eq("plan"),
@@ -700,6 +751,9 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
 			db, err := db.New(tmp)
+			t.Cleanup(func() {
+				db.Close()
+			})
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {

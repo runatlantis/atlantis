@@ -17,8 +17,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/google/go-github/v68/github"
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -202,6 +202,12 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	cmd := &CommentCommand{
 		Name: command.Autoplan,
 	}
+
+	// Update the combined plan commit status to pending
+	if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+		ctx.Log.Warn("unable to update plan commit status: %s", err)
+	}
+
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
@@ -352,6 +358,18 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	if !c.validateCtxAndComment(ctx, cmd.Name) {
 		return
+	}
+
+	// Update the combined plan or apply commit status to pending
+	switch cmd.Name {
+	case command.Plan:
+		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+			ctx.Log.Warn("unable to update plan commit status: %s", err)
+		}
+	case command.Apply:
+		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+			ctx.Log.Warn("unable to update apply commit status: %s", err)
+		}
 	}
 
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)

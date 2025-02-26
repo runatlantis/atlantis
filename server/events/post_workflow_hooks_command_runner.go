@@ -79,6 +79,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
 			CommandName:        cmd.Name.String(),
+			CommandHasErrors:   ctx.CommandHasErrors,
 			API:                ctx.API,
 		},
 		postWorkflowHooks, repoDir)

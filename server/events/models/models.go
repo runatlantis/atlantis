@@ -682,6 +682,8 @@ type WorkflowHookCommandContext struct {
 	BaseRepo Repo
 	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
 	CommandName string
+	// Set true if there were any errors during the command execution
+	CommandHasErrors bool
 	// EscapedCommentArgs are the extra arguments that were added to the atlantis
 	// command, ex. atlantis plan -- -target=resource. We then escape them
 	// by adding a \ before each character so that they can be used within

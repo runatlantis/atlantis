@@ -455,23 +455,17 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		return nil, err
 	}
 
-	if p.IncludeGitUntrackedFiles {
-		ctx.Log.Debug(("'include-git-untracked-files' option is set, getting untracked files"))
-		untrackedFiles, err := p.WorkingDir.GetGitUntrackedFiles(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	ctx.Log.Debug("%d files were modified in this pull request. Modified files: %v", len(modifiedFiles), modifiedFiles)
+
+	// If we're not including git untracked files, we can skip the clone if there are no modified files.
+	if !p.IncludeGitUntrackedFiles {
+		shouldSkipClone, err := p.shouldSkipClone(ctx, modifiedFiles)
 		if err != nil {
 			return nil, err
 		}
-		modifiedFiles = append(modifiedFiles, untrackedFiles...)
-	}
-
-	ctx.Log.Debug("%d files were modified in this pull request. Modified files: %v", len(modifiedFiles), modifiedFiles)
-
-	shouldSkipClone, err := p.shouldSkipClone(ctx, modifiedFiles)
-	if err != nil {
-		return nil, err
-	}
-	if shouldSkipClone {
-		return []command.ProjectContext{}, nil
+		if shouldSkipClone {
+			return []command.ProjectContext{}, nil
+		}
 	}
 
 	// Need to lock the workspace we're about to clone to.
@@ -488,6 +482,15 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	repoDir, _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return nil, err
+	}
+
+	if p.IncludeGitUntrackedFiles {
+		ctx.Log.Debug(("'include-git-untracked-files' option is set, getting untracked files"))
+		untrackedFiles, err := p.WorkingDir.GetGitUntrackedFiles(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+		if err != nil {
+			return nil, err
+		}
+		modifiedFiles = append(modifiedFiles, untrackedFiles...)
 	}
 
 	// Parse config file if it exists.
@@ -822,7 +825,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
-	if os.IsNotExist(errors.Cause(err)) {
+	if errors.Is(err, os.ErrNotExist) {
 		return projCtx, errors.New("no working directory found–did you run plan?")
 	} else if err != nil {
 		return projCtx, err
