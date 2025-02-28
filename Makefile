@@ -113,4 +113,4 @@ end-to-end-tests: ## Run e2e tests
 
 .PHONY: website-dev
 website-dev: ## Run runatlantic.io on localhost:8080
-	npm website:dev
+	npm run website:dev
