@@ -94,7 +94,7 @@ func buildCommentCommandRunner(
 
 // DefaultCommandRunner is the first step when processing a comment command.
 type DefaultCommandRunner struct {
-	VCSClient                vcs.Client               `validate:"required"`
+	VCSClient                vcs.Client `validate:"required"`
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
