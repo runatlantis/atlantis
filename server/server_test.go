@@ -36,13 +36,25 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestNewServer(t *testing.T) {
+const (
+	testAtlantisVersion = "1.0.0"
+	testAtlantisUrl     = "http://example.com"
+	testLockingDBType   = "boltdb"
+)
+
+func TestNewServer_GitHubUser(t *testing.T) {
 	t.Log("Run through NewServer constructor")
 	tmpDir := t.TempDir()
-	_, err := server.NewServer(server.UserConfig{
-		DataDir:     tmpDir,
-		AtlantisURL: "http://example.com",
-	}, server.Config{})
+	_, err := server.NewServer(
+		server.UserConfig{
+			DataDir:       tmpDir,
+			AtlantisURL:   testAtlantisUrl,
+			LockingDBType: testLockingDBType,
+			GithubUser:    "user",
+		}, server.Config{
+			AtlantisVersion: testAtlantisVersion,
+		},
+	)
 	Ok(t, err)
 }
 
