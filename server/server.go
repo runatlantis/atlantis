@@ -942,6 +942,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
 	}
+
 	apiController := &controllers.APIController{
 		APISecret:                      []byte(userConfig.APISecret),
 		Locker:                         lockingClient,
@@ -958,6 +959,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:                      vcsClient,
 		WorkingDir:                     workingDir,
 		WorkingDirLocker:               workingDirLocker,
+		CommitStatusUpdater:            commitStatusUpdater,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
