@@ -26,6 +26,7 @@ import (
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
@@ -39,7 +40,9 @@ import (
 const (
 	testAtlantisVersion = "1.0.0"
 	testAtlantisUrl     = "http://example.com"
-	testLockingDBType   = "boltdb"
+	testLockingDBType   = cmd.DefaultLockingDBType
+	testGitHubHostName  = cmd.DefaultGHHostname
+	testGitHubUser      = "user"
 )
 
 func TestNewServer_GitHubUser(t *testing.T) {
@@ -47,10 +50,11 @@ func TestNewServer_GitHubUser(t *testing.T) {
 	tmpDir := t.TempDir()
 	_, err := server.NewServer(
 		server.UserConfig{
-			DataDir:       tmpDir,
-			AtlantisURL:   testAtlantisUrl,
-			LockingDBType: testLockingDBType,
-			GithubUser:    "user",
+			DataDir:        tmpDir,
+			AtlantisURL:    testAtlantisUrl,
+			LockingDBType:  testLockingDBType,
+			GithubHostname: testGitHubHostName,
+			GithubUser:     testGitHubUser,
 		}, server.Config{
 			AtlantisVersion: testAtlantisVersion,
 		},
