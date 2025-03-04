@@ -47,6 +47,8 @@ jobs:
     if: needs.changes.outputs.should-run-build == 'true'
     name: Build Testing Env Image
     runs-on: ubuntu-24.04
+    permissions:
+      packages: write # for ghcr.io push
     steps:
     - name: Harden Runner
       uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
