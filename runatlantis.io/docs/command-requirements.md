@@ -53,6 +53,7 @@ The `approved` requirement by:
     ```
 
 #### Meaning
+
 Each VCS provider has different rules around what constitutes an "Approved" request. However, Atlantis `approved` is implemented in the same way for each VCS: at least one user other than the author who has the ability in the VCS to approve the request has done so. If you're using a VCS that has more complicated rules for determining approval, you can assert they are satisfied with the [mergeable](#mergeable) requirement.
 
 :::tip Tip
@@ -98,6 +99,7 @@ Set the `mergeable` requirement by:
     ```
 
 #### Meaning
+
 Each VCS provider has a different concept of "mergeability". For some this includes satisfying "approval requirements", which differs from the more narrow [approved](#approved) requirement above.
 
 ::: warning
@@ -132,6 +134,7 @@ If you set `atlantis/apply` to the mergeable requirement, use the `--gh-allow-me
 :::
 
 #### GitLab
+
 For GitLab, a merge request will be merged if there are no conflicts, no unresolved discussions if it is a project requirement and if all necessary approvers have approved the pull request. The number or list of users that are required for approval can be set in the [repo settings](https://docs.gitlab.com/user/project/merge_requests/merge_request_approvals.html).
 
 For pipelines, if the project requires that pipelines must succeed, all builds except the apply command status will be checked.
