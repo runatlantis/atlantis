@@ -60,6 +60,9 @@ func TestDeleteLock_Success(t *testing.T) {
 	}, nil)
 	tmp := t.TempDir()
 	db, err := db.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
 	Ok(t, err)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:           l,

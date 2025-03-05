@@ -286,8 +286,14 @@ tunnels:
 		colorstring.Println("\n[green]Thank you for using atlantis :) \n[reset]For more information about how to use atlantis in production go to: https://www.runatlantis.io")
 		return nil
 	case err := <-ngrokErrors:
-		return errors.Wrap(err, "ngrok tunnel")
+		if err != nil {
+			err = errors.Wrap(err, "ngrok tunnel")
+		}
+		return err
 	case err := <-atlantisErrors:
-		return errors.Wrap(err, "atlantis server")
+		if err != nil {
+			err = errors.Wrap(err, "atlantis server")
+		}
+		return err
 	}
 }

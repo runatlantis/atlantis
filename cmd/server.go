@@ -107,6 +107,7 @@ const (
 	GiteaUserFlag                    = "gitea-user"
 	GiteaWebhookSecretFlag           = "gitea-webhook-secret" // nolint: gosec
 	GiteaPageSizeFlag                = "gitea-page-size"
+	GitlabGroupAllowlistFlag         = "gitlab-group-allowlist"
 	GitlabHostnameFlag               = "gitlab-hostname"
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
@@ -154,6 +155,7 @@ const (
 	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
 	TFETokenFlag                     = "tfe-token"
 	WriteGitCredsFlag                = "write-git-creds" // nolint: gosec
+	WebhookHttpHeaders               = "webhook-http-headers"
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
@@ -262,7 +264,7 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultBitbucketBaseURL,
 	},
 	BitbucketWebhookSecretFlag: {
-		description: "Secret used to validate Bitbucket webhooks. Only Bitbucket Server supports webhook secrets." +
+		description: "Secret used to validate Bitbucket webhooks." +
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from Bitbucket. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_BITBUCKET_WEBHOOK_SECRET environment variable.",
@@ -360,6 +362,17 @@ var stringFlags = map[string]stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from Gitea. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GITEA_WEBHOOK_SECRET environment variable.",
+	},
+	GitlabGroupAllowlistFlag: {
+		description: "Comma separated list of key-value pairs representing the GitLab groups and the operations that " +
+			"the members of a particular group are allowed to perform. " +
+			"The format is {group}:{command},{group}:{command}. " +
+			"Valid values for 'command' are 'plan', 'apply' and '*', e.g. 'myorg/dev:plan,myorg/ops:apply,myorg/devops:*'" +
+			"This example gives the users from the 'myorg/dev' GitLab group the permissions to execute the 'plan' command, " +
+			"the 'myorg/ops' group the permissions to execute the 'apply' command, " +
+			"and allows the 'myorg/devops' group to perform any operation. If this argument is not provided, the default value (*:*) " +
+			"will be used and the default behavior will be to not check permissions " +
+			"and to allow users from any group to perform any operation.",
 	},
 	GitlabHostnameFlag: {
 		description:  "Hostname of your GitLab Enterprise installation. If using gitlab.com, no need to set.",
@@ -461,6 +474,12 @@ var stringFlags = map[string]stringFlag{
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
 		defaultValue: DefaultVCSStatusName,
+	},
+	WebhookHttpHeaders: {
+		description: "Additional headers added to each HTTP POST payload when using HTTP webhooks provided as a JSON string." +
+			" The map key is the header name and the value is the header value (string) or values (array of string)." +
+			" For example: `{\"Authorization\":\"Bearer some-token\",\"X-Custom-Header\":[\"value1\",\"value2\"]}`.",
+		defaultValue: "",
 	},
 	WebUsernameFlag: {
 		description:  "Username used for Web Basic Authentication on Atlantis HTTP Middleware",
@@ -1021,10 +1040,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoAllowlistFlag)
 	}
 
-	if userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret != "" {
-		return fmt.Errorf("--%s cannot be specified for Bitbucket Cloud because it is not supported by Bitbucket", BitbucketWebhookSecretFlag)
-	}
-
 	parsed, err := url.Parse(userConfig.BitbucketBaseURL)
 	if err != nil {
 		return fmt.Errorf("error parsing --%s flag value %q: %s", BitbucketWebhookSecretFlag, userConfig.BitbucketBaseURL, err)
@@ -1073,6 +1088,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if _, err := userConfig.ToAllowCommandNames(); err != nil {
 		return errors.Wrapf(err, "invalid --%s", AllowCommandsFlag)
+	}
+
+	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {
+		return errors.Wrapf(err, "invalid --%s", WebhookHttpHeaders)
 	}
 
 	return nil
@@ -1167,9 +1186,6 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	}
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL != DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
-	}
-	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs")
 	}
 	if userConfig.AzureDevopsWebhookUser != "" && userConfig.AzureDevopsWebhookPassword == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
