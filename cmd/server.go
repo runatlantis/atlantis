@@ -177,7 +177,7 @@ const (
 	DefaultGiteaBaseURL                 = "https://gitea.com"
 	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
-	DefaultLockAcquireTimeoutSeconds    = 900
+	DefaultLockAcquireTimeoutSeconds    = 0
 	DefaultLockingDBType                = "boltdb"
 	DefaultLogLevel                     = "info"
 	DefaultIgnoreVCSStatusNames         = ""
@@ -959,9 +959,6 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.AutoDiscoverModeFlag == "" {
 		c.AutoDiscoverModeFlag = DefaultAutoDiscoverMode
-	}
-	if c.LockAcquireTimeoutSeconds == 0 {
-		c.LockAcquireTimeoutSeconds = DefaultLockAcquireTimeoutSeconds
 	}
 }
 
