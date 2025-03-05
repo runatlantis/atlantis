@@ -24,6 +24,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"net/url"
 	"os"
 	"os/signal"
@@ -125,6 +126,7 @@ type Server struct {
 	ProjectCmdOutputHandler        jobs.ProjectCommandOutputHandler
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
+	EnableProfilingRoutes          bool
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -1026,6 +1028,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebUsername:                    userConfig.WebUsername,
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
+		EnableProfilingRoutes:          userConfig.EnableProfilingRoutes,
 	}, nil
 }
 
@@ -1056,6 +1059,18 @@ func (s *Server) Start() error {
 	if !s.DisableGlobalApplyLock {
 		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
 		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
+	}
+
+	if s.EnableProfilingRoutes {
+		for p, h := range map[string]http.HandlerFunc{
+			"/":        pprof.Index,
+			"/cmdline": pprof.Cmdline,
+			"/profile": pprof.Profile,
+			"/symbol":  pprof.Symbol,
+			"/trace":   pprof.Trace,
+		} {
+			s.Router.HandleFunc("/debug/pprof"+p, h).Methods("GET")
+		}
 	}
 
 	n := negroni.New(&negroni.Recovery{
