@@ -82,6 +82,20 @@ docker/dev: ## Build dev Dockerfile as atlantis-dev
 	GOOS=linux GOARCH=amd64 go build -o atlantis .
 	docker build -f Dockerfile.dev -t atlantis-dev .
 
+ALPINE_MINIMAL_VARIANT := terraform
+.PHONY: docker/alpine-slim
+docker/alpine-slim: ## Build slim terraform or tofu images
+	docker build --target alpine-slim-$(ALPINE_MINIMAL_VARIANT) -f Dockerfile -t localhost/$(IMAGE_NAME):latest-alpine-slim-$(ALPINE_MINIMAL_VARIANT) .
+
+.PHONY: docker/alpine
+docker/alpine: ## Build Dockerfile for alpine runtime target
+	docker build --target alpine -f Dockerfile -t localhost/$(IMAGE_NAME):latest-alpine .
+
+.PHONY: docker/debian
+docker/debian: ## Build Dockerfile for debian runtime target
+	docker build --target debian -f Dockerfile -t localhost/$(IMAGE_NAME):latest-debian .
+
+
 .PHONY: release
 release: ## Create packages for a release
 	docker run -v $$(pwd):/go/src/github.com/runatlantis/atlantis cimg/go:1.20 sh -c 'cd /go/src/github.com/runatlantis/atlantis && scripts/binary-release.sh'
