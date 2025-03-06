@@ -13,10 +13,10 @@ import (
 
 // GithubAppController handles the creation and setup of a new GitHub app
 type GithubAppController struct {
-	AtlantisURL         *url.URL
-	Logger              logging.SimpleLogging
+	AtlantisURL         *url.URL              `validate:"required"`
+	Logger              logging.SimpleLogging `validate:"required"`
 	GithubSetupComplete bool
-	GithubHostname      string
+	GithubHostname      string `validate:"required"`
 	GithubOrg           string
 }
 

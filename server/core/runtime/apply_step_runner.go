@@ -18,11 +18,11 @@ import (
 
 // ApplyStepRunner runs `terraform apply`.
 type ApplyStepRunner struct {
-	TerraformExecutor     TerraformExec
-	DefaultTFDistribution terraform.Distribution
-	DefaultTFVersion      *version.Version
-	CommitStatusUpdater   StatusUpdater
-	AsyncTFExec           AsyncTFExec
+	TerraformExecutor     TerraformExec          `validate:"required"`
+	DefaultTFDistribution terraform.Distribution `validate:"required"`
+	DefaultTFVersion      *version.Version       `validate:"required"`
+	CommitStatusUpdater   StatusUpdater          `validate:"required"`
+	AsyncTFExec           AsyncTFExec            `validate:"required"`
 }
 
 func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
