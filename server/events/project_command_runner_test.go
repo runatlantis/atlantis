@@ -106,6 +106,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
+	Equals(t, fmt.Sprintf("https://%s", ctx.JobID), res.PlanSuccess.JobUrl)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
 	expSteps := []string{"run", "apply", "plan", "init", "env"}
 	for _, step := range expSteps {
