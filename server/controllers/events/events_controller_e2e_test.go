@@ -1469,9 +1469,9 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	Ok(t, err)
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
-		VcsClient:        e2eVCSClient,
-		Locker:           projectLocker,
-		LockURLGenerator: &mockLockURLGenerator{},
+		VcsClient:    e2eVCSClient,
+		Locker:       projectLocker,
+		URLGenerator: &mockURLGenerator{},
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor:     terraformClient,
 			DefaultTFDistribution: defaultTFDistribution,
@@ -1679,10 +1679,14 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	return ctrl, e2eVCSClient, e2eGithubGetter, workingDir
 }
 
-type mockLockURLGenerator struct{}
+type mockURLGenerator struct{}
 
-func (m *mockLockURLGenerator) GenerateLockURL(_ string) string {
+func (m *mockURLGenerator) GenerateLockURL(_ string) string {
 	return "lock-url"
+}
+
+func (m mockURLGenerator) GenerateProjectJobURL(ctx command.ProjectContext) (string, error) {
+	return "https://" + ctx.JobID, nil
 }
 
 type mockWebhookSender struct{}

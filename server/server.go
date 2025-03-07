@@ -693,10 +693,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
-		VcsClient:        vcsClient,
-		Locker:           projectLocker,
-		LockURLGenerator: router,
-		Logger:           logger,
+		VcsClient:    vcsClient,
+		Locker:       projectLocker,
+		URLGenerator: router,
+		Logger:       logger,
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor:     terraformClient,
 			DefaultTFDistribution: defaultTfDistribution,
