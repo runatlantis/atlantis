@@ -273,6 +273,14 @@ func StripRefreshingFromPlanOutput(output string, tfVersion *version.Version) st
 	return output
 }
 
+func FilterRegexFromPlanOutput(output string, filterRegex *regexp.Regexp) string {
+	if filterRegex == nil {
+		return output
+	}
+
+	return filterRegex.ReplaceAllString(output, "${1}<redacted>$2")
+}
+
 // remoteOpsErr01114 is the error terraform plan will return if this project is
 // using TFE remote operations in TF 0.11.15.
 var remoteOpsErr01114 = `Error: Saving a generated plan is currently not supported!

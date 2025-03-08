@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -71,7 +72,8 @@ type CustomStepRunner interface {
 		path string,
 		envs map[string]string,
 		streamOutput bool,
-		postProcessOutput valid.PostProcessRunOutputOption,
+		postProcessOutput []valid.PostProcessRunOutputOption,
+		postProcessFilterRegexes []*regexp.Regexp,
 	) (string, error)
 }
 
@@ -98,7 +100,7 @@ type MultiEnvStepRunner interface {
 		cmd string,
 		path string,
 		envs map[string]string,
-		postProcessOutput valid.PostProcessRunOutputOption,
+		postProcessOutput []valid.PostProcessRunOutputOption,
 	) (string, error)
 }
 
@@ -823,7 +825,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, true, step.Output)
+			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, true, step.Output, step.FilterRegexes)
 		case "env":
 			out, err = p.EnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out
