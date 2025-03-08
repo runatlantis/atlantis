@@ -594,7 +594,7 @@ Compact:
 |-----|--------|---------|----------|----------------------|
 | run | string | none    | no       | Run a custom command |
 
-Full
+Full example:
 
 ```yaml
 - run:
@@ -606,13 +606,27 @@ Full
     output: show
 ```
 
-| Key | Type                                                         | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                             |
-|-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| run | map\[string -> string\] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
+Full example, filtering output and masking matching text (`mySecret: "foo"` -> `mySecret: "<redacted>"`):
+
+```yaml
+- run:
+    command: custom-command arg1 arg2
+    shell: sh
+    shellArgs:
+     - "--debug"
+     - "-c"
+    output:
+      - strip_refreshing
+      - filter_regex: "((?i)secret:\\s\")[^\"]*"
+```
+
+| Key | Type | Default | Required | Description |
+|-----|-----|-----|-----|-----|
+| run | map\[string -> string\] | none | no | Run a custom command |
+| run.command | string | none | yes | Shell command to run |
 | run.shell | string | "sh" | no | Name of the shell to use for command execution |
 | run.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
-| run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
+| run.output | string or []string or []any | "show" | no | How to post-process the output of this command when posted in the PR comment. The options are:<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command <br/> `filter_regex: "<regex_pattern>"` - masks the comment output based on the pattern, can be specified multiple times, filters will be processed in order. Note that this command only filters comments, links to plans will still show the unfiltered result. |
 
 #### Native Environment Variables
 
