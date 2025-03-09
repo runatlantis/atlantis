@@ -4,7 +4,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	"gopkg.in/yaml.v3"
 )
 

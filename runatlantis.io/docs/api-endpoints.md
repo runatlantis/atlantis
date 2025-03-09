@@ -161,6 +161,38 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 
 The endpoints listed in this section are non-destructive and therefore don't require authentication nor special secret token.
 
+### GET /api/locks
+
+#### Description
+
+List the currently held project locks.
+
+#### Sample Request
+
+```shell
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
+```
+
+#### Sample Response
+
+```json
+{
+  "Locks": [
+    {
+      "Name": "lock-id",
+      "ProjectName": "terraform",
+      "ProjectRepo": "owner/repo",
+      "ProjectRepoPath": "/path",
+      "PullID": "123",
+      "PullURL": "url",
+      "User": "jdoe",
+      "Workspace": "default",
+      "Time": "2025-02-13T16:47:42.040856-08:00"
+    }
+  ]
+}
+```
+
 ### GET /status
 
 #### Description

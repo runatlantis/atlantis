@@ -15,13 +15,12 @@ package events
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -347,7 +346,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+		return nil, "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
@@ -408,10 +407,10 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					}
 					// User matches the author and prevent self approve is set to true
 				} else if isOwner && !ignorePolicy && ctx.User.Username == ctx.Pull.Author && policySet.PreventSelfApprove {
-					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s the author of pr %s matches the command commenter user %s - please contact another policy owners to approve failing policies", policySet.Name, ctx.Pull.Author, ctx.User.Username))
+					prjErr = errors.Join(prjErr, fmt.Errorf("policy set: %s the author of pr %s matches the command commenter user %s - please contact another policy owners to approve failing policies", policySet.Name, ctx.Pull.Author, ctx.User.Username))
 					// User is not authorized to approve policy set.
 				} else if !ignorePolicy {
-					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
+					prjErr = errors.Join(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
 				}
 				// Still bubble up this failure, even if policy set is not targeted.
 				if !policyStatus.Passed && (prjPolicyStatus[i].Approvals != policySet.ApproveCount) {
@@ -449,7 +448,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
 
 	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+		return nil, "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
@@ -502,7 +501,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			}
 			// Exclude errors for failed policies
 			if !strings.Contains(err.Error(), "some policies failed") {
-				errs = multierror.Append(errs, err)
+				errs = errors.Join(errs, err)
 			}
 		}
 
@@ -567,7 +566,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+		return nil, "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
@@ -644,7 +643,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnApplyMode)
 	if err != nil {
-		return "", "", errors.Wrap(err, "acquiring lock")
+		return "", "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return "", lockAttempt.LockFailureReason, nil
@@ -724,7 +723,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+		return nil, "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
@@ -765,7 +764,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+		return nil, "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil

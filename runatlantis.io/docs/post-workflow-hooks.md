@@ -116,5 +116,6 @@ command](custom-workflows.md#custom-run-command).
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
     every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
   * `COMMAND_NAME` - The name of the command that is being executed, i.e. `plan`, `apply` etc.
+  * `COMMAND_HAS_ERRORS` - Indicates whether any errors occurred during the execution of the command (`plan`, `apply`). If set to `true`, at least one error was encountered; otherwise, it is `false`.
   * `OUTPUT_STATUS_FILE` - An output file to customize the success or failure status. ex. `echo 'failure' > $OUTPUT_STATUS_FILE`.
 :::

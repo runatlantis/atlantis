@@ -17,8 +17,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/google/go-github/v68/github"
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -94,7 +94,7 @@ func buildCommentCommandRunner(
 
 // DefaultCommandRunner is the first step when processing a comment command.
 type DefaultCommandRunner struct {
-	VCSClient                vcs.Client
+	VCSClient                vcs.Client `validate:"required"`
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
@@ -105,9 +105,9 @@ type DefaultCommandRunner struct {
 	EventParser          EventParsing
 	// User config option: Fail and do not run the Atlantis command request if any of the pre workflow hooks error
 	FailOnPreWorkflowHookError bool
-	Logger                     logging.SimpleLogging
-	GlobalCfg                  valid.GlobalCfg
-	StatsScope                 tally.Scope
+	Logger                     logging.SimpleLogging `validate:"required"`
+	GlobalCfg                  valid.GlobalCfg       `validate:"required"`
+	StatsScope                 tally.Scope           `validate:"required"`
 	// User config option: controls whether to operate on pull requests from forks.
 	AllowForkPRs bool
 	// ParallelPoolSize controls the size of the wait group used to run
@@ -123,14 +123,14 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to disable error comment
 	SilenceForkPRErrorsFlag        string
-	CommentCommandRunnerByCmd      map[command.Name]CommentCommandRunner
-	Drainer                        *Drainer
-	PreWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner
-	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
-	PullStatusFetcher              PullStatusFetcher
-	TeamAllowlistChecker           command.TeamAllowlistChecker
-	VarFileAllowlistChecker        *VarFileAllowlistChecker
-	CommitStatusUpdater            CommitStatusUpdater
+	CommentCommandRunnerByCmd      map[command.Name]CommentCommandRunner `validate:"required"`
+	Drainer                        *Drainer                              `validate:"required"`
+	PreWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner         `validate:"required"`
+	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner        `validate:"required"`
+	PullStatusFetcher              PullStatusFetcher                     `validate:"required"`
+	TeamAllowlistChecker           command.TeamAllowlistChecker          `validate:"required"`
+	VarFileAllowlistChecker        *VarFileAllowlistChecker              `validate:"required"`
+	CommitStatusUpdater            CommitStatusUpdater                   `validate:"required"`
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -202,6 +202,12 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	cmd := &CommentCommand{
 		Name: command.Autoplan,
 	}
+
+	// Update the combined plan commit status to pending
+	if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+		ctx.Log.Warn("unable to update plan commit status: %s", err)
+	}
+
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if err != nil {
@@ -352,6 +358,18 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 	if !c.validateCtxAndComment(ctx, cmd.Name) {
 		return
+	}
+
+	// Update the combined plan or apply commit status to pending
+	switch cmd.Name {
+	case command.Plan:
+		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+			ctx.Log.Warn("unable to update plan commit status: %s", err)
+		}
+	case command.Apply:
+		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+			ctx.Log.Warn("unable to update apply commit status: %s", err)
+		}
 	}
 
 	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
