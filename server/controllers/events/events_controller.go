@@ -58,12 +58,12 @@ const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/
 // VCSEventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
 type VCSEventsController struct {
-	CommandRunner  events.CommandRunner
-	PullCleaner    events.PullCleaner
-	Logger         logging.SimpleLogging
-	Scope          tally.Scope
-	Parser         events.EventParsing
-	CommentParser  events.CommentParsing
+	CommandRunner  events.CommandRunner  `validate:"required"`
+	PullCleaner    events.PullCleaner    `validate:"required"`
+	Logger         logging.SimpleLogging `validate:"required"`
+	Scope          tally.Scope           `validate:"required"`
+	Parser         events.EventParsing   `validate:"required"`
+	CommentParser  events.CommentParsing `validate:"required"`
 	ApplyDisabled  bool
 	EmojiReaction  string
 	ExecutableName string
@@ -71,20 +71,20 @@ type VCSEventsController struct {
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
 	GithubWebhookSecret          []byte
-	GithubRequestValidator       GithubRequestValidator
-	GitlabRequestParserValidator GitlabRequestParserValidator
+	GithubRequestValidator       GithubRequestValidator       `validate:"required"`
+	GitlabRequestParserValidator GitlabRequestParserValidator `validate:"required"`
 	// GitlabWebhookSecret is the secret added to this webhook via the GitLab
 	// UI that identifies this call as coming from GitLab. If empty, no
 	// request validation is done.
 	GitlabWebhookSecret  []byte
-	RepoAllowlistChecker *events.RepoAllowlistChecker
+	RepoAllowlistChecker *events.RepoAllowlistChecker `validate:"required"`
 	// SilenceAllowlistErrors controls whether we write an error comment on
 	// pull requests from non-allowlisted repos.
 	SilenceAllowlistErrors bool
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
-	SupportedVCSHosts []models.VCSHostType
-	VCSClient         vcs.Client
+	SupportedVCSHosts []models.VCSHostType `validate:"required"`
+	VCSClient         vcs.Client           `validate:"required"`
 	TestingMode       bool
 	// BitbucketWebhookSecret is the secret added to this webhook via the Bitbucket
 	// UI that identifies this call as coming from Bitbucket. If empty, no
@@ -99,7 +99,7 @@ type VCSEventsController struct {
 	// webhook via the Azure DevOps UI that identifies this call as coming from your
 	// Azure DevOps Team Project. If empty, no request validation is done.
 	AzureDevopsWebhookBasicPassword []byte
-	AzureDevopsRequestValidator     AzureDevopsRequestValidator
+	AzureDevopsRequestValidator     AzureDevopsRequestValidator `validate:"required"`
 	GiteaWebhookSecret              []byte
 }
 
