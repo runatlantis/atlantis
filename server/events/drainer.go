@@ -7,9 +7,9 @@ import (
 // Drainer is used to gracefully shut down atlantis by waiting for in-progress
 // operations to complete.
 type Drainer struct {
-	status DrainStatus
-	mutex  sync.Mutex
-	wg     sync.WaitGroup
+	status DrainStatus    `validate:"required"`
+	mutex  sync.Mutex     `validate:"required"`
+	wg     sync.WaitGroup `validate:"required"`
 }
 
 type DrainStatus struct {
