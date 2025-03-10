@@ -582,7 +582,10 @@ func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 // https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request
 func (g *GitlabClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
 	logger.Debug("Reset approvals for merge request %d", pull.Num)
-	_, err := g.Client.MergeRequestApprovals.ResetApprovalsOfMergeRequest(repo.FullName, pull.Num)
+	resp, err := g.Client.MergeRequestApprovals.ResetApprovalsOfMergeRequest(repo.FullName, pull.Num)
+	if resp != nil {
+		logger.Debug("PUT /projects/%s/merge_requests/%d/reset_approvals returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+	}
 	if err != nil {
 		return errors.Wrap(err, "unable to reset approvals")
 	}
