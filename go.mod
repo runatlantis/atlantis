@@ -8,7 +8,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.34.0
 	github.com/bmatcuk/doublestar/v4 v4.8.1
 	github.com/bradleyfalzon/ghinstallation/v2 v2.13.0
-	github.com/briandowns/spinner v1.23.1
+	github.com/briandowns/spinner v1.23.2
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/drmaxgit/go-azuredevops v0.13.1
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
