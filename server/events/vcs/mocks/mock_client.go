@@ -41,7 +41,7 @@ func (mock *MockClient) CreateComment(logger logging.SimpleLogging, repo models.
 	return _ret0
 }
 
-func (mock *MockClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (mock *MockClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}

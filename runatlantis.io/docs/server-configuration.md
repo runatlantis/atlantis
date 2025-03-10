@@ -487,7 +487,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
   ```
 
-  If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot token is required for this feature. 
+  If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot token is required for this feature.
 
 ### `--emoji-reaction`
 
