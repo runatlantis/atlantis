@@ -3,6 +3,7 @@ package runtime_test
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -17,17 +18,22 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/utils"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestRunStepRunner_Run(t *testing.T) {
+	testRegexSecret, _ := utils.ParseRegex(`((?i)Secret:\s")[^"]*`)
+
 	cases := []struct {
-		Command      string
-		ProjectName  string
-		ExpOut       string
-		ExpErr       string
-		Version      string
-		Distribution string
+		Command                  string
+		ProjectName              string
+		ExpOut                   string
+		ExpErr                   string
+		Version                  string
+		Distribution             string
+		PostProcessOutput        []valid.PostProcessRunOutputOption
+		PostProcessFilterRegexes []*regexp.Regexp
 	}{
 		{
 			Command: "",
@@ -99,6 +105,16 @@ func TestRunStepRunner_Run(t *testing.T) {
 			Command: "echo args=$COMMENT_ARGS",
 			ExpOut:  "args=-target=resource1,-target=resource2\n",
 		},
+		{
+			Command: `echo mySecret: \"foo\"`,
+			ExpOut:  "mySecret: \"<redacted>\"\n",
+			PostProcessOutput: []valid.PostProcessRunOutputOption{
+				"filter_regex",
+			},
+			PostProcessFilterRegexes: []*regexp.Regexp{
+				testRegexSecret,
+			},
+		},
 	}
 	for _, customPolicyCheck := range []bool{false, true} {
 		for _, c := range cases {
@@ -168,7 +184,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 					EscapedCommentArgs:    []string{"-target=resource1", "-target=resource2"},
 					CustomPolicyCheck:     customPolicyCheck,
 				}
-				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow)
+				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, c.PostProcessOutput, c.PostProcessFilterRegexes)
 				if c.ExpErr != "" {
 					ErrContains(t, c.ExpErr, err)
 					return
