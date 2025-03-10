@@ -488,7 +488,7 @@ and set `--autoplan-modules` to `false`.
   ```
 
   If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.  
-  Reference: https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request
+  Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
 
 ### `--emoji-reaction`
 
