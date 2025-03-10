@@ -35,3 +35,6 @@ tmp-CHANGELOG.md
 
 # playwright
 test-results/
+
+# We should uncomment later and provide a reasonable launch.json
+.vscode/launch.json

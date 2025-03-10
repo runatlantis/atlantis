@@ -42,12 +42,13 @@ func (d DirNotExistErr) Error() string {
 	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
+//go:generate pegomock generate --package mocks -o mocks/mock_url_generator.go URLGenerator
 
-// LockURLGenerator generates urls to locks.
-type LockURLGenerator interface {
+// URLGenerator generates urls.
+type URLGenerator interface {
 	// GenerateLockURL returns the full URL to the lock at lockID.
 	GenerateLockURL(lockID string) string
+	GenerateProjectJobURL(ctx command.ProjectContext) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_step_runner.go StepRunner
@@ -223,7 +224,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 type DefaultProjectCommandRunner struct {
 	VcsClient                 vcs.Client
 	Locker                    ProjectLocker
-	LockURLGenerator          LockURLGenerator
+	URLGenerator              URLGenerator
 	Logger                    logging.SimpleLogging
 	InitStepRunner            StepRunner
 	PlanStepRunner            StepRunner
@@ -430,7 +431,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 		failure = `One or more policy sets require additional approval.`
 	}
 	return &models.PolicyCheckResults{
-		LockURL:            p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		LockURL:            p.URLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		PolicySetResults:   prjPolicySetResults,
 		ApplyCmd:           ctx.ApplyCmd,
 		RePlanCmd:          ctx.RePlanCmd,
@@ -542,7 +543,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	}
 
 	result := &models.PolicyCheckResults{
-		LockURL:            p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		LockURL:            p.URLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		PreConftestOutput:  strings.Join(preConftestOutput, "\n"),
 		PostConftestOutput: strings.Join(postConftestOutput, "\n"),
 		PolicySetResults:   policySetResults,
@@ -607,9 +608,14 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		}
 		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
-
+	JobUrl, err := p.URLGenerator.GenerateProjectJobURL(ctx)
+	if err != nil {
+		ctx.Log.Err("error generating job URL for job %s", ctx.JobID)
+		return nil, "", err
+	}
 	return &models.PlanSuccess{
-		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		LockURL:         p.URLGenerator.GenerateLockURL(lockAttempt.LockKey),
+		JobUrl:          JobUrl,
 		TerraformOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,
