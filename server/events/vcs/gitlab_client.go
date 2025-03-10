@@ -577,8 +577,17 @@ func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 	return fmt.Sprintf("!%d", pull.Num), nil
 }
 
-func (g *GitlabClient) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
-	// TODO implement
+// DiscardReviews discards all reviews on a pull request
+// This is only available with a bot token and otherwise will return 401 unauthorized
+func (g *GitlabClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+	response, err := g.Client.MergeRequestApprovals.ResetApprovalsOfMergeRequest(repo.FullName, pull.Num)
+	if err != nil {
+		return errors.Wrap(err, "unable to discard reviews")
+	}
+	if response.StatusCode != http.StatusOK {
+		return errors.Errorf("discarding reviews failed with status code %d", response.StatusCode)
+	}
+
 	return nil
 }
 
