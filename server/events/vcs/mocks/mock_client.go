@@ -377,7 +377,7 @@ func (c *MockClient_CreateComment_OngoingVerification) GetAllCapturedArguments()
 	return
 }
 
-func (verifier *VerifierMockClient) DiscardReviews(repo models.Repo, pull models.PullRequest) *MockClient_DiscardReviews_OngoingVerification {
+func (verifier *VerifierMockClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) *MockClient_DiscardReviews_OngoingVerification {
 	_params := []pegomock.Param{repo, pull}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DiscardReviews", _params, verifier.timeout)
 	return &MockClient_DiscardReviews_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}

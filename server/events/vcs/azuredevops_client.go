@@ -186,7 +186,7 @@ func (g *AzureDevopsClient) PullIsApproved(logger logging.SimpleLogging, repo mo
 	return approvalStatus, nil
 }
 
-func (g *AzureDevopsClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error { //nolint: revive
+func (g *AzureDevopsClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error { //nolint: revive
 	// TODO implement
 	return nil
 }

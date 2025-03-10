@@ -579,13 +579,12 @@ func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 
 // DiscardReviews discards all reviews on a pull request
 // This is only available with a bot token and otherwise will return 401 unauthorized
-func (g *GitlabClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
-	response, err := g.Client.MergeRequestApprovals.ResetApprovalsOfMergeRequest(repo.FullName, pull.Num)
+// https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request
+func (g *GitlabClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+	logger.Debug("Reset approvals for merge request %d", pull.Num)
+	_, err := g.Client.MergeRequestApprovals.ResetApprovalsOfMergeRequest(repo.FullName, pull.Num)
 	if err != nil {
-		return errors.Wrap(err, "unable to discard reviews")
-	}
-	if response.StatusCode != http.StatusOK {
-		return errors.Errorf("discarding reviews failed with status code %d", response.StatusCode)
+		return errors.Wrap(err, "unable to reset approvals")
 	}
 
 	return nil

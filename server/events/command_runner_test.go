@@ -1003,7 +1003,7 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	// gets called twice: the first time before the plan starts, the second time after the plan errors
 	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(tmp)
 
-	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[models.Repo](), Any[models.PullRequest]())
+	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[logging.SimpleLogging], Any[models.Repo](), Any[models.PullRequest]())
 }
 
 func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {

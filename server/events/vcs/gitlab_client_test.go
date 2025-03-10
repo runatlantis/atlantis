@@ -1202,7 +1202,7 @@ func TestGitlabClient_GetTeamNamesForUser(t *testing.T) {
 }
 
 func TestGithubClient_DiscardReviews(t *testing.T) {
-
+	logger := logging.NewNoopLogger(t)
 	cases := []struct {
 		description   string
 		repoFullName  string
@@ -1251,7 +1251,7 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 				Num: c.pullReqeustId,
 			}
 
-			if err := client.DiscardReviews(repo, pr); (err != nil) != c.wantErr {
+			if err := client.DiscardReviews(logger, repo, pr); (err != nil) != c.wantErr {
 				t.Errorf("DiscardReviews() error = %v", err)
 			}
 		})
