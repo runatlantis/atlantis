@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -59,6 +60,9 @@ Step represents a single action/command to perform. In YAML, it can be set as
   - run:
     command: my custom command
     output: hide
+  - run:
+    command: my custom command
+    output: ["strip_refreshing", {"filter_regex": "((?i)secret:\\s\")[^\"]*"}]
 
 3. A map for a built-in command and extra_args:
   - plan:
@@ -227,9 +231,20 @@ func (s Step) Validate() error {
 		case EnvStepName:
 			foundNameKey := false
 			for _, k := range argKeys {
-				if k != NameArgKey && k != CommandArgKey && k != ValueArgKey && k != ShellArgKey && k != ShellArgsArgKey {
-					return fmt.Errorf("env steps only support keys %q, %q, %q, %q and %q, found key %q",
-						NameArgKey, ValueArgKey, CommandArgKey, ShellArgKey, ShellArgsArgKey, k)
+				if k != NameArgKey &&
+					k != CommandArgKey &&
+					k != ValueArgKey &&
+					k != ShellArgKey &&
+					k != ShellArgsArgKey {
+					return fmt.Errorf(
+						"env steps only support keys %q, %q, %q, %q and %q, found key %q",
+						NameArgKey,
+						ValueArgKey,
+						CommandArgKey,
+						ShellArgKey,
+						ShellArgsArgKey,
+						k,
+					)
 				}
 				if k == NameArgKey {
 					foundNameKey = true
@@ -245,21 +260,82 @@ func (s Step) Validate() error {
 					ValueArgKey, CommandArgKey)
 			}
 			delete(argMap, ValueArgKey)
-		case RunStepName, MultiEnvStepName:
+		case MultiEnvStepName:
 			if _, ok := argMap[CommandArgKey].(string); !ok {
 				return fmt.Errorf("%q step must have a %q key set", stepName, CommandArgKey)
 			}
 			delete(argMap, CommandArgKey)
 			if v, ok := argMap[OutputArgKey].(string); ok {
-				if stepName == RunStepName && !(v == valid.PostProcessRunOutputShow ||
-					v == valid.PostProcessRunOutputHide || v == valid.PostProcessRunOutputStripRefreshing) {
-					return fmt.Errorf("run step %q option must be one of %q, %q, or %q",
-						OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide,
-						valid.PostProcessRunOutputStripRefreshing)
-				} else if stepName == MultiEnvStepName && !(v == valid.PostProcessRunOutputShow ||
-					v == valid.PostProcessRunOutputHide) {
-					return fmt.Errorf("multienv step %q option must be %q or %q",
-						OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide)
+				switch v {
+				case valid.PostProcessRunOutputShow,
+					valid.PostProcessRunOutputHide:
+					// All good; do nothing
+				default:
+					return fmt.Errorf(
+						"multienv step %q option must be %q or %q",
+						OutputArgKey,
+						valid.PostProcessRunOutputShow,
+						valid.PostProcessRunOutputHide,
+					)
+				}
+			}
+			delete(argMap, OutputArgKey)
+		case RunStepName:
+			if _, ok := argMap[CommandArgKey].(string); !ok {
+				return fmt.Errorf("%q step must have a %q key set", stepName, CommandArgKey)
+			}
+			delete(argMap, CommandArgKey)
+			if v, ok := argMap[OutputArgKey].(string); ok {
+				switch v {
+				case valid.PostProcessRunOutputShow,
+					valid.PostProcessRunOutputHide,
+					valid.PostProcessRunOutputStripRefreshing:
+					// All good; do nothing
+				default:
+					return fmt.Errorf(
+						"run step %q option must be one of %q, %q, or %q",
+						OutputArgKey,
+						valid.PostProcessRunOutputShow,
+						valid.PostProcessRunOutputHide,
+						valid.PostProcessRunOutputStripRefreshing,
+					)
+				}
+			}
+			if argMapVal, ok := argMap[OutputArgKey].(map[string]string); ok {
+				for k, v := range argMapVal {
+					switch stepName {
+					case RunStepName:
+						switch k {
+						case valid.PostProcessRunOutputFilterRegexKey:
+							_, err := utils.ParseRegex(v)
+							if err != nil {
+								return fmt.Errorf(
+									"regex filter %q from run step %q option failed: %w",
+									OutputArgKey,
+									v,
+									err,
+								)
+							}
+						default:
+							return fmt.Errorf(
+								"run step %q option must be one of %q, %q, or %q",
+								OutputArgKey,
+								valid.PostProcessRunOutputShow,
+								valid.PostProcessRunOutputHide,
+								valid.PostProcessRunOutputStripRefreshing,
+							)
+						}
+					case MultiEnvStepName:
+						switch k {
+						default:
+							return fmt.Errorf(
+								"multienv step %q option must be %q or %q",
+								OutputArgKey,
+								valid.PostProcessRunOutputShow,
+								valid.PostProcessRunOutputHide,
+							)
+						}
+					}
 				}
 			}
 			delete(argMap, OutputArgKey)
@@ -340,17 +416,51 @@ func (s Step) ToValid() valid.Step {
 			if value, ok := stepArgs[ValueArgKey].(string); ok {
 				step.EnvVarValue = value
 			}
-			if output, ok := stepArgs[OutputArgKey].(string); ok {
-				step.Output = valid.PostProcessRunOutputOption(output)
-			}
 			if shell, ok := stepArgs[ShellArgKey].(string); ok {
 				step.RunShell = &valid.CommandShell{
 					Shell:     shell,
 					ShellArgs: []string{"-c"},
 				}
 			}
-			if step.StepName == RunStepName && step.Output == "" {
-				step.Output = valid.PostProcessRunOutputShow
+
+			switch output := stepArgs[OutputArgKey].(type) {
+			case string:
+				step.Output = append(step.Output, valid.PostProcessRunOutputOption(output))
+			case []string:
+				for _, value := range output {
+					if !slices.Contains(step.Output, valid.PostProcessRunOutputOption(value)) {
+						step.Output = append(step.Output, valid.PostProcessRunOutputOption(value))
+					}
+				}
+			case []any:
+				for _, value := range output {
+					switch v := value.(type) {
+					case string:
+						step.Output = append(step.Output, valid.PostProcessRunOutputOption(v))
+					case map[string]any:
+						for key, value := range v {
+							if !slices.Contains(step.Output, valid.PostProcessRunOutputOption(key)) {
+								step.Output = append(step.Output, valid.PostProcessRunOutputOption(key))
+							}
+							if key == valid.PostProcessRunOutputFilterRegexKey {
+								switch t := value.(type) {
+								case string:
+									r, _ := utils.ParseRegex(t)
+									step.FilterRegexes = append(step.FilterRegexes, r)
+								case []string:
+									for _, e := range t {
+										r, _ := utils.ParseRegex(e)
+										step.FilterRegexes = append(step.FilterRegexes, r)
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if step.StepName == RunStepName && len(step.Output) == 0 {
+				step.Output = append(step.Output, valid.PostProcessRunOutputShow)
 			}
 
 			switch t := stepArgs[ShellArgsArgKey].(type) {
