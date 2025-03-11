@@ -293,11 +293,12 @@ func (s Step) Validate() error {
 					// All good; do nothing
 				default:
 					return fmt.Errorf(
-						"run step %q option must be one of %q, %q, or %q",
+						"run step %q option must be one of %q, %q, %q, or %q",
 						OutputArgKey,
 						valid.PostProcessRunOutputShow,
 						valid.PostProcessRunOutputHide,
 						valid.PostProcessRunOutputStripRefreshing,
+						valid.PostProcessRunOutputFilterRegexKey,
 					)
 				}
 			}
@@ -318,11 +319,12 @@ func (s Step) Validate() error {
 							}
 						default:
 							return fmt.Errorf(
-								"run step %q option must be one of %q, %q, or %q",
+								"run step %q option must be one of %q, %q, %q, or %q",
 								OutputArgKey,
 								valid.PostProcessRunOutputShow,
 								valid.PostProcessRunOutputHide,
 								valid.PostProcessRunOutputStripRefreshing,
+								valid.PostProcessRunOutputFilterRegexKey,
 							)
 						}
 					case MultiEnvStepName:
