@@ -42,7 +42,7 @@ func (a *NotConfiguredVCSClient) ReactToComment(logger logging.SimpleLogging, re
 func (a *NotConfiguredVCSClient) PullIsApproved(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) (models.ApprovalStatus, error) {
 	return models.ApprovalStatus{}, a.err()
 }
-func (a *NotConfiguredVCSClient) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
+func (a *NotConfiguredVCSClient) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) error {
 	return nil
 }
 func (a *NotConfiguredVCSClient) PullIsMergeable(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ string, _ []string) (bool, error) {

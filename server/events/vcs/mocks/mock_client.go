@@ -41,11 +41,11 @@ func (mock *MockClient) CreateComment(logger logging.SimpleLogging, repo models.
 	return _ret0
 }
 
-func (mock *MockClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (mock *MockClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	_params := []pegomock.Param{repo, pull}
+	_params := []pegomock.Param{logger, repo, pull}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("DiscardReviews", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 error
 	if len(_result) != 0 {
@@ -377,8 +377,8 @@ func (c *MockClient_CreateComment_OngoingVerification) GetAllCapturedArguments()
 	return
 }
 
-func (verifier *VerifierMockClient) DiscardReviews(repo models.Repo, pull models.PullRequest) *MockClient_DiscardReviews_OngoingVerification {
-	_params := []pegomock.Param{repo, pull}
+func (verifier *VerifierMockClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) *MockClient_DiscardReviews_OngoingVerification {
+	_params := []pegomock.Param{logger, repo, pull}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DiscardReviews", _params, verifier.timeout)
 	return &MockClient_DiscardReviews_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }

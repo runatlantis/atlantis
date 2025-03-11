@@ -39,7 +39,7 @@ type Client interface {
 	// url is an optional link that users should click on for more information
 	// about this status.
 	UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error
-	DiscardReviews(repo models.Repo, pull models.PullRequest) error
+	DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error
 	MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error
 	MarkdownPullLink(pull models.PullRequest) (string, error)
 	GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error)
