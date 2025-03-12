@@ -15,37 +15,37 @@ We are grateful for everyone who took the time to share their experiences with A
 
 ### How do you interact with Atlantis?
 
-![](/blog/april-2024-survey-results/interact.webp)
+![](april-2024-survey-results/interact.webp)
 
 Unsurprisingly, most users of Atlantis wear multiple hats, involved throughout the development process.
 
 ### How do you/your organization deploy Atlantis
 
-![](/blog/april-2024-survey-results/deploy.webp)
+![](april-2024-survey-results/deploy.webp)
 
 Most users of terraform deploy using Kubernetes and/or AWS. "Other Docker" use docker but do not use EKS or Helm directly, while a minority use some other combination of technologies.
 
 ### What Infrastructure as Code (IaC) tool(s) do you use with Atlantis?
 
-![](/blog/april-2024-survey-results/iac.webp)
+![](april-2024-survey-results/iac.webp)
 
 The vast majority of Atlantis users are still using terraform as some part of their deployment. About half of them are in addition using Terragrunt, and OpenTofu seems to be gaining some ground.
 
 ### How many repositories does your Atlantis manage?
 
-![](/blog/april-2024-survey-results/repos.webp)
+![](april-2024-survey-results/repos.webp)
 
 Most users have relatively modest footprints to managed with Atlantis (though a few large monorepos could be obscured in the numbers).
 
 ### Which Version Control Systems (VCSs) do you use?
 
-![](/blog/april-2024-survey-results/vcs.webp)
+![](april-2024-survey-results/vcs.webp)
 
 Most users of Atlantis are using GitHub, with a sizeable chunk on GitLab, followed by Bitbucket and others. This is analogous to the support and feature requests that the maintainers see for the various VCSs in the codebase.
 
 ### What is the most important feature you find missing from Atlantis?
 
-![](/blog/april-2024-survey-results/features.webp)
+![](april-2024-survey-results/features.webp)
 
 This being a free form question, there was a long tail of responses, so the above only shows answers after normalizing that had three or more instances.
 
