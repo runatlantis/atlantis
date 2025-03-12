@@ -114,7 +114,7 @@ A new permission for `Actions` has been added, which is required for checking if
 
 ### GitLab
 
-* Follow: [GitLab: Create a personal access token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
+* Follow: [GitLab: Create a personal access token](https://docs.gitlab.com/user/profile/personal_access_tokens/#create-a-personal-access-token)
 * Create a token with **api** scope
 * Record the access token
 
