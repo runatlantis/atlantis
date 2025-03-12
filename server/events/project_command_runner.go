@@ -48,6 +48,7 @@ func (d DirNotExistErr) Error() string {
 type URLGenerator interface {
 	// GenerateLockURL returns the full URL to the lock at lockID.
 	GenerateLockURL(lockID string) string
+	// GenerateProjectJobURL returns the full URL to the Job.
 	GenerateProjectJobURL(ctx command.ProjectContext) (string, error)
 }
 
