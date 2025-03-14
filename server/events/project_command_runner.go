@@ -608,14 +608,14 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		}
 		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
 	}
-	JobUrl, err := p.URLGenerator.GenerateProjectJobURL(ctx)
+	JobURL, err := p.URLGenerator.GenerateProjectJobURL(ctx)
 	if err != nil {
 		ctx.Log.Err("error generating job URL for job %s", ctx.JobID)
 		return nil, "", err
 	}
 	return &models.PlanSuccess{
 		LockURL:         p.URLGenerator.GenerateLockURL(lockAttempt.LockKey),
-		JobUrl:          JobUrl,
+		JobURL:          JobURL,
 		TerraformOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,

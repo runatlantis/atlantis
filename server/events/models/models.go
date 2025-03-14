@@ -371,8 +371,8 @@ type PlanSuccess struct {
 	// LockURL is the full URL to the lock held by this plan.
 	LockURL string
 
-	// JobUrl is the URL for this job in the Atlantis UI
-	JobUrl string
+	// JobURL is the URL for this job in the Atlantis UI
+	JobURL string
 	// RePlanCmd is the command that users should run to re-plan this project.
 	RePlanCmd string
 	// ApplyCmd is the command that users should run to apply this plan.
