@@ -44,10 +44,11 @@ func (d DirNotExistErr) Error() string {
 
 //go:generate pegomock generate --package mocks -o mocks/mock_url_generator.go URLGenerator
 
-// URLGenerator generates urls.
+// URLGenerator generates lock and project urls.
 type URLGenerator interface {
 	// GenerateLockURL returns the full URL to the lock at lockID.
 	GenerateLockURL(lockID string) string
+	// GenerateProjectJobURL returns the full URL to the Job.
 	GenerateProjectJobURL(ctx command.ProjectContext) (string, error)
 }
 
