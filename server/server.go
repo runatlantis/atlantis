@@ -127,7 +127,7 @@ type Server struct {
 	ProjectCmdOutputHandler        jobs.ProjectCommandOutputHandler
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
-	EnableProfilingRoutes          bool
+	EnableProfilingAPI             bool
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -1029,7 +1029,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebUsername:                    userConfig.WebUsername,
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
-		EnableProfilingRoutes:          userConfig.EnableProfilingRoutes,
+		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
 	}
 
 	validate := validator.New(validator.WithRequiredStructEnabled())
@@ -1071,7 +1071,7 @@ func (s *Server) Start() error {
 		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
 	}
 
-	if s.EnableProfilingRoutes {
+	if s.EnableProfilingAPI {
 		for p, h := range map[string]http.HandlerFunc{
 			"/":        pprof.Index,
 			"/cmdline": pprof.Cmdline,
