@@ -47,6 +47,8 @@ const (
 	verboseFlagShort             = ""
 	clearPolicyApprovalFlagLong  = "clear-policy-approval"
 	clearPolicyApprovalFlagShort = ""
+	ParallelPoolSizeFlagLong     = "parallel-pool-size"
+	ParallelPoolSizeFlagShort    = "P"
 )
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -232,6 +234,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var verbose bool
 	var autoMergeDisabled bool
 	var autoMergeMethod string
+	var parallelPoolSize int
 	var flagSet *pflag.FlagSet
 	var name command.Name
 
@@ -245,6 +248,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run plan for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+		flagSet.IntVarP(&parallelPoolSize, ParallelPoolSizeFlagLong, ParallelPoolSizeFlagShort, 0, "Override default parallel pool size for this command")
 	case command.Apply.String():
 		name = command.Apply
 		flagSet = pflag.NewFlagSet(command.Apply.String(), pflag.ContinueOnError)
@@ -255,6 +259,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
 		flagSet.StringVarP(&autoMergeMethod, autoMergeMethodFlagLong, autoMergeMethodFlagShort, "", "Specifies the merge method for the VCS if automerge is enabled. (Currently only implemented for GitHub)")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+		flagSet.IntVarP(&parallelPoolSize, ParallelPoolSizeFlagLong, ParallelPoolSizeFlagShort, 0, "Override default parallel pool size for this command")
 	case command.ApprovePolicies.String():
 		name = command.ApprovePolicies
 		flagSet = pflag.NewFlagSet(command.ApprovePolicies.String(), pflag.ContinueOnError)
@@ -336,7 +341,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, autoMergeMethod, workspace, project, policySet, clearPolicyApproval),
+		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, autoMergeMethod, workspace, project, parallelPoolSize, policySet, clearPolicyApproval),
 	}
 }
 
