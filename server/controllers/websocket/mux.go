@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -64,9 +63,9 @@ func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// check if the job ID exists before registering receiver
-	if !m.registry.IsKeyExists(key) {
-		return fmt.Errorf("invalid key: %s", key)
-	}
+	// if !m.registry.IsKeyExists(key) {
+	// 	return fmt.Errorf("invalid key: %s", key)
+	// }
 
 	// Buffer size set to 1000 to ensure messages get queued.
 	// TODO: make buffer size configurable
