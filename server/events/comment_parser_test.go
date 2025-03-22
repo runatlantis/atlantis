@@ -489,12 +489,13 @@ func TestParse_UsingProjectAtSameTimeAsWorkspaceOrDir(t *testing.T) {
 
 func TestParse_Parsing(t *testing.T) {
 	cases := []struct {
-		flags        string
-		expWorkspace string
-		expDir       string
-		expVerbose   bool
-		expExtraArgs string
-		expProject   string
+		flags               string
+		expWorkspace        string
+		expDir              string
+		expVerbose          bool
+		expExtraArgs        string
+		expProject          string
+		expParallelPoolSize int
 	}{
 		// Test defaults.
 		{
@@ -504,6 +505,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		// Test each short flag individually.
 		{
@@ -513,6 +515,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		{
 			"-d dir",
@@ -521,6 +524,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		{
 			"-p project",
@@ -529,6 +533,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"project",
+			0,
 		},
 		{
 			"--verbose",
@@ -537,6 +542,16 @@ func TestParse_Parsing(t *testing.T) {
 			true,
 			"",
 			"",
+			0,
+		},
+		{
+			"-P 5",
+			"",
+			"",
+			false,
+			"",
+			"",
+			5,
 		},
 		// Test each long flag individually.
 		{
@@ -546,6 +561,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		{
 			"--dir dir",
@@ -554,6 +570,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		{
 			"--project project",
@@ -562,64 +579,81 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"project",
+			0,
+		},
+		{
+			"--parallel-pool-size 10",
+			"",
+			"",
+			false,
+			"",
+			"",
+			10,
 		},
 		// Test all of them with different permutations.
 		{
-			"-w workspace -d dir --verbose",
+			"-w workspace -d dir --verbose -P 3",
 			"workspace",
 			"dir",
 			true,
 			"",
 			"",
+			3,
 		},
 		{
-			"-d dir -w workspace --verbose",
+			"-d dir -w workspace --verbose --parallel-pool-size 7",
 			"workspace",
 			"dir",
 			true,
 			"",
 			"",
+			7,
 		},
 		{
-			"--verbose -w workspace -d dir",
+			"--verbose -w workspace -d dir -P 4",
 			"workspace",
 			"dir",
 			true,
 			"",
 			"",
+			4,
 		},
 		{
-			"-p project --verbose",
+			"-p project --verbose --parallel-pool-size 6",
 			"",
 			"",
 			true,
 			"",
 			"project",
+			6,
 		},
 		{
-			"--verbose -p project",
+			"--verbose -p project -P 8",
 			"",
 			"",
 			true,
 			"",
 			"project",
+			8,
 		},
 		// Test that flags after -- are ignored
 		{
-			"-w workspace -d dir -- --verbose",
+			"-w workspace -d dir -- --verbose -P 5",
 			"workspace",
 			"dir",
 			false,
-			"--verbose",
+			"--verbose -P 5",
 			"",
+			0,
 		},
 		{
-			"-w workspace -- -d dir --verbose",
+			"-w workspace -- -d dir --verbose --parallel-pool-size 3",
 			"workspace",
 			"",
 			false,
-			"-d dir --verbose",
+			"-d dir --verbose --parallel-pool-size 3",
 			"",
+			0,
 		},
 		// Test the extra args parsing.
 		{
@@ -629,31 +663,35 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		{
-			"-w workspace -d dir --verbose -- arg one -two --three &&",
+			"-w workspace -d dir --verbose -P 4 -- arg one -two --three &&",
 			"workspace",
 			"dir",
 			true,
 			"arg one -two --three &&",
 			"",
+			4,
 		},
 		// Test whitespace.
 		{
-			"\t-w\tworkspace\t-d\tdir\t--verbose\t--\targ\tone\t-two\t--three\t&&",
+			"\t-w\tworkspace\t-d\tdir\t--verbose\t-P\t6\t--\targ\tone\t-two\t--three\t&&",
 			"workspace",
 			"dir",
 			true,
 			"arg one -two --three &&",
 			"",
+			6,
 		},
 		{
-			"   -w   workspace   -d   dir   --verbose   --   arg   one   -two   --three   &&",
+			"   -w   workspace   -d   dir   --verbose   -P   5   --   arg   one   -two   --three   &&",
 			"workspace",
 			"dir",
 			true,
 			"arg one -two --three &&",
 			"",
+			5,
 		},
 		// Test that the dir string is normalized.
 		{
@@ -663,6 +701,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		{
 			"-d /adir",
@@ -671,6 +710,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		{
 			"-d .",
@@ -679,6 +719,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		{
 			"-d ./",
@@ -687,6 +728,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		{
 			"-d ./adir",
@@ -695,6 +737,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 		{
 			"-d \"dir with space\"",
@@ -703,6 +746,7 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
+			0,
 		},
 	}
 
@@ -1048,13 +1092,14 @@ func TestParse_VCSUsername(t *testing.T) {
 }
 
 var PlanUsage = `Usage of plan:
-  -d, --dir string         Which directory to run plan in relative to root of repo,
-                           ex. 'child/dir'.
-  -p, --project string     Which project to run plan for. Refers to the name of the
-                           project configured in a repo config file. Cannot be used
-                           at same time as workspace or dir flags.
-      --verbose            Append Atlantis log to comment.
-  -w, --workspace string   Switch to this Terraform workspace before planning.
+  -d, --dir string               Which directory to run plan in relative to root of
+                                 repo, ex. 'child/dir'.
+  -P, --parallel-pool-size int   Override default parallel pool size for this command
+  -p, --project string           Which project to run plan for. Refers to the name
+                                 of the project configured in a repo config file.
+                                 Cannot be used at same time as workspace or dir flags.
+      --verbose                  Append Atlantis log to comment.
+  -w, --workspace string         Switch to this Terraform workspace before planning.
 `
 
 var ApplyUsage = `Usage of apply:
@@ -1064,6 +1109,7 @@ var ApplyUsage = `Usage of apply:
                                    for GitHub)
   -d, --dir string                 Apply the plan for this directory, relative to
                                    root of repo, ex. 'child/dir'.
+  -P, --parallel-pool-size int     Override default parallel pool size for this command
   -p, --project string             Apply the plan for this project. Refers to the
                                    name of the project configured in a repo config
                                    file. Cannot be used at same time as workspace or
