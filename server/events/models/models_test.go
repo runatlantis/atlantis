@@ -159,6 +159,27 @@ func TestNewRepo_HTTPSAuth(t *testing.T) {
 	}, repo)
 }
 
+func TestNewRepo_GitLabSubpath(t *testing.T) {
+	// When GitLab is hosted at a subpath, the clone URL validation should still work
+	repo, err := models.NewRepo(models.Gitlab, "owner/repo", "https://company.com/gitlab/owner/repo.git", "u", "p")
+	Ok(t, err)
+	Equals(t, models.Repo{
+		VCSHost: models.VCSHost{
+			Hostname: "company.com",
+			Type:     models.Gitlab,
+		},
+		SanitizedCloneURL: "https://u:<redacted>@company.com/gitlab/owner/repo.git",
+		CloneURL:          "https://u:p@company.com/gitlab/owner/repo.git",
+		FullName:          "owner/repo",
+		Owner:             "owner",
+		Name:              "repo",
+	}, repo)
+
+	// Should fail if repo name doesn't match
+	_, err = models.NewRepo(models.Gitlab, "owner/repo", "https://company.com/gitlab/owner/different-repo.git", "u", "p")
+	ErrEquals(t, `expected clone url path to end with "/owner/repo.git" but had "/gitlab/owner/different-repo.git"`, err)
+}
+
 func TestProject_String(t *testing.T) {
 	Equals(t, "repofullname=owner/repo path=my/path", (models.Project{
 		RepoFullName: "owner/repo",
@@ -679,7 +700,7 @@ func TestPlanSuccessStats(t *testing.T) {
 		{
 			"with imports",
 			`Terraform used the selected providers to generate the following execution
-			plan. Resource actions are indicated with the following symbols:	
+			plan. Resource actions are indicated with the following symbols:
 			  + create
 			  ~ update in-place
 			  - destroy
