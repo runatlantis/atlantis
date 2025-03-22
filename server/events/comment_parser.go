@@ -340,6 +340,11 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		}
 	}
 
+	if parallelPoolSize < 0 {
+		err := fmt.Sprintf("invalid value for --%s: %d, must be >= 0", ParallelPoolSizeFlagLong, parallelPoolSize)
+		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
+	}
+
 	return CommentParseResult{
 		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, autoMergeMethod, workspace, project, parallelPoolSize, policySet, clearPolicyApproval),
 	}

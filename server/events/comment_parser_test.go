@@ -489,13 +489,12 @@ func TestParse_UsingProjectAtSameTimeAsWorkspaceOrDir(t *testing.T) {
 
 func TestParse_Parsing(t *testing.T) {
 	cases := []struct {
-		flags               string
-		expWorkspace        string
-		expDir              string
-		expVerbose          bool
-		expExtraArgs        string
-		expProject          string
-		expParallelPoolSize int
+		flags        string
+		expWorkspace string
+		expDir       string
+		expVerbose   bool
+		expExtraArgs string
+		expProject   string
 	}{
 		// Test defaults.
 		{
@@ -505,7 +504,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		// Test each short flag individually.
 		{
@@ -515,7 +513,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		{
 			"-d dir",
@@ -524,7 +521,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		{
 			"-p project",
@@ -533,7 +529,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"project",
-			0,
 		},
 		{
 			"--verbose",
@@ -542,16 +537,6 @@ func TestParse_Parsing(t *testing.T) {
 			true,
 			"",
 			"",
-			0,
-		},
-		{
-			"-P 5",
-			"",
-			"",
-			false,
-			"",
-			"",
-			5,
 		},
 		// Test each long flag individually.
 		{
@@ -561,7 +546,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		{
 			"--dir dir",
@@ -570,7 +554,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		{
 			"--project project",
@@ -579,81 +562,64 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"project",
-			0,
-		},
-		{
-			"--parallel-pool-size 10",
-			"",
-			"",
-			false,
-			"",
-			"",
-			10,
 		},
 		// Test all of them with different permutations.
 		{
-			"-w workspace -d dir --verbose -P 3",
+			"-w workspace -d dir --verbose",
 			"workspace",
 			"dir",
 			true,
 			"",
 			"",
-			3,
 		},
 		{
-			"-d dir -w workspace --verbose --parallel-pool-size 7",
+			"-d dir -w workspace --verbose",
 			"workspace",
 			"dir",
 			true,
 			"",
 			"",
-			7,
 		},
 		{
-			"--verbose -w workspace -d dir -P 4",
+			"--verbose -w workspace -d dir",
 			"workspace",
 			"dir",
 			true,
 			"",
 			"",
-			4,
 		},
 		{
-			"-p project --verbose --parallel-pool-size 6",
+			"-p project --verbose",
 			"",
 			"",
 			true,
 			"",
 			"project",
-			6,
 		},
 		{
-			"--verbose -p project -P 8",
+			"--verbose -p project",
 			"",
 			"",
 			true,
 			"",
 			"project",
-			8,
 		},
 		// Test that flags after -- are ignored
 		{
-			"-w workspace -d dir -- --verbose -P 5",
+			"-w workspace -d dir -- --verbose",
 			"workspace",
 			"dir",
 			false,
-			"--verbose -P 5",
+			"--verbose",
 			"",
-			0,
 		},
 		{
-			"-w workspace -- -d dir --verbose --parallel-pool-size 3",
+			"-w workspace -- -d dir --verbose",
 			"workspace",
 			"",
 			false,
-			"-d dir --verbose --parallel-pool-size 3",
+			"-d dir --verbose",
 			"",
-			0,
 		},
 		// Test the extra args parsing.
 		{
@@ -663,35 +629,31 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		{
-			"-w workspace -d dir --verbose -P 4 -- arg one -two --three &&",
+			"-w workspace -d dir --verbose -- arg one -two --three &&",
 			"workspace",
 			"dir",
 			true,
 			"arg one -two --three &&",
 			"",
-			4,
 		},
 		// Test whitespace.
 		{
-			"\t-w\tworkspace\t-d\tdir\t--verbose\t-P\t6\t--\targ\tone\t-two\t--three\t&&",
+			"\t-w\tworkspace\t-d\tdir\t--verbose\t--\targ\tone\t-two\t--three\t&&",
 			"workspace",
 			"dir",
 			true,
 			"arg one -two --three &&",
 			"",
-			6,
 		},
 		{
-			"   -w   workspace   -d   dir   --verbose   -P   5   --   arg   one   -two   --three   &&",
+			"   -w   workspace   -d   dir   --verbose   --   arg   one   -two   --three   &&",
 			"workspace",
 			"dir",
 			true,
 			"arg one -two --three &&",
 			"",
-			5,
 		},
 		// Test that the dir string is normalized.
 		{
@@ -701,7 +663,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		{
 			"-d /adir",
@@ -710,7 +671,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		{
 			"-d .",
@@ -719,7 +679,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		{
 			"-d ./",
@@ -728,7 +687,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		{
 			"-d ./adir",
@@ -737,7 +695,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 		{
 			"-d \"dir with space\"",
@@ -746,7 +703,6 @@ func TestParse_Parsing(t *testing.T) {
 			false,
 			"",
 			"",
-			0,
 		},
 	}
 
@@ -791,6 +747,78 @@ func TestParse_Parsing(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestParse_ParallelPoolSize(t *testing.T) {
+	cases := []struct {
+		command         command.Name
+		flags           string
+		expParallelSize int
+		expError        string
+	}{
+		// Test flag works for plan/apply
+		{
+			command:         command.Plan,
+			flags:           "-P 5",
+			expParallelSize: 5,
+		},
+		{
+			command:         command.Plan,
+			flags:           "--parallel-pool-size 10",
+			expParallelSize: 10,
+		},
+		{
+			command:         command.Apply,
+			flags:           "-P 3",
+			expParallelSize: 3,
+		},
+		{
+			command:         command.Apply,
+			flags:           "--parallel-pool-size 8",
+			expParallelSize: 8,
+		},
+		// Test flag is ignored for other commands
+		{
+			command:  command.ApprovePolicies,
+			flags:    "-P 5",
+			expError: fmt.Sprintf("```\nError: unknown shorthand flag: 'P' in -P.\n%s```", ApprovePolicyUsage),
+		},
+		{
+			command:  command.ApprovePolicies,
+			flags:    "-p project --parallel-pool-size 5",
+			expError: fmt.Sprintf("```\nError: unknown flag: --parallel-pool-size.\n%s```", ApprovePolicyUsage),
+		},
+		// // Test invalid values
+		{
+			command:  command.Plan,
+			flags:    "-P fail",
+			expError: fmt.Sprintf("```\nError: invalid argument \"fail\" for \"-P, --parallel-pool-size\" flag: strconv.ParseInt: parsing \"fail\": invalid syntax.\n%s```", PlanUsage),
+		},
+		{
+			command:  command.Apply,
+			flags:    "--parallel-pool-size -1",
+			expError: fmt.Sprintf("```\nError: invalid value for --parallel-pool-size: -1, must be >= 0.\n%s```", ApplyUsage),
+		},
+	}
+
+	for _, test := range cases {
+		comment := fmt.Sprintf("atlantis %s %s", test.command.String(), test.flags)
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, models.Github)
+
+			if test.expError != "" {
+				Equals(t, test.expError, r.CommentResponse)
+				return
+			}
+
+			Assert(t, r.CommentResponse == "",
+				"expected no error but got %q for comment %q",
+				r.CommentResponse, comment)
+			Assert(t, test.expParallelSize == r.Command.ParallelPoolSize,
+				"exp parallel pool size to equal %v but was %v for comment %q",
+				test.expParallelSize, r.Command.ParallelPoolSize, comment)
+		})
 	}
 }
 
