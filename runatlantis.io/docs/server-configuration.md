@@ -1326,8 +1326,7 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
 
   Defaults to `false`. Strip "Refreshing state..." messages from plan outputs when the result is an error.
-  These messages are always stripped from successful plan output. 
-
+  These messages are always stripped from successful plan output.
 
 ### `--tf-distribution`
 
