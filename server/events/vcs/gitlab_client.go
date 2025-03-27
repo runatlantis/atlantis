@@ -383,10 +383,10 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		!mr.WorkInProgress &&
 		(allowSkippedPipeline || !isPipelineSkipped) {
 
-		logger.Debug("Merge request is mergeable")
+		logger.Debug("Merge request %d is mergeable", mr.IID)
 		return true, nil
 	}
-	logger.Debug("Merge request is not mergeable")
+	logger.Debug("Merge request %d is not mergeable", mr.IID)
 	return false, nil
 }
 
