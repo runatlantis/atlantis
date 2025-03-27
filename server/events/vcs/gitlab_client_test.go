@@ -682,6 +682,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	ciMustPassSuccessMR := 3
 	ciMustPassFailureMR := 4
 	needRebaseMR := 5
+	needsApprovalMR := 6
 
 	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
 	Ok(t, err)
@@ -711,6 +712,13 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			defaultMr,
 			true,
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			needsApprovalMR,
+			false,
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
@@ -816,9 +824,16 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", defaultMr):
 							w.WriteHeader(http.StatusOK)
 							w.Write(pipelineSuccess) // nolint: errcheck
+						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", needsApprovalMR):
+							w.WriteHeader(http.StatusOK)
+							w.Write(pipelineSuccess) // nolint: errcheck
 						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v/approvals", c.mrID):
 							w.WriteHeader(http.StatusOK)
-							response := fmt.Sprintf(`{"id":%v,"name":"%s","rule_type":"regular","report_type":null,"eligible_approvers":[{"id":5,"name":"John Doe","username":"jdoe","state":"active","avatar_url":"https://www.gravatar.com/avatar/0?s=80&d=identicon","web_url":"http://localhost/jdoe"},{"id":50,"name":"Group Member 1","username":"group_member_1","state":"active","avatar_url":"https://www.gravatar.com/avatar/0?s=80&d=identicon","web_url":"http://localhost/group_member_1"}],"approvals_required":0,"users":[{"id":5,"name":"John Doe","username":"jdoe","state":"active","avatar_url":"https://www.gravatar.com/avatar/0?s=80&d=identicon","web_url":"http://localhost/jdoe"}],"contains_hidden_groups":false}`, c.mrID, c.statusName)
+							response := fmt.Sprintf(`{"id":%v,"name":"%s","rule_type":"regular","report_type":null,"eligible_approvers":[{"id":5,"name":"John Doe","username":"jdoe","state":"active","avatar_url":"https://www.gravatar.com/avatar/0?s=80&d=identicon","web_url":"http://localhost/jdoe"},{"id":50,"name":"Group Member 1","username":"group_member_1","state":"active","avatar_url":"https://www.gravatar.com/avatar/0?s=80&d=identicon","web_url":"http://localhost/group_member_1"}],"approvals_required":0,"approvals_left":0,"users":[{"id":5,"name":"John Doe","username":"jdoe","state":"active","avatar_url":"https://www.gravatar.com/avatar/0?s=80&d=identicon","web_url":"http://localhost/jdoe"}],"contains_hidden_groups":false}`, c.mrID, c.statusName)
+							w.Write([]byte(response)) // nolint: errcheck
+						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v/approvals", needsApprovalMR):
+							w.WriteHeader(http.StatusOK)
+							response := fmt.Sprintf(`{"id":%v,"name":"%s","rule_type":"regular","report_type":null,"eligible_approvers":[{"id":5,"name":"John Doe","username":"jdoe","state":"active","avatar_url":"https://www.gravatar.com/avatar/0?s=80&d=identicon","web_url":"http://localhost/jdoe"},{"id":50,"name":"Group Member 1","username":"group_member_1","state":"active","avatar_url":"https://www.gravatar.com/avatar/0?s=80&d=identicon","web_url":"http://localhost/group_member_1"}],"approvals_required":0,"approvals_left":2,"users":[{"id":5,"name":"John Doe","username":"jdoe","state":"active","avatar_url":"https://www.gravatar.com/avatar/0?s=80&d=identicon","web_url":"http://localhost/jdoe"}],"contains_hidden_groups":false}`, needsApprovalMR, c.statusName)
 							w.Write([]byte(response)) // nolint: errcheck
 						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", noHeadPipelineMR):
 							w.WriteHeader(http.StatusOK)
