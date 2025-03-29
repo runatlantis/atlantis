@@ -164,6 +164,7 @@ var testFlags = map[string]interface{}{
 	EnablePolicyChecksFlag:           false,
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,
+	EnableProfilingAPI:               false,
 }
 
 func TestExecute_Defaults(t *testing.T) {
