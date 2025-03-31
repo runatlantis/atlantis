@@ -22,21 +22,21 @@ const atlantisTokenHeader = "X-Atlantis-Token"
 
 type APIController struct {
 	APISecret                      []byte
-	Locker                         locking.Locker
-	Logger                         logging.SimpleLogging
-	Parser                         events.EventParsing
-	ProjectCommandBuilder          events.ProjectCommandBuilder
-	ProjectPlanCommandRunner       events.ProjectPlanCommandRunner
-	ProjectApplyCommandRunner      events.ProjectApplyCommandRunner
+	Locker                         locking.Locker                   `validate:"required"`
+	Logger                         logging.SimpleLogging            `validate:"required"`
+	Parser                         events.EventParsing              `validate:"required"`
+	ProjectCommandBuilder          events.ProjectCommandBuilder     `validate:"required"`
+	ProjectPlanCommandRunner       events.ProjectPlanCommandRunner  `validate:"required"`
+	ProjectApplyCommandRunner      events.ProjectApplyCommandRunner `validate:"required"`
 	FailOnPreWorkflowHookError     bool
-	PreWorkflowHooksCommandRunner  events.PreWorkflowHooksCommandRunner
-	PostWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
-	RepoAllowlistChecker           *events.RepoAllowlistChecker
-	Scope                          tally.Scope
-	VCSClient                      vcs.Client
-	WorkingDir                     events.WorkingDir
-	WorkingDirLocker               events.WorkingDirLocker
-	CommitStatusUpdater            events.CommitStatusUpdater
+	PreWorkflowHooksCommandRunner  events.PreWorkflowHooksCommandRunner  `validate:"required"`
+	PostWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner `validate:"required"`
+	RepoAllowlistChecker           *events.RepoAllowlistChecker          `validate:"required"`
+	Scope                          tally.Scope                           `validate:"required"`
+	VCSClient                      vcs.Client                            `validate:"required"`
+	WorkingDir                     events.WorkingDir                     `validate:"required"`
+	WorkingDirLocker               events.WorkingDirLocker               `validate:"required"`
+	CommitStatusUpdater            events.CommitStatusUpdater            `validate:"required"`
 }
 
 type APIRequest struct {

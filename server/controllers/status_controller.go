@@ -11,9 +11,9 @@ import (
 
 // StatusController handles the status of Atlantis.
 type StatusController struct {
-	Logger          logging.SimpleLogging
-	Drainer         *events.Drainer
-	AtlantisVersion string
+	Logger          logging.SimpleLogging `validate:"required"`
+	Drainer         *events.Drainer       `validate:"required"`
+	AtlantisVersion string                `validate:"required"`
 }
 
 type StatusResponse struct {

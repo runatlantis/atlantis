@@ -27,13 +27,13 @@ type PreWorkflowHooksCommandRunner interface {
 
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
 type DefaultPreWorkflowHooksCommandRunner struct {
-	VCSClient             vcs.Client
-	WorkingDirLocker      WorkingDirLocker
-	WorkingDir            WorkingDir
-	GlobalCfg             valid.GlobalCfg
-	PreWorkflowHookRunner runtime.PreWorkflowHookRunner
-	CommitStatusUpdater   CommitStatusUpdater
-	Router                PreWorkflowHookURLGenerator
+	VCSClient             vcs.Client                    `validate:"required"`
+	WorkingDirLocker      WorkingDirLocker              `validate:"required"`
+	WorkingDir            WorkingDir                    `validate:"required"`
+	GlobalCfg             valid.GlobalCfg               `validate:"required"`
+	PreWorkflowHookRunner runtime.PreWorkflowHookRunner `validate:"required"`
+	CommitStatusUpdater   CommitStatusUpdater           `validate:"required"`
+	Router                PreWorkflowHookURLGenerator   `validate:"required"`
 }
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
