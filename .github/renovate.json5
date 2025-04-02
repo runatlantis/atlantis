@@ -57,6 +57,11 @@
       ],
     },
     {
+      ignorePaths: [
+        'server/controllers/events/testdata/**',
+      ],
+    },
+    {
       matchDatasources: [
         'docker',
       ],
