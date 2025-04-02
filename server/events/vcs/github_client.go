@@ -491,14 +491,30 @@ type WorkflowRun struct {
 	RunNumber githubv4.Int
 }
 
+type CheckSuite struct {
+	Conclusion  githubv4.String
+	WorkflowRun *WorkflowRun
+}
+
+func (original CheckSuite) Copy() CheckSuite {
+	copy := CheckSuite{
+		Conclusion: original.Conclusion,
+	}
+
+	if original.WorkflowRun != nil {
+		copy.WorkflowRun = new(WorkflowRun)
+		*copy.WorkflowRun = *original.WorkflowRun
+	}
+
+	return copy
+}
+
 type CheckRun struct {
 	Name       githubv4.String
 	Conclusion githubv4.String
 	// Not currently used: GitHub API classifies as required if coming from ruleset, even when the ruleset is not enforced!
 	IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
-	CheckSuite struct {
-		WorkflowRun *WorkflowRun
-	}
+	CheckSuite CheckSuite
 }
 
 func (original CheckRun) Copy() CheckRun {
@@ -506,12 +522,9 @@ func (original CheckRun) Copy() CheckRun {
 		Name:       original.Name,
 		Conclusion: original.Conclusion,
 		IsRequired: original.IsRequired,
-		CheckSuite: original.CheckSuite,
+		CheckSuite: original.CheckSuite.Copy(),
 	}
-	if original.CheckSuite.WorkflowRun != nil {
-		copy.CheckSuite.WorkflowRun = new(WorkflowRun)
-		*copy.CheckSuite.WorkflowRun = *original.CheckSuite.WorkflowRun
-	}
+
 	return copy
 }
 

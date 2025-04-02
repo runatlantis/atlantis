@@ -73,6 +73,7 @@
                         "conclusion": "SUCCESS",
                         "isRequired": true,
                         "checkSuite": {
+                          "conclusion": "FAILURE",
                           "workflowRun": {
                             "file": {
                               "path": ".github/workflows/my-required-workflow.yaml",
@@ -89,6 +90,7 @@
                         "conclusion": "FAILURE",
                         "isRequired": true,
                         "checkSuite": {
+                          "conclusion": "FAILURE",
                           "workflowRun": {
                             "file": {
                               "path": ".github/workflows/my-required-workflow.yaml",
