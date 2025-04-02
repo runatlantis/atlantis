@@ -730,6 +730,10 @@ pagination:
 	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, nil
 }
 
+func CheckSuitePassed(checkSuite CheckSuite) bool {
+	return checkSuite.Conclusion == "SUCCESS" || checkSuite.Conclusion == "SKIPPED" || checkSuite.Conclusion == "NEUTRAL"
+}
+
 func CheckRunPassed(checkRun CheckRun) bool {
 	return checkRun.Conclusion == "SUCCESS" || checkRun.Conclusion == "SKIPPED" || checkRun.Conclusion == "NEUTRAL"
 }
@@ -772,11 +776,11 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 }
 
 func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
-	// If there's no WorkflowRun, we just skip evaluation for given CheckRun.
-	// If there is WorkflowRun, we assume there can be multiple checkRuns with the given name,
-	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckRun.
-	latestCheckRunNumber := githubv4.Int(-1)
-	var latestCheckRun *CheckRun
+	// If there's no WorkflowRun, we just skip evaluation for given CheckSuite.
+	// If there is WorkflowRun, we assume there can be multiple checkSuites with the given name,
+	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckSuite.
+	latestCheckSuiteNumber := githubv4.Int(-1)
+	var latestCheckSuite *CheckSuite
 	for _, checkRun := range checkRuns {
 		if checkRun.CheckSuite.WorkflowRun == nil {
 			continue
@@ -786,15 +790,15 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 			return false, err
 		}
 		if match {
-			if checkRun.CheckSuite.WorkflowRun.RunNumber > latestCheckRunNumber {
-				latestCheckRunNumber = checkRun.CheckSuite.WorkflowRun.RunNumber
-				latestCheckRun = &checkRun
+			if checkRun.CheckSuite.WorkflowRun.RunNumber > latestCheckSuiteNumber {
+				latestCheckSuiteNumber = checkRun.CheckSuite.WorkflowRun.RunNumber
+				latestCheckSuite = &checkRun.CheckSuite
 			}
 		}
 	}
 
-	if latestCheckRun != nil {
-		return CheckRunPassed(*latestCheckRun), nil
+	if latestCheckSuite != nil {
+		return CheckSuitePassed(*latestCheckSuite), nil
 	}
 
 	return false, nil
