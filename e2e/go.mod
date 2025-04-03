@@ -5,7 +5,7 @@ go 1.24.1
 require (
 	github.com/google/go-github/v68 v68.0.0
 	github.com/hashicorp/go-multierror v1.1.1
-	gitlab.com/gitlab-org/api/client-go v0.118.0
+	gitlab.com/gitlab-org/api/client-go v0.126.0
 )
 
 require (
@@ -15,5 +15,5 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
+	golang.org/x/time v0.10.0 // indirect
 )
