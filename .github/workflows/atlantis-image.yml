@@ -98,7 +98,7 @@ jobs:
           image=moby/buildkit:v0.14.0
 
     - name: "Install cosign"
-      uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+      uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3.8.1
       if: env.PUSH == 'true' && github.event_name != 'pull_request'
 
     # release version is the name of the tag i.e. v0.10.0
