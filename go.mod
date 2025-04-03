@@ -44,7 +44,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
-	github.com/uber-go/tally/v4 v4.1.16
+	github.com/uber-go/tally/v4 v4.1.17
 	github.com/urfave/negroni/v3 v3.1.1
 	gitlab.com/gitlab-org/api/client-go v0.118.0
 	go.etcd.io/bbolt v1.4.0
