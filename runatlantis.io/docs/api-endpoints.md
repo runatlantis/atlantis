@@ -234,3 +234,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/healthz'
   "status": "ok"
 }
 ```
+
+### GET /debug/pprof
+
+If `--enable-profiling-api` is set to true, it adds endpoints under this path to expose server's profiling data. See [profiling Go programs](https://go.dev/blog/pprof) for more information.
