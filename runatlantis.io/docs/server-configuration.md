@@ -487,18 +487,28 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
   ```
 
-  If set, discard approval if a new plan has been executed. Currently only supported in Github.
+  If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.  
+  Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
 
 ### `--emoji-reaction`
 
   ```bash
-  atlantis server --emoji-reaction thumbsup
+  atlantis server --emoji-reaction eyes
   # or
-  ATLANTIS_EMOJI_REACTION=thumbsup
+  ATLANTIS_EMOJI_REACTION=eyes
   ```
 
   The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
   Defaults to "" (empty string).
+
+  ::: warning NOTE
+  Each VCS provider supports a different list of emojis:
+  
+* [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
+* [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
+* [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
+
+  :::
 
 ### `--enable-diff-markdown-format`
 
