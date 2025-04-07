@@ -580,8 +580,19 @@ func (g *GitlabClient) MarkdownPullLink(pull models.PullRequest) (string, error)
 	return fmt.Sprintf("!%d", pull.Num), nil
 }
 
-func (g *GitlabClient) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
-	// TODO implement
+// DiscardReviews discards all reviews on a pull request
+// This is only available with a bot token and otherwise will return 401 unauthorized
+// https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request
+func (g *GitlabClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+	logger.Debug("Reset approvals for merge request %d", pull.Num)
+	resp, err := g.Client.MergeRequestApprovals.ResetApprovalsOfMergeRequest(repo.FullName, pull.Num)
+	if resp != nil {
+		logger.Debug("PUT /projects/%s/merge_requests/%d/reset_approvals returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+	}
+	if err != nil {
+		return errors.Wrap(err, "unable to reset approvals")
+	}
+
 	return nil
 }
 

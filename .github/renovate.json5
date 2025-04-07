@@ -3,14 +3,15 @@
     'config:best-practices',
     ':separateMultipleMajorReleases',
     'schedule:daily',
+    'security:openssf-scorecard',
   ],
   commitMessageSuffix: ' in {{packageFile}}',
   dependencyDashboardAutoclose: true,
   automerge: true,
   baseBranches: [
     'main',
-    'release-0.31',
     'release-0.32',
+    'release-0.33',
   ],
   platformAutomerge: true,
   labels: [

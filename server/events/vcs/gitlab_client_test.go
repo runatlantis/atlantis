@@ -1289,3 +1289,60 @@ func TestGitlabClient_GetTeamNamesForUser(t *testing.T) {
 		})
 	}
 }
+
+func TestGithubClient_DiscardReviews(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description   string
+		repoFullName  string
+		pullReqeustId int
+		wantErr       bool
+	}{
+		{
+			"success",
+			"runatlantis/atlantis",
+			42,
+			false,
+		},
+		{
+			"error",
+			"runatlantis/atlantis",
+			32,
+			true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/42/reset_approvals":
+						w.WriteHeader(http.StatusOK)
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/32/reset_approvals":
+						http.Error(w, "No bot token", http.StatusUnauthorized)
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &GitlabClient{
+				Client:  internalClient,
+				Version: nil,
+			}
+
+			repo := models.Repo{
+				FullName: c.repoFullName,
+			}
+
+			pr := models.PullRequest{
+				Num: c.pullReqeustId,
+			}
+
+			if err := client.DiscardReviews(logger, repo, pr); (err != nil) != c.wantErr {
+				t.Errorf("DiscardReviews() error = %v", err)
+			}
+		})
+	}
+}
