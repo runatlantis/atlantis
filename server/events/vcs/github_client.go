@@ -468,7 +468,8 @@ func (g *GithubClient) PullIsApproved(logger logging.SimpleLogging, repo models.
 }
 
 // DiscardReviews dismisses all reviews on a pull request
-func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (g *GithubClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+	logger.Debug("Discarding all reviews on GitHub pull request %d", pull.Num)
 	reviewStatus, err := g.getPRReviews(repo, pull)
 	if err != nil {
 		return err
