@@ -23,7 +23,7 @@ import (
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v71/github"
 )
 
 var PullEvent = github.PullRequestEvent{
