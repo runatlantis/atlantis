@@ -90,7 +90,7 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 				ProjectName:      c.ProjectName,
 			}
 			envMap := make(map[string]string)
-			value, err := multiEnvStepRunner.Run(ctx, nil, c.Command, tmpDir, envMap, valid.PostProcessRunOutputShow)
+			value, err := multiEnvStepRunner.Run(ctx, nil, c.Command, tmpDir, envMap, []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow})
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return
