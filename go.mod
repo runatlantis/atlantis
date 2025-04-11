@@ -3,7 +3,7 @@ module github.com/runatlantis/atlantis
 go 1.24.1
 
 require (
-	code.gitea.io/sdk/gitea v0.20.0
+	code.gitea.io/sdk/gitea v0.21.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/alicebob/miniredis/v2 v2.34.0
 	github.com/bmatcuk/doublestar/v4 v4.8.1
@@ -67,7 +67,7 @@ require github.com/twmb/murmur3 v1.1.8 // indirect
 
 require (
 	dario.cat/mergo v1.0.1 // indirect
-	github.com/42wim/httpsig v1.2.1 // indirect
+	github.com/42wim/httpsig v1.2.2 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
