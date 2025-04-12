@@ -1039,6 +1039,16 @@ This is useful when you have many projects and want to keep the pull request cle
 
   Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
 
+### `--redis-cluster-addresses`
+
+  ```bash
+  atlantis server --redis-cluster-addresses="127.0.0.1:6318,127.0.0.1:6319"
+  # or
+  REDIS_CLUSTER_ADDRESSES="127.0.0.1:6318,127.0.0.1:6319"
+  ```
+
+A comma-delimited string containing redis addresses in the format `host:port` when using a Locking DB type of 'redis' and a redis-deployment value of 'cluster'.
+
 ### `--redis-db`
 
   ```bash
@@ -1048,6 +1058,16 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
 
   The Redis Database to use when using a Locking DB type of `redis`. Defaults to `0`.
+
+### `--redis-deployment`
+
+  ```bash
+  atlantis server --redis-deployment="single-node"
+  # or
+  REDIS_DEPLOYMENT="single-node"
+  ```
+
+The deployment type to target when using a Locking DB type of `redis`. (single-node,cluster).
 
 ### `--redis-host`
 
@@ -1102,6 +1122,16 @@ This is useful when you have many projects and want to keep the pull request cle
   ```
 
   Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
+
+### `--redis-username`
+
+  ```bash
+  atlantis server --redis-username="username"
+  # or
+  REDIS_USERNAME="username"
+  ```
+
+The Redis Username for when using a Locking DB type of `redis`.
 
 ### `--repo-allowlist`
 

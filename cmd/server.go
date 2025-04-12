@@ -124,12 +124,15 @@ const (
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
 	PortFlag                         = "port"
+	RedisClusterAddresses            = "redis-cluster-addresses"
 	RedisDB                          = "redis-db"
+	RedisDeployment                  = "redis-deployment"
 	RedisHost                        = "redis-host"
 	RedisPassword                    = "redis-password"
 	RedisPort                        = "redis-port"
 	RedisTLSEnabled                  = "redis-tls-enabled"
 	RedisInsecureSkipVerify          = "redis-insecure-skip-verify"
+	RedisUsername                    = "redis-username"
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
@@ -407,11 +410,21 @@ var stringFlags = map[string]stringFlag{
 		description:  "Namespace for aggregating stats.",
 		defaultValue: DefaultStatsNamespace,
 	},
+	RedisClusterAddresses: {
+		description: "A comma-delimited string containing redis addresses in the format host:port" +
+			"when using a Locking DB type of 'redis' and a redis-deployment value of 'cluster'.",
+	},
+	RedisDeployment: {
+		description: "The deployment type to target when using a Locking DB type of 'redis'. (single-node,cluster)",
+	},
 	RedisHost: {
 		description: "The Redis Hostname for when using a Locking DB type of 'redis'.",
 	},
 	RedisPassword: {
 		description: "The Redis Password for when using a Locking DB type of 'redis'.",
+	},
+	RedisUsername: {
+		description: "The Redis Username for when using a Locking DB type of 'redis'.",
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",

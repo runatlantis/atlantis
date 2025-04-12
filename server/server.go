@@ -51,6 +51,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
@@ -493,7 +494,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
 		logger.Info("Utilizing Redis DB")
-		backend, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
+		redisAddresses := strings.Split(userConfig.RedisClusterAddresses, ",")
+		backend, err = redis.New(
+			userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled,
+			userConfig.RedisInsecureSkipVerify, userConfig.RedisDB, userConfig.RedisDeployment,
+			redisAddresses,
+			userConfig.RedisUsername,
+		)
 		if err != nil {
 			return nil, err
 		}

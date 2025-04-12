@@ -89,7 +89,10 @@ type UserConfig struct {
 	Port                            int    `mapstructure:"port"`
 	QuietPolicyChecks               bool   `mapstructure:"quiet-policy-checks"`
 	RedisDB                         int    `mapstructure:"redis-db"`
+	RedisDeployment                 string `mapstructure:"redis-deployment"`
 	RedisHost                       string `mapstructure:"redis-host"`
+	RedisClusterAddresses           string `mapstructure:"redis-cluster-addresses"`
+	RedisUsername                   string `mapstructure:"redis-username"`
 	RedisPassword                   string `mapstructure:"redis-password"`
 	RedisPort                       int    `mapstructure:"redis-port"`
 	RedisTLSEnabled                 bool   `mapstructure:"redis-tls-enabled"`
