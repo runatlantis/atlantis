@@ -3,6 +3,7 @@
     'config:best-practices',
     ':separateMultipleMajorReleases',
     'schedule:daily',
+    'security:openssf-scorecard',
   ],
   commitMessageSuffix: ' in {{packageFile}}',
   dependencyDashboardAutoclose: true,
