@@ -59,7 +59,10 @@
     },
     {
       ignorePaths: [
-        'server/controllers/events/testdata/**',
+        'server/controllers/events/testdata/**/*.tf',
+      ],
+      matchDatasources: [
+        'terraform',
       ],
     },
     {
