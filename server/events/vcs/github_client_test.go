@@ -1406,7 +1406,7 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 			Username: "testuser",
 		})
 	Ok(t, err)
-	Equals(t, []string{"Frontend Developers", "frontend-developers", "Employees", "employees"}, teams)
+	Equals(t, []string{"frontend-developers", "employees"}, teams)
 }
 
 func TestGithubClient_DiscardReviews(t *testing.T) {

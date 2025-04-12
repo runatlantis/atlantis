@@ -1052,7 +1052,7 @@ func (g *GithubClient) GetTeamNamesForUser(logger logging.SimpleLogging, repo mo
 			return nil, err
 		}
 		for _, edge := range q.Organization.Teams.Edges {
-			teamNames = append(teamNames, edge.Node.Name, edge.Node.Slug)
+			teamNames = append(teamNames, edge.Node.Slug)
 		}
 		if !q.Organization.Teams.PageInfo.HasNextPage {
 			break
