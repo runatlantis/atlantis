@@ -691,9 +691,9 @@ based on the organization or user that triggered the webhook.
   ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, devops-team:apply, devops-team:import"
   ```
 
-  In versions v0.35.0 and later, the GitHub team name can only be a slug.
+  In versions v0.35.0 and later, the GitHub team name can only be a slug because it is immutable.
 
-  In versions v0.34.0 and below, the GitHub team name can be a name or a slug.
+  In versions between v0.21.0 and v0.34.0, the GitHub team name can be a name or a slug.
 
   In versions v0.20.1 and below, the Github team name required the case sensitive team name.
 
