@@ -3,7 +3,6 @@ changelog:
     labels:
       - ignore-for-release
       - github-actions
-      - website
     authors:
       - octocat
   categories:
@@ -19,6 +18,10 @@ changelog:
     - title: Bug fixes 🐛
       labels:
         - bug
+    - title: Documentation
+      labels:
+        - docs
+        - website
     - title: Other Changes 🔄
       labels:
         - "*"
