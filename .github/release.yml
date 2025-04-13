@@ -19,6 +19,9 @@ changelog:
     - title: Bug fixes 🐛
       labels:
         - bug
+    - title: Security changes :lock:
+      labels:
+        - security
     - title: Other Changes 🔄
       labels:
         - "*"
