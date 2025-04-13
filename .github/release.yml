@@ -22,6 +22,9 @@ changelog:
       labels:
         - docs
         - website
+    - title: Dependencies
+      labels:
+        - dependencies
     - title: Other Changes 🔄
       labels:
         - "*"
