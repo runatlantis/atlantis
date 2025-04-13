@@ -3,9 +3,9 @@ changelog:
     labels:
       - ignore-for-release
       - github-actions
+      - website
     authors:
       - octocat
-      - renovate[bot]
   categories:
     - title: Breaking Changes 🛠
       labels:
