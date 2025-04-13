@@ -16,6 +16,18 @@ changelog:
         - Semver-Minor
         - enhancement
         - feature
+    - title: Provider AzureDevops
+      labels:
+        - provider/azuredevops
+    - title: Provider Bitbucket
+      labels:
+        - provider/bitbucket
+    - title: Provider GitHub
+      labels:
+        - provider/github
+    - title: Provider GitLab
+      labels:
+        - provider/gitlab
     - title: Bug fixes 🐛
       labels:
         - bug
