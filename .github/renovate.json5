@@ -32,6 +32,12 @@
     ],
   },
   packageRules: [
+    // This group should reduce a lot of renovate PRs
+    {
+      "groupName": "Mend: high confidence minor and patch dependency updates",
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchConfidence": ["very high", "high"]
+    },
     {
       matchFileNames: [
         'package.json',
