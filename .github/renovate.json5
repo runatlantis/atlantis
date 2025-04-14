@@ -59,6 +59,14 @@
       ],
     },
     {
+      ignorePaths: [
+        'server/controllers/events/testdata/**/*.tf',
+      ],
+      matchDatasources: [
+        'terraform',
+      ],
+    },
+    {
       matchDatasources: [
         'docker',
       ],
