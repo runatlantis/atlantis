@@ -33,10 +33,11 @@
   },
   packageRules: [
     {
+      matchBaseBranches: ['main'],
       matchFileNames: [
         'package.json',
+        'package-lock.json',
       ],
-      enabled: false,
     },
     {
       matchFileNames: [
