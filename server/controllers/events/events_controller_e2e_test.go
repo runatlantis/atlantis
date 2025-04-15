@@ -1368,7 +1368,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	defaultTFDistribution := terraformClient.DefaultDistribution()
 	defaultTFVersion := terraformClient.DefaultVersion()
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := events.NewDefaultWorkingDirLocker(1)
 	parser := &config.ParserValidator{}
 
 	globalCfgArgs := valid.GlobalCfgArgs{

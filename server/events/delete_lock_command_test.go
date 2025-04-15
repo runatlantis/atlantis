@@ -43,7 +43,7 @@ func TestDeleteLock_Success(t *testing.T) {
 	l := lockmocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
 	workingDir := events.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := events.NewDefaultWorkingDirLocker(1)
 	workspace := "workspace"
 	path := "path"
 	projectName := ""
