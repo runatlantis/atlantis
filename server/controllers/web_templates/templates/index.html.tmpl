@@ -79,7 +79,7 @@
           <span class="lock-username">{{.LockedBy}}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
-          <span class="lock-age" title="{{.TimeFormatted }}">{{ .LockAge }}</span>
+          <span class="lock-datetime" title="{{.TimeFormatted }}">{{ .LockAge }}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
           <span><code>Locked</code></span>
@@ -113,7 +113,7 @@
       <span class="pulls-element">{{ if .Pull.Workspace }}<code>{{ .Pull.Workspace }}</code>{{ end }}</span>
       <span class="pulls-element">
       {{ range .JobIDInfos }}
-        <div><span class="lock-age" title="{{ .TimeFormatted }}">{{ .JobAge }}</span></div>
+        <div><span class="lock-datetime" title="{{ .TimeFormatted }}">{{ .JobAge }}</span></div>
       {{ end }}
       </span>
       <span class="pulls-element">
