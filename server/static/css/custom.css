@@ -299,6 +299,9 @@ tbody {
 .lock-datetime {
   color: #999;
 }
+.lock-age {
+  color: #999;
+}
 /* Style for the Pull To Job Mapping Table */
 .pulls-grid{
   display: grid;

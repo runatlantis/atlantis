@@ -30,6 +30,7 @@ type JobIDInfo struct {
 	Time           time.Time
 	TimeFormatted  string
 	JobStep        string
+	JobAge         string
 }
 
 type PullInfoWithJobIDs struct {
