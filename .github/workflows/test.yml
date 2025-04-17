@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
         with:
           egress-policy: audit
 
@@ -53,10 +53,10 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:e0375fc3c99b8e4bb4ddea8917be87bd71eb905b46c1f93c4f530bbdea4305ee
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:ff2a5fb7691d65f9554e69823c55f01c6e34824b9be377199e1b7754ff5fa007
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
         with:
           egress-policy: audit
 
@@ -117,7 +117,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
         with:
           egress-policy: audit
 
@@ -134,7 +134,7 @@ jobs:
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
         with:
           egress-policy: audit
 
@@ -153,7 +153,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/3egBTNd3FM1/ngrok-v3-3.21.0-linux-amd64.tar.gz
+          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/jVjTX7dAozH/ngrok-v3-3.22.1-linux-amd64.tar.gz
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
@@ -176,7 +176,7 @@ jobs:
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
         with:
           egress-policy: audit
 
@@ -195,7 +195,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/3egBTNd3FM1/ngrok-v3-3.21.0-linux-amd64.tar.gz
+          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/jVjTX7dAozH/ngrok-v3-3.22.1-linux-amd64.tar.gz
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
