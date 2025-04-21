@@ -3,14 +3,14 @@
     'config:best-practices',
     ':separateMultipleMajorReleases',
     'schedule:daily',
+    'security:openssf-scorecard',
   ],
   commitMessageSuffix: ' in {{packageFile}}',
   dependencyDashboardAutoclose: true,
   automerge: true,
   baseBranches: [
     'main',
-    'release-0.31',
-    'release-0.32',
+    '/^release-.*/',
   ],
   platformAutomerge: true,
   labels: [
@@ -32,10 +32,11 @@
   },
   packageRules: [
     {
+      matchBaseBranches: ['main'],
       matchFileNames: [
         'package.json',
+        'package-lock.json',
       ],
-      enabled: false,
     },
     {
       matchFileNames: [
@@ -54,6 +55,14 @@
       groupName: 'github-',
       matchPackageNames: [
         '/github-actions/',
+      ],
+    },
+    {
+      ignorePaths: [
+        'server/controllers/events/testdata/**/*.tf',
+      ],
+      matchDatasources: [
+        'terraform',
       ],
     },
     {

@@ -46,7 +46,7 @@ func NewGitlabClient() *GitlabClient {
 	}
 	ownerName := os.Getenv("GITLAB_REPO_OWNER_NAME")
 	if ownerName == "" {
-		ownerName = "run-atlantis"
+		ownerName = "runatlantis"
 	}
 	repoName := os.Getenv("GITLAB_REPO_NAME")
 	if repoName == "" {

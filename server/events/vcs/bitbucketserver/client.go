@@ -197,7 +197,7 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	return approvalStatus, nil
 }
 
-func (b *Client) DiscardReviews(_ models.Repo, _ models.PullRequest) error {
+func (b *Client) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) error {
 	// TODO implement
 	return nil
 }

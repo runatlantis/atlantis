@@ -27,7 +27,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v71/github"
 	. "github.com/petergtz/pegomock/v4"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -1003,7 +1003,7 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	// gets called twice: the first time before the plan starts, the second time after the plan errors
 	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(tmp)
 
-	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[models.Repo](), Any[models.PullRequest]())
+	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
 func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
@@ -1033,7 +1033,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 
-	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[models.Repo](), Any[models.PullRequest]())
+	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
 func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {

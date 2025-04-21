@@ -337,7 +337,7 @@ func (c *GiteaClient) UpdateStatus(logger logging.SimpleLogging, repo models.Rep
 }
 
 // DiscardReviews discards / dismisses all pull request reviews
-func (c *GiteaClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (c *GiteaClient) DiscardReviews(_ logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
 	page := 0
 	nextPage := 1
 
