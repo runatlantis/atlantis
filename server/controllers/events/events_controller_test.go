@@ -1005,7 +1005,10 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	e := events_controllers.VCSEventsController{
 		ExecutableName:                  "atlantis",
+		EmojiReaction:                   "",
 		EmojiReaction:                   "eyes",
+		EmojiRunReaction:                "rocket",
+		EmojiErrorReaction:              "bomb",
 		TestingMode:                     true,
 		Logger:                          logger,
 		Scope:                           scope,

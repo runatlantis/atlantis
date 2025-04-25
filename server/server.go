@@ -977,6 +977,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		RepoAllowlistChecker:            repoAllowlist,
 		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
 		EmojiReaction:                   userConfig.EmojiReaction,
+		EmojiRunReaction:                userConfig.EmojiRunReaction,
+		EmojiErrorReaction:              userConfig.EmojiErrorReaction,
 		ExecutableName:                  userConfig.ExecutableName,
 		SupportedVCSHosts:               supportedVCSHosts,
 		VCSClient:                       vcsClient,
