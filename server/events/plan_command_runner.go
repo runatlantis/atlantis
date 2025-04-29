@@ -178,7 +178,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	if p.DiscardApprovalOnPlan {
-		if err = p.pullUpdater.VCSClient.DiscardReviews(baseRepo, pull); err != nil {
+		if err = p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
 			ctx.Log.Err("failed to remove approvals: %s", err)
 		}
 	}

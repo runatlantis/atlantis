@@ -27,13 +27,13 @@ type PostWorkflowHooksCommandRunner interface {
 
 // DefaultPostWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
 type DefaultPostWorkflowHooksCommandRunner struct {
-	VCSClient              vcs.Client
-	WorkingDirLocker       WorkingDirLocker
-	WorkingDir             WorkingDir
-	GlobalCfg              valid.GlobalCfg
-	PostWorkflowHookRunner runtime.PostWorkflowHookRunner
-	CommitStatusUpdater    CommitStatusUpdater
-	Router                 PostWorkflowHookURLGenerator
+	VCSClient              vcs.Client                     `validate:"required"`
+	WorkingDirLocker       WorkingDirLocker               `validate:"required"`
+	WorkingDir             WorkingDir                     `validate:"required"`
+	GlobalCfg              valid.GlobalCfg                `validate:"required"`
+	PostWorkflowHookRunner runtime.PostWorkflowHookRunner `validate:"required"`
+	CommitStatusUpdater    CommitStatusUpdater            `validate:"required"`
+	Router                 PostWorkflowHookURLGenerator   `validate:"required"`
 }
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
@@ -59,7 +59,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	repoDir, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 	if err != nil {
 		return err
 	}
