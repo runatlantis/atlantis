@@ -1039,9 +1039,9 @@ This is useful when you have many projects and want to keep the pull request cle
 ### `--redis-cluster-addresses`
 
   ```bash
-  atlantis server --redis-cluster-addresses="127.0.0.1:6318,127.0.0.1:6319"
+  atlantis server --redis-cluster-addresses="127.0.0.1:6318,127.0.0.1:6319,redis.cluster.com:6319"
   # or
-  REDIS_CLUSTER_ADDRESSES="127.0.0.1:6318,127.0.0.1:6319"
+  REDIS_CLUSTER_ADDRESSES="127.0.0.1:6318,127.0.0.1:6319,redis.cluster.com:6319"
   ```
 
 A comma-delimited string containing redis addresses in the format `host:port` when using a Locking DB type of 'redis' and a redis-deployment value of 'cluster'.
