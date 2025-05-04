@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-go install golang.org/x/tools/cmd/goimports@latest
+go install golang.org/x/tools/cmd/goimports@v0.29.0
 
 gobin="$(go env GOPATH)/bin"
 declare -r gobin
