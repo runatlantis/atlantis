@@ -1143,6 +1143,35 @@ func (s *Server) waitForDrain() {
 	}
 }
 
+func HumanReadableDuration(d time.Duration) string {
+	if d < time.Minute {
+		return "just now"
+	}
+	if d < time.Hour {
+		mins := int(d.Minutes())
+		return fmt.Sprintf("%d minute%s ago", mins, PluralIfNeeded(mins))
+	}
+	if d < 24*time.Hour {
+		hours := int(d.Hours())
+		return fmt.Sprintf("%d hour%s ago", hours, PluralIfNeeded(hours))
+	}
+
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+
+	if hours == 0 {
+		return fmt.Sprintf("%d day%s ago", days, PluralIfNeeded(days))
+	}
+	return fmt.Sprintf("%d day%s, %d hour%s ago", days, PluralIfNeeded(days), hours, PluralIfNeeded(hours))
+}
+
+func PluralIfNeeded(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
 // Index is the / route.
 func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	locks, err := s.Locker.List()
@@ -1155,6 +1184,8 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	var lockResults []web_templates.LockIndexData
 	for id, v := range locks {
 		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
+		lockDuration := time.Since(v.Time)
+		lockAge := HumanReadableDuration(lockDuration)
 		lockResults = append(lockResults, web_templates.LockIndexData{
 			// NOTE: must use .String() instead of .Path because we need the
 			// query params as part of the lock URL.
@@ -1166,6 +1197,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 			Workspace:     v.Workspace,
 			Time:          v.Time,
 			TimeFormatted: v.Time.Format("2006-01-02 15:04:05"),
+			LockAge:       lockAge,
 		})
 	}
 
@@ -1204,9 +1236,13 @@ func preparePullToJobMappings(s *Server) []jobs.PullInfoWithJobIDs {
 
 	for i := range pullToJobMappings {
 		for j := range pullToJobMappings[i].JobIDInfos {
+	                jobDuration := time.Since(pullToJobMappings[i].JobIDInfos[j].Time)
+		        jobAge := HumanReadableDuration(jobDuration)
 			jobUrl, _ := s.Router.Get(ProjectJobsViewRouteName).URL("job-id", pullToJobMappings[i].JobIDInfos[j].JobID)
+
 			pullToJobMappings[i].JobIDInfos[j].JobIDUrl = jobUrl.String()
 			pullToJobMappings[i].JobIDInfos[j].TimeFormatted = pullToJobMappings[i].JobIDInfos[j].Time.Format("2006-01-02 15:04:05")
+			pullToJobMappings[i].JobIDInfos[j].JobAge = jobAge
 		}
 
 		//Sort by date - newest to oldest.
