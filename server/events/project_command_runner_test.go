@@ -311,7 +311,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	When(mockWorkingDir.HasDiverged(ctx.Log, tmp)).ThenReturn(true)
 
 	res := runner.Apply(ctx)
-	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
+	Equals(t, "Pull request branch must be rebased onto default branch before running apply.", res.Failure)
 }
 
 // Test that it runs the expected apply steps.
