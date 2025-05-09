@@ -34,7 +34,7 @@ func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, c
 			}
 		case raw.UnDivergedRequirement:
 			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
-				return "Default branch must be rebased onto pull request before running plan.", nil
+				return "Pull request branch must be rebased onto default branch before running plan.", nil
 			}
 		}
 	}
@@ -61,7 +61,7 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 			}
 		case raw.UnDivergedRequirement:
 			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
-				return "Default branch must be rebased onto pull request before running apply.", nil
+				return "Pull request branch must be rebased onto default branch before running apply.", nil
 			}
 		}
 	}
