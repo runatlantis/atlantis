@@ -532,6 +532,16 @@ and set `--autoplan-modules` to `false`.
 
   Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](server-side-repo-config.md#reference).
 
+### `--enable-profiling-api`
+
+  ```bash
+  atlantis server --enable-profiling-api
+  # or
+  ATLANTIS_ENABLE_PROFILING_API=true
+  ```
+
+  Enable [`net/http/pprof`](https://pkg.go.dev/net/http/pprof) endpoints for [continuous profiling](https://grafana.com/docs/pyroscope/latest/introduction/continuous-profiling/) of resources used by the server. See [profiling Go programs](https://go.dev/blog/pprof) for more information.
+
 ### `--enable-regexp-cmd`
 
   ```bash
