@@ -830,6 +830,7 @@ based on the organization or user that triggered the webhook.
 
   ::: warning NOTE
   Atlantis needs to be able to view the listed group members, inaccessible or non-existent groups are silently ignored.
+  :::
 
 ### `--gitlab-hostname`
 
