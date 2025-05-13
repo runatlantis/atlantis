@@ -84,12 +84,12 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 		{
 			"random characters",
 			"slkjds",
-			"yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into",
+			"string was used where mapping is expected",
 		},
 		{
 			"just a colon",
 			":",
-			"yaml: did not find expected key",
+			"unexpected key name",
 		},
 	}
 
