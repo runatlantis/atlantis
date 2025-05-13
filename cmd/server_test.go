@@ -24,10 +24,10 @@ import (
 	"strings"
 	"testing"
 
+	yaml "github.com/goccy/go-yaml"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	yaml "github.com/goccy/go-yaml"
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
