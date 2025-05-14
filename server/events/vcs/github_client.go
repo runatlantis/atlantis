@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/gofri/go-github-ratelimit/github_ratelimit"
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v71/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -430,7 +430,8 @@ func (g *GithubClient) PullIsApproved(logger logging.SimpleLogging, repo models.
 }
 
 // DiscardReviews dismisses all reviews on a pull request
-func (g *GithubClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (g *GithubClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+	logger.Debug("Discarding all reviews on GitHub pull request %d", pull.Num)
 	reviewStatus, err := g.getPRReviews(repo, pull)
 	if err != nil {
 		return err
@@ -1051,7 +1052,7 @@ func (g *GithubClient) GetTeamNamesForUser(logger logging.SimpleLogging, repo mo
 			return nil, err
 		}
 		for _, edge := range q.Organization.Teams.Edges {
-			teamNames = append(teamNames, edge.Node.Name, edge.Node.Slug)
+			teamNames = append(teamNames, edge.Node.Slug)
 		}
 		if !q.Organization.Teams.PageInfo.HasNextPage {
 			break
