@@ -31,6 +31,17 @@
     ],
   },
   packageRules: [
+    // enable release branches for security updates
+    {
+      matchBranch: ['/^release-.*/'],
+      matchUpdateTypes: ['security'],
+      enabled: true
+    },
+    // disable release branches for anything else
+    {
+      matchBranch: ['/^release-.*/'],
+      enabled: false
+    },
     {
       matchBaseBranches: ['main'],
       matchFileNames: [
