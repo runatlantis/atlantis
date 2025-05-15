@@ -11,23 +11,27 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 var ctx = context.Background()
 
-// Redis is a database using Redis 6
+// RedisDB is a database using Redis 6
 type RedisDB struct { // nolint: revive
-	client *redis.Client
+	client redis.Cmdable
 }
 
 const (
-	pullKeySeparator = "::"
+	pullKeySeparator     = "::"
+	singleNodeDeployment = "single-node"
+	clusterDeployment    = "cluster"
 )
 
-func New(hostname string, port int, password string, tlsEnabled bool, insecureSkipVerify bool, db int) (*RedisDB, error) {
-	var rdb *redis.Client
+// New returns a RedisDB for client interactions with redis.
+func New(hostname string, port int, password string, tlsEnabled, insecureSkipVerify bool, db int, deployment string, addresses []string, username string) (*RedisDB, error) {
+	var rdb redis.Cmdable
 
 	var tlsConfig *tls.Config
 	if tlsEnabled {
@@ -37,12 +41,32 @@ func New(hostname string, port int, password string, tlsEnabled bool, insecureSk
 		}
 	}
 
-	rdb = redis.NewClient(&redis.Options{
-		Addr:      fmt.Sprintf("%s:%d", hostname, port),
-		Password:  password,
-		DB:        db,
-		TLSConfig: tlsConfig,
-	})
+	address := fmt.Sprintf("%s:%d", hostname, port)
+	switch strings.ToLower(deployment) {
+	case singleNodeDeployment:
+		rdb = redis.NewClient(&redis.Options{
+			Addr:      address,
+			Username:  username,
+			Password:  password,
+			DB:        db,
+			TLSConfig: tlsConfig,
+		})
+	case clusterDeployment:
+		rdb = redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:     addresses,
+			Username:  username,
+			Password:  password,
+			TLSConfig: tlsConfig,
+		})
+	default:
+		rdb = redis.NewClient(&redis.Options{
+			Addr:      address,
+			Username:  username,
+			Password:  password,
+			DB:        db,
+			TLSConfig: tlsConfig,
+		})
+	}
 
 	// Check if connection is valid
 	err := rdb.Ping(ctx).Err()
