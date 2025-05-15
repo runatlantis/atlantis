@@ -55,6 +55,8 @@ type Config struct {
 	Event          string
 	WorkspaceRegex string
 	BranchRegex    string
+	ProjectRegex   string
+	DirectoryRegex string
 	Kind           string
 	Channel        string
 	URL            string
@@ -76,6 +78,14 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 		if err != nil {
 			return nil, err
 		}
+		pr, err := regexp.Compile(c.ProjectRegex)
+		if err != nil {
+			return nil, err
+		}
+		dr, err := regexp.Compile(c.DirectoryRegex)
+		if err != nil {
+			return nil, err
+		}
 		if c.Kind == "" || c.Event == "" {
 			return nil, errors.New("must specify \"kind\" and \"event\" keys for webhooks")
 		}
@@ -90,7 +100,7 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 			if c.Channel == "" {
 				return nil, errors.New("must specify \"channel\" if using a webhook of \"kind: slack\"")
 			}
-			slack, err := NewSlack(wr, br, c.Channel, clients.Slack)
+			slack, err := NewSlack(wr, br, pr, dr, c.Channel, clients.Slack)
 			if err != nil {
 				return nil, err
 			}
@@ -103,6 +113,8 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 				Client:         clients.Http,
 				WorkspaceRegex: wr,
 				BranchRegex:    br,
+				ProjectRegex:   pr,
+				DirectoryRegex: dr,
 				URL:            c.URL,
 			}
 			webhooks = append(webhooks, httpWebhook)
