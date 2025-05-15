@@ -1,6 +1,8 @@
 package utils
 
-import "os"
+import (
+	"os"
+)
 
 // RemoveIgnoreNonExistent removes a file, ignoring if it doesn't exist.
 func RemoveIgnoreNonExistent(file string) error {
