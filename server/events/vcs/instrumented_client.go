@@ -217,7 +217,13 @@ func (c *InstrumentedClient) UpdateStatus(logger logging.SimpleLogging, repo mod
 
 	if err := c.Client.UpdateStatus(logger, repo, pull, state, src, description, url); err != nil {
 		executionError.Inc(1)
-		logger.Err("Unable to update status at url: %s, error: %s", url, err.Error())
+		if url == "" && src != "" {
+			logger.Err("Unable to update status (from '%s'), error: %s", src, err.Error())
+		} else if url != "" {
+			logger.Err("Unable to update status at url: %s, error: %s", url, err.Error())
+		} else {
+			logger.Err("Unable to update status, error: %s", err.Error())
+		}
 		return err
 	}
 
