@@ -26,11 +26,12 @@ import (
 )
 
 var commentParser = events.CommentParser{
-	GithubUser:     "github-user",
-	GitlabUser:     "gitlab-user",
-	GiteaUser:      "gitea-user",
-	ExecutableName: "atlantis",
-	AllowCommands:  command.AllCommentCommands,
+	GithubUser:              "github-user",
+	GitlabUser:              "gitlab-user",
+	GiteaUser:               "gitea-user",
+	ExecutableName:          "atlantis",
+	AllowCommands:           command.AllCommentCommands,
+	DisableDidYouMeanPrompt: false,
 }
 
 func TestNewCommentParser(t *testing.T) {
@@ -70,7 +71,7 @@ func TestNewCommentParser(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.giteaUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands), "NewCommentParser(%v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
+			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.giteaUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands, false), "NewCommentParser(%v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
 		})
 	}
 }
@@ -306,6 +307,7 @@ func TestParse_InvalidCommand(t *testing.T) {
 			command.Plan,
 			command.Apply, // duplicate command is filtered
 		},
+		false,
 	)
 	for _, c := range comments {
 		r := cp.Parse(c, models.Github)
@@ -1105,3 +1107,34 @@ var ImportUsage = `Usage of import ADDRESS ID:
       --verbose            Append Atlantis log to comment.
   -w, --workspace string   Switch to this Terraform workspace before importing.
 `
+
+func TestParse_DidYouMeanAtlantisWhenDisabled(t *testing.T) {
+	t.Log("given a comment that would normally result in a 'did you mean atlantis' response" +
+		" but the feature is disabled, should set CommentParseResult.Ignore to true")
+
+	disabledCommentParser := events.NewCommentParser(
+		"github-user",
+		"gitlab-user",
+		"gitea-user",
+		"bitbucket-user",
+		"azure-devops-user",
+		"atlantis",
+		command.AllCommentCommands,
+		true, // disable did you mean prompt
+	)
+
+	comments := []string{
+		"terraform",
+		"terraform help",
+		"terraform --help",
+		"terraform -h",
+		"terraform plan",
+		"terraform apply",
+		"terraform plan -w workspace -d . -- test",
+	}
+	for _, c := range comments {
+		r := disabledCommentParser.Parse(c, models.Github)
+		Assert(t, r.Ignore == true,
+			"For comment %q expected Ignore==true but got %v", c, r.Ignore)
+	}
+}
