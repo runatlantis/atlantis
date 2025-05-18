@@ -71,6 +71,7 @@ func (r *RunStepRunner) Run(
 		"PULL_NUM":                        fmt.Sprintf("%d", ctx.Pull.Num),
 		"PULL_URL":                        ctx.Pull.URL,
 		"REPO_REL_DIR":                    ctx.RepoRelDir,
+		"TF_APPEND_USER_AGENT":            fmt.Sprintf("Atlantis (+%s; %s; %s)", ctx.Pull.URL, ctx.Pull.HeadCommit, ctx.User.Username),
 		"USER_NAME":                       ctx.User.Username,
 		"WORKSPACE":                       ctx.Workspace,
 	}

@@ -99,6 +99,10 @@ func TestRunStepRunner_Run(t *testing.T) {
 			Command: "echo args=$COMMENT_ARGS",
 			ExpOut:  "args=-target=resource1,-target=resource2\n",
 		},
+		{
+			Command: "echo tf_append_user_agent=$TF_APPEND_USER_AGENT",
+			ExpOut:  "tf_append_user_agent=Atlantis (+https://github.com/runatlantis/atlantis/pull/2; 12345abcdef; acme-user)\n",
+		},
 	}
 	for _, customPolicyCheck := range []bool{false, true} {
 		for _, c := range cases {
