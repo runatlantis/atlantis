@@ -101,7 +101,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 		},
 		{
 			Command: "echo tf_append_user_agent=$TF_APPEND_USER_AGENT",
-			ExpOut:  "tf_append_user_agent=Atlantis (+https://github.com/runatlantis/atlantis/pull/2; 12345abcdef; acme-user)\n",
+			ExpOut:  "tf_append_user_agent=Atlantis (policy_check; myworkspace; mydir; acme-user; 12345abcdef; +https://github.com/runatlantis/atlantis/pull/2)\n",
 		},
 	}
 	for _, customPolicyCheck := range []bool{false, true} {
@@ -144,6 +144,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 			}
 			t.Run(fmt.Sprintf("%s_CustomPolicyCheck=%v", c.Command, customPolicyCheck), func(t *testing.T) {
 				ctx := command.ProjectContext{
+					CommandName: command.PolicyCheck,
 					BaseRepo: models.Repo{
 						Name:  "basename",
 						Owner: "baseowner",
