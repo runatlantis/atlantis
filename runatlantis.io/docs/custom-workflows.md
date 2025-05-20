@@ -645,6 +645,10 @@ Full
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
+  * `TF_APPEND_USER_AGENT` - Many Terraform providers inject this environment variable into the `User-Agent` header when performing HTTP requests.
+      The default value contains "Atlantis", the PR URL, HEAD commit SHA, and the user who executed the Atlantis command, ex: `Atlantis (+https://github.com/runatlantis/atlantis/pull/5588; f3bbbd66a63d4bf1747940578ec3d0103530e21d; lyoung-confluent)`
+      This makes it easier to correlate actions in provider audit logs (ex: AWS CloudTrail) with the related PR/commit that caused the modification.
+      If you wish to override this environment variable to include other fields (ex: the PR Author), you can add a custom `env` step which will take precedence.
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
