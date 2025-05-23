@@ -439,6 +439,16 @@ and set `--autoplan-modules` to `false`.
 
   If `disable-autoplan` property is `true`, this flag has no effect.
 
+### `--disable-did-you-mean-prompt`
+
+  ```bash
+  atlantis server --disable-did-you-mean-prompt
+  # or
+  ATLANTIS_DISABLE_DID_YOU_MEAN_PROMPT=true
+  ```
+
+  Disable the "Did you mean atlantis?" comment when users type 'terraform' instead of 'atlantis'.
+
 ### `--disable-global-apply-lock`
 
   ```bash

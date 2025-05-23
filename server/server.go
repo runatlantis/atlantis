@@ -610,6 +610,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AzureDevopsUser,
 		userConfig.ExecutableName,
 		allowCommands,
+		userConfig.DisableDidYouMeanPrompt,
 	)
 	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()
