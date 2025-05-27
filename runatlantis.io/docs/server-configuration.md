@@ -241,6 +241,20 @@ and set `--autoplan-modules` to `false`.
 
   Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
 
+::: warning COMPATIBILITY WARNING
+If you are affected by this change [docs](https://learn.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#administration)
+or this [issue](https://github.com/runatlantis/atlantis/issues/5595)
+both Service Hooks (v1 & v2) will convert the AD Organization name to lowercase:
+Examples: 
+`https://dev.azure.com/MYCompany/` & `https://mycompany.visualstudio.com/` will be converted to `mycompany`
+`https://dev.azure.com/MYCOMPANY/` & `https://myCOMPANY.visualstudio.com/` will be converted to `mycompany`
+
+This [change](https://github.com/runatlantis/atlantis/pull/5596) will be applied from version v0.35.0
+
+What to do if you have pending plans that were generated with a previous version?
+Running an atlantis unlock from v0.35.0 on your current PRs will ignore the files on the `MYCompany` folder. On the next atlantis plan will use the `mycompany` folder and generate everything in the new folder name
+:::
+
 ### `--azuredevops-token`
 
   ```bash
