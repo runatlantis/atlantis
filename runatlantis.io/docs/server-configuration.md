@@ -245,7 +245,7 @@ and set `--autoplan-modules` to `false`.
 If you are affected by this change [docs](https://learn.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#administration)
 or this [issue](https://github.com/runatlantis/atlantis/issues/5595)
 both Service Hooks (v1 & v2) will convert the AD Organization name to lowercase:
-Examples: 
+Examples:
 `https://dev.azure.com/MYCompany/` & `https://mycompany.visualstudio.com/` will be converted to `mycompany`
 `https://dev.azure.com/MYCOMPANY/` & `https://myCOMPANY.visualstudio.com/` will be converted to `mycompany`
 
