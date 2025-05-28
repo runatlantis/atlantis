@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - name: Harden Runner
-      uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+      uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
       with:
         egress-policy: audit
 
@@ -19,12 +19,12 @@ jobs:
       with:
         submodules: true
 
-    - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5
+    - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
       with:
         go-version-file: go.mod
 
     - name: Run GoReleaser for stable release
-      uses: goreleaser/goreleaser-action@9ed2f89a662bf1735a48bc8557fd212fa902bebf # v6
+      uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6
       if: (!contains(github.ref, 'pre'))
       with:
         # You can pass flags to goreleaser via GORELEASER_ARGS
