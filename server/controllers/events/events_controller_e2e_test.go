@@ -1492,6 +1492,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
 		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
 		RunStepRunner: &runtime.RunStepRunner{
+			AtlantisVersion:         "1.2.3",
 			TerraformExecutor:       terraformClient,
 			DefaultTFDistribution:   defaultTFDistribution,
 			DefaultTFVersion:        defaultTFVersion,

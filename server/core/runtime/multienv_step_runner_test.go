@@ -75,6 +75,7 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 	Ok(t, err)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	runStepRunner := runtime.RunStepRunner{
+		AtlantisVersion:         "1.2.3",
 		TerraformExecutor:       tfClient,
 		DefaultTFDistribution:   tfDistribution,
 		DefaultTFVersion:        tfVersion,
