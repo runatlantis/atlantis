@@ -666,21 +666,30 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 
+	// Render the applyout and err variables for use in both webhook + function return
+	if err != nil {
+		err = fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		applyOut = fmt.Sprint(err)
+	} else {
+		applyOut = strings.Join(outputs, "\n")
+	}
+
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
-		Workspace:   ctx.Workspace,
-		User:        ctx.User,
-		Repo:        ctx.Pull.BaseRepo,
-		Pull:        ctx.Pull,
-		Success:     err == nil,
-		Directory:   ctx.RepoRelDir,
-		ProjectName: ctx.ProjectName,
+		Workspace:     ctx.Workspace,
+		User:          ctx.User,
+		Repo:          ctx.Pull.BaseRepo,
+		Pull:          ctx.Pull,
+		Success:       err == nil,
+		Directory:     ctx.RepoRelDir,
+		ProjectName:   ctx.ProjectName,
+		ResultMessage: applyOut,
 	})
 
 	if err != nil {
-		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		return "", "", err
 	}
 
-	return strings.Join(outputs, "\n"), "", nil
+	return applyOut, "", nil
 }
 
 func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (versionOut string, failure string, err error) {
