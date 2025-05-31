@@ -20,22 +20,51 @@ type HttpWebhook struct {
 	URL            string
 }
 
-// Send sends the webhook to URL if workspace and branch matches their respective regex.
-func (h *HttpWebhook) Send(_ logging.SimpleLogging, applyResult ApplyResult) error {
+// SendApplyResult sends the apply webhook to URL if workspace and branch matches their respective regex.
+func (h *HttpWebhook) SendApplyResult(_ logging.SimpleLogging, applyResult ApplyResult) error {
 	if !h.WorkspaceRegex.MatchString(applyResult.Workspace) || !h.BranchRegex.MatchString(applyResult.Pull.BaseBranch) {
 		return nil
 	}
-	if err := h.doSend(applyResult); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("sending webhook to %q", h.URL))
+	if err := h.doSendApplyResult(applyResult); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("sending apply webhook to %q", h.URL))
 	}
 	return nil
 }
 
-func (h *HttpWebhook) doSend(applyResult ApplyResult) error {
+// SendPlanResult sends the plan webhook to URL if workspace and branch matches their respective regex.
+func (h *HttpWebhook) SendPlanResult(_ logging.SimpleLogging, planResult PlanResult) error {
+	if !h.WorkspaceRegex.MatchString(planResult.Workspace) || !h.BranchRegex.MatchString(planResult.Pull.BaseBranch) {
+		return nil
+	}
+	if err := h.doSendPlanResult(planResult); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("sending plan webhook to %q", h.URL))
+	}
+	return nil
+}
+
+// Send is kept for backward compatibility.
+// Deprecated: Use SendApplyResult instead.
+func (h *HttpWebhook) Send(log logging.SimpleLogging, applyResult ApplyResult) error {
+	return h.SendApplyResult(log, applyResult)
+}
+
+func (h *HttpWebhook) doSendApplyResult(applyResult ApplyResult) error {
 	body, err := json.Marshal(applyResult)
 	if err != nil {
 		return err
 	}
+	return h.sendRequest(body)
+}
+
+func (h *HttpWebhook) doSendPlanResult(planResult PlanResult) error {
+	body, err := json.Marshal(planResult)
+	if err != nil {
+		return err
+	}
+	return h.sendRequest(body)
+}
+
+func (h *HttpWebhook) sendRequest(body []byte) error {
 	req, err := http.NewRequest("POST", h.URL, bytes.NewBuffer(body))
 	if err != nil {
 		return err

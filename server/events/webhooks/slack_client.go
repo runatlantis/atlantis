@@ -31,6 +31,7 @@ type SlackClient interface {
 	AuthTest() error
 	TokenIsSet() bool
 	PostMessage(channel string, applyResult ApplyResult) error
+	PostPlanMessage(channel string, planResult PlanResult) error
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_underlying_slack_client.go UnderlyingSlackClient
@@ -65,7 +66,7 @@ func (d *DefaultSlackClient) TokenIsSet() bool {
 }
 
 func (d *DefaultSlackClient) PostMessage(channel string, applyResult ApplyResult) error {
-	attachments := d.createAttachments(applyResult)
+	attachments := d.createApplyAttachments(applyResult)
 	_, _, err := d.Slack.PostMessage(
 		channel,
 		slack.MsgOptionAsUser(true),
@@ -75,7 +76,18 @@ func (d *DefaultSlackClient) PostMessage(channel string, applyResult ApplyResult
 	return err
 }
 
-func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.Attachment {
+func (d *DefaultSlackClient) PostPlanMessage(channel string, planResult PlanResult) error {
+	attachments := d.createPlanAttachments(planResult)
+	_, _, err := d.Slack.PostMessage(
+		channel,
+		slack.MsgOptionAsUser(true),
+		slack.MsgOptionText("", false),
+		slack.MsgOptionAttachments(attachments[0]),
+	)
+	return err
+}
+
+func (d *DefaultSlackClient) createApplyAttachments(applyResult ApplyResult) []slack.Attachment {
 	var colour string
 	var successWord string
 	if applyResult.Success {
@@ -110,6 +122,53 @@ func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.
 			{
 				Title: "User",
 				Value: applyResult.User.Username,
+				Short: true,
+			},
+			{
+				Title: "Directory",
+				Value: directory,
+				Short: true,
+			},
+		},
+	}
+	return []slack.Attachment{attachment}
+}
+
+func (d *DefaultSlackClient) createPlanAttachments(planResult PlanResult) []slack.Attachment {
+	var colour string
+	var successWord string
+	if planResult.Success {
+		colour = slackSuccessColour
+		successWord = "succeeded"
+	} else {
+		colour = slackFailureColour
+		successWord = "failed"
+	}
+
+	text := fmt.Sprintf("Plan %s for <%s|%s>", successWord, planResult.Pull.URL, planResult.Repo.FullName)
+	directory := planResult.Directory
+	// Since "." looks weird, replace it with "/" to make it clear this is the root.
+	if directory == "." {
+		directory = "/"
+	}
+
+	attachment := slack.Attachment{
+		Color: colour,
+		Text:  text,
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Workspace",
+				Value: planResult.Workspace,
+				Short: true,
+			},
+			{
+				Title: "Branch",
+				Value: planResult.Pull.BaseBranch,
+				Short: true,
+			},
+			{
+				Title: "User",
+				Value: planResult.User.Username,
 				Short: true,
 			},
 			{

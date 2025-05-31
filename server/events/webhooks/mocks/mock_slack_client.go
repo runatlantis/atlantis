@@ -55,6 +55,21 @@ func (mock *MockSlackClient) PostMessage(channel string, applyResult webhooks.Ap
 	return _ret0
 }
 
+func (mock *MockSlackClient) PostPlanMessage(channel string, planResult webhooks.PlanResult) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockSlackClient().")
+	}
+	_params := []pegomock.Param{channel, planResult}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("PostPlanMessage", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(error)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockSlackClient) TokenIsSet() bool {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSlackClient().")
@@ -130,6 +145,12 @@ func (verifier *VerifierMockSlackClient) PostMessage(channel string, applyResult
 	return &MockSlackClient_PostMessage_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
+func (verifier *VerifierMockSlackClient) PostPlanMessage(channel string, planResult webhooks.PlanResult) *MockSlackClient_PostPlanMessage_OngoingVerification {
+	_params := []pegomock.Param{channel, planResult}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "PostPlanMessage", _params, verifier.timeout)
+	return &MockSlackClient_PostPlanMessage_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
 type MockSlackClient_PostMessage_OngoingVerification struct {
 	mock              *MockSlackClient
 	methodInvocations []pegomock.MethodInvocation
@@ -153,6 +174,35 @@ func (c *MockSlackClient_PostMessage_OngoingVerification) GetAllCapturedArgument
 			_param1 = make([]webhooks.ApplyResult, len(c.methodInvocations))
 			for u, param := range _params[1] {
 				_param1[u] = param.(webhooks.ApplyResult)
+			}
+		}
+	}
+	return
+}
+
+type MockSlackClient_PostPlanMessage_OngoingVerification struct {
+	mock              *MockSlackClient
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockSlackClient_PostPlanMessage_OngoingVerification) GetCapturedArguments() (string, webhooks.PlanResult) {
+	channel, planResult := c.GetAllCapturedArguments()
+	return channel[len(channel)-1], planResult[len(planResult)-1]
+}
+
+func (c *MockSlackClient_PostPlanMessage_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []webhooks.PlanResult) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]webhooks.PlanResult, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(webhooks.PlanResult)
 			}
 		}
 	}

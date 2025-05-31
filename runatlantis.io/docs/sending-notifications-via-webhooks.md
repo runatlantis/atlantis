@@ -1,22 +1,25 @@
 # Sending notifications via webhooks
 
-It is possible to send notifications to external systems whenever an apply is being done.
+It is possible to send notifications to external systems whenever a plan or apply is being done.
 
 You can make requests to any HTTP endpoint or send messages directly to your Slack channel.
 
 ::: tip NOTE
-Currently only `apply` events are supported.
+Both `plan` and `apply` events are supported.
 :::
 
 ## Configuration
 
 Webhooks are configured in Atlantis [server-side configuration](server-configuration.md).
 There can be many webhooks: sending notifications to different destinations or for different
-workspaces/branches. Here is example configuration to send Slack messages for every apply:
+workspaces/branches. Here is example configuration to send Slack messages for every plan and apply:
 
 ```yaml
 webhooks:
 - event: apply
+  kind: slack
+  channel: my-channel-id
+- event: plan
   kind: slack
   channel: my-channel-id
 ```
@@ -53,18 +56,23 @@ webhooks:
 - event: apply
   kind: http
   url: https://example.com/hooks
+- event: plan
+  kind: http
+  url: https://example.com/hooks
 ```
 
-The `apply` event information will be POSTed to `https://example.com/hooks`.
+The `apply` and `plan` event information will be POSTed to `https://example.com/hooks`.
 
 You can supply any additional headers with `--webhook-http-headers` parameter (or environment variable),
 for example for authentication purposes. See [webhook-http-headers](server-configuration.md#webhook-http-headers) for details.
 
 ### JSON payload
 
-The payload is a JSON-marshalled [ApplyResult](https://pkg.go.dev/github.com/runatlantis/atlantis/server/events/webhooks#ApplyResult) struct.
+For apply events, the payload is a JSON-marshalled [ApplyResult](https://pkg.go.dev/github.com/runatlantis/atlantis/server/events/webhooks#ApplyResult) struct.
 
-Example payload:
+For plan events, the payload is a JSON-marshalled [PlanResult](https://pkg.go.dev/github.com/runatlantis/atlantis/server/events/webhooks#PlanResult) struct, which has the same structure as ApplyResult.
+
+Example payload for an apply event:
 
 ```json
 {
@@ -105,7 +113,7 @@ Example payload:
     "Teams": null
   },
   "Success": true,
-  "Directory": "terraform/example", 
+  "Directory": "terraform/example",
   "ProjectName": "example-project"
 }
 ```
@@ -146,6 +154,9 @@ In your Atlantis [server-side configuration](server-configuration.md) you can no
 ```yaml
 webhooks:
 - event: apply
+  kind: slack
+  channel: my-channel-id
+- event: plan
   kind: slack
   channel: my-channel-id
 ```

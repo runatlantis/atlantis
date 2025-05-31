@@ -26,13 +26,28 @@ import (
 const SlackKind = "slack"
 const HttpKind = "http"
 const ApplyEvent = "apply"
+const PlanEvent = "plan"
 
 //go:generate pegomock generate --package mocks -o mocks/mock_sender.go Sender
 
 // Sender sends webhooks.
 type Sender interface {
-	// Send sends the webhook (if the implementation thinks it should).
-	Send(log logging.SimpleLogging, applyResult ApplyResult) error
+	// SendApplyResult sends the apply webhook (if the implementation thinks it should).
+	SendApplyResult(log logging.SimpleLogging, applyResult ApplyResult) error
+
+	// SendPlanResult sends the plan webhook (if the implementation thinks it should).
+	SendPlanResult(log logging.SimpleLogging, planResult PlanResult) error
+}
+
+// PlanResult is the result of a terraform plan.
+type PlanResult struct {
+	Workspace   string
+	Repo        models.Repo
+	Pull        models.PullRequest
+	User        models.User
+	Success     bool
+	Directory   string
+	ProjectName string
 }
 
 // ApplyResult is the result of a terraform apply.
@@ -79,8 +94,8 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 		if c.Kind == "" || c.Event == "" {
 			return nil, errors.New("must specify \"kind\" and \"event\" keys for webhooks")
 		}
-		if c.Event != ApplyEvent {
-			return nil, fmt.Errorf("\"event: %s\" not supported. Only \"event: %s\" is supported right now", c.Event, ApplyEvent)
+		if c.Event != ApplyEvent && c.Event != PlanEvent {
+			return nil, fmt.Errorf("\"event: %s\" not supported. Only \"event: %s\" and \"event: %s\" are supported right now", c.Event, ApplyEvent, PlanEvent)
 		}
 		switch c.Kind {
 		case SlackKind:
@@ -116,12 +131,28 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 	}, nil
 }
 
-// Send sends the webhook using its Webhooks.
-func (w *MultiWebhookSender) Send(log logging.SimpleLogging, result ApplyResult) error {
+// SendApplyResult sends the apply webhook using its Webhooks.
+func (w *MultiWebhookSender) SendApplyResult(log logging.SimpleLogging, result ApplyResult) error {
 	for _, w := range w.Webhooks {
-		if err := w.Send(log, result); err != nil {
-			log.Warn("error sending webhook: %s", err)
+		if err := w.SendApplyResult(log, result); err != nil {
+			log.Warn("error sending apply webhook: %s", err)
 		}
 	}
 	return nil
+}
+
+// SendPlanResult sends the plan webhook using its Webhooks.
+func (w *MultiWebhookSender) SendPlanResult(log logging.SimpleLogging, result PlanResult) error {
+	for _, w := range w.Webhooks {
+		if err := w.SendPlanResult(log, result); err != nil {
+			log.Warn("error sending plan webhook: %s", err)
+		}
+	}
+	return nil
+}
+
+// Send is kept for backward compatibility.
+// Deprecated: Use SendApplyResult instead.
+func (w *MultiWebhookSender) Send(log logging.SimpleLogging, result ApplyResult) error {
+	return w.SendApplyResult(log, result)
 }
