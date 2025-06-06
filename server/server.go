@@ -165,14 +165,14 @@ type WebhookConfig struct {
 
 // VCSClients holds all the VCS client instances
 type VCSClients struct {
-	Github          vcs.IGithubClient
-	Gitlab          *vcs.GitlabClient
-	BitbucketCloud  *bitbucketcloud.Client
-	BitbucketServer *bitbucketserver.Client
-	AzureDevops     *vcs.AzureDevopsClient
-	Gitea           *gitea.GiteaClient
-	SupportedHosts  []models.VCSHostType
-	GithubAppEnabled bool
+	Github            vcs.IGithubClient
+	Gitlab            *vcs.GitlabClient
+	BitbucketCloud    *bitbucketcloud.Client
+	BitbucketServer   *bitbucketserver.Client
+	AzureDevops       *vcs.AzureDevopsClient
+	Gitea             *gitea.GiteaClient
+	SupportedHosts    []models.VCSHostType
+	GithubAppEnabled  bool
 	GithubCredentials vcs.GithubCredentials
 }
 
@@ -1211,34 +1211,34 @@ func ParseAtlantisURL(u string) (*url.URL, error) {
 // setupVCSClients configures and returns all VCS client instances
 func setupVCSClients(userConfig UserConfig, globalCfg valid.GlobalCfg, logger logging.SimpleLogging, statsScope tally.Scope) (*VCSClients, error) {
 	clients := &VCSClients{}
-	
+
 	// Setup GitHub client
 	if err := setupGithubClient(userConfig, clients, logger, statsScope); err != nil {
 		return nil, err
 	}
-	
+
 	// Setup GitLab client
 	if err := setupGitlabClient(userConfig, globalCfg, clients, logger); err != nil {
 		return nil, err
 	}
-	
+
 	// Setup Bitbucket clients
 	if err := setupBitbucketClients(userConfig, clients); err != nil {
 		return nil, err
 	}
-	
+
 	// Setup Azure DevOps client
 	if err := setupAzureDevopsClient(userConfig, clients); err != nil {
 		return nil, err
 	}
-	
+
 	// Setup Gitea client
 	if err := setupGiteaClient(userConfig, clients, logger); err != nil {
 		return nil, err
 	}
-	
+
 	logSupportedVCSHosts(clients.SupportedHosts, logger)
-	
+
 	return clients, nil
 }
 
@@ -1247,16 +1247,16 @@ func setupGithubClient(userConfig UserConfig, clients *VCSClients, logger loggin
 	if userConfig.GithubUser == "" && userConfig.GithubAppID == 0 {
 		return nil
 	}
-	
+
 	var githubConfig vcs.GithubConfig
 	if userConfig.GithubAllowMergeableBypassApply {
 		githubConfig = vcs.GithubConfig{
 			AllowMergeableBypassApply: true,
 		}
 	}
-	
+
 	clients.SupportedHosts = append(clients.SupportedHosts, models.Github)
-	
+
 	var githubCredentials vcs.GithubCredentials
 	if userConfig.GithubUser != "" {
 		githubCredentials = &vcs.GithubUserCredentials{
@@ -1287,14 +1287,14 @@ func setupGithubClient(userConfig UserConfig, clients *VCSClients, logger loggin
 		}
 		clients.GithubAppEnabled = true
 	}
-	
+
 	clients.GithubCredentials = githubCredentials
-	
+
 	rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
 	if err != nil {
 		return err
 	}
-	
+
 	clients.Github = vcs.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
 	return nil
 }
@@ -1304,21 +1304,21 @@ func setupGitlabClient(userConfig UserConfig, globalCfg valid.GlobalCfg, clients
 	if userConfig.GitlabUser == "" {
 		return nil
 	}
-	
+
 	clients.SupportedHosts = append(clients.SupportedHosts, models.Gitlab)
-	
+
 	gitlabGroupAllowlistChecker, err := command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
 	if err != nil {
 		return err
 	}
-	
+
 	gitlabGroups := slices.Concat(gitlabGroupAllowlistChecker.AllTeams(), globalCfg.PolicySets.AllTeams())
 	slices.Sort(gitlabGroups)
 	clients.Gitlab, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -1327,7 +1327,7 @@ func setupBitbucketClients(userConfig UserConfig, clients *VCSClients) error {
 	if userConfig.BitbucketUser == "" {
 		return nil
 	}
-	
+
 	if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
 		clients.SupportedHosts = append(clients.SupportedHosts, models.BitbucketCloud)
 		clients.BitbucketCloud = bitbucketcloud.NewClient(
@@ -1348,7 +1348,7 @@ func setupBitbucketClients(userConfig UserConfig, clients *VCSClients) error {
 			return errors.Wrapf(err, "setting up Bitbucket Server client")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1357,15 +1357,15 @@ func setupAzureDevopsClient(userConfig UserConfig, clients *VCSClients) error {
 	if userConfig.AzureDevopsUser == "" {
 		return nil
 	}
-	
+
 	clients.SupportedHosts = append(clients.SupportedHosts, models.AzureDevops)
-	
+
 	var err error
 	clients.AzureDevops, err = vcs.NewAzureDevopsClient(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -1374,16 +1374,16 @@ func setupGiteaClient(userConfig UserConfig, clients *VCSClients, logger logging
 	if userConfig.GiteaToken == "" {
 		return nil
 	}
-	
+
 	clients.SupportedHosts = append(clients.SupportedHosts, models.Gitea)
-	
+
 	var err error
 	clients.Gitea, err = gitea.NewClient(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaPageSize, logger)
 	if err != nil {
 		fmt.Println("error setting up gitea client", "error", err)
 		return errors.Wrapf(err, "setting up Gitea client")
 	}
-	
+
 	logger.Info("gitea client configured successfully")
 	return nil
 }
