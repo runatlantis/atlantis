@@ -163,6 +163,19 @@ type WebhookConfig struct {
 	URL string `mapstructure:"url"`
 }
 
+// VCSClients holds all the VCS client instances
+type VCSClients struct {
+	Github          vcs.IGithubClient
+	Gitlab          *vcs.GitlabClient
+	BitbucketCloud  *bitbucketcloud.Client
+	BitbucketServer *bitbucketserver.Client
+	AzureDevops     *vcs.AzureDevopsClient
+	Gitea           *gitea.GiteaClient
+	SupportedHosts  []models.VCSHostType
+	GithubAppEnabled bool
+	GithubCredentials vcs.GithubCredentials
+}
+
 //go:embed static
 var staticAssets embed.FS
 
@@ -176,17 +189,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	var supportedVCSHosts []models.VCSHostType
-	var githubClient vcs.IGithubClient
-	var githubAppEnabled bool
-	var githubConfig vcs.GithubConfig
-	var githubCredentials vcs.GithubCredentials
-	var gitlabClient *vcs.GitlabClient
-	var bitbucketCloudClient *bitbucketcloud.Client
-	var bitbucketServerClient *bitbucketserver.Client
-	var azuredevopsClient *vcs.AzureDevopsClient
-	var giteaClient *gitea.GiteaClient
 
 	policyChecksEnabled := false
 	if userConfig.EnablePolicyChecksFlag {
@@ -230,116 +232,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, errors.Wrapf(err, "instantiating metrics scope")
 	}
 
-	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
-		if userConfig.GithubAllowMergeableBypassApply {
-			githubConfig = vcs.GithubConfig{
-				AllowMergeableBypassApply: true,
-			}
-		}
-		supportedVCSHosts = append(supportedVCSHosts, models.Github)
-		if userConfig.GithubUser != "" {
-			githubCredentials = &vcs.GithubUserCredentials{
-				User:      userConfig.GithubUser,
-				Token:     userConfig.GithubToken,
-				TokenFile: userConfig.GithubTokenFile,
-			}
-		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKeyFile != "" {
-			privateKey, err := os.ReadFile(userConfig.GithubAppKeyFile)
-			if err != nil {
-				return nil, err
-			}
-			githubCredentials = &vcs.GithubAppCredentials{
-				AppID:          userConfig.GithubAppID,
-				InstallationID: userConfig.GithubAppInstallationID,
-				Key:            privateKey,
-				Hostname:       userConfig.GithubHostname,
-				AppSlug:        userConfig.GithubAppSlug,
-			}
-			githubAppEnabled = true
-		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKey != "" {
-			githubCredentials = &vcs.GithubAppCredentials{
-				AppID:          userConfig.GithubAppID,
-				InstallationID: userConfig.GithubAppInstallationID,
-				Key:            []byte(userConfig.GithubAppKey),
-				Hostname:       userConfig.GithubHostname,
-				AppSlug:        userConfig.GithubAppSlug,
-			}
-			githubAppEnabled = true
-		}
-
-		var err error
-		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
-		if err != nil {
-			return nil, err
-		}
-
-		githubClient = vcs.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
+	clients, err := setupVCSClients(userConfig, globalCfg, logger, statsScope)
+	if err != nil {
+		return nil, err
 	}
-	if userConfig.GitlabUser != "" {
-		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
-		var err error
-
-		gitlabGroupAllowlistChecker, err := command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
-		if err != nil {
-			return nil, err
-		}
-
-		gitlabGroups := slices.Concat(gitlabGroupAllowlistChecker.AllTeams(), globalCfg.PolicySets.AllTeams())
-		slices.Sort(gitlabGroups)
-		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if userConfig.BitbucketUser != "" {
-		if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
-			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketCloud)
-			bitbucketCloudClient = bitbucketcloud.NewClient(
-				http.DefaultClient,
-				userConfig.BitbucketUser,
-				userConfig.BitbucketToken,
-				userConfig.AtlantisURL)
-		} else {
-			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketServer)
-			var err error
-			bitbucketServerClient, err = bitbucketserver.NewClient(
-				http.DefaultClient,
-				userConfig.BitbucketUser,
-				userConfig.BitbucketToken,
-				userConfig.BitbucketBaseURL,
-				userConfig.AtlantisURL)
-			if err != nil {
-				return nil, errors.Wrapf(err, "setting up Bitbucket Server client")
-			}
-		}
-	}
-	if userConfig.AzureDevopsUser != "" {
-		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
-
-		var err error
-		azuredevopsClient, err = vcs.NewAzureDevopsClient(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if userConfig.GiteaToken != "" {
-		supportedVCSHosts = append(supportedVCSHosts, models.Gitea)
-
-		giteaClient, err = gitea.NewClient(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaPageSize, logger)
-		if err != nil {
-			fmt.Println("error setting up gitea client", "error", err)
-			return nil, errors.Wrapf(err, "setting up Gitea client")
-		} else {
-			logger.Info("gitea client configured successfully")
-		}
-	}
-
-	var supportedVCSHostsStr []string
-	for _, host := range supportedVCSHosts {
-		supportedVCSHostsStr = append(supportedVCSHostsStr, host.String())
-	}
-
-	logger.Info("Supported VCS Hosts: %s", strings.Join(supportedVCSHostsStr, ", "))
 
 	home, err := homedir.Dir()
 	if err != nil {
@@ -412,7 +308,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
-	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient, giteaClient)
+	vcsClient := vcs.NewClientProxy(clients.Github, clients.Gitlab, clients.BitbucketCloud, clients.BitbucketServer, clients.AzureDevops, clients.Gitea)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
@@ -475,8 +371,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil && flag.Lookup("test.v") == nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("initializing %s", userConfig.DefaultTFDistribution))
 	}
+	supportsCommonMark := false
+	if clients.Gitlab != nil {
+		supportsCommonMark = clients.Gitlab.SupportsCommonMark()
+	}
 	markdownRenderer := events.NewMarkdownRenderer(
-		gitlabClient.SupportsCommonMark(),
+		supportsCommonMark,
 		userConfig.DisableApplyAll,
 		disableApply,
 		userConfig.DisableMarkdownFolding,
@@ -526,7 +426,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DataDir:          userConfig.DataDir,
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:    userConfig.CheckoutDepth,
-		GithubAppEnabled: githubAppEnabled,
+		GithubAppEnabled: clients.GithubAppEnabled,
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(
@@ -535,17 +435,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir
-	if githubAppEnabled {
+	if clients.GithubAppEnabled {
 		if !userConfig.WriteGitCreds {
 			return nil, errors.New("Github App requires --write-git-creds to support cloning")
 		}
 		workingDir = &events.GithubAppWorkingDir{
 			WorkingDir:     workingDir,
-			Credentials:    githubCredentials,
+			Credentials:    clients.GithubCredentials,
 			GithubHostname: userConfig.GithubHostname,
 		}
 
-		githubAppTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, "x-access-token", home)
+		githubAppTokenRotator := vcs.NewGithubTokenRotator(logger, clients.GithubCredentials, userConfig.GithubHostname, "x-access-token", home)
 		tokenJd, err := githubAppTokenRotator.GenerateJob()
 		if err != nil {
 			return nil, errors.Wrap(err, "could not write credentials")
@@ -554,7 +454,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	if userConfig.GithubUser != "" && userConfig.GithubTokenFile != "" && userConfig.WriteGitCreds {
-		githubTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, userConfig.GithubUser, home)
+		githubTokenRotator := vcs.NewGithubTokenRotator(logger, clients.GithubCredentials, userConfig.GithubHostname, userConfig.GithubUser, home)
 		tokenJd, err := githubTokenRotator.GenerateJob()
 		if err != nil {
 			return nil, errors.Wrap(err, "could not write credentials")
@@ -884,10 +784,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	commandRunner := &events.DefaultCommandRunner{
 		VCSClient:                      vcsClient,
-		GithubPullGetter:               githubClient,
-		GitlabMergeRequestGetter:       gitlabClient,
-		AzureDevopsPullGetter:          azuredevopsClient,
-		GiteaPullGetter:                giteaClient,
+		GithubPullGetter:               clients.Github,
+		GitlabMergeRequestGetter:       clients.Gitlab,
+		AzureDevopsPullGetter:          clients.AzureDevops,
+		GiteaPullGetter:                clients.Gitea,
 		CommentCommandRunnerByCmd:      commentCommandRunnerByCmd,
 		EventParser:                    eventParser,
 		FailOnPreWorkflowHookError:     userConfig.FailOnPreWorkflowHookError,
@@ -980,7 +880,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
 		EmojiReaction:                   userConfig.EmojiReaction,
 		ExecutableName:                  userConfig.ExecutableName,
-		SupportedVCSHosts:               supportedVCSHosts,
+		SupportedVCSHosts:               clients.SupportedHosts,
 		VCSClient:                       vcsClient,
 		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
 		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
@@ -991,7 +891,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	githubAppController := &controllers.GithubAppController{
 		AtlantisURL:         parsedURL,
 		Logger:              logger,
-		GithubSetupComplete: githubAppEnabled,
+		GithubSetupComplete: clients.GithubAppEnabled,
 		GithubHostname:      userConfig.GithubHostname,
 		GithubOrg:           userConfig.GithubOrg,
 	}
@@ -1306,4 +1206,193 @@ func ParseAtlantisURL(u string) (*url.URL, error) {
 	// use it in the rest of the program.
 	parsed.Path = strings.TrimSuffix(parsed.Path, "/")
 	return parsed, nil
+}
+
+// setupVCSClients configures and returns all VCS client instances
+func setupVCSClients(userConfig UserConfig, globalCfg valid.GlobalCfg, logger logging.SimpleLogging, statsScope tally.Scope) (*VCSClients, error) {
+	clients := &VCSClients{}
+	
+	// Setup GitHub client
+	if err := setupGithubClient(userConfig, clients, logger, statsScope); err != nil {
+		return nil, err
+	}
+	
+	// Setup GitLab client
+	if err := setupGitlabClient(userConfig, globalCfg, clients, logger); err != nil {
+		return nil, err
+	}
+	
+	// Setup Bitbucket clients
+	if err := setupBitbucketClients(userConfig, clients); err != nil {
+		return nil, err
+	}
+	
+	// Setup Azure DevOps client
+	if err := setupAzureDevopsClient(userConfig, clients); err != nil {
+		return nil, err
+	}
+	
+	// Setup Gitea client
+	if err := setupGiteaClient(userConfig, clients, logger); err != nil {
+		return nil, err
+	}
+	
+	logSupportedVCSHosts(clients.SupportedHosts, logger)
+	
+	return clients, nil
+}
+
+// setupGithubClient configures GitHub client if credentials are provided
+func setupGithubClient(userConfig UserConfig, clients *VCSClients, logger logging.SimpleLogging, statsScope tally.Scope) error {
+	if userConfig.GithubUser == "" && userConfig.GithubAppID == 0 {
+		return nil
+	}
+	
+	var githubConfig vcs.GithubConfig
+	if userConfig.GithubAllowMergeableBypassApply {
+		githubConfig = vcs.GithubConfig{
+			AllowMergeableBypassApply: true,
+		}
+	}
+	
+	clients.SupportedHosts = append(clients.SupportedHosts, models.Github)
+	
+	var githubCredentials vcs.GithubCredentials
+	if userConfig.GithubUser != "" {
+		githubCredentials = &vcs.GithubUserCredentials{
+			User:      userConfig.GithubUser,
+			Token:     userConfig.GithubToken,
+			TokenFile: userConfig.GithubTokenFile,
+		}
+	} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKeyFile != "" {
+		privateKey, err := os.ReadFile(userConfig.GithubAppKeyFile)
+		if err != nil {
+			return err
+		}
+		githubCredentials = &vcs.GithubAppCredentials{
+			AppID:          userConfig.GithubAppID,
+			InstallationID: userConfig.GithubAppInstallationID,
+			Key:            privateKey,
+			Hostname:       userConfig.GithubHostname,
+			AppSlug:        userConfig.GithubAppSlug,
+		}
+		clients.GithubAppEnabled = true
+	} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKey != "" {
+		githubCredentials = &vcs.GithubAppCredentials{
+			AppID:          userConfig.GithubAppID,
+			InstallationID: userConfig.GithubAppInstallationID,
+			Key:            []byte(userConfig.GithubAppKey),
+			Hostname:       userConfig.GithubHostname,
+			AppSlug:        userConfig.GithubAppSlug,
+		}
+		clients.GithubAppEnabled = true
+	}
+	
+	clients.GithubCredentials = githubCredentials
+	
+	rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
+	if err != nil {
+		return err
+	}
+	
+	clients.Github = vcs.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
+	return nil
+}
+
+// setupGitlabClient configures GitLab client if credentials are provided
+func setupGitlabClient(userConfig UserConfig, globalCfg valid.GlobalCfg, clients *VCSClients, logger logging.SimpleLogging) error {
+	if userConfig.GitlabUser == "" {
+		return nil
+	}
+	
+	clients.SupportedHosts = append(clients.SupportedHosts, models.Gitlab)
+	
+	gitlabGroupAllowlistChecker, err := command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+	if err != nil {
+		return err
+	}
+	
+	gitlabGroups := slices.Concat(gitlabGroupAllowlistChecker.AllTeams(), globalCfg.PolicySets.AllTeams())
+	slices.Sort(gitlabGroups)
+	clients.Gitlab, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
+	if err != nil {
+		return err
+	}
+	
+	return nil
+}
+
+// setupBitbucketClients configures Bitbucket clients if credentials are provided
+func setupBitbucketClients(userConfig UserConfig, clients *VCSClients) error {
+	if userConfig.BitbucketUser == "" {
+		return nil
+	}
+	
+	if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
+		clients.SupportedHosts = append(clients.SupportedHosts, models.BitbucketCloud)
+		clients.BitbucketCloud = bitbucketcloud.NewClient(
+			http.DefaultClient,
+			userConfig.BitbucketUser,
+			userConfig.BitbucketToken,
+			userConfig.AtlantisURL)
+	} else {
+		clients.SupportedHosts = append(clients.SupportedHosts, models.BitbucketServer)
+		var err error
+		clients.BitbucketServer, err = bitbucketserver.NewClient(
+			http.DefaultClient,
+			userConfig.BitbucketUser,
+			userConfig.BitbucketToken,
+			userConfig.BitbucketBaseURL,
+			userConfig.AtlantisURL)
+		if err != nil {
+			return errors.Wrapf(err, "setting up Bitbucket Server client")
+		}
+	}
+	
+	return nil
+}
+
+// setupAzureDevopsClient configures Azure DevOps client if credentials are provided
+func setupAzureDevopsClient(userConfig UserConfig, clients *VCSClients) error {
+	if userConfig.AzureDevopsUser == "" {
+		return nil
+	}
+	
+	clients.SupportedHosts = append(clients.SupportedHosts, models.AzureDevops)
+	
+	var err error
+	clients.AzureDevops, err = vcs.NewAzureDevopsClient(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
+	if err != nil {
+		return err
+	}
+	
+	return nil
+}
+
+// setupGiteaClient configures Gitea client if credentials are provided
+func setupGiteaClient(userConfig UserConfig, clients *VCSClients, logger logging.SimpleLogging) error {
+	if userConfig.GiteaToken == "" {
+		return nil
+	}
+	
+	clients.SupportedHosts = append(clients.SupportedHosts, models.Gitea)
+	
+	var err error
+	clients.Gitea, err = gitea.NewClient(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaPageSize, logger)
+	if err != nil {
+		fmt.Println("error setting up gitea client", "error", err)
+		return errors.Wrapf(err, "setting up Gitea client")
+	}
+	
+	logger.Info("gitea client configured successfully")
+	return nil
+}
+
+// logSupportedVCSHosts logs the list of supported VCS hosts
+func logSupportedVCSHosts(supportedHosts []models.VCSHostType, logger logging.SimpleLogging) {
+	var supportedVCSHostsStr []string
+	for _, host := range supportedHosts {
+		supportedVCSHostsStr = append(supportedVCSHostsStr, host.String())
+	}
+	logger.Info("Supported VCS Hosts: %s", strings.Join(supportedVCSHostsStr, ", "))
 }
