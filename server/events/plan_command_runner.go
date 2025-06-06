@@ -1,8 +1,8 @@
 package events
 
-import "strconv"
-
 import (
+	"strconv"
+
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
