@@ -82,6 +82,7 @@ var testFlags = map[string]interface{}{
 	DisableMarkdownFoldingFlag:       true,
 	DisableRepoLockingFlag:           true,
 	DisableGlobalApplyLockFlag:       false,
+	DisableDidYouMeanPromptFlag:      true,
 	DiscardApprovalOnPlanFlag:        true,
 	EmojiReaction:                    "eyes",
 	ExecutableName:                   "atlantis",
@@ -249,14 +250,12 @@ func getUserConfigKeysWithFlags() []string {
 
 	}
 	return ret
-
 }
 
 func TestUserConfigAllTested(t *testing.T) {
 	t.Log("All settings in userConfig should be tested.")
 
 	for _, userConfigKey := range getUserConfigKeysWithFlags() {
-
 		t.Run(userConfigKey, func(t *testing.T) {
 			// If a setting is configured in server.UserConfig, it should be tested here. If there is no corresponding const
 			// for specifying the flag, that probably means one *also* needs to be added to server.go
@@ -264,13 +263,10 @@ func TestUserConfigAllTested(t *testing.T) {
 				t.Errorf("server.UserConfig has field with mapstructure %s that is not tested, and potentially also not configured as a flag. Either add it to testFlags (and potentially as a const in cmd/server), or remove it from server.UserConfig", userConfigKey)
 			}
 		})
-
 	}
-
 }
 
 func getDocumentedFlags(t *testing.T) []string {
-
 	var ret []string
 	docFile := "../runatlantis.io/docs/server-configuration.md"
 
@@ -354,7 +350,6 @@ func TestAllFlagsDocumented(t *testing.T) {
 			t.Errorf("Found documentation for flag that doesn't exist: %s", documentedFlag)
 		}
 	}
-
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
