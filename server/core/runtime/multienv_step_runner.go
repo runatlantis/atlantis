@@ -24,7 +24,7 @@ func (r *MultiEnvStepRunner) Run(
 	envs map[string]string,
 	postProcessOutput valid.PostProcessRunOutputOption,
 ) (string, error) {
-	res, err := r.RunStepRunner.Run(ctx, shell, command, path, envs, false, postProcessOutput)
+	res, err := r.RunStepRunner.Run(ctx, shell, command, path, envs, false, valid.PostProcessRunOutputShow)
 	if err != nil {
 		return "", err
 	}
