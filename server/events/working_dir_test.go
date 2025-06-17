@@ -75,7 +75,7 @@ func TestClone_MainBranchWithMergeStrategy(t *testing.T) {
 		GpgNoSigningEnabled:         true,
 	}
 
-	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+	_, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		Num:        0,
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
@@ -87,7 +87,7 @@ func TestClone_MainBranchWithMergeStrategy(t *testing.T) {
 	runCmd(t, dataDir, "touch", "repos/0/default/proof")
 
 	// re-clone to make sure we don't try to merge main into itself
-	cloneDir, err = wd.Clone(logger, models.Repo{}, models.PullRequest{
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		BaseBranch: "main",
