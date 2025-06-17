@@ -10,6 +10,8 @@ ARG DEFAULT_TERRAFORM_VERSION=1.11.4
 ARG DEFAULT_OPENTOFU_VERSION=1.9.0
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.59.0
+# renovate: datasource=github-releases depName=gruntwork-io/terragrunt
+ARG DEFAULT_TERRAGRUNT_VERSION=v0.81.7
 
 # Stage 1: build artifact and download deps
 
@@ -30,6 +32,8 @@ ARG DEFAULT_TERRAFORM_VERSION
 ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
 ARG DEFAULT_CONFTEST_VERSION
 ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
+ARG DEFAULT_TERRAGRUNT_VERSION
+ENV DEFAULT_TERRAGRUNT_VERSION=${DEFAULT_TERRAGRUNT_VERSION}
 
 WORKDIR /app
 
@@ -133,6 +137,13 @@ RUN ./download-release.sh \
         "${DEFAULT_OPENTOFU_VERSION}" \
         "${DEFAULT_OPENTOFU_VERSION}"
 
+# install Terragrunt
+ARG DEFAULT_TERRAGRUNT_VERSION
+ENV DEFAULT_TERRAGRUNT_VERSION=${DEFAULT_TERRAGRUNT_VERSION}
+RUN curl -L https://github.com/gruntwork-io/terragrunt/releases/download/${DEFAULT_TERRAGRUNT_VERSION}/terragrunt_linux_amd64 \
+    -o /usr/local/bin/terragrunt && \
+    chmod +x /usr/local/bin/terragrunt
+
 # Stage 2 - Alpine
 # Creating the individual distro builds using targets
 FROM alpine:${ALPINE_TAG} AS alpine
@@ -197,6 +208,7 @@ COPY --from=builder /app/atlantis /usr/local/bin/atlantis
 # copy terraform binaries
 COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
 COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
+COPY --from=deps /usr/local/bin/terragrunt /usr/local/bin/terragrunt
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
@@ -207,3 +219,4 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
+
