@@ -51,6 +51,7 @@
       ],
     },
     {
+      matchBaseBranches: ["main"],
       ignorePaths: [
         'testing/**',
       ],
