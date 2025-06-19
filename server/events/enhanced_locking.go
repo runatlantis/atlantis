@@ -64,7 +64,7 @@ func NewEnhancedLockingSystem(
 	enableQueue bool,
 	enableRetry bool,
 	maxRetryAttempts int,
-	retryDelay time.Duration,
+	retryDelay int,
 ) *EnhancedLockingSystem {
 	return &EnhancedLockingSystem{
 		locker:           locker,

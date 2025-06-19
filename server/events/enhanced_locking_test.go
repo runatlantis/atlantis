@@ -8,6 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // minimal mockLocker for TryLockWithRetry
@@ -129,7 +130,7 @@ func TestEnhancedLockingSystem_CleanupAllLocks(t *testing.T) {
 	enhancedLocking.ProtectWorkingDir(repoFullName, pullNum, "default")
 	enhancedLocking.ProtectWorkingDir(repoFullName, pullNum, "staging")
 	err := enhancedLocking.CleanupAllLocks(repoFullName, pullNum)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, enhancedLocking.IsWorkingDirProtected(repoFullName, pullNum, "default"))
 	assert.False(t, enhancedLocking.IsWorkingDirProtected(repoFullName, pullNum, "staging"))
 }
@@ -191,7 +192,7 @@ func TestEnhancedLockingSystem_MemoryLockPreventsRaceConditions(t *testing.T) {
 	select {
 	case resp2 := <-secondAttemptDone:
 		err2 := <-secondErrorDone
-		assert.NoError(t, err2)
+		require.NoError(t, err2)
 		assert.False(t, resp2.LockAcquired)
 		assert.Contains(t, resp2.LockFailureReason, "Another operation is in progress for this project/workspace")
 	case <-time.After(5 * time.Second):

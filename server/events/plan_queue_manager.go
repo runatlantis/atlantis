@@ -262,7 +262,11 @@ func (p *DefaultPlanQueueManager) NotifyQueueUpdate(project models.Project, work
 
 	// Notify all users in the queue
 	for _, entry := range queue.Entries {
-		go p.notifyUser(entry.Pull, message)
+		go func(e models.PlanQueueEntry) {
+			if err := p.notifyUser(e.Pull, message); err != nil {
+				p.Logger.Warn("Failed to notify user about queue update: %s", err)
+			}
+		}(entry)
 	}
 
 	return nil
