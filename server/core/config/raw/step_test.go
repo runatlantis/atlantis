@@ -3,10 +3,10 @@ package raw_test
 import (
 	"testing"
 
+	yaml "github.com/goccy/go-yaml"
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v3"
 )
 
 func TestStepConfig_YAMLMarshalling(t *testing.T) {
@@ -148,7 +148,11 @@ key: value`,
 key:
  - value:
      another: map`,
-			expErr: "yaml: unmarshal errors:\n  line 3: cannot unmarshal !!seq into map[string]interface {}",
+			expErr: `[3:2] sequence was used where mapping is expected
+   2 | key:
+>  3 |  - value:
+        ^
+   4 |      another: map`,
 		},
 	}
 
