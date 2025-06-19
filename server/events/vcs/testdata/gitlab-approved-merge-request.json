@@ -1,0 +1,37 @@
+{
+  "id": 545644,
+  "iid": 2,
+  "project_id": 17829,
+  "title": "More test",
+  "description": "",
+  "state": "opened",
+  "created_at": "2023-10-07T04:02:15.394Z",
+  "updated_at": "2023-10-07T04:44:20.860Z",
+  "merge_status": "can_be_merged",
+  "approved": true,
+  "approvals_required": 1,
+  "approvals_left": 0,
+  "require_password_to_approve": false,
+  "approved_by": [
+    {
+      "user": {
+        "id": 81,
+        "username": "lmassa",
+        "name": "Luke Massa",
+        "state": "active",
+        "avatar_url": "https://secure.gravatar.com/avatar/0e6dd44205919a3dab626e54672a4141?s=80&d=identicon",
+        "web_url": "https://gitlab.dev.tripadvisor.com/lmassa"
+      }
+    }
+  ],
+  "suggested_approvers": [],
+  "approvers": [],
+  "approver_groups": [],
+  "user_has_approved": true,
+  "user_can_approve": false,
+  "approval_rules_left": [],
+  "has_approval_rules": true,
+  "merge_request_approvers_available": true,
+  "multiple_approval_rules_available": true,
+  "invalid_approvers_rules": []
+}
