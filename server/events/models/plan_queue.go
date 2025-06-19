@@ -55,6 +55,9 @@ type PlanQueueManager interface {
 	// GetQueueStatus gets the current queue status for a project/workspace
 	GetQueueStatus(project Project, workspace string) (*PlanQueue, error)
 
+	// GetAllQueues gets all active queues
+	GetAllQueues() ([]*PlanQueue, error)
+
 	// TransferLock transfers the lock to the next person in queue
 	TransferLock(project Project, workspace string) error
 

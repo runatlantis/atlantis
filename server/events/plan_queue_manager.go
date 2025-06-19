@@ -308,3 +308,20 @@ func (p *DefaultPlanQueueManager) notifyUser(pull models.PullRequest, message st
 func (p *DefaultPlanQueueManager) queueKey(project models.Project, workspace string) string {
 	return fmt.Sprintf("queue:%s:%s:%s", project.RepoFullName, project.Path, workspace)
 }
+
+// GetAllQueues gets all active queues
+func (p *DefaultPlanQueueManager) GetAllQueues() ([]*models.PlanQueue, error) {
+	p.queuesMutex.RLock()
+	defer p.queuesMutex.RUnlock()
+
+	queues := make([]*models.PlanQueue, 0, len(p.queues))
+	for _, queue := range p.queues {
+		// Return a copy to avoid race conditions
+		queueCopy := *queue
+		queueCopy.Entries = make([]models.PlanQueueEntry, len(queue.Entries))
+		copy(queueCopy.Entries, queue.Entries)
+		queues = append(queues, &queueCopy)
+	}
+
+	return queues, nil
+}
