@@ -1338,6 +1338,17 @@ This is useful when you have many projects and want to keep the pull request cle
 
   Namespace for emitting stats/metrics. See [stats](stats.md) section.
 
+### `--strip-refresh-output-from-errors`
+
+  ```bash
+  atlantis server --strip-refresh-output-from-errors
+  # or
+  ATLANTIS_STRIP_REFRESH_OUTPUT_FROM_ERRORS=true
+  ```
+
+  Defaults to `false`. Strip "Refreshing state..." messages from plan outputs when the result is an error.
+  These messages are always stripped from successful plan output.
+
 ### `--tf-distribution`
 
   <Badge text="Deprecated" type="warn"/>
