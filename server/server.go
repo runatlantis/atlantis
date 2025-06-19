@@ -562,8 +562,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		scheduledExecutorService.AddJob(tokenJd)
 	}
 
-	var projectLocker events.ProjectLocker
-	projectLocker = &events.DefaultProjectLocker{
+	projectLocker := &events.DefaultProjectLocker{
 		Locker:     lockingClient,
 		NoOpLocker: noOpLocker,
 		VCSClient:  vcsClient,
