@@ -562,7 +562,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		scheduledExecutorService.AddJob(tokenJd)
 	}
 
-	projectLocker := &events.DefaultProjectLocker{
+	var projectLocker events.ProjectLocker
+	projectLocker = &events.DefaultProjectLocker{
 		Locker:     lockingClient,
 		NoOpLocker: noOpLocker,
 		VCSClient:  vcsClient,
@@ -790,6 +791,45 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
 	)
+
+	// Create plan queue manager if enabled
+	var planQueueManager models.PlanQueueManager
+	if userConfig.EnablePlanQueue {
+		planQueueManager = events.NewDefaultPlanQueueManager(backend, lockingClient, vcsClient, logger)
+		logger.Info("Plan queue functionality enabled")
+	}
+
+	// Create enhanced locking system if enabled
+	var enhancedLocking *events.EnhancedLockingSystem
+	if userConfig.EnablePlanQueue || userConfig.EnableLockRetry {
+		enhancedLocking = events.NewEnhancedLockingSystem(
+			lockingClient,
+			backend,
+			vcsClient,
+			logger,
+			planQueueManager,
+			userConfig.EnablePlanQueue,
+			userConfig.EnableLockRetry,
+			userConfig.LockRetryMaxAttempts,
+			time.Duration(userConfig.LockRetryDelay),
+		)
+		logger.Info("Enhanced locking system enabled (queue: %v, retry: %v)", userConfig.EnablePlanQueue, userConfig.EnableLockRetry)
+	}
+
+	// Create enhanced project locker
+	enhancedProjectLocker := events.NewEnhancedProjectLocker(
+		lockingClient,
+		noOpLocker,
+		vcsClient,
+		enhancedLocking,
+		userConfig.EnablePlanQueue,
+		userConfig.EnableLockRetry,
+	)
+	
+	// Use enhanced project locker if available, otherwise use default
+	if enhancedProjectLocker != nil {
+		projectLocker = enhancedProjectLocker
+	}
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,
