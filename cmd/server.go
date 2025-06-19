@@ -998,6 +998,18 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.AutoDiscoverModeFlag == "" {
 		c.AutoDiscoverModeFlag = DefaultAutoDiscoverMode
 	}
+	if !v.IsSet("enable-plan-queue") {
+		c.EnablePlanQueue = false
+	}
+	if !v.IsSet("enable-lock-retry") {
+		c.EnableLockRetry = false
+	}
+	if !v.IsSet("lock-retry-max-attempts") {
+		c.LockRetryMaxAttempts = 3
+	}
+	if !v.IsSet("lock-retry-delay") {
+		c.LockRetryDelay = 5
+	}
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
