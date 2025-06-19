@@ -825,7 +825,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.EnablePlanQueue,
 		userConfig.EnableLockRetry,
 	)
-	
+
 	// Use enhanced project locker if available, otherwise use default
 	if enhancedProjectLocker != nil {
 		projectLocker = enhancedProjectLocker

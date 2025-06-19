@@ -42,25 +42,25 @@ type PlanQueue struct {
 type PlanQueueManager interface {
 	// AddToQueue adds a new entry to the queue
 	AddToQueue(entry PlanQueueEntry) error
-	
+
 	// RemoveFromQueue removes an entry from the queue
 	RemoveFromQueue(project Project, workspace string, pullNum int) error
-	
+
 	// GetNextInQueue gets the next entry in the queue
 	GetNextInQueue(project Project, workspace string) (*PlanQueueEntry, error)
-	
+
 	// IsInQueue checks if a pull request is already in the queue
 	IsInQueue(project Project, workspace string, pullNum int) (bool, error)
-	
+
 	// GetQueueStatus gets the current queue status for a project/workspace
 	GetQueueStatus(project Project, workspace string) (*PlanQueue, error)
-	
+
 	// TransferLock transfers the lock to the next person in queue
 	TransferLock(project Project, workspace string) error
-	
+
 	// CleanupQueue removes all queue entries for a pull request
 	CleanupQueue(repoFullName string, pullNum int) error
-	
+
 	// NotifyQueueUpdate notifies users about queue updates
 	NotifyQueueUpdate(project Project, workspace string, message string) error
-} 
+}

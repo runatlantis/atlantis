@@ -14,13 +14,13 @@ import (
 
 // DefaultPlanQueueManager implements the PlanQueueManager interface
 type DefaultPlanQueueManager struct {
-	Backend    locking.Backend
-	Locker     locking.Locker
-	VCSClient  vcs.Client
-	Logger     logging.SimpleLogging
-	
+	Backend   locking.Backend
+	Locker    locking.Locker
+	VCSClient vcs.Client
+	Logger    logging.SimpleLogging
+
 	// In-memory queues for now (could be moved to backend later)
-	queues     map[string]*models.PlanQueue
+	queues      map[string]*models.PlanQueue
 	queuesMutex sync.RWMutex
 }
 
@@ -41,7 +41,7 @@ func (p *DefaultPlanQueueManager) AddToQueue(entry models.PlanQueueEntry) error 
 	defer p.queuesMutex.Unlock()
 
 	queueKey := p.queueKey(entry.Project, entry.Workspace)
-	
+
 	// Get or create queue
 	queue, exists := p.queues[queueKey]
 	if !exists {
@@ -72,8 +72,8 @@ func (p *DefaultPlanQueueManager) AddToQueue(entry models.PlanQueueEntry) error 
 	})
 
 	queue.UpdatedAt = time.Now()
-	
-	p.Logger.Info("Added PR %d to queue for project %s, workspace %s (position: %d)", 
+
+	p.Logger.Info("Added PR %d to queue for project %s, workspace %s (position: %d)",
 		entry.Pull.Num, entry.Project.String(), entry.Workspace, len(queue.Entries))
 
 	// Notify the user about their position in queue
@@ -98,15 +98,15 @@ func (p *DefaultPlanQueueManager) RemoveFromQueue(project models.Project, worksp
 		if entry.Pull.Num == pullNum {
 			queue.Entries = append(queue.Entries[:i], queue.Entries[i+1:]...)
 			queue.UpdatedAt = time.Now()
-			
-			p.Logger.Info("Removed PR %d from queue for project %s, workspace %s", 
+
+			p.Logger.Info("Removed PR %d from queue for project %s, workspace %s",
 				pullNum, project.String(), workspace)
-			
+
 			// If queue is empty, remove it
 			if len(queue.Entries) == 0 {
 				delete(p.queues, queueKey)
 			}
-			
+
 			return nil
 		}
 	}
@@ -181,7 +181,7 @@ func (p *DefaultPlanQueueManager) TransferLock(project models.Project, workspace
 
 	// Get the next entry
 	nextEntry := queue.Entries[0]
-	
+
 	// Remove from queue
 	queue.Entries = queue.Entries[1:]
 	queue.UpdatedAt = time.Now()
@@ -207,7 +207,7 @@ func (p *DefaultPlanQueueManager) TransferLock(project models.Project, workspace
 		return fmt.Errorf("failed to transfer lock")
 	}
 
-	p.Logger.Info("Successfully transferred lock to PR %d for project %s, workspace %s", 
+	p.Logger.Info("Successfully transferred lock to PR %d for project %s, workspace %s",
 		nextEntry.Pull.Num, project.String(), workspace)
 
 	// Notify the user that they now have the lock
@@ -230,14 +230,14 @@ func (p *DefaultPlanQueueManager) CleanupQueue(repoFullName string, pullNum int)
 					newEntries = append(newEntries, entry)
 				}
 			}
-			
+
 			if len(newEntries) != len(queue.Entries) {
 				queue.Entries = newEntries
 				queue.UpdatedAt = time.Now()
-				
-				p.Logger.Info("Cleaned up queue entries for PR %d in project %s, workspace %s", 
+
+				p.Logger.Info("Cleaned up queue entries for PR %d in project %s, workspace %s",
 					pullNum, queue.Project.String(), queue.Workspace)
-				
+
 				// If queue is empty, remove it
 				if len(queue.Entries) == 0 {
 					delete(p.queues, queueKey)
@@ -272,7 +272,7 @@ func (p *DefaultPlanQueueManager) NotifyQueueUpdate(project models.Project, work
 func (p *DefaultPlanQueueManager) notifyQueuePosition(entry models.PlanQueueEntry, position int) {
 	message := fmt.Sprintf(
 		"Your plan request has been added to the queue for project `%s` in workspace `%s`. "+
-		"You are currently in position %d. You will be notified when it's your turn to plan.",
+			"You are currently in position %d. You will be notified when it's your turn to plan.",
 		entry.Project.String(), entry.Workspace, position)
 
 	if err := p.notifyUser(entry.Pull, message); err != nil {
@@ -284,7 +284,7 @@ func (p *DefaultPlanQueueManager) notifyQueuePosition(entry models.PlanQueueEntr
 func (p *DefaultPlanQueueManager) notifyLockAcquired(entry models.PlanQueueEntry) {
 	message := fmt.Sprintf(
 		"🎉 Your turn! The lock for project `%s` in workspace `%s` has been transferred to you. "+
-		"You can now run `atlantis plan` to start planning.",
+			"You can now run `atlantis plan` to start planning.",
 		entry.Project.String(), entry.Workspace)
 
 	if err := p.notifyUser(entry.Pull, message); err != nil {
@@ -303,4 +303,4 @@ func (p *DefaultPlanQueueManager) notifyUser(pull models.PullRequest, message st
 // queueKey generates a key for the queue
 func (p *DefaultPlanQueueManager) queueKey(project models.Project, workspace string) string {
 	return fmt.Sprintf("queue:%s:%s:%s", project.RepoFullName, project.Path, workspace)
-} 
+}

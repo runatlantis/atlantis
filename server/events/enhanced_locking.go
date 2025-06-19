@@ -14,23 +14,23 @@ import (
 
 // EnhancedLockingSystem provides a robust locking mechanism that addresses race conditions
 type EnhancedLockingSystem struct {
-	locker              locking.Locker
-	backend             locking.Backend
-	vcsClient           vcs.Client
-	logger              logging.SimpleLogging
-	queueManager        models.PlanQueueManager
-	enableQueue         bool
-	enableRetry         bool
-	maxRetryAttempts    int
-	retryDelay          time.Duration
-	
+	locker           locking.Locker
+	backend          locking.Backend
+	vcsClient        vcs.Client
+	logger           logging.SimpleLogging
+	queueManager     models.PlanQueueManager
+	enableQueue      bool
+	enableRetry      bool
+	maxRetryAttempts int
+	retryDelay       time.Duration
+
 	// In-memory locks to prevent race conditions
-	memoryLocks         map[string]*MemoryLock
-	memoryLocksMutex    sync.RWMutex
-	
+	memoryLocks      map[string]*MemoryLock
+	memoryLocksMutex sync.RWMutex
+
 	// Working directory protection
-	workingDirLocks     map[string]*WorkingDirLock
-	workingDirMutex     sync.RWMutex
+	workingDirLocks map[string]*WorkingDirLock
+	workingDirMutex sync.RWMutex
 }
 
 // MemoryLock represents an in-memory lock to prevent race conditions
@@ -88,7 +88,7 @@ func (e *EnhancedLockingSystem) TryLockWithRetry(
 	pull models.PullRequest,
 	user models.User,
 ) (*TryLockResponse, error) {
-	
+
 	// First, try to acquire memory lock to prevent race conditions
 	memoryLockKey := e.memoryLockKey(project, workspace)
 	if !e.tryAcquireMemoryLock(memoryLockKey, project, workspace, pull, user) {
@@ -126,26 +126,26 @@ func (e *EnhancedLockingSystem) TryLockWithRetry(
 			if e.enableQueue {
 				return e.handleQueueLogic(project, workspace, pull, user, lockAttempt)
 			}
-			
+
 			// Return failure with retry information
 			if e.enableRetry && attempt < e.maxRetryAttempts {
 				e.logger.Info("Lock busy, retrying in %v (attempt %d/%d)", e.retryDelay, attempt, e.maxRetryAttempts)
 				time.Sleep(e.retryDelay)
 				continue
 			}
-			
+
 			link, err := e.vcsClient.MarkdownPullLink(lockAttempt.CurrLock.Pull)
 			if err != nil {
 				// Release memory lock on error
 				e.releaseMemoryLock(memoryLockKey)
 				return nil, err
 			}
-			
+
 			failureMsg := fmt.Sprintf(
 				"This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\n"+
 					"Once the lock is released, comment `atlantis plan` here to re-plan.",
 				link, link)
-			
+
 			// Release memory lock on failure
 			e.releaseMemoryLock(memoryLockKey)
 			return &TryLockResponse{
@@ -179,7 +179,7 @@ func (e *EnhancedLockingSystem) handleQueueLogic(
 	user models.User,
 	lockAttempt locking.TryLockResponse,
 ) (*TryLockResponse, error) {
-	
+
 	// Check if we're already in the queue
 	inQueue, err := e.queueManager.IsInQueue(project, workspace, pull.Num)
 	if err != nil {
@@ -249,7 +249,7 @@ func (e *EnhancedLockingSystem) ProtectWorkingDir(repoFullName string, pullNum i
 
 	key := fmt.Sprintf("%s:%d:%s", repoFullName, pullNum, workspace)
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	e.workingDirLocks[key] = &WorkingDirLock{
 		RepoFullName: repoFullName,
 		PullNum:      pullNum,
@@ -354,4 +354,4 @@ func (e *EnhancedLockingSystem) CleanupAllLocks(repoFullName string, pullNum int
 	}
 
 	return nil
-} 
+}

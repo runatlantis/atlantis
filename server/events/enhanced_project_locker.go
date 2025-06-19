@@ -40,7 +40,7 @@ func NewEnhancedProjectLocker(
 
 // TryLock attempts to acquire a lock with enhanced features
 func (e *EnhancedProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) (*TryLockResponse, error) {
-	
+
 	// If enhanced locking is enabled, use it
 	if e.enhancedLocking != nil {
 		// Use enhanced locking system
@@ -55,7 +55,7 @@ func (e *EnhancedProjectLocker) TryLock(log logging.SimpleLogging, pull models.P
 
 		return response, nil
 	}
-	
+
 	// Fall back to default behavior
 	return e.DefaultProjectLocker.TryLock(log, pull, user, workspace, project, repoLocking)
 }
@@ -65,7 +65,7 @@ func (e *EnhancedProjectLocker) ProtectWorkingDir(repoFullName string, pullNum i
 	if e.enhancedLocking != nil {
 		return e.enhancedLocking.ProtectWorkingDir(repoFullName, pullNum, workspace)
 	}
-	
+
 	// Return a no-op cancel function if enhanced locking is not available
 	return func() {}
 }
@@ -75,6 +75,6 @@ func (e *EnhancedProjectLocker) IsWorkingDirProtected(repoFullName string, pullN
 	if e.enhancedLocking != nil {
 		return e.enhancedLocking.IsWorkingDirProtected(repoFullName, pullNum, workspace)
 	}
-	
+
 	return false
-} 
+}

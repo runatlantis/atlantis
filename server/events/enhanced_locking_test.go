@@ -17,6 +17,7 @@ import (
 type mockLocker struct {
 	callCount int
 }
+
 func (m *mockLocker) TryLock(project models.Project, workspace string, pull models.PullRequest, user models.User) (locking.TryLockResponse, error) {
 	m.callCount++
 	if m.callCount == 1 {
@@ -27,43 +28,80 @@ func (m *mockLocker) TryLock(project models.Project, workspace string, pull mode
 	}
 	return locking.TryLockResponse{
 		LockAcquired: false,
-		CurrLock: models.ProjectLock{Pull: models.PullRequest{Num: 1}},
+		CurrLock:     models.ProjectLock{Pull: models.PullRequest{Num: 1}},
 	}, nil
 }
 func (m *mockLocker) Unlock(lockKey string) (*models.ProjectLock, error) { return nil, nil }
-func (m *mockLocker) List() (map[string]models.ProjectLock, error) { return nil, nil }
-func (m *mockLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) { return nil, nil }
+func (m *mockLocker) List() (map[string]models.ProjectLock, error)       { return nil, nil }
+func (m *mockLocker) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+	return nil, nil
+}
 func (m *mockLocker) GetLock(lockKey string) (*models.ProjectLock, error) { return nil, nil }
 
 // minimal mockVCSClient for MarkdownPullLink
 // always returns a dummy link
 
 type mockVCSClient struct{}
+
 func (m *mockVCSClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return "dummy-link", nil
 }
 func (m *mockVCSClient) CreateComment(log logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	return nil
 }
-func (m *mockVCSClient) DiscardReviews(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error { return nil }
-func (m *mockVCSClient) UpdateStatus(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, src, description, url string) error { return nil }
-func (m *mockVCSClient) MergePull(log logging.SimpleLogging, pull models.PullRequest, opts models.PullRequestOptions) error { return nil }
-func (m *mockVCSClient) GetModifiedFiles(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) { return nil, nil }
-func (m *mockVCSClient) GetPullRequest(repo models.Repo, num int) (models.PullRequest, error) { return models.PullRequest{}, nil }
-func (m *mockVCSClient) IsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) { return true, nil }
-func (m *mockVCSClient) ApprovePull(log logging.SimpleLogging, repo models.Repo, pullNum int) error { return nil }
-func (m *mockVCSClient) UnapprovePull(log logging.SimpleLogging, repo models.Repo, pullNum int) error { return nil }
-func (m *mockVCSClient) GetPullLabels(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) { return nil, nil }
+func (m *mockVCSClient) DiscardReviews(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+	return nil
+}
+func (m *mockVCSClient) UpdateStatus(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, src, description, url string) error {
+	return nil
+}
+func (m *mockVCSClient) MergePull(log logging.SimpleLogging, pull models.PullRequest, opts models.PullRequestOptions) error {
+	return nil
+}
+func (m *mockVCSClient) GetModifiedFiles(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
+	return nil, nil
+}
+func (m *mockVCSClient) GetPullRequest(repo models.Repo, num int) (models.PullRequest, error) {
+	return models.PullRequest{}, nil
+}
+func (m *mockVCSClient) IsMergeable(repo models.Repo, pull models.PullRequest) (bool, error) {
+	return true, nil
+}
+func (m *mockVCSClient) ApprovePull(log logging.SimpleLogging, repo models.Repo, pullNum int) error {
+	return nil
+}
+func (m *mockVCSClient) UnapprovePull(log logging.SimpleLogging, repo models.Repo, pullNum int) error {
+	return nil
+}
+func (m *mockVCSClient) GetPullLabels(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
+	return nil, nil
+}
 func (m *mockVCSClient) AddPullLabel(repo models.Repo, pullNum int, label string) error { return nil }
-func (m *mockVCSClient) RemovePullLabel(repo models.Repo, pullNum int, label string) error { return nil }
+func (m *mockVCSClient) RemovePullLabel(repo models.Repo, pullNum int, label string) error {
+	return nil
+}
 func (m *mockVCSClient) GetUserName() (string, error) { return "", nil }
-func (m *mockVCSClient) GetTeamNamesForUser(log logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) { return nil, nil }
-func (m *mockVCSClient) GetCloneURL(log logging.SimpleLogging, hostType models.VCSHostType, cloneURL string) (string, error) { return cloneURL, nil }
-func (m *mockVCSClient) GetFileContent(log logging.SimpleLogging, pull models.PullRequest, filePath string) (bool, []byte, error) { return true, []byte{}, nil }
-func (m *mockVCSClient) HidePrevCommandComments(log logging.SimpleLogging, repo models.Repo, pullNum int, command string, workspace string) error { return nil }
-func (m *mockVCSClient) PullIsApproved(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) { return models.ApprovalStatus{}, nil }
-func (m *mockVCSClient) PullIsMergeable(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest, branch string, requiredStatuses []string) (bool, error) { return true, nil }
-func (m *mockVCSClient) ReactToComment(log logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error { return nil }
+func (m *mockVCSClient) GetTeamNamesForUser(log logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) {
+	return nil, nil
+}
+func (m *mockVCSClient) GetCloneURL(log logging.SimpleLogging, hostType models.VCSHostType, cloneURL string) (string, error) {
+	return cloneURL, nil
+}
+func (m *mockVCSClient) GetFileContent(log logging.SimpleLogging, pull models.PullRequest, filePath string) (bool, []byte, error) {
+	return true, []byte{}, nil
+}
+func (m *mockVCSClient) HidePrevCommandComments(log logging.SimpleLogging, repo models.Repo, pullNum int, command string, workspace string) error {
+	return nil
+}
+func (m *mockVCSClient) PullIsApproved(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
+	return models.ApprovalStatus{}, nil
+}
+func (m *mockVCSClient) PullIsMergeable(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest, branch string, requiredStatuses []string) (bool, error) {
+	return true, nil
+}
+func (m *mockVCSClient) ReactToComment(log logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error {
+	return nil
+}
 func (m *mockVCSClient) SupportsSingleFileDownload(repo models.Repo) bool { return true }
 
 func TestEnhancedLockingSystem_ProtectWorkingDir(t *testing.T) {
@@ -122,10 +160,10 @@ func TestEnhancedLockingSystem_MemoryLockPreventsRaceConditions(t *testing.T) {
 			return
 		}
 		firstLockAcquired <- true
-		
+
 		// Hold the lock for a short time to ensure second attempt happens while locked
 		time.Sleep(100 * time.Millisecond)
-		
+
 		// Release the lock
 		if resp.UnlockFn != nil {
 			_ = resp.UnlockFn()
@@ -136,7 +174,7 @@ func TestEnhancedLockingSystem_MemoryLockPreventsRaceConditions(t *testing.T) {
 	go func() {
 		// Wait a bit to ensure first lock is acquired
 		time.Sleep(50 * time.Millisecond)
-		
+
 		resp2, err2 := enhancedLocking.TryLockWithRetry(project, workspace, pull2, user)
 		secondAttemptDone <- resp2
 		secondErrorDone <- err2
@@ -187,4 +225,4 @@ func TestEnhancedLockingSystem_WorkingDirProtectionIsolation(t *testing.T) {
 	enhancedLocking.CleanupWorkingDirProtection(repoFullName, pullNum, "default")
 	assert.False(t, enhancedLocking.IsWorkingDirProtected(repoFullName, pullNum, "default"))
 	assert.True(t, enhancedLocking.IsWorkingDirProtected(repoFullName, pullNum, "staging"))
-} 
+}
