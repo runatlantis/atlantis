@@ -1432,6 +1432,27 @@ The effect of the race condition is more evident when using parallel configurati
   The paths in this argument should be absolute paths. Relative paths and globbing are currently not supported.
   If this argument is not provided, it defaults to Atlantis' data directory, determined by the `--data-dir` argument.
 
+### `--vcs-pull-req-status-fetcher-backoff`
+
+  ```bash
+  atlantis server --vcs-pull-req-status-fetcher-backoff=1000
+  # or
+  ATLANTIS_VCS_PULL_REQ_STATUS_FETCHER_BACKOFF=1000
+  ```
+
+  Backoff between pull request status retries in milliseconds.
+
+### `--vcs-pull-req-status-fetcher-retry-times`
+
+  ```bash
+  atlantis server --vcs-pull-req-status-fetcher-retry-times=3
+  # or
+  ATLANTIS_VCS_PULL_REQ_STATUS_FETCHER_RETRY_TIMES=3
+  ```
+
+  Number of attempts in order to fetch pull request status from vcs until we get succeful one 
+  or exhaust retries.
+
 ### `--vcs-status-name`
 
   ```bash
