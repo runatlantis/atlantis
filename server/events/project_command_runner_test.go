@@ -551,6 +551,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	Ok(t, err)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	run := runtime.RunStepRunner{
+		AtlantisVersion:         "1.2.3",
 		TerraformExecutor:       tfClient,
 		DefaultTFDistribution:   tfDistribution,
 		DefaultTFVersion:        tfVersion,
