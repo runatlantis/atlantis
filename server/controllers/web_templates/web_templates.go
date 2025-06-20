@@ -37,6 +37,7 @@ var templateFileNames = map[string]string{
 	"project-jobs":       "project-jobs.html.tmpl",
 	"project-jobs-error": "project-jobs-error.html.tmpl",
 	"github-app":         "github-app.html.tmpl",
+	"queues":             "queues.html.tmpl",
 }
 
 // TemplateWriter is an interface over html/template that's used to enable
@@ -129,3 +130,5 @@ type GithubSetupData struct {
 }
 
 var GithubAppSetupTemplate = templates.Lookup(templateFileNames["github-app"])
+
+var QueueTemplate = templates.Lookup(templateFileNames["queues"])
