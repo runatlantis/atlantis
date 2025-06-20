@@ -14,27 +14,27 @@ import (
 
 // QueueController handles all requests relating to Atlantis plan queues.
 type QueueController struct {
-	AtlantisVersion    string                       `validate:"required"`
-	AtlantisURL        *url.URL                     `validate:"required"`
-	Logger             logging.SimpleLogging        `validate:"required"`
-	QueueManager       models.PlanQueueManager      `validate:"required"`
-	QueueTemplate      web_templates.TemplateWriter `validate:"required"`
+	AtlantisVersion string                       `validate:"required"`
+	AtlantisURL     *url.URL                     `validate:"required"`
+	Logger          logging.SimpleLogging        `validate:"required"`
+	QueueManager    models.PlanQueueManager      `validate:"required"`
+	QueueTemplate   web_templates.TemplateWriter `validate:"required"`
 }
 
 // QueueData represents the data structure for queue template rendering
 type QueueData struct {
-	Queues         []QueueInfo
+	Queues          []QueueInfo
 	AtlantisVersion string
 	CleanedBasePath string
 }
 
 // QueueInfo represents a single queue entry for the UI
 type QueueInfo struct {
-	Project     string
-	Workspace   string
+	Project      string
+	Workspace    string
 	RepoFullName string
-	Entries     []QueueEntryInfo
-	UpdatedAt   string
+	Entries      []QueueEntryInfo
+	UpdatedAt    string
 }
 
 // QueueEntryInfo represents a single queue entry for the UI
@@ -70,16 +70,16 @@ func (q *QueueController) GetQueues(w http.ResponseWriter, r *http.Request) {
 		}
 
 		queueInfos = append(queueInfos, QueueInfo{
-			Project:     queue.Project.String(),
-			Workspace:   queue.Workspace,
+			Project:      queue.Project.String(),
+			Workspace:    queue.Workspace,
 			RepoFullName: queue.Project.RepoFullName,
-			Entries:     entries,
-			UpdatedAt:   queue.UpdatedAt.Format("2006-01-02 15:04:05"),
+			Entries:      entries,
+			UpdatedAt:    queue.UpdatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 
 	viewData := QueueData{
-		Queues:         queueInfos,
+		Queues:          queueInfos,
 		AtlantisVersion: q.AtlantisVersion,
 		CleanedBasePath: q.AtlantisURL.Path,
 	}
@@ -127,9 +127,9 @@ func (q *QueueController) GetQueueStatus(w http.ResponseWriter, r *http.Request)
 	}
 
 	response := map[string]interface{}{
-		"project":   queue.Project.String(),
-		"workspace": queue.Workspace,
-		"entries":   entries,
+		"project":    queue.Project.String(),
+		"workspace":  queue.Workspace,
+		"entries":    entries,
 		"updated_at": queue.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}
 
@@ -191,11 +191,11 @@ func (q *QueueController) GetAllQueues(w http.ResponseWriter, r *http.Request) {
 		}
 
 		queueList = append(queueList, map[string]interface{}{
-			"project":   queue.Project.String(),
-			"workspace": queue.Workspace,
+			"project":        queue.Project.String(),
+			"workspace":      queue.Workspace,
 			"repo_full_name": queue.Project.RepoFullName,
-			"entries":   entries,
-			"updated_at": queue.UpdatedAt.Format("2006-01-02 15:04:05"),
+			"entries":        entries,
+			"updated_at":     queue.UpdatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -217,13 +217,16 @@ func (q *QueueController) respond(w http.ResponseWriter, lvl logging.LogLevel, r
 func (q *QueueController) respondJSON(w http.ResponseWriter, responseCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(responseCode)
-	
+
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		q.Logger.Err("Failed to marshal JSON response: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	
-	w.Write(jsonData)
-} 
+
+	_, err = w.Write(jsonData)
+	if err != nil {
+		q.Logger.Err("Failed to write JSON response: %s", err)
+	}
+}
