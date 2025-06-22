@@ -26,7 +26,7 @@ debug: ## Output internal make variables
 
 .PHONY: build-service
 build-service: ## Build the main Go service
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o atlantis .
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -v -o atlantis .
 
 .PHONY: build
 build: build-service ## Runs make build-service

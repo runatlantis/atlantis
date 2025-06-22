@@ -65,8 +65,7 @@ type AsyncProjectCommandOutputHandler struct {
 	logger logging.SimpleLogging
 
 	// Tracks all the jobs for a pull request which is used for clean up after a pull request is closed.
-	pullToJobMapping     sync.Map
-	pullToJobMappingLock sync.RWMutex
+	pullToJobMapping sync.Map
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_project_command_output_handler.go ProjectCommandOutputHandler
@@ -110,28 +109,22 @@ func NewAsyncProjectCommandOutputHandler(
 }
 
 func (p *AsyncProjectCommandOutputHandler) GetPullToJobMapping() []PullInfoWithJobIDs {
-
 	var pullToJobMappings []PullInfoWithJobIDs
-	i := 0
-
-	p.pullToJobMappingLock.RLock()
-	defer p.pullToJobMappingLock.RUnlock()
 
 	p.pullToJobMapping.Range(func(key, value interface{}) bool {
 		pullInfo := key.(PullInfo)
-		jobIDMap := value.(map[string]JobIDInfo)
+		jobIDSyncMap := value.(*sync.Map)
 
-		p := PullInfoWithJobIDs{
+		var jobIDInfos []JobIDInfo
+		jobIDSyncMap.Range(func(_, v interface{}) bool {
+			jobIDInfos = append(jobIDInfos, v.(JobIDInfo))
+			return true
+		})
+
+		pullToJobMappings = append(pullToJobMappings, PullInfoWithJobIDs{
 			Pull:       pullInfo,
-			JobIDInfos: make([]JobIDInfo, 0, len(jobIDMap)),
-		}
-
-		for _, JobIDInfo := range jobIDMap {
-			p.JobIDInfos = append(p.JobIDInfos, JobIDInfo)
-		}
-
-		pullToJobMappings = append(pullToJobMappings, p)
-		i++
+			JobIDInfos: jobIDInfos,
+		})
 		return true
 	})
 
@@ -196,18 +189,16 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 
 		// Add job to pullToJob mapping
 		if _, ok := p.pullToJobMapping.Load(msg.JobInfo.PullInfo); !ok {
-			p.pullToJobMappingLock.Lock()
-			p.pullToJobMapping.Store(msg.JobInfo.PullInfo, map[string]JobIDInfo{})
-			p.pullToJobMappingLock.Unlock()
+			p.pullToJobMapping.Store(msg.JobInfo.PullInfo, &sync.Map{})
 		}
 		value, _ := p.pullToJobMapping.Load(msg.JobInfo.PullInfo)
-		jobMapping := value.(map[string]JobIDInfo)
-		jobMapping[msg.JobID] = JobIDInfo{
+		jobMapping := value.(*sync.Map)
+		jobMapping.Store(msg.JobID, JobIDInfo{
 			JobID:          msg.JobID,
 			JobDescription: msg.JobInfo.JobDescription,
 			Time:           time.Now(),
 			JobStep:        msg.JobInfo.JobStep,
-		}
+		})
 
 		// Forward new message to all receiver channels and output buffer
 		p.writeLogLine(msg.JobID, msg.Line)
@@ -305,16 +296,22 @@ func (p *AsyncProjectCommandOutputHandler) GetProjectOutputBuffer(jobID string) 
 }
 
 func (p *AsyncProjectCommandOutputHandler) GetJobIDMapForPull(pullInfo PullInfo) map[string]JobIDInfo {
+	result := make(map[string]JobIDInfo)
 	if value, ok := p.pullToJobMapping.Load(pullInfo); ok {
-		return value.(map[string]JobIDInfo)
+		jobIDSyncMap := value.(*sync.Map)
+		jobIDSyncMap.Range(func(k, v interface{}) bool {
+			result[k.(string)] = v.(JobIDInfo)
+			return true
+		})
 	}
-	return nil
+	return result
 }
 
 func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 	if value, ok := p.pullToJobMapping.Load(pullInfo); ok {
-		jobMapping := value.(map[string]JobIDInfo)
-		for jobID := range jobMapping {
+		jobIDSyncMap := value.(*sync.Map)
+		jobIDSyncMap.Range(func(k, _ interface{}) bool {
+			jobID := k.(string)
 			p.projectOutputBuffersLock.Lock()
 			delete(p.projectOutputBuffers, jobID)
 			p.projectOutputBuffersLock.Unlock()
@@ -322,12 +319,9 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 			p.receiverBuffersLock.Lock()
 			delete(p.receiverBuffers, jobID)
 			p.receiverBuffersLock.Unlock()
-		}
-
-		// Remove job mapping
-		p.pullToJobMappingLock.Lock()
+			return true
+		})
 		p.pullToJobMapping.Delete(pullInfo)
-		p.pullToJobMappingLock.Unlock()
 	}
 }
 

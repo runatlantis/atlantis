@@ -18,7 +18,9 @@ package main
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/DataDog/dd-trace-go/v2/profiler"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/spf13/viper"
@@ -33,6 +35,21 @@ var (
 )
 
 func main() {
+	err := profiler.Start(
+		profiler.WithService("atlantis"),
+		profiler.WithEnv("infra"),
+		profiler.WithProfileTypes(
+			profiler.CPUProfile,
+			profiler.HeapProfile,
+			profiler.BlockProfile,
+			profiler.MutexProfile,
+			profiler.GoroutineProfile,
+		),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer profiler.Stop()
 
 	v := viper.New()
 
