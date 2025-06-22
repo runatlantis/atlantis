@@ -65,7 +65,8 @@ type AsyncProjectCommandOutputHandler struct {
 	logger logging.SimpleLogging
 
 	// Tracks all the jobs for a pull request which is used for clean up after a pull request is closed.
-	pullToJobMapping sync.Map
+	pullToJobMapping     sync.Map
+	pullToJobMappingLock sync.RWMutex
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_project_command_output_handler.go ProjectCommandOutputHandler
@@ -110,8 +111,11 @@ func NewAsyncProjectCommandOutputHandler(
 
 func (p *AsyncProjectCommandOutputHandler) GetPullToJobMapping() []PullInfoWithJobIDs {
 
-	pullToJobMappings := []PullInfoWithJobIDs{}
+	var pullToJobMappings []PullInfoWithJobIDs
 	i := 0
+
+	p.pullToJobMappingLock.RLock()
+	defer p.pullToJobMappingLock.RUnlock()
 
 	p.pullToJobMapping.Range(func(key, value interface{}) bool {
 		pullInfo := key.(PullInfo)
@@ -192,7 +196,9 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 
 		// Add job to pullToJob mapping
 		if _, ok := p.pullToJobMapping.Load(msg.JobInfo.PullInfo); !ok {
+			p.pullToJobMappingLock.Lock()
 			p.pullToJobMapping.Store(msg.JobInfo.PullInfo, map[string]JobIDInfo{})
+			p.pullToJobMappingLock.Unlock()
 		}
 		value, _ := p.pullToJobMapping.Load(msg.JobInfo.PullInfo)
 		jobMapping := value.(map[string]JobIDInfo)
@@ -319,7 +325,9 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 		}
 
 		// Remove job mapping
+		p.pullToJobMappingLock.Lock()
 		p.pullToJobMapping.Delete(pullInfo)
+		p.pullToJobMappingLock.Unlock()
 	}
 }
 
