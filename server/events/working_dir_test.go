@@ -56,6 +56,53 @@ func TestClone_NoneExisting(t *testing.T) {
 	Equals(t, expCommit, actCommit)
 }
 
+// Test running on main branch with merge strategy
+func TestClone_MainBranchWithMergeStrategy(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+	expCommit := runCmd(t, repoDir, "git", "rev-parse", "main")
+
+	dataDir := t.TempDir()
+
+	logger := logging.NewNoopLogger(t)
+
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+	}
+
+	_, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		Num:        0,
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+	}, "default")
+	Ok(t, err)
+
+	// Create a file that we can use to check if the repo was recloned.
+	runCmd(t, dataDir, "touch", "repos/0/default/proof")
+
+	// re-clone to make sure we don't try to merge main into itself
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+	}, "default")
+	Ok(t, err)
+
+	// Use rev-parse to verify at correct commit.
+	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
+	Equals(t, expCommit, actCommit)
+
+	// Check that our proof file is still there, proving that we didn't reclone.
+	_, err = os.Stat(filepath.Join(cloneDir, "proof"))
+	Ok(t, err)
+}
+
 // Test that if we don't have any existing files, we check out the repo
 // successfully when we're using the merge method.
 func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
