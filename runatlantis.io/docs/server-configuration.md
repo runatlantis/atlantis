@@ -51,7 +51,7 @@ Values are chosen in this order:
 
 ## Flags
 
-### `--allow-commands` <Badge text="v0.34.0+" type="info"/>
+### `--allow-commands` <Badge text="v0.27.0+" type="info"/>
 
 ```bash
 atlantis server --allow-commands=version,plan,apply,unlock,approve_policies
@@ -63,9 +63,9 @@ List of allowed commands to be run on the Atlantis server, Defaults to `version,
 
 Notes:
 
-- Accepts a comma separated list, ex. `command1,command2`.
-- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state` and `all` are available.
-- `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
+-  Accepts a comma separated list, ex. `command1,command2`.
+-  `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state` and `all` are available.
+-  `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
 
 ### `--allow-draft-prs` <Badge text="v0.13.0" type="info"/>
 
@@ -77,7 +77,7 @@ ATLANTIS_ALLOW_DRAFT_PRS=true
 
 Respond to pull requests from draft prs. Defaults to `false`.
 
-### `--allow-fork-prs` <Badge text="v0.34.0+" type="info"/>
+### `--allow-fork-prs` <Badge text="v0.3.1+" type="info"/>
 
 ```bash
 atlantis server --allow-fork-prs
@@ -119,8 +119,8 @@ where `$port` is from the [`--port`](#port) flag. Supports a basepath if you're 
 
 Notes:
 
-- If a load balancer with a non http/https port (not the one defined in the `--port` flag) is used, update the URL to include the port like in the example above.
-- This URL is used as the `details` link next to each atlantis job to view the job's logs.
+-  If a load balancer with a non http/https port (not the one defined in the `--port` flag) is used, update the URL to include the port like in the example above.
+-  This URL is used as the `details` link next to each atlantis job to view the job's logs.
 
 ### `--autodiscover-mode` <Badge text="v0.27.0+" type="info"/>
 
@@ -164,22 +164,22 @@ List of file patterns that Atlantis will use to check if a directory contains mo
 
 Notes:
 
-- Accepts a comma separated list, ex. `pattern1,pattern2`.
-- Patterns use the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
-- List of file patterns will be used by both automatic and manually run plans.
-- When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json`, `terragrunt.hcl` and `.terraform.lock.hcl` files
+-  Accepts a comma separated list, ex. `pattern1,pattern2`.
+-  Patterns use the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
+-  List of file patterns will be used by both automatic and manually run plans.
+-  When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json`, `terragrunt.hcl` and `.terraform.lock.hcl` files
    (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
-- Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
-- A custom [Workflow](repo-level-atlantis-yaml.md#configuring-planning) that uses autoplan `when_modified` will ignore this value.
+-  Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
+-  A custom [Workflow](repo-level-atlantis-yaml.md#configuring-planning) that uses autoplan `when_modified` will ignore this value.
 
    Examples:
 
-- Autoplan when any `*.tf` or `*.tfvars` file is modified.
-  - `--autoplan-file-list='**/*.tf,**/*.tfvars'`
-- Autoplan when any `*.tf` file is modified except in `project2/` directory
-  - `--autoplan-file-list='**/*.tf,!project2'`
-- Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
-  - `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
+-  Autoplan when any `*.tf` or `*.tfvars` file is modified.
+   -  `--autoplan-file-list='**/*.tf,**/*.tfvars'`
+-  Autoplan when any `*.tf` file is modified except in `project2/` directory
+   -  `--autoplan-file-list='**/*.tf,!project2'`
+-  Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
+   -  `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
 
 ::: warning NOTE
 By default, changes to modules will not trigger autoplanning. See the flags below.
@@ -217,8 +217,8 @@ Current default is "" (disabled).
 
 Examples:
 
-- `**/*.tf` - will index all projects that have a `.tf` file in their directory, and plan them whenever an in-repo module dependency has changed.
-- `**/*.tf,!foo,!bar` - will index all projects containing `.tf` except `foo` and `bar` and plan them whenever an in-repo module dependency has changed.
+-  `**/*.tf` - will index all projects that have a `.tf` file in their directory, and plan them whenever an in-repo module dependency has changed.
+-  `**/*.tf,!foo,!bar` - will index all projects containing `.tf` except `foo` and `bar` and plan them whenever an in-repo module dependency has changed.
    This allows projects to opt-out of auto-planning when a module dependency changes.
 
 ::: warning NOTE
@@ -231,7 +231,7 @@ This flag overrides `--autoplan-modules`. If you wish to disable auto-planning o
 and set `--autoplan-modules` to `false`.
 :::
 
-### `--azuredevops-hostname` <Badge text="v0.35.0+" type="info"/>
+### `--azuredevops-hostname` <Badge text="v0.9.0+" type="info"/>
 
 ```bash
 atlantis server --azuredevops-hostname="dev.azure.com"
@@ -255,7 +255,7 @@ What to do if you have pending plans that were generated with a previous version
 Running an atlantis unlock from v0.35.0 on your current PRs will ignore the files on the `MYCompany` folder. On the next atlantis plan will use the `mycompany` folder and generate everything in the new folder name
 :::
 
-### `--azuredevops-token` <Badge text="v0.35.0+" type="info"/>
+### `--azuredevops-token` <Badge text="v0.9.0+" type="info"/>
 
 ```bash
 atlantis server --azuredevops-token="RandomStringProducedByAzureDevOps"
@@ -265,7 +265,7 @@ ATLANTIS_AZUREDEVOPS_TOKEN="RandomStringProducedByAzureDevOps"
 
 Azure DevOps token of API user.
 
-### `--azuredevops-user` <Badge text="v0.35.0+" type="info"/>
+### `--azuredevops-user` <Badge text="v0.9.0+" type="info"/>
 
 ```bash
 atlantis server --azuredevops-user="username@example.com"
@@ -275,7 +275,7 @@ ATLANTIS_AZUREDEVOPS_USER="username@example.com"
 
 Azure DevOps username of API user.
 
-### `--azuredevops-webhook-password` <Badge text="v0.35.0+" type="info"/>
+### `--azuredevops-webhook-password` <Badge text="v0.9.0+" type="info"/>
 
 ```bash
 atlantis server --azuredevops-webhook-password="password123"
@@ -294,7 +294,7 @@ actions. Should be specified via the `ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD` env
 variable.
 :::
 
-### `--azuredevops-webhook-user` <Badge text="v0.35.0+" type="info"/>
+### `--azuredevops-webhook-user` <Badge text="v0.9.0+" type="info"/>
 
 ```bash
 atlantis server --azuredevops-webhook-user="username@example.com"
@@ -351,7 +351,7 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
-### `--checkout-depth` <Badge text="v0.37.0+" type="info"/>
+### `--checkout-depth` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
 atlantis server --checkout-depth=0
@@ -362,7 +362,7 @@ ATLANTIS_CHECKOUT_DEPTH=0
 The number of commits to fetch from the branch. Used if `--checkout-strategy=merge` since the `--checkout-strategy=branch` (default) checkout strategy always defaults to a shallow clone using a depth of 1.
 Defaults to `0`. See [Checkout Strategy](checkout-strategy.md) for more details.
 
-### `--checkout-strategy` <Badge text="v0.37.0+" type="info"/>
+### `--checkout-strategy` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
 atlantis server --checkout-strategy="<branch|merge>"
@@ -518,9 +518,9 @@ Defaults to "" (empty string).
 ::: warning NOTE
 Each VCS provider supports a different list of emojis:
 
-- [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
-- [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
-- [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
+-  [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
+-  [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
+-  [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
 
    :::
 
@@ -790,7 +790,7 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
-### `--gitea-base-url` <Badge text="v0.39.0+" type="info"/>
+### `--gitea-base-url` <Badge text="v0.32.0+" type="info"/>
 
 ```bash
 atlantis server --gitea-base-url="http://your-gitea.corp:7990/basepath"
@@ -800,7 +800,7 @@ ATLANTIS_GITEA_BASE_URL="http://your-gitea.corp:7990/basepath"
 
 Base URL of Gitea installation. Must include `http://` or `https://`. Defaults to `https://gitea.com` if left empty/absent.
 
-### `--gitea-page-size` <Badge text="v0.39.0+" type="info"/>
+### `--gitea-page-size` <Badge text="v0.32.0+" type="info"/>
 
 ```bash
 atlantis server --gitea-page-size=30
@@ -815,7 +815,7 @@ The default value conforms to the Gitea server's standard config setting: DEFAUL
 The highest valid value depends on the Gitea server's config setting: MAX_RESPONSE_ITEMS
 :::
 
-### `--gitea-token` <Badge text="v0.39.0+" type="info"/>
+### `--gitea-token` <Badge text="v0.32.0+" type="info"/>
 
 ```bash
 atlantis server --gitea-token="token"
@@ -825,7 +825,7 @@ ATLANTIS_GITEA_TOKEN="token"
 
 Gitea app password of API user.
 
-### `--gitea-user` <Badge text="v0.39.0+" type="info"/>
+### `--gitea-user` <Badge text="v0.32.0+" type="info"/>
 
 ```bash
 atlantis server --gitea-user="myuser"
@@ -835,7 +835,7 @@ ATLANTIS_GITEA_USER="myuser"
 
 Gitea username of API user.
 
-### `--gitea-webhook-secret` <Badge text="v0.39.0+" type="info"/>
+### `--gitea-webhook-secret` <Badge text="v0.32.0+" type="info"/>
 
 ```bash
 atlantis server --gitea-webhook-secret="secret"
@@ -1006,8 +1006,8 @@ The locking database type to use for storing plan and apply locks. Defaults to `
 
 Notes:
 
-- If set to `boltdb`, only one process may have access to the boltdb instance.
-- If set to `redis`, then `--redis-host`, `--redis-port`, and `--redis-password` must be set.
+-  If set to `boltdb`, only one process may have access to the boltdb instance.
+-  If set to `redis`, then `--redis-host`, `--redis-port`, and `--redis-password` must be set.
 
 ### `--log-level` <Badge text="v0.1.0+" type="info"/>
 
@@ -1177,31 +1177,31 @@ Atlantis requires you to specify an allowlist of repositories it will accept web
 
 Notes:
 
-- Accepts a comma separated list, ex. `definition1,definition2`
-- Format is `{hostname}/{owner}/{repo}`, ex. `github.com/runatlantis/atlantis`
-- `*` matches any characters, ex. `github.com/runatlantis/*` will match all repos in the runatlantis organization
-- An entry beginning with `!` negates it, ex. `github.com/foo/*,!github.com/foo/bar` will match all github repos in the `foo` owner _except_ `bar`.
-- For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
-  - User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
-- For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
-- Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo allowlist for each repository until the change is complete.
+-  Accepts a comma separated list, ex. `definition1,definition2`
+-  Format is `{hostname}/{owner}/{repo}`, ex. `github.com/runatlantis/atlantis`
+-  `*` matches any characters, ex. `github.com/runatlantis/*` will match all repos in the runatlantis organization
+-  An entry beginning with `!` negates it, ex. `github.com/foo/*,!github.com/foo/bar` will match all github repos in the `foo` owner _except_ `bar`.
+-  For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
+   -  User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
+-  For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
+-  Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo allowlist for each repository until the change is complete.
 
    Examples:
 
-- Allowlist `myorg/repo1` and `myorg/repo2` on `github.com`
-  - `--repo-allowlist=github.com/myorg/repo1,github.com/myorg/repo2`
-- Allowlist all repos under `myorg` on `github.com`
-  - `--repo-allowlist='github.com/myorg/*'`
-- Allowlist all repos under `myorg` on `github.com`, excluding `myorg/untrusted-repo`
-  - `--repo-allowlist='github.com/myorg/*,!github.com/myorg/untrusted-repo'`
-- Allowlist all repos in my GitHub Enterprise installation
-  - `--repo-allowlist='github.yourcompany.com/*'`
-- Allowlist all repos under `myorg` project `myproject` on Azure DevOps
-  - `--repo-allowlist='myorg.visualstudio.com/myproject/*,dev.azure.com/myorg/myproject/*'`
-- Allowlist all repositories
-  - `--repo-allowlist='*'`
+-  Allowlist `myorg/repo1` and `myorg/repo2` on `github.com`
+   -  `--repo-allowlist=github.com/myorg/repo1,github.com/myorg/repo2`
+-  Allowlist all repos under `myorg` on `github.com`
+   -  `--repo-allowlist='github.com/myorg/*'`
+-  Allowlist all repos under `myorg` on `github.com`, excluding `myorg/untrusted-repo`
+   -  `--repo-allowlist='github.com/myorg/*,!github.com/myorg/untrusted-repo'`
+-  Allowlist all repos in my GitHub Enterprise installation
+   -  `--repo-allowlist='github.yourcompany.com/*'`
+-  Allowlist all repos under `myorg` project `myproject` on Azure DevOps
+   -  `--repo-allowlist='myorg.visualstudio.com/myproject/*,dev.azure.com/myorg/myproject/*'`
+-  Allowlist all repositories
+   -  `--repo-allowlist='*'`
 
-### `--repo-config` <Badge text="v0.38.0+" type="info"/>
+### `--repo-config` <Badge text="v0.27.0+" type="info"/>
 
 ```bash
 atlantis server --repo-config="path/to/repos.yaml"
@@ -1211,7 +1211,7 @@ ATLANTIS_REPO_CONFIG="path/to/repos.yaml"
 
 Path to a YAML server-side repo config file. See [Server Side Repo Config](server-side-repo-config.md).
 
-### `--repo-config-json` <Badge text="v0.38.0+" type="info"/>
+### `--repo-config-json` <Badge text="v0.27.0+" type="info"/>
 
 ```bash
 atlantis server --repo-config-json='{"repos":[{"id":"/.*/", "apply_requirements":["mergeable"]}]}'
@@ -1453,8 +1453,8 @@ Set to false if you want to disable terraform plugin cache.
 
 This flag is useful when having multiple projects that need to run a plan and apply in the same PR to avoid the race condition of `plugin_cache_dir` concurrently, this is a terraform known issue, more info:
 
-- [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
-- [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
+-  [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
+-  [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
 
 The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
 
