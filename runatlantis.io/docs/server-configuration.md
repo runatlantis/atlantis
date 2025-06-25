@@ -1186,7 +1186,7 @@ Notes:
 -  For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
 -  Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo allowlist for each repository until the change is complete.
 
-   Examples:
+Examples:
 
 -  Allowlist `myorg/repo1` and `myorg/repo2` on `github.com`
    -  `--repo-allowlist=github.com/myorg/repo1,github.com/myorg/repo2`
@@ -1544,18 +1544,6 @@ ATLANTIS_WRITE_GIT_CREDS=true
 ```
 
 Write out a .git-credentials file with the provider user and token to allow
-cloning private modules over HTTPS or SSH. See [here](https://git-scm.com/docs/git-credential-store) for more information.
+cloning private modules over HTTPS or SSH. See [Git Credential Store documentation](https://git-scm.com/docs/git-credential-store) for more information.
 
-Follow the `git::ssh` syntax to avoid using a custom `.gitconfig` with an `insteadOf`.
-
-```hcl
-module "private_submodule" {
-  source = "git::ssh://git@github.com/<org>/<repo>//modules/<some-module-name>?ref=v1.2.3"
-
-  # ...
-}
-```
-
-::: warning SECURITY WARNING
-This does write secrets to disk and should only be enabled in a secure environment.
-:::
+Follow the `git::ssh`
