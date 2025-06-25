@@ -22,8 +22,8 @@ more details.
 
 **Notes:**
 
--  By default, repo root `atlantis.yaml` file is used.
--  You can change this behaviour by setting [Server Side Repo Config](server-side-repo-config.md)
+- By default, repo root `atlantis.yaml` file is used.
+- You can change this behaviour by setting [Server Side Repo Config](server-side-repo-config.md)
 
 ::: danger DANGER
 Atlantis uses the `atlantis.yaml` version from the pull request, similar to other
@@ -214,10 +214,10 @@ projects:
 
 Note:
 
--  `when_modified` uses the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
--  The paths are relative to the project's directory.
--  `when_modified` will be used by both automatic and manually run plans.
--  `when_modified` will continue to work for manually run plans even when autoplan is disabled.
+- `when_modified` uses the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
+- The paths are relative to the project's directory.
+- `when_modified` will be used by both automatic and manually run plans.
+- `when_modified` will continue to work for manually run plans even when autoplan is disabled.
 
 ### Supporting Terraform Workspaces
 
