@@ -151,7 +151,7 @@ ATLANTIS_AUTOMERGE=true
 Automatically merge pull requests after all plans have been successfully applied.
 Defaults to `false`. See [Automerging](automerging.md) for more details.
 
-### `--autoplan-file-list` <Badge text="v0.17.0" type="info"/>
+### `--autoplan-file-list` <Badge text="v0.15.0+" type="info"/>
 
 ```bash
 # NOTE: Use single quotes to avoid shell expansion of *.
@@ -172,7 +172,7 @@ Notes:
 -  Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
 -  A custom [Workflow](repo-level-atlantis-yaml.md#configuring-planning) that uses autoplan `when_modified` will ignore this value.
 
-   Examples:
+Examples:
 
 -  Autoplan when any `*.tf` or `*.tfvars` file is modified.
    -  `--autoplan-file-list='**/*.tf,**/*.tfvars'`
@@ -362,7 +362,7 @@ ATLANTIS_CHECKOUT_DEPTH=0
 The number of commits to fetch from the branch. Used if `--checkout-strategy=merge` since the `--checkout-strategy=branch` (default) checkout strategy always defaults to a shallow clone using a depth of 1.
 Defaults to `0`. See [Checkout Strategy](checkout-strategy.md) for more details.
 
-### `--checkout-strategy` <Badge text="v0.28.0+" type="info"/>
+### `--checkout-strategy` <Badge text="v0.9.0+" type="info"/>
 
 ```bash
 atlantis server --checkout-strategy="<branch|merge>"
@@ -373,7 +373,7 @@ ATLANTIS_CHECKOUT_STRATEGY="<branch|merge>"
 How to check out pull requests. Use either `branch` or `merge`.
 Defaults to `branch`. See [Checkout Strategy](checkout-strategy.md) for more details.
 
-### `--config` <Badge text="v0.38.0+" type="info"/>
+### `--config` <Badge text="v0.1.0+" type="info"/>
 
 ```bash
 atlantis server --config="my/config/file.yaml"
@@ -420,7 +420,7 @@ ATLANTIS_DEFAULT_TF_VERSION="v0.12.31"
 Terraform version to default to. Will download to `<data-dir>/bin/terraform<version>`
 if not in `PATH`. See [Terraform Versions](terraform-versions.md) for more details.
 
-### `--disable-apply-all` <Badge text="v0.16.0" type="info"/>
+### `--disable-apply-all` <Badge text="v0.9.0+" type="info"/>
 
 ```bash
 atlantis server --disable-apply-all
@@ -431,7 +431,7 @@ ATLANTIS_DISABLE_APPLY_ALL=true
 Disable `atlantis apply` command so a specific project/workspace/directory has to
 be specified for applies.
 
-### `--disable-autoplan` <Badge text="v0.15.0" type="info"/>
+### `--disable-autoplan` <Badge text="v0.15.0+" type="info"/>
 
 ```bash
 atlantis server --disable-autoplan
@@ -611,7 +611,7 @@ Comment command trigger executable name. Defaults to `atlantis`.
 
 This is useful when running multiple Atlantis servers against a single repository.
 
-### `--fail-on-pre-workflow-hook-error` <Badge text="v0.31.0+" type="info"/>
+### `--fail-on-pre-workflow-hook-error` <Badge text="v0.27.0+" type="info"/>
 
 ```bash
 atlantis server --fail-on-pre-workflow-hook-error
