@@ -1201,7 +1201,7 @@ Notes:
 -  Allowlist all repositories
    -  `--repo-allowlist='*'`
 
-### `--repo-config` <Badge text="v0.27.0+" type="info"/>
+### `--repo-config` <Badge text="v0.5.0+" type="info"/>
 
 ```bash
 atlantis server --repo-config="path/to/repos.yaml"
@@ -1211,7 +1211,7 @@ ATLANTIS_REPO_CONFIG="path/to/repos.yaml"
 
 Path to a YAML server-side repo config file. See [Server Side Repo Config](server-side-repo-config.md).
 
-### `--repo-config-json` <Badge text="v0.27.0+" type="info"/>
+### `--repo-config-json` <Badge text="v0.5.0+" type="info"/>
 
 ```bash
 atlantis server --repo-config-json='{"repos":[{"id":"/.*/", "apply_requirements":["mergeable"]}]}'
