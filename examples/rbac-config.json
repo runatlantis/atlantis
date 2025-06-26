@@ -1,0 +1,118 @@
+{
+  "session_secret": "change-me-in-production-use-a-strong-secret",
+  "session_duration": "24h",
+  "session_cookie_name": "atlantis_session",
+  "secure_cookies": false,
+  "csrf_secret": "change-me-in-production-use-a-strong-csrf-secret",
+  "enable_basic_auth": true,
+  "basic_auth_user": "atlantis",
+  "basic_auth_pass": "atlantis",
+  "default_roles": ["user"],
+  "admin_groups": ["admin", "administrators", "devops"],
+  "admin_emails": ["admin@example.com", "devops@example.com"],
+  "roles": {
+    "lock-manager": {
+      "name": "lock-manager",
+      "permissions": [
+        "lock:read",
+        "lock:create",
+        "lock:delete",
+        "lock:force",
+        "repo:read",
+        "plan:read"
+      ],
+      "description": "Can manage locks and read repositories/plans"
+    },
+    "plan-approver": {
+      "name": "plan-approver",
+      "permissions": [
+        "repo:read",
+        "lock:read",
+        "plan:read",
+        "plan:create",
+        "plan:apply",
+        "plan:delete"
+      ],
+      "description": "Can approve and apply plans"
+    },
+    "policy-admin": {
+      "name": "policy-admin",
+      "permissions": [
+        "repo:read",
+        "lock:read",
+        "plan:read",
+        "policy:read",
+        "policy:write",
+        "admin:read"
+      ],
+      "description": "Can manage policies and read admin info"
+    },
+    "read-only": {
+      "name": "read-only",
+      "permissions": ["repo:read", "lock:read", "plan:read", "policy:read"],
+      "description": "Read-only access to all resources"
+    },
+    "emergency-admin": {
+      "name": "emergency-admin",
+      "permissions": [
+        "repo:read",
+        "repo:write",
+        "repo:delete",
+        "lock:read",
+        "lock:create",
+        "lock:delete",
+        "lock:force",
+        "plan:read",
+        "plan:create",
+        "plan:apply",
+        "plan:delete",
+        "policy:read",
+        "policy:write",
+        "admin:read",
+        "admin:write"
+      ],
+      "description": "Emergency administrator with broad permissions"
+    }
+  },
+  "providers": [
+    {
+      "type": "oidc",
+      "id": "google",
+      "name": "Google",
+      "client_id": "your-google-client-id.apps.googleusercontent.com",
+      "client_secret": "your-google-client-secret",
+      "redirect_url": "https://your-atlantis-domain.com/auth/callback?provider=google",
+      "scopes": ["openid", "email", "profile"],
+      "enabled": true,
+      "default_roles": ["user"],
+      "allowed_groups": [
+        "admin",
+        "devops",
+        "engineers",
+        "lock-managers",
+        "plan-approvers"
+      ],
+      "allowed_emails": ["admin@example.com", "devops@example.com"]
+    },
+    {
+      "type": "oidc",
+      "id": "okta",
+      "name": "Okta",
+      "client_id": "your-okta-client-id",
+      "client_secret": "your-okta-client-secret",
+      "redirect_url": "https://your-atlantis-domain.com/auth/callback?provider=okta",
+      "issuer_url": "https://your-org.okta.com",
+      "scopes": ["openid", "email", "profile", "groups"],
+      "enabled": true,
+      "default_roles": ["user"],
+      "allowed_groups": [
+        "admin",
+        "devops",
+        "engineers",
+        "lock-managers",
+        "plan-approvers"
+      ],
+      "allowed_emails": ["admin@example.com", "devops@example.com"]
+    }
+  ]
+}

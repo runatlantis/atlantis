@@ -1,0 +1,81 @@
+{
+  "session_secret": "change-me-in-production-use-a-strong-secret",
+  "session_duration": "24h",
+  "session_cookie_name": "atlantis_session",
+  "secure_cookies": false,
+  "csrf_secret": "change-me-in-production-use-a-strong-csrf-secret",
+  "enable_basic_auth": true,
+  "basic_auth_user": "atlantis",
+  "basic_auth_pass": "atlantis",
+  "default_roles": ["user"],
+  "admin_groups": ["admin", "administrators", "devops"],
+  "admin_emails": ["admin@example.com", "devops@example.com"],
+  "providers": [
+    {
+      "type": "oauth2",
+      "id": "google",
+      "name": "Google",
+      "client_id": "your-google-client-id.apps.googleusercontent.com",
+      "client_secret": "your-google-client-secret",
+      "redirect_url": "https://your-atlantis-domain.com/auth/callback?provider=google",
+      "scopes": ["openid", "email", "profile"],
+      "enabled": true,
+      "default_roles": ["user"],
+      "allowed_groups": ["admin", "devops", "engineers"],
+      "allowed_emails": ["admin@example.com", "devops@example.com"]
+    },
+    {
+      "type": "oidc",
+      "id": "okta",
+      "name": "Okta",
+      "client_id": "your-okta-client-id",
+      "client_secret": "your-okta-client-secret",
+      "redirect_url": "https://your-atlantis-domain.com/auth/callback?provider=okta",
+      "issuer_url": "https://your-org.okta.com",
+      "scopes": ["openid", "email", "profile", "groups"],
+      "enabled": true,
+      "default_roles": ["user"],
+      "allowed_groups": ["admin", "devops", "engineers"],
+      "allowed_emails": ["admin@example.com", "devops@example.com"]
+    },
+    {
+      "type": "oidc",
+      "id": "azure",
+      "name": "Azure AD",
+      "client_id": "your-azure-client-id",
+      "client_secret": "your-azure-client-secret",
+      "redirect_url": "https://your-atlantis-domain.com/auth/callback?provider=azure",
+      "issuer_url": "https://login.microsoftonline.com/your-tenant-id",
+      "scopes": ["openid", "email", "profile", "User.Read"],
+      "enabled": true,
+      "default_roles": ["user"],
+      "allowed_groups": ["admin", "devops", "engineers"],
+      "allowed_emails": ["admin@example.com", "devops@example.com"]
+    },
+    {
+      "type": "oidc",
+      "id": "auth0",
+      "name": "Auth0",
+      "client_id": "your-auth0-client-id",
+      "client_secret": "your-auth0-client-secret",
+      "redirect_url": "https://your-atlantis-domain.com/auth/callback?provider=auth0",
+      "issuer_url": "https://your-tenant.auth0.com",
+      "scopes": ["openid", "email", "profile"],
+      "enabled": true,
+      "default_roles": ["user"],
+      "allowed_groups": ["admin", "devops", "engineers"],
+      "allowed_emails": ["admin@example.com", "devops@example.com"]
+    },
+    {
+      "type": "basic",
+      "id": "basic",
+      "name": "Basic Authentication",
+      "client_id": "atlantis",
+      "client_secret": "atlantis",
+      "enabled": true,
+      "default_roles": ["user"],
+      "allowed_groups": ["admin"],
+      "allowed_emails": ["admin@example.com"]
+    }
+  ]
+}
