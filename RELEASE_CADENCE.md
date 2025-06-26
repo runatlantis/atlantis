@@ -57,6 +57,8 @@ In case of critical security vulnerabilities or severe bugs:
 -  **Testing**: Help test release candidates
 -  **Documentation**: Contribute to release notes and migration guides
 
+For detailed information about contributing to Atlantis, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 ## Release History
 
 For detailed information about past releases, see:
