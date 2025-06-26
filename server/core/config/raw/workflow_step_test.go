@@ -3,10 +3,10 @@ package raw_test
 import (
 	"testing"
 
+	yaml "github.com/goccy/go-yaml"
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v3"
 )
 
 func TestWorkflowHook_YAMLMarshalling(t *testing.T) {
@@ -47,7 +47,11 @@ key: value`,
 key:
   value:
     another: map`,
-			expErr: "yaml: unmarshal errors:\n  line 3: cannot unmarshal !!map into string",
+			expErr: `[3:8] cannot unmarshal map[string]interface {} into Go value of type string
+   2 | key:
+>  3 |   value:
+              ^
+   4 |     another: map`,
 		},
 	}
 
