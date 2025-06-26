@@ -10,27 +10,6 @@ Atlantis follows a **monthly release cadence** to provide regular, predictable u
 -  **Timing**: First week OR last week of every month (but only once per month)
 -  **Release Day**: Typically Tuesday or Wednesday to allow for weekend buffer
 
-## Release Process
-
-### Pre-Release (1 week before)
-
-1. **Feature Freeze**: No new features are merged to main
-2. **Bug Fixes Only**: Only critical bug fixes and security patches are accepted
-3. **Testing**: Comprehensive testing of the release candidate
-4. **Documentation**: Update CHANGELOG.md with all changes
-
-### Release Week
-
-1. **Monday**: Final testing and validation
-2. **Tuesday/Wednesday**: Create and publish the release
-3. **Thursday/Friday**: Monitor for any critical issues
-
-### Post-Release (1 week after)
-
-1. **Monitoring**: Watch for any critical issues or regressions
-2. **Hotfixes**: Address any critical issues discovered post-release
-3. **Documentation**: Update any missing documentation
-
 ## Versioning
 
 Atlantis follows [Semantic Versioning](https://semver.org/) (SemVer):
@@ -57,7 +36,7 @@ A release is ready when:
 
 1. ✅ All tests pass
 2. ✅ Documentation is updated
-3. ✅ CHANGELOG.md is current
+3. ✅ Release notes are current
 4. ✅ No known critical bugs
 5. ✅ Security scan passes
 6. ✅ Performance benchmarks are acceptable
@@ -83,7 +62,6 @@ In case of critical security vulnerabilities or severe bugs:
 For detailed information about past releases, see:
 
 -  [GitHub Releases](https://github.com/runatlantis/atlantis/releases)
--  [CHANGELOG.md](./CHANGELOG.md)
 
 ---
 
