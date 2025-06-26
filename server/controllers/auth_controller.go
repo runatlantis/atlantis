@@ -2,12 +2,62 @@ package controllers
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/url"
 
 	"github.com/runatlantis/atlantis/server/auth"
 	"github.com/runatlantis/atlantis/server/logging"
 )
+
+var loginTemplate = template.Must(template.New("login").Parse(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Atlantis - Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{.BasePath}}/static/css/normalize.css">
+    <link rel="stylesheet" href="{{.BasePath}}/static/css/skeleton.css">
+    <link rel="stylesheet" href="{{.BasePath}}/static/css/custom.css">
+    <link rel="icon" type="image/png" href="{{.BasePath}}/static/images/atlantis-icon.png">
+</head>
+<body>
+<div class="container">
+    <section class="header">
+        <a title="atlantis" href="{{.BasePath}}/"><img class="hero" src="{{.BasePath}}/static/images/atlantis-icon_512.png"/></a>
+        <p class="title-heading">Atlantis</p>
+        <p class="title-heading"><strong>Login</strong></p>
+    </section>
+    <section>
+        <div class="row">
+            <div class="six columns offset-by-three">
+                <h5>Choose your login method:</h5>
+                {{range .Providers}}
+                <a class="button button-primary u-full-width" href="{{.AuthURL}}">
+                    Login with {{.Name}}
+                </a>
+                {{end}}
+            </div>
+        </div>
+    </section>
+</div>
+<footer>
+    <p>Atlantis SSO Authentication</p>
+</footer>
+</body>
+</html>
+`))
+
+type loginProviderData struct {
+	Name   string
+	AuthURL string
+}
+
+type loginPageData struct {
+	BasePath  string
+	Providers []loginProviderData
+}
 
 // AuthController handles authentication-related HTTP requests
 type AuthController struct {
@@ -103,29 +153,7 @@ func (c *AuthController) redirectToProvider(w http.ResponseWriter, r *http.Reque
 
 // showLoginPage displays a simple login page with available providers
 func (c *AuthController) showLoginPage(w http.ResponseWriter, r *http.Request, providers []auth.Provider) {
-	html := `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Atlantis - Login</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="` + c.BaseURL.Path + `/static/css/normalize.css">
-    <link rel="stylesheet" href="` + c.BaseURL.Path + `/static/css/skeleton.css">
-    <link rel="stylesheet" href="` + c.BaseURL.Path + `/static/css/custom.css">
-    <link rel="icon" type="image/png" href="` + c.BaseURL.Path + `/static/images/atlantis-icon.png">
-</head>
-<body>
-<div class="container">
-    <section class="header">
-        <a title="atlantis" href="` + c.BaseURL.Path + `/"><img class="hero" src="` + c.BaseURL.Path + `/static/images/atlantis-icon_512.png"/></a>
-        <p class="title-heading">Atlantis</p>
-        <p class="title-heading"><strong>Login</strong></p>
-    </section>
-    <section>
-        <div class="row">
-            <div class="six columns offset-by-three">
-                <h5>Choose your login method:</h5>`
-
+	var providerData []loginProviderData
 	for _, provider := range providers {
 		if provider.GetType() == auth.ProviderTypeOAuth2 || provider.GetType() == auth.ProviderTypeOIDC {
 			state, err := c.generateState()
@@ -133,34 +161,27 @@ func (c *AuthController) showLoginPage(w http.ResponseWriter, r *http.Request, p
 				c.Logger.Err("Failed to generate state for provider %s: %s", provider.GetID(), err)
 				continue
 			}
-
 			authURL, err := provider.InitAuthURL(state)
 			if err != nil {
 				c.Logger.Err("Failed to generate auth URL for provider %s: %s", provider.GetID(), err)
 				continue
 			}
-
-			html += `
-                <a class="button button-primary u-full-width" href="` + authURL + `">
-                    Login with ` + provider.GetName() + `
-                </a>`
+			providerData = append(providerData, loginProviderData{
+				Name:   provider.GetName(),
+				AuthURL: authURL,
+			})
 		}
 	}
-
-	html += `
-            </div>
-        </div>
-    </section>
-</div>
-<footer>
-    <p>Atlantis SSO Authentication</p>
-</footer>
-</body>
-</html>`
-
+	data := loginPageData{
+		BasePath:  c.BaseURL.Path,
+		Providers: providerData,
+	}
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(html))
+	if err := loginTemplate.Execute(w, data); err != nil {
+		c.Logger.Err("Failed to render login template: %s", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // handleOAuthCallback processes OAuth2/OIDC callback
