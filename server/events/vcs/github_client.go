@@ -125,11 +125,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 		return nil, errors.Wrap(err, "error initializing github authentication transport")
 	}
 
-	transportWithRateLimit, err := github_ratelimit.NewRateLimitWaiterClient(
-		transport.Transport,
-		github_ratelimit.WithTotalSleepLimit(time.Minute, func(callbackContext *github_ratelimit.CallbackContext) {
-			logger.Warn("github rate limit exceeded total sleep time, requests will fail to avoid penalties from github")
-		}))
+	transportWithRateLimit, err := github_ratelimit.NewRateLimitWaiterClient(transport.Transport)
 	if err != nil {
 		return nil, errors.Wrap(err, "error initializing github rate limit transport")
 	}
