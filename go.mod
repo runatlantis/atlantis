@@ -34,7 +34,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/patternmatcher v0.6.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
-	github.com/opentofu/tofudl v0.0.0-20250129123822-d4254f2a6147
+	github.com/opentofu/tofudl v0.0.1
 	github.com/petergtz/pegomock/v4 v4.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.7.3
