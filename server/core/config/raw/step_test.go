@@ -467,7 +467,7 @@ func TestStep_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "\"run\" step \"shellArgs\" option must be a string or a list of strings, found [42 42]\n",
+			expErr: "\"run\" step \"shellArgs\" option must be a string or a list of strings, found [42 42]",
 		},
 		{
 			description: "run step with shellArgs contain not strings",
@@ -481,7 +481,7 @@ func TestStep_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "\"run\" step \"shellArgs\" option must contain only strings, found 42\n",
+			expErr: "\"run\" step \"shellArgs\" option must contain only strings, found 42",
 		},
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should

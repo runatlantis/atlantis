@@ -1060,7 +1060,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:       true,
 			mergeMethodOption: "merge",
 			expMethod:         "",
-			expErr:            "Merge method 'merge' is not allowed by the repository Pull Request settings",
+			expErr:            "merge method 'merge' is not allowed by the repository Pull Request settings",
 		},
 		"merge with rebase: overridden by command: rebase not allowed": {
 			allowMerge:        true,
@@ -1068,7 +1068,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:       true,
 			mergeMethodOption: "rebase",
 			expMethod:         "",
-			expErr:            "Merge method 'rebase' is not allowed by the repository Pull Request settings",
+			expErr:            "merge method 'rebase' is not allowed by the repository Pull Request settings",
 		},
 		"merge with squash: overridden by command: squash not allowed": {
 			allowMerge:        true,
@@ -1076,7 +1076,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:       false,
 			mergeMethodOption: "squash",
 			expMethod:         "",
-			expErr:            "Merge method 'squash' is not allowed by the repository Pull Request settings",
+			expErr:            "merge method 'squash' is not allowed by the repository Pull Request settings",
 		},
 		"merge with unknown: overridden by command: unknown doesn't exist": {
 			allowMerge:        true,
@@ -1084,7 +1084,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:       true,
 			mergeMethodOption: "unknown",
 			expMethod:         "",
-			expErr:            "Merge method 'unknown' is unknown. Specify one of the valid values: 'merge, rebase, squash'",
+			expErr:            "merge method 'unknown' is unknown. Specify one of the valid values: 'merge, rebase, squash'",
 		},
 	}
 
