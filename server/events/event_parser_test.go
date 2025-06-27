@@ -842,7 +842,7 @@ func TestParseBitbucketCloudCommentEvent_CommitHashMissing(t *testing.T) {
 	path := filepath.Join("testdata", "bitbucket-cloud-comment-event.json")
 	bytes, err := os.ReadFile(path)
 	Ok(t, err)
-	emptyCommitHash := strings.Replace(string(bytes), `        "hash": "e0624da46d3a",`, "", -1)
+	emptyCommitHash := strings.ReplaceAll(string(bytes), `        "hash": "e0624da46d3a",`, "")
 	_, _, _, _, _, err = parser.ParseBitbucketCloudPullCommentEvent([]byte(emptyCommitHash))
 	ErrContains(t, "Key: 'CommentEvent.CommonEventData.PullRequest.Source.Commit.Hash' Error:Field validation for 'Hash' failed on the 'required' tag", err)
 }
@@ -923,9 +923,10 @@ func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.pullState, func(t *testing.T) {
-			withState := strings.Replace(string(bytes), `"state": "MERGED"`, fmt.Sprintf(`"state": "%s"`, c.pullState), -1)
+			withState := strings.ReplaceAll(string(bytes), `"state": "MERGED"`, fmt.Sprintf(`"state": "%s"`, c.pullState))
 			pull, _, _, _, _, err := parser.ParseBitbucketCloudPullCommentEvent([]byte(withState))
 			Ok(t, err)
+			
 			Equals(t, c.exp, pull.State)
 		})
 	}
@@ -1094,7 +1095,7 @@ func TestParseBitbucketServerCommentEvent_CommitHashMissing(t *testing.T) {
 	if err != nil {
 		Ok(t, err)
 	}
-	emptyCommitHash := strings.Replace(string(bytes), `"latestCommit": "bfb1af1ba9c2a2fa84cd61af67e6e1b60a22e060",`, "", -1)
+	emptyCommitHash := strings.ReplaceAll(string(bytes), `"latestCommit": "bfb1af1ba9c2a2fa84cd61af67e6e1b60a22e060",`, "")
 	_, _, _, _, _, err = parser.ParseBitbucketServerPullCommentEvent([]byte(emptyCommitHash))
 	ErrContains(t, "Key: 'CommentEvent.CommonEventData.PullRequest.FromRef.LatestCommit' Error:Field validation for 'LatestCommit' failed on the 'required' tag", err)
 }
@@ -1173,7 +1174,7 @@ func TestParseBitbucketServerCommentEvent_MultipleStates(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.pullState, func(t *testing.T) {
-			withState := strings.Replace(string(bytes), `"state": "OPEN"`, fmt.Sprintf(`"state": "%s"`, c.pullState), -1)
+			withState := strings.ReplaceAll(string(bytes), `"state": "OPEN"`, fmt.Sprintf(`"state": "%s"`, c.pullState))
 			pull, _, _, _, _, err := parser.ParseBitbucketServerPullCommentEvent([]byte(withState))
 			Ok(t, err)
 			Equals(t, c.exp, pull.State)
