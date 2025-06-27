@@ -29,7 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
 	"github.com/runatlantis/atlantis/server/utils"
-	tally "github.com/uber-go/tally/v4"
+	"github.com/uber-go/tally/v4"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
@@ -208,9 +208,9 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		ctx.Log.Warn("unable to update plan commit status: %s", err)
 	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
-	if err != nil {
+	if preWorkflowHooksErr != nil {
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
 
@@ -224,6 +224,10 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
 					ctx.Log.Warn("Unable to update apply commit status: %s", err)
 				}
+			}
+
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("```\nError: Atlantis failed to run pre-workflow hooks.\n Error: %v```", preWorkflowHooksErr.Error()), ""); err != nil {
+				ctx.Log.Warn("Unable to comment on pull request: %s", err)
 			}
 
 			return
@@ -372,9 +376,9 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		}
 	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
-	if err != nil {
+	if preWorkflowHooksErr != nil {
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
 
@@ -388,6 +392,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
 					ctx.Log.Warn("unable to update apply commit status: %s", err)
 				}
+			}
+
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("```\nError: Atlantis failed to run pre-workflow hooks.\n Error: %v```", preWorkflowHooksErr.Error()), ""); err != nil {
+				ctx.Log.Warn("Unable to comment on pull request: %s", err)
 			}
 
 			return
