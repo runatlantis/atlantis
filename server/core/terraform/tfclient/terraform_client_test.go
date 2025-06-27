@@ -389,7 +389,7 @@ func TestEnsureVersion_downloaded_downloadingDisabled(t *testing.T) {
 func tempSetEnv(t *testing.T, key string, value string) func() {
 	orig := os.Getenv(key)
 	Ok(t, os.Setenv(key, value))
-	return func() { 
+	return func() {
 		if setErr := os.Setenv(key, orig); setErr != nil {
 			t.Errorf("failed to restore environment variable %s: %v", key, setErr)
 		}

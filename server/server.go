@@ -514,10 +514,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	} else {
 		lockingClient = locking.NewClient(backend)
 	}
-	disableGlobalApplyLock := false
-	if userConfig.DisableGlobalApplyLock {
-		disableGlobalApplyLock = true
-	}
+	disableGlobalApplyLock := userConfig.DisableGlobalApplyLock
 
 	applyLockingClient = locking.NewApplyClient(backend, disableApply, disableGlobalApplyLock)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
@@ -1022,7 +1019,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectJobsErrorTemplate:       web_templates.ProjectJobsErrorTemplate,
 		SSLKeyFile:                     userConfig.SSLKeyFile,
 		SSLCertFile:                    userConfig.SSLCertFile,
-		DisableGlobalApplyLock:         userConfig.DisableGlobalApplyLock,
+		DisableGlobalApplyLock:         disableGlobalApplyLock,
 		Drainer:                        drainer,
 		ProjectCmdOutputHandler:        projectCmdOutputHandler,
 		WebAuthentication:              userConfig.WebBasicAuth,
@@ -1308,7 +1305,7 @@ func ParseAtlantisURL(u string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !(parsed.Scheme == "http" || parsed.Scheme == "https") {
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return nil, errors.New("http or https must be specified")
 	}
 	// We want the path to end without a trailing slash so we know how to

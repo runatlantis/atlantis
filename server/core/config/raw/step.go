@@ -211,12 +211,12 @@ func (s Step) Validate() error {
 		case []interface{}:
 			for _, e := range t {
 				if _, ok := e.(string); !ok {
-					return fmt.Errorf("%q step %q option must contain only strings, found %v\n",
+					return fmt.Errorf("%q step %q option must contain only strings, found %v",
 						stepName, ShellArgsArgKey, e)
 				}
 			}
 		default:
-			return fmt.Errorf("%q step %q option must be a string or a list of strings, found %v\n",
+			return fmt.Errorf("%q step %q option must be a string or a list of strings, found %v",
 				stepName, ShellArgsArgKey, t)
 		}
 		delete(argMap, ShellArgsArgKey)
@@ -251,13 +251,13 @@ func (s Step) Validate() error {
 			}
 			delete(argMap, CommandArgKey)
 			if v, ok := argMap[OutputArgKey].(string); ok {
-				if stepName == RunStepName && !(v == valid.PostProcessRunOutputShow ||
-					v == valid.PostProcessRunOutputHide || v == valid.PostProcessRunOutputStripRefreshing) {
+				if stepName == RunStepName && v != valid.PostProcessRunOutputShow &&
+					v != valid.PostProcessRunOutputHide && v != valid.PostProcessRunOutputStripRefreshing {
 					return fmt.Errorf("run step %q option must be one of %q, %q, or %q",
 						OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide,
 						valid.PostProcessRunOutputStripRefreshing)
-				} else if stepName == MultiEnvStepName && !(v == valid.PostProcessRunOutputShow ||
-					v == valid.PostProcessRunOutputHide) {
+				} else if stepName == MultiEnvStepName && v != valid.PostProcessRunOutputShow &&
+					v != valid.PostProcessRunOutputHide {
 					return fmt.Errorf("multienv step %q option must be %q or %q",
 						OutputArgKey, valid.PostProcessRunOutputShow, valid.PostProcessRunOutputHide)
 				}
@@ -295,7 +295,7 @@ func (s Step) Validate() error {
 				len(keys), strings.Join(keys, ","))
 		}
 		for stepName := range elem {
-			if !(stepName == RunStepName || stepName == MultiEnvStepName) {
+			if stepName != RunStepName && stepName != MultiEnvStepName {
 				return fmt.Errorf("%q is not a valid step type", stepName)
 			}
 		}

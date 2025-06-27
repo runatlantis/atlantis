@@ -302,7 +302,7 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 			}
 		}
 		if iterationID := status.IterationID; iterationID != nil {
-			if !(*iterationID >= 1) {
+			if *iterationID < 1 {
 				return errors.New("supportsIterations was true but got invalid iteration ID or no matching iteration commit SHA was found")
 			}
 		}
