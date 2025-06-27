@@ -20,10 +20,13 @@ type MockAuthManager struct {
 	providerError    error
 	user             *auth.User
 	userError        error
-	sessionID        string
+	authenticateUser func(ctx context.Context, user *auth.User) (*auth.Session, error)
 }
 
 func (m *MockAuthManager) AuthenticateUser(ctx context.Context, user *auth.User) (*auth.Session, error) {
+	if m.authenticateUser != nil {
+		return m.authenticateUser(ctx, user)
+	}
 	return &auth.Session{
 		ID:        "test-session",
 		UserID:    user.ID,
@@ -272,15 +275,30 @@ func TestAuthController_Callback_InvalidProvider(t *testing.T) {
 
 func TestAuthController_Callback_OAuthProvider(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
+	testUser := &auth.User{
+		ID:    "test-user",
+		Email: "test@example.com",
+		Name:  "Test User",
+	}
+	
 	mockProvider := &MockProvider{
 		id:       "google",
 		name:     "Google",
 		providerType: auth.ProviderTypeOAuth2,
 		enabled:  true,
+		user:     testUser,
 	}
 	
 	mockManager := &MockAuthManager{
 		provider: mockProvider,
+		authenticateUser: func(ctx context.Context, user *auth.User) (*auth.Session, error) {
+			return &auth.Session{
+				ID:        "test-session",
+				UserID:    user.ID,
+				CreatedAt: time.Now(),
+				ExpiresAt: time.Now().Add(24 * time.Hour),
+			}, nil
+		},
 	}
 	
 	baseURL, _ := url.Parse("https://example.com")

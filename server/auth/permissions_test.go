@@ -315,9 +315,15 @@ func TestHelperFunctions(t *testing.T) {
 		t.Error("Admin should be able to write policies")
 	}
 
-	// Test CanManageUsers
-	if !checker.CanManageUsers(user) {
-		t.Error("Admin should be able to manage users")
+	// Test CanManageUsers (should be superadmin)
+	superadmin := &User{
+		ID:         "superadmin-user",
+		Email:      "superadmin@example.com",
+		Roles:      []string{"superadmin"},
+		Permissions: []Permission{},
+	}
+	if !checker.CanManageUsers(superadmin) {
+		t.Error("Superadmin should be able to manage users")
 	}
 
 	// Test IsAdmin
@@ -325,9 +331,9 @@ func TestHelperFunctions(t *testing.T) {
 		t.Error("User with admin role should be considered admin")
 	}
 
-	// Test IsSuperAdmin
-	if !checker.IsSuperAdmin(user) {
-		t.Error("Admin should be considered super admin")
+	// Test IsSuperAdmin (should be superadmin)
+	if !checker.IsSuperAdmin(superadmin) {
+		t.Error("Superadmin should be considered super admin")
 	}
 
 	// Test with regular user

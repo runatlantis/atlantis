@@ -13,7 +13,8 @@ import (
 type contextKey string
 
 const (
-	userContextKey contextKey = "user"
+	userContextKey     contextKey = "user"
+	authManagerContextKey contextKey = "auth_manager"
 )
 
 // AuthMiddleware handles authentication for HTTP requests
@@ -137,18 +138,16 @@ func RequirePermission(permission Permission) func(http.HandlerFunc) http.Handle
 			}
 
 			// Get permission checker from auth manager
-			authManager, ok := r.Context().Value("auth_manager").(Manager)
+			authManager, ok := r.Context().Value(authManagerContextKey).(Manager)
 			if !ok {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 
-			if authManagerWithChecker, ok := authManager.(*AuthManager); ok {
-				permissionChecker := authManagerWithChecker.GetPermissionChecker()
-				if !permissionChecker.HasPermission(user, permission) {
-					http.Error(w, "Insufficient permissions", http.StatusForbidden)
-					return
-				}
+			permissionChecker := authManager.GetPermissionChecker()
+			if !permissionChecker.HasPermission(user, permission) {
+				http.Error(w, "Insufficient permissions", http.StatusForbidden)
+				return
 			}
 
 			next(w, r)
@@ -167,18 +166,16 @@ func RequireAnyPermission(permissions []Permission) func(http.HandlerFunc) http.
 			}
 
 			// Get permission checker from auth manager
-			authManager, ok := r.Context().Value("auth_manager").(Manager)
+			authManager, ok := r.Context().Value(authManagerContextKey).(Manager)
 			if !ok {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 
-			if authManagerWithChecker, ok := authManager.(*AuthManager); ok {
-				permissionChecker := authManagerWithChecker.GetPermissionChecker()
-				if !permissionChecker.HasAnyPermission(user, permissions) {
-					http.Error(w, "Insufficient permissions", http.StatusForbidden)
-					return
-				}
+			permissionChecker := authManager.GetPermissionChecker()
+			if !permissionChecker.HasAnyPermission(user, permissions) {
+				http.Error(w, "Insufficient permissions", http.StatusForbidden)
+				return
 			}
 
 			next(w, r)
@@ -197,18 +194,16 @@ func RequireAllPermissions(permissions []Permission) func(http.HandlerFunc) http
 			}
 
 			// Get permission checker from auth manager
-			authManager, ok := r.Context().Value("auth_manager").(Manager)
+			authManager, ok := r.Context().Value(authManagerContextKey).(Manager)
 			if !ok {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 
-			if authManagerWithChecker, ok := authManager.(*AuthManager); ok {
-				permissionChecker := authManagerWithChecker.GetPermissionChecker()
-				if !permissionChecker.HasAllPermissions(user, permissions) {
-					http.Error(w, "Insufficient permissions", http.StatusForbidden)
-					return
-				}
+			permissionChecker := authManager.GetPermissionChecker()
+			if !permissionChecker.HasAllPermissions(user, permissions) {
+				http.Error(w, "Insufficient permissions", http.StatusForbidden)
+				return
 			}
 
 			next(w, r)
@@ -227,18 +222,16 @@ func RequireAdmin() func(http.HandlerFunc) http.HandlerFunc {
 			}
 
 			// Get permission checker from auth manager
-			authManager, ok := r.Context().Value("auth_manager").(Manager)
+			authManager, ok := r.Context().Value(authManagerContextKey).(Manager)
 			if !ok {
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
 				return
 			}
 
-			if authManagerWithChecker, ok := authManager.(*AuthManager); ok {
-				permissionChecker := authManagerWithChecker.GetPermissionChecker()
-				if !permissionChecker.IsAdmin(user) {
-					http.Error(w, "Admin privileges required", http.StatusForbidden)
-					return
-				}
+			permissionChecker := authManager.GetPermissionChecker()
+			if !permissionChecker.IsAdmin(user) {
+				http.Error(w, "Admin privileges required", http.StatusForbidden)
+				return
 			}
 
 			next(w, r)

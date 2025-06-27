@@ -20,6 +20,20 @@ func NewBasicAuthProvider(config *ProviderConfig) (*BasicAuthProvider, error) {
 		return nil, fmt.Errorf("invalid provider type for basic auth: %s", config.Type)
 	}
 
+	// Validate required fields
+	if config.ID == "" {
+		return nil, fmt.Errorf("provider ID is required")
+	}
+	if config.Name == "" {
+		return nil, fmt.Errorf("provider name is required")
+	}
+	if config.ClientID == "" {
+		return nil, fmt.Errorf("client ID (username) is required for basic auth")
+	}
+	if config.ClientSecret == "" {
+		return nil, fmt.Errorf("client secret (password) is required for basic auth")
+	}
+
 	return &BasicAuthProvider{
 		config: config,
 	}, nil

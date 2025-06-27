@@ -178,6 +178,7 @@ type Manager interface {
 	GetUserFromRequest(r *http.Request) (*User, error)
 	LoginRequired(r *http.Request) bool
 	RedirectToLogin(w http.ResponseWriter, r *http.Request) error
+	GetPermissionChecker() PermissionChecker
 }
 
 // PermissionChecker interface for checking user permissions

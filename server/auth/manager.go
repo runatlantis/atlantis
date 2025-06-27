@@ -211,7 +211,8 @@ func (m *AuthManager) InvalidateSession(ctx context.Context, sessionID string) e
 	defer m.sessionMux.Unlock()
 
 	if _, exists := m.sessions[sessionID]; !exists {
-		return fmt.Errorf("session not found")
+		// Session doesn't exist, which is fine - no error
+		return nil
 	}
 
 	delete(m.sessions, sessionID)
@@ -259,6 +260,11 @@ func (m *AuthManager) LoginRequired(r *http.Request) bool {
 		return false
 	}
 
+	// Check if user is already authenticated
+	if _, err := m.GetUserFromRequest(r); err == nil {
+		return false
+	}
+
 	return true
 }
 
@@ -283,13 +289,13 @@ func (m *AuthManager) RedirectToLogin(w http.ResponseWriter, r *http.Request) er
 				return fmt.Errorf("failed to generate auth URL: %w", err)
 			}
 
-			http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
+			http.Redirect(w, r, authURL, http.StatusFound)
 			return nil
 		}
 	}
 
 	// Multiple providers - show login page
-	http.Redirect(w, r, "/auth/login", http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/login", http.StatusFound)
 	return nil
 }
 

@@ -56,16 +56,12 @@ func (m *MockManager) GetProvider(providerID string) (Provider, error) {
 }
 
 func (m *MockManager) GetEnabledProviders() []Provider {
-	return nil
+	return []Provider{}
 }
 
 func (m *MockManager) GetPermissionChecker() PermissionChecker {
 	return NewPermissionChecker(nil)
 }
-
-const (
-	authManagerContextKey contextKey = "auth_manager"
-)
 
 func TestNewAuthMiddleware(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
@@ -793,10 +789,14 @@ func TestSpecificPermissionMiddlewares(t *testing.T) {
 	for _, tt := range middlewares {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test with user having the required permission
+			role := "admin"
+			if tt.name == "RequireUserManagementPermission" {
+				role = "superadmin"
+			}
 			testUser := &User{
 				ID:         "test-user",
 				Email:      "test@example.com",
-				Roles:      []string{"admin"}, // admin role has all permissions
+				Roles:      []string{role},
 				Permissions: []Permission{},
 			}
 			

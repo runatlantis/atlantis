@@ -25,6 +25,20 @@ func NewOAuth2Provider(config *ProviderConfig) (*OAuth2Provider, error) {
 		return nil, fmt.Errorf("invalid provider type for OAuth2: %s", config.Type)
 	}
 
+	// Validate required fields
+	if config.ID == "" {
+		return nil, fmt.Errorf("provider ID is required")
+	}
+	if config.Name == "" {
+		return nil, fmt.Errorf("provider name is required")
+	}
+	if config.ClientID == "" {
+		return nil, fmt.Errorf("client ID is required")
+	}
+	if config.ClientSecret == "" {
+		return nil, fmt.Errorf("client secret is required")
+	}
+
 	oauth2Config := &oauth2.Config{
 		ClientID:     config.ClientID,
 		ClientSecret: config.ClientSecret,
@@ -43,6 +57,9 @@ func NewOAuth2Provider(config *ProviderConfig) (*OAuth2Provider, error) {
 			config.UserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
 		}
 	case "okta":
+		if config.IssuerURL == "" {
+			return nil, fmt.Errorf("issuer URL is required for Okta provider")
+		}
 		oauth2Config.Endpoint = oauth2.Endpoint{
 			AuthURL:  fmt.Sprintf("%s/oauth2/v1/authorize", config.IssuerURL),
 			TokenURL: fmt.Sprintf("%s/oauth2/v1/token", config.IssuerURL),
@@ -51,6 +68,9 @@ func NewOAuth2Provider(config *ProviderConfig) (*OAuth2Provider, error) {
 			config.UserInfoURL = fmt.Sprintf("%s/oauth2/v1/userinfo", config.IssuerURL)
 		}
 	case "azure":
+		if config.IssuerURL == "" {
+			return nil, fmt.Errorf("issuer URL is required for Azure provider")
+		}
 		oauth2Config.Endpoint = oauth2.Endpoint{
 			AuthURL:  fmt.Sprintf("%s/oauth2/v2.0/authorize", config.IssuerURL),
 			TokenURL: fmt.Sprintf("%s/oauth2/v2.0/token", config.IssuerURL),
@@ -60,13 +80,12 @@ func NewOAuth2Provider(config *ProviderConfig) (*OAuth2Provider, error) {
 		}
 	default:
 		// Custom provider
-		if config.AuthURL != "" && config.TokenURL != "" {
-			oauth2Config.Endpoint = oauth2.Endpoint{
-				AuthURL:  config.AuthURL,
-				TokenURL: config.TokenURL,
-			}
-		} else {
+		if config.AuthURL == "" || config.TokenURL == "" {
 			return nil, fmt.Errorf("custom OAuth2 provider must specify auth_url and token_url")
+		}
+		oauth2Config.Endpoint = oauth2.Endpoint{
+			AuthURL:  config.AuthURL,
+			TokenURL: config.TokenURL,
 		}
 	}
 
@@ -193,9 +212,20 @@ func (p *OAuth2Provider) ValidateToken(ctx context.Context, tokenString string) 
 	return p.GetUserInfo(ctx, &TokenResponse{AccessToken: tokenString})
 }
 
-// InitiateLogin is not used for OAuth2/OIDC
+// InitiateLogin redirects to the OAuth2 authorization URL
 func (p *OAuth2Provider) InitiateLogin(w http.ResponseWriter, r *http.Request) error {
-	return fmt.Errorf("initiate login not supported for OAuth2/OIDC")
+	state, err := generateState()
+	if err != nil {
+		return fmt.Errorf("failed to generate state: %w", err)
+	}
+
+	authURL, err := p.InitAuthURL(state)
+	if err != nil {
+		return fmt.Errorf("failed to generate auth URL: %w", err)
+	}
+
+	http.Redirect(w, r, authURL, http.StatusFound)
+	return nil
 }
 
 // ProcessSAMLResponse is not used for OAuth2/OIDC

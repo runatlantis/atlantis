@@ -136,6 +136,10 @@ func (pc *PermissionCheckerImpl) RemoveRole(roleName string) error {
 		return fmt.Errorf("cannot remove default role: %s", roleName)
 	}
 
+	if _, exists := pc.roles[roleName]; !exists {
+		return fmt.Errorf("role does not exist: %s", roleName)
+	}
+
 	delete(pc.roles, roleName)
 	return nil
 }
@@ -278,7 +282,7 @@ func GetPermissionDescription(permission Permission) string {
 // GetPermissionCategory returns the category of a permission
 func GetPermissionCategory(permission Permission) string {
 	parts := strings.Split(string(permission), ":")
-	if len(parts) >= 1 {
+	if len(parts) >= 2 {
 		return parts[0]
 	}
 	return "unknown"
