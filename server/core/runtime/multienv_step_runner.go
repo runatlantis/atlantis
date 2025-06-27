@@ -37,7 +37,7 @@ func (r *MultiEnvStepRunner) Run(
 
 		vars, err := parseMultienvLine(res)
 		if err != nil {
-			return "", fmt.Errorf("invalid environment variable definition: %s (%w)", res, err)
+			return "", fmt.Errorf("Invalid environment variable definition: %s (%w)", res, err)
 		}
 
 		for i := 0; i < len(vars); i += 2 {

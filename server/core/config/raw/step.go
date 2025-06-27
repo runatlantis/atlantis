@@ -211,12 +211,12 @@ func (s Step) Validate() error {
 		case []interface{}:
 			for _, e := range t {
 				if _, ok := e.(string); !ok {
-					return fmt.Errorf("%q step %q option must contain only strings, found %v",
+					return fmt.Errorf("%q step %q option must contain only strings, found %v\n",
 						stepName, ShellArgsArgKey, e)
 				}
 			}
 		default:
-			return fmt.Errorf("%q step %q option must be a string or a list of strings, found %v",
+			return fmt.Errorf("%q step %q option must be a string or a list of strings, found %v\n",
 				stepName, ShellArgsArgKey, t)
 		}
 		delete(argMap, ShellArgsArgKey)
