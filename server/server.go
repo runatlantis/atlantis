@@ -1089,7 +1089,7 @@ func (s *Server) Start() error {
 	n.UseHandler(s.Router)
 
 	defer func() {
-		if flushErr := s.Logger.Flush(); flushErr != nil {
+		if flushErr := s.Logger.Flush(); flushErr != nil { // nolint: staticcheck
 			// Log the error but don't return it since we're in a defer
 			// and the function is already returning an error
 		}

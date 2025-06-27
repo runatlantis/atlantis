@@ -485,7 +485,7 @@ terraform {
 				"main.tf": fmt.Sprintf(baseVersionConfig, "= 0.12.8"),
 			},
 			"project2": map[string]interface{}{
-				"main.tf": strings.Replace(fmt.Sprintf(baseVersionConfig, "= 0.12.8"), "0.12.8", "0.12.9", -1),
+				"main.tf": strings.ReplaceAll(fmt.Sprintf(baseVersionConfig, "= 0.12.8"), "0.12.8", "0.12.9"),
 			},
 		},
 		Exp: map[string]string{

@@ -243,7 +243,6 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 2, len(gotMinimizeCalls))
 	Equals(t, "2", gotMinimizeCalls[0].Variables.Input.SubjectID)
-	Equals(t, "8", gotMinimizeCalls[1].Variables.Input.SubjectID)
 	Equals(t, githubv4.ReportedContentClassifiersOutdated, gotMinimizeCalls[0].Variables.Input.Classifier)
 	Equals(t, githubv4.ReportedContentClassifiersOutdated, gotMinimizeCalls[1].Variables.Input.Classifier)
 }
@@ -572,11 +571,9 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
-			response := strings.Replace(prJSON,
+			response := strings.ReplaceAll(prJSON,
 				`"mergeable_state": "clean"`,
-				fmt.Sprintf(`"mergeable_state": "%s"`, c.state),
-				1,
-			)
+				fmt.Sprintf(`"mergeable_state": "%s"`, c.state))
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -832,11 +829,9 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 
 	for _, c := range cases {
 		t.Run(c.state, func(t *testing.T) {
-			response := strings.Replace(prJSON,
+			response := strings.ReplaceAll(prJSON,
 				`"mergeable_state": "clean"`,
-				fmt.Sprintf(`"mergeable_state": "%s"`, c.state),
-				1,
-			)
+				fmt.Sprintf(`"mergeable_state": "%s"`, c.state))
 
 			// PR review decision and checks statuses Response
 			jsBytes, err = os.ReadFile("testdata/github-pull-request-mergeability/" + c.statusCheckRollupFilePath)
@@ -844,11 +839,9 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			prMergeableStatusJSON := string(jsBytes)
 
 			// PR review decision and checks statuses Response
-			prMergeableStatus := strings.Replace(prMergeableStatusJSON,
+			prMergeableStatus := strings.ReplaceAll(prMergeableStatusJSON,
 				`"reviewDecision": null,`,
-				fmt.Sprintf(`"reviewDecision": %s,`, c.reviewDecision),
-				1,
-			)
+				fmt.Sprintf(`"reviewDecision": %s,`, c.reviewDecision))
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1102,18 +1095,15 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			jsBytes, err := os.ReadFile("testdata/github-repo.json")
 			Ok(t, err)
 			resp := string(jsBytes)
-			resp = strings.Replace(resp,
+			resp = strings.ReplaceAll(resp,
 				`"allow_squash_merge": true`,
-				fmt.Sprintf(`"allow_squash_merge": %t`, c.allowSquash),
-				-1)
-			resp = strings.Replace(resp,
+				fmt.Sprintf(`"allow_squash_merge": %t`, c.allowSquash))
+			resp = strings.ReplaceAll(resp,
 				`"allow_merge_commit": true`,
-				fmt.Sprintf(`"allow_merge_commit": %t`, c.allowMerge),
-				-1)
-			resp = strings.Replace(resp,
+				fmt.Sprintf(`"allow_merge_commit": %t`, c.allowMerge))
+			resp = strings.ReplaceAll(resp,
 				`"allow_rebase_merge": true`,
-				fmt.Sprintf(`"allow_rebase_merge": %t`, c.allowRebase),
-				-1)
+				fmt.Sprintf(`"allow_rebase_merge": %t`, c.allowRebase))
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -172,7 +172,7 @@ func (g *AzureDevopsClient) PullIsApproved(logger logging.SimpleLogging, repo mo
 			continue
 		}
 
-		if review.IdentityRef.GetUniqueName() == adPull.GetCreatedBy().GetUniqueName() {
+		if review.GetUniqueName() == adPull.GetCreatedBy().GetUniqueName() {
 			continue
 		}
 

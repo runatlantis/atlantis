@@ -114,8 +114,8 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	// because Bitbucket supports http.
 	authedCloneURL := strings.ReplaceAll(cloneURL, "https://", "https://"+auth)
 	authedCloneURL = strings.ReplaceAll(authedCloneURL, "http://", "http://"+auth)
-	sanitizedCloneURL := strings.Replace(cloneURL, "https://", "https://"+redactedAuth, -1)
-	sanitizedCloneURL = strings.Replace(sanitizedCloneURL, "http://", "http://"+redactedAuth, -1)
+	sanitizedCloneURL := strings.ReplaceAll(cloneURL, "https://", "https://"+redactedAuth)
+	sanitizedCloneURL = strings.ReplaceAll(sanitizedCloneURL, "http://", "http://"+redactedAuth)
 
 	// Get the owner and repo names from the full name.
 	owner, repo := SplitRepoFullName(repoFullName)

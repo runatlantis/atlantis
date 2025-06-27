@@ -177,7 +177,7 @@ func NewMarkdownRenderer(
 // Render formats the data into a markdown string.
 // nolint: interfacer
 func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd PullCommand) string {
-	commandStr := cases.Title(language.English).String(strings.Replace(cmd.CommandName().String(), "_", " ", -1))
+	commandStr := cases.Title(language.English).String(strings.ReplaceAll(cmd.CommandName().String(), "_", " "))
 	var vcsRequestType string
 	if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab {
 		vcsRequestType = "Merge Request"

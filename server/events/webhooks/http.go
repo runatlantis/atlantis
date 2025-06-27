@@ -51,7 +51,7 @@ func (h *HttpWebhook) doSend(applyResult ApplyResult) error {
 		return err
 	}
 	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
+		if closeErr := resp.Body.Close(); closeErr != nil { // nolint: staticcheck
 			// Log the error but don't return it since we're in a defer
 			// and the function is already returning an error
 		}
