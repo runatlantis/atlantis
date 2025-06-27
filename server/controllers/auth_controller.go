@@ -1,3 +1,5 @@
+// Package controllers provides HTTP controllers for handling web requests in Atlantis.
+// This includes authentication controllers for managing user login, logout, and session management.
 package controllers
 
 import (
@@ -156,7 +158,7 @@ func (c *AuthController) redirectToProvider(w http.ResponseWriter, r *http.Reque
 }
 
 // showLoginPage displays a simple login page with available providers
-func (c *AuthController) showLoginPage(w http.ResponseWriter, r *http.Request, providers []auth.Provider) {
+func (c *AuthController) showLoginPage(w http.ResponseWriter, _ *http.Request, providers []auth.Provider) {
 	var providerData []loginProviderData
 	for _, provider := range providers {
 		if provider.GetType() == auth.ProviderTypeOAuth2 || provider.GetType() == auth.ProviderTypeOIDC {

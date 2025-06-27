@@ -59,14 +59,14 @@ func (p *BasicAuthProvider) IsEnabled() bool {
 	return p.config.Enabled
 }
 
-// InitAuthURL is not used for basic auth
-func (p *BasicAuthProvider) InitAuthURL(state string) (string, error) {
-	return "", fmt.Errorf("auth URL not supported for basic auth")
+// InitAuthURL is not supported for basic auth
+func (p *BasicAuthProvider) InitAuthURL(_ string) (string, error) {
+	return "", fmt.Errorf("basic auth does not support OAuth2 flow")
 }
 
-// ExchangeCode is not used for basic auth
-func (p *BasicAuthProvider) ExchangeCode(ctx context.Context, code string) (*TokenResponse, error) {
-	return nil, fmt.Errorf("code exchange not supported for basic auth")
+// ExchangeCode is not supported for basic auth
+func (p *BasicAuthProvider) ExchangeCode(_ context.Context, _ string) (*TokenResponse, error) {
+	return nil, fmt.Errorf("basic auth does not support OAuth2 code exchange")
 }
 
 // GetUserInfo is not used for basic auth
@@ -126,14 +126,16 @@ func (p *BasicAuthProvider) ValidateToken(ctx context.Context, tokenString strin
 	return nil, fmt.Errorf("invalid credentials")
 }
 
-// InitiateLogin is not used for basic auth
-func (p *BasicAuthProvider) InitiateLogin(w http.ResponseWriter, r *http.Request) error {
-	return fmt.Errorf("initiate login not supported for basic auth")
+// InitiateLogin handles basic authentication login
+func (p *BasicAuthProvider) InitiateLogin(_ http.ResponseWriter, r *http.Request) error {
+	// Basic auth is handled by the browser's built-in authentication dialog
+	// This method is called when the user needs to be prompted for credentials
+	return nil
 }
 
-// ProcessSAMLResponse is not used for basic auth
-func (p *BasicAuthProvider) ProcessSAMLResponse(w http.ResponseWriter, r *http.Request) (*User, error) {
-	return nil, fmt.Errorf("SAML response processing not supported for basic auth")
+// ProcessSAMLResponse is not supported for basic auth
+func (p *BasicAuthProvider) ProcessSAMLResponse(_ http.ResponseWriter, _ *http.Request) (*User, error) {
+	return nil, fmt.Errorf("basic auth does not support SAML")
 }
 
 // ValidateBasicAuth validates basic auth from HTTP request

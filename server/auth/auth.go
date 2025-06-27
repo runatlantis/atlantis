@@ -1,3 +1,6 @@
+// Package auth provides authentication and authorization functionality for Atlantis.
+// It supports multiple authentication providers including OAuth2, OIDC, and basic authentication,
+// as well as role-based access control (RBAC) with granular permissions.
 package auth
 
 import (
@@ -12,9 +15,14 @@ import (
 type ProviderType string
 
 const (
+	// Provider types
+	// ProviderTypeOAuth2 is the provider type for OAuth2
 	ProviderTypeOAuth2    ProviderType = "oauth2"
+	// ProviderTypeOIDC is the provider type for OIDC
 	ProviderTypeOIDC      ProviderType = "oidc"
+	// ProviderTypeSAML is the provider type for SAML
 	ProviderTypeSAML      ProviderType = "saml"
+	// ProviderTypeBasicAuth is the provider type for basic authentication
 	ProviderTypeBasicAuth ProviderType = "basic"
 )
 
@@ -22,35 +30,60 @@ const (
 type Permission string
 
 const (
-	// Repository permissions
+	// Permission constants
+	// PermissionRepoRead allows reading repository information
 	PermissionRepoRead    Permission = "repo:read"
+	// PermissionRepoWrite allows writing to repositories
 	PermissionRepoWrite   Permission = "repo:write"
+	// PermissionRepoDelete allows deleting repositories
 	PermissionRepoDelete  Permission = "repo:delete"
 	
 	// Lock permissions
+	// PermissionLockRead allows reading locks
 	PermissionLockRead    Permission = "lock:read"
+	// PermissionLockCreate allows creating locks
 	PermissionLockCreate  Permission = "lock:create"
+	// PermissionLockWrite allows creating and updating locks
+	PermissionLockWrite   Permission = "lock:write"
+	// PermissionLockDelete allows deleting locks
 	PermissionLockDelete  Permission = "lock:delete"
+	// PermissionLockForce allows force deleting locks
 	PermissionLockForce   Permission = "lock:force"
+	// PermissionLockForceDelete allows force deleting locks
+	PermissionLockForceDelete Permission = "lock:force-delete"
 	
 	// Plan permissions
+	// PermissionPlanRead allows reading plans
 	PermissionPlanRead    Permission = "plan:read"
+	// PermissionPlanCreate allows creating plans
 	PermissionPlanCreate  Permission = "plan:create"
-	PermissionPlanApply   Permission = "plan:apply"
+	// PermissionPlanWrite allows creating and updating plans
+	PermissionPlanWrite   Permission = "plan:write"
+	// PermissionPlanDelete allows deleting plans
 	PermissionPlanDelete  Permission = "plan:delete"
+	// PermissionPlanApply allows applying plans
+	PermissionPlanApply   Permission = "plan:apply"
 	
 	// Policy permissions
+	// PermissionPolicyRead allows reading policies
 	PermissionPolicyRead  Permission = "policy:read"
+	// PermissionPolicyWrite allows writing policies
 	PermissionPolicyWrite Permission = "policy:write"
 	
 	// Admin permissions
+	// PermissionAdminRead allows reading admin information
 	PermissionAdminRead   Permission = "admin:read"
+	// PermissionAdminWrite allows writing admin information
 	PermissionAdminWrite  Permission = "admin:write"
+	// PermissionAdminDelete allows deleting admin resources
 	PermissionAdminDelete Permission = "admin:delete"
 	
 	// User management permissions
+	// PermissionUserRead allows reading user information
 	PermissionUserRead    Permission = "user:read"
+	// PermissionUserWrite allows writing user information
 	PermissionUserWrite   Permission = "user:write"
+	// PermissionUserDelete allows deleting users
 	PermissionUserDelete  Permission = "user:delete"
 )
 
@@ -197,7 +230,7 @@ type PermissionChecker interface {
 	CanManageUsers(user *User) bool
 }
 
-// Default roles with permissions
+// DefaultRoles defines the default roles available in the system
 var DefaultRoles = map[string]Role{
 	"user": {
 		Name: "user",
@@ -215,9 +248,9 @@ var DefaultRoles = map[string]Role{
 			PermissionRepoRead,
 			PermissionRepoWrite,
 			PermissionLockRead,
-			PermissionLockCreate,
+			PermissionLockWrite,
 			PermissionPlanRead,
-			PermissionPlanCreate,
+			PermissionPlanWrite,
 			PermissionPolicyRead,
 		},
 		Description: "Developer with write access",
@@ -229,11 +262,11 @@ var DefaultRoles = map[string]Role{
 			PermissionRepoWrite,
 			PermissionRepoDelete,
 			PermissionLockRead,
-			PermissionLockCreate,
+			PermissionLockWrite,
 			PermissionLockDelete,
-			PermissionLockForce,
+			PermissionLockForceDelete,
 			PermissionPlanRead,
-			PermissionPlanCreate,
+			PermissionPlanWrite,
 			PermissionPlanApply,
 			PermissionPlanDelete,
 			PermissionPolicyRead,
@@ -251,11 +284,11 @@ var DefaultRoles = map[string]Role{
 			PermissionRepoWrite,
 			PermissionRepoDelete,
 			PermissionLockRead,
-			PermissionLockCreate,
+			PermissionLockWrite,
 			PermissionLockDelete,
-			PermissionLockForce,
+			PermissionLockForceDelete,
 			PermissionPlanRead,
-			PermissionPlanCreate,
+			PermissionPlanWrite,
 			PermissionPlanApply,
 			PermissionPlanDelete,
 			PermissionPolicyRead,

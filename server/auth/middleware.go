@@ -17,17 +17,17 @@ const (
 	authManagerContextKey contextKey = "auth_manager"
 )
 
-// AuthMiddleware handles authentication for HTTP requests
+// AuthMiddleware provides HTTP middleware for authentication and authorization in Atlantis.
 type AuthMiddleware struct {
-	authManager Manager
-	logger      logging.SimpleLogging
+	Manager Manager
+	logger  logging.SimpleLogging
 }
 
 // NewAuthMiddleware creates a new authentication middleware
 func NewAuthMiddleware(authManager Manager, logger logging.SimpleLogging) *AuthMiddleware {
 	return &AuthMiddleware{
-		authManager: authManager,
-		logger:      logger,
+		Manager: authManager,
+		logger:  logger,
 	}
 }
 
@@ -36,18 +36,18 @@ func (m *AuthMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 	m.logger.Debug("%s %s – from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
 
 	// Check if authentication is required for this request
-	if !m.authManager.LoginRequired(r) {
+	if !m.Manager.LoginRequired(r) {
 		next(rw, r)
 		return
 	}
 
 	// Try to get user from request
-	user, err := m.authManager.GetUserFromRequest(r)
+	user, err := m.Manager.GetUserFromRequest(r)
 	if err != nil {
 		m.logger.Debug("[AUTH] No valid authentication found for: %s", r.URL.RequestURI())
 		
 		// Redirect to login page
-		if err := m.authManager.RedirectToLogin(rw, r); err != nil {
+		if err := m.Manager.RedirectToLogin(rw, r); err != nil {
 			m.logger.Err("Failed to redirect to login: %s", err)
 			http.Error(rw, "Authentication required", http.StatusUnauthorized)
 		}

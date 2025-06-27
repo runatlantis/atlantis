@@ -9,7 +9,7 @@ import (
 
 // LoadConfigFromFile loads authentication configuration from a JSON file
 func LoadConfigFromFile(filename string) (*Config, error) {
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(filename) // nolint: gosec
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}

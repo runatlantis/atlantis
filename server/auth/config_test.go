@@ -711,9 +711,13 @@ func TestLoadConfigFromEnv_MultipleProviders(t *testing.T) {
 func TestGetEnvOrDefault(t *testing.T) {
 	// Test with environment variable set
 	if err := os.Setenv("TEST_VAR", "test-value"); err != nil {
-		t.Fatalf("Failed to set env: %v", err)
+		t.Fatalf("Failed to set TEST_VAR: %v", err)
 	}
-	defer os.Unsetenv("TEST_VAR")
+	defer func() {
+		if err := os.Unsetenv("TEST_VAR"); err != nil {
+			t.Errorf("Failed to unset TEST_VAR: %v", err)
+		}
+	}()
 
 	result := getEnvOrDefault("TEST_VAR", "default-value")
 	if result != "test-value" {
@@ -750,7 +754,11 @@ func TestGetEnvBoolOrDefault(t *testing.T) {
 				if err := os.Setenv("TEST_BOOL_VAR", tt.envValue); err != nil {
 					t.Fatalf("Failed to set env: %v", err)
 				}
-				defer os.Unsetenv("TEST_BOOL_VAR")
+				defer func() {
+					if err := os.Unsetenv("TEST_BOOL_VAR"); err != nil {
+						t.Errorf("Failed to unset TEST_BOOL_VAR: %v", err)
+					}
+				}()
 			}
 
 			result := getEnvBoolOrDefault("TEST_BOOL_VAR", tt.defaultValue)

@@ -228,18 +228,16 @@ func (p *OAuth2Provider) InitiateLogin(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
-// ProcessSAMLResponse is not used for OAuth2/OIDC
-func (p *OAuth2Provider) ProcessSAMLResponse(w http.ResponseWriter, r *http.Request) (*User, error) {
-	return nil, fmt.Errorf("SAML response processing not supported for OAuth2/OIDC")
+// ProcessSAMLResponse is not supported for OAuth2
+func (p *OAuth2Provider) ProcessSAMLResponse(_ http.ResponseWriter, _ *http.Request) (*User, error) {
+	return nil, fmt.Errorf("OAuth2 does not support SAML")
 }
 
 // validateIDToken validates an OIDC ID token
-func (p *OAuth2Provider) validateIDToken(ctx context.Context, tokenString string) (*User, error) {
-	// Parse and validate the ID token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// In a real implementation, you would fetch the public key from the issuer
-		// For now, we'll skip signature validation
-		return []byte(""), nil
+func (p *OAuth2Provider) validateIDToken(_ context.Context, tokenString string) (*User, error) {
+	// Parse and validate the JWT token
+	token, err := jwt.Parse(tokenString, func(_ *jwt.Token) (interface{}, error) {
+		return []byte(p.config.ClientSecret), nil
 	})
 
 	if err != nil {

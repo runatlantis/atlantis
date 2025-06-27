@@ -39,19 +39,19 @@ func (m *MockManager) InvalidateSession(ctx context.Context, sessionID string) e
 	return nil
 }
 
-func (m *MockManager) GetUserFromRequest(r *http.Request) (*User, error) {
+func (m *MockManager) GetUserFromRequest(_ *http.Request) (*User, error) {
 	return m.user, m.userError
 }
 
-func (m *MockManager) LoginRequired(r *http.Request) bool {
+func (m *MockManager) LoginRequired(_ *http.Request) bool {
 	return m.loginRequired
 }
 
-func (m *MockManager) RedirectToLogin(w http.ResponseWriter, r *http.Request) error {
+func (m *MockManager) RedirectToLogin(_ http.ResponseWriter, _ *http.Request) error {
 	return m.redirectError
 }
 
-func (m *MockManager) GetProvider(providerID string) (Provider, error) {
+func (m *MockManager) GetProvider(_ string) (Provider, error) {
 	return nil, nil
 }
 
@@ -73,7 +73,7 @@ func TestNewAuthMiddleware(t *testing.T) {
 		t.Fatal("Middleware should not be nil")
 	}
 	
-	if middleware.authManager != mockManager {
+	if middleware.Manager != mockManager {
 		t.Error("Auth manager should be set correctly")
 	}
 	

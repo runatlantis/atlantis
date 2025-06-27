@@ -13,7 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// AuthManager implements the authentication manager
+// AuthManager handles authentication, session, and provider management for Atlantis.
 type AuthManager struct {
 	config           *Config
 	providers        map[string]Provider
@@ -23,7 +23,7 @@ type AuthManager struct {
 	permissionChecker PermissionChecker
 }
 
-// NewManager creates a new authentication manager
+// NewManager creates a new Manager instance
 func NewManager(config *Config, logger logging.SimpleLogging) (Manager, error) {
 	// Create permission checker
 	permissionChecker := NewPermissionChecker(config.Roles)
@@ -113,7 +113,7 @@ func (m *AuthManager) GetPermissionChecker() PermissionChecker {
 }
 
 // AuthenticateUser authenticates a user and creates a session
-func (m *AuthManager) AuthenticateUser(ctx context.Context, user *User) (*Session, error) {
+func (m *AuthManager) AuthenticateUser(_ context.Context, user *User) (*Session, error) {
 	// Generate session ID
 	sessionID, err := generateSessionID()
 	if err != nil {
@@ -174,7 +174,7 @@ func (m *AuthManager) mapUserRolesAndPermissions(user *User) {
 }
 
 // ValidateSession validates a session and returns the user
-func (m *AuthManager) ValidateSession(ctx context.Context, sessionID string) (*User, error) {
+func (m *AuthManager) ValidateSession(_ context.Context, sessionID string) (*User, error) {
 	m.sessionMux.RLock()
 	session, exists := m.sessions[sessionID]
 	m.sessionMux.RUnlock()
@@ -206,7 +206,7 @@ func (m *AuthManager) ValidateSession(ctx context.Context, sessionID string) (*U
 }
 
 // InvalidateSession invalidates a session
-func (m *AuthManager) InvalidateSession(ctx context.Context, sessionID string) error {
+func (m *AuthManager) InvalidateSession(_ context.Context, sessionID string) error {
 	m.sessionMux.Lock()
 	defer m.sessionMux.Unlock()
 
