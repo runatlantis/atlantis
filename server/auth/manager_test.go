@@ -151,11 +151,10 @@ func TestManager_ValidateSession(t *testing.T) {
 	}
 
 	if validatedUser == nil {
-		t.Error("Should return user for valid session")
+		t.Fatal("Validated user should not be nil")
 	}
-
 	if validatedUser.ID != testUser.ID {
-		t.Errorf("Validated user ID = %s, want %s", validatedUser.ID, testUser.ID)
+		t.Errorf("Expected user ID %s, got %s", testUser.ID, validatedUser.ID)
 	}
 }
 
@@ -281,11 +280,10 @@ func TestManager_GetUserFromRequest(t *testing.T) {
 	}
 
 	if retrievedUser == nil {
-		t.Error("Should return user for request with valid session cookie")
+		t.Fatal("Retrieved user should not be nil")
 	}
-
 	if retrievedUser.ID != testUser.ID {
-		t.Errorf("Retrieved user ID = %s, want %s", retrievedUser.ID, testUser.ID)
+		t.Errorf("Expected user ID %s, got %s", testUser.ID, retrievedUser.ID)
 	}
 }
 

@@ -115,7 +115,7 @@ func (p *OAuth2Provider) ExchangeCode(ctx context.Context, code string) (*TokenR
 		AccessToken:  token.AccessToken,
 		TokenType:    token.TokenType,
 		RefreshToken: token.RefreshToken,
-		ExpiresIn:    int(token.Expiry.Sub(time.Now()).Seconds()),
+		ExpiresIn:    int(time.Until(token.Expiry).Seconds()),
 	}, nil
 }
 
@@ -130,7 +130,9 @@ func (p *OAuth2Provider) GetUserInfo(ctx context.Context, token *TokenResponse) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // ignore error, as defer cannot return values
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("user info request failed with status: %d", resp.StatusCode)
@@ -180,7 +182,9 @@ func (p *OAuth2Provider) ValidateToken(ctx context.Context, tokenString string) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate token: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // ignore error, as defer cannot return values
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("token validation failed with status: %d", resp.StatusCode)

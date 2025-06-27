@@ -121,7 +121,9 @@ func (c *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
 	// Get user from request to invalidate their session
 	if user, err := c.AuthManager.GetUserFromRequest(r); err == nil {
 		if user.SessionID != "" {
-			c.AuthManager.InvalidateSession(r.Context(), user.SessionID)
+			if err := c.AuthManager.InvalidateSession(r.Context(), user.SessionID); err != nil {
+				c.Logger.Err("Failed to invalidate session: %v", err)
+			}
 		}
 	}
 
@@ -247,5 +249,7 @@ func (c *AuthController) respond(w http.ResponseWriter, lvl logging.LogLevel, re
 	response := fmt.Sprintf(format, args...)
 	c.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)
-	fmt.Fprintln(w, response)
+	if _, err := fmt.Fprintln(w, response); err != nil {
+		c.Logger.Err("Failed to write response: %v", err)
+	}
 } 

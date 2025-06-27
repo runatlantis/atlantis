@@ -180,12 +180,14 @@ func TestOAuth2Provider_ExchangeCode(t *testing.T) {
 		// Return a mock token response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		if _, err := w.Write([]byte(`{
 			"access_token": "test-access-token",
 			"token_type": "Bearer",
 			"refresh_token": "test-refresh-token",
 			"expires_in": 3600
-		}`))
+		}`)); err != nil {
+			t.Errorf("Failed to write response: %v", err)
+		}
 	}))
 	defer mockServer.Close()
 
@@ -252,7 +254,7 @@ func TestOAuth2Provider_GetUserInfo(t *testing.T) {
 		// Return a mock user info response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		if _, err := w.Write([]byte(`{
 			"id": "123456789",
 			"email": "test@example.com",
 			"name": "Test User",
@@ -260,7 +262,9 @@ func TestOAuth2Provider_GetUserInfo(t *testing.T) {
 			"family_name": "User",
 			"picture": "https://example.com/avatar.jpg",
 			"locale": "en"
-		}`))
+		}`)); err != nil {
+			t.Errorf("Failed to write response: %v", err)
+		}
 	}))
 	defer mockServer.Close()
 
@@ -337,7 +341,7 @@ func TestOAuth2Provider_ValidateToken(t *testing.T) {
 		// Return a mock user info response
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		if _, err := w.Write([]byte(`{
 			"id": "123456789",
 			"email": "test@example.com",
 			"name": "Test User",
@@ -345,7 +349,9 @@ func TestOAuth2Provider_ValidateToken(t *testing.T) {
 			"family_name": "User",
 			"picture": "https://example.com/avatar.jpg",
 			"locale": "en"
-		}`))
+		}`)); err != nil {
+			t.Errorf("Failed to write response: %v", err)
+		}
 	}))
 	defer mockServer.Close()
 

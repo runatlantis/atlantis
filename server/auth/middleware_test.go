@@ -63,6 +63,10 @@ func (m *MockManager) GetPermissionChecker() PermissionChecker {
 	return NewPermissionChecker(nil)
 }
 
+const (
+	authManagerContextKey contextKey = "auth_manager"
+)
+
 func TestNewAuthMiddleware(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	mockManager := &MockManager{}
@@ -127,7 +131,7 @@ func TestAuthMiddleware_ServeHTTP_AuthRequired_ValidUser(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		// Check that user is in context
-		user, ok := UserFromContext(r.Context())
+		user, ok := GetUserFromContext(r.Context())
 		if !ok {
 			t.Error("User should be in request context")
 		}
@@ -203,9 +207,9 @@ func TestContextWithUser(t *testing.T) {
 		Email: "test@example.com",
 	}
 	
-	newCtx := contextWithUser(ctx, testUser)
+	newCtx := WithUser(ctx, testUser)
 	
-	user, ok := UserFromContext(newCtx)
+	user, ok := GetUserFromContext(newCtx)
 	if !ok {
 		t.Fatal("User should be retrievable from context")
 	}
@@ -223,7 +227,7 @@ func TestUserFromContext(t *testing.T) {
 	}
 	
 	// Test with no user in context
-	user, ok := UserFromContext(ctx)
+	user, ok := GetUserFromContext(ctx)
 	if ok {
 		t.Error("Should return false when no user in context")
 	}
@@ -232,8 +236,8 @@ func TestUserFromContext(t *testing.T) {
 	}
 	
 	// Test with user in context
-	ctxWithUser := contextWithUser(ctx, testUser)
-	user, ok = UserFromContext(ctxWithUser)
+	ctxWithUser := WithUser(ctx, testUser)
+	user, ok = GetUserFromContext(ctxWithUser)
 	if !ok {
 		t.Error("Should return true when user in context")
 	}
@@ -405,7 +409,7 @@ func TestRequirePermission(t *testing.T) {
 	// Create middleware that adds auth manager to context
 	authMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "auth_manager", mockManager)
+			ctx := context.WithValue(r.Context(), authManagerContextKey, mockManager)
 			next(w, r.WithContext(ctx))
 		}
 	}
@@ -421,7 +425,7 @@ func TestRequirePermission(t *testing.T) {
 	}
 	
 	req := httptest.NewRequest("GET", "/test", nil)
-	ctx := contextWithUser(req.Context(), testUser)
+	ctx := WithUser(req.Context(), testUser)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	
@@ -467,7 +471,7 @@ func TestRequirePermission_InsufficientPermissions(t *testing.T) {
 	// Create middleware that adds auth manager to context
 	authMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "auth_manager", mockManager)
+			ctx := context.WithValue(r.Context(), authManagerContextKey, mockManager)
 			next(w, r.WithContext(ctx))
 		}
 	}
@@ -483,7 +487,7 @@ func TestRequirePermission_InsufficientPermissions(t *testing.T) {
 	}
 	
 	req := httptest.NewRequest("GET", "/test", nil)
-	ctx := contextWithUser(req.Context(), testUser)
+	ctx := WithUser(req.Context(), testUser)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	
@@ -511,7 +515,7 @@ func TestRequireAnyPermission(t *testing.T) {
 	// Create middleware that adds auth manager to context
 	authMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "auth_manager", mockManager)
+			ctx := context.WithValue(r.Context(), authManagerContextKey, mockManager)
 			next(w, r.WithContext(ctx))
 		}
 	}
@@ -528,7 +532,7 @@ func TestRequireAnyPermission(t *testing.T) {
 	}
 	
 	req := httptest.NewRequest("GET", "/test", nil)
-	ctx := contextWithUser(req.Context(), testUser)
+	ctx := WithUser(req.Context(), testUser)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	
@@ -552,7 +556,7 @@ func TestRequireAnyPermission_NoPermissions(t *testing.T) {
 	// Create middleware that adds auth manager to context
 	authMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "auth_manager", mockManager)
+			ctx := context.WithValue(r.Context(), authManagerContextKey, mockManager)
 			next(w, r.WithContext(ctx))
 		}
 	}
@@ -569,7 +573,7 @@ func TestRequireAnyPermission_NoPermissions(t *testing.T) {
 	}
 	
 	req := httptest.NewRequest("GET", "/test", nil)
-	ctx := contextWithUser(req.Context(), testUser)
+	ctx := WithUser(req.Context(), testUser)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	
@@ -597,7 +601,7 @@ func TestRequireAllPermissions(t *testing.T) {
 	// Create middleware that adds auth manager to context
 	authMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "auth_manager", mockManager)
+			ctx := context.WithValue(r.Context(), authManagerContextKey, mockManager)
 			next(w, r.WithContext(ctx))
 		}
 	}
@@ -614,7 +618,7 @@ func TestRequireAllPermissions(t *testing.T) {
 	}
 	
 	req := httptest.NewRequest("GET", "/test", nil)
-	ctx := contextWithUser(req.Context(), testUser)
+	ctx := WithUser(req.Context(), testUser)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	
@@ -638,7 +642,7 @@ func TestRequireAllPermissions_MissingPermission(t *testing.T) {
 	// Create middleware that adds auth manager to context
 	authMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "auth_manager", mockManager)
+			ctx := context.WithValue(r.Context(), authManagerContextKey, mockManager)
 			next(w, r.WithContext(ctx))
 		}
 	}
@@ -655,7 +659,7 @@ func TestRequireAllPermissions_MissingPermission(t *testing.T) {
 	}
 	
 	req := httptest.NewRequest("GET", "/test", nil)
-	ctx := contextWithUser(req.Context(), testUser)
+	ctx := WithUser(req.Context(), testUser)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	
@@ -683,7 +687,7 @@ func TestRequireAdmin(t *testing.T) {
 	// Create middleware that adds auth manager to context
 	authMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "auth_manager", mockManager)
+			ctx := context.WithValue(r.Context(), authManagerContextKey, mockManager)
 			next(w, r.WithContext(ctx))
 		}
 	}
@@ -699,7 +703,7 @@ func TestRequireAdmin(t *testing.T) {
 	}
 	
 	req := httptest.NewRequest("GET", "/admin", nil)
-	ctx := contextWithUser(req.Context(), testUser)
+	ctx := WithUser(req.Context(), testUser)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	
@@ -723,7 +727,7 @@ func TestRequireAdmin_NonAdmin(t *testing.T) {
 	// Create middleware that adds auth manager to context
 	authMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "auth_manager", mockManager)
+			ctx := context.WithValue(r.Context(), authManagerContextKey, mockManager)
 			next(w, r.WithContext(ctx))
 		}
 	}
@@ -739,7 +743,7 @@ func TestRequireAdmin_NonAdmin(t *testing.T) {
 	}
 	
 	req := httptest.NewRequest("GET", "/admin", nil)
-	ctx := contextWithUser(req.Context(), testUser)
+	ctx := WithUser(req.Context(), testUser)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 	
@@ -767,7 +771,7 @@ func TestSpecificPermissionMiddlewares(t *testing.T) {
 	// Create middleware that adds auth manager to context
 	authMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "auth_manager", mockManager)
+			ctx := context.WithValue(r.Context(), authManagerContextKey, mockManager)
 			next(w, r.WithContext(ctx))
 		}
 	}
@@ -797,7 +801,7 @@ func TestSpecificPermissionMiddlewares(t *testing.T) {
 			}
 			
 			req := httptest.NewRequest("GET", "/test", nil)
-			ctx := contextWithUser(req.Context(), testUser)
+			ctx := WithUser(req.Context(), testUser)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			

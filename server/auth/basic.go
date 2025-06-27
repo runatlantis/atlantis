@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strings"
@@ -165,7 +166,10 @@ func (p *BasicAuthProvider) ValidateBasicAuth(r *http.Request) (*User, error) {
 
 // Helper function to decode basic auth token
 func decodeBasicAuth(token string) (string, error) {
-	// In a real implementation, this would decode base64
-	// For now, we'll assume the token is already decoded
-	return token, nil
+	// Decode base64 encoded credentials
+	decoded, err := base64.StdEncoding.DecodeString(token)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode base64: %w", err)
+	}
+	return string(decoded), nil
 } 

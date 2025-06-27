@@ -45,12 +45,18 @@ func TestLoadConfigFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() {
+		if err := tmpfile.Close(); err != nil {
+			t.Fatalf("Failed to close temp file: %v", err)
+		}
+		if err := os.Remove(tmpfile.Name()); err != nil {
+			t.Fatalf("Failed to remove temp file: %v", err)
+		}
+	}()
 
 	if _, err := tmpfile.Write(configJSON); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
-	tmpfile.Close()
 
 	// Load config from file
 	config, err := LoadConfigFromFile(tmpfile.Name())
@@ -129,12 +135,18 @@ func TestLoadConfigFromFile_Defaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() {
+		if err := tmpfile.Close(); err != nil {
+			t.Fatalf("Failed to close temp file: %v", err)
+		}
+		if err := os.Remove(tmpfile.Name()); err != nil {
+			t.Fatalf("Failed to remove temp file: %v", err)
+		}
+	}()
 
 	if _, err := tmpfile.Write(configJSON); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
-	tmpfile.Close()
 
 	// Load config from file
 	config, err := LoadConfigFromFile(tmpfile.Name())
@@ -158,12 +170,18 @@ func TestLoadConfigFromFile_InvalidJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() {
+		if err := tmpfile.Close(); err != nil {
+			t.Fatalf("Failed to close temp file: %v", err)
+		}
+		if err := os.Remove(tmpfile.Name()); err != nil {
+			t.Fatalf("Failed to remove temp file: %v", err)
+		}
+	}()
 
 	if _, err := tmpfile.Write([]byte("invalid json")); err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
-	tmpfile.Close()
 
 	// Load config from file should fail
 	_, err = LoadConfigFromFile(tmpfile.Name())
@@ -182,19 +200,43 @@ func TestLoadConfigFromFile_FileNotFound(t *testing.T) {
 
 func TestLoadConfigFromEnv(t *testing.T) {
 	// Set environment variables
-	os.Setenv("ATLANTIS_SESSION_SECRET", "env-secret")
-	os.Setenv("ATLANTIS_SECURE_COOKIES", "true")
-	os.Setenv("ATLANTIS_CSRF_SECRET", "env-csrf")
-	os.Setenv("ATLANTIS_ENABLE_BASIC_AUTH", "true")
-	os.Setenv("ATLANTIS_BASIC_AUTH_USER", "envuser")
-	os.Setenv("ATLANTIS_BASIC_AUTH_PASS", "envpass")
+	if err := os.Setenv("ATLANTIS_SESSION_SECRET", "env-secret"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_SECURE_COOKIES", "true"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_CSRF_SECRET", "env-csrf"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_ENABLE_BASIC_AUTH", "true"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_BASIC_AUTH_USER", "envuser"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_BASIC_AUTH_PASS", "envpass"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("ATLANTIS_SESSION_SECRET")
-		os.Unsetenv("ATLANTIS_SECURE_COOKIES")
-		os.Unsetenv("ATLANTIS_CSRF_SECRET")
-		os.Unsetenv("ATLANTIS_ENABLE_BASIC_AUTH")
-		os.Unsetenv("ATLANTIS_BASIC_AUTH_USER")
-		os.Unsetenv("ATLANTIS_BASIC_AUTH_PASS")
+		if err := os.Unsetenv("ATLANTIS_SESSION_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_SECURE_COOKIES"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_CSRF_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_ENABLE_BASIC_AUTH"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_BASIC_AUTH_USER"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_BASIC_AUTH_PASS"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
 	}()
 
 	config, err := LoadConfigFromEnv()
@@ -229,12 +271,24 @@ func TestLoadConfigFromEnv(t *testing.T) {
 
 func TestLoadConfigFromEnv_Defaults(t *testing.T) {
 	// Clear environment variables
-	os.Unsetenv("ATLANTIS_SESSION_SECRET")
-	os.Unsetenv("ATLANTIS_SECURE_COOKIES")
-	os.Unsetenv("ATLANTIS_CSRF_SECRET")
-	os.Unsetenv("ATLANTIS_ENABLE_BASIC_AUTH")
-	os.Unsetenv("ATLANTIS_BASIC_AUTH_USER")
-	os.Unsetenv("ATLANTIS_BASIC_AUTH_PASS")
+	if err := os.Unsetenv("ATLANTIS_SESSION_SECRET"); err != nil {
+		t.Fatalf("Failed to unset env: %v", err)
+	}
+	if err := os.Unsetenv("ATLANTIS_SECURE_COOKIES"); err != nil {
+		t.Fatalf("Failed to unset env: %v", err)
+	}
+	if err := os.Unsetenv("ATLANTIS_CSRF_SECRET"); err != nil {
+		t.Fatalf("Failed to unset env: %v", err)
+	}
+	if err := os.Unsetenv("ATLANTIS_ENABLE_BASIC_AUTH"); err != nil {
+		t.Fatalf("Failed to unset env: %v", err)
+	}
+	if err := os.Unsetenv("ATLANTIS_BASIC_AUTH_USER"); err != nil {
+		t.Fatalf("Failed to unset env: %v", err)
+	}
+	if err := os.Unsetenv("ATLANTIS_BASIC_AUTH_PASS"); err != nil {
+		t.Fatalf("Failed to unset env: %v", err)
+	}
 
 	config, err := LoadConfigFromEnv()
 	if err != nil {
@@ -268,13 +322,25 @@ func TestLoadConfigFromEnv_Defaults(t *testing.T) {
 
 func TestLoadConfigFromEnv_GoogleProvider(t *testing.T) {
 	// Set Google OAuth2 environment variables
-	os.Setenv("ATLANTIS_GOOGLE_CLIENT_ID", "google-client-id")
-	os.Setenv("ATLANTIS_GOOGLE_CLIENT_SECRET", "google-client-secret")
-	os.Setenv("ATLANTIS_GOOGLE_REDIRECT_URL", "https://example.com/google/callback")
+	if err := os.Setenv("ATLANTIS_GOOGLE_CLIENT_ID", "google-client-id"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_GOOGLE_CLIENT_SECRET", "google-client-secret"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_GOOGLE_REDIRECT_URL", "https://example.com/google/callback"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("ATLANTIS_GOOGLE_CLIENT_ID")
-		os.Unsetenv("ATLANTIS_GOOGLE_CLIENT_SECRET")
-		os.Unsetenv("ATLANTIS_GOOGLE_REDIRECT_URL")
+		if err := os.Unsetenv("ATLANTIS_GOOGLE_CLIENT_ID"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_GOOGLE_CLIENT_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_GOOGLE_REDIRECT_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
 	}()
 
 	config, err := LoadConfigFromEnv()
@@ -314,15 +380,31 @@ func TestLoadConfigFromEnv_GoogleProvider(t *testing.T) {
 
 func TestLoadConfigFromEnv_OktaProvider(t *testing.T) {
 	// Set Okta OIDC environment variables
-	os.Setenv("ATLANTIS_OKTA_CLIENT_ID", "okta-client-id")
-	os.Setenv("ATLANTIS_OKTA_CLIENT_SECRET", "okta-client-secret")
-	os.Setenv("ATLANTIS_OKTA_REDIRECT_URL", "https://example.com/okta/callback")
-	os.Setenv("ATLANTIS_OKTA_ISSUER_URL", "https://example.okta.com")
+	if err := os.Setenv("ATLANTIS_OKTA_CLIENT_ID", "okta-client-id"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_OKTA_CLIENT_SECRET", "okta-client-secret"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_OKTA_REDIRECT_URL", "https://example.com/okta/callback"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_OKTA_ISSUER_URL", "https://example.okta.com"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("ATLANTIS_OKTA_CLIENT_ID")
-		os.Unsetenv("ATLANTIS_OKTA_CLIENT_SECRET")
-		os.Unsetenv("ATLANTIS_OKTA_REDIRECT_URL")
-		os.Unsetenv("ATLANTIS_OKTA_ISSUER_URL")
+		if err := os.Unsetenv("ATLANTIS_OKTA_CLIENT_ID"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_OKTA_CLIENT_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_OKTA_REDIRECT_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_OKTA_ISSUER_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
 	}()
 
 	config, err := LoadConfigFromEnv()
@@ -354,13 +436,25 @@ func TestLoadConfigFromEnv_OktaProvider(t *testing.T) {
 
 func TestLoadConfigFromEnv_OktaProvider_MissingIssuerURL(t *testing.T) {
 	// Set Okta OIDC environment variables without issuer URL
-	os.Setenv("ATLANTIS_OKTA_CLIENT_ID", "okta-client-id")
-	os.Setenv("ATLANTIS_OKTA_CLIENT_SECRET", "okta-client-secret")
-	os.Setenv("ATLANTIS_OKTA_REDIRECT_URL", "https://example.com/okta/callback")
+	if err := os.Setenv("ATLANTIS_OKTA_CLIENT_ID", "okta-client-id"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_OKTA_CLIENT_SECRET", "okta-client-secret"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_OKTA_REDIRECT_URL", "https://example.com/okta/callback"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("ATLANTIS_OKTA_CLIENT_ID")
-		os.Unsetenv("ATLANTIS_OKTA_CLIENT_SECRET")
-		os.Unsetenv("ATLANTIS_OKTA_REDIRECT_URL")
+		if err := os.Unsetenv("ATLANTIS_OKTA_CLIENT_ID"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_OKTA_CLIENT_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_OKTA_REDIRECT_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
 	}()
 
 	_, err := LoadConfigFromEnv()
@@ -371,15 +465,31 @@ func TestLoadConfigFromEnv_OktaProvider_MissingIssuerURL(t *testing.T) {
 
 func TestLoadConfigFromEnv_AzureProvider(t *testing.T) {
 	// Set Azure AD environment variables
-	os.Setenv("ATLANTIS_AZURE_CLIENT_ID", "azure-client-id")
-	os.Setenv("ATLANTIS_AZURE_CLIENT_SECRET", "azure-client-secret")
-	os.Setenv("ATLANTIS_AZURE_REDIRECT_URL", "https://example.com/azure/callback")
-	os.Setenv("ATLANTIS_AZURE_TENANT_ID", "tenant-123")
+	if err := os.Setenv("ATLANTIS_AZURE_CLIENT_ID", "azure-client-id"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_AZURE_CLIENT_SECRET", "azure-client-secret"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_AZURE_REDIRECT_URL", "https://example.com/azure/callback"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_AZURE_TENANT_ID", "tenant-123"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("ATLANTIS_AZURE_CLIENT_ID")
-		os.Unsetenv("ATLANTIS_AZURE_CLIENT_SECRET")
-		os.Unsetenv("ATLANTIS_AZURE_REDIRECT_URL")
-		os.Unsetenv("ATLANTIS_AZURE_TENANT_ID")
+		if err := os.Unsetenv("ATLANTIS_AZURE_CLIENT_ID"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_AZURE_CLIENT_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_AZURE_REDIRECT_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_AZURE_TENANT_ID"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
 	}()
 
 	config, err := LoadConfigFromEnv()
@@ -412,13 +522,25 @@ func TestLoadConfigFromEnv_AzureProvider(t *testing.T) {
 
 func TestLoadConfigFromEnv_AzureProvider_MissingTenantID(t *testing.T) {
 	// Set Azure AD environment variables without tenant ID
-	os.Setenv("ATLANTIS_AZURE_CLIENT_ID", "azure-client-id")
-	os.Setenv("ATLANTIS_AZURE_CLIENT_SECRET", "azure-client-secret")
-	os.Setenv("ATLANTIS_AZURE_REDIRECT_URL", "https://example.com/azure/callback")
+	if err := os.Setenv("ATLANTIS_AZURE_CLIENT_ID", "azure-client-id"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_AZURE_CLIENT_SECRET", "azure-client-secret"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_AZURE_REDIRECT_URL", "https://example.com/azure/callback"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("ATLANTIS_AZURE_CLIENT_ID")
-		os.Unsetenv("ATLANTIS_AZURE_CLIENT_SECRET")
-		os.Unsetenv("ATLANTIS_AZURE_REDIRECT_URL")
+		if err := os.Unsetenv("ATLANTIS_AZURE_CLIENT_ID"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_AZURE_CLIENT_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_AZURE_REDIRECT_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
 	}()
 
 	_, err := LoadConfigFromEnv()
@@ -429,15 +551,31 @@ func TestLoadConfigFromEnv_AzureProvider_MissingTenantID(t *testing.T) {
 
 func TestLoadConfigFromEnv_Auth0Provider(t *testing.T) {
 	// Set Auth0 environment variables
-	os.Setenv("ATLANTIS_AUTH0_CLIENT_ID", "auth0-client-id")
-	os.Setenv("ATLANTIS_AUTH0_CLIENT_SECRET", "auth0-client-secret")
-	os.Setenv("ATLANTIS_AUTH0_REDIRECT_URL", "https://example.com/auth0/callback")
-	os.Setenv("ATLANTIS_AUTH0_DOMAIN", "example.auth0.com")
+	if err := os.Setenv("ATLANTIS_AUTH0_CLIENT_ID", "auth0-client-id"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_AUTH0_CLIENT_SECRET", "auth0-client-secret"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_AUTH0_REDIRECT_URL", "https://example.com/auth0/callback"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_AUTH0_DOMAIN", "example.auth0.com"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("ATLANTIS_AUTH0_CLIENT_ID")
-		os.Unsetenv("ATLANTIS_AUTH0_CLIENT_SECRET")
-		os.Unsetenv("ATLANTIS_AUTH0_REDIRECT_URL")
-		os.Unsetenv("ATLANTIS_AUTH0_DOMAIN")
+		if err := os.Unsetenv("ATLANTIS_AUTH0_CLIENT_ID"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_AUTH0_CLIENT_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_AUTH0_REDIRECT_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_AUTH0_DOMAIN"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
 	}()
 
 	config, err := LoadConfigFromEnv()
@@ -470,13 +608,25 @@ func TestLoadConfigFromEnv_Auth0Provider(t *testing.T) {
 
 func TestLoadConfigFromEnv_Auth0Provider_MissingDomain(t *testing.T) {
 	// Set Auth0 environment variables without domain
-	os.Setenv("ATLANTIS_AUTH0_CLIENT_ID", "auth0-client-id")
-	os.Setenv("ATLANTIS_AUTH0_CLIENT_SECRET", "auth0-client-secret")
-	os.Setenv("ATLANTIS_AUTH0_REDIRECT_URL", "https://example.com/auth0/callback")
+	if err := os.Setenv("ATLANTIS_AUTH0_CLIENT_ID", "auth0-client-id"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_AUTH0_CLIENT_SECRET", "auth0-client-secret"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_AUTH0_REDIRECT_URL", "https://example.com/auth0/callback"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("ATLANTIS_AUTH0_CLIENT_ID")
-		os.Unsetenv("ATLANTIS_AUTH0_CLIENT_SECRET")
-		os.Unsetenv("ATLANTIS_AUTH0_REDIRECT_URL")
+		if err := os.Unsetenv("ATLANTIS_AUTH0_CLIENT_ID"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_AUTH0_CLIENT_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_AUTH0_REDIRECT_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
 	}()
 
 	_, err := LoadConfigFromEnv()
@@ -487,23 +637,51 @@ func TestLoadConfigFromEnv_Auth0Provider_MissingDomain(t *testing.T) {
 
 func TestLoadConfigFromEnv_MultipleProviders(t *testing.T) {
 	// Set multiple provider environment variables
-	os.Setenv("ATLANTIS_GOOGLE_CLIENT_ID", "google-client-id")
-	os.Setenv("ATLANTIS_GOOGLE_CLIENT_SECRET", "google-client-secret")
-	os.Setenv("ATLANTIS_GOOGLE_REDIRECT_URL", "https://example.com/google/callback")
+	if err := os.Setenv("ATLANTIS_GOOGLE_CLIENT_ID", "google-client-id"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_GOOGLE_CLIENT_SECRET", "google-client-secret"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_GOOGLE_REDIRECT_URL", "https://example.com/google/callback"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	
-	os.Setenv("ATLANTIS_OKTA_CLIENT_ID", "okta-client-id")
-	os.Setenv("ATLANTIS_OKTA_CLIENT_SECRET", "okta-client-secret")
-	os.Setenv("ATLANTIS_OKTA_REDIRECT_URL", "https://example.com/okta/callback")
-	os.Setenv("ATLANTIS_OKTA_ISSUER_URL", "https://example.okta.com")
+	if err := os.Setenv("ATLANTIS_OKTA_CLIENT_ID", "okta-client-id"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_OKTA_CLIENT_SECRET", "okta-client-secret"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_OKTA_REDIRECT_URL", "https://example.com/okta/callback"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
+	if err := os.Setenv("ATLANTIS_OKTA_ISSUER_URL", "https://example.okta.com"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	
 	defer func() {
-		os.Unsetenv("ATLANTIS_GOOGLE_CLIENT_ID")
-		os.Unsetenv("ATLANTIS_GOOGLE_CLIENT_SECRET")
-		os.Unsetenv("ATLANTIS_GOOGLE_REDIRECT_URL")
-		os.Unsetenv("ATLANTIS_OKTA_CLIENT_ID")
-		os.Unsetenv("ATLANTIS_OKTA_CLIENT_SECRET")
-		os.Unsetenv("ATLANTIS_OKTA_REDIRECT_URL")
-		os.Unsetenv("ATLANTIS_OKTA_ISSUER_URL")
+		if err := os.Unsetenv("ATLANTIS_GOOGLE_CLIENT_ID"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_GOOGLE_CLIENT_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_GOOGLE_REDIRECT_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_OKTA_CLIENT_ID"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_OKTA_CLIENT_SECRET"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_OKTA_REDIRECT_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
+		if err := os.Unsetenv("ATLANTIS_OKTA_ISSUER_URL"); err != nil {
+			t.Fatalf("Failed to unset env: %v", err)
+		}
 	}()
 
 	config, err := LoadConfigFromEnv()
@@ -532,7 +710,9 @@ func TestLoadConfigFromEnv_MultipleProviders(t *testing.T) {
 
 func TestGetEnvOrDefault(t *testing.T) {
 	// Test with environment variable set
-	os.Setenv("TEST_VAR", "test-value")
+	if err := os.Setenv("TEST_VAR", "test-value"); err != nil {
+		t.Fatalf("Failed to set env: %v", err)
+	}
 	defer os.Unsetenv("TEST_VAR")
 
 	result := getEnvOrDefault("TEST_VAR", "default-value")
@@ -567,7 +747,9 @@ func TestGetEnvBoolOrDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envValue != "" {
-				os.Setenv("TEST_BOOL_VAR", tt.envValue)
+				if err := os.Setenv("TEST_BOOL_VAR", tt.envValue); err != nil {
+					t.Fatalf("Failed to set env: %v", err)
+				}
 				defer os.Unsetenv("TEST_BOOL_VAR")
 			}
 

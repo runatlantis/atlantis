@@ -9,6 +9,13 @@ import (
 	"github.com/urfave/negroni/v3"
 )
 
+// contextKey is a custom type for context keys to avoid collisions
+type contextKey string
+
+const (
+	userContextKey contextKey = "user"
+)
+
 // AuthMiddleware handles authentication for HTTP requests
 type AuthMiddleware struct {
 	authManager Manager
@@ -48,21 +55,21 @@ func (m *AuthMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 
 	// User is authenticated, add user info to request context
 	ctx := r.Context()
-	ctx = contextWithUser(ctx, user)
+	ctx = WithUser(ctx, user)
 	r = r.WithContext(ctx)
 
 	m.logger.Debug("[AUTH] User %s authenticated for: %s", user.Email, r.URL.RequestURI())
 	next(rw, r)
 }
 
-// contextWithUser adds user to request context
-func contextWithUser(ctx context.Context, user *User) context.Context {
-	return context.WithValue(ctx, "user", user)
+// WithUser adds a user to the request context
+func WithUser(ctx context.Context, user *User) context.Context {
+	return context.WithValue(ctx, userContextKey, user)
 }
 
-// UserFromContext extracts user from request context
-func UserFromContext(ctx context.Context) (*User, bool) {
-	user, ok := ctx.Value("user").(*User)
+// GetUserFromContext retrieves a user from the request context
+func GetUserFromContext(ctx context.Context) (*User, bool) {
+	user, ok := ctx.Value(userContextKey).(*User)
 	return user, ok
 }
 
@@ -123,7 +130,7 @@ func (l *LegacyAuthMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Request
 func RequirePermission(permission Permission) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			user, ok := UserFromContext(r.Context())
+			user, ok := GetUserFromContext(r.Context())
 			if !ok {
 				http.Error(w, "Authentication required", http.StatusUnauthorized)
 				return
@@ -153,7 +160,7 @@ func RequirePermission(permission Permission) func(http.HandlerFunc) http.Handle
 func RequireAnyPermission(permissions []Permission) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			user, ok := UserFromContext(r.Context())
+			user, ok := GetUserFromContext(r.Context())
 			if !ok {
 				http.Error(w, "Authentication required", http.StatusUnauthorized)
 				return
@@ -183,7 +190,7 @@ func RequireAnyPermission(permissions []Permission) func(http.HandlerFunc) http.
 func RequireAllPermissions(permissions []Permission) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			user, ok := UserFromContext(r.Context())
+			user, ok := GetUserFromContext(r.Context())
 			if !ok {
 				http.Error(w, "Authentication required", http.StatusUnauthorized)
 				return
@@ -213,7 +220,7 @@ func RequireAllPermissions(permissions []Permission) func(http.HandlerFunc) http
 func RequireAdmin() func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			user, ok := UserFromContext(r.Context())
+			user, ok := GetUserFromContext(r.Context())
 			if !ok {
 				http.Error(w, "Authentication required", http.StatusUnauthorized)
 				return

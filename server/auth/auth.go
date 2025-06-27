@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -123,6 +125,33 @@ type Config struct {
 	AdminEmails       []string         `json:"admin_emails"`
 	Roles             map[string]Role  `json:"roles"`
 	Providers         []ProviderConfig `json:"providers"`
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for Config
+func (c *Config) UnmarshalJSON(data []byte) error {
+	// Create a temporary struct to handle the raw JSON
+	type configAlias Config
+	aux := &struct {
+		SessionDuration string `json:"session_duration"`
+		*configAlias
+	}{
+		configAlias: (*configAlias)(c),
+	}
+	
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	
+	// Parse session duration if it's a string
+	if aux.SessionDuration != "" {
+		duration, err := time.ParseDuration(aux.SessionDuration)
+		if err != nil {
+			return fmt.Errorf("invalid session_duration: %w", err)
+		}
+		c.SessionDuration = duration
+	}
+	
+	return nil
 }
 
 // Provider interface for authentication providers
