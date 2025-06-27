@@ -926,7 +926,7 @@ func TestParseBitbucketCloudCommentEvent_MultipleStates(t *testing.T) {
 			withState := strings.ReplaceAll(string(bytes), `"state": "MERGED"`, fmt.Sprintf(`"state": "%s"`, c.pullState))
 			pull, _, _, _, _, err := parser.ParseBitbucketCloudPullCommentEvent([]byte(withState))
 			Ok(t, err)
-			
+
 			Equals(t, c.exp, pull.State)
 		})
 	}
