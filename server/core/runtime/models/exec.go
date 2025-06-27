@@ -38,6 +38,7 @@ func (e LocalExec) CombinedOutput(args []string, envs map[string]string, workdir
 
 	// honestly not entirely sure why we're using sh -c but it's used
 	// for the terraform binary so copying it for now
+	// nolint: gosec
 	cmd := exec.Command("sh", "-c", formattedArgs)
 	cmd.Env = envVars
 	cmd.Dir = workdir

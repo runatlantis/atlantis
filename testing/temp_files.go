@@ -39,7 +39,7 @@ func dirStructureGo(t *testing.T, parentDir string, structure map[string]interfa
 	for key, val := range structure {
 		// If val is nil then key is a filename and we just create it
 		if val == nil {
-			_, err := os.Create(filepath.Join(parentDir, key))
+			_, err := os.Create(filepath.Join(parentDir, key)) // nolint: gosec
 			Ok(t, err)
 			continue
 		}

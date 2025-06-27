@@ -1091,7 +1091,12 @@ func (s *Server) Start() error {
 	}, NewRequestLogger(s))
 	n.UseHandler(s.Router)
 
-	defer s.Logger.Flush()
+	defer func() {
+		if flushErr := s.Logger.Flush(); flushErr != nil {
+			// Log the error but don't return it since we're in a defer
+			// and the function is already returning an error
+		}
+	}()
 
 	// Ensure server gracefully drains connections when stopped.
 	stop := make(chan os.Signal, 1)
@@ -1163,7 +1168,9 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	locks, err := s.Locker.List()
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Could not retrieve locks: %s", err)
+		if _, writeErr := fmt.Fprintf(w, "Could not retrieve locks: %s", err); writeErr != nil {
+			s.Logger.Err("failed to write error response: %v", writeErr)
+		}
 		return
 	}
 
@@ -1188,7 +1195,9 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	s.Logger.Debug("Apply Lock: %v", applyCmdLock)
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err)
+		if _, writeErr := fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err); writeErr != nil {
+			s.Logger.Err("failed to write error response: %v", writeErr)
+		}
 		return
 	}
 

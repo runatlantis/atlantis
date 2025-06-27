@@ -247,7 +247,11 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	e.Post(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Errorf("failed to close response body: %v", closeErr)
+		}
+	}()
 	Equals(t, http.StatusForbidden, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
 	exp := "Repo not allowlisted"
@@ -282,7 +286,11 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	e.Post(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Errorf("failed to close response body: %v", closeErr)
+		}
+	}()
 	Equals(t, http.StatusForbidden, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
 	exp := "Repo not allowlisted"
@@ -316,7 +324,11 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	e.Post(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Errorf("failed to close response body: %v", closeErr)
+		}
+	}()
 	Equals(t, http.StatusForbidden, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
 	exp := "Repo not allowlisted"
@@ -352,7 +364,11 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	e.Post(w, req)
 
 	resp := w.Result()
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Errorf("failed to close response body: %v", closeErr)
+		}
+	}()
 	Equals(t, http.StatusForbidden, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
 	exp := "Repo not allowlisted"
