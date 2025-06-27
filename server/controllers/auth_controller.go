@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -206,7 +208,7 @@ func (c *AuthController) handleOAuthCallback(w http.ResponseWriter, r *http.Requ
 	token, err := provider.ExchangeCode(r.Context(), code)
 	if err != nil {
 		c.Logger.Err("Failed to exchange code for token: %s", err)
-		c.respond(w, logging.Error, http.StatusInternalServerError, "Authentication failed")
+		c.respond(w, logging.Error, http.StatusBadRequest, "Authentication failed")
 		return
 	}
 
@@ -214,7 +216,7 @@ func (c *AuthController) handleOAuthCallback(w http.ResponseWriter, r *http.Requ
 	user, err := provider.GetUserInfo(r.Context(), token)
 	if err != nil {
 		c.Logger.Err("Failed to get user info: %s", err)
-		c.respond(w, logging.Error, http.StatusInternalServerError, "Failed to get user information")
+		c.respond(w, logging.Error, http.StatusBadRequest, "Failed to get user information")
 		return
 	}
 
@@ -239,9 +241,12 @@ func (c *AuthController) handleOAuthCallback(w http.ResponseWriter, r *http.Requ
 
 // generateState generates a random state parameter for CSRF protection
 func (c *AuthController) generateState() (string, error) {
-	// This is a simplified implementation
-	// In a real implementation, you would use a cryptographically secure random generator
-	return "state", nil
+	// Generate a cryptographically secure random state
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random state: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(bytes), nil
 }
 
 // respond sends an HTTP response with the given status code and message
@@ -249,7 +254,7 @@ func (c *AuthController) respond(w http.ResponseWriter, lvl logging.LogLevel, re
 	response := fmt.Sprintf(format, args...)
 	c.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)
-	if _, err := fmt.Fprintln(w, response); err != nil {
+	if _, err := fmt.Fprint(w, response); err != nil {
 		c.Logger.Err("Failed to write response: %v", err)
 	}
 } 
