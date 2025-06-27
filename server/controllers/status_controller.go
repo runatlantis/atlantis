@@ -32,7 +32,9 @@ func (d *StatusController) Get(w http.ResponseWriter, _ *http.Request) {
 	}, "", "  ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "Error creating status json response: %s", err)
+		if _, writeErr := fmt.Fprintf(w, "Error creating status json response: %s", err); writeErr != nil {
+			d.Logger.Err("failed to write error response: %v", writeErr)
+		}
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

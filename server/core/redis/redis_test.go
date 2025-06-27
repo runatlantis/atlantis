@@ -63,7 +63,11 @@ func TestRedisWithTLS(t *testing.T) {
 	caPath = certFile.Name()
 	_, err = certFile.Write(certData)
 	Ok(t, err)
-	defer certFile.Close()
+	defer func() {
+		if closeErr := certFile.Close(); closeErr != nil {
+			t.Errorf("failed to close cert file: %v", closeErr)
+		}
+	}()
 	tlsConfig := &tls.Config{
 		Certificates:       []tls.Certificate{cert},
 		InsecureSkipVerify: true, //nolint:gosec // This is purely for testing

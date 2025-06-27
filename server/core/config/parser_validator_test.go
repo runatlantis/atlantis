@@ -41,7 +41,7 @@ func TestHasRepoCfg_FileDoesNotExist(t *testing.T) {
 func TestHasRepoCfg_InvalidFileExtension(t *testing.T) {
 	tmpDir := t.TempDir()
 	repoConfigFile := "atlantis.yml"
-	_, err := os.Create(filepath.Join(tmpDir, repoConfigFile))
+	_, err := os.Create(filepath.Join(tmpDir, "atlantis.yml"))
 	Ok(t, err)
 
 	r := config.ParserValidator{}

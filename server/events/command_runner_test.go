@@ -86,9 +86,11 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	// create an empty DB
 	tmp := t.TempDir()
-	defaultBoltDB, err := db.New(tmp)
+	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		defaultBoltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 
@@ -97,7 +99,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		SilenceNoProjects:     false,
 		StatusName:            "atlantis-test",
 		discardApprovalOnPlan: false,
-		backend:               defaultBoltDB,
+		backend:               boltDB,
 		DisableUnlockLabel:    "do-not-unlock",
 	}
 
@@ -778,7 +780,9 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -808,7 +812,9 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -839,7 +845,9 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -866,7 +874,9 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -890,7 +900,9 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -911,7 +923,9 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -956,7 +970,9 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -979,7 +995,9 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -1034,7 +1052,9 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -1061,7 +1081,9 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -1110,7 +1132,9 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -1169,7 +1193,9 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
@@ -1250,7 +1276,9 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
-		boltDB.Close()
+		if closeErr := boltDB.Close(); closeErr != nil {
+			t.Errorf("failed to close database: %v", closeErr)
+		}
 	})
 	Ok(t, err)
 	dbUpdater.Backend = boltDB
