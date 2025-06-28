@@ -211,20 +211,28 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 		}
 		scope.Counter(fmt.Sprintf("error_%d", resp.err.code)).Inc(1)
 		w.WriteHeader(resp.err.code)
-		fmt.Fprintln(w, resp.err.err.Error())
+		if _, err := fmt.Fprintln(w, resp.err.err.Error()); err != nil {
+			e.Logger.Err("failed to write error response: %v", err)
+		}
 		return
 	}
 
 	scope.Counter(fmt.Sprintf("success_%d", http.StatusOK)).Inc(1)
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, resp.body)
+	if _, err := fmt.Fprintln(w, resp.body); err != nil {
+		e.Logger.Err("failed to write success response: %v", err)
+	}
 }
 
 func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r *http.Request) {
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
 	reqID := r.Header.Get(bitbucketCloudRequestIDHeader)
 	sig := r.Header.Get(bitbucketSignatureHeader)
-	defer r.Body.Close() // nolint: errcheck
+	defer func() {
+		if closeErr := r.Body.Close(); closeErr != nil {
+			e.Logger.Err("failed to close request body: %v", closeErr)
+		}
+	}()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
@@ -254,7 +262,11 @@ func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r
 	eventType := r.Header.Get(bitbucketEventTypeHeader)
 	reqID := r.Header.Get(bitbucketServerRequestIDHeader)
 	sig := r.Header.Get(bitbucketSignatureHeader)
-	defer r.Body.Close() // nolint: errcheck
+	defer func() {
+		if closeErr := r.Body.Close(); closeErr != nil {
+			e.Logger.Err("failed to close request body: %v", closeErr)
+		}
+	}()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketServerRequestIDHeader, reqID)
@@ -318,7 +330,11 @@ func (e *VCSEventsController) handleGiteaPost(w http.ResponseWriter, r *http.Req
 	eventType := r.Header.Get(giteaEventTypeHeader)
 	reqID := r.Header.Get(giteaRequestIDHeader)
 
-	defer r.Body.Close() // Ensure the request body is closed
+	defer func() {
+		if closeErr := r.Body.Close(); closeErr != nil {
+			e.Logger.Err("failed to close request body: %v", closeErr)
+		}
+	}()
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -899,7 +915,9 @@ func (e *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLeve
 	response := fmt.Sprintf(format, args...)
 	e.Logger.Log(lvl, response)
 	w.WriteHeader(code)
-	fmt.Fprintln(w, response)
+	if _, err := fmt.Fprintln(w, response); err != nil {
+		e.Logger.Err("failed to write response: %v", err)
+	}
 }
 
 // commentNotAllowlisted comments on the pull request that the repo is not

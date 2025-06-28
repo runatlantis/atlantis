@@ -48,7 +48,7 @@ This mode sets up Atlantis on a test repo so you can try it out. We will
 
 [bold]Press Ctrl-c at any time to exit
 `
-var pullRequestBody = strings.Replace(`
+var pullRequestBody = strings.ReplaceAll(`
 In this pull request we will learn how to use Atlantis.
 
 1. In a couple of seconds you should see the output of Atlantis automatically running $terraform plan$.
@@ -82,7 +82,7 @@ In this pull request we will learn how to use Atlantis.
 
 1. Finally, merge the pull request to unlock this directory.
 
-Thank you for trying out Atlantis! Next, try using Atlantis on your own repositories: [www.runatlantis.io/guide/getting-started.html](https://www.runatlantis.io/guide/getting-started.html).`, "$", "`", -1)
+Thank you for trying out Atlantis! Next, try using Atlantis on your own repositories: [www.runatlantis.io/guide/getting-started.html](https://www.runatlantis.io/guide/getting-started.html).`, "$", "`")
 
 // Start begins the testdrive process.
 // nolint: errcheck

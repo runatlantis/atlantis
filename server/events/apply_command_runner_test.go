@@ -142,7 +142,9 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 			tmp := t.TempDir()
 			db, err := db.New(tmp)
 			t.Cleanup(func() {
-				db.Close()
+				if closeErr := db.Close(); closeErr != nil {
+					t.Errorf("failed to close database: %v", closeErr)
+				}
 			})
 			Ok(t, err)
 

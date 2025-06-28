@@ -30,7 +30,7 @@ func TestGenerateRCFile_WritesFile(t *testing.T) {
 	expContents := `credentials "hostname" {
   token = "token"
 }`
-	actContents, err := os.ReadFile(filepath.Join(tmp, ".terraformrc"))
+	actContents, err := os.ReadFile(filepath.Join(tmp, ".terraformrc")) // nolint: gosec
 	Ok(t, err)
 	Equals(t, expContents, string(actContents))
 }
@@ -259,7 +259,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	filename := filepath.Join(tmp, "data")
-	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // nolint: gosec
 	Ok(t, err)
 
 	var exp string

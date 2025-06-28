@@ -1,3 +1,4 @@
+// Package common provides common utilities for runtime operations.
 package common
 
 import (

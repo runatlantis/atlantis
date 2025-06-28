@@ -93,7 +93,7 @@ func GetPlanFilename(workspace string, projName string) string {
 	if projName == "" {
 		return fmt.Sprintf("%s.tfplan", workspace)
 	}
-	projName = strings.Replace(projName, "/", planfileSlashReplace, -1)
+	projName = strings.ReplaceAll(projName, "/", planfileSlashReplace)
 	return fmt.Sprintf("%s-%s.tfplan", projName, workspace)
 }
 
@@ -119,5 +119,5 @@ func ProjectNameFromPlanfile(workspace string, filename string) (string, error) 
 		return "", nil
 	}
 	rawProjName := projMatch[0][1]
-	return strings.Replace(rawProjName, planfileSlashReplace, "/", -1), nil
+	return strings.ReplaceAll(rawProjName, planfileSlashReplace, "/"), nil
 }

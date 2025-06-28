@@ -177,7 +177,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				// Replace $DIR in the exp with the actual temp dir. We do this
 				// here because when constructing the cases we don't yet know the
 				// temp dir.
-				expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
+				expOut := strings.ReplaceAll(c.ExpOut, "$DIR", tmpDir)
 				Equals(t, expOut, out)
 
 				terraform.VerifyWasCalledOnce().EnsureVersion(Eq(logger), NotEq(defaultDistribution), Eq(projVersion))

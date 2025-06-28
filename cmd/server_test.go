@@ -276,7 +276,11 @@ func getDocumentedFlags(t *testing.T) []string {
 
 	file, err := os.Open(docFile)
 	Ok(t, err)
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			t.Errorf("failed to close file: %v", closeErr)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

@@ -19,7 +19,11 @@ func wsHandler(t *testing.T, checkOrigin bool) http.HandlerFunc {
 			t.Log("upgrade:", err)
 			return
 		}
-		defer c.Close()
+		defer func() {
+			if closeErr := c.Close(); closeErr != nil {
+				t.Errorf("failed to close websocket connection: %v", closeErr)
+			}
+		}()
 	}
 }
 
@@ -50,7 +54,11 @@ func TestCheckOriginFunc(t *testing.T) {
 			}
 			c, _, err := websocket.DefaultDialer.Dial(u.String(), header)
 			if err == nil {
-				defer c.Close()
+				defer func() {
+					if closeErr := c.Close(); closeErr != nil {
+						t.Errorf("failed to close websocket connection: %v", closeErr)
+					}
+				}()
 			}
 			if (err != nil) != tt.wantErr {
 				t.Errorf("websocket dial error = %v, wantErr %v", err, tt.wantErr)

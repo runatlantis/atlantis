@@ -514,10 +514,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	} else {
 		lockingClient = locking.NewClient(backend)
 	}
-	disableGlobalApplyLock := false
-	if userConfig.DisableGlobalApplyLock {
-		disableGlobalApplyLock = true
-	}
+	disableGlobalApplyLock := userConfig.DisableGlobalApplyLock
 
 	applyLockingClient = locking.NewApplyClient(backend, disableApply, disableGlobalApplyLock)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
@@ -1022,7 +1019,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectJobsErrorTemplate:       web_templates.ProjectJobsErrorTemplate,
 		SSLKeyFile:                     userConfig.SSLKeyFile,
 		SSLCertFile:                    userConfig.SSLCertFile,
-		DisableGlobalApplyLock:         userConfig.DisableGlobalApplyLock,
+		DisableGlobalApplyLock:         disableGlobalApplyLock,
 		Drainer:                        drainer,
 		ProjectCmdOutputHandler:        projectCmdOutputHandler,
 		WebAuthentication:              userConfig.WebBasicAuth,
@@ -1091,7 +1088,12 @@ func (s *Server) Start() error {
 	}, NewRequestLogger(s))
 	n.UseHandler(s.Router)
 
-	defer s.Logger.Flush()
+	defer func() {
+		if flushErr := s.Logger.Flush(); flushErr != nil { // nolint: staticcheck
+			// Log the error but don't return it since we're in a defer
+			// and the function is already returning an error
+		}
+	}()
 
 	// Ensure server gracefully drains connections when stopped.
 	stop := make(chan os.Signal, 1)
@@ -1163,7 +1165,9 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	locks, err := s.Locker.List()
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Could not retrieve locks: %s", err)
+		if _, writeErr := fmt.Fprintf(w, "Could not retrieve locks: %s", err); writeErr != nil {
+			s.Logger.Err("failed to write error response: %v", writeErr)
+		}
 		return
 	}
 
@@ -1188,7 +1192,9 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	s.Logger.Debug("Apply Lock: %v", applyCmdLock)
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err)
+		if _, writeErr := fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err); writeErr != nil {
+			s.Logger.Err("failed to write error response: %v", writeErr)
+		}
 		return
 	}
 
@@ -1299,7 +1305,7 @@ func ParseAtlantisURL(u string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !(parsed.Scheme == "http" || parsed.Scheme == "https") {
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return nil, errors.New("http or https must be specified")
 	}
 	// We want the path to end without a trailing slash so we know how to

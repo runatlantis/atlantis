@@ -338,7 +338,11 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 						Equals(t, updateStatusDescription, updateStatusJsonBody.Description)
 						Equals(t, gitlabPipelineSuccessMrID, updateStatusJsonBody.PipelineId)
 
-						defer r.Body.Close() // nolint: errcheck
+						defer func() {
+							if closeErr := r.Body.Close(); closeErr != nil {
+								t.Errorf("failed to close request body: %v", closeErr)
+							}
+						}() // nolint: errcheck
 
 						setStatusJsonResponse, err := json.Marshal(EmptyStruct{})
 						Ok(t, err)
@@ -460,7 +464,11 @@ func TestGitlabClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 							Equals(t, gitlabPipelineSuccessMrID, updateStatusJsonBody.PipelineId)
 						}
 
-						defer r.Body.Close()
+						defer func() {
+							if closeErr := r.Body.Close(); closeErr != nil {
+								t.Errorf("failed to close request body: %v", closeErr)
+							}
+						}() // nolint: errcheck
 
 						getCommitJsonResponse, err := json.Marshal(EmptyStruct{})
 						Ok(t, err)
@@ -592,7 +600,11 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 						Equals(t, updateStatusTargetUrl, updateStatusJsonBody.TargetUrl)
 						Equals(t, updateStatusDescription, updateStatusJsonBody.Description)
 
-						defer r.Body.Close() // nolint: errcheck
+						defer func() {
+							if closeErr := r.Body.Close(); closeErr != nil {
+								t.Errorf("failed to close request body: %v", closeErr)
+							}
+						}() // nolint: errcheck
 
 						if shouldSendConflict {
 							w.WriteHeader(http.StatusConflict)
@@ -1013,8 +1025,7 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 						t.Errorf("got unexpected method at %q", r.Method)
 						http.Error(w, "not found", http.StatusNotFound)
 					}
-				}),
-			)
+				}))
 
 			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 			Ok(t, err)

@@ -45,7 +45,7 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 		{
 			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_NO_VALUE'`,
 			Output:  valid.PostProcessRunOutputShow,
-			ExpErr:  "Invalid environment variable definition: TF_VAR_REPODEFINEDVARIABLE_NO_VALUE",
+			ExpErr:  "invalid environment variable definition: TF_VAR_REPODEFINEDVARIABLE_NO_VALUE",
 			ExpEnv:  map[string]string{},
 		},
 		{

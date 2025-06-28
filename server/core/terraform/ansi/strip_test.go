@@ -10,14 +10,8 @@ func TestStrip(t *testing.T) {
 	}{
 		{
 			name: "strip ansi",
-			str: `
-[32m+[0m create
-[0m[1mPlan:[0m 3 to add, 0 to change, 0 to destroy.
-`,
-			want: `
-+ create
-Plan: 3 to add, 0 to change, 0 to destroy.
-`,
+			str:  "\n\x1b[32m+\x1b[0m create\n\x1b[0m\x1b[1mPlan:\x1b[0m 3 to add, 0 to change, 0 to destroy.\n",
+			want: "\n+ create\nPlan: 3 to add, 0 to change, 0 to destroy.\n",
 		},
 	}
 	for _, tt := range tests {
