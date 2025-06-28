@@ -25,6 +25,8 @@ type RepoCfg struct {
 	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
 	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
 	EmojiReaction             *string             `yaml:"emoji_reaction,omitempty"`
+	EmojiRunReaction          *string             `yaml:"emoji_run_reaction,omitempty"`
+	EmojiErrorReaction        *string             `yaml:"emoji_error_reaction,omitempty"`
 	AllowedRegexpPrefixes     []string            `yaml:"allowed_regexp_prefixes,omitempty"`
 	AbortOnExecutionOrderFail *bool               `yaml:"abort_on_execution_order_fail,omitempty"`
 	RepoLocks                 *RepoLocks          `yaml:"repo_locks,omitempty"`
@@ -64,9 +66,15 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 	parallelApply := r.ParallelApply
 	parallelPlan := r.ParallelPlan
 
-	emojiReaction := DefaultEmojiReaction
+	emojiReaction, emojiRunReaction, emojiErrorReaction := DefaultEmojiReaction, DefaultEmojiReaction, DefaultEmojiReaction
 	if r.EmojiReaction != nil {
 		emojiReaction = *r.EmojiReaction
+	}
+	if r.EmojiRunReaction != nil {
+		emojiRunReaction = *r.EmojiRunReaction
+	}
+	if r.EmojiErrorReaction != nil {
+		emojiErrorReaction = *r.EmojiErrorReaction
 	}
 
 	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
@@ -95,6 +103,8 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		DeleteSourceBranchOnMerge: r.DeleteSourceBranchOnMerge,
 		AllowedRegexpPrefixes:     r.AllowedRegexpPrefixes,
 		EmojiReaction:             emojiReaction,
+		EmojiRunReaction:          emojiRunReaction,
+		EmojiErrorReaction:        emojiErrorReaction,
 		AbortOnExecutionOrderFail: abortOnExecutionOrderFail,
 		RepoLocks:                 repoLocks,
 		SilencePRComments:         r.SilencePRComments,
