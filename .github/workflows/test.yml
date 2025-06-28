@@ -53,7 +53,7 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:ff2a5fb7691d65f9554e69823c55f01c6e34824b9be377199e1b7754ff5fa007
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:a8718483fd22bfeaa6f0af0eb7e5f7d6679dba6ef529da952feda7977457dd23
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
