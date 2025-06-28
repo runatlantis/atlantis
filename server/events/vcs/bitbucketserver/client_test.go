@@ -209,7 +209,11 @@ func TestClient_MergePullDeleteSourceBranch(t *testing.T) {
 			w.Write(pullRequest) // nolint: errcheck
 		case "/rest/branch-utils/1.0/projects/ow/repos/repo/branches":
 			Equals(t, "DELETE", r.Method)
-			defer r.Body.Close()
+			defer func() {
+				if closeErr := r.Body.Close(); closeErr != nil {
+					t.Errorf("failed to close request body: %v", closeErr)
+				}
+			}()
 			b, err := io.ReadAll(r.Body)
 			Ok(t, err)
 			var payload bitbucketserver.DeleteSourceBranch

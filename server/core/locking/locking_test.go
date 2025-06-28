@@ -20,12 +20,12 @@ import (
 
 	"strings"
 
-	. "github.com/petergtz/pegomock/v4"
+	. "github.com/petergtz/pegomock/v4" // nolint: revive
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	. "github.com/runatlantis/atlantis/testing"
+	. "github.com/runatlantis/atlantis/testing" // nolint: revive
 )
 
 var project = models.NewProject("owner/repo", "path", "")
