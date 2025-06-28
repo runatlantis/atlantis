@@ -132,6 +132,10 @@ type UserConfig struct {
 	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
 	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
+	EnablePlanQueue            bool            `mapstructure:"enable-plan-queue"`
+	EnableLockRetry            bool            `mapstructure:"enable-lock-retry"`
+	LockRetryMaxAttempts       int             `mapstructure:"lock-retry-max-attempts"`
+	LockRetryDelay             int             `mapstructure:"lock-retry-delay"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName
