@@ -809,10 +809,10 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		"TF_APPEND_USER_AGENT": fmt.Sprintf(
 			"Atlantis/%s (%s; %s; %s; %s; %s; +%s)",
 			atlantisVersion,
-			ctx.CommandName,
-			ctx.Workspace,
-			ctx.RepoRelDir,
 			ctx.User.Username,
+			ctx.CommandName,
+			ctx.RepoRelDir,
+			ctx.Workspace,
 			ctx.Pull.HeadCommit,
 			ctx.Pull.URL,
 		),
