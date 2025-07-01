@@ -615,7 +615,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	runStepRunner := &runtime.RunStepRunner{
-		AtlantisVersion:         config.AtlantisVersion,
 		TerraformExecutor:       terraformClient,
 		DefaultTFDistribution:   defaultTfDistribution,
 		DefaultTFVersion:        defaultTfVersion,
@@ -697,6 +696,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
+		AtlantisVersion:  config.AtlantisVersion,
 		VcsClient:        vcsClient,
 		Locker:           projectLocker,
 		LockURLGenerator: router,

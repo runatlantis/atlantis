@@ -101,7 +101,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 		},
 		{
 			Command: "echo tf_append_user_agent=$TF_APPEND_USER_AGENT",
-			ExpOut:  "tf_append_user_agent=Atlantis/1.2.3 (policy_check; myworkspace; mydir; acme-user; 12345abcdef; +https://github.com/runatlantis/atlantis/pull/2)\n",
+			ExpOut:  "tf_append_user_agent=passthrough\n",
 		},
 	}
 	for _, customPolicyCheck := range []bool{false, true} {
@@ -136,7 +136,6 @@ func TestRunStepRunner_Run(t *testing.T) {
 			tmpDir := t.TempDir()
 
 			r := runtime.RunStepRunner{
-				AtlantisVersion:         "1.2.3",
 				TerraformExecutor:       terraform,
 				DefaultTFDistribution:   defaultDistribution,
 				DefaultTFVersion:        defaultVersion,
@@ -174,7 +173,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 					EscapedCommentArgs:    []string{"-target=resource1", "-target=resource2"},
 					CustomPolicyCheck:     customPolicyCheck,
 				}
-				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow)
+				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"TF_APPEND_USER_AGENT": "passthrough"}, true, valid.PostProcessRunOutputShow)
 				if c.ExpErr != "" {
 					ErrContains(t, c.ExpErr, err)
 					return
