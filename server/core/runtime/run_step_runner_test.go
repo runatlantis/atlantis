@@ -144,7 +144,6 @@ func TestRunStepRunner_Run(t *testing.T) {
 			}
 			t.Run(fmt.Sprintf("%s_CustomPolicyCheck=%v", c.Command, customPolicyCheck), func(t *testing.T) {
 				ctx := command.ProjectContext{
-					CommandName: command.PolicyCheck,
 					BaseRepo: models.Repo{
 						Name:  "basename",
 						Owner: "baseowner",

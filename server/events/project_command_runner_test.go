@@ -71,8 +71,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	expEnvs := map[string]string{
-		"name":                 "value",
-		"TF_APPEND_USER_AGENT": "Atlantis/1.2.3 (policy_check; myworkspace; mydir; acme-user; 12345abcdef; +https://github.com/runatlantis/atlantis/pull/2)",
+		"name": "value",
 	}
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
