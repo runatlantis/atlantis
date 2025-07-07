@@ -6,6 +6,8 @@ terraform {
     region         = "ap-southeast-2"
     encrypt        = true
     dynamodb_table = "terraform-state-locking"
-    role_arn       = "arn:aws:iam::028287609508:role/cross-account/state-storage-plentiau-terraform-state"
+    assume_role = {
+      role_arn = "arn:aws:iam::028287609508:role/cross-account/state-storage-plentiau-terraform-state"
+    }
   }
 }
