@@ -86,6 +86,8 @@ jobs:
           # latest
           type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') && matrix.image_type == 'alpine' }},suffix=
           type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') }},suffix=${{ env.SUFFIX }}
+          # Generate ref-based tags for master and release/* branches
+          type=ref,event=branch,prefix=,suffix=${{ env.SUFFIX }},enable=${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/') }}
         flavor: |
           # This is disabled here so we can use the raw form above
           latest=false
