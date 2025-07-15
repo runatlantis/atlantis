@@ -45,7 +45,7 @@ var defaultUserConfig = struct {
 	AutoplanFileList:         "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	RestrictFileList:         false,
 	SilenceNoProjects:        false,
-	IncludeGitUntrackedFiles: true,
+	IncludeGitUntrackedFiles: false,
 	AutoDiscoverMode:         "auto",
 }
 
@@ -241,7 +241,7 @@ terraform {
 			tmpDir := DirStructure(t, c.TestDirStructure)
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(ChangedFiles(c.TestDirStructure, ""), nil)
@@ -602,7 +602,7 @@ projects:
 
 				workingDir := mocks.NewMockWorkingDir()
 				When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-					Any[string]())).ThenReturn(tmpDir, false, nil)
+					Any[string]())).ThenReturn(tmpDir, nil)
 				When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
@@ -790,7 +790,7 @@ projects:
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
@@ -1191,7 +1191,7 @@ projects:
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
@@ -1379,7 +1379,7 @@ projects:
 	Ok(t, err)
 
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Any[string]())).ThenReturn(repoDir, false, nil)
+		Any[string]())).ThenReturn(repoDir, nil)
 	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
@@ -1467,7 +1467,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
@@ -1623,7 +1623,7 @@ projects:
 				Any[models.PullRequest]())).ThenReturn(testCase.ModifiedFiles, nil)
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
@@ -1695,27 +1695,40 @@ projects:
 // Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 	cases := []struct {
-		AtlantisYAML   string
-		ExpectedCtxs   int
-		ExpectedClones InvocationCountMatcher
-		ModifiedFiles  []string
+		AtlantisYAML             string
+		ExpectedCtxs             int
+		ExpectedClones           InvocationCountMatcher
+		ModifiedFiles            []string
+		IncludeGitUntrackedFiles bool
 	}{
 		{
 			AtlantisYAML: `
 version: 3
 projects:
 - dir: dir1`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Never(),
-			ModifiedFiles:  []string{"dir2/main.tf"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           Never(),
+			ModifiedFiles:            []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: false,
+		},
+		{
+			AtlantisYAML: `
+version: 3
+projects:
+- dir: dir1`,
+			ExpectedCtxs:             0,
+			ExpectedClones:           Once(),
+			ModifiedFiles:            []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: true,
 		},
 		{
 			AtlantisYAML: `
 version: 3
 parallel_plan: true`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Once(),
-			ModifiedFiles:  []string{"README.md"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           Once(),
+			ModifiedFiles:            []string{"README.md"},
+			IncludeGitUntrackedFiles: false,
 		},
 		{
 			AtlantisYAML: `
@@ -1724,9 +1737,10 @@ autodiscover:
   mode: enabled
 projects:
 - dir: dir1`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Once(),
-			ModifiedFiles:  []string{"dir2/main.tf"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           Once(),
+			ModifiedFiles:            []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: false,
 		},
 	}
 
@@ -1770,7 +1784,7 @@ projects:
 			userConfig.AutoplanFileList,
 			userConfig.RestrictFileList,
 			userConfig.SilenceNoProjects,
-			userConfig.IncludeGitUntrackedFiles,
+			c.IncludeGitUntrackedFiles,
 			userConfig.AutoDiscoverMode,
 			scope,
 			terraformClient,
@@ -1807,7 +1821,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Any[string]())).ThenReturn(tmpDir, false, nil)
+		Any[string]())).ThenReturn(tmpDir, nil)
 	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 		Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
@@ -2024,7 +2038,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetGitUntrackedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(c.UntrackedFiles, nil)
@@ -2135,7 +2149,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetGitUntrackedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(c.UntrackedFiles, nil)

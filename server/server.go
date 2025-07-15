@@ -24,6 +24,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"net/url"
 	"os"
 	"os/signal"
@@ -34,6 +35,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
 	tally "github.com/uber-go/tally/v4"
 	prometheus "github.com/uber-go/tally/v4/prometheus"
@@ -125,6 +127,7 @@ type Server struct {
 	ProjectCmdOutputHandler        jobs.ProjectCommandOutputHandler
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
+	EnableProfilingAPI             bool
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -203,19 +206,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
-	validator := &cfg.ParserValidator{}
+	parserValidator := &cfg.ParserValidator{}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(
 		valid.GlobalCfgArgs{
 			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
 		})
 	if userConfig.RepoConfig != "" {
-		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
+		globalCfg, err = parserValidator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing %s file", userConfig.RepoConfig)
 		}
 	} else if userConfig.RepoConfigJSON != "" {
-		globalCfg, err = validator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
+		globalCfg, err = parserValidator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing --%s", config.RepoConfigJSONFlag)
 		}
@@ -426,8 +429,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
-		return nil, errors.Wrapf(err,
-			"parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
+		return nil, errors.Wrapf(err, "parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
 	}
 
 	underlyingRouter := mux.NewRouter()
@@ -650,7 +652,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
 		policyChecksEnabled,
-		validator,
+		parserValidator,
 		&events.DefaultProjectFinder{},
 		vcsClient,
 		workingDir,
@@ -942,6 +944,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
 	}
+
 	apiController := &controllers.APIController{
 		APISecret:                      []byte(userConfig.APISecret),
 		Locker:                         lockingClient,
@@ -956,6 +959,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		RepoAllowlistChecker:           repoAllowlist,
 		Scope:                          statsScope.SubScope("api"),
 		VCSClient:                      vcsClient,
+		WorkingDir:                     workingDir,
+		WorkingDirLocker:               workingDirLocker,
+		CommitStatusUpdater:            commitStatusUpdater,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -990,7 +996,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
-	return &Server{
+	server := &Server{
 		AtlantisVersion:                config.AtlantisVersion,
 		AtlantisURL:                    parsedURL,
 		Router:                         underlyingRouter,
@@ -1023,7 +1029,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebUsername:                    userConfig.WebUsername,
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
-	}, nil
+		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
+	}
+
+	validate := validator.New(validator.WithRequiredStructEnabled())
+
+	err = validate.Struct(server)
+	if err != nil {
+		return nil, err
+	} else {
+		return server, nil
+	}
 }
 
 // Start creates the routes and starts serving traffic.
@@ -1037,6 +1053,7 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
+	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
@@ -1052,6 +1069,18 @@ func (s *Server) Start() error {
 	if !s.DisableGlobalApplyLock {
 		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
 		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
+	}
+
+	if s.EnableProfilingAPI {
+		for p, h := range map[string]http.HandlerFunc{
+			"/":        pprof.Index,
+			"/cmdline": pprof.Cmdline,
+			"/profile": pprof.Profile,
+			"/symbol":  pprof.Symbol,
+			"/trace":   pprof.Trace,
+		} {
+			s.Router.HandleFunc("/debug/pprof"+p, h).Methods("GET")
+		}
 	}
 
 	n := negroni.New(&negroni.Recovery{

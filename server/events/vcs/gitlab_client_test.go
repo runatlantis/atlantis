@@ -1121,40 +1121,139 @@ func TestGitlabClient_GetTeamNamesForUser(t *testing.T) {
 	userSuccess, err := os.ReadFile("testdata/gitlab-user-success.json")
 	Ok(t, err)
 
-	configuredGroups := []string{"someorg/group1", "someorg/group2", "someorg/group3", "someorg/group4"}
-	testServer := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch r.RequestURI {
-			case "/api/v4/users?username=testuser":
-				w.WriteHeader(http.StatusOK)
-				w.Write(userSuccess) // nolint: errcheck
-			case "/api/v4/groups/someorg%2Fgroup1/members/123", "/api/v4/groups/someorg%2Fgroup2/members/123":
-				w.WriteHeader(http.StatusOK)
-				w.Write(groupMembershipSuccess) // nolint: errcheck
-			case "/api/v4/groups/someorg%2Fgroup3/members/123":
-				http.Error(w, "forbidden", http.StatusForbidden)
-			case "/api/v4/groups/someorg%2Fgroup4/members/123":
-				http.Error(w, "not found", http.StatusNotFound)
-			default:
-				t.Errorf("got unexpected request at %q", r.RequestURI)
-				http.Error(w, "not found", http.StatusNotFound)
-			}
-		}))
-	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+	userEmpty, err := os.ReadFile("testdata/gitlab-user-none.json")
 	Ok(t, err)
-	client := &GitlabClient{
-		Client:           internalClient,
-		Version:          nil,
-		ConfiguredGroups: configuredGroups,
-	}
 
-	teams, err := client.GetTeamNamesForUser(
-		logger,
-		models.Repo{
-			Owner: "someorg",
-		}, models.User{
-			Username: "testuser",
-		})
+	multipleUsers, err := os.ReadFile("testdata/gitlab-user-multiple.json")
 	Ok(t, err)
-	Equals(t, []string{"someorg/group1", "someorg/group2"}, teams)
+
+	configuredGroups := []string{"someorg/group1", "someorg/group2", "someorg/group3", "someorg/group4"}
+
+	cases := []struct {
+		userName string
+		expErr   string
+		expTeams []string
+	}{
+		{
+			userName: "testuser",
+			expTeams: []string{"someorg/group1", "someorg/group2"},
+		},
+		{
+			userName: "none",
+			expErr:   "GET /users returned no user",
+		},
+		{
+			userName: "multiuser",
+			expErr:   "GET /users returned more than 1 user",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.userName, func(t *testing.T) {
+
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/users?username=testuser":
+						w.WriteHeader(http.StatusOK)
+						w.Write(userSuccess) // nolint: errcheck
+					case "/api/v4/users?username=none":
+						w.WriteHeader(http.StatusOK)
+						w.Write(userEmpty) // nolint: errcheck
+					case "/api/v4/users?username=multiuser":
+						w.WriteHeader(http.StatusOK)
+						w.Write(multipleUsers) // nolint: errcheck
+					case "/api/v4/groups/someorg%2Fgroup1/members/123", "/api/v4/groups/someorg%2Fgroup2/members/123":
+						w.WriteHeader(http.StatusOK)
+						w.Write(groupMembershipSuccess) // nolint: errcheck
+					case "/api/v4/groups/someorg%2Fgroup3/members/123":
+						http.Error(w, "forbidden", http.StatusForbidden)
+					case "/api/v4/groups/someorg%2Fgroup4/members/123":
+						http.Error(w, "not found", http.StatusNotFound)
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &GitlabClient{
+				Client:           internalClient,
+				Version:          nil,
+				ConfiguredGroups: configuredGroups,
+			}
+
+			teams, err := client.GetTeamNamesForUser(
+				logger,
+				models.Repo{
+					Owner: "someorg",
+				}, models.User{
+					Username: c.userName,
+				})
+			if c.expErr == "" {
+				Ok(t, err)
+				Equals(t, c.expTeams, teams)
+			} else {
+				ErrContains(t, c.expErr, err)
+
+			}
+
+		})
+	}
+}
+
+func TestGithubClient_DiscardReviews(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description   string
+		repoFullName  string
+		pullReqeustId int
+		wantErr       bool
+	}{
+		{
+			"success",
+			"runatlantis/atlantis",
+			42,
+			false,
+		},
+		{
+			"error",
+			"runatlantis/atlantis",
+			32,
+			true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/42/reset_approvals":
+						w.WriteHeader(http.StatusOK)
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/32/reset_approvals":
+						http.Error(w, "No bot token", http.StatusUnauthorized)
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &GitlabClient{
+				Client:  internalClient,
+				Version: nil,
+			}
+
+			repo := models.Repo{
+				FullName: c.repoFullName,
+			}
+
+			pr := models.PullRequest{
+				Num: c.pullReqeustId,
+			}
+
+			if err := client.DiscardReviews(logger, repo, pr); (err != nil) != c.wantErr {
+				t.Errorf("DiscardReviews() error = %v", err)
+			}
+		})
+	}
 }

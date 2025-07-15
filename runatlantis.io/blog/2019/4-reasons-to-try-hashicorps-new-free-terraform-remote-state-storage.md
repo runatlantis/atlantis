@@ -74,11 +74,11 @@ Step 1 — Sign up for your [free Terraform Cloud](https://app.terraform.io/sign
 
 Step 2 — When you log in, you'll land on this page where you'll create your organization:
 
-![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic1.webp)
+![](4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic1.webp)
 
 Step 3 — Next, go into User Settings and generate a token:
 
-![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic2.webp)
+![](4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic2.webp)
 
 Step 4 — Take this token and create a local ~/.terraformrc file:
 
@@ -105,7 +105,7 @@ terraform {
 
 Run `terraform init` and tada! Your state is now being stored in Terraform Enterprise. You can see the state in the UI:
 
-![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic3.webp)
+![](4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic3.webp)
 
 Speaking of seeing state in a UI...
 
@@ -113,17 +113,17 @@ Speaking of seeing state in a UI...
 
 The second reason to try Terraform Cloud is its fully featured state viewer:
 
-![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic4.webp)
+![](4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic4.webp)
 
 If you've ever messed up your Terraform state and needed to download an old version or wanted an audit log to know who changed what, then you'll love this feature.
 
 You can view the full state file at each point in time:
 
-![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic5.webp)
+![](4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic5.webp)
 
 You can also see the diff of what changed:
 
-![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic6.webp)
+![](4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic6.webp)
 
 Of course, you can find a way to get this information from some of the other state backends, but it's difficult. With HashiCorp's remote state storage, you get it for free.
 
@@ -135,15 +135,15 @@ Ever been working on a piece of infrastructure and wanted to ensure that no one 
 
 Terraform Cloud comes with the ability to lock and unlock states from the UI:
 
-![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic7.webp)
+![](4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic7.webp)
 
 While the state is locked, `terraform` operations will receive an error:
 
-![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic8.webp)
+![](4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic8.webp)
 
 This saves you a lot of these:
 
-![](/blog/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic9.webp)
+![](4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage/pic9.webp)
 
 ## Reason #4 — Works With Atlantis
 

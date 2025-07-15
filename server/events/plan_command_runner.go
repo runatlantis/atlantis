@@ -1,6 +1,8 @@
 package events
 
 import (
+	"strconv"
+
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -114,11 +116,6 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		return
 	}
 
-	// At this point we are sure Atlantis has work to do, so set commit status to pending
-	if err := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-		ctx.Log.Warn("unable to update plan commit status: %s", err)
-	}
-
 	// discard previous plans that might not be relevant anymore
 	ctx.Log.Debug("deleting previous plans and locks")
 	p.deletePlans(ctx)
@@ -183,13 +180,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	if p.DiscardApprovalOnPlan {
-		if err = p.pullUpdater.VCSClient.DiscardReviews(baseRepo, pull); err != nil {
+		if err = p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
 			ctx.Log.Err("failed to remove approvals: %s", err)
 		}
-	}
-
-	if err = p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.PendingCommitStatus, command.Plan); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
 	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
@@ -248,10 +241,6 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	if !cmd.IsForSpecificProject() {
 		ctx.Log.Debug("deleting previous plans and locks")
 		p.deletePlans(ctx)
-		_, err = p.lockingLocker.UnlockByPull(baseRepo.FullName, pull.Num)
-		if err != nil {
-			ctx.Log.Err("deleting locks: %s", err)
-		}
 	}
 
 	// Only run commands in parallel if enabled
@@ -261,6 +250,25 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
+	}
+	ctx.CommandHasErrors = result.HasErrors()
+
+	for i, projResult := range result.ProjectResults {
+		projCtx := projectCmds[i]
+
+		if projResult.PlanStatus() == models.PlannedNoChangesPlanStatus || projResult.PlanStatus() == models.ErroredPlanStatus {
+			ctx.Log.Info("Keeping lock for project '%s' (no changes or error)", projCtx.ProjectName)
+			continue
+		}
+
+		// delete lock only if there are changes
+		ctx.Log.Info("Deleting lock for project '%s' (changes detected)", projCtx.ProjectName)
+		lockID := projCtx.BaseRepo.FullName + "/" + strconv.Itoa(projCtx.Pull.Num) + "/" + projCtx.ProjectName + "/" + projCtx.Workspace
+
+		_, err := p.lockingLocker.Unlock(lockID)
+		if err != nil {
+			ctx.Log.Err("failed unlocking project '%s': %s", projCtx.ProjectName, err)
+		}
 	}
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
