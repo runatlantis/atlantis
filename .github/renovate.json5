@@ -8,7 +8,7 @@
   commitMessageSuffix: ' in {{packageFile}}',
   dependencyDashboardAutoclose: true,
   automerge: true,
-  baseBranches: [
+  baseBranchPatterns: [
     'main',
     '/^release-.*/',
   ],
@@ -31,16 +31,20 @@
     ],
   },
   packageRules: [
-    // enable release branches for security updates
     {
-      matchBaseBranches: ['/^release-.*/'],
-      matchUpdateTypes: ['security'],
-      enabled: true
+      matchBaseBranches: [
+        '/^release-.*/',
+      ],
+      matchUpdateTypes: [
+        'security',
+      ],
+      enabled: true,
     },
-    // disable release branches for anything else
     {
-      matchBaseBranches: ['/^release-.*/'],
-      enabled: false
+      matchBaseBranches: [
+        '/^release-.*/',
+      ],
+      enabled: false,
     },
     {
       matchBaseBranches: [
