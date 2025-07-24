@@ -113,7 +113,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		}
-		//this is to clean up any stale plans that exist from previous runs
+		// this is to clean up any stale plans that exist from previous runs
 		ctx.Log.Info("deleting stale plans and locks -- no project to run")
 		p.deletePlans(ctx)
 		return
