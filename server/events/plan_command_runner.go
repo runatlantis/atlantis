@@ -321,7 +321,8 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 	var numErrored int
 	status := models.SuccessCommitStatus
 
-	if commandName == command.Plan {
+	switch commandName {
+	case command.Plan:
 		numErrored = pullStatus.StatusCount(models.ErroredPlanStatus)
 		// We consider anything that isn't a plan error as a plan success.
 		// For example, if there is an apply error, that means that at least a
@@ -331,7 +332,7 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
 		}
-	} else if commandName == command.Apply {
+	case command.Apply:
 		numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
 		numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
