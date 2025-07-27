@@ -31,6 +31,7 @@
     ],
   },
   packageRules: [
+    // enable release branches for security updates
     {
       matchBaseBranches: [
         '/^release-.*/',
@@ -40,6 +41,7 @@
       ],
       enabled: true,
     },
+    // disable release branches for anything else
     {
       matchBaseBranches: [
         '/^release-.*/',
