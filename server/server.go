@@ -732,6 +732,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,
 		CommandRequirementHandler: applyRequirementHandler,
+		ProcessTracker:            events.NewProcessTracker(),
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -848,6 +849,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		instrumentedProjectCmdRunner,
 	)
 
+	cancelCommandRunner := events.NewCancelCommandRunner(
+		vcsClient,
+		projectOutputWrapper.ProjectCommandRunner,
+		pullUpdater,
+		userConfig.SilenceNoProjects,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
@@ -856,6 +864,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
 		command.State:           stateCommandRunner,
+		command.Cancel:          cancelCommandRunner,
 	}
 
 	var teamAllowlistChecker command.TeamAllowlistChecker
