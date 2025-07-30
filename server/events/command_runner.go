@@ -226,7 +226,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 				}
 			}
 
-			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf(PreWorkflowHookErrorComment, preWorkflowHooksErr.Error()), ""); err != nil {
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, formatPreWorkflowHookError(preWorkflowHooksErr), ""); err != nil {
 				ctx.Log.Warn("Unable to comment on pull request: %s", err)
 			}
 
