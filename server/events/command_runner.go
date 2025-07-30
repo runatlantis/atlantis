@@ -214,6 +214,12 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
 
+			// Create comment on pull request about the pre-workflow hook failure
+			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", err.Error())
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
+			}
+
 			// Update the plan or apply commit status to failed
 			switch cmd.Name {
 			case command.Plan:
@@ -377,6 +383,12 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	if err != nil {
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
+
+			// Create comment on pull request about the pre-workflow hook failure
+			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", err.Error())
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
+			}
 
 			// Update the plan or apply commit status to failed
 			switch cmd.Name {
@@ -566,3 +578,6 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 }
 
 var automergeComment = `Automatically merging because all plans have been successfully applied.`
+
+// formatPreWorkflowHookError formats the pre-workflow hook error for display in a comment
+
