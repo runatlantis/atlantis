@@ -394,7 +394,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 				}
 			}
 
-			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("```\nError: Atlantis failed to run pre-workflow hooks.\n Error: %v```", preWorkflowHooksErr.Error()), ""); err != nil {
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, formatPreWorkflowHookError(preWorkflowHooksErr), ""); err != nil {
 				ctx.Log.Warn("Unable to comment on pull request: %s", err)
 			}
 
