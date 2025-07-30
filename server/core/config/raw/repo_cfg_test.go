@@ -45,7 +45,10 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.RepoCfg",
+			expErr: `[1:1] unknown field "invalid"
+>  1 | invalid: key
+       ^
+`,
 		},
 		{
 			description: "version set to 2",
@@ -91,7 +94,11 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!map into []raw.Project",
+			expErr: `[2:6] mapping was used where sequence is expected
+   1 | projects:
+>  2 |   key: value
+            ^
+`,
 		},
 		{
 			description: "projects with a scalar",
@@ -101,7 +108,10 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `value` into []raw.Project",
+			expErr: `[1:11] string was used where sequence is expected
+>  1 | projects: value
+                 ^
+`,
 		},
 		{
 			description: "automerge not a boolean",
@@ -111,7 +121,11 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!str `notabool` into bool",
+			expErr: `[2:12] cannot unmarshal string into Go struct field RepoCfg.Automerge of type bool
+   1 | version: 3
+>  2 | automerge: notabool
+                  ^
+`,
 		},
 		{
 			description: "parallel apply not a boolean",
@@ -121,8 +135,11 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!str `notabool` into bool",
-		},
+			expErr: `[2:17] cannot unmarshal string into Go struct field RepoCfg.ParallelApply of type bool
+   1 | version: 3
+>  2 | parallel_apply: notabool
+                       ^
+`},
 		{
 			description: "should use values if set",
 			input: `
