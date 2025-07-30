@@ -31,6 +31,11 @@ generate an access token. Read on for the instructions for your specific Git hos
 
 * Create a [Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-fine-grained-personal-access-token)
 * Create the token with **repo** scope
+  * The following repository permissions are the minimum required:
+    * Commit statuses: read and write (to update the PR with indicators of plan/apply/policy job states)
+    * Contents: read only (to fetch the files changed and clone the repository)
+    * Metadata: read only (this will be automatically selected as mandatory when Contents is set to read-only)
+    * Pull requests: read and write (to comment and react on the PR)
 * Record the access token
 ::: warning
 Your Atlantis user must also have "Write permissions" (for repos in an organization) or be a "Collaborator" (for repos in a user account) to be able to set commit statuses:
