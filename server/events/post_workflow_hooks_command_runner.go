@@ -2,9 +2,13 @@ package events
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -59,7 +63,18 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	// check if the MR is closed (merged). if so, we need to handle the case where
+	// the source branch might have been deleted
+	var repoDir string
+	if ctx.Pull.State == models.ClosedPullState {
+		ctx.Log.Info("mr is closed (merged), using base branch for post-workflow hooks")
+		// for closed MRs, we'll clone the base repo and checkout the base branch
+		// instead of trying to merge the head branch which might be deleted
+		repoDir, err = w.cloneForClosedMR(ctx)
+	} else {
+		repoDir, err = w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -85,11 +100,72 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 		postWorkflowHooks, repoDir)
 
 	if err != nil {
-		ctx.Log.Err("Error running post-workflow hooks %s.", err)
+		ctx.Log.Err("running post-workflow hooks: %s", err)
 		return err
 	}
 
 	return nil
+}
+
+// cloneForClosedMR clones the repository for a closed MR without trying to fetch the deleted head branch
+func (w *DefaultPostWorkflowHooksCommandRunner) cloneForClosedMR(ctx *command.Context) (string, error) {
+	// for closed MRs, we'll use a simpler approach: clone the base repo directly
+	// and checkout the base branch. this avoids the merge strategy that tries to fetch the deleted head branch
+
+	// first, try to get the existing working directory if it exists
+	existingDir, err := w.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if err == nil {
+		// if the directory exists, we can use it
+		ctx.Log.Info("Using existing working directory for closed MR %q", existingDir)
+		return existingDir, nil
+	}
+
+	// if the directory doesn't exist, we need to create it
+	// we'll use a temporary approach: create a minimal clone of the base repo
+	ctx.Log.Info("Creating new working directory for closed MR")
+
+	// get the pull directory path
+	pullDir, err := w.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		// if GetPullDir fails, we'll create the directory structure manually
+		ctx.Log.Warn("Could not get pull directory, creating manually")
+		// this is a fallback - we'll create a temporary directory
+		tempDir, err := os.MkdirTemp("", "atlantis-closed-mr-*")
+		if err != nil {
+			return "", errors.Wrap(err, "creating temporary directory for closed MR")
+		}
+		cloneDir := filepath.Join(tempDir, DefaultWorkspace)
+
+		// clone the base repo with the base branch
+		baseCloneURL := ctx.Pull.BaseRepo.CloneURL
+		cmd := exec.Command("git", "clone", "--depth=1", "--branch", ctx.Pull.BaseBranch, "--single-branch", baseCloneURL, cloneDir) // #nosec
+
+		_, err = cmd.CombinedOutput()
+		if err != nil {
+			return "", errors.Wrap(err, "Running git clone for closed MR")
+		}
+
+		ctx.Log.Info("Successfully cloned base repo for closed MR in temp directory")
+		return cloneDir, nil
+	}
+
+	// if we can get the pull directory, create the workspace directory
+	cloneDir := filepath.Join(pullDir, DefaultWorkspace)
+	if err := os.MkdirAll(cloneDir, 0700); err != nil {
+		return "", errors.Wrap(err, "creating workspace directory for closed MR")
+	}
+
+	// clone the base repo with the base branch
+	baseCloneURL := ctx.Pull.BaseRepo.CloneURL
+	cmd := exec.Command("git", "clone", "--depth=1", "--branch", ctx.Pull.BaseBranch, "--single-branch", baseCloneURL, cloneDir) // #nosec
+
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		return "", errors.Wrap(err, "Running git clone for closed MR")
+	}
+
+	ctx.Log.Info("Successfully cloned base repo for closed MR")
+	return cloneDir, nil
 }
 
 func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
