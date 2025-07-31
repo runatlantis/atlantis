@@ -2,6 +2,8 @@ package events_test
 
 import (
 	"errors"
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/google/uuid"
@@ -17,6 +19,29 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+type WorkflowHookCommandContextMatcher struct {
+	expected models.WorkflowHookCommandContext
+}
+
+func (m WorkflowHookCommandContextMatcher) Matches(param Param) bool {
+	actual, ok := param.(models.WorkflowHookCommandContext)
+	if !ok {
+		return false
+	}
+
+	if err := uuid.Validate(actual.HookID); err != nil {
+		return false
+	}
+
+	actual.HookID = ""
+	m.expected.HookID = ""
+	return reflect.DeepEqual(m.expected, actual)
+}
+
+func (m WorkflowHookCommandContextMatcher) String() string {
+	return fmt.Sprintf("WorkflowHookCommandContex(%#v)", m.expected)
+}
 
 var postWh events.DefaultPostWorkflowHooksCommandRunner
 var postWhWorkingDir *mocks.MockWorkingDir
@@ -143,7 +168,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, nil)
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Any[string](),
 			Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
@@ -152,6 +177,56 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		Ok(t, err)
 		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
 			Eq(testHook.RunCommand), Eq(defaultShell), Eq(defaultShellArgs), Eq(repoDir))
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
+	t.Run("success hooks in cfg, check context with failed command", func(t *testing.T) {
+		postWorkflowHooksSetup(t)
+
+		unlockCalled := newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: testdata.GithubRepo.ID(),
+					PostWorkflowHooks: []*valid.WorkflowHook{
+						&testHook,
+					},
+				},
+			},
+		}
+
+		postWh.GlobalCfg = globalCfg
+		ctx.CommandHasErrors = true
+
+		expectedCtx := pCtx
+		expectedCtx.CommandHasErrors = true
+		expectedCtx.HookStepName = "post plan #0"
+		expectedCtx.HookDescription = "Post workflow hook #0"
+
+		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
+			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
+		When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
+		When(whPostWorkflowHookRunner.Run(
+			ArgThat[models.WorkflowHookCommandContext](WorkflowHookCommandContextMatcher{expected: expectedCtx}),
+			Eq(testHook.RunCommand),
+			Any[string](),
+			Any[string](),
+			Eq(repoDir),
+		)).ThenReturn(result, runtimeDesc, nil)
+
+		err := postWh.RunPostHooks(ctx, planCmd)
+
+		Ok(t, err)
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(
+			ArgThat[models.WorkflowHookCommandContext](WorkflowHookCommandContextMatcher{expected: expectedCtx}),
+			Eq(testHook.RunCommand),
+			Eq(defaultShell),
+			Eq(defaultShellArgs),
+			Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 	t.Run("success hooks not in cfg", func(t *testing.T) {
@@ -237,7 +312,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, errors.New("some error"))
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, errors.New("some error"))
 
 		err := postWh.RunPostHooks(ctx, planCmd)
 
@@ -272,7 +347,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, nil)
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, errors.New("some error"))
 
@@ -314,7 +389,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, nil)
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
@@ -350,7 +425,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, nil)
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHookWithShell.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
@@ -386,7 +461,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, nil)
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
@@ -422,7 +497,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, nil)
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHookWithShellandShellArgs.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
@@ -459,7 +534,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, nil)
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
 		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](),
 			Eq(testHookWithPlanCommand.RunCommand), Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
@@ -495,7 +570,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, nil)
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
 		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHookWithPlanCommand.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
@@ -531,7 +606,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 		When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, false, nil)
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
 		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHookWithPlanApplyCommands.RunCommand),
 			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 

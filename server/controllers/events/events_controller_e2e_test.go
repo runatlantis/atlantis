@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v71/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 
@@ -1647,6 +1647,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              backend,
 		DisableAutoplan:                opt.disableAutoplan,
+		CommitStatusUpdater:            commitStatusUpdater,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")

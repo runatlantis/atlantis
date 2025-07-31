@@ -6,7 +6,7 @@ package mocks
 import (
 	pegomock "github.com/petergtz/pegomock/v4"
 	logging "github.com/runatlantis/atlantis/server/logging"
-	go_gitlab "gitlab.com/gitlab-org/api/client-go"
+	client_go "gitlab.com/gitlab-org/api/client-go"
 	"reflect"
 	"time"
 )
@@ -26,17 +26,17 @@ func NewMockGitlabMergeRequestGetter(options ...pegomock.Option) *MockGitlabMerg
 func (mock *MockGitlabMergeRequestGetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockGitlabMergeRequestGetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockGitlabMergeRequestGetter) GetMergeRequest(logger logging.SimpleLogging, repoFullName string, pullNum int) (*go_gitlab.MergeRequest, error) {
+func (mock *MockGitlabMergeRequestGetter) GetMergeRequest(logger logging.SimpleLogging, repoFullName string, pullNum int) (*client_go.MergeRequest, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGitlabMergeRequestGetter().")
 	}
 	_params := []pegomock.Param{logger, repoFullName, pullNum}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetMergeRequest", _params, []reflect.Type{reflect.TypeOf((**go_gitlab.MergeRequest)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var _ret0 *go_gitlab.MergeRequest
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetMergeRequest", _params, []reflect.Type{reflect.TypeOf((**client_go.MergeRequest)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 *client_go.MergeRequest
 	var _ret1 error
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(*go_gitlab.MergeRequest)
+			_ret0 = _result[0].(*client_go.MergeRequest)
 		}
 		if _result[1] != nil {
 			_ret1 = _result[1].(error)

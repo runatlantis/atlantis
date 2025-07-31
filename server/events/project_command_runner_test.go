@@ -66,7 +66,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Any[string]())).ThenReturn(repoDir, false, nil)
+		Any[string]())).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
 		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
@@ -106,6 +106,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
+	t.Logf("output is %s", res.PlanSuccess.TerraformOutput)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
 	expSteps := []string{"run", "apply", "plan", "init", "env"}
 	for _, step := range expSteps {
@@ -575,7 +576,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Any[string]())).ThenReturn(repoDir, false, nil)
+		Any[string]())).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
 		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
@@ -717,7 +718,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			}
 			repoDir := t.TempDir()
 			When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(repoDir, false, nil)
+				Any[string]())).ThenReturn(repoDir, nil)
 			if c.setup != nil {
 				c.setup(repoDir, ctx, mockLocker, mockInit, mockImport)
 			}
@@ -1280,7 +1281,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			}
 
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, Author: testdata.User.Username}
-			When(runner.VcsClient.GetTeamNamesForUser(testdata.GithubRepo, testdata.User)).ThenReturn(c.userTeams, nil)
+			When(runner.VcsClient.GetTeamNamesForUser(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.User))).ThenReturn(c.userTeams, nil)
 			ctx := command.ProjectContext{
 				User:                testdata.User,
 				Log:                 logging.NewNoopLogger(t),

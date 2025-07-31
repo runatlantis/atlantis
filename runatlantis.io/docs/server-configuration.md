@@ -241,6 +241,20 @@ and set `--autoplan-modules` to `false`.
 
   Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
 
+::: warning COMPATIBILITY WARNING
+If you are affected by this change [docs](https://learn.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#administration)
+or this [issue](https://github.com/runatlantis/atlantis/issues/5595)
+both Service Hooks (v1 & v2) will convert the AD Organization name to lowercase:
+Examples:
+`https://dev.azure.com/MYCompany/` & `https://mycompany.visualstudio.com/` will be converted to `mycompany`
+`https://dev.azure.com/MYCOMPANY/` & `https://myCOMPANY.visualstudio.com/` will be converted to `mycompany`
+
+This [change](https://github.com/runatlantis/atlantis/pull/5596) will be applied from version v0.35.0
+
+What to do if you have pending plans that were generated with a previous version?
+Running an atlantis unlock from v0.35.0 on your current PRs will ignore the files on the `MYCompany` folder. On the next atlantis plan will use the `mycompany` folder and generate everything in the new folder name
+:::
+
 ### `--azuredevops-token`
 
   ```bash
@@ -330,8 +344,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_BITBUCKET_WEBHOOK_SECRET="secret"
   ```
 
-  Secret used to validate Bitbucket webhooks. Only Bitbucket Server supports webhook secrets.
-  For Bitbucket.org, see [Security](security.md#bitbucket-cloud-bitbucket-org) for mitigations.
+  Secret used to validate Bitbucket webhooks.
 
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from Bitbucket.
@@ -488,18 +501,28 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
   ```
 
-  If set, discard approval if a new plan has been executed. Currently only supported in Github.
+  If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.  
+  Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
 
 ### `--emoji-reaction`
 
   ```bash
-  atlantis server --emoji-reaction thumbsup
+  atlantis server --emoji-reaction eyes
   # or
-  ATLANTIS_EMOJI_REACTION=thumbsup
+  ATLANTIS_EMOJI_REACTION=eyes
   ```
 
   The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
   Defaults to "" (empty string).
+
+  ::: warning NOTE
+  Each VCS provider supports a different list of emojis:
+  
+* [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
+* [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
+* [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
+
+  :::
 
 ### `--enable-diff-markdown-format`
 
@@ -522,6 +545,16 @@ and set `--autoplan-modules` to `false`.
   ```
 
   Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](server-side-repo-config.md#reference).
+
+### `--enable-profiling-api`
+
+  ```bash
+  atlantis server --enable-profiling-api
+  # or
+  ATLANTIS_ENABLE_PROFILING_API=true
+  ```
+
+  Enable [`net/http/pprof`](https://pkg.go.dev/net/http/pprof) endpoints for [continuous profiling](https://grafana.com/docs/pyroscope/latest/introduction/continuous-profiling/) of resources used by the server. See [profiling Go programs](https://go.dev/blog/pprof) for more information.
 
 ### `--enable-regexp-cmd`
 
@@ -677,23 +710,20 @@ based on the organization or user that triggered the webhook.
 ### `--gh-team-allowlist`
 
   ```bash
-  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
+  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, devops-team:apply, devops-team:import"
   # or
-  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
+  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, devops-team:apply, devops-team:import"
   ```
 
-  In versions v0.21.0 and later, the GitHub team name can be a name or a slug.
+  In versions v0.35.0 and later, the GitHub team name can only be a slug because it is immutable.
+
+  In versions between v0.21.0 and v0.34.0, the GitHub team name can be a name or a slug.
 
   In versions v0.20.1 and below, the Github team name required the case sensitive team name.
 
   Comma-separated list of GitHub teams and permission pairs.
 
   By default, any team can plan and apply.
-
-  ::: warning NOTE
-  You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
-  i.e., "Engineering Team:plan, Infrastructure Team:apply"
-  :::
 
 ### `--gh-token`
 
@@ -800,6 +830,21 @@ based on the organization or user that triggered the webhook.
   This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
   :::
 
+### `--gitlab-group-allowlist`
+
+  ```bash
+  atlantis server --gitlab-group-allowlist="myorg/mygroup:plan, myorg/secteam:apply, myorg/devops:apply, myorg/devops:import"
+  # or
+  ATLANTIS_GITLAB_GROUP_ALLOWLIST="myorg/mygroup:plan, myorg/secteam:apply, myorg/devops:apply, myorg/devops:import"
+  ```
+
+  Comma-separated list of GitLab groups and permission pairs.
+
+  By default, any group can plan and apply.
+
+  ::: warning NOTE
+  Atlantis needs to be able to view the listed group members, inaccessible or non-existent groups are silently ignored.
+
 ### `--gitlab-hostname`
 
   ```bash
@@ -863,9 +908,14 @@ based on the organization or user that triggered the webhook.
   ```
 
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub and GitLab currently. This is not enabled by default. When using Github App, you need to set `--gh-app-slug` to enable this feature.
-  For github, ensure the `--gh-user` is set appropriately or comments will not be hidden.
+  GitHub and GitLab and Bitbucket currently and is not enabled by default.
+  
+  For Bitbucket, the comments are deleted rather than hidden as Bitbucket does not support hiding comments.
+  
+  For GitHub, ensure the `--gh-user` is set appropriately or comments will not be hidden.
 
+  When using the GitHub App, you need to set `--gh-app-slug` to enable this feature.
+  
 ### `--hide-unchanged-plan-comments`
 
   ```bash

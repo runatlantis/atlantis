@@ -104,6 +104,7 @@ var testFlags = map[string]interface{}{
 	GiteaUserFlag:                    "gitea-user",
 	GiteaWebhookSecretFlag:           "gitea-secret",
 	GiteaPageSizeFlag:                30,
+	GitlabGroupAllowlistFlag:         "",
 	GitlabHostnameFlag:               "gitlab-hostname",
 	GitlabTokenFlag:                  "gitlab-token",
 	GitlabUserFlag:                   "gitlab-user",
@@ -163,6 +164,7 @@ var testFlags = map[string]interface{}{
 	EnablePolicyChecksFlag:           false,
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,
+	EnableProfilingAPI:               false,
 }
 
 func TestExecute_Defaults(t *testing.T) {
@@ -937,18 +939,6 @@ func TestExecute_ADUser(t *testing.T) {
 	Ok(t, err)
 
 	Equals(t, "user", passedConfig.AzureDevopsUser)
-}
-
-// If using bitbucket cloud, webhook secrets are not supported.
-func TestExecute_BitbucketCloudWithWebhookSecret(t *testing.T) {
-	c := setup(map[string]interface{}{
-		BitbucketUserFlag:          "user",
-		BitbucketTokenFlag:         "token",
-		RepoAllowlistFlag:          "*",
-		BitbucketWebhookSecretFlag: "my secret",
-	}, t)
-	err := c.Execute()
-	ErrEquals(t, "--bitbucket-webhook-secret cannot be specified for Bitbucket Cloud because it is not supported by Bitbucket", err)
 }
 
 // Base URL must have a scheme.

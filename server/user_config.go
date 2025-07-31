@@ -45,6 +45,7 @@ type UserConfig struct {
 	EmojiReaction               string `mapstructure:"emoji-reaction"`
 	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
+	EnableProfilingAPI          bool   `mapstructure:"enable-profiling-api"`
 	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
 	ExecutableName              string `mapstructure:"executable-name"`
 	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
@@ -69,6 +70,7 @@ type UserConfig struct {
 	GiteaWebhookSecret              string `mapstructure:"gitea-webhook-secret"`
 	GiteaPageSize                   int    `mapstructure:"gitea-page-size"`
 	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
+	GitlabGroupAllowlist            string `mapstructure:"gitlab-group-allowlist"`
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`

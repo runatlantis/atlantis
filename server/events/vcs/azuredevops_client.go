@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -68,25 +68,40 @@ func (g *AzureDevopsClient) GetModifiedFiles(logger logging.SimpleLogging, repo 
 	targetRefName := strings.Replace(pullRequest.GetTargetRefName(), "refs/heads/", "", 1)
 	sourceRefName := strings.Replace(pullRequest.GetSourceRefName(), "refs/heads/", "", 1)
 
-	r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName)
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
-	}
+	const pageSize = 100 // Number of files from diff call
+	var skip int
 
-	for _, change := range r.Changes {
-		item := change.GetItem()
-		// Convert the path to a relative path from the repo's root.
-		relativePath := filepath.Clean("./" + item.GetPath())
-		files = append(files, relativePath)
-
-		// If the file was renamed, we'll want to run plan in the directory
-		// it was moved from as well.
-		changeType := azuredevops.Rename.String()
-		if change.ChangeType == &changeType {
-			// Convert the path to a relative path from the repo's root.
-			relativePath = filepath.Clean("./" + change.GetSourceServerItem())
-			files = append(files, relativePath)
+	for {
+		r, resp, err := g.Client.Git.GetDiffs(g.ctx, owner, project, repoName, targetRefName, sourceRefName, &azuredevops.GitDiffListOptions{
+			Top:  pageSize,
+			Skip: skip,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "getting pull request")
 		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
+		}
+
+		for _, change := range r.Changes {
+			item := change.GetItem()
+			// Convert the path to a relative path from the repo's root.
+			relativePath := filepath.Clean("./" + item.GetPath())
+			files = append(files, relativePath)
+
+			// If the file was renamed, we'll want to run plan in the directory
+			// it was moved from as well.
+			changeType := azuredevops.Rename.String()
+			if change.ChangeType == &changeType {
+				relativePath = filepath.Clean("./" + change.GetSourceServerItem())
+				files = append(files, relativePath)
+			}
+		}
+
+		if len(r.Changes) < pageSize {
+			break // Break if we have reached the end
+		}
+		skip += pageSize // Move to next page
 	}
 
 	return files, nil
@@ -171,7 +186,7 @@ func (g *AzureDevopsClient) PullIsApproved(logger logging.SimpleLogging, repo mo
 	return approvalStatus, nil
 }
 
-func (g *AzureDevopsClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error { //nolint: revive
+func (g *AzureDevopsClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error { //nolint: revive
 	// TODO implement
 	return nil
 }
@@ -267,7 +282,7 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 		return errors.Wrap(err, "getting pull request")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.Wrapf(err, "http response code %d getting pull request", resp.StatusCode)
+		return errors.Errorf("http response code %d getting pull request", resp.StatusCode)
 	}
 	if source.GetSupportsIterations() {
 		opts := azuredevops.PullRequestIterationsListOptions{}
@@ -276,7 +291,7 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 			return errors.Wrap(err, "listing pull request iterations")
 		}
 		if resp.StatusCode != http.StatusOK {
-			return errors.Wrapf(err, "http response code %d listing pull request iterations", resp.StatusCode)
+			return errors.Errorf("http response code %d listing pull request iterations", resp.StatusCode)
 		}
 		for _, iteration := range iterations {
 			if sourceRef := iteration.GetSourceRefCommit(); sourceRef != nil {
@@ -297,7 +312,7 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 		return errors.Wrap(err, "creating pull request status")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.Wrapf(err, "http response code %d creating pull request status", resp.StatusCode)
+		return errors.Errorf("http response code %d creating pull request status", resp.StatusCode)
 	}
 	return err
 }
@@ -393,7 +408,7 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *AzureDevopsClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) { //nolint: revive
+func (g *AzureDevopsClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) { //nolint: revive
 	return nil, nil
 }
 

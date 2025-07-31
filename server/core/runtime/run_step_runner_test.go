@@ -100,89 +100,90 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ExpOut:  "args=-target=resource1,-target=resource2\n",
 		},
 	}
+	for _, customPolicyCheck := range []bool{false, true} {
+		for _, c := range cases {
+			var projVersion *version.Version
+			var err error
 
-	for _, c := range cases {
+			projVersion, err = version.NewVersion("v0.11.0")
 
-		var projVersion *version.Version
-		var err error
-
-		projVersion, err = version.NewVersion("v0.11.0")
-
-		if c.Version != "" {
-			projVersion, err = version.NewVersion(c.Version)
-			Ok(t, err)
-		}
-
-		Ok(t, err)
-
-		projTFDistribution := "terraform"
-		if c.Distribution != "" {
-			projTFDistribution = c.Distribution
-		}
-
-		defaultVersion, _ := version.NewVersion("0.8")
-
-		RegisterMockTestingT(t)
-		terraform := tfclientmocks.NewMockClient()
-		defaultDistribution := tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader())
-		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
-			ThenReturn(nil)
-
-		logger := logging.NewNoopLogger(t)
-		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-		tmpDir := t.TempDir()
-
-		r := runtime.RunStepRunner{
-			TerraformExecutor:       terraform,
-			DefaultTFDistribution:   defaultDistribution,
-			DefaultTFVersion:        defaultVersion,
-			TerraformBinDir:         "/bin/dir",
-			ProjectCmdOutputHandler: projectCmdOutputHandler,
-		}
-		t.Run(c.Command, func(t *testing.T) {
-			ctx := command.ProjectContext{
-				BaseRepo: models.Repo{
-					Name:  "basename",
-					Owner: "baseowner",
-				},
-				HeadRepo: models.Repo{
-					Name:  "headname",
-					Owner: "headowner",
-				},
-				Pull: models.PullRequest{
-					Num:        2,
-					URL:        "https://github.com/runatlantis/atlantis/pull/2",
-					HeadBranch: "add-feat",
-					HeadCommit: "12345abcdef",
-					BaseBranch: "main",
-					Author:     "acme",
-				},
-				User: models.User{
-					Username: "acme-user",
-				},
-				Log:                   logger,
-				Workspace:             "myworkspace",
-				RepoRelDir:            "mydir",
-				TerraformDistribution: &projTFDistribution,
-				TerraformVersion:      projVersion,
-				ProjectName:           c.ProjectName,
-				EscapedCommentArgs:    []string{"-target=resource1", "-target=resource2"},
+			if c.Version != "" {
+				projVersion, err = version.NewVersion(c.Version)
+				Ok(t, err)
 			}
-			out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow)
-			if c.ExpErr != "" {
-				ErrContains(t, c.ExpErr, err)
-				return
-			}
+
 			Ok(t, err)
-			// Replace $DIR in the exp with the actual temp dir. We do this
-			// here because when constructing the cases we don't yet know the
-			// temp dir.
-			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
-			Equals(t, expOut, out)
 
-			terraform.VerifyWasCalledOnce().EnsureVersion(Eq(logger), NotEq(defaultDistribution), Eq(projVersion))
-			terraform.VerifyWasCalled(Never()).EnsureVersion(Eq(logger), Eq(defaultDistribution), Eq(defaultVersion))
+			projTFDistribution := "terraform"
+			if c.Distribution != "" {
+				projTFDistribution = c.Distribution
+			}
 
-		})
+			defaultVersion, _ := version.NewVersion("0.8")
+
+			RegisterMockTestingT(t)
+			terraform := tfclientmocks.NewMockClient()
+			defaultDistribution := tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader())
+			When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
+				ThenReturn(nil)
+
+			logger := logging.NewNoopLogger(t)
+			projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+			tmpDir := t.TempDir()
+
+			r := runtime.RunStepRunner{
+				TerraformExecutor:       terraform,
+				DefaultTFDistribution:   defaultDistribution,
+				DefaultTFVersion:        defaultVersion,
+				TerraformBinDir:         "/bin/dir",
+				ProjectCmdOutputHandler: projectCmdOutputHandler,
+			}
+			t.Run(fmt.Sprintf("%s_CustomPolicyCheck=%v", c.Command, customPolicyCheck), func(t *testing.T) {
+				ctx := command.ProjectContext{
+					BaseRepo: models.Repo{
+						Name:  "basename",
+						Owner: "baseowner",
+					},
+					HeadRepo: models.Repo{
+						Name:  "headname",
+						Owner: "headowner",
+					},
+					Pull: models.PullRequest{
+						Num:        2,
+						URL:        "https://github.com/runatlantis/atlantis/pull/2",
+						HeadBranch: "add-feat",
+						HeadCommit: "12345abcdef",
+						BaseBranch: "main",
+						Author:     "acme",
+					},
+					User: models.User{
+						Username: "acme-user",
+					},
+					Log:                   logger,
+					Workspace:             "myworkspace",
+					RepoRelDir:            "mydir",
+					TerraformDistribution: &projTFDistribution,
+					TerraformVersion:      projVersion,
+					ProjectName:           c.ProjectName,
+					EscapedCommentArgs:    []string{"-target=resource1", "-target=resource2"},
+					CustomPolicyCheck:     customPolicyCheck,
+				}
+				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow)
+				if c.ExpErr != "" {
+					ErrContains(t, c.ExpErr, err)
+					return
+				}
+				Ok(t, err)
+				// Replace $DIR in the exp with the actual temp dir. We do this
+				// here because when constructing the cases we don't yet know the
+				// temp dir.
+				expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
+				Equals(t, expOut, out)
+
+				terraform.VerifyWasCalledOnce().EnsureVersion(Eq(logger), NotEq(defaultDistribution), Eq(projVersion))
+				terraform.VerifyWasCalled(Never()).EnsureVersion(Eq(logger), Eq(defaultDistribution), Eq(defaultVersion))
+
+			})
+		}
 	}
 }

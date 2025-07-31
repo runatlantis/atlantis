@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v68/github"
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
+	"github.com/google/go-github/v71/github"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -1331,6 +1331,36 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 	}, r)
 }
 
+func TestParseAzureDevopsRepo_LowercasesOwner(t *testing.T) {
+	parser := events.EventParser{
+		AzureDevopsUser:  "azuredevops-user",
+		AzureDevopsToken: "azuredevops-token",
+	}
+
+	tests := []struct {
+		url      string
+		expected string
+	}{
+		{"https://dev.azure.com/MyCompany/project/_git/repo", "mycompany"},
+		{"https://MYCOMPANY.visualstudio.com/project/_git/repo", "mycompany"},
+		{"https://AnotherOrg.visualstudio.com/project/_git/repo", "anotherorg"},
+	}
+
+	for _, tt := range tests {
+		repo := azuredevops.GitRepository{}
+		repo.WebURL = azuredevops.String(tt.url)
+		repo.ParentRepository = nil
+		repo.Project = &azuredevops.TeamProjectReference{Name: azuredevops.String("project")}
+		repo.Name = azuredevops.String("repo")
+
+		r, err := parser.ParseAzureDevopsRepo(&repo)
+		Ok(t, err)
+		// Only check the owner part
+		parts := strings.Split(r.FullName, "/")
+		owner := parts[0]
+		Equals(t, tt.expected, owner)
+	}
+}
 func TestParseAzureDevopsPullEvent(t *testing.T) {
 	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(ADPullEvent)
 	Ok(t, err)
