@@ -1695,11 +1695,11 @@ projects:
 // Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 	cases := []struct {
-		AtlantisYAML   string
-		IsFork         bool
-		ExpectedCtxs   int
-		ExpectedClones InvocationCountMatcher
-		ModifiedFiles  []string
+		AtlantisYAML   		 string
+		IsFork         		 bool
+		ExpectedCtxs   		 int
+		ExpectedClones 		 InvocationCountMatcher
+		ModifiedFiles  		 []string
 		IncludeGitUntrackedFiles bool
 	}{
 		{
