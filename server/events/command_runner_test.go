@@ -315,7 +315,7 @@ func TestRunCommentCommand_CommentPreWorkflowHookFailure(t *testing.T) {
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
 
-	Assert(t, strings.Contains(comment, "Error: Atlantis failed to run pre-workflow hooks."), fmt.Sprintf("comment should be about a pre-workflow hook failure but was %q", comment))
+	Assert(t, strings.Contains(comment, "Error: Pre-workflow hook failed"), fmt.Sprintf("comment should be about a pre-workflow hook failure but was %q", comment))
 }
 
 func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
@@ -877,7 +877,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
 
-	Assert(t, strings.Contains(comment, "Error: Atlantis failed to run pre-workflow hooks."), fmt.Sprintf("comment should be about a pre-workflow hook failure but was %q", comment))
+	Assert(t, strings.Contains(comment, "Error: Pre-workflow hook failed"), fmt.Sprintf("comment should be about a pre-workflow hook failure but was %q", comment))
 }
 
 func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_False(t *testing.T) {
