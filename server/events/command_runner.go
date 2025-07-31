@@ -214,6 +214,12 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
 
+			// Create comment on pull request about the pre-workflow hook failure
+			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", preWorkflowHooksErr.Error())
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
+			}
+
 			// Update the plan or apply commit status to failed
 			switch cmd.Name {
 			case command.Plan:
@@ -224,10 +230,6 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
 					ctx.Log.Warn("Unable to update apply commit status: %s", err)
 				}
-			}
-
-			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, formatPreWorkflowHookError(preWorkflowHooksErr), ""); err != nil {
-				ctx.Log.Warn("Unable to comment on pull request: %s", err)
 			}
 
 			return
@@ -382,6 +384,12 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
 
+			// Create comment on pull request about the pre-workflow hook failure
+			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", preWorkflowHooksErr.Error())
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
+			}
+
 			// Update the plan or apply commit status to failed
 			switch cmd.Name {
 			case command.Plan:
@@ -392,10 +400,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
 					ctx.Log.Warn("unable to update apply commit status: %s", err)
 				}
-			}
-
-			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, formatPreWorkflowHookError(preWorkflowHooksErr), ""); err != nil {
-				ctx.Log.Warn("Unable to comment on pull request: %s", err)
 			}
 
 			return
