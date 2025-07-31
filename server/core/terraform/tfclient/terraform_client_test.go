@@ -389,7 +389,11 @@ func TestEnsureVersion_downloaded_downloadingDisabled(t *testing.T) {
 func tempSetEnv(t *testing.T, key string, value string) func() {
 	orig := os.Getenv(key)
 	Ok(t, os.Setenv(key, value))
-	return func() { os.Setenv(key, orig) }
+	return func() {
+		if setErr := os.Setenv(key, orig); setErr != nil {
+			t.Errorf("failed to restore environment variable %s: %v", key, setErr)
+		}
+	}
 }
 
 // returns parent, bindir, cachedir
@@ -481,7 +485,7 @@ terraform {
 				"main.tf": fmt.Sprintf(baseVersionConfig, "= 0.12.8"),
 			},
 			"project2": map[string]interface{}{
-				"main.tf": strings.Replace(fmt.Sprintf(baseVersionConfig, "= 0.12.8"), "0.12.8", "0.12.9", -1),
+				"main.tf": strings.ReplaceAll(fmt.Sprintf(baseVersionConfig, "= 0.12.8"), "0.12.8", "0.12.9"),
 			},
 		},
 		Exp: map[string]string{

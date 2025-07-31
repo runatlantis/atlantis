@@ -319,7 +319,7 @@ var mergeCommentEventJSON = `{
   "user": {
     "name": "Administrator",
     "username": "root",
-    "avatar_url": "http://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=40\u0026d=identicon"
+    "avatar_url": "http://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=40&d=identicon"
   },
   "project_id": 5,
   "project":{
@@ -425,7 +425,7 @@ var mergeCommentEventJSON = `{
     "assignee": {
       "name": "User1",
       "username": "user1",
-      "avatar_url": "http://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=40\u0026d=identicon"
+      "avatar_url": "http://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=40&d=identicon"
     }
   }
 }`
@@ -435,7 +435,7 @@ var commitCommentEventJSON = `{
   "user": {
     "name": "Administrator",
     "username": "root",
-    "avatar_url": "http://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=40\u0026d=identicon"
+    "avatar_url": "http://www.gravatar.com/avatar/e64c7d89f26bd1972efa854d13d7dd61?s=40&d=identicon"
   },
   "project_id": 5,
   "project":{
@@ -488,7 +488,7 @@ var commitCommentEventJSON = `{
   },
   "commit": {
     "id": "cfe32cf61b73a0d5e9f13e774abde7ff789b1660",
-    "message": "Add submodule\n\nSigned-off-by: Dmitriy Zaporozhets \u003cdmitriy.zaporozhets@gmail.com\u003e\n",
+    "message": "Add submodule\n\nSigned-off-by: Dmitriy Zaporozhets <dmitriy.zaporozhets@gmail.com>\n",
     "timestamp": "2014-02-27T10:06:20+02:00",
     "url": "http://example.com/gitlab-org/gitlab-test/commit/cfe32cf61b73a0d5e9f13e774abde7ff789b1660",
     "author": {

@@ -398,6 +398,7 @@ func (c *DefaultClient) prepExecCmd(log logging.SimpleLogging, d terraform.Distr
 	if err != nil {
 		return "", nil, err
 	}
+	// nolint: gosec
 	cmd := exec.Command("sh", "-c", tfCmd)
 	cmd.Dir = path
 	cmd.Env = envVars

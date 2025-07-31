@@ -103,9 +103,8 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 		}
 	}
 
-	// We url encode because we're using them in a URL and weird characters can
-	// mess up git.
-	cloneURL = strings.Replace(cloneURL, " ", "%20", -1)
+	// URL encode spaces in the clone URL.
+	cloneURL = strings.ReplaceAll(cloneURL, " ", "%20")
 	escapedVCSUser := url.QueryEscape(vcsUser)
 	escapedVCSToken := url.QueryEscape(vcsToken)
 	auth := fmt.Sprintf("%s:%s@", escapedVCSUser, escapedVCSToken)
@@ -113,10 +112,10 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 
 	// Construct clone urls with http and https auth. Need to do both
 	// because Bitbucket supports http.
-	authedCloneURL := strings.Replace(cloneURL, "https://", "https://"+auth, -1)
-	authedCloneURL = strings.Replace(authedCloneURL, "http://", "http://"+auth, -1)
-	sanitizedCloneURL := strings.Replace(cloneURL, "https://", "https://"+redactedAuth, -1)
-	sanitizedCloneURL = strings.Replace(sanitizedCloneURL, "http://", "http://"+redactedAuth, -1)
+	authedCloneURL := strings.ReplaceAll(cloneURL, "https://", "https://"+auth)
+	authedCloneURL = strings.ReplaceAll(authedCloneURL, "http://", "http://"+auth)
+	sanitizedCloneURL := strings.ReplaceAll(cloneURL, "https://", "https://"+redactedAuth)
+	sanitizedCloneURL = strings.ReplaceAll(sanitizedCloneURL, "http://", "http://"+redactedAuth)
 
 	// Get the owner and repo names from the full name.
 	owner, repo := SplitRepoFullName(repoFullName)
