@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Atlantis - Plan Queues</title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="{{ .CleanedBasePath }}/static/js/jquery-3.5.1.min.js"></script>
+  <script>
+    $(document).ready(function () {
+      // Auto-refresh every 30 seconds
+      setInterval(function() {
+        location.reload();
+      }, 30000);
+
+      // Handle remove from queue buttons
+      $('.remove-from-queue').click(function() {
+        var button = $(this);
+        var repo = button.data('repo');
+        var project = button.data('project');
+        var workspace = button.data('workspace');
+        var pullNum = button.data('pull-num');
+        
+        if (confirm('Are you sure you want to remove this entry from the queue?')) {
+          $.ajax({
+            url: '{{ .CleanedBasePath }}/api/queues/' + repo + '/' + project + '/' + workspace + '/' + pullNum,
+            type: 'DELETE',
+            success: function(result) {
+              location.reload();
+            },
+            error: function(xhr) {
+              alert('Failed to remove from queue: ' + xhr.responseText);
+            }
+          });
+        }
+      });
+    });
+  </script>
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
+  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
+  <style>
+    .queue-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .queue-card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    .queue-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+      gap: 10px;
+      font-weight: bold;
+      padding: 10px 0;
+      border-bottom: 2px solid #ddd;
+      margin-bottom: 10px;
+    }
+    .queue-entry {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .queue-entry:last-child {
+      border-bottom: none;
+    }
+    .position-badge {
+      background: #007cba;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .remove-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .remove-btn:hover {
+      background: #c82333;
+    }
+    .nav-links {
+      margin-bottom: 20px;
+    }
+    .nav-links a {
+      margin-right: 15px;
+      color: #007cba;
+      text-decoration: none;
+    }
+    .nav-links a:hover {
+      text-decoration: underline;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <section class="header">
+    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
+    <p class="title-heading">Plan Queues</p>
+  </section>
+
+  <div class="nav-links">
+    <a href="{{ .CleanedBasePath }}/">← Back to Dashboard</a>
+    <a href="{{ .CleanedBasePath }}/api/queues" target="_blank">API</a>
+  </div>
+
+  <section>
+    {{ if .Queues }}
+    <div class="queue-grid">
+      {{ range .Queues }}
+      <div class="queue-card">
+        <h5><strong>{{ .Project }}</strong> - <code>{{ .Workspace }}</code></h5>
+        <p><small>Repository: {{ .RepoFullName }} | Updated: {{ .UpdatedAt }}</small></p>
+        
+        <div class="queue-header">
+          <span>Position</span>
+          <span>Pull Request</span>
+          <span>User</span>
+          <span>Added</span>
+          <span>Status</span>
+          <span>Actions</span>
+        </div>
+        
+        {{ if .Entries }}
+          {{ range .Entries }}
+          <div class="queue-entry">
+            <span><span class="position-badge">#{{ .Position }}</span></span>
+            <span><strong>#{{ .PullNum }}</strong></span>
+            <span>{{ .Username }}</span>
+            <span>{{ .Time }}</span>
+            <span><code>Waiting</code></span>
+            <span>
+              <button class="remove-btn remove-from-queue" 
+                      data-repo="{{ $.RepoFullName }}" 
+                      data-project="{{ $.Project }}" 
+                      data-workspace="{{ $.Workspace }}" 
+                      data-pull-num="{{ .PullNum }}">
+                Remove
+              </button>
+            </span>
+          </div>
+          {{ end }}
+        {{ else }}
+          <div class="empty-state">
+            <p>No entries in queue</p>
+          </div>
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+    {{ else }}
+    <div class="empty-state">
+      <h5>No Active Queues</h5>
+      <p>There are currently no plan queues active.</p>
+    </div>
+    {{ end }}
+  </section>
+</div>
+
+<footer>
+{{ .AtlantisVersion }}
+</footer>
+</body>
+</html> 
