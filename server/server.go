@@ -38,7 +38,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
 	tally "github.com/uber-go/tally/v4"
-	prometheus "github.com/uber-go/tally/v4/prometheus"
+	"github.com/uber-go/tally/v4/prometheus"
 	"github.com/urfave/negroni/v3"
 
 	cfg "github.com/runatlantis/atlantis/server/core/config"
@@ -998,14 +998,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	configController := &controllers.ConfigController{
-		APISecret:          []byte(userConfig.APISecret),
-		Logger:             logger,
-		CommandRunner:      commandRunner,
-		RepoConfig:         userConfig.RepoConfig,
-		RepoConfigJSON:     userConfig.RepoConfigJSON,
-		PolicyCheckEnabled: policyChecksEnabled,
-		ParserValidator:    parserValidator,
-		Scope:              statsScope,
+		APISecret:       []byte(userConfig.APISecret),
+		Logger:          logger,
+		CommandRunner:   commandRunner,
+		RepoConfig:      userConfig.RepoConfig,
+		RepoConfigJSON:  userConfig.RepoConfigJSON,
+		ParserValidator: parserValidator,
+		Scope:           statsScope,
+		GlobalCfgArgs: valid.GlobalCfgArgs{
+			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
+		},
 	}
 
 	server := &Server{

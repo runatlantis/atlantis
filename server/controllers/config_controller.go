@@ -32,17 +32,19 @@ type ConfigReloadResponse struct {
 
 // ConfigController handles configuration management API endpoints
 type ConfigController struct {
-	APISecret          []byte
-	Logger             logging.SimpleLogging        `validate:"required"`
-	CommandRunner      *events.DefaultCommandRunner `validate:"required"`
-	RepoConfig         string                       // Path to repo config file
-	RepoConfigJSON     string                       // JSON config string
-	PolicyCheckEnabled bool                         // Whether policy checks are enabled
-	ParserValidator    *cfg.ParserValidator         `validate:"required"`
-	Scope              tally.Scope                  `validate:"required"`
+	APISecret       []byte
+	Logger          logging.SimpleLogging        `validate:"required"`
+	CommandRunner   *events.DefaultCommandRunner `validate:"required"`
+	RepoConfig      string                       // Path to repo config file
+	RepoConfigJSON  string                       // JSON config string
+	ParserValidator *cfg.ParserValidator         `validate:"required"`
+	Scope           tally.Scope                  `validate:"required"`
 
 	// Mutex to ensure thread-safe config updates
 	configMutex sync.RWMutex
+
+	// Store the original args
+	GlobalCfgArgs valid.GlobalCfgArgs
 }
 
 // ReloadConfig handles POST /api/config/reload
@@ -110,11 +112,8 @@ func (c *ConfigController) reloadConfiguration() error {
 
 	c.Logger.Info("Starting configuration reload")
 
-	// Create default global config
-	globalCfgArgs := valid.GlobalCfgArgs{
-		PolicyCheckEnabled: c.PolicyCheckEnabled,
-	}
-	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	// Use the original args that were used at startup
+	globalCfg := valid.NewGlobalCfgFromArgs(c.GlobalCfgArgs)
 
 	// Parse the configuration using the same logic as server startup
 	parserValidator := &cfg.ParserValidator{}
@@ -136,8 +135,7 @@ func (c *ConfigController) reloadConfiguration() error {
 		c.Logger.Info("No server-side configuration specified, using defaults")
 	}
 
-	// Update the global configuration in the command runner
-	// This is the critical part - we need to atomically update the configuration
+	// Atomically update the global configuration in the command runner
 	c.CommandRunner.UpdateGlobalCfg(globalCfg)
 
 	c.Logger.Info("Configuration reload completed successfully")

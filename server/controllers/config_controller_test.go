@@ -28,13 +28,12 @@ func TestConfigController_ReloadConfig_Success(t *testing.T) {
 	}
 
 	configController := &controllers.ConfigController{
-		APISecret:          []byte(apiSecret),
-		Logger:             logger,
-		CommandRunner:      commandRunner,
-		RepoConfig:         "",
-		RepoConfigJSON:     "",
-		PolicyCheckEnabled: false,
-		Scope:              scope,
+		APISecret:      []byte(apiSecret),
+		Logger:         logger,
+		CommandRunner:  commandRunner,
+		RepoConfig:     "",
+		RepoConfigJSON: "",
+		Scope:          scope,
 	}
 
 	// Create test request
@@ -73,13 +72,12 @@ func TestConfigController_ReloadConfig_InvalidAuth(t *testing.T) {
 	}
 
 	configController := &controllers.ConfigController{
-		APISecret:          []byte(apiSecret),
-		Logger:             logger,
-		CommandRunner:      commandRunner,
-		RepoConfig:         "",
-		RepoConfigJSON:     "",
-		PolicyCheckEnabled: false,
-		Scope:              scope,
+		APISecret:      []byte(apiSecret),
+		Logger:         logger,
+		CommandRunner:  commandRunner,
+		RepoConfig:     "",
+		RepoConfigJSON: "",
+		Scope:          scope,
 	}
 
 	// Create test request with wrong token
@@ -112,13 +110,12 @@ func TestConfigController_ReloadConfig_NoAuth(t *testing.T) {
 	}
 
 	configController := &controllers.ConfigController{
-		APISecret:          []byte(apiSecret),
-		Logger:             logger,
-		CommandRunner:      commandRunner,
-		RepoConfig:         "",
-		RepoConfigJSON:     "",
-		PolicyCheckEnabled: false,
-		Scope:              scope,
+		APISecret:      []byte(apiSecret),
+		Logger:         logger,
+		CommandRunner:  commandRunner,
+		RepoConfig:     "",
+		RepoConfigJSON: "",
+		Scope:          scope,
 	}
 
 	// Create test request without token
