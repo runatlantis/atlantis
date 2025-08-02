@@ -116,6 +116,7 @@ my-terraform-project/
 ```
 
 When you run:
+
 * `atlantis plan` (uses default workspace) automatically includes `env/default.tfvars`
 * `atlantis plan -w staging` automatically includes `env/staging.tfvars`
 * `atlantis plan -w production` automatically includes `env/production.tfvars`

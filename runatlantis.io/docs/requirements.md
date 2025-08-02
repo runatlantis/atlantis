@@ -99,6 +99,7 @@ Atlantis automatically includes workspace-specific variable files if they exist 
 ```
 
 When using this structure, Atlantis will automatically include the appropriate file based on the workspace:
+
 * `atlantis plan` includes `env/default.tfvars`
 * `atlantis plan -w staging` includes `env/staging.tfvars`  
 * `atlantis plan -w production` includes `env/production.tfvars`
