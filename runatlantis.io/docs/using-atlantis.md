@@ -94,6 +94,36 @@ atlantis plan -d dir -- -var foo='bar'
 
 If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.md#adding-extra-arguments-to-terraform-commands).
 
+### Automatic Environment Variable Files
+
+Atlantis automatically includes workspace-specific variable files if they exist in your repository. This feature helps reduce duplication across different environments and workspaces.
+
+#### How it works
+
+When running `atlantis plan`, Atlantis automatically checks for a file at `env/{workspace}.tfvars` relative to the project directory. If this file exists, Atlantis will automatically include it using the `-var-file` flag.
+
+#### Examples
+
+```
+# Repository structure
+my-terraform-project/
+├── main.tf
+├── variables.tf
+└── env/
+    ├── default.tfvars
+    ├── staging.tfvars
+    └── production.tfvars
+```
+
+When you run:
+- `atlantis plan` (uses default workspace) automatically includes `env/default.tfvars`
+- `atlantis plan -w staging` automatically includes `env/staging.tfvars`
+- `atlantis plan -w production` automatically includes `env/production.tfvars`
+
+::: tip
+This feature works for any workspace name. If you have a custom workspace called `dev-team-1`, Atlantis will look for `env/dev-team-1.tfvars`.
+:::
+
 ### Using the -destroy Flag
 
 #### Example
@@ -162,6 +192,10 @@ Because Atlantis under the hood is running `terraform apply plan.tfplan`, any Te
 
 They're ignored because they can't be specified for an already generated planfile.
 If you would like to specify these flags, do it while running `atlantis plan`.
+
+::: tip
+The automatic `env/{workspace}.tfvars` file inclusion happens during the `atlantis plan` phase. Since `atlantis apply` uses the already-generated plan file, any environment-specific variables are already incorporated from when the plan was created.
+:::
 
 ---
 

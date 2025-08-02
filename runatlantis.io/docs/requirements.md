@@ -82,8 +82,31 @@ If you're using Terraform `>= 0.9.0`, Atlantis supports workspaces through an
 └── main.tf
 ```
 
-For Atlantis to be able to plan automatically with `.tfvars files`, you need to create
-an `atlantis.yaml` file to tell it to use `-var-file={YOUR_FILE}`.
+Atlantis supports `.tfvars` files in two ways:
+
+#### Automatic env/{workspace}.tfvars files
+Atlantis automatically includes workspace-specific variable files if they exist in an `env/` directory:
+
+```plain
+.
+├── main.tf
+├── variables.tf
+└── env/
+    ├── default.tfvars
+    ├── staging.tfvars
+    └── production.tfvars
+```
+
+When using this structure, Atlantis will automatically include the appropriate file based on the workspace:
+- `atlantis plan` includes `env/default.tfvars`
+- `atlantis plan -w staging` includes `env/staging.tfvars`  
+- `atlantis plan -w production` includes `env/production.tfvars`
+
+This requires no additional configuration and works automatically.
+
+#### Custom .tfvars files with atlantis.yaml
+For other `.tfvars` file locations or structures, you need to create
+an `atlantis.yaml` file to tell Atlantis to use `-var-file={YOUR_FILE}`.
 See [atlantis.yaml Use Cases](custom-workflows.md#tfvars-files) for more details.
 
 ### Multiple Repos
