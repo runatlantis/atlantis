@@ -104,8 +104,7 @@ When running `atlantis plan`, Atlantis automatically checks for a file at `env/{
 
 #### Examples
 
-```
-# Repository structure
+```plain
 my-terraform-project/
 ├── main.tf
 ├── variables.tf
