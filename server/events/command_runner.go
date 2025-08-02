@@ -16,6 +16,7 @@ package events
 import (
 	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/google/go-github/v71/github"
@@ -131,6 +132,22 @@ type DefaultCommandRunner struct {
 	TeamAllowlistChecker           command.TeamAllowlistChecker          `validate:"required"`
 	VarFileAllowlistChecker        *VarFileAllowlistChecker              `validate:"required"`
 	CommitStatusUpdater            CommitStatusUpdater                   `validate:"required"`
+	// Mutex to protect GlobalCfg during updates
+	globalCfgMutex sync.RWMutex
+}
+
+// UpdateGlobalCfg safely updates the global configuration with thread synchronization
+func (c *DefaultCommandRunner) UpdateGlobalCfg(newCfg valid.GlobalCfg) {
+	c.globalCfgMutex.Lock()
+	defer c.globalCfgMutex.Unlock()
+	c.GlobalCfg = newCfg
+}
+
+// GetGlobalCfg safely retrieves the current global configuration
+func (c *DefaultCommandRunner) GetGlobalCfg() valid.GlobalCfg {
+	c.globalCfgMutex.RLock()
+	defer c.globalCfgMutex.RUnlock()
+	return c.GlobalCfg
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -539,7 +556,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 		return false
 	}
 
-	repo := c.GlobalCfg.MatchingRepo(ctx.Pull.BaseRepo.ID())
+	repo := c.GetGlobalCfg().MatchingRepo(ctx.Pull.BaseRepo.ID())
 	if !repo.BranchMatches(ctx.Pull.BaseBranch) {
 		ctx.Log.Info("command was run on a pull request which doesn't match base branches")
 		// just ignore it to allow us to use any git workflows without malicious intentions.
