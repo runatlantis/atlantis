@@ -160,7 +160,7 @@ COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # renovate: datasource=repology depName=alpine_3_21/ca-certificates versioning=loose
-ENV CA_CERTIFICATES_VERSION="20241121-r1"
+ENV CA_CERTIFICATES_VERSION="20250619-r0"
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
