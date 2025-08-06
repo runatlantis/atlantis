@@ -182,6 +182,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	a.updateCommitStatus(ctx, pullStatus)
 
 	if a.autoMerger.automergeEnabled(projectCmds) && !cmd.AutoMergeDisabled {
+		// todo: get automergemethod from atlantis yaml?
 		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
 	}
 }
