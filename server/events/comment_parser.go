@@ -232,7 +232,6 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var clearPolicyApproval bool
 	var verbose bool
 	var autoMergeDisabled bool
-	// todo: get from flag, otherwise from atlantis.yaml (client), otherwise empty
 	var autoMergeMethod string
 	var flagSet *pflag.FlagSet
 	var name command.Name

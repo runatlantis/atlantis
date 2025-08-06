@@ -12,8 +12,9 @@ import (
 )
 
 type AutoMerger struct {
-	VCSClient       vcs.Client
-	GlobalAutomerge bool
+	VCSClient             vcs.Client
+	GlobalAutomerge       bool
+	GlobalAutomergeMethod string
 }
 
 func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool, mergeMethod string) {
@@ -56,6 +57,14 @@ func (c *AutoMerger) automergeEnabled(projectCmds []command.ProjectContext) bool
 		automerge = projectCmds[0].AutomergeEnabled
 	}
 	return automerge
+}
+
+// getAutomergeMethod returns the automerge method to use based on the context.
+func (c *AutoMerger) getAutomergeMethod(projectCmds []command.ProjectContext) string {
+	if len(projectCmds) > 0 && projectCmds[0].AutomergeMethod != "" {
+		return projectCmds[0].AutomergeMethod
+	}
+	return c.GlobalAutomergeMethod
 }
 
 // deleteSourceBranchOnMergeEnabled returns true if we should delete the source branch on merge in this context.
