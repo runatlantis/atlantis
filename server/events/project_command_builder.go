@@ -230,6 +230,8 @@ type DefaultProjectCommandBuilder struct {
 	EnableRegExpCmd bool
 	// User config option: Automatically merge pull requests after all plans have been successfully applied.
 	EnableAutoMerge bool
+	// User config option: Method of merging pull requests after all plans have been successfully applied (merge, rebase, squash).
+	AutomergeMethod string
 	// User config option: Whether to run plan operations in parallel.
 	EnableParallelPlan bool
 	// User config option: Whether to run apply operations in parallel.
@@ -521,10 +523,14 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	}
 
 	automerge := p.EnableAutoMerge
+	automergeMethod := p.AutomergeMethod
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
 	if hasRepoCfg {
+		if repoCfg.AutomergeMethod != "" {
+			automergeMethod = repoCfg.AutomergeMethod
+		}
 		if repoCfg.Automerge != nil {
 			automerge = *repoCfg.Automerge
 		}
@@ -552,6 +558,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 				verbose,
 				abortOnExecutionOrderFail,
 				p.TerraformExecutor,
+				automergeMethod,
 			)...)
 	}
 
@@ -866,6 +873,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
 	automerge := p.EnableAutoMerge
+	automergeMethod := p.AutomergeMethod
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
@@ -878,6 +886,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		}
 		if repoCfgPtr.ParallelPlan != nil {
 			parallelPlan = *repoCfgPtr.ParallelPlan
+		}
+		if repoCfgPtr.AutomergeMethod != "" {
+			automergeMethod = repoCfgPtr.AutomergeMethod
 		}
 		abortOnExecutionOrderFail = repoCfgPtr.AbortOnExecutionOrderFail
 	}
@@ -906,6 +917,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 					verbose,
 					abortOnExecutionOrderFail,
 					p.TerraformExecutor,
+					automergeMethod,
 				)...)
 		}
 	} else {
@@ -930,6 +942,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 				verbose,
 				abortOnExecutionOrderFail,
 				p.TerraformExecutor,
+				automergeMethod,
 			)...)
 	}
 
