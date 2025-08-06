@@ -10,6 +10,9 @@ import (
 // DefaultEmojiReaction is the default emoji reaction for repos
 const DefaultEmojiReaction = ""
 
+// DefaultAutomergeMethod is the default automerge method for repos
+const DefaultAutomergeMethod = "merge"
+
 // DefaultAbortOnExecutionOrderFail being false is the default setting for abort on execution group failures
 const DefaultAbortOnExecutionOrderFail = false
 
@@ -21,6 +24,7 @@ type RepoCfg struct {
 	PolicySets                PolicySets          `yaml:"policies,omitempty"`
 	AutoDiscover              *AutoDiscover       `yaml:"autodiscover,omitempty"`
 	Automerge                 *bool               `yaml:"automerge,omitempty"`
+	AutomergeMethod           *string             `yaml:"automerge_method,omitempty"`
 	ParallelApply             *bool               `yaml:"parallel_apply,omitempty"`
 	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
 	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
@@ -46,6 +50,7 @@ func (r RepoCfg) Validate() error {
 		validation.Field(&r.Version, validation.By(equals2)),
 		validation.Field(&r.Projects),
 		validation.Field(&r.Workflows),
+		validation.Field(&r.AutomergeMethod, validation.In("merge", "squash", "rebase")),
 	)
 }
 
@@ -61,6 +66,10 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 	}
 
 	automerge := r.Automerge
+	automergeMethod := DefaultAutomergeMethod
+	if r.AutomergeMethod != nil {
+		automergeMethod = *r.AutomergeMethod
+	}
 	parallelApply := r.ParallelApply
 	parallelPlan := r.ParallelPlan
 
@@ -89,6 +98,7 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		Workflows:                 validWorkflows,
 		AutoDiscover:              autoDiscover,
 		Automerge:                 automerge,
+		AutomergeMethod:           automergeMethod,
 		ParallelApply:             parallelApply,
 		ParallelPlan:              parallelPlan,
 		ParallelPolicyCheck:       parallelPlan,
