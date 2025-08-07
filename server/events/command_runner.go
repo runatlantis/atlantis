@@ -29,7 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
 	"github.com/runatlantis/atlantis/server/utils"
-	tally "github.com/uber-go/tally/v4"
+	"github.com/uber-go/tally/v4"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
@@ -208,11 +208,17 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		ctx.Log.Warn("unable to update plan commit status: %s", err)
 	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
-	if err != nil {
+	if preWorkflowHooksErr != nil {
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
+
+			// Create comment on pull request about the pre-workflow hook failure
+			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", preWorkflowHooksErr.Error())
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
+			}
 
 			// Update the plan or apply commit status to failed
 			switch cmd.Name {
@@ -372,11 +378,17 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		}
 	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
-	if err != nil {
+	if preWorkflowHooksErr != nil {
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
+
+			// Create comment on pull request about the pre-workflow hook failure
+			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", preWorkflowHooksErr.Error())
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
+			}
 
 			// Update the plan or apply commit status to failed
 			switch cmd.Name {
