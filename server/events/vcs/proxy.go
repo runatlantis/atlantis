@@ -77,8 +77,8 @@ func (d *ClientProxy) PullIsApproved(logger logging.SimpleLogging, repo models.R
 	return d.clients[repo.VCSHost.Type].PullIsApproved(logger, repo, pull)
 }
 
-func (d *ClientProxy) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
-	return d.clients[repo.VCSHost.Type].DiscardReviews(repo, pull)
+func (d *ClientProxy) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+	return d.clients[repo.VCSHost.Type].DiscardReviews(logger, repo, pull)
 }
 
 func (d *ClientProxy) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
@@ -97,8 +97,8 @@ func (d *ClientProxy) MarkdownPullLink(pull models.PullRequest) (string, error) 
 	return d.clients[pull.BaseRepo.VCSHost.Type].MarkdownPullLink(pull)
 }
 
-func (d *ClientProxy) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
-	return d.clients[repo.VCSHost.Type].GetTeamNamesForUser(repo, user)
+func (d *ClientProxy) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) {
+	return d.clients[repo.VCSHost.Type].GetTeamNamesForUser(logger, repo, user)
 }
 
 func (d *ClientProxy) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {

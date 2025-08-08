@@ -24,15 +24,18 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
 	tally "github.com/uber-go/tally/v4"
 	prometheus "github.com/uber-go/tally/v4/prometheus"
@@ -42,6 +45,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/redis"
+	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
@@ -123,16 +127,18 @@ type Server struct {
 	ProjectCmdOutputHandler        jobs.ProjectCommandOutputHandler
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
+	EnableProfilingAPI             bool
 }
 
 // Config holds config for server that isn't passed in by the user.
 type Config struct {
-	AllowForkPRsFlag        string
-	AtlantisURLFlag         string
-	AtlantisVersion         string
-	DefaultTFVersionFlag    string
-	RepoConfigJSONFlag      string
-	SilenceForkPRErrorsFlag string
+	AllowForkPRsFlag          string
+	AtlantisURLFlag           string
+	AtlantisVersion           string
+	DefaultTFDistributionFlag string
+	DefaultTFVersionFlag      string
+	RepoConfigJSONFlag        string
+	SilenceForkPRErrorsFlag   string
 }
 
 // WebhookConfig is nested within UserConfig. It's used to configure webhooks.
@@ -147,11 +153,14 @@ type WebhookConfig struct {
 	// that is being modified for this event. If the regex matches, we'll
 	// send the webhook, ex. "main.*".
 	BranchRegex string `mapstructure:"branch-regex"`
-	// Kind is the type of webhook we should send, ex. slack.
+	// Kind is the type of webhook we should send, ex. slack or http.
 	Kind string `mapstructure:"kind"`
 	// Channel is the channel to send this webhook to. It only applies to
 	// slack webhooks. Should be without '#'.
 	Channel string `mapstructure:"channel"`
+	// URL is the URL where to deliver this webhook. It only applies to
+	// http webhooks.
+	URL string `mapstructure:"url"`
 }
 
 //go:embed static
@@ -197,19 +206,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
-	validator := &cfg.ParserValidator{}
+	parserValidator := &cfg.ParserValidator{}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(
 		valid.GlobalCfgArgs{
 			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
 		})
 	if userConfig.RepoConfig != "" {
-		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
+		globalCfg, err = parserValidator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing %s file", userConfig.RepoConfig)
 		}
 	} else if userConfig.RepoConfigJSON != "" {
-		globalCfg, err = validator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
+		globalCfg, err = parserValidator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing --%s", config.RepoConfigJSONFlag)
 		}
@@ -269,7 +278,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
 		var err error
-		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, logger)
+
+		gitlabGroupAllowlistChecker, err := command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+		if err != nil {
+			return nil, err
+		}
+
+		gitlabGroups := slices.Concat(gitlabGroupAllowlistChecker.AllTeams(), globalCfg.PolicySets.AllTeams())
+		slices.Sort(gitlabGroups)
+		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
 		if err != nil {
 			return nil, err
 		}
@@ -377,10 +394,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			Event:          c.Event,
 			Kind:           c.Kind,
 			WorkspaceRegex: c.WorkspaceRegex,
+			URL:            c.URL,
 		}
 		webhooksConfig = append(webhooksConfig, config)
 	}
-	webhooksManager, err := webhooks.NewMultiWebhookSender(webhooksConfig, webhooks.NewSlackClient(userConfig.SlackToken))
+	webhookHeaders, err := userConfig.ToWebhookHttpHeaders()
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing webhook http headers")
+	}
+	webhooksManager, err := webhooks.NewMultiWebhookSender(
+		webhooksConfig,
+		webhooks.Clients{
+			Slack: webhooks.NewSlackClient(userConfig.SlackToken),
+			Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
+		},
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing webhooks")
 	}
@@ -401,8 +429,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
-		return nil, errors.Wrapf(err,
-			"parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
+		return nil, errors.Wrapf(err, "parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
 	}
 
 	underlyingRouter := mux.NewRouter()
@@ -427,12 +454,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		)
 	}
 
-	distribution := terraform.NewDistributionTerraform()
-	if userConfig.TFDistribution == "opentofu" {
-		distribution = terraform.NewDistributionOpenTofu()
-	}
+	distribution := terraform.NewDistribution(userConfig.DefaultTFDistribution)
 
-	terraformClient, err := terraform.NewClient(
+	terraformClient, err := tfclient.NewClient(
 		logger,
 		distribution,
 		binDir,
@@ -449,7 +473,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
 	if err != nil && flag.Lookup("test.v") == nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("initializing %s", userConfig.TFDistribution))
+		return nil, errors.Wrap(err, fmt.Sprintf("initializing %s", userConfig.DefaultTFDistribution))
 	}
 	markdownRenderer := events.NewMarkdownRenderer(
 		gitlabClient.SupportsCommonMark(),
@@ -461,6 +485,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.MarkdownTemplateOverridesDir,
 		userConfig.ExecutableName,
 		userConfig.HideUnchangedPlanComments,
+		userConfig.QuietPolicyChecks,
 	)
 
 	var lockingClient locking.Locker
@@ -586,10 +611,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ExecutableName,
 		allowCommands,
 	)
+	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	runStepRunner := &runtime.RunStepRunner{
 		TerraformExecutor:       terraformClient,
+		DefaultTFDistribution:   defaultTfDistribution,
 		DefaultTFVersion:        defaultTfVersion,
 		TerraformBinDir:         terraformClient.TerraformBinDir(),
 		ProjectCmdOutputHandler: projectCmdOutputHandler,
@@ -625,7 +652,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
 		policyChecksEnabled,
-		validator,
+		parserValidator,
 		&events.DefaultProjectFinder{},
 		vcsClient,
 		workingDir,
@@ -648,13 +675,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		terraformClient,
 	)
 
-	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfVersion)
+	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing show step runner")
 	}
 
 	policyCheckStepRunner, err := runtime.NewPolicyCheckStepRunner(
+		defaultTfDistribution,
 		defaultTfVersion,
 		policy.NewConfTestExecutorWorkflow(logger, binDir, &policy.ConfTestGoGetterVersionDownloader{}),
 	)
@@ -671,18 +699,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VcsClient:        vcsClient,
 		Locker:           projectLocker,
 		LockURLGenerator: router,
+		Logger:           logger,
 		InitStepRunner: &runtime.InitStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTfVersion,
+			TerraformExecutor:     terraformClient,
+			DefaultTFDistribution: defaultTfDistribution,
+			DefaultTFVersion:      defaultTfVersion,
 		},
-		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfVersion, commitStatusUpdater, terraformClient),
+		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, commitStatusUpdater, terraformClient),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckStepRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
-			TerraformExecutor:   terraformClient,
-			DefaultTFVersion:    defaultTfVersion,
-			CommitStatusUpdater: commitStatusUpdater,
-			AsyncTFExec:         terraformClient,
+			TerraformExecutor:     terraformClient,
+			DefaultTFDistribution: defaultTfDistribution,
+			DefaultTFVersion:      defaultTfVersion,
+			CommitStatusUpdater:   commitStatusUpdater,
+			AsyncTFExec:           terraformClient,
 		},
 		RunStepRunner: runStepRunner,
 		EnvStepRunner: &runtime.EnvStepRunner{
@@ -695,8 +726,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor: terraformClient,
 			DefaultTFVersion:  defaultTfVersion,
 		},
-		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfVersion),
-		StateRmStepRunner:         runtime.NewStateRmStepRunner(terraformClient, defaultTfVersion),
+		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
+		StateRmStepRunner:         runtime.NewStateRmStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
 		WorkingDir:                workingDir,
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,
@@ -834,6 +865,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			ExtraArgs:                   globalCfg.TeamAuthz.Args,
 			ExternalTeamAllowlistRunner: &runtime.DefaultExternalTeamAllowlistRunner{},
 		}
+	} else if userConfig.GitlabUser != "" {
+		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GitlabGroupAllowlist)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		teamAllowlistChecker, err = command.NewTeamAllowlistChecker(userConfig.GithubTeamAllowlist)
 		if err != nil {
@@ -908,6 +944,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
 	}
+
 	apiController := &controllers.APIController{
 		APISecret:                      []byte(userConfig.APISecret),
 		Locker:                         lockingClient,
@@ -922,6 +959,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		RepoAllowlistChecker:           repoAllowlist,
 		Scope:                          statsScope.SubScope("api"),
 		VCSClient:                      vcsClient,
+		WorkingDir:                     workingDir,
+		WorkingDirLocker:               workingDirLocker,
+		CommitStatusUpdater:            commitStatusUpdater,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -956,7 +996,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
-	return &Server{
+	server := &Server{
 		AtlantisVersion:                config.AtlantisVersion,
 		AtlantisURL:                    parsedURL,
 		Router:                         underlyingRouter,
@@ -989,7 +1029,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebUsername:                    userConfig.WebUsername,
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
-	}, nil
+		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
+	}
+
+	validate := validator.New(validator.WithRequiredStructEnabled())
+
+	err = validate.Struct(server)
+	if err != nil {
+		return nil, err
+	} else {
+		return server, nil
+	}
 }
 
 // Start creates the routes and starts serving traffic.
@@ -1003,6 +1053,7 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
+	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
@@ -1018,6 +1069,18 @@ func (s *Server) Start() error {
 	if !s.DisableGlobalApplyLock {
 		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
 		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
+	}
+
+	if s.EnableProfilingAPI {
+		for p, h := range map[string]http.HandlerFunc{
+			"/":        pprof.Index,
+			"/cmdline": pprof.Cmdline,
+			"/profile": pprof.Profile,
+			"/symbol":  pprof.Symbol,
+			"/trace":   pprof.Trace,
+		} {
+			s.Router.HandleFunc("/debug/pprof"+p, h).Methods("GET")
+		}
 	}
 
 	n := negroni.New(&negroni.Recovery{

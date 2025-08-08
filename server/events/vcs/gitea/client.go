@@ -337,7 +337,7 @@ func (c *GiteaClient) UpdateStatus(logger logging.SimpleLogging, repo models.Rep
 }
 
 // DiscardReviews discards / dismisses all pull request reviews
-func (c *GiteaClient) DiscardReviews(repo models.Repo, pull models.PullRequest) error {
+func (c *GiteaClient) DiscardReviews(_ logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
 	page := 0
 	nextPage := 1
 
@@ -413,7 +413,7 @@ func (c *GiteaClient) MarkdownPullLink(pull models.PullRequest) (string, error) 
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (c *GiteaClient) GetTeamNamesForUser(repo models.Repo, user models.User) ([]string, error) {
+func (c *GiteaClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) {
 	// TODO: implement
 	return nil, errors.New("GetTeamNamesForUser not (yet) implemented for Gitea client")
 }

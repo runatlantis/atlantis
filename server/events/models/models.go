@@ -669,13 +669,15 @@ type TeamAllowlistCheckerContext struct {
 	API bool
 }
 
-// WorkflowHookCommandContext defines the context for a pre and post worklfow_hooks that will
+// WorkflowHookCommandContext defines the context for a pre and post workflow_hooks that will
 // be executed before workflows.
 type WorkflowHookCommandContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
 	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
 	CommandName string
+	// Set true if there were any errors during the command execution
+	CommandHasErrors bool
 	// EscapedCommentArgs are the extra arguments that were added to the atlantis
 	// command, ex. atlantis plan -- -target=resource. We then escape them
 	// by adding a \ before each character so that they can be used within

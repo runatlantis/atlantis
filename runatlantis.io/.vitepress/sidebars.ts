@@ -44,7 +44,7 @@ const en = [
           { text: "Checkout Strategy", link: "/docs/checkout-strategy" },
           { text: "Terraform Versions", link: "/docs/terraform-versions" },
           { text: "Terraform Cloud", link: "/docs/terraform-cloud" },
-          { text: "Using Slack Hooks", link: "/docs/using-slack-hooks" },
+          { text: "Sending Notifications via Webhooks", link: "/docs/sending-notifications-via-webhooks" },
           { text: "Stats", link: "/docs/stats" },
           { text: "FAQ", link: "/docs/faq" },
         ]

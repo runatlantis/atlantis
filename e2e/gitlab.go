@@ -20,7 +20,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 type GitlabClient struct {
@@ -46,7 +46,7 @@ func NewGitlabClient() *GitlabClient {
 	}
 	ownerName := os.Getenv("GITLAB_REPO_OWNER_NAME")
 	if ownerName == "" {
-		ownerName = "run-atlantis"
+		ownerName = "runatlantis"
 	}
 	repoName := os.Getenv("GITLAB_REPO_NAME")
 	if repoName == "" {
@@ -166,7 +166,7 @@ func (g GitlabClient) DeleteBranch(ctx context.Context, branchName string) error
 }
 
 func (g GitlabClient) IsAtlantisInProgress(state string) bool {
-	// From https://docs.gitlab.com/ee/api/pipelines.html
+	// From https://docs.gitlab.com/api/pipelines/
 	// created, waiting_for_resource, preparing, pending, running, success, failed, canceled, skipped, manual, scheduled
 	for _, s := range []string{"success", "failed", "canceled", "skipped"} {
 		if state == s {

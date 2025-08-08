@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -1039,21 +1040,21 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash: false,
 			expMethod:   "rebase",
 		},
-		"all true: merge with merge: overrided by command": {
+		"all true: merge with merge: overridden by command": {
 			allowMerge:        true,
 			allowRebase:       true,
 			allowSquash:       true,
 			mergeMethodOption: "merge",
 			expMethod:         "merge",
 		},
-		"all true: merge with rebase: overrided by command": {
+		"all true: merge with rebase: overridden by command": {
 			allowMerge:        true,
 			allowRebase:       true,
 			allowSquash:       true,
 			mergeMethodOption: "rebase",
 			expMethod:         "rebase",
 		},
-		"all true: merge with squash: overrided by command": {
+		"all true: merge with squash: overridden by command": {
 			allowMerge:        true,
 			allowRebase:       true,
 			allowSquash:       true,
@@ -1397,16 +1398,19 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 	Ok(t, err)
 	defer disableSSLVerification()()
 
-	teams, err := client.GetTeamNamesForUser(models.Repo{
-		Owner: "testrepo",
-	}, models.User{
-		Username: "testuser",
-	})
+	teams, err := client.GetTeamNamesForUser(
+		logger,
+		models.Repo{
+			Owner: "testrepo",
+		}, models.User{
+			Username: "testuser",
+		})
 	Ok(t, err)
-	Equals(t, []string{"Frontend Developers", "frontend-developers", "Employees", "employees"}, teams)
+	Equals(t, []string{"frontend-developers", "employees"}, teams)
 }
 
 func TestGithubClient_DiscardReviews(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	type ResponseDef struct {
 		httpCode int
 		body     string
@@ -1594,7 +1598,7 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass", ""}, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
 			Ok(t, err)
 			defer disableSSLVerification()()
-			if err := client.DiscardReviews(tt.args.repo, tt.args.pull); (err != nil) != tt.wantErr {
+			if err := client.DiscardReviews(logger, tt.args.repo, tt.args.pull); (err != nil) != tt.wantErr {
 				t.Errorf("DiscardReviews() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			Equals(t, responseLength, responseIndex) // check if all defined requests have been used
@@ -1712,4 +1716,55 @@ func TestGithubClient_GetPullLabels_EmptyResponse(t *testing.T) {
 		})
 	Ok(t, err)
 	Equals(t, 0, len(labels))
+}
+
+func TestGithubClient_SecondaryRateLimitHandling_CreateComment(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	calls := 0
+	maxCalls := 2
+
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost || r.URL.Path != "/api/v3/repos/owner/repo/issues/1/comments" {
+				t.Errorf("Unexpected request: %s %s", r.Method, r.URL.Path)
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+
+			if calls < maxCalls {
+				// Secondary rate limiting, x-ratelimit-remaining must be > 0
+				w.Header().Set("x-ratelimit-remaining", "1")
+				w.Header().Set("x-ratelimit-reset", fmt.Sprintf("%d", time.Now().Unix()+1))
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"message": "You have exceeded a secondary rate limit"}`)) // nolint: errcheck
+			} else {
+				w.WriteHeader(http.StatusCreated)
+				w.Write([]byte(`{"id": 1, "body": "Test comment"}`)) // nolint: errcheck
+			}
+			calls++
+		}),
+	)
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{User: "user", Token: "pass"}, vcs.GithubConfig{}, 0, logger)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	// Simulate creating a comment
+	repo := models.Repo{
+		FullName: "owner/repo",
+		Owner:    "owner",
+		Name:     "repo",
+	}
+	pullNum := 1
+	comment := "Test comment"
+
+	err = client.CreateComment(logger, repo, pullNum, comment, "")
+	Ok(t, err)
+
+	// Verify that the number of calls is greater than maxCalls, indicating that retries occurred
+	Assert(t, calls > maxCalls, "Expected more than %d calls due to rate limiting, but got %d", maxCalls, calls)
+
 }

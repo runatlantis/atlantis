@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v66/github"
-	"github.com/mcdafydd/go-azuredevops/azuredevops"
+	"github.com/drmaxgit/go-azuredevops/azuredevops"
+	"github.com/google/go-github/v71/github"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -30,7 +30,7 @@ import (
 	. "github.com/runatlantis/atlantis/server/events/vcs/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
-	gitlab "github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 var parser = events.EventParser{
@@ -68,12 +68,12 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 	comment := github.IssueCommentEvent{
 		Repo: &Repo,
 		Issue: &github.Issue{
-			Number:  github.Int(1),
-			User:    &github.User{Login: github.String("issue_user")},
-			HTMLURL: github.String("https://github.com/runatlantis/atlantis/issues/1"),
+			Number:  github.Ptr(1),
+			User:    &github.User{Login: github.Ptr("issue_user")},
+			HTMLURL: github.Ptr("https://github.com/runatlantis/atlantis/issues/1"),
 		},
 		Comment: &github.IssueComment{
-			User: &github.User{Login: github.String("comment_user")},
+			User: &github.User{Login: github.Ptr("comment_user")},
 		},
 	}
 
@@ -170,8 +170,8 @@ func TestParseGithubPullEventFromDraft(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	// verify that close event treated as 'close' events by default
 	closeEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	closeEvent.Action = github.String("closed")
-	closeEvent.PullRequest.Draft = github.Bool(true)
+	closeEvent.Action = github.Ptr("closed")
+	closeEvent.PullRequest.Draft = github.Ptr(true)
 
 	_, evType, _, _, _, err := parser.ParseGithubPullEvent(logger, &closeEvent)
 	Ok(t, err)
@@ -179,7 +179,7 @@ func TestParseGithubPullEventFromDraft(t *testing.T) {
 
 	// verify that draft PRs are treated as 'other' events by default
 	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
-	testEvent.PullRequest.Draft = github.Bool(true)
+	testEvent.PullRequest.Draft = github.Ptr(true)
 	_, evType, _, _, _, err = parser.ParseGithubPullEvent(logger, &testEvent)
 	Ok(t, err)
 	Equals(t, models.OtherPullEvent, evType)
@@ -1331,6 +1331,36 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 	}, r)
 }
 
+func TestParseAzureDevopsRepo_LowercasesOwner(t *testing.T) {
+	parser := events.EventParser{
+		AzureDevopsUser:  "azuredevops-user",
+		AzureDevopsToken: "azuredevops-token",
+	}
+
+	tests := []struct {
+		url      string
+		expected string
+	}{
+		{"https://dev.azure.com/MyCompany/project/_git/repo", "mycompany"},
+		{"https://MYCOMPANY.visualstudio.com/project/_git/repo", "mycompany"},
+		{"https://AnotherOrg.visualstudio.com/project/_git/repo", "anotherorg"},
+	}
+
+	for _, tt := range tests {
+		repo := azuredevops.GitRepository{}
+		repo.WebURL = azuredevops.String(tt.url)
+		repo.ParentRepository = nil
+		repo.Project = &azuredevops.TeamProjectReference{Name: azuredevops.String("project")}
+		repo.Name = azuredevops.String("repo")
+
+		r, err := parser.ParseAzureDevopsRepo(&repo)
+		Ok(t, err)
+		// Only check the owner part
+		parts := strings.Split(r.FullName, "/")
+		owner := parts[0]
+		Equals(t, tt.expected, owner)
+	}
+}
 func TestParseAzureDevopsPullEvent(t *testing.T) {
 	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(ADPullEvent)
 	Ok(t, err)

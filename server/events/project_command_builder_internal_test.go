@@ -9,7 +9,7 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -631,7 +631,7 @@ projects:
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, false, nil)
+				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -648,7 +648,7 @@ projects:
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			terraformClient := mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := NewProjectCommandBuilder(
 				false,
@@ -846,7 +846,7 @@ projects:
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, false, nil)
+				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -865,7 +865,7 @@ projects:
 
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := NewProjectCommandBuilder(
 				false,
@@ -1091,7 +1091,7 @@ workflows:
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, false, nil)
+				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -1112,7 +1112,7 @@ workflows:
 			}
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := NewProjectCommandBuilder(
 				true,
@@ -1245,7 +1245,7 @@ projects:
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, false, nil)
+				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -1264,7 +1264,7 @@ projects:
 			}
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := NewProjectCommandBuilder(
 				false,
@@ -1385,7 +1385,7 @@ projects:
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, false, nil)
+				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(c.modifiedFiles, nil)
@@ -1406,7 +1406,7 @@ projects:
 			}
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := NewProjectCommandBuilder(
 				false,

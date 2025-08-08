@@ -144,6 +144,33 @@ func TestParse_HelpResponse(t *testing.T) {
 	}
 }
 
+func TestParse_TrimCommandString(t *testing.T) {
+	t.Log("commands should be trimmed of whitespace and backtick (helps with Gitlab copy/paste issues)")
+	allowCommandsCases := [][]command.Name{
+		command.AllCommentCommands,
+		{}, // empty case
+	}
+	helpComments := []string{
+		"`atlantis help`",
+		"`  atlantis help  `",
+		"`atlantis help`  ",
+		"  `atlantis help",
+	}
+	for _, allowCommandCase := range allowCommandsCases {
+		for _, c := range helpComments {
+			t.Run(fmt.Sprintf("%s with allow commands %v", c, allowCommandCase), func(t *testing.T) {
+				commentParser := events.CommentParser{
+					GithubUser:     "github-user",
+					ExecutableName: "atlantis",
+					AllowCommands:  allowCommandCase,
+				}
+				r := commentParser.Parse(c, models.Github)
+				Equals(t, commentParser.HelpComment(), r.CommentResponse)
+			})
+		}
+	}
+}
+
 func TestParse_UnusedArguments(t *testing.T) {
 	t.Log("if there are unused flags we return an error")
 	cases := []struct {

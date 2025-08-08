@@ -241,6 +241,20 @@ and set `--autoplan-modules` to `false`.
 
   Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
 
+::: warning COMPATIBILITY WARNING
+If you are affected by this change [docs](https://learn.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#administration)
+or this [issue](https://github.com/runatlantis/atlantis/issues/5595)
+both Service Hooks (v1 & v2) will convert the AD Organization name to lowercase:
+Examples:
+`https://dev.azure.com/MYCompany/` & `https://mycompany.visualstudio.com/` will be converted to `mycompany`
+`https://dev.azure.com/MYCOMPANY/` & `https://myCOMPANY.visualstudio.com/` will be converted to `mycompany`
+
+This [change](https://github.com/runatlantis/atlantis/pull/5596) will be applied from version v0.35.0
+
+What to do if you have pending plans that were generated with a previous version?
+Running an atlantis unlock from v0.35.0 on your current PRs will ignore the files on the `MYCompany` folder. On the next atlantis plan will use the `mycompany` folder and generate everything in the new folder name
+:::
+
 ### `--azuredevops-token`
 
   ```bash
@@ -330,8 +344,7 @@ and set `--autoplan-modules` to `false`.
   ATLANTIS_BITBUCKET_WEBHOOK_SECRET="secret"
   ```
 
-  Secret used to validate Bitbucket webhooks. Only Bitbucket Server supports webhook secrets.
-  For Bitbucket.org, see [Security](security.md#bitbucket-cloud-bitbucket-org) for mitigations.
+  Secret used to validate Bitbucket webhooks.
 
   ::: warning SECURITY WARNING
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from Bitbucket.
@@ -386,6 +399,16 @@ and set `--autoplan-modules` to `false`.
   Note that the atlantis user is restricted to `~/.atlantis`.
   If you set the `--data-dir` flag to a path outside of Atlantis its home directory, ensure that you grant the atlantis user the correct permissions.
 
+### `--default-tf-distribution`
+
+  ```bash
+  atlantis server --default-tf-distribution="terraform"
+  # or
+  ATLANTIS_DEFAULT_TF_DISTRIBUTION="terraform"
+  ```
+
+  Which TF distribution to use. Can be set to `terraform` or `opentofu`.
+
 ### `--default-tf-version`
 
   ```bash
@@ -430,6 +453,16 @@ and set `--autoplan-modules` to `false`.
 
   If `disable-autoplan` property is `true`, this flag has no effect.
 
+### `--disable-global-apply-lock`
+
+  ```bash
+  atlantis server --disable-global-apply-lock
+  # or
+  ATLANTIS_DISABLE_GLOBAL_APPLY_LOCK=true
+  ```
+
+  If true, removes button in the UI that allows users to globally disable apply commands.
+
 ### `--disable-markdown-folding`
 
   ```bash
@@ -460,16 +493,36 @@ and set `--autoplan-modules` to `false`.
 
   Stops atlantis from unlocking a pull request with this label. Defaults to "" (feature disabled).
 
+### `--discard-approval-on-plan`
+
+  ```bash
+  atlantis server --discard-approval-on-plan
+  # or
+  ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
+  ```
+
+  If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.  
+  Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
+
 ### `--emoji-reaction`
 
   ```bash
-  atlantis server --emoji-reaction thumbsup
+  atlantis server --emoji-reaction eyes
   # or
-  ATLANTIS_EMOJI_REACTION=thumbsup
+  ATLANTIS_EMOJI_REACTION=eyes
   ```
 
   The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
   Defaults to "" (empty string).
+
+  ::: warning NOTE
+  Each VCS provider supports a different list of emojis:
+  
+* [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
+* [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
+* [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
+
+  :::
 
 ### `--enable-diff-markdown-format`
 
@@ -493,6 +546,16 @@ and set `--autoplan-modules` to `false`.
 
   Enables atlantis to run server side policies on the result of a terraform plan. Policies are defined in [server side repo config](server-side-repo-config.md#reference).
 
+### `--enable-profiling-api`
+
+  ```bash
+  atlantis server --enable-profiling-api
+  # or
+  ATLANTIS_ENABLE_PROFILING_API=true
+  ```
+
+  Enable [`net/http/pprof`](https://pkg.go.dev/net/http/pprof) endpoints for [continuous profiling](https://grafana.com/docs/pyroscope/latest/introduction/continuous-profiling/) of resources used by the server. See [profiling Go programs](https://go.dev/blog/pprof) for more information.
+
 ### `--enable-regexp-cmd`
 
   ```bash
@@ -509,7 +572,7 @@ and set `--autoplan-modules` to `false`.
 
   This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
-  This will bypass `--restrict-file-list` if regex is used, normal commands will stil be blocked if necessary.
+  This will bypass `--restrict-file-list` if regex is used, normal commands will still be blocked if necessary.
 
   ::: warning SECURITY WARNING
   It's not supposed to be used with `--disable-apply-all`.
@@ -537,66 +600,6 @@ and set `--autoplan-modules` to `false`.
   ```
 
   Fail and do not run the requested Atlantis command if any of the pre workflow hooks error.
-
-### `--gitea-base-url`
-
-  ```bash
-  atlantis server --gitea-base-url="http://your-gitea.corp:7990/basepath"
-  # or
-  ATLANTIS_GITEA_BASE_URL="http://your-gitea.corp:7990/basepath"
-  ```
-
-  Base URL of Gitea installation. Must include `http://` or `https://`. Defaults to `https://gitea.com` if left empty/absent.
-
-### `--gitea-token`
-
-  ```bash
-  atlantis server --gitea-token="token"
-  # or (recommended)
-  ATLANTIS_GITEA_TOKEN="token"
-  ```
-
-  Gitea app password of API user.
-
-### `--gitea-user`
-
-  ```bash
-  atlantis server --gitea-user="myuser"
-  # or
-  ATLANTIS_GITEA_USER="myuser"
-  ```
-
-  Gitea username of API user.
-
-### `--gitea-webhook-secret`
-
-  ```bash
-  atlantis server --gitea-webhook-secret="secret"
-  # or (recommended)
-  ATLANTIS_GITEA_WEBHOOK_SECRET="secret"
-  ```
-
-  Secret used to validate Gitea webhooks.
-
-  ::: warning SECURITY WARNING
-  If not specified, Atlantis won't be able to validate that the incoming webhook call came from Gitea.
-  This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
-  :::
-
-### `--gitea-page-size`
-
-  ```bash
-  atlantis server --gitea-page-size=30
-  # or (recommended)
-  ATLANTIS_GITEA_PAGE_SIZE=30
-  ```
-
-  Number of items on a single page in Gitea paged responses.
-
-  ::: warning Configuration dependent
-  The default value conforms to the Gitea server's standard config setting: DEFAULT_PAGING_NUM
- The highest valid value depends on the Gitea server's config setting: MAX_RESPONSE_ITEMS
-  :::
 
 ### `--gh-allow-mergeable-bypass-apply`
 
@@ -633,6 +636,21 @@ and set `--autoplan-modules` to `false`.
 
   After which Atlantis will display your new app's credentials: your app's ID, its generated `--gh-webhook-secret` and the contents of the file for `--gh-app-key-file`. Update your Atlantis config accordingly, and restart the server.
   :::
+
+### `--gh-app-installation-id`
+
+  ```bash
+  atlantis server --gh-app-installation-id="123"
+  # or
+  ATLANTIS_GH_APP_INSTALLATION_ID="123"
+  ```
+
+The installation ID of a specific instance of a GitHub application. Normally this value is
+derived by querying GitHub for the list of installations of the ID supplied via `--gh-app-id` and selecting
+the first one found and where multiple installations results in an error. Use this flag if you have multiple
+instances of Atlantis but you want to use a single already-installed GitHub app for all of them. You would normally do this if
+you are running a proxy as your single GitHub application that will proxy to an appropriate Atlantis instance
+based on the organization or user that triggered the webhook.
 
 ### `--gh-app-key`
 
@@ -679,21 +697,6 @@ and set `--autoplan-modules` to `false`.
   Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
   don't set. Defaults to `github.com`.
 
-### `--gh-app-installation-id`
-
-  ```bash
-  atlantis server --gh-app-installation-id="123"
-  # or
-  ATLANTIS_GH_APP_INSTALLATION_ID="123"
-  ```
-
-The installation ID of a specific instance of a GitHub application. Normally this value is
-derived by querying GitHub for the list of installations of the ID supplied via `--gh-app-id` and selecting
-the first one found and where multiple installations results in an error. Use this flag if you have multiple
-instances of Atlantis but you want to use a single already-installed GitHub app for all of them. You would normally do this if
-you are running a proxy as your single GitHub application that will proxy to an appropriate Atlantis instance
-based on the organization or user that triggered the webhook.
-
 ### `--gh-org`
 
   ```bash
@@ -707,23 +710,20 @@ based on the organization or user that triggered the webhook.
 ### `--gh-team-allowlist`
 
   ```bash
-  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
+  atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, devops-team:apply, devops-team:import"
   # or
-  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, DevOps Team:apply, DevOps Team:import"
+  ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, devops-team:apply, devops-team:import"
   ```
 
-  In versions v0.21.0 and later, the GitHub team name can be a name or a slug.
+  In versions v0.35.0 and later, the GitHub team name can only be a slug because it is immutable.
+
+  In versions between v0.21.0 and v0.34.0, the GitHub team name can be a name or a slug.
 
   In versions v0.20.1 and below, the Github team name required the case sensitive team name.
 
   Comma-separated list of GitHub teams and permission pairs.
 
   By default, any team can plan and apply.
-
-  ::: warning NOTE
-  You should use the Team name as the variable, not the slug, even if it has spaces or special characters.
-  i.e., "Engineering Team:plan, Infrastructure Team:apply"
-  :::
 
 ### `--gh-token`
 
@@ -753,7 +753,7 @@ based on the organization or user that triggered the webhook.
   ATLANTIS_GH_USER="myuser"
   ```
 
-   GitHub username of API user.
+   GitHub username of API user. This user is also used by the flag `--hide-user-plan-comments` and will need to be updated if migrating to github EMU.
 
 ### `--gh-webhook-secret`
 
@@ -769,6 +769,81 @@ based on the organization or user that triggered the webhook.
   If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitHub.
   This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
   :::
+
+### `--gitea-base-url`
+
+  ```bash
+  atlantis server --gitea-base-url="http://your-gitea.corp:7990/basepath"
+  # or
+  ATLANTIS_GITEA_BASE_URL="http://your-gitea.corp:7990/basepath"
+  ```
+
+  Base URL of Gitea installation. Must include `http://` or `https://`. Defaults to `https://gitea.com` if left empty/absent.
+
+### `--gitea-page-size`
+
+  ```bash
+  atlantis server --gitea-page-size=30
+  # or (recommended)
+  ATLANTIS_GITEA_PAGE_SIZE=30
+  ```
+
+  Number of items on a single page in Gitea paged responses.
+
+  ::: warning Configuration dependent
+  The default value conforms to the Gitea server's standard config setting: DEFAULT_PAGING_NUM
+ The highest valid value depends on the Gitea server's config setting: MAX_RESPONSE_ITEMS
+  :::
+
+### `--gitea-token`
+
+  ```bash
+  atlantis server --gitea-token="token"
+  # or (recommended)
+  ATLANTIS_GITEA_TOKEN="token"
+  ```
+
+  Gitea app password of API user.
+
+### `--gitea-user`
+
+  ```bash
+  atlantis server --gitea-user="myuser"
+  # or
+  ATLANTIS_GITEA_USER="myuser"
+  ```
+
+  Gitea username of API user.
+
+### `--gitea-webhook-secret`
+
+  ```bash
+  atlantis server --gitea-webhook-secret="secret"
+  # or (recommended)
+  ATLANTIS_GITEA_WEBHOOK_SECRET="secret"
+  ```
+
+  Secret used to validate Gitea webhooks.
+
+  ::: warning SECURITY WARNING
+  If not specified, Atlantis won't be able to validate that the incoming webhook call came from Gitea.
+  This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
+  :::
+
+### `--gitlab-group-allowlist`
+
+  ```bash
+  atlantis server --gitlab-group-allowlist="myorg/mygroup:plan, myorg/secteam:apply, myorg/devops:apply, myorg/devops:import"
+  # or
+  ATLANTIS_GITLAB_GROUP_ALLOWLIST="myorg/mygroup:plan, myorg/secteam:apply, myorg/devops:apply, myorg/devops:import"
+  ```
+
+  Comma-separated list of GitLab groups and permission pairs.
+
+  By default, any group can plan and apply.
+
+  ::: warning NOTE
+  Atlantis needs to be able to view the listed group members, inaccessible or non-existent groups are silently ignored.
 
 ### `--gitlab-hostname`
 
@@ -833,8 +908,14 @@ based on the organization or user that triggered the webhook.
   ```
 
   Hide previous plan comments to declutter PRs. This is only supported in
-  GitHub and GitLab currently. This is not enabled by default. When using Github App, you need to set `--gh-app-slug` to enable this feature.
+  GitHub and GitLab and Bitbucket currently and is not enabled by default.
+  
+  For Bitbucket, the comments are deleted rather than hidden as Bitbucket does not support hiding comments.
+  
+  For GitHub, ensure the `--gh-user` is set appropriately or comments will not be hidden.
 
+  When using the GitHub App, you need to set `--gh-app-slug` to enable this feature.
+  
 ### `--hide-unchanged-plan-comments`
 
   ```bash
@@ -846,18 +927,6 @@ based on the organization or user that triggered the webhook.
 Remove no-changes plan comments from the pull request.
 
 This is useful when you have many projects and want to keep the pull request clean from useless comments.
-
-### `--include-git-untracked-files`
-
-  ```bash
-  atlantis server --include-git-untracked-files
-  # or
-  ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
-  ```
-
-  Include git untracked files in the Atlantis modified file list.
-  Used for example with CDKTF pre-workflow hooks that dynamically generate
-  Terraform files.
 
 ### `--ignore-vcs-status-names`
 
@@ -872,6 +941,18 @@ This is useful when you have many projects and want to keep the pull request cle
    (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
    from other Atlantis services when checking if the PR is mergeable.
    Currently only implemented for GitHub.
+
+### `--include-git-untracked-files`
+
+  ```bash
+  atlantis server --include-git-untracked-files
+  # or
+  ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
+  ```
+
+  Include git untracked files in the Atlantis modified file list.
+  Used for example with CDKTF pre-workflow hooks that dynamically generate
+  Terraform files.
 
 ### `--locking-db-type`
 
@@ -1140,7 +1221,7 @@ This is useful when you have many projects and want to keep the pull request cle
 
   `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
   This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
-  like `atlantis plan -p .*` will still work if used. normal commands will stil be blocked if necessary.
+  like `atlantis plan -p .*` will still work if used. normal commands will still be blocked if necessary.
   Defaults to `false`.
 
 ### `--silence-allowlist-errors`
@@ -1223,7 +1304,7 @@ This is useful when you have many projects and want to keep the pull request cle
   ATLANTIS_SLACK_TOKEN='token'
   ```
 
-  API token for Slack notifications. See [Using Slack hooks](using-slack-hooks.md).
+  API token for Slack notifications. See [Using Slack hooks](sending-notifications-via-webhooks.md#using-slack-hooks).
 
 ### `--ssl-cert-file`
 
@@ -1259,13 +1340,8 @@ This is useful when you have many projects and want to keep the pull request cle
 
 ### `--tf-distribution`
 
-  ```bash
-  atlantis server --tf-distribution="terraform"
-  # or
-  ATLANTIS_TF_DISTRIBUTION="terraform"
-  ```
-
-  Which TF distribution to use. Can be set to `terraform` or `opentofu`.
+  <Badge text="Deprecated" type="warn"/>
+  Deprecated for `--default-tf-distribution`.
 
 ### `--tf-download`
 
@@ -1342,7 +1418,7 @@ This flag is useful when having multiple projects that need to run a plan and ap
 * [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
 * [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
 
-The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient managment of the PRs.
+The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
 
 ### `--var-file-allowlist`
 
@@ -1398,6 +1474,18 @@ The effect of the race condition is more evident when using parallel configurati
   ```
 
   Username used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
+
+### `--webhook-http-headers`
+
+  ```bash
+  atlantis server --webhook-http-headers='{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}'
+  # or
+  ATLANTIS_WEBHOOK_HTTP_HEADERS='{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}'
+  ```
+
+  Additional headers added to each HTTP POST payload when using [http webhooks](sending-notifications-via-webhooks.md#using-http-webhooks)
+  provided as a JSON string. The map key is the header name and the value is the header value
+  (string) or values (array of string).
 
 ### `--websocket-check-origin`
 

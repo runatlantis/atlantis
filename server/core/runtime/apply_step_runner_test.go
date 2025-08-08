@@ -14,7 +14,9 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
+	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -59,17 +61,20 @@ func TestRun_Success(t *testing.T) {
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	o := runtime.ApplyStepRunner{
-		TerraformExecutor: terraform,
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
 	}
 
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -91,22 +96,24 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	o := runtime.ApplyStepRunner{
-		TerraformExecutor: terraform,
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
 	}
-
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), nil, "default")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "default")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
 
-func TestRun_UsesConfiguredTFVersion(t *testing.T) {
+func TestApplyStepRunner_TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	tmpDir := t.TempDir()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")
 	err := os.WriteFile(planPath, nil, 0600)
@@ -123,17 +130,55 @@ func TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	}
 
 	RegisterMockTestingT(t)
-	terraform := mocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	o := runtime.ApplyStepRunner{
-		TerraformExecutor: terraform,
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
 	}
-
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[*version.Version](), Any[string]())).
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, tfVersion, "workspace")
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}
+
+func TestApplyStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
+	tmpDir := t.TempDir()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	err := os.WriteFile(planPath, nil, 0600)
+	Ok(t, err)
+
+	logger := logging.NewNoopLogger(t)
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	tfVersion, _ := version.NewVersion("0.11.0")
+	projTFDistribution := "opentofu"
+	ctx := command.ProjectContext{
+		Workspace:             "workspace",
+		RepoRelDir:            ".",
+		EscapedCommentArgs:    []string{"comment", "args"},
+		TerraformDistribution: &projTFDistribution,
+		Log:                   logger,
+	}
+
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
+	}
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), NotEq[tf.Distribution](tfDistribution), Any[*version.Version](), Any[string]())).
+		ThenReturn("output", nil)
+	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	Ok(t, err)
+	Equals(t, "output", output)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq(tmpDir), Eq([]string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}), Eq(map[string]string(nil)), NotEq[tf.Distribution](tfDistribution), Eq(tfVersion), Eq("workspace"))
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -197,7 +242,7 @@ func TestRun_UsingTarget(t *testing.T) {
 			planPath := filepath.Join(tmpDir, "workspace.tfplan")
 			err := os.WriteFile(planPath, nil, 0600)
 			Ok(t, err)
-			terraform := mocks.NewMockClient()
+			terraform := tfclientmocks.NewMockClient()
 			step := runtime.ApplyStepRunner{
 				TerraformExecutor: terraform,
 			}
@@ -361,7 +406,7 @@ type remoteApplyMock struct {
 }
 
 // RunCommandAsync fakes out running terraform async.
-func (r *remoteApplyMock) RunCommandAsync(_ command.ProjectContext, _ string, args []string, _ map[string]string, _ *version.Version, _ string) (chan<- string, <-chan runtimemodels.Line) {
+func (r *remoteApplyMock) RunCommandAsync(_ command.ProjectContext, _ string, args []string, _ map[string]string, _ tf.Distribution, _ *version.Version, _ string) (chan<- string, <-chan runtimemodels.Line) {
 	r.CalledArgs = args
 
 	in := make(chan string)

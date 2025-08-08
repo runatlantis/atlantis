@@ -57,6 +57,7 @@ type MarkdownRenderer struct {
 	markdownTemplates         *template.Template
 	executableName            string
 	hideUnchangedPlanComments bool
+	quietPolicyChecks         bool
 }
 
 // commonData is data that all responses have.
@@ -72,6 +73,7 @@ type commonData struct {
 	EnableDiffMarkdownFormat  bool
 	ExecutableName            string
 	HideUnchangedPlanComments bool
+	QuietPolicyChecks         bool
 	VcsRequestType            string
 }
 
@@ -131,11 +133,12 @@ type policyCheckResultsData struct {
 }
 
 type projectResultTmplData struct {
-	Workspace   string
-	RepoRelDir  string
-	ProjectName string
-	Rendered    string
-	NoChanges   bool
+	Workspace    string
+	RepoRelDir   string
+	ProjectName  string
+	Rendered     string
+	NoChanges    bool
+	IsSuccessful bool
 }
 
 // Initialize templates
@@ -149,6 +152,7 @@ func NewMarkdownRenderer(
 	markdownTemplateOverridesDir string,
 	executableName string,
 	hideUnchangedPlanComments bool,
+	quietPolicyChecks bool,
 ) *MarkdownRenderer {
 	var templates *template.Template
 	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
@@ -166,6 +170,7 @@ func NewMarkdownRenderer(
 		markdownTemplates:         templates,
 		executableName:            executableName,
 		hideUnchangedPlanComments: hideUnchangedPlanComments,
+		quietPolicyChecks:         quietPolicyChecks,
 	}
 }
 
@@ -192,6 +197,7 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 		EnableDiffMarkdownFormat:  m.enableDiffMarkdownFormat,
 		ExecutableName:            m.executableName,
 		HideUnchangedPlanComments: m.hideUnchangedPlanComments,
+		QuietPolicyChecks:         m.quietPolicyChecks,
 		VcsRequestType:            vcsRequestType,
 	}
 
@@ -224,9 +230,10 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 
 	for _, result := range results {
 		resultData := projectResultTmplData{
-			Workspace:   result.Workspace,
-			RepoRelDir:  result.RepoRelDir,
-			ProjectName: result.ProjectName,
+			Workspace:    result.Workspace,
+			RepoRelDir:   result.RepoRelDir,
+			ProjectName:  result.ProjectName,
+			IsSuccessful: result.IsSuccessful(),
 		}
 		if result.PlanSuccess != nil {
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
@@ -316,7 +323,7 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
 			}
 			// Error out if no template was found, only if there are no errors or failures.
-			// This is because some errors and failures rely on additional context rendered by templtes, but not all errors or failures.
+			// This is because some errors and failures rely on additional context rendered by templates, but not all errors or failures.
 		} else if !(result.Error != nil || result.Failure != "") {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
