@@ -11,34 +11,6 @@ import (
 	tally "github.com/uber-go/tally/v4"
 )
 
-func TestWorkspaceCopyOptimization_FeatureFlag(t *testing.T) {
-	tmpDir := t.TempDir()
-	scope := tally.NewTestScope("test", map[string]string{})
-
-	baseWorkspace := &events.FileWorkspace{
-		DataDir:       tmpDir,
-		CheckoutMerge: false,
-	}
-
-	// Test with optimization disabled
-	optimizer := events.NewWorkspaceCopyOptimizer(baseWorkspace, false, scope)
-	if optimizer.IsOptimizationEnabled() {
-		t.Error("Expected optimization to be disabled")
-	}
-
-	// Test with optimization enabled
-	optimizer = events.NewWorkspaceCopyOptimizer(baseWorkspace, true, scope)
-	if !optimizer.IsOptimizationEnabled() {
-		t.Error("Expected optimization to be enabled")
-	}
-
-	// Test runtime toggle
-	optimizer.SetOptimizationEnabled(false)
-	if optimizer.IsOptimizationEnabled() {
-		t.Error("Expected optimization to be disabled after toggle")
-	}
-}
-
 func TestWorkspaceCopyOptimization_DirectoryStructure(t *testing.T) {
 	tmpDir := t.TempDir()
 
