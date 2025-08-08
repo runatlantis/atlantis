@@ -1,14 +1,12 @@
 package events
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -248,7 +246,7 @@ func (w *WorkspaceCopyOptimizer) copyDirectory(src, dst string) error {
 	return nil
 }
 
-// copyFile copies a single file preserving permissions and using optimal methods
+// copyFile copies a single file preserving permissions
 func (w *WorkspaceCopyOptimizer) copyFile(src, dst string) error {
 	// Open source file
 	srcFile, err := os.Open(src)
@@ -270,77 +268,11 @@ func (w *WorkspaceCopyOptimizer) copyFile(src, dst string) error {
 	}
 	defer dstFile.Close()
 
-	// Try to use efficient copy methods
-	if err := w.efficientCopy(dstFile, srcFile); err != nil {
-		// Fall back to standard copy on error
-		if _, copyErr := io.Copy(dstFile, srcFile); copyErr != nil {
-			return copyErr
-		}
-	}
-
-	return nil
+	// Copy
+	_, err = io.Copy(dstFile, srcFile)
+	return err
 }
 
-// efficientCopy attempts to use OS-specific efficient copy methods
-func (w *WorkspaceCopyOptimizer) efficientCopy(dst, src *os.File) error {
-	// Try copy_file_range on Linux (Go 1.15+)
-	if srcInfo, err := src.Stat(); err == nil {
-		if size := srcInfo.Size(); size > 0 {
-			// Attempt system-specific optimized copy
-			return w.systemCopy(dst, src, size)
-		}
-	}
-	return errors.New("efficient copy not available")
-}
-
-// systemCopy uses system-specific optimized copy mechanisms
-func (w *WorkspaceCopyOptimizer) systemCopy(dst, src *os.File, size int64) error {
-	// On Linux, try copy_file_range
-	if w.tryCopyFileRange(dst, src, size) {
-		return nil
-	}
-
-	// Fall back to sendfile on Unix systems
-	if w.trySendFile(dst, src, size) {
-		return nil
-	}
-
-	return errors.New("no system copy available")
-}
-
-// tryCopyFileRange attempts Linux copy_file_range syscall
-func (w *WorkspaceCopyOptimizer) tryCopyFileRange(dst, src *os.File, size int64) bool {
-	// copy_file_range is available on Linux kernel 4.5+
-	// This is a simplified implementation - production code would handle
-	// partial copies and error conditions more thoroughly
-	var copied int64
-	for copied < size {
-		n, err := syscall.Syscall6(
-			syscall.SYS_COPY_FILE_RANGE,
-			src.Fd(),
-			uintptr(copied),
-			dst.Fd(),
-			uintptr(copied),
-			uintptr(size-copied),
-			0,
-		)
-		if err != 0 {
-			return false
-		}
-		if n == 0 {
-			break
-		}
-		copied += int64(n)
-	}
-	return copied == size
-}
-
-// trySendFile attempts sendfile syscall (available on most Unix systems)
-func (w *WorkspaceCopyOptimizer) trySendFile(dst, src *os.File, size int64) bool {
-	// sendfile implementation would go here
-	// This is platform-specific and requires syscall handling
-	return false
-}
 
 // Delete extends the base implementation to clean up base clone
 func (w *WorkspaceCopyOptimizer) Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error {
