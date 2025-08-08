@@ -165,6 +165,7 @@ var testFlags = map[string]interface{}{
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,
 	EnableProfilingAPI:               false,
+	EnableWorkspaceCopyOptimization:  false,
 }
 
 func TestExecute_Defaults(t *testing.T) {
