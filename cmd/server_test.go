@@ -165,6 +165,10 @@ var testFlags = map[string]interface{}{
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,
 	EnableProfilingAPI:               false,
+	EnablePlanQueueFlag:              false,
+	EnableLockRetryFlag:              false,
+	LockRetryMaxAttemptsFlag:         3,
+	LockRetryDelayFlag:               5,
 }
 
 func TestExecute_Defaults(t *testing.T) {

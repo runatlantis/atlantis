@@ -117,6 +117,10 @@ const (
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
+	EnablePlanQueueFlag              = "enable-plan-queue"
+	EnableLockRetryFlag              = "enable-lock-retry"
+	LockRetryMaxAttemptsFlag         = "lock-retry-max-attempts"
+	LockRetryDelayFlag               = "lock-retry-delay"
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
@@ -640,6 +644,14 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable the use of the Terraform plugin cache",
 		defaultValue: true,
 	},
+	EnablePlanQueueFlag: {
+		description:  "Enable plan queue feature",
+		defaultValue: false,
+	},
+	EnableLockRetryFlag: {
+		description:  "Enable lock retry feature",
+		defaultValue: false,
+	},
 }
 var intFlags = map[string]intFlag{
 	CheckoutDepthFlag: {
@@ -659,6 +671,14 @@ var intFlags = map[string]intFlag{
 	ParallelPoolSize: {
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
 		defaultValue: DefaultParallelPoolSize,
+	},
+	LockRetryMaxAttemptsFlag: {
+		description:  "Maximum number of attempts to retry acquiring a lock when enabled.",
+		defaultValue: 3,
+	},
+	LockRetryDelayFlag: {
+		description:  "Delay in seconds between lock retry attempts.",
+		defaultValue: 5,
 	},
 	PortFlag: {
 		description:  "Port to bind to.",
@@ -977,6 +997,18 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.AutoDiscoverModeFlag == "" {
 		c.AutoDiscoverModeFlag = DefaultAutoDiscoverMode
+	}
+	if !v.IsSet("enable-plan-queue") {
+		c.EnablePlanQueue = false
+	}
+	if !v.IsSet("enable-lock-retry") {
+		c.EnableLockRetry = false
+	}
+	if !v.IsSet("lock-retry-max-attempts") {
+		c.LockRetryMaxAttempts = 3
+	}
+	if !v.IsSet("lock-retry-delay") {
+		c.LockRetryDelay = 5
 	}
 }
 
