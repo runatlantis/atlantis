@@ -1,6 +1,8 @@
 package events
 
 import (
+	"strings"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/utils"
@@ -10,6 +12,11 @@ type PullUpdater struct {
 	HidePrevPlanComments bool
 	VCSClient            vcs.Client
 	MarkdownRenderer     *MarkdownRenderer
+}
+
+// IsLockFailure checks if the failure message is related to a lock being held by another pull request.
+func IsLockFailure(failure string) bool {
+	return strings.Contains(failure, "This project is currently locked")
 }
 
 func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res command.Result) {
@@ -34,6 +41,12 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 		var commentOnProjects []command.ProjectResult
 		for _, result := range res.ProjectResults {
 			if utils.SlicesContains(result.SilencePRComments, cmd.CommandName().String()) {
+				// If it's a lock failure, allow it to pass through even when silenced
+				if result.Failure != "" && IsLockFailure(result.Failure) {
+					ctx.Log.Debug("allowing lock failure comment for silenced command '%s' on project '%s'", cmd.CommandName().String(), result.ProjectName)
+					commentOnProjects = append(commentOnProjects, result)
+					continue
+				}
 				ctx.Log.Debug("silenced command '%s' comment for project '%s'", cmd.CommandName().String(), result.ProjectName)
 				continue
 			}
