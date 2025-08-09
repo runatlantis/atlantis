@@ -61,7 +61,7 @@
       <span>Project</span>
       <span>Workspace</span>
       <span>Locked By</span>
-      <span>Date/Time</span>
+      <span>Lock Age</span>
       <span>Status</span>
     </div>
     {{ range .Locks }}
@@ -79,7 +79,7 @@
           <span class="lock-username">{{.LockedBy}}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
-          <span class="lock-datetime">{{.TimeFormatted}}</span>
+          <span class="lock-datetime" title="{{.TimeFormatted }}">{{ .LockAge }}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
           <span><code>Locked</code></span>
@@ -102,7 +102,7 @@
       <span>Repository</span>
       <span>Project</span>
       <span>Workspace</span>
-      <span>Date/Time</span>
+      <span>Job Age</span>
       <span>Step</span>
       <span>Description</span>
     </div>
@@ -113,7 +113,7 @@
       <span class="pulls-element">{{ if .Pull.Workspace }}<code>{{ .Pull.Workspace }}</code>{{ end }}</span>
       <span class="pulls-element">
       {{ range .JobIDInfos }}
-        <div><span class="lock-datetime">{{ .TimeFormatted }}</span></div>
+        <div><span class="lock-datetime" title="{{ .TimeFormatted }}">{{ .JobAge }}</span></div>
       {{ end }}
       </span>
       <span class="pulls-element">
