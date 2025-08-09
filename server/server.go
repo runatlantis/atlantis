@@ -705,7 +705,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			DefaultTFDistribution: defaultTfDistribution,
 			DefaultTFVersion:      defaultTfVersion,
 		},
-		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, commitStatusUpdater, terraformClient),
+		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, commitStatusUpdater, terraformClient, userConfig.StripRefreshOutputFromErrors),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckStepRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{

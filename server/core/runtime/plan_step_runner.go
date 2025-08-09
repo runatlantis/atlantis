@@ -27,20 +27,22 @@ var (
 )
 
 type planStepRunner struct {
-	TerraformExecutor     TerraformExec
-	DefaultTFDistribution terraform.Distribution
-	DefaultTFVersion      *version.Version
-	CommitStatusUpdater   StatusUpdater
-	AsyncTFExec           AsyncTFExec
+	TerraformExecutor            TerraformExec
+	DefaultTFDistribution        terraform.Distribution
+	DefaultTFVersion             *version.Version
+	CommitStatusUpdater          StatusUpdater
+	AsyncTFExec                  AsyncTFExec
+	StripRefreshOutputFromErrors bool
 }
 
-func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec) Runner {
+func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec, stripRefreshOutputFromErrors bool) Runner {
 	runner := &planStepRunner{
-		TerraformExecutor:     terraformExecutor,
-		DefaultTFDistribution: defaultTfDistribution,
-		DefaultTFVersion:      defaultTfVersion,
-		CommitStatusUpdater:   commitStatusUpdater,
-		AsyncTFExec:           asyncTFExec,
+		TerraformExecutor:            terraformExecutor,
+		DefaultTFDistribution:        defaultTfDistribution,
+		DefaultTFVersion:             defaultTfVersion,
+		CommitStatusUpdater:          commitStatusUpdater,
+		AsyncTFExec:                  asyncTFExec,
+		StripRefreshOutputFromErrors: stripRefreshOutputFromErrors,
 	}
 	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfDistribution, defaultTfVersion, runner)
 }
@@ -63,7 +65,11 @@ func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 		return p.remotePlan(ctx, extraArgs, path, tfDistribution, tfVersion, planFile, envs)
 	}
 	if err != nil {
-		return output, err
+		if p.StripRefreshOutputFromErrors {
+			return StripRefreshingFromPlanOutput(output, tfVersion), err
+		} else {
+			return output, err
+		}
 	}
 	return p.fmtPlanOutput(output, tfVersion), nil
 }
@@ -87,8 +93,14 @@ func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 	}
 	args := p.flatten(argList)
 	output, err := p.runRemotePlan(ctx, args, path, tfDistribution, tfVersion, envs)
+
+	planOutput := StripRefreshingFromPlanOutput(output, tfVersion)
+	errOutput := output
+	if p.StripRefreshOutputFromErrors {
+		errOutput = planOutput
+	}
 	if err != nil {
-		return output, err
+		return errOutput, err
 	}
 
 	// If using remote ops, we create our own "fake" planfile with the
@@ -99,13 +111,12 @@ func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 	// plan. To ensure that what gets applied is the plan we printed to the PR,
 	// during the apply phase, we diff the output we stored in the fake
 	// planfile with the pending apply output.
-	planOutput := StripRefreshingFromPlanOutput(output, tfVersion)
 
 	// We also prepend our own remote ops header to the file so during apply we
 	// know this is a remote apply.
 	err = os.WriteFile(planFile, []byte(remoteOpsHeader+planOutput), 0600)
 	if err != nil {
-		return output, errors.Wrap(err, "unable to create planfile for remote ops")
+		return errOutput, errors.Wrap(err, "unable to create planfile for remote ops")
 	}
 
 	return p.fmtPlanOutput(output, tfVersion), nil
@@ -258,7 +269,6 @@ func StripRefreshingFromPlanOutput(output string, tfVersion *version.Version) st
 				finalIndex = i
 			}
 		}
-
 		if finalIndex != 0 {
 			output = strings.Join(lines[finalIndex+1:], "\n")
 		}
