@@ -309,3 +309,86 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		assert.Empty(t, dfPrjCmdOutputHandler.GetReceiverBufferForPull(ctx.PullInfo()))
 	})
 }
+
+func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
+	t.Log("CleanUpPull should call LogStreamResourceCleaner.CleanUp with complete PullInfo including RepoFullName and Path")
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+
+	// Create mocks
+	workingDir := mocks.NewMockWorkingDir()
+	locker := lockmocks.NewMockLocker()
+	client := vcsmocks.NewMockClient()
+	resourceCleaner := mocks.NewMockResourceCleaner()
+
+	// Create temporary database
+	tmp := t.TempDir()
+	db, err := db.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
+	Ok(t, err)
+
+	// Create test data with multiple projects to verify all fields are populated correctly
+	testProjects := []command.ProjectResult{
+		{
+			RepoRelDir:  "path/to/project1",
+			Workspace:   "default",
+			ProjectName: "project1",
+		},
+		{
+			RepoRelDir:  "path/to/project2",
+			Workspace:   "staging",
+			ProjectName: "project2",
+		},
+	}
+
+	// Add pull status to database
+	_, err = db.UpdatePullWithResults(testdata.Pull, testProjects)
+	Ok(t, err)
+
+	// Create executor
+	pce := events.PullClosedExecutor{
+		Locker:                   locker,
+		VCSClient:                client,
+		WorkingDir:               workingDir,
+		Backend:                  db,
+		PullClosedTemplate:       &events.PullClosedEventTemplate{},
+		LogStreamResourceCleaner: resourceCleaner,
+	}
+
+	// Setup mock expectations
+	When(locker.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
+
+	// Execute CleanUpPull
+	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+	Ok(t, err)
+
+	// Verify ResourceCleaner.CleanUp was called twice (once for each project)
+	resourceCleaner.VerifyWasCalled(Times(2)).CleanUp(Any[jobs.PullInfo]())
+
+	// Get the captured arguments to verify they contain all required fields
+	capturedArgs := resourceCleaner.VerifyWasCalled(Times(2)).CleanUp(Any[jobs.PullInfo]()).GetAllCapturedArguments()
+
+	// Verify first project's PullInfo
+	expectedPullInfo1 := jobs.PullInfo{
+		PullNum:      testdata.Pull.Num,
+		Repo:         testdata.Pull.BaseRepo.Name,
+		RepoFullName: testdata.Pull.BaseRepo.FullName,
+		ProjectName:  "project1",
+		Path:         "path/to/project1",
+		Workspace:    "default",
+	}
+	Equals(t, expectedPullInfo1, capturedArgs[0])
+
+	// Verify second project's PullInfo
+	expectedPullInfo2 := jobs.PullInfo{
+		PullNum:      testdata.Pull.Num,
+		Repo:         testdata.Pull.BaseRepo.Name,
+		RepoFullName: testdata.Pull.BaseRepo.FullName,
+		ProjectName:  "project2",
+		Path:         "path/to/project2",
+		Workspace:    "staging",
+	}
+	Equals(t, expectedPullInfo2, capturedArgs[1])
+}
