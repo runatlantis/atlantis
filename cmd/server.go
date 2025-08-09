@@ -87,6 +87,7 @@ const (
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableProfilingAPI               = "enable-profiling-api"
+	EnableWorkspaceCopyOptimization  = "enable-workspace-copy-optimization"
 	ExecutableName                   = "executable-name"
 	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
@@ -536,6 +537,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnableDiffMarkdownFormat: {
 		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
+		defaultValue: false,
+	},
+	EnableWorkspaceCopyOptimization: {
+		description:  "Enable workspace copy optimization to improve clone performance by copying from a base clone instead of cloning each workspace separately.",
 		defaultValue: false,
 	},
 	FailOnPreWorkflowHookError: {
