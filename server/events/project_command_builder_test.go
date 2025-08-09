@@ -1695,10 +1695,11 @@ projects:
 // Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 	cases := []struct {
-		AtlantisYAML             string
-		ExpectedCtxs             int
-		ExpectedClones           InvocationCountMatcher
-		ModifiedFiles            []string
+		AtlantisYAML   		 string
+		IsFork         		 bool
+		ExpectedCtxs   		 int
+		ExpectedClones 		 InvocationCountMatcher
+		ModifiedFiles  		 []string
 		IncludeGitUntrackedFiles bool
 	}{
 		{
@@ -1720,6 +1721,16 @@ projects:
 			ExpectedClones:           Once(),
 			ModifiedFiles:            []string{"dir2/main.tf"},
 			IncludeGitUntrackedFiles: true,
+		},
+		{
+			AtlantisYAML: `
+version: 3
+projects:
+- dir: dir1`,
+			IsFork:         true,
+			ExpectedCtxs:   0,
+			ExpectedClones: Never(),
+			ModifiedFiles:  []string{"dir2/main.tf"},
 		},
 		{
 			AtlantisYAML: `
@@ -1754,7 +1765,7 @@ projects:
 			Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 		When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(true)
 		When(vcsClient.GetFileContent(
-			Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
+			Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
 		workingDir := mocks.NewMockWorkingDir()
 
 		logger := logging.NewNoopLogger(t)
@@ -1792,20 +1803,32 @@ projects:
 
 		var actCtxs []command.ProjectContext
 		var err error
+
+		baseRepo := models.Repo{Owner: "owner"}
+		headRepo := baseRepo
+		if c.IsFork {
+			headRepo.Owner = "repoForker"
+		}
+
 		actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
-			HeadRepo: models.Repo{},
-			Pull:     models.PullRequest{},
-			User:     models.User{},
-			Log:      logger,
-			Scope:    scope,
+			HeadRepo: headRepo,
+			Pull: models.PullRequest{
+				BaseRepo: baseRepo,
+			},
+			User:  models.User{},
+			Log:   logger,
+			Scope: scope,
 			PullRequestStatus: models.PullReqStatus{
 				Mergeable: true,
 			},
 		})
+
 		Ok(t, err)
 		Equals(t, c.ExpectedCtxs, len(actCtxs))
 		workingDir.VerifyWasCalled(c.ExpectedClones).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
 			Any[models.PullRequest](), Any[string]())
+		_, actRepo, _, _ := vcsClient.VerifyWasCalled(Once()).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]()).GetCapturedArguments()
+		Equals(t, headRepo, actRepo)
 	}
 }
 
