@@ -77,6 +77,7 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
+	DisableDidYouMeanPromptFlag      = "disable-did-you-mean-prompt"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
@@ -512,6 +513,9 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 
+	DisableDidYouMeanPromptFlag: {
+		description: "Disable the 'Did you mean atlantis?' comment when users type 'terraform' instead of 'atlantis'",
+	},
 	DisableRepoLockingFlag: {
 		description: "Disable atlantis locking repos",
 	},
