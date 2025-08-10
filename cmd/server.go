@@ -49,117 +49,119 @@ const (
 // 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
 const (
 	// Flag names.
-	ADWebhookPasswordFlag            = "azuredevops-webhook-password" // nolint: gosec
-	ADWebhookUserFlag                = "azuredevops-webhook-user"
-	ADTokenFlag                      = "azuredevops-token" // nolint: gosec
-	ADUserFlag                       = "azuredevops-user"
-	ADHostnameFlag                   = "azuredevops-hostname"
-	AllowCommandsFlag                = "allow-commands"
-	AllowForkPRsFlag                 = "allow-fork-prs"
-	AtlantisURLFlag                  = "atlantis-url"
-	AutoDiscoverModeFlag             = "autodiscover-mode"
-	AutomergeFlag                    = "automerge"
-	ParallelPlanFlag                 = "parallel-plan"
-	ParallelApplyFlag                = "parallel-apply"
-	AutoplanModules                  = "autoplan-modules"
-	AutoplanModulesFromProjects      = "autoplan-modules-from-projects"
-	AutoplanFileListFlag             = "autoplan-file-list"
-	BitbucketBaseURLFlag             = "bitbucket-base-url"
-	BitbucketTokenFlag               = "bitbucket-token"
-	BitbucketUserFlag                = "bitbucket-user"
-	BitbucketWebhookSecretFlag       = "bitbucket-webhook-secret"
-	CheckoutDepthFlag                = "checkout-depth"
-	CheckoutStrategyFlag             = "checkout-strategy"
-	ConfigFlag                       = "config"
-	DataDirFlag                      = "data-dir"
-	DefaultTFDistributionFlag        = "default-tf-distribution"
-	DefaultTFVersionFlag             = "default-tf-version"
-	DisableApplyAllFlag              = "disable-apply-all"
-	DisableAutoplanFlag              = "disable-autoplan"
-	DisableAutoplanLabelFlag         = "disable-autoplan-label"
-	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
-	DisableRepoLockingFlag           = "disable-repo-locking"
-	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
-	DisableUnlockLabelFlag           = "disable-unlock-label"
-	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
-	EmojiReaction                    = "emoji-reaction"
-	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
-	EnablePolicyChecksFlag           = "enable-policy-checks"
-	EnableRegExpCmdFlag              = "enable-regexp-cmd"
-	EnableProfilingAPI               = "enable-profiling-api"
-	ExecutableName                   = "executable-name"
-	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
-	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
-	GHHostnameFlag                   = "gh-hostname"
-	GHTeamAllowlistFlag              = "gh-team-allowlist"
-	GHTokenFlag                      = "gh-token"
-	GHTokenFileFlag                  = "gh-token-file" // nolint: gosec
-	GHUserFlag                       = "gh-user"
-	GHAppIDFlag                      = "gh-app-id"
-	GHAppKeyFlag                     = "gh-app-key"
-	GHAppKeyFileFlag                 = "gh-app-key-file"
-	GHAppSlugFlag                    = "gh-app-slug"
-	GHAppInstallationIDFlag          = "gh-app-installation-id"
-	GHOrganizationFlag               = "gh-org"
-	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
-	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
-	GiteaBaseURLFlag                 = "gitea-base-url"
-	GiteaTokenFlag                   = "gitea-token"
-	GiteaUserFlag                    = "gitea-user"
-	GiteaWebhookSecretFlag           = "gitea-webhook-secret" // nolint: gosec
-	GiteaPageSizeFlag                = "gitea-page-size"
-	GitlabGroupAllowlistFlag         = "gitlab-group-allowlist"
-	GitlabHostnameFlag               = "gitlab-hostname"
-	GitlabTokenFlag                  = "gitlab-token"
-	GitlabUserFlag                   = "gitlab-user"
-	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
-	IncludeGitUntrackedFiles         = "include-git-untracked-files"
-	APISecretFlag                    = "api-secret"
-	HidePrevPlanComments             = "hide-prev-plan-comments"
-	QuietPolicyChecks                = "quiet-policy-checks"
-	LockingDBType                    = "locking-db-type"
-	LogLevelFlag                     = "log-level"
-	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
-	MaxCommentsPerCommand            = "max-comments-per-command"
-	ParallelPoolSize                 = "parallel-pool-size"
-	StatsNamespace                   = "stats-namespace"
-	AllowDraftPRs                    = "allow-draft-prs"
-	PortFlag                         = "port"
-	RedisDB                          = "redis-db"
-	RedisHost                        = "redis-host"
-	RedisPassword                    = "redis-password"
-	RedisPort                        = "redis-port"
-	RedisTLSEnabled                  = "redis-tls-enabled"
-	RedisInsecureSkipVerify          = "redis-insecure-skip-verify"
-	RepoConfigFlag                   = "repo-config"
-	RepoConfigJSONFlag               = "repo-config-json"
-	RepoAllowlistFlag                = "repo-allowlist"
-	SilenceNoProjectsFlag            = "silence-no-projects"
-	SilenceForkPRErrorsFlag          = "silence-fork-pr-errors"
-	SilenceVCSStatusNoPlans          = "silence-vcs-status-no-plans"
-	SilenceVCSStatusNoProjectsFlag   = "silence-vcs-status-no-projects"
-	SilenceAllowlistErrorsFlag       = "silence-allowlist-errors"
-	SkipCloneNoChanges               = "skip-clone-no-changes"
-	SlackTokenFlag                   = "slack-token"
-	SSLCertFileFlag                  = "ssl-cert-file"
-	SSLKeyFileFlag                   = "ssl-key-file"
-	RestrictFileList                 = "restrict-file-list"
-	TFDistributionFlag               = "tf-distribution" // deprecated for DefaultTFDistributionFlag
-	TFDownloadFlag                   = "tf-download"
-	TFDownloadURLFlag                = "tf-download-url"
-	UseTFPluginCache                 = "use-tf-plugin-cache"
-	VarFileAllowlistFlag             = "var-file-allowlist"
-	VCSStatusName                    = "vcs-status-name"
-	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
-	TFEHostnameFlag                  = "tfe-hostname"
-	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
-	TFETokenFlag                     = "tfe-token"
-	WriteGitCredsFlag                = "write-git-creds" // nolint: gosec
-	WebhookHttpHeaders               = "webhook-http-headers"
-	WebBasicAuthFlag                 = "web-basic-auth"
-	WebUsernameFlag                  = "web-username"
-	WebPasswordFlag                  = "web-password"
-	WebsocketCheckOrigin             = "websocket-check-origin"
+	ADWebhookPasswordFlag                 = "azuredevops-webhook-password" // nolint: gosec
+	ADWebhookUserFlag                     = "azuredevops-webhook-user"
+	ADTokenFlag                           = "azuredevops-token" // nolint: gosec
+	ADUserFlag                            = "azuredevops-user"
+	ADHostnameFlag                        = "azuredevops-hostname"
+	AllowCommandsFlag                     = "allow-commands"
+	AllowForkPRsFlag                      = "allow-fork-prs"
+	AtlantisURLFlag                       = "atlantis-url"
+	AutoDiscoverModeFlag                  = "autodiscover-mode"
+	AutomergeFlag                         = "automerge"
+	ParallelPlanFlag                      = "parallel-plan"
+	ParallelApplyFlag                     = "parallel-apply"
+	AutoplanModules                       = "autoplan-modules"
+	AutoplanModulesFromProjects           = "autoplan-modules-from-projects"
+	AutoplanFileListFlag                  = "autoplan-file-list"
+	BitbucketBaseURLFlag                  = "bitbucket-base-url"
+	BitbucketTokenFlag                    = "bitbucket-token"
+	BitbucketUserFlag                     = "bitbucket-user"
+	BitbucketWebhookSecretFlag            = "bitbucket-webhook-secret"
+	CheckoutDepthFlag                     = "checkout-depth"
+	CheckoutStrategyFlag                  = "checkout-strategy"
+	ConfigFlag                            = "config"
+	DataDirFlag                           = "data-dir"
+	DefaultTFDistributionFlag             = "default-tf-distribution"
+	DefaultTFVersionFlag                  = "default-tf-version"
+	DisableApplyAllFlag                   = "disable-apply-all"
+	DisableAutoplanFlag                   = "disable-autoplan"
+	DisableAutoplanLabelFlag              = "disable-autoplan-label"
+	DisableMarkdownFoldingFlag            = "disable-markdown-folding"
+	DisableRepoLockingFlag                = "disable-repo-locking"
+	DisableGlobalApplyLockFlag            = "disable-global-apply-lock"
+	DisableUnlockLabelFlag                = "disable-unlock-label"
+	DiscardApprovalOnPlanFlag             = "discard-approval-on-plan"
+	EmojiReaction                         = "emoji-reaction"
+	EnableDiffMarkdownFormat              = "enable-diff-markdown-format"
+	EnablePolicyChecksFlag                = "enable-policy-checks"
+	EnableRegExpCmdFlag                   = "enable-regexp-cmd"
+	EnableProfilingAPI                    = "enable-profiling-api"
+	ExecutableName                        = "executable-name"
+	FailOnPreWorkflowHookError            = "fail-on-pre-workflow-hook-error"
+	HideUnchangedPlanComments             = "hide-unchanged-plan-comments"
+	GHHostnameFlag                        = "gh-hostname"
+	GHTeamAllowlistFlag                   = "gh-team-allowlist"
+	GHTokenFlag                           = "gh-token"
+	GHTokenFileFlag                       = "gh-token-file" // nolint: gosec
+	GHUserFlag                            = "gh-user"
+	GHAppIDFlag                           = "gh-app-id"
+	GHAppKeyFlag                          = "gh-app-key"
+	GHAppKeyFileFlag                      = "gh-app-key-file"
+	GHAppSlugFlag                         = "gh-app-slug"
+	GHAppInstallationIDFlag               = "gh-app-installation-id"
+	GHOrganizationFlag                    = "gh-org"
+	GHWebhookSecretFlag                   = "gh-webhook-secret"               // nolint: gosec
+	GHAllowMergeableBypassApply           = "gh-allow-mergeable-bypass-apply" // nolint: gosec
+	GiteaBaseURLFlag                      = "gitea-base-url"
+	GiteaTokenFlag                        = "gitea-token"
+	GiteaUserFlag                         = "gitea-user"
+	GiteaWebhookSecretFlag                = "gitea-webhook-secret" // nolint: gosec
+	GiteaPageSizeFlag                     = "gitea-page-size"
+	GitlabGroupAllowlistFlag              = "gitlab-group-allowlist"
+	GitlabHostnameFlag                    = "gitlab-hostname"
+	GitlabTokenFlag                       = "gitlab-token"
+	GitlabUserFlag                        = "gitlab-user"
+	GitlabWebhookSecretFlag               = "gitlab-webhook-secret" // nolint: gosec
+	IncludeGitUntrackedFiles              = "include-git-untracked-files"
+	APISecretFlag                         = "api-secret"
+	HidePrevPlanComments                  = "hide-prev-plan-comments"
+	QuietPolicyChecks                     = "quiet-policy-checks"
+	LockingDBType                         = "locking-db-type"
+	LogLevelFlag                          = "log-level"
+	MarkdownTemplateOverridesDirFlag      = "markdown-template-overrides-dir"
+	MaxCommentsPerCommand                 = "max-comments-per-command"
+	ParallelPoolSize                      = "parallel-pool-size"
+	StatsNamespace                        = "stats-namespace"
+	AllowDraftPRs                         = "allow-draft-prs"
+	PortFlag                              = "port"
+	RedisDB                               = "redis-db"
+	RedisHost                             = "redis-host"
+	RedisPassword                         = "redis-password"
+	RedisPort                             = "redis-port"
+	RedisTLSEnabled                       = "redis-tls-enabled"
+	RedisInsecureSkipVerify               = "redis-insecure-skip-verify"
+	RepoConfigFlag                        = "repo-config"
+	RepoConfigJSONFlag                    = "repo-config-json"
+	RepoAllowlistFlag                     = "repo-allowlist"
+	SilenceNoProjectsFlag                 = "silence-no-projects"
+	SilenceForkPRErrorsFlag               = "silence-fork-pr-errors"
+	SilenceVCSStatusNoPlans               = "silence-vcs-status-no-plans"
+	SilenceVCSStatusNoProjectsFlag        = "silence-vcs-status-no-projects"
+	SilenceAllowlistErrorsFlag            = "silence-allowlist-errors"
+	SkipCloneNoChanges                    = "skip-clone-no-changes"
+	SlackTokenFlag                        = "slack-token"
+	SSLCertFileFlag                       = "ssl-cert-file"
+	SSLKeyFileFlag                        = "ssl-key-file"
+	RestrictFileList                      = "restrict-file-list"
+	TFDistributionFlag                    = "tf-distribution" // deprecated for DefaultTFDistributionFlag
+	TFDownloadFlag                        = "tf-download"
+	TFDownloadURLFlag                     = "tf-download-url"
+	UseTFPluginCache                      = "use-tf-plugin-cache"
+	VarFileAllowlistFlag                  = "var-file-allowlist"
+	VCSPullReqStatusFetcherBackoffFlag    = "vcs-pull-req-status-fetcher-backoff"
+	VCSPullReqStatusFetcherRetryTimesFlag = "vcs-pull-req-status-fetcher-retry-times"
+	VCSStatusName                         = "vcs-status-name"
+	IgnoreVCSStatusNames                  = "ignore-vcs-status-names"
+	TFEHostnameFlag                       = "tfe-hostname"
+	TFELocalExecutionModeFlag             = "tfe-local-execution-mode"
+	TFETokenFlag                          = "tfe-token"
+	WriteGitCredsFlag                     = "write-git-creds" // nolint: gosec
+	WebhookHttpHeaders                    = "webhook-http-headers"
+	WebBasicAuthFlag                      = "web-basic-auth"
+	WebUsernameFlag                       = "web-username"
+	WebPasswordFlag                       = "web-password"
+	WebsocketCheckOrigin                  = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser                  = ""
@@ -641,6 +643,7 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: true,
 	},
 }
+
 var intFlags = map[string]intFlag{
 	CheckoutDepthFlag: {
 		description: fmt.Sprintf("Used only if --%s=%s.", CheckoutStrategyFlag, CheckoutStrategyMerge) +
@@ -672,6 +675,10 @@ var intFlags = map[string]intFlag{
 		description:  "The Redis Port for when using a Locking DB type of 'redis'.",
 		defaultValue: DefaultRedisPort,
 	},
+	VCSPullReqStatusFetcherRetryTimesFlag: {
+		description:  "Number of retries for vcs pull request status request",
+		defaultValue: 0,
+	},
 }
 
 var int64Flags = map[string]int64Flag{
@@ -684,6 +691,10 @@ var int64Flags = map[string]int64Flag{
 			"using this specific GitHub Application Installation ID, otherwise it attempts to auto-detect it. " +
 			"Note that this value must be set if you want to have one App and multiple installations of that same " +
 			"application.",
+		defaultValue: 0,
+	},
+	VCSPullReqStatusFetcherBackoffFlag: {
+		description:  "Backoff in milliseconds for vcs pull request status request",
 		defaultValue: 0,
 	},
 }
@@ -877,7 +888,6 @@ func (s *ServerCmd) run() error {
 		RepoConfigJSONFlag:        RepoConfigJSONFlag,
 		SilenceForkPRErrorsFlag:   SilenceForkPRErrorsFlag,
 	})
-
 	if err != nil {
 		return errors.Wrap(err, "initializing server")
 	}
