@@ -79,17 +79,18 @@ type CommentBuilder interface {
 
 // CommentParser implements CommentParsing
 type CommentParser struct {
-	GithubUser      string
-	GitlabUser      string
-	GiteaUser       string
-	BitbucketUser   string
-	AzureDevopsUser string
-	ExecutableName  string
-	AllowCommands   []command.Name
+	GithubUser              string
+	GitlabUser              string
+	GiteaUser               string
+	BitbucketUser           string
+	AzureDevopsUser         string
+	ExecutableName          string
+	AllowCommands           []command.Name
+	DisableDidYouMeanPrompt bool
 }
 
 // NewCommentParser returns a CommentParser
-func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name) *CommentParser {
+func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name, disableDidYouMeanPrompt bool) *CommentParser {
 	var commentAllowCommands []command.Name
 	for _, acceptableCommand := range command.AllCommentCommands {
 		for _, allowCommand := range allowCommands {
@@ -101,13 +102,14 @@ func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDev
 	}
 
 	return &CommentParser{
-		GithubUser:      githubUser,
-		GitlabUser:      gitlabUser,
-		GiteaUser:       giteaUser,
-		BitbucketUser:   bitbucketUser,
-		AzureDevopsUser: azureDevopsUser,
-		ExecutableName:  executableName,
-		AllowCommands:   commentAllowCommands,
+		GithubUser:              githubUser,
+		GitlabUser:              gitlabUser,
+		GiteaUser:               giteaUser,
+		BitbucketUser:           bitbucketUser,
+		AzureDevopsUser:         azureDevopsUser,
+		ExecutableName:          executableName,
+		AllowCommands:           commentAllowCommands,
+		DisableDidYouMeanPrompt: disableDidYouMeanPrompt,
 	}
 }
 
@@ -163,11 +165,17 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 
 	// Helpfully warn the user if they're using "terraform" instead of "atlantis"
 	if executableName == "terraform" && e.ExecutableName != "terraform" {
+		if e.DisableDidYouMeanPrompt {
+			return CommentParseResult{Ignore: true}
+		}
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, "terraform")}
 	}
 
 	// Helpfully warn the user that the command might be misspelled
 	if utils.IsSimilarWord(executableName, e.ExecutableName) {
+		if e.DisableDidYouMeanPrompt {
+			return CommentParseResult{Ignore: true}
+		}
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, args[0])}
 	}
 
