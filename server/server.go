@@ -108,6 +108,7 @@ type Server struct {
 	VCSEventsController            *events_controllers.VCSEventsController
 	GithubAppController            *controllers.GithubAppController
 	LocksController                *controllers.LocksController
+	QueueController                *controllers.QueueController
 	StatusController               *controllers.StatusController
 	JobsController                 *controllers.JobsController
 	APIController                  *controllers.APIController
@@ -912,6 +913,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Create the plan queue manager
+	planQueueManager := events.NewDefaultPlanQueueManager(backend, lockingClient, vcsClient, logger)
+
 	locksController := &controllers.LocksController{
 		AtlantisVersion:    config.AtlantisVersion,
 		AtlantisURL:        parsedURL,
@@ -924,6 +929,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:   workingDirLocker,
 		Backend:            backend,
 		DeleteLockCommand:  deleteLockCommand,
+	}
+
+	queueController := &controllers.QueueController{
+		AtlantisVersion: config.AtlantisVersion,
+		AtlantisURL:     parsedURL,
+		Logger:          logger,
+		QueueManager:    planQueueManager,
+		QueueTemplate:   web_templates.QueueTemplate,
 	}
 
 	wsMux := websocket.NewMultiplexor(
@@ -1013,8 +1026,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSEventsController:            eventsController,
 		GithubAppController:            githubAppController,
 		LocksController:                locksController,
-		JobsController:                 jobsController,
+		QueueController:                queueController,
 		StatusController:               statusController,
+		JobsController:                 jobsController,
 		APIController:                  apiController,
 		IndexTemplate:                  web_templates.IndexTemplate,
 		LockDetailTemplate:             web_templates.LockTemplate,
@@ -1061,6 +1075,12 @@ func (s *Server) Start() error {
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
 	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
 	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
+
+	// Queue routes
+	s.Router.HandleFunc("/queues", s.QueueController.GetQueues).Methods("GET")
+	s.Router.HandleFunc("/api/queues", s.QueueController.GetAllQueues).Methods("GET")
+	s.Router.HandleFunc("/api/queues/{repo}/{project}/{workspace}", s.QueueController.GetQueueStatus).Methods("GET")
+	s.Router.HandleFunc("/api/queues/{repo}/{project}/{workspace}/{pull_num}", s.QueueController.RemoveFromQueue).Methods("DELETE")
 
 	r, ok := s.StatsReporter.(prometheus.Reporter)
 	if ok {

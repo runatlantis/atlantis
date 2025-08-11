@@ -31,6 +31,10 @@
     <p class="title-heading">atlantis</p>
     <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
   </section>
+  <section class="nav-links" style="text-align: center; margin-bottom: 20px;">
+    <a href="{{ .CleanedBasePath }}/queues" class="button button-primary">View Plan Queues</a>
+    <a href="{{ .CleanedBasePath }}/api/queues" target="_blank" class="button">Queue API</a>
+  </section>
   <section>
     {{ if .ApplyLock.GlobalApplyLockEnabled }}
     {{ if .ApplyLock.Locked }}
