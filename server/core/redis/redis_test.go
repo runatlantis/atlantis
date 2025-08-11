@@ -1,4 +1,4 @@
-package redis_test
+package redis
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"net"
 	"os"
@@ -16,10 +17,11 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/core/redis"
+	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -43,40 +45,65 @@ var (
 	caPath string
 )
 
-func TestRedisWithTLS(t *testing.T) {
-	t.Log("connecting to redis over TLS")
+func TestNew(t *testing.T) {
+	t.Run("single-node", func(t *testing.T) {
+		// Start Server and Connect
+		s := miniredis.NewMiniRedis()
+		if err := s.Start(); err != nil {
+			t.Fatalf("could not start miniredis: %s", err)
+			// not reached
+		}
+		t.Cleanup(s.Close)
+		r := newTestRedis(s)
+		assert.IsType(t, &redis.Client{}, r.client)
+	})
+	t.Run("with tls", func(t *testing.T) {
+		t.Log("connecting to redis over TLS")
 
-	// Setup the Miniredis Server for TLS
-	certBytes, keyBytes, err := generateLocalhostCert()
-	Ok(t, err)
-	certOut := new(bytes.Buffer)
-	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
-	Ok(t, err)
-	certData := certOut.Bytes()
-	keyOut := new(bytes.Buffer)
-	err = pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
-	Ok(t, err)
-	cert, err = tls.X509KeyPair(certData, keyOut.Bytes())
-	Ok(t, err)
-	certFile, err := os.CreateTemp("", "cert.*.pem")
-	Ok(t, err)
-	caPath = certFile.Name()
-	_, err = certFile.Write(certData)
-	Ok(t, err)
-	defer certFile.Close()
-	tlsConfig := &tls.Config{
-		Certificates:       []tls.Certificate{cert},
-		InsecureSkipVerify: true, //nolint:gosec // This is purely for testing
-	}
+		// Setup the Miniredis Server for TLS
+		certBytes, keyBytes, err := generateLocalhostCert()
+		Ok(t, err)
+		certOut := new(bytes.Buffer)
+		err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
+		Ok(t, err)
+		certData := certOut.Bytes()
+		keyOut := new(bytes.Buffer)
+		err = pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
+		Ok(t, err)
+		cert, err = tls.X509KeyPair(certData, keyOut.Bytes())
+		Ok(t, err)
+		certFile, err := os.CreateTemp("", "cert.*.pem")
+		Ok(t, err)
+		caPath = certFile.Name()
+		_, err = certFile.Write(certData)
+		Ok(t, err)
+		defer certFile.Close()
+		tlsConfig := &tls.Config{
+			Certificates:       []tls.Certificate{cert},
+			InsecureSkipVerify: true, //nolint:gosec // This is purely for testing
+		}
 
-	// Start Server and Connect
-	s := miniredis.NewMiniRedis()
-	if err := s.StartTLS(tlsConfig); err != nil {
-		t.Fatalf("could not start miniredis: %s", err)
-		// not reached
-	}
-	t.Cleanup(s.Close)
-	_ = newTestRedisTLS(s)
+		// Start Server and Connect
+		s := miniredis.NewMiniRedis()
+		if err := s.StartTLS(tlsConfig); err != nil {
+			t.Fatalf("could not start miniredis: %s", err)
+			// not reached
+		}
+		t.Cleanup(s.Close)
+		r := newTestRedisTLS(s)
+		assert.IsType(t, &redis.Client{}, r.client)
+	})
+	t.Run("cluster", func(t *testing.T) {
+		// Start Server and Connect
+		s := miniredis.NewMiniRedis()
+		if err := s.Start(); err != nil {
+			t.Fatalf("could not start miniredis: %s", err)
+			// not reached
+		}
+		t.Cleanup(s.Close)
+		r := newTestRedisCluster(s)
+		assert.IsType(t, &redis.ClusterClient{}, r.client)
+	})
 }
 
 func TestLockCommandNotSet(t *testing.T) {
@@ -930,16 +957,24 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 	}
 }
 
-func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {
-	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", false, false, 0)
+func newTestRedis(mr *miniredis.Miniredis) *RedisDB {
+	r, err := New(mr.Host(), mr.Server().Addr().Port, "", false, false, 0, singleNodeDeployment, []string{""}, "")
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create test redis client"))
 	}
 	return r
 }
 
-func newTestRedisTLS(mr *miniredis.Miniredis) *redis.RedisDB {
-	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", true, true, 0)
+func newTestRedisCluster(mr *miniredis.Miniredis) *RedisDB {
+	r, err := New(mr.Host(), mr.Server().Addr().Port, "", false, false, 0, clusterDeployment, []string{fmt.Sprintf("%s:%s", mr.Host(), mr.Port())}, "")
+	if err != nil {
+		panic(errors.Wrap(err, "failed to create test redis client"))
+	}
+	return r
+}
+
+func newTestRedisTLS(mr *miniredis.Miniredis) *RedisDB {
+	r, err := New(mr.Host(), mr.Server().Addr().Port, "", true, true, 0, singleNodeDeployment, []string{""}, "")
 	if err != nil {
 		panic(errors.Wrap(err, "failed to create test redis client"))
 	}
