@@ -43,7 +43,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	// Using version >= 0.10 here so we don't expect any env commands.
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger(t)
-	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
+	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, false)
 
 	expPlanArgs := []string{"plan",
 		"-input=false",
@@ -104,7 +104,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger(t)
-	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
+	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, false)
 	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -185,7 +185,7 @@ Terraform will perform the following actions:
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
-	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
+	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, false)
 	When(terraform.RunCommandWithVersion(
 		Any[command.ProjectContext](),
 		Any[string](),
@@ -238,7 +238,7 @@ func TestRun_OutputOnErr(t *testing.T) {
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
-	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
+	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, false)
 	expOutput := "expected output"
 	expErrMsg := "error!"
 	When(terraform.RunCommandWithVersion(
@@ -263,6 +263,47 @@ func TestRun_OutputOnErr(t *testing.T) {
 	actOutput, actErr := s.Run(command.ProjectContext{Workspace: "default"}, nil, "", map[string]string(nil))
 	ErrEquals(t, expErrMsg, actErr)
 	Equals(t, expOutput, actOutput)
+}
+
+// Test that we strip refresh output from errors if configured to do so.
+func TestRun_StripRefreshOutputOnErr(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	tfVersion, _ := version.NewVersion("0.14.0")
+	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, true)
+	tfOutput := `null_resource.hi: Refreshing state... (ID: 217661332516885645)
+null_resource.hi[1]: Refreshing state... (ID: 6064510335076839362)
+
+An execution plan has been generated and is shown below.`
+	strippedOutput := `
+An execution plan has been generated and is shown below.`
+	expErrMsg := "error!"
+	When(terraform.RunCommandWithVersion(
+		Any[command.ProjectContext](),
+		Any[string](),
+		Any[[]string](),
+		Any[map[string]string](),
+		Any[tf.Distribution](),
+		Any[*version.Version](),
+		Any[string]())).
+		Then(func(params []Param) ReturnValues {
+			// This code allows us to return different values depending on the
+			// tf command being run while still using the wildcard matchers above.
+			tfArgs := params[2].([]string)
+			if stringSliceEquals(tfArgs, []string{"workspace", "show"}) {
+				return []ReturnValue{"default\n", nil}
+			} else if tfArgs[0] == "plan" {
+				return []ReturnValue{tfOutput, errors.New(expErrMsg)}
+			}
+			return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
+		})
+	actOutput, actErr := s.Run(command.ProjectContext{Workspace: "default"}, nil, "", map[string]string(nil))
+	ErrEquals(t, expErrMsg, actErr)
+	Equals(t, strippedOutput, actOutput)
 }
 
 // Test that if we're using 0.12, we don't set the optional -var atlantis_repo_name
@@ -314,7 +355,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 			mockDownloader := mocks.NewMockDownloader()
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
-			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
+			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, false)
 			ctx := command.ProjectContext{
 				Workspace:          "default",
 				RepoRelDir:         ".",
@@ -406,7 +447,7 @@ locally at this time.
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			asyncTf := &remotePlanMock{}
-			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTf)
+			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTf, false)
 			absProjectPath := t.TempDir()
 
 			// First, terraform workspace gets run.
@@ -603,7 +644,7 @@ func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 			mockDownloader := mocks.NewMockDownloader()
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
-			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
+			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, false)
 			ctx := command.ProjectContext{
 				Workspace:          "default",
 				RepoRelDir:         ".",

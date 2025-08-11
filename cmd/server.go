@@ -143,6 +143,7 @@ const (
 	SlackTokenFlag                   = "slack-token"
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
+	StripRefreshOutputFromErrorsFlag = "strip-refresh-output-from-errors"
 	RestrictFileList                 = "restrict-file-list"
 	TFDistributionFlag               = "tf-distribution" // deprecated for DefaultTFDistributionFlag
 	TFDownloadFlag                   = "tf-download"
@@ -597,6 +598,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceAllowlistErrorsFlag: {
 		description:  "Silences the posting of allowlist error comments.",
+		defaultValue: false,
+	},
+	StripRefreshOutputFromErrorsFlag: {
+		description:  "Strips state refresh lines from output on plan errors.",
 		defaultValue: false,
 	},
 	DisableMarkdownFoldingFlag: {
