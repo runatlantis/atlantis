@@ -522,11 +522,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	applyLockingClient = locking.NewApplyClient(backend, disableApply, disableGlobalApplyLock)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
-	var workingDir events.WorkingDir = &events.FileWorkspace{
+	// Create base FileWorkspace
+	baseWorkspace := &events.FileWorkspace{
 		DataDir:          userConfig.DataDir,
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:    userConfig.CheckoutDepth,
 		GithubAppEnabled: githubAppEnabled,
+	}
+
+	// Wrap with copy optimization if enabled
+	var workingDir events.WorkingDir
+	if userConfig.EnableWorkspaceCopyOptimization {
+		logger.Info("Workspace copy optimization enabled")
+		workingDir = events.NewWorkspaceCopyOptimizer(baseWorkspace, true, statsScope)
+	} else {
+		workingDir = baseWorkspace
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(

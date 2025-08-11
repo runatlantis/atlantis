@@ -579,6 +579,16 @@ Running an atlantis unlock from v0.35.0 on your current PRs will ignore the file
   The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects.
   :::
 
+### `--enable-workspace-copy-optimization`
+
+  ```bash
+  atlantis server --enable-workspace-copy-optimization
+  # or
+  ATLANTIS_ENABLE_WORKSPACE_COPY_OPTIMIZATION=true
+  ```
+
+  Enable workspace copy optimization to improve performance when working with multiple workspaces by using copies for subsequent workspaces instead of full repository clones.
+
 ### `--executable-name`
 
   ```bash
