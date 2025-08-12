@@ -105,7 +105,7 @@ jobs:
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
+      uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5
       env:
         SUFFIX: ${{ format('-{0}', matrix.image_type) }}
       with:
@@ -137,7 +137,7 @@ jobs:
           # Suffix is not used here since there's no way to disable it above
 
     - name: Login to Packages Container registry
-      uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+      uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
