@@ -25,6 +25,7 @@ import (
 func NewRequestLogger(s *Server) *RequestLogger {
 	return &RequestLogger{
 		s.Logger,
+		s.BasePath,
 		s.WebAuthentication,
 		s.WebUsername,
 		s.WebPassword,
@@ -35,6 +36,7 @@ func NewRequestLogger(s *Server) *RequestLogger {
 // as well as handle the basicauth on the requests
 type RequestLogger struct {
 	logger            logging.SimpleLogging
+	BasePath          string
 	WebAuthentication bool
 	WebUsername       string
 	WebPassword       string
@@ -45,10 +47,10 @@ func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 	l.logger.Debug("%s %s – from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
 	allowed := false
 	if !l.WebAuthentication ||
-		r.URL.Path == "/events" ||
-		r.URL.Path == "/healthz" ||
-		r.URL.Path == "/status" ||
-		strings.HasPrefix(r.URL.Path, "/api/") {
+		r.URL.Path == l.BasePath+"/events" ||
+		r.URL.Path == l.BasePath+"/healthz" ||
+		r.URL.Path == l.BasePath+"/status" ||
+		strings.HasPrefix(r.URL.Path, l.BasePath+"/api/") {
 		allowed = true
 	} else {
 		user, pass, ok := r.BasicAuth()

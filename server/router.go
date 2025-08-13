@@ -36,7 +36,7 @@ func (r *Router) GenerateLockURL(lockID string) string {
 	// qualified LockURL we just append the router's url to our base url.
 	// We're not doing anything fancy here with the actual url object because
 	// golang likes to double escape the lockURL path when using url.Parse().
-	return r.AtlantisURL.String() + lockURL.String()
+	return r.AtlantisURL.ResolveReference(lockURL).String()
 }
 
 func (r *Router) GenerateProjectJobURL(ctx command.ProjectContext) (string, error) {
@@ -50,7 +50,7 @@ func (r *Router) GenerateProjectJobURL(ctx command.ProjectContext) (string, erro
 		return "", errors.Wrapf(err, "creating job url for %s", ctx.JobID)
 	}
 
-	return r.AtlantisURL.String() + jobURL.String(), nil
+	return r.AtlantisURL.ResolveReference(jobURL).String(), nil
 }
 
 func (r *Router) GenerateProjectWorkflowHookURL(hookID string) (string, error) {
@@ -61,5 +61,5 @@ func (r *Router) GenerateProjectWorkflowHookURL(hookID string) (string, error) {
 		return "", errors.Wrapf(err, "creating workflow hook url for %s", hookID)
 	}
 
-	return r.AtlantisURL.String() + jobURL.String(), nil
+	return r.AtlantisURL.ResolveReference(jobURL).String(), nil
 }
