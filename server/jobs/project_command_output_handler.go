@@ -303,8 +303,9 @@ func (p *AsyncProjectCommandOutputHandler) GetJobIDMapForPull(pullInfo PullInfo)
 			result[k.(string)] = v.(JobIDInfo)
 			return true
 		})
+		return result
 	}
-	return result
+	return nil
 }
 
 func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
@@ -321,6 +322,7 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 			p.receiverBuffersLock.Unlock()
 			return true
 		})
+		// Remove job mapping
 		p.pullToJobMapping.Delete(pullInfo)
 	}
 }
