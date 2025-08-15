@@ -59,9 +59,9 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 			ExpVCSStatusTotal: 1,
 		},
 		{
-			Description:      "When planning with silenced VCS status, don't do anything",
+			Description:      "When planning with silenced VCS status, still clear pending status",
 			VCSStatusSilence: true,
-			ExpVCSStatusSet:  false,
+			ExpVCSStatusSet:  true, // Changed: we now update status to clear pending
 			ExpSilenced:      true,
 		},
 		{
@@ -825,4 +825,68 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPlanCommandRunner_SilenceFlagsClearsPendingStatus tests that when silence flags are enabled
+// and no projects are found, the pending status that was set earlier is cleared.
+// This is a regression test for issue #5389 where PRs were getting stuck with pending status.
+func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
+	// Test the specific scenario from issue #5389:
+	// When silence flags are enabled and no projects match when_modified patterns,
+	// the pending status should be cleared instead of leaving the PR stuck.
+	
+	// This test ensures that even when ATLANTIS_SILENCE_VCS_STATUS_NO_PLANS and
+	// ATLANTIS_SILENCE_VCS_STATUS_NO_PROJECTS are true, we still update the status
+	// to clear any pending state that was set earlier (e.g., in command_runner.go)
+	
+	t.Run("silence flags with no projects should clear pending status", func(t *testing.T) {
+		RegisterMockTestingT(t)
+		
+		_ = setup(t, func(tc *TestConfig) {
+			tc.SilenceNoProjects = true
+			tc.silenceVCSStatusNoProjects = true  // This is the key flag
+			tc.silenceVCSStatusNoPlans = true     // This is the key flag
+		})
+		
+		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+		scopeNull, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+		
+		ctx := &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    scopeNull,
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.AutoTrigger,
+		}
+		
+		// Mock no projects found (simulating when_modified patterns not matching)
+		When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{}, nil)
+		
+		// This is the key test: when both conditions are true:
+		// 1. Silence flags are enabled
+		// 2. No projects are found
+		// We should STILL update the status to clear any pending state
+		
+		// The plan runner is now configured with silence flags
+		// When it finds no projects, it should clear the pending status
+		// even though silence is enabled
+		
+		// Run through the plan command (which will internally check for projects)
+		cmd := &events.CommentCommand{Name: command.Plan}
+		planCommandRunner.Run(ctx, cmd)
+		
+		// CRITICAL VERIFICATION: With the fix, even with silence flags enabled,
+		// we should update the status to Success with 0/0 to clear pending state
+		// This prevents PRs from being stuck in pending state (issue #5389)
+		commitUpdater.VerifyWasCalled(AtLeast(1)).UpdateCombinedCount(
+			Any[logging.SimpleLogging](),
+			Any[models.Repo](),
+			Any[models.PullRequest](),
+			Eq[models.CommitStatus](models.SuccessCommitStatus),
+			Eq[command.Name](command.Plan),
+			Eq(0),
+			Eq(0),
+		)
+	})
 }
