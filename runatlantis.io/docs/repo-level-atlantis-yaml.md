@@ -53,40 +53,40 @@ manually configured project, the manually configured project will take precedenc
 ## Example Using All Keys
 
 ```yaml
-version: 3 <Badge text="v0.1.0+" type="info"/>
-automerge: true <Badge text="v0.15.0+" type="info"/>
-autodiscover: <Badge text="v0.18.0+" type="info"/>
+version: 3 # Available since v0.1.0
+automerge: true # Available since v0.15.0
+autodiscover: # Available since v0.18.0
   mode: auto
   ignore_paths:
   - some/path
-delete_source_branch_on_merge: true <Badge text="v0.15.0+" type="info"/>
-parallel_plan: true <Badge text="v0.17.0+" type="info"/>
-parallel_apply: true <Badge text="v0.17.0+" type="info"/>
-abort_on_execution_order_fail: true <Badge text="v0.17.0+" type="info"/>
+delete_source_branch_on_merge: true # Available since v0.15.0
+parallel_plan: true # Available since v0.17.0
+parallel_apply: true # Available since v0.17.0
+abort_on_execution_order_fail: true # Available since v0.17.0
 projects:
-- name: my-project-name <Badge text="v0.1.0+" type="info"/>
-  branch: /main/ <Badge text="v0.20.0+" type="info"/>
-  dir: . <Badge text="v0.1.0+" type="info"/>
-  workspace: default <Badge text="v0.1.0+" type="info"/>
-  terraform_distribution: terraform <Badge text="v0.25.0+" type="info"/>
-  terraform_version: v0.11.0 <Badge text="v0.1.0+" type="info"/>
-  delete_source_branch_on_merge: true <Badge text="v0.17.0+" type="info"/>
-  repo_locking: true # deprecated: use repo_locks instead <Badge text="v0.17.0+" type="info"/>
-  repo_locks: <Badge text="v0.17.0+" type="info"/>
+- name: my-project-name # Available since v0.1.0
+  branch: /main/ # Available since v0.20.0
+  dir: . # Available since v0.1.0
+  workspace: default # Available since v0.1.0
+  terraform_distribution: terraform # Available since v0.25.0
+  terraform_version: v0.11.0 # Available since v0.1.0
+  delete_source_branch_on_merge: true # Available since v0.17.0
+  repo_locking: true # deprecated: use repo_locks instead, Available since v0.17.0
+  repo_locks: # Available since v0.17.0
     mode: on_plan
-  custom_policy_check: false <Badge text="v0.17.0+" type="info"/>
-  autoplan: <Badge text="v0.1.0+" type="info"/>
+  custom_policy_check: false # Available since v0.17.0
+  autoplan: # Available since v0.1.0
     when_modified: ["*.tf", "../modules/**/*.tf", ".terraform.lock.hcl"]
     enabled: true
-  plan_requirements: [mergeable, approved, undiverged] <Badge text="v0.17.0+" type="info"/>
-  apply_requirements: [mergeable, approved, undiverged] <Badge text="v0.17.0+" type="info"/>
-  import_requirements: [mergeable, approved, undiverged] <Badge text="v0.17.0+" type="info"/>
-  silence_pr_comments: ["apply"] <Badge text="v0.17.0+" type="info"/>
-  execution_order_group: 1 <Badge text="v0.17.0+" type="info"/>
-  depends_on: <Badge text="v0.20.0+" type="info"/>
+  plan_requirements: [mergeable, approved, undiverged] # Available since v0.17.0
+  apply_requirements: [mergeable, approved, undiverged] # Available since v0.17.0
+  import_requirements: [mergeable, approved, undiverged] # Available since v0.17.0
+  silence_pr_comments: ["apply"] # Available since v0.17.0
+  execution_order_group: 1 # Available since v0.17.0
+  depends_on: # Available since v0.20.0
     - project-1
-  workflow: myworkflow <Badge text="v0.17.0+" type="info"/>
-workflows: <Badge text="v0.1.0+" type="info"/>
+  workflow: myworkflow # Available since v0.17.0
+workflows: # Available since v0.1.0
   myworkflow:
     plan:
       steps:
@@ -102,7 +102,7 @@ workflows: <Badge text="v0.1.0+" type="info"/>
       steps:
       - run: echo hi
       - apply
-allowed_regexp_prefixes: <Badge text="v0.19.0+" type="info"/>
+allowed_regexp_prefixes: # Available since v0.19.0
 - dev/
 - staging/
 ```
