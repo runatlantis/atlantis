@@ -20,6 +20,7 @@ func TestIndexTemplate(t *testing.T) {
 				Workspace:     "workspace",
 				Time:          time.Now(),
 				TimeFormatted: "2006-01-02 15:04:05",
+				LockAge:       "just now",
 			},
 		},
 		ApplyLock: ApplyLockData{
@@ -40,7 +41,7 @@ func TestIndexTemplate(t *testing.T) {
 					Workspace:    "workspace",
 				},
 				JobIDInfos: []jobs.JobIDInfo{
-					{JobID: "job id", JobIDUrl: "job id url", JobDescription: "job description", Time: time.Now(), TimeFormatted: "02-01-2006 15:04:05", JobStep: "job step"},
+					{JobID: "job id", JobIDUrl: "job id url", JobDescription: "job description", Time: time.Now(), TimeFormatted: "02-01-2006 15:04:05", JobStep: "job step", "JobAge": "just now"},
 				},
 			},
 		},
