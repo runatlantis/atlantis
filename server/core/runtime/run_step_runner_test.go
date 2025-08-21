@@ -53,6 +53,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 		},
 		{
 			Command: "echo 'a",
+			ExpOut:  "sh: -c: line 0: unexpected EOF while looking for matching `''\nsh: -c: line 1: syntax error: unexpected end of file\n",
 			ExpErr:  "exit status 2: running \"echo 'a\" in",
 		},
 		{
@@ -61,6 +62,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 		},
 		{
 			Command: "lkjlkj",
+			ExpOut:  "sh: lkjlkj: command not found\n",
 			ExpErr:  "exit status 127: running \"lkjlkj\" in",
 		},
 		{
@@ -169,16 +171,18 @@ func TestRunStepRunner_Run(t *testing.T) {
 					CustomPolicyCheck:     customPolicyCheck,
 				}
 				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow)
-				if c.ExpErr != "" {
-					ErrContains(t, c.ExpErr, err)
-					return
-				}
-				Ok(t, err)
+
 				// Replace $DIR in the exp with the actual temp dir. We do this
 				// here because when constructing the cases we don't yet know the
 				// temp dir.
 				expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 				Equals(t, expOut, out)
+
+				if c.ExpErr != "" {
+					ErrContains(t, c.ExpErr, err)
+					return
+				}
+				Ok(t, err)
 
 				terraform.VerifyWasCalledOnce().EnsureVersion(Eq(logger), NotEq(defaultDistribution), Eq(projVersion))
 				terraform.VerifyWasCalled(Never()).EnsureVersion(Eq(logger), Eq(defaultDistribution), Eq(defaultVersion))

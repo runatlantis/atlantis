@@ -494,14 +494,15 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	var errs error
 	if err != nil {
+		err1 := err // don't override the original err - we need it later
 		for {
-			err = errors.Unwrap(err)
-			if err == nil {
+			err1 = errors.Unwrap(err1)
+			if err1 == nil {
 				break
 			}
 			// Exclude errors for failed policies
-			if !strings.Contains(err.Error(), "some policies failed") {
-				errs = errors.Join(errs, err)
+			if !strings.Contains(err1.Error(), "some policies failed") {
+				errs = errors.Join(errs, err1)
 			}
 		}
 
@@ -528,7 +529,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			preConftestOutput = append(preConftestOutput, output)
 		} else {
 			// Using a policy tool other than Conftest, manually building result struct
-			passed := !strings.Contains(strings.ToLower(output), "fail")
+			passed := err == nil && !strings.Contains(strings.ToLower(output), "fail") // policy fails if output contains "fail" OR on non-zero exit code
 			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: "Custom", PolicyOutput: output, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
 			preConftestOutput = append(preConftestOutput, "")
 		}
@@ -554,12 +555,12 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Using this function instead of catching failed policy runs with errors, for cases when '--no-fail' is passed to conftest.
 	// One reason to pass such an arg to conftest would be to prevent workflow termination so custom run scripts
 	// can be run after the conftest step.
-	ctx.Log.Err(strings.Join(outputs, "\n"))
+	ctx.Log.Debug(strings.Join(outputs, "\n"))
 	if !result.PolicyCleared() {
 		failure = "Some policy sets did not pass."
 	}
 
-	return result, failure, nil
+	return result, failure, err
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*models.PlanSuccess, string, error) {
