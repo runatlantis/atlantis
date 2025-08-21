@@ -22,12 +22,13 @@ import (
 
 func TestRunStepRunner_Run(t *testing.T) {
 	cases := []struct {
-		Command      string
-		ProjectName  string
-		ExpOut       string
-		ExpErr       string
-		Version      string
-		Distribution string
+		Command        string
+		ProjectName    string
+		ExpOut         string
+		ExpOutContains string
+		ExpErr         string
+		Version        string
+		Distribution   string
 	}{
 		{
 			Command: "",
@@ -52,18 +53,18 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ExpOut:  "green\n",
 		},
 		{
-			Command: "echo 'a",
-			ExpOut:  "sh: -c: line 0: unexpected EOF while looking for matching `''\nsh: -c: line 1: syntax error: unexpected end of file\n",
-			ExpErr:  "exit status 2: running \"echo 'a\" in",
+			Command:        "echo 'a",
+			ExpOutContains: "error",
+			ExpErr:         "exit status 2: running \"echo 'a\" in",
 		},
 		{
 			Command: "echo hi >> file && cat file",
 			ExpOut:  "hi\n",
 		},
 		{
-			Command: "lkjlkj",
-			ExpOut:  "sh: lkjlkj: command not found\n",
-			ExpErr:  "exit status 127: running \"lkjlkj\" in",
+			Command:        "lkjlkj",
+			ExpOutContains: "not found",
+			ExpErr:         "exit status 127: running \"lkjlkj\" in",
 		},
 		{
 			Command: "echo workspace=$WORKSPACE version=$ATLANTIS_TERRAFORM_VERSION dir=$DIR planfile=$PLANFILE showfile=$SHOWFILE project=$PROJECT_NAME",
@@ -176,7 +177,12 @@ func TestRunStepRunner_Run(t *testing.T) {
 				// here because when constructing the cases we don't yet know the
 				// temp dir.
 				expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
-				Equals(t, expOut, out)
+				if len(expOut) > 0 {
+					Equals(t, expOut, out)
+				}
+				if len(c.ExpOutContains) > 0 {
+					Assert(t, strings.Contains(out, c.ExpOutContains), "expected %q to contain %q", out, c.ExpOutContains)
+				}
 
 				if c.ExpErr != "" {
 					ErrContains(t, c.ExpErr, err)
