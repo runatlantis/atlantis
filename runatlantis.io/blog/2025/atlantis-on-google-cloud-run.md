@@ -270,20 +270,20 @@ The impersonation itself is enabled by setting the `GOOGLE_IMPERSONATE_SERVICE_A
 
 ```yaml
 repos:
-  - id: id: github.com/acme/gcp-tf-example
+  - id: github.com/acme/example
     apply_requirements: [approved, mergeable]
     import_requirements: [approved, mergeable]
     delete_source_branch_on_merge: true
     allowed_overrides: ["workflow"]
-    allowed_workflows: ["gcp-tf-example-dev", "gcp-tf-example-prod"]
+    allowed_workflows: ["example-dev", "example-prod"]
 
 workflows:
-  gcp-tf-example-dev:
+  example-dev:
     plan:
       steps:
         - env:
             name: GOOGLE_IMPERSONATE_SERVICE_ACCOUNT
-            value: atlantis-example-dev@acme-atlantis-mgmt.iam.gserviceaccount.com
+            value: example-dev@acme-atlantis-mgmt.iam.gserviceaccount.com
         - run: rm -rf .terraform
         - init:
             extra_args:
@@ -294,15 +294,16 @@ workflows:
       steps:
         - env:
             name: GOOGLE_IMPERSONATE_SERVICE_ACCOUNT
-            value: atlantis-example-dev@acme-atlantis-mgmt.iam.gserviceaccount.com
+            value: example-dev@acme-atlantis-mgmt.iam.gserviceaccount.com
         - apply:
             extra_args: ["-lock=false"]
 
-  gcp-tf-example-prod:
+  example-prod:
     plan:
       steps:
         - env:
             name: GOOGLE_IMPERSONATE_SERVICE_ACCOUNT
+            value: example-prod@acme-atlantis-mgmt.iam.gserviceaccount.com
         - run: rm -rf .terraform
         - init:
             extra_args:
@@ -313,7 +314,7 @@ workflows:
       steps:
         - env:
             name: GOOGLE_IMPERSONATE_SERVICE_ACCOUNT
-            value: atlantis-example-prod@acme-atlantis-mgmt.iam.gserviceaccount.com
+            value: example-prod@acme-atlantis-mgmt.iam.gserviceaccount.com
         - apply:
             extra_args: ["-lock=false"]
 ```
