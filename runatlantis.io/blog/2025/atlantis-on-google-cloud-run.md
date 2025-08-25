@@ -13,7 +13,7 @@ This blog post covers the most important parts of the Terraform code. For a comp
 
 Most Atlantis deployments run on self-managed VMs. While this is a familiar and straightforward option, it comes with challenges. Identities often become overly powerful, with direct or indirect access — through impersonation — to many resources and projects. High availability is also lacking: Atlantis writes its locking backend directly to disk, so if the VM goes down, Atlantis becomes unavailable. In short, self-managed VMs create a single point of failure, offer no horizontal scaling, and demand ongoing maintenance — from patching and OS upgrades to backups.
 
-In this blog post, we’ll show how to run Atlantis on serverless container platforms like Google Cloud Run. Instead of a single instance, we’ll use a central database for locking, and deploy multiple Atlantis instances behind a load balancer. Each instance runs with its own identity and limited permissions, managing only its own projects. This architecture eliminates the single point of failure, allows horizontal scaling, and enables a least-privilege security model.
+In this blog post, we will show how to run Atlantis on serverless container platforms like Google Cloud Run. Instead of a single instance, we will use a central database for locking, and deploy multiple Atlantis instances behind a load balancer. Each instance runs with its own identity and limited permissions, managing only its own projects. This architecture eliminates the single point of failure, allows horizontal scaling, and enables a least-privilege security model.
 
 ## What we’ll build
 
@@ -41,7 +41,7 @@ To facilitate the creation and management of multiple Atlantis instances, we’l
 Once you have one instance set up, it’s straightforward to replicate it and place it behind a shared load balancer.
 
 ## Redis: A distributed locking backend
-Since Atlantis v0.19.0, Redis is a supported locking backend. Redis is an in-memory data structure store that we'll use to provide a central locking backend for multiple Atlantis instances. Each instance will connect to the same Redis instance, allowing them to coordinate locks and avoid conflicts.
+Since Atlantis v0.19.0, Redis is a supported locking backend. Redis is an in-memory data structure store that we will use to provide a central locking backend for multiple Atlantis instances. Each instance will connect to the same Redis instance, allowing them to coordinate locks and avoid conflicts.
 
 Redis also supports persistence, through RDB (Redis Database), which performs point-in-time snapshots of the dataset at specified intervals, and AOF (Append Only File), which logs every write operation received by the Redis server. This means that even if the Redis instance goes down, we don't lose our locks.
 
@@ -74,7 +74,7 @@ This creates a Redis instance with 1 GiB of memory and enables RDB, taking snaps
 
 ## Deploying to Cloud Run
 
-Cloud Run is a serverless container platform that automatically scales your applications, handles HTTP requests, and abstracts away infrastructure. You pay only for the compute you use, and each service runs under a single service account that defines its permissions. Making it a great fit for 1 or more Atlantis instances.
+Cloud Run is a serverless container platform that automatically scales your applications, handles HTTP requests, and abstracts away infrastructure. You pay only for the compute you use, and each service runs under a single service account that defines its permissions. This makes it a great fit for one or more Atlantis instances.
 
 We'll begin by creating a server-side Atlantis configuration, `atlantis/management.yaml`:
 
@@ -229,7 +229,7 @@ Cloud Run instances can scale down to zero when not in use, which can lead to co
 ## Impersonation and Least Privilege
 Each Atlantis Cloud Run service deployed runs under a service account that defines its identity. Instead of giving this account broad access, we use a service account that only has permission to impersonate other, more restricted service accounts.
 
-This isn't something you'll need to do for the management Atlantis instance, as that gets deployed against a single project anyways, but it's important for the other Atlantis instances that will manage multiple projects and environments. By using impersonation, we can ensure that each Atlantis instance only has the permissions it needs to manage its specific projects.
+This isn't something you'll need to do for the management Atlantis instance, as that gets deployed against a single project anyway, but it's important for the other Atlantis instances that will manage multiple projects and environments. By using impersonation, we can ensure that each Atlantis instance only has the permissions it needs to manage its specific projects.
 
 For example, you can create one base Atlantis service account (`atlantis-example`) and separate service accounts for each environment (e.g. `atlantis-example-dev`, `atlantis-example-prod`). The base account is granted the `roles/iam.serviceAccountTokenCreator` role on those environment accounts, and impersonates them when Atlantis runs Terraform commands.
 
@@ -323,7 +323,7 @@ workflows:
 
 When running multiple Atlantis instances—each responsible for a different set of projects or environments—it’s important to route traffic to the right Atlantis instance. Instead of giving each instance its own public endpoint, we centralize traffic through a single global HTTPS load balancer.
 
-This load balancer uses host-based routing to direct requests to the appropriate Atlantis instance based on the subdomain. For example, requests to `network.atlantis.acme.com` are routed to the Atlantis instance managing the network projects, while requests to `workloads.atlantis.acme.com` go to the Atlantis instance managing the workload projects.
+The below load balancer uses host-based routing to direct requests to the appropriate Atlantis instance based on the subdomain. For example, requests to `network.atlantis.acme.com` are routed to the Atlantis instance managing the network projects, while requests to `workloads.atlantis.acme.com` go to the Atlantis instance managing the workload projects.
 
 ```tf
 resource "google_compute_url_map" "atlantis" {
