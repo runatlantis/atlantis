@@ -962,6 +962,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:                     workingDir,
 		WorkingDirLocker:               workingDirLocker,
 		CommitStatusUpdater:            commitStatusUpdater,
+		SilenceVCSStatusNoProjects:     userConfig.SilenceVCSStatusNoProjects,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
