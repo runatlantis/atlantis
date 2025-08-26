@@ -39,7 +39,6 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
-	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -1524,7 +1523,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			"atlantis",                       // executableName
 			false,                            // hideUnchangedPlanComments
 			opt.userConfig.QuietPolicyChecks, // quietPolicyChecks
-			logging.NewNoopLogger(e2eData.t), // logger
+			logging.NewNoopLogger(t), // logger
 		),
 	}
 
