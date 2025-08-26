@@ -3,7 +3,7 @@ package vcs
 import (
 	"strconv"
 
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v71/github"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -206,6 +206,12 @@ func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo 
 }
 
 func (c *InstrumentedClient) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+	// If the plan isn't coming from a pull request,
+	// don't attempt to update the status.
+	if pull.Num == 0 {
+		return nil
+	}
+
 	scope := c.StatsScope.SubScope("update_status")
 	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
 

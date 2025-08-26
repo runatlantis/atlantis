@@ -86,6 +86,7 @@ const (
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
+	EnableProfilingAPI               = "enable-profiling-api"
 	ExecutableName                   = "executable-name"
 	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
@@ -527,6 +528,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnableRegExpCmdFlag: {
 		description:  "Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.",
+		defaultValue: false,
+	},
+	EnableProfilingAPI: {
+		description:  "Enable net/http/pprof routes in server for continuous profiling.",
 		defaultValue: false,
 	},
 	EnableDiffMarkdownFormat: {

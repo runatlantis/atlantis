@@ -1406,10 +1406,11 @@ func TestGithubClient_GetTeamNamesForUser(t *testing.T) {
 			Username: "testuser",
 		})
 	Ok(t, err)
-	Equals(t, []string{"Frontend Developers", "frontend-developers", "Employees", "employees"}, teams)
+	Equals(t, []string{"frontend-developers", "employees"}, teams)
 }
 
 func TestGithubClient_DiscardReviews(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
 	type ResponseDef struct {
 		httpCode int
 		body     string
@@ -1597,7 +1598,7 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 			client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass", ""}, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
 			Ok(t, err)
 			defer disableSSLVerification()()
-			if err := client.DiscardReviews(tt.args.repo, tt.args.pull); (err != nil) != tt.wantErr {
+			if err := client.DiscardReviews(logger, tt.args.repo, tt.args.pull); (err != nil) != tt.wantErr {
 				t.Errorf("DiscardReviews() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			Equals(t, responseLength, responseIndex) // check if all defined requests have been used
