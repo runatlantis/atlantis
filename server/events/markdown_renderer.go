@@ -17,12 +17,15 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -58,6 +61,7 @@ type MarkdownRenderer struct {
 	executableName            string
 	hideUnchangedPlanComments bool
 	quietPolicyChecks         bool
+	logger                    logging.SimpleLogging
 }
 
 // commonData is data that all responses have.
@@ -153,13 +157,10 @@ func NewMarkdownRenderer(
 	executableName string,
 	hideUnchangedPlanComments bool,
 	quietPolicyChecks bool,
+	logger logging.SimpleLogging,
 ) *MarkdownRenderer {
-	var templates *template.Template
-	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
-	if overrides, err := templates.ParseGlob(fmt.Sprintf("%s/*.tmpl", markdownTemplateOverridesDir)); err == nil {
-		// doesn't override if templates directory doesn't exist
-		templates = overrides
-	}
+	templates := loadTemplatesWithLogging(markdownTemplateOverridesDir, logger)
+	
 	return &MarkdownRenderer{
 		gitlabSupportsCommonMark:  gitlabSupportsCommonMark,
 		disableApplyAll:           disableApplyAll,
@@ -171,7 +172,84 @@ func NewMarkdownRenderer(
 		executableName:            executableName,
 		hideUnchangedPlanComments: hideUnchangedPlanComments,
 		quietPolicyChecks:         quietPolicyChecks,
+		logger:                    logger,
 	}
+}
+
+// loadTemplatesWithLogging loads templates with comprehensive diagnostic logging
+func loadTemplatesWithLogging(markdownTemplateOverridesDir string, logger logging.SimpleLogging) *template.Template {
+	// Log built-in template loading
+	logger.Info("loading built-in markdown templates")
+	templates, err := template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
+	if err != nil {
+		logger.Err("loading built-in templates: %v", err)
+		// Return empty template set rather than panic
+		return template.New("").Funcs(sprig.TxtFuncMap())
+	}
+	logger.Info("successfully loaded %d built-in templates", len(templates.Templates()))
+	
+	// Log template names for debugging
+	var builtinTemplateNames []string
+	for _, tmpl := range templates.Templates() {
+		builtinTemplateNames = append(builtinTemplateNames, tmpl.Name())
+	}
+	logger.Debug("built-in template names: %v", builtinTemplateNames)
+
+	// Log override directory check
+	if markdownTemplateOverridesDir == "" {
+		logger.Info("no template override directory specified")
+		return templates
+	}
+
+	logger.Info("checking for template overrides in directory %q", markdownTemplateOverridesDir)
+	
+	// Check if directory exists
+	if _, err := os.Stat(markdownTemplateOverridesDir); os.IsNotExist(err) {
+		logger.Warn("template override directory does not exist %q", markdownTemplateOverridesDir)
+		return templates
+	} else if err != nil {
+		logger.Err("accessing template override directory %q: %v", markdownTemplateOverridesDir, err)
+		return templates
+	}
+	
+	logger.Info("template override directory exists and is accessible %q", markdownTemplateOverridesDir)
+	
+	// List available template files
+	globPattern := filepath.Join(markdownTemplateOverridesDir, "*.tmpl")
+	matches, err := filepath.Glob(globPattern)
+	if err != nil {
+		logger.Err("globbing template files with pattern %q: %v", globPattern, err)
+		return templates
+	}
+	
+	if len(matches) == 0 {
+		logger.Warn("no template files found in override directory %q", markdownTemplateOverridesDir)
+		return templates
+	}
+	
+	logger.Info("found %d template files matching pattern %q: %v", len(matches), globPattern, matches)
+	
+	// Attempt to parse overrides
+	logger.Info("attempting to parse template overrides from %q", globPattern)
+	overrides, err := templates.ParseGlob(globPattern)
+	if err != nil {
+		logger.Err("parsing template overrides from %q: %v", globPattern, err)
+		logger.Err("continuing with built-in templates only")
+		return templates
+	}
+	
+	logger.Info("successfully parsed template overrides, override template count: %d", len(overrides.Templates()))
+	
+	// Log template names for debugging
+	var overrideTemplateNames []string
+	for _, tmpl := range overrides.Templates() {
+		overrideTemplateNames = append(overrideTemplateNames, tmpl.Name())
+	}
+	logger.Info("override template names: %v", overrideTemplateNames)
+	
+	// Apply overrides
+	logger.Info("template overrides applied successfully")
+	return overrides
 }
 
 // Render formats the data into a markdown string.
@@ -434,9 +512,28 @@ func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, outp
 }
 
 func (m *MarkdownRenderer) renderTemplateTrimSpace(tmpl *template.Template, data interface{}) string {
+	if tmpl == nil {
+		m.logger.Err("template is nil, template not found in template set")
+		// List all available templates for debugging
+		var availableTemplates []string
+		for _, t := range m.markdownTemplates.Templates() {
+			availableTemplates = append(availableTemplates, t.Name())
+		}
+		m.logger.Err("available templates: %v", availableTemplates)
+		return "template not found, this indicates a template override issue"
+	}
+	
+	templateName := tmpl.Name()
+	m.logger.Debug("executing template %q", templateName)
+	
 	buf := &bytes.Buffer{}
 	if err := tmpl.Execute(buf, data); err != nil {
-		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
+		m.logger.Err("executing template %q: %v", templateName, err)
+		return fmt.Sprintf("rendering template %q: %v", templateName, err)
 	}
-	return strings.TrimSpace(buf.String())
+	
+	result := strings.TrimSpace(buf.String())
+	m.logger.Debug("successfully executed template %q, output length: %d characters", templateName, len(result))
+	
+	return result
 }

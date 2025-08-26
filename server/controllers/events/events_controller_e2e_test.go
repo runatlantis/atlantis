@@ -28,6 +28,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	mock_policy "github.com/runatlantis/atlantis/server/core/runtime/policy/mocks"
 	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/logging"
 	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/events"
@@ -1523,6 +1524,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			"atlantis",                       // executableName
 			false,                            // hideUnchangedPlanComments
 			opt.userConfig.QuietPolicyChecks, // quietPolicyChecks
+			logging.NewNoopLogger(e2eData.t), // logger
 		),
 	}
 
