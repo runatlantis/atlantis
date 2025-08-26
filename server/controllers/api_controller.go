@@ -38,7 +38,7 @@ type APIController struct {
 	WorkingDirLocker               events.WorkingDirLocker               `validate:"required"`
 	CommitStatusUpdater            events.CommitStatusUpdater            `validate:"required"`
 	// SilenceVCSStatusNoProjects is whether API should set commit status if no projects are found
-	SilenceVCSStatusNoProjects     bool
+	SilenceVCSStatusNoProjects bool
 }
 
 type APIRequest struct {
