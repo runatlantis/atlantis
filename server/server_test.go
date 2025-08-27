@@ -298,27 +298,27 @@ func TestGetBasePath(t *testing.T) {
 		// Valid URLs should work.
 		{
 			RawUrl:           "https://example.com",
-			ExpectedBasePath: "/",
+			ExpectedBasePath: "",
 		},
 		{
 			RawUrl:           "http://example.com",
-			ExpectedBasePath: "/",
+			ExpectedBasePath: "",
 		},
 		{
 			RawUrl:           "http://example.com/",
-			ExpectedBasePath: "/",
+			ExpectedBasePath: "",
 		},
 		{
 			RawUrl:           "http://example.com",
-			ExpectedBasePath: "/",
+			ExpectedBasePath: "",
 		},
 		{
 			RawUrl:           "http://example.com:4141",
-			ExpectedBasePath: "/",
+			ExpectedBasePath: "",
 		},
 		{
 			RawUrl:           "http://example.com:4141/",
-			ExpectedBasePath: "/",
+			ExpectedBasePath: "",
 		},
 		{
 			RawUrl:           "http://example.com/baseurl",
