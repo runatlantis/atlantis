@@ -238,28 +238,29 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		return nil, err
 	}
 
+	if len(cmds) == 0 {
+		ctx.Log.Info("determined there was no project to run plan in")
+		// When silence is enabled and no projects are found, don't set any VCS status
+		if !a.SilenceVCSStatusNoProjects {
+			ctx.Log.Debug("setting VCS status to success with no projects found")
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update plan status: %s", err)
+			}
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update policy check status: %s", err)
+			}
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update apply status: %s", err)
+			}
+		} else {
+			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
+		}
+		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+	}
+
 	// Update the combined plan commit status to pending
 	if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
 		ctx.Log.Warn("unable to update plan commit status: %s", err)
-	}
-
-	if len(cmds) == 0 {
-		ctx.Log.Info("determined there was no project to run plan in")
-		if a.SilenceVCSStatusNoProjects {
-			// If silence is enabled but a pending status was already set above,
-			// we need to clear it to avoid leaving the PR check stuck in pending state
-			ctx.Log.Debug("clearing pending status since no projects found and silence is enabled")
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending plan status: %s", err)
-			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending policy check status: %s", err)
-			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending apply status: %s", err)
-			}
-		}
-		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
 	}
 
 	var projectResults []command.ProjectResult
@@ -285,28 +286,29 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 		return nil, err
 	}
 
+	if len(cmds) == 0 {
+		ctx.Log.Info("determined there was no project to run apply in")
+		// When silence is enabled and no projects are found, don't set any VCS status
+		if !a.SilenceVCSStatusNoProjects {
+			ctx.Log.Debug("setting VCS status to success with no projects found")
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update plan status: %s", err)
+			}
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update policy check status: %s", err)
+			}
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+				ctx.Log.Warn("unable to update apply status: %s", err)
+			}
+		} else {
+			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
+		}
+		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+	}
+
 	// Update the combined apply commit status to pending
 	if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
 		ctx.Log.Warn("unable to update apply commit status: %s", err)
-	}
-
-	if len(cmds) == 0 {
-		ctx.Log.Info("determined there was no project to run apply in")
-		if a.SilenceVCSStatusNoProjects {
-			// If silence is enabled but a pending status was already set above,
-			// we need to clear it to avoid leaving the PR check stuck in pending state
-			ctx.Log.Debug("clearing pending status since no projects found and silence is enabled")
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending plan status: %s", err)
-			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending policy check status: %s", err)
-			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending apply status: %s", err)
-			}
-		}
-		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
 	}
 
 	var projectResults []command.ProjectResult

@@ -113,18 +113,8 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		} else {
-			// If silence is enabled but a pending status was already set (in command_runner.go),
-			// we need to clear it to avoid leaving the PR check stuck in pending state
-			ctx.Log.Debug("clearing pending status since no projects found and silence is enabled")
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending plan status: %s", err)
-			}
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending policy check status: %s", err)
-			}
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending apply status: %s", err)
-			}
+			// When silence is enabled and no projects are found, don't set any status
+			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
 		return
 	}
@@ -244,18 +234,8 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 				}
 			}
 		} else {
-			// If silence is enabled but a pending status was already set (in command_runner.go),
-			// we need to clear it to avoid leaving the PR check stuck in pending state
-			ctx.Log.Debug("clearing pending status since no projects found and silence is enabled")
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending plan status: %s", err)
-			}
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending policy check status: %s", err)
-			}
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
-				ctx.Log.Warn("unable to clear pending apply status: %s", err)
-			}
+			// When silence is enabled and no projects are found, don't set any status
+			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
 		return
 	}
