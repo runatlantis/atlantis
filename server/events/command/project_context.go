@@ -136,6 +136,8 @@ type ProjectContext struct {
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.
+// Note: Branch names (HeadBranch, BaseBranch) are intentionally excluded to prevent high cardinality issues.
+// Only stable, low-cardinality identifiers should be included in metrics tags.
 func (p ProjectContext) SetProjectScopeTags(scope tally.Scope) tally.Scope {
 	v := ""
 	if p.TerraformVersion != nil {

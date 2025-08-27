@@ -10,6 +10,22 @@ Currently Statsd and Prometheus is supported. See configuration below for detail
 
 Metrics are configured through the [Server Side Config](server-side-repo-config.md#metrics).
 
+## Cardinality Considerations
+
+::: important IMPORTANT
+Atlantis is designed to prevent high cardinality issues in metrics by intentionally excluding branch names and other dynamic identifiers from metric tags. The following tags are used for metrics:
+
+- `base_repo`: Repository name (e.g., "runatlantis/atlantis")
+- `pr_number`: Pull request number
+- `project`: Project name (normalized to remove branch-like suffixes)
+- `project_path`: Project directory path
+- `terraform_distribution`: Terraform distribution type
+- `terraform_version`: Terraform version
+- `workspace`: Terraform workspace name
+
+Branch names (`HeadBranch`, `BaseBranch`) are intentionally excluded from metrics to prevent high cardinality issues that could impact monitoring system performance.
+:::
+
 ## Available Metrics
 
 Assuming metrics are exposed from the endpoint `/metrics` from the [metrics](server-side-repo-config.md#metrics) server side config e.g.
