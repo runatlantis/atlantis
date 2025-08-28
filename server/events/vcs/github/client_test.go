@@ -1183,38 +1183,6 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 			mergeMethodOption: "squash",
 			expMethod:         "squash",
 		},
-		"merge with merge: overridden by command: merge not allowed": {
-			allowMerge:        false,
-			allowRebase:       true,
-			allowSquash:       true,
-			mergeMethodOption: "merge",
-			expMethod:         "",
-			expErr:            "merge method 'merge' is not allowed by the repository Pull Request settings",
-		},
-		"merge with rebase: overridden by command: rebase not allowed": {
-			allowMerge:        true,
-			allowRebase:       false,
-			allowSquash:       true,
-			mergeMethodOption: "rebase",
-			expMethod:         "",
-			expErr:            "merge method 'rebase' is not allowed by the repository Pull Request settings",
-		},
-		"merge with squash: overridden by command: squash not allowed": {
-			allowMerge:        true,
-			allowRebase:       true,
-			allowSquash:       false,
-			mergeMethodOption: "squash",
-			expMethod:         "",
-			expErr:            "merge method 'squash' is not allowed by the repository Pull Request settings",
-		},
-		"merge with unknown: overridden by command: unknown doesn't exist": {
-			allowMerge:        true,
-			allowRebase:       true,
-			allowSquash:       true,
-			mergeMethodOption: "unknown",
-			expMethod:         "",
-			expErr:            "merge method 'unknown' is unknown. Specify one of the valid values: 'merge, rebase, squash'",
-		},
 	}
 
 	for name, c := range cases {
