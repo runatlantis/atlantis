@@ -63,6 +63,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/status"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
@@ -898,7 +899,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRsFlag:               config.AllowForkPRsFlag,
 		SilenceForkPRErrors:            userConfig.SilenceForkPRErrors,
 		SilenceForkPRErrorsFlag:        config.SilenceForkPRErrorsFlag,
-		SilenceVCSStatusNoProjects:     userConfig.SilenceVCSStatusNoProjects,
 		DisableAutoplan:                userConfig.DisableAutoplan,
 		DisableAutoplanLabel:           userConfig.DisableAutoplanLabel,
 		Drainer:                        drainer,
@@ -909,6 +909,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}
+
+	// Create StatusManager with silence policy
+	statusPolicy := status.NewSilencePolicy(
+		userConfig.SilenceNoProjects,
+		userConfig.SilenceVCSStatusNoPlans,
+		userConfig.SilenceVCSStatusNoProjects,
+		userConfig.SilenceForkPRErrors,
+	)
+	statusManager := status.NewStatusManager(commitStatusUpdater, statusPolicy, logger)
+	commandRunner.StatusManager = statusManager
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
 		return nil, err
