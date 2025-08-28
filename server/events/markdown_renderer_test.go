@@ -71,6 +71,7 @@ func TestRenderErr(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -146,6 +147,7 @@ func TestRenderFailure(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -196,6 +198,7 @@ func TestRenderErrAndFailure(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	ctx := &command.Context{
@@ -1203,6 +1206,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -1577,6 +1581,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		true,       // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -1778,6 +1783,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -1963,6 +1969,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2022,6 +2029,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2097,6 +2105,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2207,6 +2216,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 					"atlantis",                // executableName
 					false,                     // hideUnchangedPlanComments
 					false,                     // quietPolicyChecks
+					logging.NewNoopLogger(t), // logger
 				)
 				logger := logging.NewNoopLogger(t).WithHistory()
 				logText := "log"
@@ -2353,6 +2363,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 						"atlantis",                // executableName
 						false,                     // hideUnchangedPlanComments
 						false,                     // quietPolicyChecks
+						logging.NewNoopLogger(t), // logger
 					)
 					logger := logging.NewNoopLogger(t).WithHistory()
 					logText := "log"
@@ -2504,6 +2515,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2584,6 +2596,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2811,6 +2824,7 @@ This plan was not saved because one or more projects failed and automerge requir
 				"atlantis", // executableName
 				false,      // hideUnchangedPlanComments
 				false,      // quietPolicyChecks
+				logging.NewNoopLogger(t), // logger
 			)
 			logger := logging.NewNoopLogger(t).WithHistory()
 			logText := "log"
@@ -3368,6 +3382,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -3506,6 +3521,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -3966,6 +3982,7 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -4022,6 +4039,7 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(b), // logger
 	)
 	logger := logging.NewNoopLogger(b).WithHistory()
 	logText := "log"
@@ -4235,6 +4253,7 @@ Ran Plan for 3 projects:
 		"atlantis", // executableName
 		true,       // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		logging.NewNoopLogger(t), // logger
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
