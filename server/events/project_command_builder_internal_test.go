@@ -8,6 +8,7 @@ import (
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -123,6 +124,7 @@ projects:
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
+				AutomergeMethod:    raw.DefaultAutomergeMethod,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -184,6 +186,7 @@ projects:
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
+				AutomergeMethod:    raw.DefaultAutomergeMethod,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -253,6 +256,7 @@ projects:
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
+				AutomergeMethod:    raw.DefaultAutomergeMethod,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -409,6 +413,7 @@ workflows:
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
+				AutomergeMethod:    raw.DefaultAutomergeMethod,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -472,6 +477,7 @@ projects:
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
+				AutomergeMethod:    raw.DefaultAutomergeMethod,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -538,6 +544,7 @@ workflows:
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
+				AutomergeMethod:    raw.DefaultAutomergeMethod,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -590,6 +597,7 @@ projects:
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   false,
+				AutomergeMethod:    raw.DefaultAutomergeMethod,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
@@ -804,6 +812,7 @@ projects:
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
+				AutomergeMethod:    raw.DefaultAutomergeMethod,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logging.NewNoopLogger(t),
@@ -1049,6 +1058,7 @@ workflows:
 				BaseRepo:           baseRepo,
 				EscapedCommentArgs: []string{`\f\l\a\g`},
 				AutomergeEnabled:   true,
+				AutomergeMethod:    raw.DefaultAutomergeMethod,
 				AutoplanEnabled:    true,
 				HeadRepo:           models.Repo{},
 				Log:                logger,
