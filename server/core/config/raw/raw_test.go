@@ -6,7 +6,7 @@ import (
 
 	"errors"
 
-	yaml "github.com/goccy/go-yaml"
+	"gopkg.in/yaml.v3"
 )
 
 // Bool is a helper routine that allocates a new bool value
@@ -23,7 +23,8 @@ func String(v string) *string { return &v }
 
 // Helper function to unmarshal from strings
 func unmarshalString(in string, out interface{}) error {
-	decoder := yaml.NewDecoder(strings.NewReader(in), yaml.Strict())
+	decoder := yaml.NewDecoder(strings.NewReader(in))
+	decoder.KnownFields(true)
 
 	err := decoder.Decode(out)
 	if errors.Is(err, io.EOF) {

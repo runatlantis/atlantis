@@ -84,12 +84,12 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 		{
 			"random characters",
 			"slkjds",
-			"string was used where mapping is expected",
+			"yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into",
 		},
 		{
 			"just a colon",
 			":",
-			"unexpected key name",
+			"yaml: did not find expected key",
 		},
 	}
 
@@ -670,12 +670,7 @@ projects:
 version: 3
 projects:
 - unknown: value`,
-			expErr: `[4:3] unknown field "unknown"
-   2 | version: 3
-   3 | projects:
->  4 | - unknown: value
-         ^
-`,
+			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in type raw.Project",
 		},
 		{
 			description: "referencing workflow that doesn't exist",
@@ -1277,11 +1272,8 @@ func TestParseGlobalCfg(t *testing.T) {
 			expErr: "file <tmp> was empty",
 		},
 		"invalid fields": {
-			input: "invalid: key",
-			expErr: `[1:1] unknown field "invalid"
->  1 | invalid: key
-       ^
-`,
+			input:  "invalid: key",
+			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.GlobalCfg",
 		},
 		"no id specified": {
 			input: `repos:

@@ -19,6 +19,10 @@ Custom workflows can be specified in the Server-Side Repo Config or in the Repo-
 
 ### .tfvars files
 
+::: tip
+Before creating custom workflows for `.tfvars` files, consider using Atlantis's automatic `env/{workspace}.tfvars` feature. If you structure your files as `env/staging.tfvars`, `env/production.tfvars`, etc., Atlantis will automatically include them based on the workspace without any configuration. See [Using Atlantis - Automatic Environment Variable Files](using-atlantis.md#automatic-environment-variable-files) for details.
+:::
+
 Given the structure:
 
 ```plain

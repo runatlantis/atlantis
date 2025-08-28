@@ -1,20 +1,18 @@
 # Note: This file is only used for Atlantis local development
 services:
   ngrok:
-    image: wernight/ngrok:latest@sha256:d211f29ebcfe5f4e72df4fa8bdd9a667886e127d7fcb1be4a1af5ad83a8a1b77
+    image: ngrok/ngrok:latest@sha256:1dae5be9a74825c44ab9c89be047e18b7b71ce5ce4453cabfcfec2e541e67b14
     ports:
       - 4040:4040
-    environment:
-      # https://dashboard.ngrok.com/get-started/your-authtoken
-      # NGROK_AUTH: REPLACE-WITH-YOUR-TOKEN // set this in atlantis.env
-      NGROK_PROTOCOL: http
-      NGROK_PORT: atlantis:4141
+    command:
+      - "http"
+      - "atlantis:4141"
     env_file:
       - atlantis.env
     depends_on:
       - atlantis
   redis:
-    image: redis:7.4-alpine@sha256:ee9e8748ace004102a267f7b8265dab2c618317df22507b89d16a8add7154273
+    image: redis:7.4-alpine@sha256:bb186d083732f669da90be8b0f975a37812b15e913465bb14d845db72a4e3e08
     restart: always
     ports:
       - 6379:6379
