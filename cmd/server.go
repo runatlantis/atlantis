@@ -241,7 +241,7 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultAutoDiscoverMode,
 	},
 	AutomergeMethodFlag: {
-		description:  "Method to use when auto merging pull requests. Can be either 'merge' (default), 'squash', or 'rebase'. Only supported for GitHub.",
+		description:  "Method to use when automatically merging pull requests. Can be either 'merge' (default), 'squash', or 'rebase'. Only supported for GitHub repositories.",
 		defaultValue: DefaultAutomergeMethod,
 	},
 	AutoplanModulesFromProjects: {
