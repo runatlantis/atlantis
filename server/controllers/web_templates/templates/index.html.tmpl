@@ -13,7 +13,7 @@
         $("p.js-discard-success").show();
         setTimeout(function() {
           $("p.js-discard-success").fadeOut('slow',function(){
-            window.location.href = "/";
+            window.location.href = "{{ .CleanedBasePath }}/";
           })
         }, 5000); // <-- time in milliseconds
       }
@@ -53,7 +53,6 @@
   <br>
   <section>
     <p class="title-heading small"><strong>Locks</strong></p>
-    {{ $basePath := .CleanedBasePath }}
     {{ if .Locks }}
     <div class="lock-grid">
     <div class="lock-header">
@@ -66,22 +65,22 @@
     </div>
     {{ range .Locks }}
         <div class="lock-row">
-        <a class="lock-link" href="{{ $basePath }}{{.LockPath}}">
+        <a class="lock-link" href="{{.LockPath}}">
           <span class="lock-reponame">{{.RepoFullName}} #{{.PullNum}}</span>
         </a>
-        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+        <a class="lock-link" tabindex="-1" href="{{.LockPath}}">
           <span class="lock-path">{{.Path}}</span>
         </a>
-        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+        <a class="lock-link" tabindex="-1" href="{{.LockPath}}">
           <span><code>{{.Workspace}}</code></span>
         </a>
-        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+        <a class="lock-link" tabindex="-1" href="{{.LockPath}}">
           <span class="lock-username">{{.LockedBy}}</span>
         </a>
-        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+        <a class="lock-link" tabindex="-1" href="{{.LockPath}}">
           <span class="lock-datetime">{{.TimeFormatted}}</span>
         </a>
-        <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+        <a class="lock-link" tabindex="-1" href="{{.LockPath}}">
           <span><code>Locked</code></span>
         </a>
         </div>
@@ -118,7 +117,7 @@
       </span>
       <span class="pulls-element">
       {{ range .JobIDInfos }}
-        <div><a href="{{ $basePath }}{{ .JobIDUrl }}" target="_blank">{{ .JobStep }}</a></div>
+        <div><a href="{{ .JobIDUrl }}" target="_blank">{{ .JobStep }}</a></div>
       {{ end }}
       </span>
       <span class="pulls-element">
