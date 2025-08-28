@@ -17,10 +17,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"maps"
 	"net/http"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -951,27 +949,9 @@ func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 		squashMergeMethod  = "squash"
 	)
 
-	mergeMethodsAllow := map[string]func() bool{
-		defaultMergeMethod: repo.GetAllowMergeCommit,
-		rebaseMergeMethod:  repo.GetAllowRebaseMerge,
-		squashMergeMethod:  repo.GetAllowSquashMerge,
-	}
-
-	mergeMethodsName := slices.Collect(maps.Keys(mergeMethodsAllow))
-	sort.Strings(mergeMethodsName)
-
 	var method string
 	if pullOptions.MergeMethod != "" {
 		method = pullOptions.MergeMethod
-
-		isMethodAllowed, isMethodExist := mergeMethodsAllow[method]
-		if !isMethodExist {
-			return fmt.Errorf("Merge method '%s' is unknown. Specify one of the valid values: '%s'", method, strings.Join(mergeMethodsName, ", "))
-		}
-
-		if !isMethodAllowed() {
-			return fmt.Errorf("Merge method '%s' is not allowed by the repository Pull Request settings", method)
-		}
 	} else {
 		method = defaultMergeMethod
 		if !repo.GetAllowMergeCommit() {
