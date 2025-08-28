@@ -1,6 +1,8 @@
 package status
 
 import (
+	"errors"
+	
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -100,10 +102,13 @@ func (s *DefaultStatusManager) ClearStatusForCommand(ctx *command.Context, cmdNa
 	return s.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, cmdName, 0, 0)
 }
 
-// GetCurrentStatus returns the current status state (placeholder for future)
+// GetCurrentStatus returns the current status state from VCS
+// This would be used for status reconciliation and avoiding duplicate updates
 func (s *DefaultStatusManager) GetCurrentStatus(repo models.Repo, pull models.PullRequest) (*StatusState, error) {
-	// TODO: Implement status querying from VCS
-	return nil, nil
+	// TODO: Query actual status from VCS provider (GitHub/GitLab/etc)
+	// This should return current pending/success/failure state for each command type
+	// Implementation would depend on VCS provider and might use existing VCS client
+	return nil, errors.New("GetCurrentStatus not implemented - status querying from VCS not yet supported")
 }
 
 // executeDecision executes a status decision

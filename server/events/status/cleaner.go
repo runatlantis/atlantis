@@ -108,10 +108,3 @@ func (h *StatusCleanupHelper) CleanupAfterSilence(ctx *command.Context, reason s
 	return h.Cleaner.ClearAllStatuses(ctx)
 }
 
-// CleanupPendingOnly clears only pending statuses, leaving success/failure statuses intact
-func (h *StatusCleanupHelper) CleanupPendingOnly(ctx *command.Context, commands []command.Name) error {
-	ctx.Log.Debug("cleaning up pending statuses only")
-	// This would require querying current status first (future enhancement)
-	// For now, just clear all specified commands
-	return h.Cleaner.ClearPendingStatuses(ctx, commands)
-}

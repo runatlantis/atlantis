@@ -148,10 +148,11 @@ func (p *SilencePolicy) DecideOnNoProjects(ctx *command.Context, cmdName command
 
 // shouldSilenceForkPR checks if this is a fork PR that should be silenced
 func (p *SilencePolicy) shouldSilenceForkPR(ctx *command.Context) bool {
-	// TODO: Need to determine if this is a fork PR
-	// For now, return false as we don't have access to fork detection logic
-	// This would need to be passed in or determined from context
-	return false
+	// A fork PR is when head repo owner != base repo owner
+	isForkPR := ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner
+	
+	// We silence if it's a fork PR and SilenceForkPRErrors is enabled
+	return isForkPR && p.SilenceForkPRErrors
 }
 
 // shouldSilenceNoProjects checks if we should silence when no projects are found
