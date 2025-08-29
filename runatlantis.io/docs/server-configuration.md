@@ -151,7 +151,6 @@ ATLANTIS_AUTOMERGE=true
 Automatically merge pull requests after all plans have been successfully applied.
 Defaults to `false`. See [Automerging](automerging.md) for more details.
 
-
 ### `--automerge-method` <Badge text="v0.35.1" type="info"/>
 
 ```bash
