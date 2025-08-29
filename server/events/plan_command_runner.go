@@ -112,6 +112,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
+		} else {
+			// When silence is enabled and no projects are found, don't set any status
+			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
 		return
 	}
@@ -230,6 +233,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 					ctx.Log.Warn("unable to update commit status: %s", err)
 				}
 			}
+		} else {
+			// When silence is enabled and no projects are found, don't set any status
+			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
 		return
 	}
