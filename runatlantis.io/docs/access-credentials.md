@@ -63,7 +63,9 @@ Only a single installation per GitHub App is supported at the moment.
 :::
 
 ::: tip NOTE
-GitHub App handles the webhook calls by itself, hence there is no need to create webhooks separately. If webhooks were created manually, those should be removed when using GitHub App. Otherwise, there would be 2 calls to Atlantis resulting in locking errors on path/workspace.
+GitHub App handles the webhook calls by itself, hence there is no need to create webhooks separately. If webhooks were created manually, those can be removed when using GitHub App. Otherwise, there would be 2 calls to Atlantis resulting in locking errors on path/workspace.
+
+Webhooks can either be created manually or managed by the GitHub App for repositories that trigger Atlantis. If manually creating (see the [section below](access-credentials.md#manually-creating-the-github-app)), do not specify webhook details in the GitHub app configuration settings. In both cases it is strongly recommended to protect the webhooks using a secret. See [Webhook Secrets](webhook-secrets.md#webhook-secrets)
 :::
 
 #### Manually Creating the GitHub app
@@ -82,10 +84,6 @@ Manually installing the GitHub app means that the credentials can be shared by m
 
 ::: tip NOTE
 Repositories must be manually registered with the created GitHub app to allow Atlantis to interact with Pull Requests.
-:::
-
-::: tip NOTE
-Webhooks must be created manually for repositories that trigger Atlantis.
 :::
 
 ::: tip NOTE
