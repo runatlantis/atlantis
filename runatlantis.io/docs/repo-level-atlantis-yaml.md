@@ -65,7 +65,7 @@ parallel_apply: true # Available since v0.17.0
 abort_on_execution_order_fail: true # Available since v0.17.0
 projects:
 - name: my-project-name # Available since v0.1.0
-  branch: /main/ # Available since v0.20.0
+  branch: /main/ # Available since v0.21.0
   dir: . # Available since v0.1.0
   workspace: default # Available since v0.1.0
   terraform_distribution: terraform # Available since v0.25.0
