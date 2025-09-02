@@ -30,13 +30,13 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_resource_cleaner.go ResourceCleaner
+//go:generate mockgen -destination=mocks/mock_resource_cleaner.go -package=mocks github.com/runatlantis/atlantis/server/events ResourceCleaner
 
 type ResourceCleaner interface {
 	CleanUp(pullInfo jobs.PullInfo)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
+//go:generate mockgen -destination=mocks/mock_pull_cleaner.go -package=mocks github.com/runatlantis/atlantis/server/events PullCleaner
 
 // PullCleaner cleans up pull requests after they're closed/merged.
 type PullCleaner interface {

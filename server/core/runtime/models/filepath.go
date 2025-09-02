@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_filepath.go FilePath
+//go:generate mockgen -destination=mocks/mock_filepath.go -package=mocks . FilePath
 
 type FilePath interface {
 	NotExists() bool

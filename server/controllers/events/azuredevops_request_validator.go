@@ -8,7 +8,7 @@ import (
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_azuredevops_request_validator.go AzureDevopsRequestValidator
+//go:generate mockgen -destination=mocks/mock_azuredevops_request_validator.go -package=mocks . AzureDevopsRequestValidator
 
 // AzureDevopsRequestValidator handles checking if Azure DevOps requests
 // contain a valid Basic authentication username and password.

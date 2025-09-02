@@ -25,7 +25,7 @@ import (
 
 const secretHeader = "X-Gitlab-Token" // #nosec
 
-//go:generate pegomock generate --package mocks -o mocks/mock_gitlab_request_parser_validator.go GitlabRequestParserValidator
+//go:generate mockgen -destination=mocks/mock_gitlab_request_parser_validator.go -package=mocks . GitlabRequestParserValidator
 
 // GitlabRequestParserValidator parses and validates GitLab requests.
 type GitlabRequestParserValidator interface {

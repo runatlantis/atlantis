@@ -6,7 +6,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events/vcs --package mocks -o mocks/mock_pull_req_status_fetcher.go PullReqStatusFetcher
+//go:generate mockgen -destination=mocks/mock_pull_req_status_fetcher.go -package=mocks github.com/runatlantis/atlantis/server/events/vcs PullReqStatusFetcher
 
 type PullReqStatusFetcher interface {
 	FetchPullStatus(logger logging.SimpleLogging, pull models.PullRequest) (models.PullReqStatus, error)

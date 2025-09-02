@@ -22,7 +22,7 @@ import (
 	"github.com/google/go-github/v71/github"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_github_request_validator.go GithubRequestValidator
+//go:generate mockgen -destination=mocks/mock_github_request_validator.go -package=mocks . GithubRequestValidator
 
 // GithubRequestValidator handles checking if GitHub requests are signed
 // properly by the secret.

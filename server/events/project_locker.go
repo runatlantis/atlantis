@@ -22,7 +22,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_project_lock.go ProjectLocker
+//go:generate mockgen -destination=mocks/mock_project_lock.go -package=mocks . ProjectLocker
 
 // ProjectLocker locks this project against other plans being run until this
 // project is unlocked.

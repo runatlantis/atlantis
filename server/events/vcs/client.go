@@ -18,7 +18,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_client.go github.com/runatlantis/atlantis/server/events/vcs Client
+//go:generate mockgen -destination=mocks/mock_client.go -package=mocks github.com/runatlantis/atlantis/server/events/vcs Client
 
 // Client is used to make API calls to a VCS host like GitHub or GitLab.
 type Client interface {

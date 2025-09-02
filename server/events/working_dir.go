@@ -34,8 +34,7 @@ const workingDirPrefix = "repos"
 var cloneLocks sync.Map
 var recheckRequiredMap sync.Map
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
+//go:generate mockgen -destination=mocks/mock_working_dir.go -package=mocks github.com/runatlantis/atlantis/server/events WorkingDir
 
 // WorkingDir handles the workspace on disk for running commands.
 type WorkingDir interface {

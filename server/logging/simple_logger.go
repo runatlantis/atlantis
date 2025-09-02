@@ -26,7 +26,7 @@ import (
 	"go.uber.org/zap/zaptest"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_simple_logging.go SimpleLogging
+//go:generate mockgen -destination=mocks/mock_simple_logging.go -package=mocks . SimpleLogging
 
 // SimpleLogging is the interface used for logging throughout the codebase.
 type SimpleLogging interface {
