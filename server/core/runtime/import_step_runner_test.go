@@ -33,19 +33,16 @@ func TestImportStepRunner_Run_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.15.0")
 	s := NewImportStepRunner(terraform, tfDistribution, tfVersion)
 
-	When(terraform.RunCommandWithVersion(gomock.Any(), gomock.Any(), Any[[]string](), Any[map[string]string](), gomock.Any(), gomock.Any(), gomock.Any())).
-		ThenReturn("output", nil)
+	commands := []string{"import", "-var", "foo=bar", "addr", "id"}
+	terraform.EXPECT().RunCommandWithVersion(context, tmpDir, commands, map[string]string(nil), tfDistribution, tfVersion, workspace).Return("output", nil)
 	output, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	commands := []string{"import", "-var", "foo=bar", "addr", "id"}
-	// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().RunCommandWithVersion(context, tmpDir, commands, map[string]string(nil), tfDistribution, tfVersion, workspace)
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -68,26 +65,21 @@ func TestImportStepRunner_Run_Workspace(t *testing.T) {
 	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
 	tfVersion, _ := version.NewVersion("0.15.0")
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	s := NewImportStepRunner(terraform, tfDistribution, tfVersion)
 
-	When(terraform.RunCommandWithVersion(gomock.Any(), gomock.Any(), Any[[]string](), Any[map[string]string](), gomock.Any(), gomock.Any(), gomock.Any())).
-		ThenReturn("output", nil)
+	// Set up expectations for workspace switching
+	terraform.EXPECT().RunCommandWithVersion(context, tmpDir, []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, workspace).Return("", nil)
+	terraform.EXPECT().RunCommandWithVersion(context, tmpDir, []string{"workspace", "select", workspace}, map[string]string(nil), tfDistribution, tfVersion, workspace).Return("", nil)
+
+	// Set up expectation for import command
+	commands := []string{"import", "-var", "foo=bar", "addr", "id"}
+	terraform.EXPECT().RunCommandWithVersion(context, tmpDir, commands, map[string]string(nil), tfDistribution, tfVersion, workspace).Return("output", nil)
+
 	output, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-
-	// switch workspace
-	// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().RunCommandWithVersion(context, tmpDir, []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, workspace)
-	// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().RunCommandWithVersion(context, tmpDir, []string{"workspace", "select", workspace}, map[string]string(nil), tfDistribution, tfVersion, workspace)
-
-	// exec import
-	commands := []string{"import", "-var", "foo=bar", "addr", "id"}
-	// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().RunCommandWithVersion(context, tmpDir, commands, map[string]string(nil), tfDistribution, tfVersion, workspace)
 
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
@@ -113,26 +105,24 @@ func TestImportStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
 	tfVersion, _ := version.NewVersion("0.15.0")
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	s := NewImportStepRunner(terraform, tfDistribution, tfVersion)
 
-	When(terraform.RunCommandWithVersion(gomock.Any(), gomock.Any(), Any[[]string](), Any[map[string]string](), gomock.Any(), gomock.Any(), gomock.Any())).
-		ThenReturn("output", nil)
+	// Create expected distribution based on project configuration  
+	expectedDistribution := tf.NewDistributionOpenTofuWithDownloader(mockDownloader)
+
+	// Set up expectations for workspace switching with configured distribution
+	terraform.EXPECT().RunCommandWithVersion(gomock.Eq(context), gomock.Eq(tmpDir), gomock.Eq([]string{"workspace", "show"}), gomock.Eq(map[string]string(nil)), gomock.Not(gomock.Eq(tfDistribution)), gomock.Eq(tfVersion), gomock.Eq(workspace)).Return("", nil)
+	terraform.EXPECT().RunCommandWithVersion(gomock.Eq(context), gomock.Eq(tmpDir), gomock.Eq([]string{"workspace", "select", workspace}), gomock.Eq(map[string]string(nil)), gomock.Not(gomock.Eq(tfDistribution)), gomock.Eq(tfVersion), gomock.Eq(workspace)).Return("", nil)
+
+	// Set up expectation for import command with configured distribution
+	commands := []string{"import", "-var", "foo=bar", "addr", "id"}
+	terraform.EXPECT().RunCommandWithVersion(gomock.Eq(context), gomock.Eq(tmpDir), gomock.Eq(commands), gomock.Eq(map[string]string(nil)), gomock.Not(gomock.Eq(tfDistribution)), gomock.Eq(tfVersion), gomock.Eq(workspace)).Return("output", nil)
+
 	output, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-
-	// switch workspace
-	// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().RunCommandWithVersion(Eq(context), Eq(tmpDir), Eq([]string{"workspace", "show"}), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq(workspace))
-	// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().RunCommandWithVersion(Eq(context), Eq(tmpDir), Eq([]string{"workspace", "select", workspace}), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq(workspace))
-
-	// exec import
-	commands := []string{"import", "-var", "foo=bar", "addr", "id"}
-	// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().RunCommandWithVersion(Eq(context), Eq(tmpDir), Eq(commands), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq(workspace))
 
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")

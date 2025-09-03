@@ -27,17 +27,16 @@ func TestConfTestVersionDownloader(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDownloader := conftest_mocks.NewMockDownloader()
+	mockDownloader := conftest_mocks.NewMockDownloader(ctrl)
 
 	subject := ConfTestVersionDownloader{
 		downloader: mockDownloader,
 	}
 
 	t.Run("success", func(t *testing.T) {
+		mockDownloader.EXPECT().GetAny(gomock.Eq(destPath), gomock.Eq(fullURL)).Return(nil).Times(1)
 
 		binPath, err := subject.downloadConfTestVersion(version, destPath)
-
-		mockDownloader.VerifyWasCalledOnce().GetAny(Eq(destPath), Eq(fullURL))
 
 		Ok(t, err)
 
@@ -45,8 +44,7 @@ func TestConfTestVersionDownloader(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-
-		When(mockDownloader.GetAny(Eq(destPath), Eq(fullURL))).ThenReturn(errors.New("err"))
+		mockDownloader.EXPECT().GetAny(gomock.Eq(destPath), gomock.Eq(fullURL)).Return(errors.New("err")).Times(1)
 		_, err := subject.downloadConfTestVersion(version, destPath)
 
 		Assert(t, err != nil, "err is expected")
@@ -61,8 +59,8 @@ func TestEnsureExecutorVersion(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockCache := mocks.NewMockExecutionVersionCache()
-	mockExec := models_mocks.NewMockExec()
+	mockCache := mocks.NewMockExecutionVersionCache(ctrl)
+	mockExec := models_mocks.NewMockExec(ctrl)
 	log := logging.NewNoopLogger(t)
 
 	t.Run("no specified version or default version without conftest command", func(t *testing.T) {
@@ -71,7 +69,7 @@ func TestEnsureExecutorVersion(t *testing.T) {
 			Exec:         mockExec,
 		}
 
-		When(mockExec.LookPath(Any[string]())).ThenReturn("", errors.New("not found"))
+		mockExec.EXPECT().LookPath(gomock.Any()).Return("", errors.New("not found")).Times(1)
 		_, err := subject.EnsureExecutorVersion(log, nil)
 
 		Assert(t, err != nil, "expected error finding version")
@@ -82,7 +80,7 @@ func TestEnsureExecutorVersion(t *testing.T) {
 			VersionCache: mockCache,
 			Exec:         mockExec,
 		}
-		When(mockExec.LookPath(Any[string]())).ThenReturn(expectedPath, nil)
+		mockExec.EXPECT().LookPath(gomock.Any()).Return(expectedPath, nil).Times(1)
 		path, err := subject.EnsureExecutorVersion(log, nil)
 		Ok(t, err)
 		Assert(t, path == expectedPath, "path is expected")
@@ -94,7 +92,7 @@ func TestEnsureExecutorVersion(t *testing.T) {
 			DefaultConftestVersion: defaultVersion,
 		}
 
-		When(mockCache.Get(defaultVersion)).ThenReturn(expectedPath, nil)
+		mockCache.EXPECT().Get(defaultVersion).Return(expectedPath, nil).Times(1)
 
 		path, err := subject.EnsureExecutorVersion(log, nil)
 
@@ -111,7 +109,7 @@ func TestEnsureExecutorVersion(t *testing.T) {
 
 		versionInput, _ := version.NewVersion("2.0")
 
-		When(mockCache.Get(versionInput)).ThenReturn(expectedPath, nil)
+		mockCache.EXPECT().Get(versionInput).Return(expectedPath, nil).Times(1)
 
 		path, err := subject.EnsureExecutorVersion(log, versionInput)
 
@@ -128,7 +126,7 @@ func TestEnsureExecutorVersion(t *testing.T) {
 
 		versionInput, _ := version.NewVersion("2.0")
 
-		When(mockCache.Get(versionInput)).ThenReturn(expectedPath, errors.New("some err"))
+		mockCache.EXPECT().Get(versionInput).Return(expectedPath, errors.New("some err")).Times(1)
 
 		_, err := subject.EnsureExecutorVersion(log, versionInput)
 
@@ -140,8 +138,8 @@ func TestRun(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockResolver := conftest_mocks.NewMockSourceResolver()
-	mockExec := models_mocks.NewMockExec()
+	mockResolver := conftest_mocks.NewMockSourceResolver(ctrl)
+	mockExec := models_mocks.NewMockExec(ctrl)
 
 	subject := &ConfTestExecutorWorkflow{
 		SourceResolver: mockResolver,
