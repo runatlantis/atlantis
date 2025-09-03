@@ -25,7 +25,7 @@ import (
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v71/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -1029,6 +1029,12 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 		} else {
 			owner = strings.Split(uri.Path, "/")[1]
 		}
+		owner = strings.ToLower(owner)
+		// Important Issue
+		// Details in here: https://github.com/runatlantis/atlantis/issues/5595
+		// Original issue from 2018: https://github.com/runatlantis/atlantis/issues/1858
+		// Related Microsoft article: https://learn.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#administration
+		// If Azure DevOps forces the usage of new url, we need to remove all the changes added on this pull request (1 line and 1 test)
 	}
 
 	// Construct our own clone URL so we always get the new dev.azure.com

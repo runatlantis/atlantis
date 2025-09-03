@@ -580,15 +580,22 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	}
 	defer unlockFn()
 
-	p.WorkingDir.SetCheckForUpstreamChanges()
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, mergedAgain, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
-	if cloneErr != nil {
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		return nil, "", cloneErr
+		return nil, "", err
 	}
+	mergedAgain, err := p.WorkingDir.MergeAgain(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
+		return nil, "", err
+	}
+
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
@@ -706,7 +713,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 
 func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out *models.ImportSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}
@@ -752,7 +759,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 
 func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out *models.StateRmSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}

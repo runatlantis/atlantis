@@ -8,10 +8,9 @@
   commitMessageSuffix: ' in {{packageFile}}',
   dependencyDashboardAutoclose: true,
   automerge: true,
-  baseBranches: [
+  baseBranchPatterns: [
     'main',
-    'release-0.32',
-    'release-0.33',
+    '/^release-.*/',
   ],
   platformAutomerge: true,
   labels: [
@@ -32,11 +31,31 @@
     ],
   },
   packageRules: [
+    // enable release branches for security updates
     {
-      matchFileNames: [
-        'package.json',
+      matchBaseBranches: [
+        '/^release-.*/',
+      ],
+      matchUpdateTypes: [
+        'security',
+      ],
+      enabled: true,
+    },
+    // disable release branches for anything else
+    {
+      matchBaseBranches: [
+        '/^release-.*/',
       ],
       enabled: false,
+    },
+    {
+      matchBaseBranches: [
+        'main',
+      ],
+      matchFileNames: [
+        'package.json',
+        'package-lock.json',
+      ],
     },
     {
       matchFileNames: [
@@ -55,6 +74,14 @@
       groupName: 'github-',
       matchPackageNames: [
         '/github-actions/',
+      ],
+    },
+    {
+      ignorePaths: [
+        'server/controllers/events/testdata/**/*.tf',
+      ],
+      matchDatasources: [
+        'terraform',
       ],
     },
     {
@@ -79,16 +106,11 @@
   customManagers: [
     {
       customType: 'regex',
-      fileMatch: [
-        '(^|/)Dockerfile$',
-        '(^|/)Dockerfile\\.[^/]*$',
+      managerFilePatterns: [
+        '/(^|/)Dockerfile$/',
+        '/(^|/)Dockerfile\\.[^/]*$/',
       ],
       matchStrings: [
-        // example:
-        // # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-        // ENV DEFAULT_TERRAFORM_VERSION=x.x.x
-        // # renovate: datasource=github-releases depName=open-policy-agent/conftest
-        // ARG DEFAULT_CONFTEST_VERSION=x.x.x
         'renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION=(?<currentValue>.*)\\s',
       ],
       versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}',
@@ -96,8 +118,8 @@
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '.*go$',
+      managerFilePatterns: [
+        '/.*go$/',
       ],
       matchStrings: [
         '\\sconst .*Version = "(?<currentValue>.*)"\\s// renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s',
@@ -107,9 +129,9 @@
     },
     {
       customType: 'regex',
-      fileMatch: [
-        '^\\.github/workflows/[^/]+\\.ya?ml$',
-        'Makefile$',
+      managerFilePatterns: [
+        '/^\\.github/workflows/[^/]+\\.ya?ml$/',
+        '/Makefile$/',
       ],
       matchStrings: [
         'renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.*?_VERSION: (?<currentValue>.*)\\s',
