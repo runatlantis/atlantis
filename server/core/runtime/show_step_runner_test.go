@@ -18,11 +18,14 @@ import (
 )
 
 func TestShowStepRunnner(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	
 	logger := logging.NewNoopLogger(t)
 	path := t.TempDir()
 	resultPath := filepath.Join(path, "test-default.json")
 	envs := map[string]string{"key": "val"}
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.12")
 	context := command.ProjectContext{
@@ -30,9 +33,6 @@ func TestShowStepRunnner(t *testing.T) {
 		ProjectName: "test",
 		Log:         logger,
 	}
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	mockExecutor := tfclientmocks.NewMockClient(ctrl)
 
@@ -44,9 +44,9 @@ func TestShowStepRunnner(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 
-		When(mockExecutor.RunCommandWithVersion(
+		mockExecutor.EXPECT().RunCommandWithVersion(
 			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfDistribution, tfVersion, context.Workspace,
-		)).ThenReturn("success", nil)
+		).Return("success", nil)
 
 		r, err := subject.Run(context, []string{}, path, envs)
 
@@ -73,9 +73,9 @@ func TestShowStepRunnner(t *testing.T) {
 			TerraformVersion: v,
 		}
 
-		When(mockExecutor.RunCommandWithVersion(
+		mockExecutor.EXPECT().RunCommandWithVersion(
 			contextWithVersionOverride, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, d, v, context.Workspace,
-		)).ThenReturn("success", nil)
+		).Return("success", nil)
 
 		r, err := subject.Run(contextWithVersionOverride, []string{}, path, envs)
 
@@ -103,9 +103,9 @@ func TestShowStepRunnner(t *testing.T) {
 			TerraformDistribution: &projTFDistribution,
 		}
 
-		When(mockExecutor.RunCommandWithVersion(
-			Eq(contextWithDistributionOverride), Eq(path), Eq([]string{"show", "-json", filepath.Join(path, "test-default.tfplan")}), Eq(envs), NotEq(d), NotEq(v), Eq(context.Workspace),
-		)).ThenReturn("success", nil)
+		mockExecutor.EXPECT().RunCommandWithVersion(
+			gomock.Eq(contextWithDistributionOverride), gomock.Eq(path), gomock.Eq([]string{"show", "-json", filepath.Join(path, "test-default.tfplan")}), gomock.Eq(envs), gomock.Not(gomock.Eq(d)), gomock.Not(gomock.Eq(v)), gomock.Eq(context.Workspace),
+		).Return("success", nil)
 
 		r, err := subject.Run(contextWithDistributionOverride, []string{}, path, envs)
 
@@ -120,9 +120,9 @@ func TestShowStepRunnner(t *testing.T) {
 	})
 
 	t.Run("failure running command", func(t *testing.T) {
-		When(mockExecutor.RunCommandWithVersion(
+		mockExecutor.EXPECT().RunCommandWithVersion(
 			context, path, []string{"show", "-json", filepath.Join(path, "test-default.tfplan")}, envs, tfDistribution, tfVersion, context.Workspace,
-		)).ThenReturn("success", errors.New("error"))
+		).Return("success", errors.New("error"))
 
 		_, err := subject.Run(context, []string{}, path, envs)
 

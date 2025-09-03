@@ -43,7 +43,7 @@ func TestRun(t *testing.T) {
 		},
 	}
 
-	executorWorkflow := mocks.NewMockVersionedExecutorWorkflow()
+	executorWorkflow := mocks.NewMockVersionedExecutorWorkflow(ctrl)
 	s := &policyCheckStepRunner{
 		versionEnsurer: executorWorkflow,
 		executor:       executorWorkflow,
@@ -52,7 +52,7 @@ func TestRun(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		extraArgs := []string{"extra", "args"}
 		executorWorkflow.EXPECT().EnsureExecutorVersion(logger, v).Return(executablePath, nil)
-		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("Success!", nil)
+		executorWorkflow.EXPECT().Run(context, executablePath, map[string]string(nil), workdir, extraArgs).Return("Success!", nil)
 
 		output, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
 
@@ -72,7 +72,7 @@ func TestRun(t *testing.T) {
 	t.Run("executor failure", func(t *testing.T) {
 		extraArgs := []string{"extra", "args"}
 		executorWorkflow.EXPECT().EnsureExecutorVersion(logger, v).Return(executablePath, nil)
-		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("", errors.New("error running executor"))
+		executorWorkflow.EXPECT().Run(context, executablePath, map[string]string(nil), workdir, extraArgs).Return("", errors.New("error running executor"))
 
 		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
 
