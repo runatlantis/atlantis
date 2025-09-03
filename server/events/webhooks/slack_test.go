@@ -17,7 +17,7 @@ import (
 	"regexp"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/webhooks/mocks"
@@ -27,8 +27,9 @@ import (
 
 func TestSend_PostMessage(t *testing.T) {
 	t.Log("Sending a hook with a matching regex should call PostMessage")
-	RegisterMockTestingT(t)
-	client := mocks.NewMockSlackClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	client := mocks.NewMockSlackClient(ctrl)
 	regex, err := regexp.Compile(".*")
 	Ok(t, err)
 
@@ -53,8 +54,9 @@ func TestSend_PostMessage(t *testing.T) {
 
 func TestSend_NoopSuccess(t *testing.T) {
 	t.Log("Sending a hook with a non-matching regex should succeed")
-	RegisterMockTestingT(t)
-	client := mocks.NewMockSlackClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	client := mocks.NewMockSlackClient(ctrl)
 	regex, err := regexp.Compile("weirdemv")
 	Ok(t, err)
 

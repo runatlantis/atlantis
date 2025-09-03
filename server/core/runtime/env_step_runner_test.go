@@ -13,7 +13,7 @@ import (
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -39,8 +39,9 @@ func TestEnvStepRunner_Run(t *testing.T) {
 			ExpValue: "test",
 		},
 	}
-	RegisterMockTestingT(t)
-	tfClient := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	tfClient := tfclientmocks.NewMockClient(ctrl)
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, err := version.NewVersion("0.12.0")

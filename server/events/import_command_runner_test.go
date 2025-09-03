@@ -3,7 +3,7 @@ package events_test
 import (
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -15,7 +15,8 @@ import (
 
 func TestImportCommandRunner_Run(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	tests := []struct {
 		name          string

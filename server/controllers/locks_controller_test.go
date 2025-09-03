@@ -17,7 +17,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 
 	"github.com/gorilla/mux"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/events"
 
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
@@ -132,8 +132,9 @@ func TestGetLock_InvalidLockID(t *testing.T) {
 
 func TestGetLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	l := mocks.NewMockLocker(ctrl)
 	When(l.GetLock("id")).ThenReturn(nil, errors.New("err"))
 	lc := controllers.LocksController{
 		Logger: logging.NewNoopLogger(t),
@@ -148,8 +149,9 @@ func TestGetLock_LockerErr(t *testing.T) {
 
 func TestGetLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 404")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	l := mocks.NewMockLocker(ctrl)
 	When(l.GetLock("id")).ThenReturn(nil, nil)
 	lc := controllers.LocksController{
 		Logger: logging.NewNoopLogger(t),
@@ -164,8 +166,9 @@ func TestGetLock_None(t *testing.T) {
 
 func TestGetLock_Success(t *testing.T) {
 	t.Log("Should be able to render a lock successfully")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	l := mocks.NewMockLocker(ctrl)
 	When(l.GetLock("id")).ThenReturn(&models.ProjectLock{
 		Project:   models.Project{RepoFullName: "owner/repo", Path: "path"},
 		Pull:      models.PullRequest{URL: "url", Author: "lkysow"},
@@ -220,7 +223,8 @@ func TestDeleteLock_InvalidLockID(t *testing.T) {
 
 func TestDeleteLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	dlc := mocks2.NewMockDeleteLockCommand()
 	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(nil, errors.New("err"))
 	lc := controllers.LocksController{
@@ -236,7 +240,8 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 
 func TestDeleteLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 404")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	dlc := mocks2.NewMockDeleteLockCommand()
 	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(nil, nil)
 	lc := controllers.LocksController{
@@ -252,8 +257,9 @@ func TestDeleteLock_None(t *testing.T) {
 
 func TestDeleteLock_OldFormat(t *testing.T) {
 	t.Log("If the lock doesn't have BaseRepo set it is deleted successfully")
-	RegisterMockTestingT(t)
-	cp := vcsmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cp := vcsmocks.NewMockClient(ctrl)
 	dlc := mocks2.NewMockDeleteLockCommand()
 	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{}, nil)
 	lc := controllers.LocksController{
@@ -271,15 +277,16 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 
 func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	t.Log("When deleting a lock, pull status has to be updated to reflect discarded plan")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	repoName := "owner/repo"
 	projectPath := "path"
 	workspaceName := "workspace"
 
-	cp := vcsmocks.NewMockClient()
+	cp := vcsmocks.NewMockClient(ctrl)
 	l := mocks2.NewMockDeleteLockCommand()
-	workingDir := mocks2.NewMockWorkingDir()
+	workingDir := mocks2.NewMockWorkingDir(ctrl)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: repoName},
@@ -336,15 +343,16 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 
 func TestDeleteLock_CommentFailed(t *testing.T) {
 	t.Log("If the commenting fails we still return success")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	dlc := mocks2.NewMockDeleteLockCommand()
 	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{FullName: "owner/repo"},
 		},
 	}, nil)
-	cp := vcsmocks.NewMockClient()
-	workingDir := mocks2.NewMockWorkingDir()
+	cp := vcsmocks.NewMockClient(ctrl)
+	workingDir := mocks2.NewMockWorkingDir(ctrl)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	var backend locking.Backend
 	tmp := t.TempDir()
@@ -368,10 +376,11 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 
 func TestDeleteLock_CommentSuccess(t *testing.T) {
 	t.Log("We should comment back on the pull request if the lock is deleted")
-	RegisterMockTestingT(t)
-	cp := vcsmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cp := vcsmocks.NewMockClient(ctrl)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	workingDir := mocks2.NewMockWorkingDir()
+	workingDir := mocks2.NewMockWorkingDir(ctrl)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	var backend locking.Backend
 	tmp := t.TempDir()

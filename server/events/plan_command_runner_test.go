@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v71/github"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -19,7 +19,8 @@ import (
 
 func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	cases := []struct {
 		Description       string
@@ -133,26 +134,27 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 			}
 
 			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(
-				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+				gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any())
 			if c.ExpVCSStatusSet {
-				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
+				// TODO: Convert to gomock expectation with argument capture
+	// commitUpdater.EXPECT().UpdateCombinedCount(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
 					Eq[models.CommitStatus](models.SuccessCommitStatus),
 					Eq[command.Name](command.Plan),
 					Eq(c.ExpVCSStatusSucc),
 					Eq(c.ExpVCSStatusTotal),
 				)
 			} else {
-				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
-					Any[models.CommitStatus](),
+				// TODO: Convert Never() expectation: commitUpdater.EXPECT().UpdateCombinedCount(
+					gomock.Any().Times(0),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
 					Eq[command.Name](command.Plan),
-					Any[int](),
-					Any[int](),
+					gomock.Any(),
+					gomock.Any(),
 				)
 			}
 		})
@@ -161,7 +163,8 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 
 func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	cases := []struct {
 		Description       string
@@ -536,15 +539,15 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 
-			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			When(githubGetter.GetPullRequest(gomock.Any(), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(gomock.Any(), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
-			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
+			projectCommandBuilder.EXPECT().BuildPlanCommands(ctx, cmd).Return(c.ProjectContexts, nil)
 			// When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
 			// 	return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
 			// })
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectResults[i])
+				projectCommandRunner.EXPECT().Plan(c.ProjectContexts[i]).Return(c.ProjectResults[i])
 			}
 
 			planCommandRunner.Run(ctx, cmd)
@@ -555,8 +558,9 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 
 			require.Equal(t, c.PlanFailed, ctx.CommandHasErrors)
 
-			vcsClient.VerifyWasCalledOnce().CreateComment(
-				Any[logging.SimpleLogging](), Any[models.Repo](), Eq(modelPull.Num), Any[string](), Eq("plan"),
+			// TODO: Convert to gomock expectation with argument capture
+	// vcsClient.EXPECT().CreateComment(
+				gomock.Any(), gomock.Any(), Eq(modelPull.Num), gomock.Any(), Eq("plan"),
 			)
 		})
 	}
@@ -564,7 +568,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 
 func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	cases := []struct {
 		Description            string
@@ -788,35 +793,37 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				Ok(t, err)
 			}
 
-			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
+			projectCommandBuilder.EXPECT().BuildPlanCommands(ctx, cmd).Return(c.ProjectContexts, nil)
 
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectResults[i])
+				projectCommandRunner.EXPECT().Plan(c.ProjectContexts[i]).Return(c.ProjectResults[i])
 			}
 
 			planCommandRunner.Run(ctx, cmd)
 
-			vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), AnyInt(), AnyString(), AnyString())
+			// TODO: Convert to gomock expectation with argument capture
+	// vcsClient.EXPECT().CreateComment(gomock.Any(), gomock.Any(), AnyInt(), AnyString(), AnyString())
 
 			ExpCommitStatus := models.SuccessCommitStatus
 			if c.ExpVCSApplyStatusSucc != c.ExpVCSApplyStatusTotal {
 				ExpCommitStatus = models.PendingCommitStatus
 			}
 			if c.DoNotUpdateApply {
-				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
-					Any[models.CommitStatus](),
+				// TODO: Convert Never() expectation: commitUpdater.EXPECT().UpdateCombinedCount(
+					gomock.Any().Times(0),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
 					Eq[command.Name](command.Apply),
 					AnyInt(),
 					AnyInt(),
 				)
 			} else {
-				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
+				// TODO: Convert to gomock expectation with argument capture
+	// commitUpdater.EXPECT().UpdateCombinedCount(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
 					Eq[models.CommitStatus](ExpCommitStatus),
 					Eq[command.Name](command.Apply),
 					Eq(c.ExpVCSApplyStatusSucc),

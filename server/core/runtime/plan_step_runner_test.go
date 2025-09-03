@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
@@ -25,8 +25,9 @@ import (
 
 func TestRun_AddsEnvVarFile(t *testing.T) {
 	// Test that if env/workspace.tfvars file exists we use -var-file option.
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 
@@ -96,8 +97,9 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 func TestRun_UsesDiffPathForProject(t *testing.T) {
 	// Test that if running for a project, uses a different path for the plan
 	// file.
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 	mockDownloader := mocks.NewMockDownloader()
@@ -178,8 +180,9 @@ Terraform will perform the following actions:
 
   - aws_security_group_rule.allow_all
 `
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 	mockDownloader := mocks.NewMockDownloader()
@@ -231,8 +234,9 @@ Terraform will perform the following actions:
 
 // Test that even if there's an error, we get the returned output.
 func TestRun_OutputOnErr(t *testing.T) {
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 	mockDownloader := mocks.NewMockDownloader()
@@ -269,7 +273,8 @@ func TestRun_OutputOnErr(t *testing.T) {
 // flags because in >= 0.12 you can't set -var flags if those variables aren't
 // being used.
 func TestRun_NoOptionalVarsIn012(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	expPlanArgs := []string{
 		"plan",
@@ -299,7 +304,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			terraform := tfclientmocks.NewMockClient()
+			terraform := tfclientmocks.NewMockClient(ctrl)
 			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 			asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 			When(terraform.RunCommandWithVersion(
@@ -399,8 +404,9 @@ locally at this time.
 					Name:     "repo",
 				},
 			}
-			RegisterMockTestingT(t)
-			terraform := tfclientmocks.NewMockClient()
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+			terraform := tfclientmocks.NewMockClient(ctrl)
 			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 			mockDownloader := mocks.NewMockDownloader()
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
@@ -555,7 +561,8 @@ Plan: 0 to add, 0 to change, 1 to destroy.`, output)
 }
 
 func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	expPlanArgs := []string{
 		"plan",
@@ -588,7 +595,7 @@ func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			terraform := tfclientmocks.NewMockClient()
+			terraform := tfclientmocks.NewMockClient(ctrl)
 			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
 			asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 			When(terraform.RunCommandWithVersion(

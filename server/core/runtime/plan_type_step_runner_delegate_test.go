@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	. "github.com/runatlantis/atlantis/testing"
 
 	"github.com/runatlantis/atlantis/server/core/runtime/mocks"
@@ -28,7 +28,8 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 
 func TestRunDelegate(t *testing.T) {
 
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	mockDefaultRunner := mocks.NewMockRunner()
 	mockRemoteRunner := mocks.NewMockRunner()
@@ -168,7 +169,8 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 
 func TestRunDelegate_UsesConfiguredDistribution(t *testing.T) {
 
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	mockDefaultRunner := mocks.NewMockRunner()
 	mockRemoteRunner := mocks.NewMockRunner()

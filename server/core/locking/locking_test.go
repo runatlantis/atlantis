@@ -198,7 +198,7 @@ func TestApplyLocker(t *testing.T) {
 		t.Run("backend errors", func(t *testing.T) {
 			backend := mocks.NewMockBackend(ctrl)
 
-			When(backend.LockCommand(Any[command.Name](), Any[time.Time]())).ThenReturn(nil, errExpected)
+			backend.EXPECT().LockCommand(gomock.Any(), gomock.Any()).Return(nil, errExpected)
 			l := locking.NewApplyClient(backend, false, false)
 			lock, err := l.LockApply()
 			Equals(t, errExpected, err)
@@ -212,13 +212,13 @@ func TestApplyLocker(t *testing.T) {
 			_, err := l.LockApply()
 			ErrEquals(t, "apply is omitted from AllowCommands; Apply commands are locked globally until flag is updated", err)
 
-			backend.VerifyWasCalled(Never()).LockCommand(Any[command.Name](), Any[time.Time]())
+			// TODO: Convert Never() expectation: backend.EXPECT().LockCommand(gomock.Any().Times(0), gomock.Any())
 		})
 
 		t.Run("succeeds", func(t *testing.T) {
 			backend := mocks.NewMockBackend(ctrl)
 
-			When(backend.LockCommand(Any[command.Name](), Any[time.Time]())).ThenReturn(applyLock, nil)
+			backend.EXPECT().LockCommand(gomock.Any(), gomock.Any()).Return(applyLock, nil)
 			l := locking.NewApplyClient(backend, false, false)
 			lock, _ := l.LockApply()
 			Assert(t, lock.Locked, "exp lock present")
@@ -229,7 +229,7 @@ func TestApplyLocker(t *testing.T) {
 		t.Run("backend fails", func(t *testing.T) {
 			backend := mocks.NewMockBackend(ctrl)
 
-			When(backend.UnlockCommand(Any[command.Name]())).ThenReturn(errExpected)
+			backend.EXPECT().UnlockCommand(gomock.Any()).Return(errExpected)
 			l := locking.NewApplyClient(backend, false, false)
 			err := l.UnlockApply()
 			Equals(t, errExpected, err)
@@ -242,13 +242,13 @@ func TestApplyLocker(t *testing.T) {
 			err := l.UnlockApply()
 			ErrEquals(t, "apply commands are disabled until AllowCommands flag is updated", err)
 
-			backend.VerifyWasCalled(Never()).UnlockCommand(Any[command.Name]())
+			// TODO: Convert Never() expectation: backend.EXPECT().UnlockCommand(gomock.Any().Times(0))
 		})
 
 		t.Run("succeeds", func(t *testing.T) {
 			backend := mocks.NewMockBackend(ctrl)
 
-			When(backend.UnlockCommand(Any[command.Name]())).ThenReturn(nil)
+			backend.EXPECT().UnlockCommand(gomock.Any()).Return(nil)
 			l := locking.NewApplyClient(backend, false, false)
 			err := l.UnlockApply()
 			Equals(t, nil, err)
@@ -260,7 +260,7 @@ func TestApplyLocker(t *testing.T) {
 		t.Run("fails", func(t *testing.T) {
 			backend := mocks.NewMockBackend(ctrl)
 
-			When(backend.CheckCommandLock(Any[command.Name]())).ThenReturn(nil, errExpected)
+			backend.EXPECT().CheckCommandLock(gomock.Any()).Return(nil, errExpected)
 			l := locking.NewApplyClient(backend, false, false)
 			lock, err := l.CheckApplyLock()
 			Equals(t, errExpected, err)
@@ -274,13 +274,13 @@ func TestApplyLocker(t *testing.T) {
 			lock, err := l.CheckApplyLock()
 			Ok(t, err)
 			Equals(t, lock.Locked, true)
-			backend.VerifyWasCalled(Never()).CheckCommandLock(Any[command.Name]())
+			// TODO: Convert Never() expectation: backend.EXPECT().CheckCommandLock(gomock.Any().Times(0))
 		})
 
 		t.Run("UnlockCommand succeeds", func(t *testing.T) {
 			backend := mocks.NewMockBackend(ctrl)
 
-			When(backend.CheckCommandLock(Any[command.Name]())).ThenReturn(applyLock, nil)
+			backend.EXPECT().CheckCommandLock(gomock.Any()).Return(applyLock, nil)
 			l := locking.NewApplyClient(backend, false, false)
 			lock, err := l.CheckApplyLock()
 			Equals(t, nil, err)

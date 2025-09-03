@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
@@ -30,8 +30,9 @@ func TestStateRmStepRunner_Run_Success(t *testing.T) {
 		Workspace:          workspace,
 	}
 
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
@@ -62,8 +63,9 @@ func TestStateRmStepRunner_Run_Workspace(t *testing.T) {
 		Workspace:          workspace,
 	}
 
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
@@ -104,8 +106,9 @@ func TestStateRmStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 		TerraformDistribution: &projTFDistribution,
 	}
 
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)

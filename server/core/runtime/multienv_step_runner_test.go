@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -67,8 +67,9 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 			},
 		},
 	}
-	RegisterMockTestingT(t)
-	tfClient := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	tfClient := tfclientmocks.NewMockClient(ctrl)
 	mockDownloader := terraformmocks.NewMockDownloader()
 	tfDistribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, err := version.NewVersion("0.12.0")

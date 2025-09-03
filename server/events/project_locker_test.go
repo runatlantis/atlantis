@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -30,7 +30,7 @@ import (
 func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 	var githubClient *vcs.GithubClient
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
-	mockLocker := mocks.NewMockLocker()
+	mockLocker := mocks.NewMockLocker(ctrl)
 	locker := events.DefaultProjectLocker{
 		Locker:    mockLocker,
 		VCSClient: mockClient,
@@ -63,10 +63,11 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 }
 
 func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	var githubClient *vcs.GithubClient
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
-	mockLocker := mocks.NewMockLocker()
+	mockLocker := mocks.NewMockLocker(ctrl)
 	locker := events.DefaultProjectLocker{
 		Locker:    mockLocker,
 		VCSClient: mockClient,
@@ -102,10 +103,11 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 }
 
 func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	var githubClient *vcs.GithubClient
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
-	mockLocker := mocks.NewMockLocker()
+	mockLocker := mocks.NewMockLocker(ctrl)
 	locker := events.DefaultProjectLocker{
 		Locker:    mockLocker,
 		VCSClient: mockClient,
@@ -194,9 +196,10 @@ func TestDefaultProjectLocker_RepoLocking(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			mockLocker := mocks.NewMockLocker()
-			mockNoOpLocker := mocks.NewMockLocker()
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+			mockLocker := mocks.NewMockLocker(ctrl)
+			mockNoOpLocker := mocks.NewMockLocker(ctrl)
 			locker := events.DefaultProjectLocker{
 				Locker:     mockLocker,
 				NoOpLocker: mockNoOpLocker,

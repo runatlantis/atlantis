@@ -5,14 +5,15 @@ import (
 	"net/http"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/controllers/events"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestAzureDevopsValidate_WithBasicAuthErr(t *testing.T) {
 	t.Log("if the request does not have a valid basic auth user and password there is an error")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	g := events.DefaultAzureDevopsRequestValidator{}
 	buf := bytes.NewBufferString("")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
@@ -27,7 +28,8 @@ func TestAzureDevopsValidate_WithBasicAuthErr(t *testing.T) {
 
 func TestAzureDevopsValidate_WithBasicAuth(t *testing.T) {
 	t.Log("if the request has a valid basic auth user and password the payload is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	g := events.DefaultAzureDevopsRequestValidator{}
 	buf := bytes.NewBufferString(`{"yo":true}`)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
@@ -42,7 +44,8 @@ func TestAzureDevopsValidate_WithBasicAuth(t *testing.T) {
 
 func TestAzureDevopsValidate_WithoutSecretInvalidContentType(t *testing.T) {
 	t.Log("if the request has an invalid content type an error is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	g := events.DefaultAzureDevopsRequestValidator{}
 	buf := bytes.NewBufferString("")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
@@ -56,7 +59,8 @@ func TestAzureDevopsValidate_WithoutSecretInvalidContentType(t *testing.T) {
 
 func TestAzureDevopsValidate_WithoutSecretJSON(t *testing.T) {
 	t.Log("if the request is JSON the body is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	g := events.DefaultAzureDevopsRequestValidator{}
 	buf := bytes.NewBufferString(`{"yo":true}`)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
@@ -31,9 +31,10 @@ func TestShowStepRunnner(t *testing.T) {
 		Log:         logger,
 	}
 
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	mockExecutor := tfclientmocks.NewMockClient()
+	mockExecutor := tfclientmocks.NewMockClient(ctrl)
 
 	subject := showStepRunner{
 		terraformExecutor:     mockExecutor,

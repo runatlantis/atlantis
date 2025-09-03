@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -67,8 +67,9 @@ func TestUpdateCombined(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.expDescrip, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			client := mocks.NewMockClient()
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+			client := mocks.NewMockClient(ctrl)
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
 			err := s.UpdateCombined(logger, models.Repo{}, models.PullRequest{}, c.status, c.command)
 			Ok(t, err)
@@ -134,8 +135,9 @@ func TestUpdateCombinedCount(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.expDescrip, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			client := mocks.NewMockClient()
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+			client := mocks.NewMockClient(ctrl)
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis-test"}
 			err := s.UpdateCombinedCount(logger, models.Repo{}, models.PullRequest{}, c.status, c.command, c.numSuccess, c.numTotal)
 			Ok(t, err)
@@ -149,7 +151,8 @@ func TestUpdateCombinedCount(t *testing.T) {
 // Test that it sets the "source" properly depending on if the project is
 // named or not.
 func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	cases := []struct {
 		projectName string
 		repoRelDir  string
@@ -172,7 +175,7 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.expSrc, func(t *testing.T) {
-			client := mocks.NewMockClient()
+			client := mocks.NewMockClient(ctrl)
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
 			err := s.UpdateProject(command.ProjectContext{
 				ProjectName: c.projectName,
@@ -189,7 +192,8 @@ func TestDefaultCommitStatusUpdater_UpdateProjectSrc(t *testing.T) {
 
 // Test that it uses the right words in the description.
 func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	cases := []struct {
 		status     models.CommitStatus
 		cmd        command.Name
@@ -238,7 +242,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.expDescrip, func(t *testing.T) {
-			client := mocks.NewMockClient()
+			client := mocks.NewMockClient(ctrl)
 			s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
 			err := s.UpdateProject(command.ProjectContext{
 				RepoRelDir: ".",
@@ -253,8 +257,9 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 
 // Test that we can set the status name.
 func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) {
-	RegisterMockTestingT(t)
-	client := mocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	client := mocks.NewMockClient(ctrl)
 	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "custom"}
 	err := s.UpdateProject(command.ProjectContext{
 		RepoRelDir: ".",

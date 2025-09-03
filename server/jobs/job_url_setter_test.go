@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -17,7 +17,8 @@ func TestJobURLSetter(t *testing.T) {
 	ctx := createTestProjectCmdContext(t)
 
 	t.Run("update project status with project jobs url", func(t *testing.T) {
-		RegisterMockTestingT(t)
+		ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 		projectStatusUpdater := mocks.NewMockProjectStatusUpdater()
 		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
 		url := "url-to-project-jobs"
@@ -33,7 +34,8 @@ func TestJobURLSetter(t *testing.T) {
 	})
 
 	t.Run("update project status with project jobs url error", func(t *testing.T) {
-		RegisterMockTestingT(t)
+		ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 		projectStatusUpdater := mocks.NewMockProjectStatusUpdater()
 		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)

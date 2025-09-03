@@ -29,7 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 
 	"github.com/google/go-github/v71/github"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -82,7 +82,8 @@ type TestConfig struct {
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	// create an empty DB
 	tmp := t.TempDir()
@@ -107,13 +108,13 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
 	eventParsing = mocks.NewMockEventParsing()
-	vcsClient := vcsmocks.NewMockClient()
+	vcsClient := vcsmocks.NewMockClient(ctrl)
 	githubGetter = mocks.NewMockGithubPullGetter()
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
 	azuredevopsGetter = mocks.NewMockAzureDevopsPullGetter()
 	logger := logging.NewNoopLogger(t)
 	projectCommandRunner = mocks.NewMockProjectCommandRunner()
-	workingDir = mocks.NewMockWorkingDir()
+	workingDir = mocks.NewMockWorkingDir(ctrl)
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
 	pullReqStatusFetcher = vcsmocks.NewMockPullReqStatusFetcher()
@@ -121,7 +122,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
 	applyLockChecker = lockingmocks.NewMockApplyLockChecker()
-	lockingLocker = lockingmocks.NewMockLocker()
+	lockingLocker = lockingmocks.NewMockLocker(ctrl)
 
 	dbUpdater = &events.DBUpdater{
 		Backend: testConfig.backend,

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
@@ -85,8 +85,9 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+			workingDir := mocks.NewMockWorkingDir(ctrl)
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			if tt.setup != nil {
 				tt.setup(workingDir)
@@ -193,8 +194,9 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+			workingDir := mocks.NewMockWorkingDir(ctrl)
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			if tt.setup != nil {
 				tt.setup(workingDir)
@@ -322,8 +324,9 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+			workingDir := mocks.NewMockWorkingDir(ctrl)
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			gotFailure, err := a.ValidateProjectDependencies(tt.ctx)
 			if !tt.wantErr(t, err, fmt.Sprintf("ValidateProjectDependencies(%v)", tt.ctx)) {
@@ -402,8 +405,9 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+			workingDir := mocks.NewMockWorkingDir(ctrl)
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			if tt.setup != nil {
 				tt.setup(workingDir)

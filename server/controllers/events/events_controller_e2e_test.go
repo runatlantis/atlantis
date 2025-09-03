@@ -15,7 +15,7 @@ import (
 
 	"github.com/google/go-github/v71/github"
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 
 	"github.com/runatlantis/atlantis/server"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
@@ -624,7 +624,8 @@ func TestGitHubWorkflow(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 			// reset userConfig
 			userConfig = server.UserConfig{}
@@ -797,7 +798,8 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 			// reset userConfig
 			userConfig = server.UserConfig{}
@@ -1195,7 +1197,8 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 			// reset userConfig
 			userConfig = server.UserConfig{}
@@ -1301,7 +1304,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	discardApprovalOnPlan := true
 	dataDir, binDir, cacheDir := mkSubDirs(t)
 	// Mocks.
-	e2eVCSClient := vcsmocks.NewMockClient()
+	e2eVCSClient := vcsmocks.NewMockClient(ctrl)
 	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
 	e2eGithubGetter := mocks.NewMockGithubPullGetter()
 	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()

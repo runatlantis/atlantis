@@ -629,10 +629,10 @@ projects:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
+			workingDir := NewMockWorkingDir(ctrl)
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmp, nil)
-			vcsClient := vcsmocks.NewMockClient()
+			vcsClient := vcsmocks.NewMockClient(ctrl)
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
@@ -648,7 +648,7 @@ projects:
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			terraformClient := tfclientmocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient(ctrl)
 
 			builder := NewProjectCommandBuilder(
 				false,
@@ -844,10 +844,10 @@ projects:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
+			workingDir := NewMockWorkingDir(ctrl)
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmp, nil)
-			vcsClient := vcsmocks.NewMockClient()
+			vcsClient := vcsmocks.NewMockClient(ctrl)
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
@@ -865,7 +865,7 @@ projects:
 
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := tfclientmocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient(ctrl)
 
 			builder := NewProjectCommandBuilder(
 				false,
@@ -1089,10 +1089,10 @@ workflows:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
+			workingDir := NewMockWorkingDir(ctrl)
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmp, nil)
-			vcsClient := vcsmocks.NewMockClient()
+			vcsClient := vcsmocks.NewMockClient(ctrl)
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
@@ -1112,7 +1112,7 @@ workflows:
 			}
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := tfclientmocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient(ctrl)
 
 			builder := NewProjectCommandBuilder(
 				true,
@@ -1243,10 +1243,10 @@ projects:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
+			workingDir := NewMockWorkingDir(ctrl)
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmp, nil)
-			vcsClient := vcsmocks.NewMockClient()
+			vcsClient := vcsmocks.NewMockClient(ctrl)
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
 
@@ -1264,7 +1264,7 @@ projects:
 			}
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := tfclientmocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient(ctrl)
 
 			builder := NewProjectCommandBuilder(
 				false,
@@ -1383,10 +1383,10 @@ projects:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
+			workingDir := NewMockWorkingDir(ctrl)
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmp, nil)
-			vcsClient := vcsmocks.NewMockClient()
+			vcsClient := vcsmocks.NewMockClient(ctrl)
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(c.modifiedFiles, nil)
 
@@ -1406,7 +1406,7 @@ projects:
 			}
 			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
 
-			terraformClient := tfclientmocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient(ctrl)
 
 			builder := NewProjectCommandBuilder(
 				false,

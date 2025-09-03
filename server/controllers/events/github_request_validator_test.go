@@ -19,14 +19,15 @@ import (
 	"net/url"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/controllers/events"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestValidate_WithSecretErr(t *testing.T) {
 	t.Log("if the request is not valid against the secret there is an error")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	g := events.DefaultGithubRequestValidator{}
 	buf := bytes.NewBufferString("")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
@@ -41,7 +42,8 @@ func TestValidate_WithSecretErr(t *testing.T) {
 
 func TestValidate_WithSecret(t *testing.T) {
 	t.Log("if the request is valid against the secret the payload is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	g := events.DefaultGithubRequestValidator{}
 	buf := bytes.NewBufferString(`{"yo":true}`)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
@@ -56,7 +58,8 @@ func TestValidate_WithSecret(t *testing.T) {
 
 func TestValidate_WithoutSecretInvalidContentType(t *testing.T) {
 	t.Log("if the request has an invalid content type an error is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	g := events.DefaultGithubRequestValidator{}
 	buf := bytes.NewBufferString("")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
@@ -70,7 +73,8 @@ func TestValidate_WithoutSecretInvalidContentType(t *testing.T) {
 
 func TestValidate_WithoutSecretJSON(t *testing.T) {
 	t.Log("if the request is JSON the body is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	g := events.DefaultGithubRequestValidator{}
 	buf := bytes.NewBufferString(`{"yo":true}`)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
@@ -84,7 +88,8 @@ func TestValidate_WithoutSecretJSON(t *testing.T) {
 
 func TestValidate_WithoutSecretFormNoPayload(t *testing.T) {
 	t.Log("if the request is form encoded and does not contain a payload param an error is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	g := events.DefaultGithubRequestValidator{}
 	buf := bytes.NewBufferString("")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
@@ -98,7 +103,8 @@ func TestValidate_WithoutSecretFormNoPayload(t *testing.T) {
 
 func TestValidate_WithoutSecretForm(t *testing.T) {
 	t.Log("if the request is form encoded and does not contain a payload param an error is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	g := events.DefaultGithubRequestValidator{}
 	form := url.Values{}
 	form.Set("payload", `{"yo":true}`)

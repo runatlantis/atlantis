@@ -19,7 +19,7 @@ import (
 	"reflect"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/controllers/events"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
@@ -29,7 +29,8 @@ var parser = events.DefaultGitlabRequestParserValidator{}
 
 func TestValidate_InvalidSecret(t *testing.T) {
 	t.Log("If the secret header is set and doesn't match expected an error is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	buf := bytes.NewBufferString("")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -41,7 +42,8 @@ func TestValidate_InvalidSecret(t *testing.T) {
 
 func TestValidate_ValidSecret(t *testing.T) {
 	t.Log("If the secret header matches then the event is returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	buf := bytes.NewBufferString(mergeEventJSON)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -54,7 +56,8 @@ func TestValidate_ValidSecret(t *testing.T) {
 
 func TestValidate_NoSecret(t *testing.T) {
 	t.Log("If there is no secret then we ignore the secret header and return the event")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	buf := bytes.NewBufferString(mergeEventJSON)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -67,7 +70,8 @@ func TestValidate_NoSecret(t *testing.T) {
 
 func TestValidate_InvalidMergeEvent(t *testing.T) {
 	t.Log("If the merge event is malformed there should be an error")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	buf := bytes.NewBufferString("{")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -79,7 +83,8 @@ func TestValidate_InvalidMergeEvent(t *testing.T) {
 
 func TestValidate_InvalidMergeCommentEvent(t *testing.T) {
 	t.Log("If the merge comment event is malformed there should be an error")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	buf := bytes.NewBufferString("{")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -91,7 +96,8 @@ func TestValidate_InvalidMergeCommentEvent(t *testing.T) {
 
 func TestValidate_UnrecognizedEvent(t *testing.T) {
 	t.Log("If the event is not one we care about we return nil")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	buf := bytes.NewBufferString("")
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -103,7 +109,8 @@ func TestValidate_UnrecognizedEvent(t *testing.T) {
 
 func TestValidate_ValidMergeEvent(t *testing.T) {
 	t.Log("If the merge event is valid it should be returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	buf := bytes.NewBufferString(mergeEventJSON)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -116,7 +123,8 @@ func TestValidate_ValidMergeEvent(t *testing.T) {
 // If the comment was on a commit instead of a merge request, make sure we
 // return the right object.
 func TestValidate_CommitCommentEvent(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	buf := bytes.NewBufferString(commitCommentEventJSON)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)
@@ -128,7 +136,8 @@ func TestValidate_CommitCommentEvent(t *testing.T) {
 
 func TestValidate_ValidMergeCommentEvent(t *testing.T) {
 	t.Log("If the merge comment event is valid it should be returned")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	buf := bytes.NewBufferString(mergeCommentEventJSON)
 	req, err := http.NewRequest("POST", "http://localhost/event", buf)
 	Ok(t, err)

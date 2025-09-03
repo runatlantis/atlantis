@@ -10,7 +10,8 @@ import (
 )
 
 func TestExecutorService_Run(t *testing.T) {
-	pegomock.RegisterMockTestingT(t)
+	pegomock.ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	mockJob := mocks.NewMockJob()
 	type fields struct {
 		log  logging.SimpleLogging

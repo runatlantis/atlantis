@@ -29,7 +29,7 @@ func (mock *MockWorkingDir) FailHandler() pegomock.FailHandler      { return moc
 
 func (mock *MockWorkingDir) Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
 	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir(ctrl).")
 	}
 	_params := []pegomock.Param{logger, headRepo, p, workspace}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("Clone", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
@@ -48,7 +48,7 @@ func (mock *MockWorkingDir) Clone(logger logging.SimpleLogging, headRepo models.
 
 func (mock *MockWorkingDir) Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error {
 	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir(ctrl).")
 	}
 	_params := []pegomock.Param{logger, r, p}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("Delete", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
@@ -63,7 +63,7 @@ func (mock *MockWorkingDir) Delete(logger logging.SimpleLogging, r models.Repo, 
 
 func (mock *MockWorkingDir) DeleteForWorkspace(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) error {
 	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir(ctrl).")
 	}
 	_params := []pegomock.Param{logger, r, p, workspace}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteForWorkspace", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
@@ -78,7 +78,7 @@ func (mock *MockWorkingDir) DeleteForWorkspace(logger logging.SimpleLogging, r m
 
 func (mock *MockWorkingDir) DeletePlan(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string, path string, projectName string) error {
 	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir(ctrl).")
 	}
 	_params := []pegomock.Param{logger, r, p, workspace, path, projectName}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("DeletePlan", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
@@ -93,7 +93,7 @@ func (mock *MockWorkingDir) DeletePlan(logger logging.SimpleLogging, r models.Re
 
 func (mock *MockWorkingDir) GetGitUntrackedFiles(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) ([]string, error) {
 	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir(ctrl).")
 	}
 	_params := []pegomock.Param{logger, r, p, workspace}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetGitUntrackedFiles", _params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
@@ -112,7 +112,7 @@ func (mock *MockWorkingDir) GetGitUntrackedFiles(logger logging.SimpleLogging, r
 
 func (mock *MockWorkingDir) GetPullDir(r models.Repo, p models.PullRequest) (string, error) {
 	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir(ctrl).")
 	}
 	_params := []pegomock.Param{r, p}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetPullDir", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
@@ -131,7 +131,7 @@ func (mock *MockWorkingDir) GetPullDir(r models.Repo, p models.PullRequest) (str
 
 func (mock *MockWorkingDir) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
 	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir(ctrl).")
 	}
 	_params := []pegomock.Param{r, p, workspace}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetWorkingDir", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
@@ -150,7 +150,7 @@ func (mock *MockWorkingDir) GetWorkingDir(r models.Repo, p models.PullRequest, w
 
 func (mock *MockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
 	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir(ctrl).")
 	}
 	_params := []pegomock.Param{logger, cloneDir}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("HasDiverged", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
@@ -165,7 +165,7 @@ func (mock *MockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir s
 
 func (mock *MockWorkingDir) MergeAgain(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (bool, error) {
 	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir(ctrl).")
 	}
 	_params := []pegomock.Param{logger, headRepo, p, workspace}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("MergeAgain", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})

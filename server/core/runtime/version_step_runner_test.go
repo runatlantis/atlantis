@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
@@ -15,7 +15,8 @@ import (
 )
 
 func TestRunVersionStep(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	logger := logging.NewNoopLogger(t)
 	workspace := "default"
 
@@ -35,7 +36,7 @@ func TestRunVersionStep(t *testing.T) {
 		},
 	}
 
-	terraform := tfclientmocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.15.0")
@@ -55,7 +56,8 @@ func TestRunVersionStep(t *testing.T) {
 }
 
 func TestVersionStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	logger := logging.NewNoopLogger(t)
 	workspace := "default"
 	projTFDistribution := "opentofu"
@@ -76,7 +78,7 @@ func TestVersionStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 		TerraformDistribution: &projTFDistribution,
 	}
 
-	terraform := tfclientmocks.NewMockClient()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.15.0")

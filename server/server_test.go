@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
@@ -77,8 +77,9 @@ func TestNewServer_InvalidAtlantisURL(t *testing.T) {
 
 func TestIndex_LockErr(t *testing.T) {
 	t.Log("index should return a 503 if unable to list locks")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	l := mocks.NewMockLocker(ctrl)
 	When(l.List()).ThenReturn(nil, errors.New("err"))
 	s := server.Server{
 		Locker: l,
@@ -91,8 +92,9 @@ func TestIndex_LockErr(t *testing.T) {
 
 func TestIndex_Success(t *testing.T) {
 	t.Log("Index should render the index template successfully.")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	l := mocks.NewMockLocker(ctrl)
 	al := mocks.NewMockApplyLocker()
 	// These are the locks that we expect to be rendered.
 	now := time.Now()

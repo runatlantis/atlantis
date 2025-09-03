@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	runtime_mocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -24,9 +24,10 @@ var whPreWorkflowHookRunner *runtime_mocks.MockPreWorkflowHookRunner
 var preCommitStatusUpdater *mocks.MockCommitStatusUpdater
 
 func preWorkflowHooksSetup(t *testing.T) {
-	RegisterMockTestingT(t)
-	vcsClient := vcsmocks.NewMockClient()
-	preWhWorkingDir = mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	vcsClient := vcsmocks.NewMockClient(ctrl)
+	preWhWorkingDir = mocks.NewMockWorkingDir(ctrl)
 	preWhWorkingDirLocker = mocks.NewMockWorkingDirLocker()
 	whPreWorkflowHookRunner = runtime_mocks.NewMockPreWorkflowHookRunner()
 	preCommitStatusUpdater = mocks.NewMockCommitStatusUpdater()

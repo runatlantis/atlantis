@@ -3,7 +3,7 @@ package events_test
 import (
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -47,7 +47,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 	expectedApplyCmt := "Apply Comment"
 	expectedPlanCmt := "Plan Comment"
 
-	terraformClient := tfclientmocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient(ctrl)
 
 	t.Run("with project name defined", func(t *testing.T) {
 		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, projName, []string{})).ThenReturn(expectedPlanCmt)

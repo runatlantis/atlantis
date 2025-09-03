@@ -27,7 +27,7 @@ import (
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/google/go-github/v71/github"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -225,8 +225,9 @@ func TestPost_GithubCommentInvalidCommand(t *testing.T) {
 
 func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	t.Log("when the event is a gitlab comment from a repo that isn't allowlisted we comment with an error")
-	RegisterMockTestingT(t)
-	vcsClient := vcsmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	vcsClient := vcsmocks.NewMockClient(ctrl)
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	e := events_controllers.VCSEventsController{
@@ -259,8 +260,9 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 
 func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	t.Log("when the event is a gitlab comment from a repo that isn't allowlisted and we are silencing errors, do not comment with an error")
-	RegisterMockTestingT(t)
-	vcsClient := vcsmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	vcsClient := vcsmocks.NewMockClient(ctrl)
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	e := events_controllers.VCSEventsController{
@@ -293,8 +295,9 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 
 func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	t.Log("when the event is a github comment from a repo that isn't allowlisted we comment with an error")
-	RegisterMockTestingT(t)
-	vcsClient := vcsmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	vcsClient := vcsmocks.NewMockClient(ctrl)
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	e := events_controllers.VCSEventsController{
@@ -328,8 +331,9 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 
 func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	t.Log("when the event is a github comment from a repo that isn't allowlisted and we are silencing errors, do not comment with an error")
-	RegisterMockTestingT(t)
-	vcsClient := vcsmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	vcsClient := vcsmocks.NewMockClient(ctrl)
 	logger := logging.NewNoopLogger(t)
 	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	e := events_controllers.VCSEventsController{
@@ -778,7 +782,8 @@ func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
 func TestPost_GithubPullRequestClosedErrCleaningPull(t *testing.T) {
 	t.Skip("relies too much on mocks, should use real event parser")
 	t.Log("when the event is a closed pull request and we have an error calling CleanUpPull we return a 503")
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	e, v, _, _, p, _, c, _, _ := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "pull_request")
@@ -863,7 +868,8 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.header, func(t *testing.T) {
-			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 			pullCleaner := emocks.NewMockPullCleaner()
 			allowlist, err := events.NewRepoAllowlistChecker("*")
 			Ok(t, err)
@@ -990,7 +996,8 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 }
 
 func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *mocks.MockAzureDevopsRequestValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	v := mocks.NewMockGithubRequestValidator()
 	gl := mocks.NewMockGitlabRequestParserValidator()
 	ado := mocks.NewMockAzureDevopsRequestValidator()
@@ -998,7 +1005,7 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 	cp := emocks.NewMockCommentParsing()
 	cr := emocks.NewMockCommandRunner()
 	c := emocks.NewMockPullCleaner()
-	vcsmock := vcsmocks.NewMockClient()
+	vcsmock := vcsmocks.NewMockClient(ctrl)
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 	logger := logging.NewNoopLogger(t)

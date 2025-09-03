@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
@@ -150,8 +150,9 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 
 		Ok(t, err)
 
-		RegisterMockTestingT(t)
-		terraform := tfclientmocks.NewMockClient()
+		ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+		terraform := tfclientmocks.NewMockClient(ctrl)
 		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
 			ThenReturn(nil)
 

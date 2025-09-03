@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
@@ -21,7 +21,8 @@ import (
 )
 
 func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	cases := []struct {
@@ -48,7 +49,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.version, func(t *testing.T) {
-			terraform := tfclientmocks.NewMockClient()
+			terraform := tfclientmocks.NewMockClient(ctrl)
 
 			logger := logging.NewNoopLogger(t)
 			ctx := command.ProjectContext{
@@ -82,7 +83,8 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 }
 
 func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	cases := []struct {
@@ -114,7 +116,7 @@ func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.version, func(t *testing.T) {
-			terraform := tfclientmocks.NewMockClient()
+			terraform := tfclientmocks.NewMockClient(ctrl)
 
 			logger := logging.NewNoopLogger(t)
 			ctx := command.ProjectContext{
@@ -150,8 +152,9 @@ func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 
 func TestRun_ShowInitOutputOnError(t *testing.T) {
 	// If there was an error during init then we want the output to be returned.
-	RegisterMockTestingT(t)
-	tfClient := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	tfClient := tfclientmocks.NewMockClient(ctrl)
 	logger := logging.NewNoopLogger(t)
 	When(tfClient.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", errors.New("error"))
@@ -191,8 +194,9 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 		Log:        logger,
 	}
 
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.14.0")
@@ -216,8 +220,9 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
 		Workspace:  "workspace",
@@ -250,8 +255,9 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
 
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
@@ -280,7 +286,8 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 }
 
 func TestRun_InitExtraArgsDeDupe(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	cases := []struct {
 		description  string
 		extraArgs    []string
@@ -320,7 +327,7 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			terraform := tfclientmocks.NewMockClient()
+			terraform := tfclientmocks.NewMockClient(ctrl)
 
 			logger := logging.NewNoopLogger(t)
 			ctx := command.ProjectContext{
@@ -357,8 +364,9 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	err := os.WriteFile(lockFilePath, nil, 0600)
 	Ok(t, err)
 
-	RegisterMockTestingT(t)
-	terraform := tfclientmocks.NewMockClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	terraform := tfclientmocks.NewMockClient(ctrl)
 
 	logger := logging.NewNoopLogger(t)
 	mockDownloader := mocks.NewMockDownloader()

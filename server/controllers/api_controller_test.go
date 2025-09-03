@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/controllers"
 	. "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -257,14 +257,15 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 }
 
 func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	locker := NewMockLocker()
 	logger := logging.NewNoopLogger(t)
 	parser := NewMockEventParsing()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	vcsClient := NewMockClient()
-	workingDir := NewMockWorkingDir()
+	workingDir := NewMockWorkingDir(ctrl)
 	Ok(t, err)
 
 	workingDirLocker := NewMockWorkingDirLocker()

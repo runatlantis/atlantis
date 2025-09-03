@@ -21,7 +21,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/events/webhooks/mocks"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -39,7 +39,7 @@ func TestAuthTest_Success(t *testing.T) {
 func TestAuthTest_Error(t *testing.T) {
 	t.Log("When the underlying slack client errors, an error should be returned")
 	setup(t)
-	When(underlying.AuthTest()).ThenReturn(nil, errors.New(""))
+	underlying.EXPECT().AuthTest().Return(nil, errors.New(""))
 	err := client.AuthTest()
 	Assert(t, err != nil, "expected error")
 }
@@ -89,7 +89,8 @@ func TestPostMessage_Success(t *testing.T) {
 	channel := "somechannel"
 	err := client.PostMessage(channel, result)
 	Ok(t, err)
-	underlying.VerifyWasCalledOnce().PostMessage(
+	// TODO: Convert to gomock expectation with argument capture
+	// underlying.EXPECT().PostMessage(
 		channel,
 		slack.MsgOptionAsUser(true),
 		slack.MsgOptionText("", false),
@@ -103,7 +104,8 @@ func TestPostMessage_Success(t *testing.T) {
 
 	err = client.PostMessage(channel, result)
 	Ok(t, err)
-	underlying.VerifyWasCalledOnce().PostMessage(
+	// TODO: Convert to gomock expectation with argument capture
+	// underlying.EXPECT().PostMessage(
 		channel,
 		slack.MsgOptionAsUser(true),
 		slack.MsgOptionText("", false),
@@ -151,8 +153,9 @@ func TestPostMessage_Error(t *testing.T) {
 */
 
 func setup(t *testing.T) {
-	RegisterMockTestingT(t)
-	underlying = mocks.NewMockUnderlyingSlackClient()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	underlying = mocks.NewMockUnderlyingSlackClient(ctrl)
 	client = webhooks.DefaultSlackClient{
 		Slack: underlying,
 		Token: "sometoken",

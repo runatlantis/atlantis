@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	runtime_mocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -50,9 +50,10 @@ var whPostWorkflowHookRunner *runtime_mocks.MockPostWorkflowHookRunner
 var postCommitStatusUpdater *mocks.MockCommitStatusUpdater
 
 func postWorkflowHooksSetup(t *testing.T) {
-	RegisterMockTestingT(t)
-	vcsClient := vcsmocks.NewMockClient()
-	postWhWorkingDir = mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	vcsClient := vcsmocks.NewMockClient(ctrl)
+	postWhWorkingDir = mocks.NewMockWorkingDir(ctrl)
 	postWhWorkingDirLocker = mocks.NewMockWorkingDirLocker()
 	whPostWorkflowHookRunner = runtime_mocks.NewMockPostWorkflowHookRunner()
 	postCommitStatusUpdater = mocks.NewMockCommitStatusUpdater()

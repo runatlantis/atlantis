@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -15,7 +15,8 @@ import (
 )
 
 func TestRun(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	logger := logging.NewNoopLogger(t)
 	workspace := "default"
 	v, _ := version.NewVersion("1.0")
@@ -50,7 +51,7 @@ func TestRun(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		extraArgs := []string{"extra", "args"}
-		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)
+		executorWorkflow.EXPECT().EnsureExecutorVersion(logger, v).Return(executablePath, nil)
 		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("Success!", nil)
 
 		output, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
@@ -62,7 +63,7 @@ func TestRun(t *testing.T) {
 	t.Run("ensure version failure", func(t *testing.T) {
 		extraArgs := []string{"extra", "args"}
 		expectedErr := errors.New("error ensuring version")
-		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn("", expectedErr)
+		executorWorkflow.EXPECT().EnsureExecutorVersion(logger, v).Return("", expectedErr)
 
 		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil))
 
@@ -70,7 +71,7 @@ func TestRun(t *testing.T) {
 	})
 	t.Run("executor failure", func(t *testing.T) {
 		extraArgs := []string{"extra", "args"}
-		When(executorWorkflow.EnsureExecutorVersion(logger, v)).ThenReturn(executablePath, nil)
+		executorWorkflow.EXPECT().EnsureExecutorVersion(logger, v).Return(executablePath, nil)
 		When(executorWorkflow.Run(context, executablePath, map[string]string(nil), workdir, extraArgs)).ThenReturn("", errors.New("error running executor"))
 
 		_, err := s.Run(context, extraArgs, workdir, map[string]string(nil))

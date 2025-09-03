@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime/cache/mocks"
 	models_mocks "github.com/runatlantis/atlantis/server/core/runtime/models/mocks"
@@ -24,7 +24,8 @@ func TestConfTestVersionDownloader(t *testing.T) {
 	platform := getPlatform()
 	fullURL := fmt.Sprintf("https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/conftest_0.25.0_%s.tar.gz?checksum=file:https://github.com/open-policy-agent/conftest/releases/download/v0.25.0/checksums.txt", platform)
 
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	mockDownloader := conftest_mocks.NewMockDownloader()
 
@@ -57,7 +58,8 @@ func TestEnsureExecutorVersion(t *testing.T) {
 	defaultVersion, _ := version.NewVersion("1.0")
 	expectedPath := "some/path"
 
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 	mockCache := mocks.NewMockExecutionVersionCache()
 	mockExec := models_mocks.NewMockExec()
@@ -136,7 +138,8 @@ func TestEnsureExecutorVersion(t *testing.T) {
 
 func TestRun(t *testing.T) {
 
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	mockResolver := conftest_mocks.NewMockSourceResolver()
 	mockExec := models_mocks.NewMockExec()
 

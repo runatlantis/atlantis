@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/events"
 	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -59,9 +59,10 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	workingDir := eventMocks.NewMockWorkingDir()
+	workingDir := eventMocks.NewMockWorkingDir(ctrl)
 
 	credentials := vcsMocks.NewMockGithubCredentials()
 
@@ -104,9 +105,10 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 func TestMergeAgain_GithubAppSetsCorrectUrl(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	workingDir := eventMocks.NewMockWorkingDir()
+	workingDir := eventMocks.NewMockWorkingDir(ctrl)
 
 	credentials := vcsMocks.NewMockGithubCredentials()
 

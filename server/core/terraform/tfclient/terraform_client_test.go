@@ -24,7 +24,7 @@ import (
 	"time"
 
 	version "github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
@@ -212,7 +212,8 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 
 // Test that if we don't have that version of TF that we download it.
 func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
@@ -227,7 +228,7 @@ func TestNewClient_DefaultTFFlagDownload(t *testing.T) {
 	defer tempSetEnv(t, "PATH", "")()
 
 	mockDownloader := mocks.NewMockDownloader()
-	When(mockDownloader.Install(Any[context.Context](), Any[string](), Any[string](), Any[*version.Version]())).Then(func(params []Param) ReturnValues {
+	When(mockDownloader.Install(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any())).Then(func(params []Param) ReturnValues {
 		binPath := filepath.Join(params[1].(string), "terraform0.11.10")
 		err := os.WriteFile(binPath, []byte("#!/bin/sh\necho '\nTerraform v0.11.10\n'"), 0700) // #nosec G306
 		return []ReturnValue{binPath, err}
@@ -263,7 +264,8 @@ func TestNewClient_BadVersion(t *testing.T) {
 // Test that if we run a command with a version we don't have, we download it.
 func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	tmp, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	ctx := command.ProjectContext{
@@ -297,7 +299,8 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 // Test that EnsureVersion downloads terraform.
 func TestEnsureVersion_downloaded(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	_, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
@@ -329,7 +332,8 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 // Test that EnsureVersion downloads terraform from a custom URL.
 func TestEnsureVersion_downloaded_customURL(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	_, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
@@ -362,7 +366,8 @@ func TestEnsureVersion_downloaded_customURL(t *testing.T) {
 // Test that EnsureVersion throws an error when downloads are disabled
 func TestEnsureVersion_downloaded_downloadingDisabled(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	_, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
@@ -493,10 +498,12 @@ terraform {
 
 	runDetectVersionTestCase := func(t *testing.T, name string, testCase testCase, downloadsAllowed bool) bool {
 		return t.Run(name, func(t *testing.T) {
-			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
 			logger := logging.NewNoopLogger(t)
-			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 			_, binDir, cacheDir := mkSubDirs(t)
 			projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 			mockDownloader := mocks.NewMockDownloader()
@@ -543,7 +550,8 @@ terraform {
 
 func TestExtractExactRegex(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	_, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 	mockDownloader := mocks.NewMockDownloader()
