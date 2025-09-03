@@ -24,9 +24,9 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockFilePath := models_mocks.NewMockFilePath()
-	mockExec := models_mocks.NewMockExec()
-	mockSerializer := cache_mocks.NewMockKeySerializer()
+	mockFilePath := models_mocks.NewMockFilePath(ctrl)
+	mockExec := models_mocks.NewMockExec(ctrl)
+	mockSerializer := cache_mocks.NewMockKeySerializer(ctrl)
 
 	t.Run("serializer error", func(t *testing.T) {
 		subject := &ExecutionVersionDiskLayer{
@@ -112,9 +112,9 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 	})
 
 	t.Run("loads version", func(t *testing.T) {
-		mockLoaderPath := models_mocks.NewMockFilePath()
-		mockSymlinkPath := models_mocks.NewMockFilePath()
-		mockLoadedBinaryPath := models_mocks.NewMockFilePath()
+		mockLoaderPath := models_mocks.NewMockFilePath(ctrl)
+		mockSymlinkPath := models_mocks.NewMockFilePath(ctrl)
+		mockLoadedBinaryPath := models_mocks.NewMockFilePath(ctrl)
 		expectedLoaderPath := "/some/path/to/binary"
 		expectedBinaryVersionPath := filepath.Join(expectedPath, binaryVersion)
 
@@ -143,7 +143,7 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 
 		mockFilePath.EXPECT().NotExists().Return(true)
 
-		When(mockFilePath.Join(binaryName, "versions", versionInput.Original())).ThenReturn(mockLoaderPath)
+		mockFilePath.EXPECT().Join(binaryName, "versions", versionInput.Original()).Return(mockLoaderPath)
 
 		mockLoaderPath.EXPECT().Resolve().Return(expectedLoaderPath)
 		mockLoadedBinaryPath.EXPECT().Symlink(expectedBinaryVersionPath).Return(mockSymlinkPath, nil)
@@ -158,7 +158,7 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 	})
 
 	t.Run("loader error", func(t *testing.T) {
-		mockLoaderPath := models_mocks.NewMockFilePath()
+		mockLoaderPath := models_mocks.NewMockFilePath(ctrl)
 		expectedLoaderPath := "/some/path/to/binary"
 		subject := &ExecutionVersionDiskLayer{
 			versionRootDir: mockFilePath,
@@ -184,7 +184,7 @@ func TestExecutionVersionDiskLayer(t *testing.T) {
 
 		mockFilePath.EXPECT().NotExists().Return(true)
 
-		When(mockFilePath.Join(binaryName, "versions", versionInput.Original())).ThenReturn(mockLoaderPath)
+		mockFilePath.EXPECT().Join(binaryName, "versions", versionInput.Original()).Return(mockLoaderPath)
 
 		mockLoaderPath.EXPECT().Resolve().Return(expectedLoaderPath)
 
@@ -201,7 +201,7 @@ func TestExecutionVersionMemoryLayer(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockLayer := cache_mocks.NewMockExecutionVersionCache()
+	mockLayer := cache_mocks.NewMockExecutionVersionCache(ctrl)
 
 	cache := make(map[string]string)
 

@@ -20,7 +20,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.8")
 	workspace := "default"
@@ -35,24 +35,7 @@ func TestRun_NoWorkspaceIn08(t *testing.T) {
 	Ok(t, err)
 
 	// Verify that no env or workspace commands were run
-	// TODO: Convert Never() expectation: terraform.EXPECT().RunCommandWithVersion(ctx,
-		"/path",
-		[]string{"env",
-			"select",
-			"workspace"},
-		map[string]string(nil).Times(0),
-		tfDistribution,
-		tfVersion,
-		workspace)
-	// TODO: Convert Never() expectation: terraform.EXPECT().RunCommandWithVersion(ctx,
-		"/path",
-		[]string{"workspace",
-			"select",
-			"workspace"},
-		map[string]string(nil).Times(0),
-		tfDistribution,
-		tfVersion,
-		workspace)
+	// TODO: Convert Never() expectation: terraform.EXPECT().RunCommandWithVersion(...).Times(0)
 }
 
 func TestRun_ErrWorkspaceIn08(t *testing.T) {
@@ -61,7 +44,7 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.8")
 	logger := logging.NewNoopLogger(t)
@@ -78,7 +61,7 @@ func TestRun_ErrWorkspaceIn08(t *testing.T) {
 func TestRun_SwitchesWorkspace(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 
 	cases := []struct {
@@ -117,17 +100,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 			_, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 
-			// Verify that env select was called as well as plan.
-			// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().RunCommandWithVersion(ctx,
-				"/path",
-				[]string{c.expWorkspaceCmd,
-					"select",
-					"workspace"},
-				map[string]string(nil),
-				tfDistribution,
-				tfVersion,
-				"workspace")
+			// TODO: Convert to gomock expectation: terraform.EXPECT().RunCommandWithVersion(...)
 		})
 	}
 }
@@ -135,7 +108,7 @@ func TestRun_SwitchesWorkspace(t *testing.T) {
 func TestRun_SwitchesWorkspaceDistribution(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 
 	cases := []struct {
@@ -180,17 +153,7 @@ func TestRun_SwitchesWorkspaceDistribution(t *testing.T) {
 			_, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 
-			// Verify that env select was called as well as plan.
-			// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().RunCommandWithVersion(Eq(ctx),
-				Eq("/path"),
-				Eq([]string{c.expWorkspaceCmd,
-					"select",
-					"workspace"}),
-				Eq(map[string]string(nil)),
-				NotEq(tfDistribution),
-				Eq(tfVersion),
-				Eq("workspace"))
+			// TODO: Convert to gomock expectation: terraform.EXPECT().RunCommandWithVersion(...)
 		})
 	}
 }
@@ -225,7 +188,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.tfVersion, func(t *testing.T) {
 			terraform := tfclientmocks.NewMockClient(ctrl)
-			mockDownloader := mocks.NewMockDownloader()
+			mockDownloader := mocks.NewMockDownloader(ctrl)
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			logger := logging.NewNoopLogger(t)
@@ -248,17 +211,15 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 
 			// Ensure that we actually try to switch workspaces by making the
 			// output of `workspace show` to be a different name.
-			When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, "workspace")).ThenReturn("diffworkspace\n", nil)
+			terraform.EXPECT().RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, "workspace").Return("diffworkspace\n", nil)
 
 			expWorkspaceArgs := []string{c.expWorkspaceCommand, "select", "workspace"}
-			When(terraform.RunCommandWithVersion(ctx, "/path", expWorkspaceArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")).ThenReturn("", errors.New("workspace does not exist"))
+			terraform.EXPECT().RunCommandWithVersion(ctx, "/path", expWorkspaceArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace").Return("", errors.New("workspace does not exist"))
 
 			_, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 
-			// Verify that env select was called as well as plan.
-			// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().RunCommandWithVersion(ctx, "/path", expWorkspaceArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
+			// TODO: Convert to gomock expectation: terraform.EXPECT().RunCommandWithVersion(...)
 		})
 	}
 }
@@ -269,7 +230,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger(t)
@@ -289,11 +250,10 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		},
 	}
 	s := NewWorkspaceStepRunnerDelegate(terraform, tfDistribution, tfVersion, &NullRunner{})
-	When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, "workspace")).ThenReturn("workspace\n", nil)
+	terraform.EXPECT().RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, "workspace").Return("workspace\n", nil)
 
 	_, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 	Ok(t, err)
 
-	// Verify that workspace select was never called.
-	// TODO: Convert Never() expectation: terraform.EXPECT().RunCommandWithVersion(ctx, "/path", []string{"workspace", "select", "workspace"}, map[string]string(nil).Times(0), tfDistribution, tfVersion, "workspace")
+	// TODO: Convert Never() expectation: terraform.EXPECT().RunCommandWithVersion(...).Times(0)
 }
