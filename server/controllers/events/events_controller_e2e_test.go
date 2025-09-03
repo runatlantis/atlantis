@@ -651,6 +651,46 @@ func TestGitHubWorkflow(t *testing.T) {
 				gomock.Any(), gomock.Any(), gomock.Any()).Return(GitHubPullRequestParsed(headSHA), nil).AnyTimes()
 			vcsClient.EXPECT().GetModifiedFiles(
 				gomock.Any(), gomock.Any(), gomock.Any()).Return(c.ModifiedFiles, nil).AnyTimes()
+			
+			// Calculate expected number of replies
+			expNumReplies := len(c.Comments)
+			if !c.ExpNoLocksToDelete {
+				expNumReplies++
+			}
+			if c.ExpAutoplan {
+				expNumReplies++
+			}
+			if c.ExpAutomerge {
+				expNumReplies++
+			}
+			
+			// Set up expectation to capture VCS comments
+			actReplies := make([]string, 0, expNumReplies)
+			vcsClient.EXPECT().CreateComment(
+				gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Times(expNumReplies).
+				Do(func(ctx interface{}, repo interface{}, pullNum interface{}, comment string, command interface{}) {
+					actReplies = append(actReplies, comment)
+				})
+			
+			// Set up hook expectations if needed
+			expNumHooks := len(c.Comments) - c.ExpParseFailedCount
+			if !c.DisableAutoplan {
+				expNumHooks++
+			}
+			if !c.DisablePreWorkflowHooks {
+				mockPreWorkflowHookRunner.EXPECT().Run(gomock.Any(),
+					gomock.Eq("some dummy command"), gomock.Any(), gomock.Any(), gomock.Any()).Times(expNumHooks)
+			}
+			mockPostWorkflowHookRunner.EXPECT().Run(gomock.Any(),
+				gomock.Eq("some post dummy command"), gomock.Any(), gomock.Any(), gomock.Any()).Times(expNumHooks)
+			
+			// Set up merge expectations
+			if c.ExpAutomerge {
+				vcsClient.EXPECT().MergePull(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+			} else {
+				vcsClient.EXPECT().MergePull(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			}
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -681,54 +721,13 @@ func TestGitHubWorkflow(t *testing.T) {
 			eventsController.Post(w, pullClosedReq)
 			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
-			expNumHooks := len(c.Comments) - c.ExpParseFailedCount
-			// if auto plan is disabled, hooks will not be called on pull request opened event
-			if !c.DisableAutoplan {
-				expNumHooks++
-			}
-			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			if !c.DisablePreWorkflowHooks {
-				// TODO: Convert to gomock expectation
-				// mockPreWorkflowHookRunner.EXPECT().Run(gomock.Any(),
-				//	gomock.Eq("some dummy command"), gomock.Any(), gomock.Any(), gomock.Any()).Times(expNumHooks)
-			}
-			// TODO: Convert to gomock expectation  
-			// mockPostWorkflowHookRunner.EXPECT().Run(gomock.Any(),
-			//	gomock.Eq("some post dummy command"), gomock.Any(), gomock.Any(), gomock.Any()).Times(expNumHooks)
-
-			// Now we're ready to verify Atlantis made all the comments back (or
-			// replies) that we expect.  We expect each plan to have 1 comment,
-			// and apply have 1 for each comment
-			expNumReplies := len(c.Comments)
-
-			// If there are locks to delete at the end, that will take a comment
-			if !c.ExpNoLocksToDelete {
-				expNumReplies++
-			}
-
-			if c.ExpAutoplan {
-				expNumReplies++
-			}
-
-			if c.ExpAutomerge {
-				expNumReplies++
-			}
-
-			// TODO: Convert to gomock expectation with argument capture
-			// vcsClient.EXPECT().CreateComment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(expNumReplies)
-			var actReplies []string
+			// Now verify the captured comments match expectations
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)
 			}
 
-			if c.ExpAutomerge {
-				// Verify that the merge API call was made.
-				// TODO: Convert to gomock expectation with argument capture
-	// vcsClient.EXPECT().MergePull(gomock.Any(), gomock.Any(), gomock.Any())
-			} else {
-				// TODO: Convert Never() expectation: vcsClient.EXPECT().MergePull(gomock.Any().Times(0), gomock.Any(), gomock.Any())
-			}
+			// Mock expectations for merge were set up earlier, so we just verify the test completed
 		})
 	}
 }
@@ -832,6 +831,20 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 			w := httptest.NewRecorder()
 			githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Any(), gomock.Any()).Return(GitHubPullRequestParsed(headSHA), nil).AnyTimes()
 			vcsClient.EXPECT().GetModifiedFiles(gomock.Any(), gomock.Any(), gomock.Any()).Return(c.ModifiedFiles, nil).AnyTimes()
+			
+			// Set up expectation to capture VCS comments for terraform lock test
+			expNumReplies := 2  // Based on test structure - plan and apply
+			actReplies := make([]string, 0, expNumReplies)
+			vcsClient.EXPECT().CreateComment(
+				gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Times(expNumReplies).
+				Do(func(ctx interface{}, repo interface{}, pullNum interface{}, comment string, command interface{}) {
+					actReplies = append(actReplies, comment)
+				})
+			
+			// Set up pre-workflow hook expectation
+			mockPreWorkflowHookRunner.EXPECT().Run(gomock.Any(),
+				gomock.Eq("some dummy command"), gomock.Any(), gomock.Any(), gomock.Any()).Times(2)
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -883,17 +896,15 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 			}
 
 			// Let's verify the pre-workflow hook was called for each comment including the pull request opened event
-			// TODO: Convert to gomock expectation: mockPreWorkflowHookRunner.EXPECT().Run(gomock.Any(),
-			//		gomock.Eq("some dummy command"), gomock.Any(), gomock.Any(), gomock.Any()).Times(2)
+			// (Expectations were set up earlier during test setup)
 
 			// Now we're ready to verify Atlantis made all the comments back (or
 			// replies) that we expect.  We expect each plan to have 1 comment,
 			// and apply have 1 for each comment plus one for the locks deleted at the
 			// end.
 
-			// TODO: Convert to gomock expectation: vcsClient.EXPECT().CreateComment(
-			//		gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(2).GetAllCapturedArguments()
-			var actReplies []string
+			// VCS CreateComment expectations were set up earlier with argument capture
+			// actReplies was populated by the Do() function in the expectation
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, false)
@@ -1231,6 +1242,43 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				gomock.Any(), gomock.Any(), gomock.Any()).Return(GitHubPullRequestParsed(headSHA), nil).AnyTimes()
 			vcsClient.EXPECT().GetModifiedFiles(
 				gomock.Any(), gomock.Any(), gomock.Any()).Return(c.ModifiedFiles, nil).AnyTimes()
+			
+			// Pre-calculate expected number of replies for policy check test
+			expNumReplies := len(c.Comments) + 1
+			if c.ExpAutoplan {
+				expNumReplies += 2
+			}
+			var planRegex = regexp.MustCompile("plan")
+			for _, comment := range c.Comments {
+				if planRegex.MatchString(comment) {
+					expNumReplies++
+				}
+			}
+			if c.ExpAutomerge {
+				expNumReplies++
+			}
+			if c.ExpQuietPolicyChecks && !c.ExpQuietPolicyCheckFailure {
+				expNumReplies--
+			}
+			if !c.ExpPolicyChecks {
+				expNumReplies--
+			}
+			
+			// Set up expectation to capture VCS comments for policy check test
+			actReplies := make([]string, 0, expNumReplies)
+			vcsClient.EXPECT().CreateComment(
+				gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Times(expNumReplies).
+				Do(func(ctx interface{}, repo interface{}, pullNum interface{}, comment string, command interface{}) {
+					actReplies = append(actReplies, comment)
+				})
+			
+			// Set up merge expectations
+			if c.ExpAutomerge {
+				vcsClient.EXPECT().MergePull(gomock.Any(), gomock.Any(), gomock.Any()).Times(1)
+			} else {
+				vcsClient.EXPECT().MergePull(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			}
 
 			// First, send the open pull request event which triggers autoplan.
 			pullOpenedReq := GitHubPullRequestOpenedEvent(t, headSHA)
@@ -1256,47 +1304,16 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// replies) that we expect.  We expect each plan to have 2 comments,
 			// one for plan one for policy check and apply have 1 for each
 			// comment plus one for the locks deleted at the end.
-			expNumReplies := len(c.Comments) + 1
-
-			if c.ExpAutoplan {
-				expNumReplies++
-				expNumReplies++
-			}
-
-			var planRegex = regexp.MustCompile("plan")
-			for _, comment := range c.Comments {
-				if planRegex.MatchString(comment) {
-					expNumReplies++
-				}
-			}
-
-			if c.ExpAutomerge {
-				expNumReplies++
-			}
-
-			if c.ExpQuietPolicyChecks && !c.ExpQuietPolicyCheckFailure {
-				expNumReplies--
-			}
-
-			if !c.ExpPolicyChecks {
-				expNumReplies--
-			}
-			// TODO: Convert to gomock expectation with argument capture
-			// vcsClient.EXPECT().CreateComment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(expNumReplies)
-			var actReplies []string
+			// (Expected replies calculation and VCS CreateComment expectations were set up earlier with argument capture)
+			// actReplies was populated by the Do() function in the expectation
 
 			Assert(t, len(c.ExpReplies) == len(actReplies), "missing expected replies, got %d but expected %d", len(actReplies), len(c.ExpReplies))
 			for i, expReply := range c.ExpReplies {
 				assertCommentEquals(t, expReply, actReplies[i], c.RepoDir, c.ExpParallel)
 			}
 
-			if c.ExpAutomerge {
-				// Verify that the merge API call was made.
-				// TODO: Convert to gomock expectation with argument capture
-	// vcsClient.EXPECT().MergePull(gomock.Any(), gomock.Any(), gomock.Any())
-			} else {
-				// TODO: Convert Never() expectation: vcsClient.EXPECT().MergePull(gomock.Any().Times(0), gomock.Any(), gomock.Any())
-			}
+			// Verify that the merge API call was made (or not made).
+			// Mock expectations for merge were set up earlier during test setup
 		})
 	}
 }

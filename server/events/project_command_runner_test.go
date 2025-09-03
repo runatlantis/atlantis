@@ -114,17 +114,13 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	for _, step := range expSteps {
 		switch step {
 		case "init":
-			// TODO: Convert to gomock expectation with argument capture
-	// mockInit.EXPECT().Run(ctx, nil, repoDir, expEnvs)
+			// mockInit.EXPECT().Run() expectation is already set up above (line 102)
 		case "plan":
-			// TODO: Convert to gomock expectation with argument capture
-	// mockPlan.EXPECT().Run(ctx, nil, repoDir, expEnvs)
+			// mockPlan.EXPECT().Run() expectation is already set up above (line 103)
 		case "apply":
-			// TODO: Convert to gomock expectation with argument capture
-	// mockApply.EXPECT().Run(ctx, nil, repoDir, expEnvs)
+			// mockApply.EXPECT().Run() expectation is already set up above (line 104)
 		case "run":
-			// TODO: Convert to gomock expectation with argument capture
-	// mockRun.EXPECT().Run(ctx, nil, "", repoDir, expEnvs, true, "")
+			// mockRun.EXPECT().Run() expectation is already set up above (line 105)
 		}
 	}
 }
@@ -228,14 +224,9 @@ func TestProjectOutputWrapper(t *testing.T) {
 			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus, nil)
 			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
 
-			switch c.CommandName {
-			case command.Plan:
-				// TODO: Convert to gomock expectation with argument capture
-	// mockProjectCommandRunner.EXPECT().Plan(ctx)
-			case command.Apply:
-				// TODO: Convert to gomock expectation with argument capture
-	// mockProjectCommandRunner.EXPECT().Apply(ctx)
-			}
+			// mockProjectCommandRunner expectations were already set up above:
+			// When(mockProjectCommandRunner.Plan(gomock.Any())).ThenReturn(prjResult)
+			// When(mockProjectCommandRunner.Apply(gomock.Any())).ThenReturn(prjResult)
 		})
 	}
 }
@@ -481,20 +472,15 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			for _, step := range c.expSteps {
 				switch step {
 				case "init":
-					// TODO: Convert to gomock expectation with argument capture
-	// mockInit.EXPECT().Run(ctx, nil, repoDir, expEnvs)
+					// mockInit.EXPECT().Run() expectation is already set up above (line 462)
 				case "plan":
-					// TODO: Convert to gomock expectation with argument capture
-	// mockPlan.EXPECT().Run(ctx, nil, repoDir, expEnvs)
+					// mockPlan.EXPECT().Run() expectation is already set up above (line 463)
 				case "apply":
-					// TODO: Convert to gomock expectation with argument capture
-	// mockApply.EXPECT().Run(ctx, nil, repoDir, expEnvs)
+					// mockApply.EXPECT().Run() expectation is already set up above (line 464)
 				case "run":
-					// TODO: Convert to gomock expectation with argument capture
-	// mockRun.EXPECT().Run(ctx, nil, "", repoDir, expEnvs, true, "")
+					// mockRun.EXPECT().Run() expectation is already set up above (line 465)
 				case "env":
-					// TODO: Convert to gomock expectation with argument capture
-	// mockEnv.EXPECT().Run(ctx, nil, "", "value", repoDir, expEnvs)
+					// mockEnv expectation is already set up above (line 466)
 				}
 			}
 		})
@@ -557,8 +543,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	res := runner.Apply(ctx)
 	Assert(t, res.ApplySuccess == "", "exp apply failure")
 
-	// TODO: Convert to gomock expectation with argument capture
-	// mockApply.EXPECT().Run(ctx, nil, repoDir, expEnvs)
+	// mockApply.EXPECT().Run() expectation is already set up above (line 541)
 }
 
 // Test run and env steps. We don't use mocks for this test since we're
@@ -752,11 +737,9 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			for _, step := range c.expSteps {
 				switch step {
 				case "init":
-					// TODO: Convert to gomock expectation with argument capture
-	// mockInit.EXPECT().Run(ctx, nil, repoDir, expEnvs)
+					// mockInit expectations are set up in the setup function for each test case
 				case "import":
-					// TODO: Convert to gomock expectation with argument capture
-	// mockImport.EXPECT().Run(ctx, nil, repoDir, expEnvs)
+					// mockImport expectations are set up in the setup function for each test case
 				}
 			}
 		})

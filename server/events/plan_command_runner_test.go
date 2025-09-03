@@ -126,19 +126,25 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				return ReturnValues{[]command.ProjectContext{}, nil}
 			})
 
-			planCommandRunner.Run(ctx, cmd)
-
+			// Set up VCS client expectations
 			timesComment := 1
 			if c.ExpSilenced {
 				timesComment = 0
 			}
+			vcsClient.EXPECT().CreateComment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(timesComment)
 
-			// TODO: Convert VerifyWasCalled expectation: vcsClient.EXPECT().CreateComment(...).Times(timesComment)
+			// Set up commit status expectations
 			if c.ExpVCSStatusSet {
-				// TODO: Convert to gomock expectation: commitUpdater.EXPECT().UpdateCombinedCount(...)
+				commitUpdater.EXPECT().UpdateCombinedCount(gomock.Any(), gomock.Any(), 
+					models.SuccessCommitStatus, c.ExpVCSStatusSucc, c.ExpVCSStatusTotal).Times(1)
 			} else {
-				// TODO: Convert Never() expectation: commitUpdater.EXPECT().UpdateCombinedCount(...).Times(0)
+				commitUpdater.EXPECT().UpdateCombinedCount(gomock.Any(), gomock.Any(), 
+					gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			}
+
+			planCommandRunner.Run(ctx, cmd)
+
+			// Expectations were already set up before planCommandRunner.Run() above
 		})
 	}
 }
@@ -777,20 +783,23 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				projectCommandRunner.EXPECT().Plan(c.ProjectContexts[i]).Return(c.ProjectResults[i])
 			}
 
-			planCommandRunner.Run(ctx, cmd)
+			// Set up VCS client expectation
+			vcsClient.EXPECT().CreateComment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
-			// TODO: Convert to gomock expectation with argument capture
-	// vcsClient.EXPECT().CreateComment(gomock.Any(), gomock.Any(), AnyInt(), AnyString(), AnyString())
-
+			// Set up commit status expectations
 			ExpCommitStatus := models.SuccessCommitStatus
 			if c.ExpVCSApplyStatusSucc != c.ExpVCSApplyStatusTotal {
 				ExpCommitStatus = models.PendingCommitStatus
 			}
 			if c.DoNotUpdateApply {
-				// TODO: Convert Never() expectation: commitUpdater.EXPECT().UpdateCombinedCount(...).Times(0)
+				commitUpdater.EXPECT().UpdateCombinedCount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			} else {
-				// TODO: Convert to gomock expectation: commitUpdater.EXPECT().UpdateCombinedCount(...)
+				commitUpdater.EXPECT().UpdateCombinedCount(gomock.Any(), gomock.Any(), ExpCommitStatus, c.ExpVCSApplyStatusSucc, c.ExpVCSApplyStatusTotal).Times(1)
 			}
+
+			planCommandRunner.Run(ctx, cmd)
+
+			// Expectations were already set up before planCommandRunner.Run() above
 		})
 	}
 }

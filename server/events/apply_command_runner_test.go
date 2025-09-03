@@ -72,11 +72,10 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			}
 
 			applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{Locked: c.ApplyLocked}, c.ApplyLockError)
+			// Set up VCS client expectation
+			vcsClient.EXPECT().CreateComment(
+				gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(modelPull.Num), gomock.Eq(c.ExpComment), gomock.Eq("apply")).Times(1)
 			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
-
-			// TODO: Convert to gomock expectation with argument capture
-			// vcsClient.EXPECT().CreateComment(
-			//		gomock.Any(), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(c.ExpComment), Eq("apply"))
 		})
 	}
 }
@@ -192,36 +191,39 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				return ReturnValues{[]command.ProjectContext{}, nil}
 			})
 
-			applyCommandRunner.Run(ctx, cmd)
-
+			// Set up VCS client expectations
 			timesComment := 1
 			if c.ExpSilenced {
 				timesComment = 0
 			}
+			vcsClient.EXPECT().CreateComment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(timesComment)
 
-			// TODO: Convert VerifyWasCalled expectation: vcsClient.EXPECT().CreateComment(...).Times(timesComment)
+			// Set up commit status expectations
 			if c.ExpVCSStatusSet {
-				// TODO: Convert to gomock expectation with argument capture
-				// commitUpdater.EXPECT().UpdateCombinedCount(
-				//		gomock.Any(),
-				//		gomock.Any(),
-				//		gomock.Any(),
-				//		Eq[models.CommitStatus](models.SuccessCommitStatus),
-				//		Eq[command.Name](command.Apply),
-				//		Eq(c.ExpVCSStatusSucc),
-				//		Eq(c.ExpVCSStatusTotal),
-				// )
+				commitUpdater.EXPECT().UpdateCombinedCount(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					models.SuccessCommitStatus,
+					command.Apply,
+					c.ExpVCSStatusSucc,
+					c.ExpVCSStatusTotal,
+				).Times(1)
 			} else {
-				// TODO: Convert Never() expectation: commitUpdater.EXPECT().UpdateCombinedCount(
-				//		gomock.Any().Times(0),
-				//		gomock.Any(),
-				//		gomock.Any(),
-				//		gomock.Any(),
-				//		Eq[command.Name](command.Apply),
-				//		gomock.Any(),
-				//		gomock.Any(),
-				// )
+				commitUpdater.EXPECT().UpdateCombinedCount(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					command.Apply,
+					gomock.Any(),
+					gomock.Any(),
+				).Times(0)
 			}
+
+			applyCommandRunner.Run(ctx, cmd)
+
+			// Expectations were already set up before applyCommandRunner.Run() above
 		})
 	}
 }
@@ -543,6 +545,9 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			for i := range c.ProjectContexts {
 				projectCommandRunner.EXPECT().Apply(c.ProjectContexts[i]).Return(c.ProjectResults[i])
 			}
+			// Set up VCS client expectation to capture the final comment
+			vcsClient.EXPECT().CreateComment(
+				gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num), gomock.Eq(c.ExpComment), gomock.Eq("apply")).Times(1)
 
 			applyCommandRunner.Run(ctx, cmd)
 
@@ -551,7 +556,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 
 			require.Equal(t, c.ApplyFailed, ctx.CommandHasErrors)
 
-			// TODO: Convert to gomock expectation: vcsClient.EXPECT().CreateComment(...)
+			// VCS client expectation was already set up before applyCommandRunner.Run() above
 		})
 	}
 }
