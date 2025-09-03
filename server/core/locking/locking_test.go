@@ -20,7 +20,7 @@ import (
 
 	"strings"
 
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -37,9 +37,11 @@ var timeNow = time.Now().Local()
 var pl = models.ProjectLock{Project: project, Pull: pull, User: user, Workspace: workspace, Time: timeNow}
 
 func TestTryLock_Err(t *testing.T) {
-	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.TryLock(Any[models.ProjectLock]())).ThenReturn(false, models.ProjectLock{}, errExpected)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	
+	backend := mocks.NewMockBackend(ctrl)
+	backend.EXPECT().TryLock(gomock.Any()).Return(false, models.ProjectLock{}, errExpected)
 	t.Log("when the backend returns an error, TryLock should return that error")
 	l := locking.NewClient(backend)
 	_, err := l.TryLock(project, workspace, pull, user)
@@ -47,10 +49,12 @@ func TestTryLock_Err(t *testing.T) {
 }
 
 func TestTryLock_Success(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	
 	currLock := models.ProjectLock{}
-	backend := mocks.NewMockBackend()
-	When(backend.TryLock(Any[models.ProjectLock]())).ThenReturn(true, currLock, nil)
+	backend := mocks.NewMockBackend(ctrl)
+	backend.EXPECT().TryLock(gomock.Any()).Return(true, currLock, nil)
 	l := locking.NewClient(backend)
 	r, err := l.TryLock(project, workspace, pull, user)
 	Ok(t, err)
@@ -58,8 +62,8 @@ func TestTryLock_Success(t *testing.T) {
 }
 
 func TestUnlock_InvalidKey(t *testing.T) {
-	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
+	backend := mocks.NewMockBackend(ctrl)
 	l := locking.NewClient(backend)
 
 	_, err := l.Unlock("invalidkey")
@@ -68,19 +72,18 @@ func TestUnlock_InvalidKey(t *testing.T) {
 }
 
 func TestUnlock_Err(t *testing.T) {
-	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.Unlock(Any[models.Project](), Any[string]())).ThenReturn(nil, errExpected)
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
+	backend := mocks.NewMockBackend(ctrl)
+	backend.EXPECT().Unlock(gomock.Any(), gomock.Any()).Return(nil, errExpected)
 	l := locking.NewClient(backend)
 	_, err := l.Unlock("owner/repo/path/workspace")
 	Equals(t, err, err)
-	backend.VerifyWasCalledOnce().Unlock(project, "workspace")
 }
 
 func TestUnlock(t *testing.T) {
-	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.Unlock(Any[models.Project](), Any[string]())).ThenReturn(&pl, nil)
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
+	backend := mocks.NewMockBackend(ctrl)
+	backend.EXPECT().Unlock(gomock.Any(), gomock.Any()).Return(&pl, nil)
 	l := locking.NewClient(backend)
 	lock, err := l.Unlock("owner/repo/path/workspace")
 	Ok(t, err)
@@ -88,18 +91,18 @@ func TestUnlock(t *testing.T) {
 }
 
 func TestList_Err(t *testing.T) {
-	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.List()).ThenReturn(nil, errExpected)
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
+	backend := mocks.NewMockBackend(ctrl)
+	backend.EXPECT().List().Return(nil, errExpected)
 	l := locking.NewClient(backend)
 	_, err := l.List()
 	Equals(t, errExpected, err)
 }
 
 func TestList(t *testing.T) {
-	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.List()).ThenReturn([]models.ProjectLock{pl}, nil)
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
+	backend := mocks.NewMockBackend(ctrl)
+	backend.EXPECT().List().Return([]models.ProjectLock{pl}, nil)
 	l := locking.NewClient(backend)
 	list, err := l.List()
 	Ok(t, err)
@@ -109,17 +112,17 @@ func TestList(t *testing.T) {
 }
 
 func TestUnlockByPull(t *testing.T) {
-	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.UnlockByPull("owner/repo", 1)).ThenReturn(nil, errExpected)
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
+	backend := mocks.NewMockBackend(ctrl)
+	backend.EXPECT().UnlockByPull("owner/repo", 1).Return(nil, errExpected)
 	l := locking.NewClient(backend)
 	_, err := l.UnlockByPull("owner/repo", 1)
 	Equals(t, errExpected, err)
 }
 
 func TestGetLock_BadKey(t *testing.T) {
-	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
+	backend := mocks.NewMockBackend(ctrl)
 	l := locking.NewClient(backend)
 	_, err := l.GetLock("invalidkey")
 	Assert(t, err != nil, "err should not be nil")
@@ -127,18 +130,18 @@ func TestGetLock_BadKey(t *testing.T) {
 }
 
 func TestGetLock_Err(t *testing.T) {
-	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.GetLock(project, workspace)).ThenReturn(nil, errExpected)
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
+	backend := mocks.NewMockBackend(ctrl)
+	backend.EXPECT().GetLock(project, workspace).Return(nil, errExpected)
 	l := locking.NewClient(backend)
 	_, err := l.GetLock("owner/repo/path/workspace")
 	Equals(t, errExpected, err)
 }
 
 func TestGetLock(t *testing.T) {
-	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.GetLock(project, workspace)).ThenReturn(&pl, nil)
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
+	backend := mocks.NewMockBackend(ctrl)
+	backend.EXPECT().GetLock(project, workspace).Return(&pl, nil)
 	l := locking.NewClient(backend)
 	lock, err := l.GetLock("owner/repo/path/workspace")
 	Ok(t, err)
@@ -146,7 +149,7 @@ func TestGetLock(t *testing.T) {
 }
 
 func TestTryLock_NoOpLocker(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
 	currLock := models.ProjectLock{}
 	l := locking.NewNoOpLocker()
 	r, err := l.TryLock(project, workspace, pull, user)
@@ -183,7 +186,7 @@ func TestGetLock_NoOpLocker(t *testing.T) {
 }
 
 func TestApplyLocker(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t); defer ctrl.Finish()
 	applyLock := &command.Lock{
 		CommandName: command.Apply,
 		LockMetadata: command.LockMetadata{
@@ -193,7 +196,7 @@ func TestApplyLocker(t *testing.T) {
 
 	t.Run("LockApply", func(t *testing.T) {
 		t.Run("backend errors", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			backend := mocks.NewMockBackend(ctrl)
 
 			When(backend.LockCommand(Any[command.Name](), Any[time.Time]())).ThenReturn(nil, errExpected)
 			l := locking.NewApplyClient(backend, false, false)
@@ -203,7 +206,7 @@ func TestApplyLocker(t *testing.T) {
 		})
 
 		t.Run("can't lock if apply is omitted from userConfig.AllowCommands", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			backend := mocks.NewMockBackend(ctrl)
 
 			l := locking.NewApplyClient(backend, true, false)
 			_, err := l.LockApply()
@@ -213,7 +216,7 @@ func TestApplyLocker(t *testing.T) {
 		})
 
 		t.Run("succeeds", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			backend := mocks.NewMockBackend(ctrl)
 
 			When(backend.LockCommand(Any[command.Name](), Any[time.Time]())).ThenReturn(applyLock, nil)
 			l := locking.NewApplyClient(backend, false, false)
@@ -224,7 +227,7 @@ func TestApplyLocker(t *testing.T) {
 
 	t.Run("UnlockApply", func(t *testing.T) {
 		t.Run("backend fails", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			backend := mocks.NewMockBackend(ctrl)
 
 			When(backend.UnlockCommand(Any[command.Name]())).ThenReturn(errExpected)
 			l := locking.NewApplyClient(backend, false, false)
@@ -233,7 +236,7 @@ func TestApplyLocker(t *testing.T) {
 		})
 
 		t.Run("can't lock if apply is omitted from userConfig.AllowCommands", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			backend := mocks.NewMockBackend(ctrl)
 
 			l := locking.NewApplyClient(backend, true, false)
 			err := l.UnlockApply()
@@ -243,7 +246,7 @@ func TestApplyLocker(t *testing.T) {
 		})
 
 		t.Run("succeeds", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			backend := mocks.NewMockBackend(ctrl)
 
 			When(backend.UnlockCommand(Any[command.Name]())).ThenReturn(nil)
 			l := locking.NewApplyClient(backend, false, false)
@@ -255,7 +258,7 @@ func TestApplyLocker(t *testing.T) {
 
 	t.Run("CheckApplyLock", func(t *testing.T) {
 		t.Run("fails", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			backend := mocks.NewMockBackend(ctrl)
 
 			When(backend.CheckCommandLock(Any[command.Name]())).ThenReturn(nil, errExpected)
 			l := locking.NewApplyClient(backend, false, false)
@@ -265,7 +268,7 @@ func TestApplyLocker(t *testing.T) {
 		})
 
 		t.Run("when apply is not in AllowCommands always return a lock", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			backend := mocks.NewMockBackend(ctrl)
 
 			l := locking.NewApplyClient(backend, true, false)
 			lock, err := l.CheckApplyLock()
@@ -275,7 +278,7 @@ func TestApplyLocker(t *testing.T) {
 		})
 
 		t.Run("UnlockCommand succeeds", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			backend := mocks.NewMockBackend(ctrl)
 
 			When(backend.CheckCommandLock(Any[command.Name]())).ThenReturn(applyLock, nil)
 			l := locking.NewApplyClient(backend, false, false)

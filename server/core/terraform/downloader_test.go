@@ -6,14 +6,13 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	. "github.com/petergtz/pegomock/v4"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 )
 
 func TestTerraformInstall(t *testing.T) {
 	d := &terraform.TerraformDownloader{}
-	RegisterMockTestingT(t)
 	binDir := t.TempDir()
 
 	v, _ := version.NewVersion("1.8.1")
@@ -30,7 +29,6 @@ func TestTerraformInstall(t *testing.T) {
 
 func TestOpenTofuInstall(t *testing.T) {
 	d := &terraform.TofuDownloader{}
-	RegisterMockTestingT(t)
 	binDir := t.TempDir()
 
 	v, _ := version.NewVersion("1.8.0")
