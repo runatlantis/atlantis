@@ -53,7 +53,7 @@ Docker compose is set up to start an atlantis container and ngrok container in t
 e.g.
 
 ```sh
-NGROK_AUTH=1234567890
+NGROK_AUTHTOKEN=1234567890
 
 ATLANTIS_GH_APP_ID=123
 ATLANTIS_GH_APP_KEY_FILE="/.ssh/somekey.pem"
