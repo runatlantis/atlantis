@@ -31,8 +31,8 @@ func TestRunDelegate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDefaultRunner := mocks.NewMockRunner()
-	mockRemoteRunner := mocks.NewMockRunner()
+	mockDefaultRunner := mocks.NewMockRunner(ctrl)
+	mockRemoteRunner := mocks.NewMockRunner(ctrl)
 
 	subject := &planTypeStepRunnerDelegate{
 		defaultRunner:    mockDefaultRunner,
@@ -58,11 +58,10 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
+		mockRemoteRunner.EXPECT().Run(ctx, extraArgs, tmpDir, envs).Return(expectedOut, nil)
+		mockDefaultRunner.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
-
-		mockDefaultRunner.VerifyWasCalled(Never())
 
 		Equals(t, expectedOut, output)
 		Ok(t, err)
@@ -86,11 +85,10 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
+		mockRemoteRunner.EXPECT().Run(ctx, extraArgs, tmpDir, envs).Return(expectedOut, errors.New("err"))
+		mockDefaultRunner.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
-
-		mockDefaultRunner.VerifyWasCalled(Never())
 
 		Equals(t, expectedOut, output)
 		Assert(t, err != nil, "err should not be nil")
@@ -114,11 +112,10 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
+		mockDefaultRunner.EXPECT().Run(ctx, extraArgs, tmpDir, envs).Return(expectedOut, nil)
+		mockRemoteRunner.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
-
-		mockRemoteRunner.VerifyWasCalled(Never())
 
 		Equals(t, expectedOut, output)
 		Ok(t, err)
@@ -142,11 +139,10 @@ func TestRunDelegate(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
+		mockDefaultRunner.EXPECT().Run(ctx, extraArgs, tmpDir, envs).Return(expectedOut, errors.New("err"))
+		mockRemoteRunner.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
-
-		mockRemoteRunner.VerifyWasCalled(Never())
 
 		Equals(t, expectedOut, output)
 		Assert(t, err != nil, "err should not be nil")
@@ -172,8 +168,8 @@ func TestRunDelegate_UsesConfiguredDistribution(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDefaultRunner := mocks.NewMockRunner()
-	mockRemoteRunner := mocks.NewMockRunner()
+	mockDefaultRunner := mocks.NewMockRunner(ctrl)
+	mockRemoteRunner := mocks.NewMockRunner(ctrl)
 
 	subject := &planTypeStepRunnerDelegate{
 		defaultRunner:    mockDefaultRunner,
@@ -201,11 +197,10 @@ func TestRunDelegate_UsesConfiguredDistribution(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
+		mockRemoteRunner.EXPECT().Run(ctx, extraArgs, tmpDir, envs).Return(expectedOut, nil)
+		mockDefaultRunner.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
-
-		mockDefaultRunner.VerifyWasCalled(Never())
 
 		Equals(t, expectedOut, output)
 		Ok(t, err)
@@ -230,11 +225,10 @@ func TestRunDelegate_UsesConfiguredDistribution(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockRemoteRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
+		mockRemoteRunner.EXPECT().Run(ctx, extraArgs, tmpDir, envs).Return(expectedOut, errors.New("err"))
+		mockDefaultRunner.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
-
-		mockDefaultRunner.VerifyWasCalled(Never())
 
 		Equals(t, expectedOut, output)
 		Assert(t, err != nil, "err should not be nil")
@@ -259,11 +253,10 @@ func TestRunDelegate_UsesConfiguredDistribution(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, nil)
+		mockDefaultRunner.EXPECT().Run(ctx, extraArgs, tmpDir, envs).Return(expectedOut, nil)
+		mockRemoteRunner.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
-
-		mockRemoteRunner.VerifyWasCalled(Never())
 
 		Equals(t, expectedOut, output)
 		Ok(t, err)
@@ -288,11 +281,10 @@ func TestRunDelegate_UsesConfiguredDistribution(t *testing.T) {
 
 		expectedOut := "some random output"
 
-		When(mockDefaultRunner.Run(ctx, extraArgs, tmpDir, envs)).ThenReturn(expectedOut, errors.New("err"))
+		mockDefaultRunner.EXPECT().Run(ctx, extraArgs, tmpDir, envs).Return(expectedOut, errors.New("err"))
+		mockRemoteRunner.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 		output, err := subject.Run(ctx, extraArgs, tmpDir, envs)
-
-		mockRemoteRunner.VerifyWasCalled(Never())
 
 		Equals(t, expectedOut, output)
 		Assert(t, err != nil, "err should not be nil")

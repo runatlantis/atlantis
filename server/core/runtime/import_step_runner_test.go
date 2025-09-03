@@ -109,9 +109,6 @@ func TestImportStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	s := NewImportStepRunner(terraform, tfDistribution, tfVersion)
 
-	// Create expected distribution based on project configuration  
-	expectedDistribution := tf.NewDistributionOpenTofuWithDownloader(mockDownloader)
-
 	// Set up expectations for workspace switching with configured distribution
 	terraform.EXPECT().RunCommandWithVersion(gomock.Eq(context), gomock.Eq(tmpDir), gomock.Eq([]string{"workspace", "show"}), gomock.Eq(map[string]string(nil)), gomock.Not(gomock.Eq(tfDistribution)), gomock.Eq(tfVersion), gomock.Eq(workspace)).Return("", nil)
 	terraform.EXPECT().RunCommandWithVersion(gomock.Eq(context), gomock.Eq(tmpDir), gomock.Eq([]string{"workspace", "select", workspace}), gomock.Eq(map[string]string(nil)), gomock.Not(gomock.Eq(tfDistribution)), gomock.Eq(tfVersion), gomock.Eq(workspace)).Return("", nil)

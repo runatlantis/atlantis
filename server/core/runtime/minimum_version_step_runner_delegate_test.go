@@ -14,7 +14,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockDelegate := mocks.NewMockRunner()
+	mockDelegate := mocks.NewMockRunner(ctrl)
 
 	tfVersion12, _ := version.NewVersion("0.12.0")
 	tfVersion11, _ := version.NewVersion("0.11.15")
@@ -35,7 +35,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 
 		ctx := command.ProjectContext{}
 
-		When(mockDelegate.Run(ctx, extraArgs, path, envs)).ThenReturn(expectedOut, nil)
+		mockDelegate.EXPECT().Run(ctx, extraArgs, path, envs).Return(expectedOut, nil)
 
 		output, err := subject.Run(
 			ctx,
@@ -59,7 +59,7 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			TerraformVersion: tfVersion12,
 		}
 
-		When(mockDelegate.Run(ctx, extraArgs, path, envs)).ThenReturn(expectedOut, nil)
+		mockDelegate.EXPECT().Run(ctx, extraArgs, path, envs).Return(expectedOut, nil)
 
 		output, err := subject.Run(
 			ctx,
@@ -81,14 +81,14 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 
 		ctx := command.ProjectContext{}
 
+		mockDelegate.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+		
 		output, err := subject.Run(
 			ctx,
 			extraArgs,
 			path,
 			envs,
 		)
-
-		mockDelegate.VerifyWasCalled(Never())
 
 		Equals(t, "Version: 0.11.15 is unsupported for this step. Minimum version is: 0.12.0", output)
 		Ok(t, err)
@@ -105,14 +105,14 @@ func TestRunMinimumVersionDelegate(t *testing.T) {
 			TerraformVersion: tfVersion11,
 		}
 
+		mockDelegate.EXPECT().Run(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+		
 		output, err := subject.Run(
 			ctx,
 			extraArgs,
 			path,
 			envs,
 		)
-
-		mockDelegate.VerifyWasCalled(Never())
 
 		Equals(t, "Version: 0.11.15 is unsupported for this step. Minimum version is: 0.12.0", output)
 		Ok(t, err)
