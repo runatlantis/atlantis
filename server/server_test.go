@@ -28,7 +28,6 @@ import (
 	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
