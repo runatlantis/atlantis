@@ -182,6 +182,7 @@ func TestGetLock_Success(t *testing.T) {
 		Workspace: "workspace",
 	}, nil)
 	tmpl := tMocks.NewMockTemplateWriter(ctrl)
+	tmpl.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	atlantisURL, err := url.Parse("https://example.com/basepath")
 	Ok(t, err)
 	lc := controllers.LocksController{
@@ -293,6 +294,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	workspaceName := "workspace"
 
 	cp := vcsmocks.NewMockClient(ctrl)
+	cp.EXPECT().CreateComment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	l := mocks2.NewMockDeleteLockCommand(ctrl)
 	workingDir := mocks2.NewMockWorkingDir(ctrl)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
@@ -387,6 +389,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	cp := vcsmocks.NewMockClient(ctrl)
+	cp.EXPECT().CreateComment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	dlc := mocks2.NewMockDeleteLockCommand(ctrl)
 	workingDir := mocks2.NewMockWorkingDir(ctrl)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()

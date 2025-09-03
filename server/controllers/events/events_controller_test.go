@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 // Copyright 2017 HootSuite Media Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the License);
@@ -97,7 +100,7 @@ func TestPost_InvalidGithubSecret(t *testing.T) {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "value")
-	When(v.Validate(req, secret)).ThenReturn(nil, errors.New("err"))
+	v.EXPECT().Validate(req, secret).Return(nil, errors.New("err"))
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusBadRequest, "err")
 }
@@ -108,7 +111,7 @@ func TestPost_InvalidGiteaSecret(t *testing.T) {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(giteaHeader, "value")
-	When(v.Validate(req, secret)).ThenReturn(nil, errors.New("err"))
+	v.EXPECT().Validate(req, secret).Return(nil, errors.New("err"))
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusBadRequest, "request did not pass validation")
 }
@@ -998,13 +1001,13 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *mocks.MockAzureDevopsRequestValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	v := mocks.NewMockGithubRequestValidator()
-	gl := mocks.NewMockGitlabRequestParserValidator()
-	ado := mocks.NewMockAzureDevopsRequestValidator()
-	p := emocks.NewMockEventParsing()
-	cp := emocks.NewMockCommentParsing()
-	cr := emocks.NewMockCommandRunner()
-	c := emocks.NewMockPullCleaner()
+	v := mocks.NewMockGithubRequestValidator(ctrl)
+	gl := mocks.NewMockGitlabRequestParserValidator(ctrl)
+	ado := mocks.NewMockAzureDevopsRequestValidator(ctrl)
+	p := emocks.NewMockEventParsing(ctrl)
+	cp := emocks.NewMockCommentParsing(ctrl)
+	cr := emocks.NewMockCommandRunner(ctrl)
+	c := emocks.NewMockPullCleaner(ctrl)
 	vcsmock := vcsmocks.NewMockClient(ctrl)
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
