@@ -63,7 +63,7 @@ func TestShowStepRunnner(t *testing.T) {
 	t.Run("success w/ version override", func(t *testing.T) {
 
 		v, _ := version.NewVersion("0.13.0")
-		mockDownloader := mocks.NewMockDownloader()
+		mockDownloader := mocks.NewMockDownloader(ctrl)
 		d := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 
 		contextWithVersionOverride := command.ProjectContext{
@@ -92,7 +92,7 @@ func TestShowStepRunnner(t *testing.T) {
 	t.Run("success w/ distribution override", func(t *testing.T) {
 
 		v, _ := version.NewVersion("0.13.0")
-		mockDownloader := mocks.NewMockDownloader()
+		mockDownloader := mocks.NewMockDownloader(ctrl)
 		d := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 		projTFDistribution := "opentofu"
 

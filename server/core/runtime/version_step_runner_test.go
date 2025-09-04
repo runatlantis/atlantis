@@ -37,7 +37,7 @@ func TestRunVersionStep(t *testing.T) {
 	}
 
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.15.0")
 	tmpDir := t.TempDir()
@@ -49,8 +49,9 @@ func TestRunVersionStep(t *testing.T) {
 	}
 
 	t.Run("ensure runs", func(t *testing.T) {
+		terraform.EXPECT().RunCommandWithVersion(context, tmpDir, []string{"version"}, map[string]string(nil), tfDistribution, tfVersion, "default").
+			Return("", nil)
 		_, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
-		terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, []string{"version"}, map[string]string(nil), tfDistribution, tfVersion, "default")
 		Ok(t, err)
 	})
 }
@@ -79,7 +80,7 @@ func TestVersionStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	}
 
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.15.0")
 	tmpDir := t.TempDir()
@@ -91,8 +92,11 @@ func TestVersionStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	}
 
 	t.Run("ensure runs", func(t *testing.T) {
+		// Use gomock.Not to assert that distribution is not the default
+		notDefaultDistribution := gomock.Not(gomock.Eq(tfDistribution))
+		terraform.EXPECT().RunCommandWithVersion(context, tmpDir, []string{"version"}, map[string]string(nil), notDefaultDistribution, tfVersion, "default").
+			Return("", nil)
 		_, err := s.Run(context, []string{}, tmpDir, map[string]string(nil))
-		terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(context), Eq(tmpDir), Eq([]string{"version"}), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq("default"))
 		Ok(t, err)
 	})
 }

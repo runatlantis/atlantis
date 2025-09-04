@@ -70,11 +70,11 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	tfClient := tfclientmocks.NewMockClient(ctrl)
-	mockDownloader := terraformmocks.NewMockDownloader()
+	mockDownloader := terraformmocks.NewMockDownloader(ctrl)
 	tfDistribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, err := version.NewVersion("0.12.0")
 	Ok(t, err)
-	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler(ctrl)
 	runStepRunner := runtime.RunStepRunner{
 		TerraformExecutor:       tfClient,
 		DefaultTFDistribution:   tfDistribution,

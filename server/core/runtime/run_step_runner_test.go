@@ -124,12 +124,15 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 			terraform := tfclientmocks.NewMockClient(ctrl)
-			defaultDistribution := tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader())
-			When(terraform.EnsureVersion(gomock.Any(), gomock.Any(), gomock.Any())).
-				ThenReturn(nil)
-
+			defaultDistribution := tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader(ctrl))
 			logger := logging.NewNoopLogger(t)
-			projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+			
+			// Expect non-default distribution
+			notDefaultDistribution := gomock.Not(gomock.Eq(defaultDistribution))
+			terraform.EXPECT().EnsureVersion(logger, notDefaultDistribution, projVersion).
+				Return(nil)
+
+			projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler(ctrl)
 			tmpDir := t.TempDir()
 
 			r := runtime.RunStepRunner{
@@ -181,9 +184,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
 				Equals(t, expOut, out)
 
-				// TODO: Convert to gomock expectation with argument capture
-	// terraform.EXPECT().EnsureVersion(Eq(logger), NotEq(defaultDistribution), Eq(projVersion))
-				// TODO: Convert Never() expectation: terraform.EXPECT().EnsureVersion(Eq(logger).Times(0), Eq(defaultDistribution), Eq(defaultVersion))
+				// Expectation was set before Run() call
 
 			})
 		}

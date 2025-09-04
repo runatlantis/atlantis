@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-version"
-	"go.uber.org/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
@@ -19,6 +18,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"go.uber.org/mock/gomock"
 
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -28,8 +28,8 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
-	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater(ctrl)
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec(ctrl)
 
 	// Create the env/workspace.tfvars file.
 	tmpDir := t.TempDir()
@@ -39,7 +39,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	err = os.WriteFile(envVarsFile, nil, 0600)
 	Ok(t, err)
 
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	// Using version >= 0.10 here so we don't expect any env commands.
 	tfVersion, _ := version.NewVersion("0.10.0")
@@ -83,14 +83,12 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 			Name:     "repo",
 		},
 	}
-	When(terraform.RunCommandWithVersion(ctx, tmpDir, expPlanArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")).ThenReturn("output", nil)
+	terraform.EXPECT().RunCommandWithVersion(ctx, tmpDir, expPlanArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace").Return("output", nil)
 
 	output, err := s.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 
-	// Verify that env select was never called since we're in version >= 0.10
-	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(ctx, tmpDir, []string{"env", "select", "workspace"}, map[string]string(nil), tfDistribution, tfVersion, "workspace")
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expPlanArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
+	// The expectations above will be verified automatically by gomock
 	Equals(t, "output", output)
 }
 
@@ -100,9 +98,9 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
-	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
-	mockDownloader := mocks.NewMockDownloader()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater(ctrl)
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec(ctrl)
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger(t)
@@ -123,7 +121,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 			Name:     "repo",
 		},
 	}
-	When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, "workspace")).ThenReturn("workspace\n", nil)
+	terraform.EXPECT().RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, "workspace").Return("workspace\n", nil)
 
 	expPlanArgs := []string{"plan",
 		"-input=false",
@@ -145,7 +143,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		"comment",
 		"args",
 	}
-	When(terraform.RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfDistribution, tfVersion, "default")).ThenReturn("output", nil)
+	terraform.EXPECT().RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfDistribution, tfVersion, "default").Return("output", nil)
 
 	output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 	Ok(t, err)
@@ -183,31 +181,36 @@ Terraform will perform the following actions:
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
-	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
-	mockDownloader := mocks.NewMockDownloader()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater(ctrl)
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec(ctrl)
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
 	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
-	When(terraform.RunCommandWithVersion(
-		Any[command.ProjectContext](),
-		Any[string](),
-		Any[[]string](),
-		Any[map[string]string](),
-		Any[tf.Distribution](),
-		Any[*version.Version](),
-		Any[string]())).
-		Then(func(params []Param) ReturnValues {
-			// This code allows us to return different values depending on the
-			// tf command being run while still using the wildcard matchers above.
-			tfArgs := params[2].([]string)
-			if stringSliceEquals(tfArgs, []string{"workspace", "show"}) {
-				return []ReturnValue{"default", nil}
-			} else if tfArgs[0] == "plan" {
-				return []ReturnValue{rawOutput, nil}
-			}
-			return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
-		})
+	// Set up expectations for workspace show command
+	terraform.EXPECT().RunCommandWithVersion(
+		gomock.Any(),
+		gomock.Any(),
+		[]string{"workspace", "show"},
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any()).Return("default", nil)
+
+	// Set up expectations for plan command
+	terraform.EXPECT().RunCommandWithVersion(
+		gomock.Any(),
+		gomock.Any(),
+		gomock.AssignableToTypeOf([]string{}),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any()).DoAndReturn(func(ctx command.ProjectContext, dir string, args []string, env map[string]string, dist tf.Distribution, ver *version.Version, workspace string) (string, error) {
+		if len(args) > 0 && args[0] == "plan" {
+			return rawOutput, nil
+		}
+		return "", errors.New("unexpected call to RunCommandWithVersion")
+	})
 	actOutput, err := s.Run(command.ProjectContext{Workspace: "default"}, nil, "", map[string]string(nil))
 	Ok(t, err)
 	Equals(t, `
@@ -237,33 +240,38 @@ func TestRun_OutputOnErr(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
-	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
-	mockDownloader := mocks.NewMockDownloader()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater(ctrl)
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec(ctrl)
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
 	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
 	expOutput := "expected output"
 	expErrMsg := "error!"
-	When(terraform.RunCommandWithVersion(
-		Any[command.ProjectContext](),
-		Any[string](),
-		Any[[]string](),
-		Any[map[string]string](),
-		Any[tf.Distribution](),
-		Any[*version.Version](),
-		Any[string]())).
-		Then(func(params []Param) ReturnValues {
-			// This code allows us to return different values depending on the
-			// tf command being run while still using the wildcard matchers above.
-			tfArgs := params[2].([]string)
-			if stringSliceEquals(tfArgs, []string{"workspace", "show"}) {
-				return []ReturnValue{"default\n", nil}
-			} else if tfArgs[0] == "plan" {
-				return []ReturnValue{expOutput, errors.New(expErrMsg)}
-			}
-			return []ReturnValue{"", errors.New("unexpected call to RunCommandWithVersion")}
-		})
+	// Set up expectations for workspace show command
+	terraform.EXPECT().RunCommandWithVersion(
+		gomock.Any(),
+		gomock.Any(),
+		[]string{"workspace", "show"},
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any()).Return("default\n", nil)
+
+	// Set up expectations for plan command
+	terraform.EXPECT().RunCommandWithVersion(
+		gomock.Any(),
+		gomock.Any(),
+		gomock.AssignableToTypeOf([]string{}),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any()).DoAndReturn(func(ctx command.ProjectContext, dir string, args []string, env map[string]string, dist tf.Distribution, ver *version.Version, workspace string) (string, error) {
+		if len(args) > 0 && args[0] == "plan" {
+			return expOutput, errors.New(expErrMsg)
+		}
+		return "", errors.New("unexpected call to RunCommandWithVersion")
+	})
 	actOutput, actErr := s.Run(command.ProjectContext{Workspace: "default"}, nil, "", map[string]string(nil))
 	ErrEquals(t, expErrMsg, actErr)
 	Equals(t, expOutput, actOutput)
@@ -305,18 +313,10 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			terraform := tfclientmocks.NewMockClient(ctrl)
-			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
-			asyncTfExec := runtimemocks.NewMockAsyncTFExec()
-			When(terraform.RunCommandWithVersion(
-				Any[command.ProjectContext](),
-				Any[string](),
-				Any[[]string](),
-				Any[map[string]string](),
-				Any[tf.Distribution](),
-				Any[*version.Version](),
-				Any[string]())).ThenReturn("output", nil)
+			commitStatusUpdater := runtimemocks.NewMockStatusUpdater(ctrl)
+			asyncTfExec := runtimemocks.NewMockAsyncTFExec(ctrl)
 
-			mockDownloader := mocks.NewMockDownloader()
+			mockDownloader := mocks.NewMockDownloader(ctrl)
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
@@ -335,11 +335,13 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 				},
 			}
 
+			terraform.EXPECT().RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfDistribution, tfVersion, "default").Return("output", nil)
+
 			output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 			Equals(t, "output", output)
 
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), tfDistribution, tfVersion, "default")
+			// The expectation above will be verified automatically by gomock
 		})
 	}
 
@@ -405,10 +407,10 @@ locally at this time.
 				},
 			}
 			ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+			defer ctrl.Finish()
 			terraform := tfclientmocks.NewMockClient(ctrl)
-			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
-			mockDownloader := mocks.NewMockDownloader()
+			commitStatusUpdater := runtimemocks.NewMockStatusUpdater(ctrl)
+			mockDownloader := mocks.NewMockDownloader(ctrl)
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			asyncTf := &remotePlanMock{}
@@ -416,14 +418,14 @@ locally at this time.
 			absProjectPath := t.TempDir()
 
 			// First, terraform workspace gets run.
-			When(terraform.RunCommandWithVersion(
+			terraform.EXPECT().RunCommandWithVersion(
 				ctx,
 				absProjectPath,
 				[]string{"workspace", "show"},
 				map[string]string(nil),
 				tfDistribution,
 				tfVersion,
-				"default")).ThenReturn("default\n", nil)
+				"default").Return("default\n", nil)
 
 			// Then the first call to terraform plan should return the remote ops error.
 			expPlanArgs := []string{"plan",
@@ -462,8 +464,8 @@ locally at this time.
 			planErr := errors.New("exit status 1: err")
 			planOutput := "\n" + c.remoteOpsErr
 			asyncTf.LinesToSend = remotePlanOutput
-			When(terraform.RunCommandWithVersion(ctx, absProjectPath, expPlanArgs, map[string]string(nil), tfDistribution, tfVersion, "default")).
-				ThenReturn(planOutput, planErr)
+			terraform.EXPECT().RunCommandWithVersion(ctx, absProjectPath, expPlanArgs, map[string]string(nil), tfDistribution, tfVersion, "default").
+				Return(planOutput, planErr)
 
 			output, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath, map[string]string(nil))
 			Ok(t, err)
@@ -489,8 +491,8 @@ Plan: 0 to add, 0 to change, 1 to destroy.`), "expect plan success")
 
 			// Ensure that the status was updated with the runURL.
 			runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
-			commitStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.PendingCommitStatus, runURL, nil)
-			commitStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.SuccessCommitStatus, runURL, nil)
+			commitStatusUpdater.EXPECT().UpdateProject(ctx, command.Plan, models.PendingCommitStatus, runURL, nil)
+			commitStatusUpdater.EXPECT().UpdateProject(ctx, command.Plan, models.SuccessCommitStatus, runURL, nil)
 		})
 	}
 }
@@ -596,18 +598,10 @@ func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			terraform := tfclientmocks.NewMockClient(ctrl)
-			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
-			asyncTfExec := runtimemocks.NewMockAsyncTFExec()
-			When(terraform.RunCommandWithVersion(
-				Any[command.ProjectContext](),
-				Any[string](),
-				Any[[]string](),
-				Any[map[string]string](),
-				Any[tf.Distribution](),
-				Any[*version.Version](),
-				Any[string]())).ThenReturn("output", nil)
+			commitStatusUpdater := runtimemocks.NewMockStatusUpdater(ctrl)
+			asyncTfExec := runtimemocks.NewMockAsyncTFExec(ctrl)
 
-			mockDownloader := mocks.NewMockDownloader()
+			mockDownloader := mocks.NewMockDownloader(ctrl)
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec)
@@ -627,11 +621,13 @@ func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 				TerraformDistribution: &c.tfDistribution,
 			}
 
+			terraform.EXPECT().RunCommandWithVersion(ctx, "/path", expPlanArgs, map[string]string(nil), gomock.Not(gomock.Eq(tfDistribution)), tfVersion, "default").Return("output", nil)
+
 			output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
 			Equals(t, "output", output)
 
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq("/path"), Eq(expPlanArgs), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq("default"))
+			// The expectation above will be verified automatically by gomock
 		})
 	}
 

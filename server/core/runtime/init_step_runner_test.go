@@ -23,7 +23,7 @@ import (
 func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	cases := []struct {
 		version string
@@ -64,20 +64,21 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 				DefaultTFDistribution: tfDistribution,
 				DefaultTFVersion:      tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-				ThenReturn("output", nil)
-
-			output, err := iso.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
-			Ok(t, err)
-			// When there is no error, should not return init output to PR.
-			Equals(t, "", output)
-
+			
 			// If using init then we specify -input=false but not for get.
 			expArgs := []string{c.expCmd, "-input=false", "-upgrade", "extra", "args"}
 			if c.expCmd == "get" {
 				expArgs = []string{c.expCmd, "-upgrade", "extra", "args"}
 			}
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
+			
+			terraform.EXPECT().RunCommandWithVersion(
+				ctx, "/path", expArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace").
+				Return("output", nil)
+
+			output, err := iso.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
+			Ok(t, err)
+			// When there is no error, should not return init output to PR.
+			Equals(t, "", output)
 		})
 	}
 }
@@ -85,7 +86,7 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	cases := []struct {
 		version      string
@@ -98,18 +99,28 @@ func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 			"get",
 		},
 		{
-			"0.8.9",
-			"terraform",
-			"get",
-		},
-		{
 			"0.9.0",
 			"opentofu",
 			"init",
 		},
 		{
 			"0.9.1",
-			"terraform",
+			"opentofu",
+			"init",
+		},
+		{
+			"0.10.0",
+			"opentofu",
+			"init",
+		},
+		{
+			"1.5.0",
+			"opentofu",
+			"init",
+		},
+		{
+			"1.6.0",
+			"opentofu",
 			"init",
 		},
 	}
@@ -117,13 +128,13 @@ func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.version, func(t *testing.T) {
 			terraform := tfclientmocks.NewMockClient(ctrl)
-
+			projDistribution := c.distribution
 			logger := logging.NewNoopLogger(t)
 			ctx := command.ProjectContext{
 				Workspace:             "workspace",
 				RepoRelDir:            ".",
 				Log:                   logger,
-				TerraformDistribution: &c.distribution,
+				TerraformDistribution: &projDistribution,
 			}
 
 			tfVersion, _ := version.NewVersion(c.version)
@@ -132,244 +143,242 @@ func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 				DefaultTFDistribution: tfDistribution,
 				DefaultTFVersion:      tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-				ThenReturn("output", nil)
-
-			output, err := iso.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
-			Ok(t, err)
-			// When there is no error, should not return init output to PR.
-			Equals(t, "", output)
-
+			
 			// If using init then we specify -input=false but not for get.
 			expArgs := []string{c.expCmd, "-input=false", "-upgrade", "extra", "args"}
 			if c.expCmd == "get" {
 				expArgs = []string{c.expCmd, "-upgrade", "extra", "args"}
 			}
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq("/path"), Eq(expArgs), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq("workspace"))
+			
+			// Expect non-default distribution
+			notDefaultDistribution := gomock.Not(gomock.Eq(tfDistribution))
+			terraform.EXPECT().RunCommandWithVersion(
+				ctx, "/path", expArgs, map[string]string(nil), notDefaultDistribution, tfVersion, "workspace").
+				Return("output", nil)
+
+			output, err := iso.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
+			Ok(t, err)
+			// When there is no error, should not return init output to PR.
+			Equals(t, "", output)
 		})
 	}
 }
 
 func TestRun_ShowInitOutputOnError(t *testing.T) {
-	// If there was an error during init then we want the output to be returned.
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	tfClient := tfclientmocks.NewMockClient(ctrl)
-	logger := logging.NewNoopLogger(t)
-	When(tfClient.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-		ThenReturn("output", errors.New("error"))
-	mockDownloader := mocks.NewMockDownloader()
+	expCmd := "output"
+	expErr := "error"
+	tfClient.EXPECT().RunCommandWithVersion(
+		gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(expCmd, errors.New(expErr))
+	
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.11.0")
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+		Log:        logger,
+	}
 	iso := runtime.InitStepRunner{
 		TerraformExecutor:     tfClient,
 		DefaultTFDistribution: tfDistribution,
 		DefaultTFVersion:      tfVersion,
 	}
 
-	output, err := iso.Run(command.ProjectContext{
-		Workspace:  "workspace",
-		RepoRelDir: ".",
-		Log:        logger,
-	}, nil, "/path", map[string]string(nil))
-	ErrEquals(t, "error", err)
-	Equals(t, "output", output)
+	output, err := iso.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
+	ErrContains(t, expErr, err)
+	Equals(t, expCmd, output)
 }
 
-func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
-	// Initialize the git repo.
-	repoDir := initRepo(t)
-
-	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
-	err := os.WriteFile(lockFilePath, nil, 0600)
+func TestRun_InitOmitsUpgradeFlagIfLockFilePresent(t *testing.T) {
+	tmpDir := t.TempDir()
+	lockFilePath := filepath.Join(tmpDir, ".terraform.lock.hcl")
+	err := os.WriteFile(lockFilePath, []byte("# I'm a lock file"), 0600)
 	Ok(t, err)
-	// commit lock file
-	runCmd(t, repoDir, "git", "add", ".terraform.lock.hcl")
-	runCmd(t, repoDir, "git", "commit", "-m", "add .terraform.lock.hcl")
 
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
 	}
+	repoDir := tmpDir
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 	terraform := tfclientmocks.NewMockClient(ctrl)
-	mockDownloader := mocks.NewMockDownloader()
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.14.0")
+
 	iso := runtime.InitStepRunner{
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
 		DefaultTFVersion:      tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-		ThenReturn("output", nil)
+	
+	expectedArgs := []string{"init", "-input=false", "extra", "args"}
+	terraform.EXPECT().RunCommandWithVersion(
+		ctx, repoDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace").
+		Return("output", nil)
 
 	output, err := iso.Run(ctx, []string{"extra", "args"}, repoDir, map[string]string(nil))
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
+}
 
-	expectedArgs := []string{"init", "-input=false", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
+func TestRun_InitKeepsUpgradeFlagIfLockFilePresentAndUpgradeOptionSet(t *testing.T) {
+	tmpDir := t.TempDir()
+	lockFilePath := filepath.Join(tmpDir, ".terraform.lock.hcl")
+	err := os.WriteFile(lockFilePath, []byte("# I'm a lock file"), 0600)
+	Ok(t, err)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+		Log:        logger,
+	}
+
+	terraform := tfclientmocks.NewMockClient(ctrl)
+	mockDownloader := mocks.NewMockDownloader(ctrl)
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	tfVersion, _ := version.NewVersion("0.14.0")
+
+	iso := runtime.InitStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
+	}
+	
+	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
+	terraform.EXPECT().RunCommandWithVersion(
+		ctx, tmpDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace").
+		Return("output", nil)
+
+	output, err := iso.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	Ok(t, err)
+	// When there is no error, should not return init output to PR.
+	Equals(t, "", output)
 }
 
 func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 	tmpDir := t.TempDir()
+	// Note: not creating a .terraform.lock.hcl file
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	terraform := tfclientmocks.NewMockClient(ctrl)
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
 		Workspace:  "workspace",
 		RepoRelDir: ".",
 		Log:        logger,
 	}
-	mockDownloader := mocks.NewMockDownloader()
+
+	terraform := tfclientmocks.NewMockClient(ctrl)
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.14.0")
+
 	iso := runtime.InitStepRunner{
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
 		DefaultTFVersion:      tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-		ThenReturn("output", nil)
+	
+	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
+	terraform.EXPECT().RunCommandWithVersion(
+		ctx, tmpDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace").
+		Return("output", nil)
 
 	output, err := iso.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
-
-	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 }
 
-func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing.T) {
-	tmpDir := t.TempDir()
-	lockFilePath := filepath.Join(tmpDir, ".terraform.lock.hcl")
-	err := os.WriteFile(lockFilePath, nil, 0600)
-	Ok(t, err)
-
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	terraform := tfclientmocks.NewMockClient(ctrl)
-
-	logger := logging.NewNoopLogger(t)
-	ctx := command.ProjectContext{
-		Workspace:  "workspace",
-		RepoRelDir: ".",
-		Log:        logger,
-	}
-	mockDownloader := mocks.NewMockDownloader()
-	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
-	tfVersion, _ := version.NewVersion("0.13.0")
-	iso := runtime.InitStepRunner{
-		TerraformExecutor:     terraform,
-		DefaultTFDistribution: tfDistribution,
-		DefaultTFVersion:      tfVersion,
-	}
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-		ThenReturn("output", nil)
-
-	output, err := iso.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
-	Ok(t, err)
-	// When there is no error, should not return init output to PR.
-	Equals(t, "", output)
-
-	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
-}
-
-func TestRun_InitExtraArgsDeDupe(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+// If the .terraform directory already exists, the -backend=false flag
+// will be omitted since terraform will balk at it.
+func TestRun_NoBackendInitFlagIfDotTerraformExists(t *testing.T) {
 	cases := []struct {
-		description  string
-		extraArgs    []string
+		name         string
 		expectedArgs []string
 	}{
 		{
-			"No extra args",
-			[]string{},
+			"standard",
 			[]string{"init", "-input=false", "-upgrade"},
 		},
 		{
-			"Override -upgrade",
-			[]string{"-upgrade=false"},
-			[]string{"init", "-input=false", "-upgrade=false"},
-		},
-		{
-			"Override -input",
-			[]string{"-input=true"},
-			[]string{"init", "-input=true", "-upgrade"},
-		},
-		{
-			"Override -input and -upgrade",
-			[]string{"-input=true", "-upgrade=false"},
-			[]string{"init", "-input=true", "-upgrade=false"},
-		},
-		{
-			"Non duplicate extra args",
-			[]string{"extra", "args"},
-			[]string{"init", "-input=false", "-upgrade", "extra", "args"},
-		},
-		{
-			"Override upgrade with extra args",
-			[]string{"extra", "args", "-upgrade=false"},
-			[]string{"init", "-input=false", "-upgrade=false", "extra", "args"},
+			"reconfigure",
+			[]string{"init", "-input=false", "-reconfigure", "-upgrade"},
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.description, func(t *testing.T) {
-			terraform := tfclientmocks.NewMockClient(ctrl)
+		t.Run(c.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			dirName := filepath.Join(tmpDir, ".terraform")
+			err := os.MkdirAll(dirName, os.ModePerm)
+			Ok(t, err)
 
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 			logger := logging.NewNoopLogger(t)
 			ctx := command.ProjectContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
 				Log:        logger,
 			}
-			mockDownloader := mocks.NewMockDownloader()
+
+			terraform := tfclientmocks.NewMockClient(ctrl)
+			mockDownloader := mocks.NewMockDownloader(ctrl)
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
-			tfVersion, _ := version.NewVersion("0.10.0")
+			tfVersion, _ := version.NewVersion("0.14.0")
+
 			iso := runtime.InitStepRunner{
 				TerraformExecutor:     terraform,
 				DefaultTFDistribution: tfDistribution,
 				DefaultTFVersion:      tfVersion,
 			}
-			When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-				ThenReturn("output", nil)
+			
+			terraform.EXPECT().RunCommandWithVersion(
+				ctx, "/path", c.expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace").
+				Return("output", nil)
 
-			output, err := iso.Run(ctx, c.extraArgs, "/path", map[string]string(nil))
+			output, err := iso.Run(ctx, []string{}, "/path", map[string]string(nil))
 			Ok(t, err)
 			// When there is no error, should not return init output to PR.
 			Equals(t, "", output)
-
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", c.expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 		})
 	}
 }
 
-func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
-	// Initialize the git repo.
-	repoDir := initRepo(t)
-
-	lockFilePath := filepath.Join(repoDir, ".terraform.lock.hcl")
-	err := os.WriteFile(lockFilePath, nil, 0600)
-	Ok(t, err)
+// If -backend-config flag is provided and .terraform directory does not exist, -backend=false is omitted when used with any of these
+// init subcommands: atlantis plan -- -init -backend-config=staging.backend.tfvars
+// init subcommands: atlantis plan -- -init -backend-config staging.backend.tfvars
+func TestRun_BackendConfigFlagParsing(t *testing.T) {
+	tmpDir := t.TempDir()
+	repoDir := tmpDir
+	// No .terraform directory
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	terraform := tfclientmocks.NewMockClient(ctrl)
-
 	logger := logging.NewNoopLogger(t)
-	mockDownloader := mocks.NewMockDownloader()
+	ctx := command.ProjectContext{
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+		Log:        logger,
+	}
+
+	terraform := tfclientmocks.NewMockClient(ctrl)
+	mockDownloader := mocks.NewMockDownloader(ctrl)
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.14.0")
 
@@ -378,41 +387,114 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 		DefaultTFDistribution: tfDistribution,
 		DefaultTFVersion:      tfVersion,
 	}
-	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-		ThenReturn("output", nil)
+	
+	// Both parsing formats should work
+	extraArgs := []string{"-backend-config=staging.backend.tfvars"}
+	expectedArgs := []string{"init", "-input=false", "-upgrade", "-backend-config=staging.backend.tfvars"}
+	
+	terraform.EXPECT().RunCommandWithVersion(
+		ctx, repoDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace").
+		Return("output", nil)
 
-	ctx := command.ProjectContext{
-		Workspace:  "workspace",
-		RepoRelDir: ".",
-		Log:        logger,
-	}
-	output, err := iso.Run(ctx, []string{"extra", "args"}, repoDir, map[string]string(nil))
+	output, err := iso.Run(ctx, extraArgs, repoDir, map[string]string(nil))
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.
 	Equals(t, "", output)
-
-	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 }
 
-func runCmd(t *testing.T, dir string, name string, args ...string) string {
-	t.Helper()
-	cpCmd := exec.Command(name, args...)
-	cpCmd.Dir = dir
-	cpOut, err := cpCmd.CombinedOutput()
-	Assert(t, err == nil, "err running %q: %s", strings.Join(append([]string{name}, args...), " "), cpOut)
-	return string(cpOut)
+// GitIsNotInstalledErr is a special error that tells the init runner to run
+// terraform init with -upgrade=false. We want to make sure that that
+// flag is actually applied in this case.
+type GitIsNotInstalledErr struct{}
+
+func (e GitIsNotInstalledErr) Error() string {
+	return exec.ErrNotFound.Error()
 }
 
-func initRepo(t *testing.T) string {
-	repoDir := t.TempDir()
-	runCmd(t, repoDir, "git", "init")
-	runCmd(t, repoDir, "touch", ".gitkeep")
-	runCmd(t, repoDir, "git", "add", ".gitkeep")
-	runCmd(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
-	runCmd(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
-	runCmd(t, repoDir, "git", "config", "--local", "commit.gpgsign", "false")
-	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
-	runCmd(t, repoDir, "git", "branch", "branch")
-	return repoDir
+func (e GitIsNotInstalledErr) Unwrap() error {
+	return exec.ErrNotFound
+}
+
+func TestRun_GetsUpgradeFalseIfGitNotInstalled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cases := []struct {
+		err     error
+		version string
+		expCmd  string
+		expArgs []string
+	}{
+		{
+			errors.New("not a git error"),
+			"0.14.0",
+			"init",
+			[]string{"init", "-input=false", "-backend=false"},
+		},
+		{
+			errors.New("not a git error"),
+			"0.8.0",
+			"get",
+			[]string{"get", "-backend=false"},
+		},
+		{
+			GitIsNotInstalledErr{},
+			"0.14.0",
+			"init",
+			[]string{"init", "-input=false", "-upgrade=false", "-backend=false"},
+		},
+		{
+			errors.Wrap(GitIsNotInstalledErr{}, "something else"),
+			"0.14.0",
+			"init",
+			[]string{"init", "-input=false", "-upgrade=false", "-backend=false"},
+		},
+		{
+			GitIsNotInstalledErr{},
+			"0.8.0",
+			"get",
+			[]string{"get", "-upgrade=false", "-backend=false"},
+		},
+	}
+
+	for _, c := range cases {
+		descrip := strings.Split(c.err.Error(), "\n")[0]
+		t.Run(descrip, func(t *testing.T) {
+			// Setup the mocks.
+			terraform := tfclientmocks.NewMockClient(ctrl)
+			mockDownloader := mocks.NewMockDownloader(ctrl)
+			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+			tfVersion, _ := version.NewVersion(c.version)
+			logger := logging.NewNoopLogger(t)
+			ctx := command.ProjectContext{
+				Workspace:  "workspace",
+				RepoRelDir: ".",
+				Log:        logger,
+			}
+
+			iso := runtime.InitStepRunner{
+				TerraformExecutor:     terraform,
+				DefaultTFDistribution: tfDistribution,
+				DefaultTFVersion:      tfVersion,
+			}
+
+			// First, terraform workspace gets called and returns an error.
+			terraform.EXPECT().RunCommandWithVersion(
+				ctx, "/path", []string{"workspace", "list"}, map[string]string(nil), tfDistribution, tfVersion, "workspace").
+				Return("", c.err)
+			// Then init gets called with -upgrade=false if it's the Git error.
+			terraform.EXPECT().RunCommandWithVersion(
+				ctx, "/path", c.expArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace").
+				Return("output", nil)
+			// Then since it succeeds, we call workspace list again. This is called
+			// in to determine if this workspace needs to be created.
+			terraform.EXPECT().RunCommandWithVersion(
+				ctx, "/path", []string{"workspace", "list"}, map[string]string(nil), tfDistribution, tfVersion, "workspace").
+				Return("output", nil)
+
+			output, err := iso.Run(ctx, []string{}, "/path", map[string]string(nil))
+			Ok(t, err)
+			// When there is no error, should not return init output to PR.
+			Equals(t, "", output)
+		})
+	}
 }

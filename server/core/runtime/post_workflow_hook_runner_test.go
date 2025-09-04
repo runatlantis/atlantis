@@ -5,10 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/go-version"
 	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -151,15 +149,15 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		Ok(t, err)
 
 		ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+		defer ctrl.Finish()
 		terraform := tfclientmocks.NewMockClient(ctrl)
-		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
-			ThenReturn(nil)
+		terraform.EXPECT().EnsureVersion(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil).AnyTimes()
 
 		logger := logging.NewNoopLogger(t)
 		tmpDir := t.TempDir()
 
-		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler(ctrl)
 		r := runtime.DefaultPostWorkflowHookRunner{
 			OutputHandler: projectCmdOutputHandler,
 		}
@@ -188,6 +186,14 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 				CommandName:      "plan",
 				CommandHasErrors: false,
 			}
+			
+			// Set up expectation for SendWorkflowHook
+			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
+			projectCmdOutputHandler.EXPECT().SendWorkflowHook(
+				gomock.Any(), 
+				expOut,
+				false).Times(1)
+			
 			_, desc, err := r.Run(ctx, c.Command, c.Shell, c.ShellArgs, tmpDir)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
@@ -198,9 +204,6 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			// here because when constructing the cases we don't yet know the
 			// temp dir.
 			Equals(t, c.ExpDescription, desc)
-			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
-			projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
-				Any[models.WorkflowHookCommandContext](), Eq(expOut), Eq(false))
 		})
 	}
 }

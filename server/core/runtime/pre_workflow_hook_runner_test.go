@@ -6,10 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/go-version"
 	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	tf "github.com/runatlantis/atlantis/server/core/terraform"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
@@ -158,20 +156,16 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		var err error
-
-		Ok(t, err)
-
 		ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+		defer ctrl.Finish()
 		terraform := tfclientmocks.NewMockClient(ctrl)
-		When(terraform.EnsureVersion(gomock.Any(), gomock.Any(), gomock.Any())).
-			ThenReturn(nil)
+		terraform.EXPECT().EnsureVersion(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil).AnyTimes()
 
 		logger := logging.NewNoopLogger(t)
 		tmpDir := t.TempDir()
 
-		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler(ctrl)
 		r := runtime.DefaultPreWorkflowHookRunner{
 			OutputHandler: projectCmdOutputHandler,
 		}
@@ -199,6 +193,14 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 				Log:         logger,
 				CommandName: "plan",
 			}
+			
+			// Set up expectation for SendWorkflowHook
+			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
+			projectCmdOutputHandler.EXPECT().SendWorkflowHook(
+				gomock.Any(), 
+				expOut,
+				false).Times(1)
+			
 			_, desc, err := r.Run(ctx, c.Command, c.Shell, c.ShellArgs, tmpDir)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
@@ -209,10 +211,6 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 			// here because when constructing the cases we don't yet know the
 			// temp dir.
 			Equals(t, c.ExpDescription, desc)
-			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
-			// TODO: Convert to gomock expectation with argument capture
-	// projectCmdOutputHandler.EXPECT().SendWorkflowHook(
-				gomock.Any(), Eq(expOut), Eq(false))
 		})
 	}
 }
