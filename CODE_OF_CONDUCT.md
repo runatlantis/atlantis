@@ -55,7 +55,7 @@ further defined and clarified by project maintainers.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting the project team by messaging `@lkysow` on the
+reported by contacting the project team by messaging `@PePE Amengual`, `@Dylan Page` or `@chenrui333`  on the
 [Atlantis Slack community](https://slack.cncf.io/).
 All complaints will be reviewed and investigated and will result in a response that
 is deemed necessary and appropriate to the circumstances. The project team is
