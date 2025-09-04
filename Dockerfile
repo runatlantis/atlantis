@@ -37,8 +37,10 @@ WORKDIR /app
 # This is needed to download transitive dependencies instead of compiling them
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
+# renovate: datasource=repology depName=alpine_3_21/bash versioning=loose
+ENV BUILDER_BASH_VERSION="5.2.37-r0"
 RUN apk add --no-cache \
-        bash~=5.2
+        bash=${BUILDER_BASH_VERSION}
 COPY go.mod go.sum ./
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -161,19 +163,35 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # renovate: datasource=repology depName=alpine_3_21/ca-certificates versioning=loose
 ENV CA_CERTIFICATES_VERSION="20250619-r0"
+# renovate: datasource=repology depName=alpine_3_21/curl versioning=loose
+ENV CURL_VERSION="8.12.1-r1"
+# renovate: datasource=repology depName=alpine_3_21/git versioning=loose
+ENV GIT_VERSION="2.47.3-r0"
+# renovate: datasource=repology depName=alpine_3_21/unzip versioning=loose
+ENV UNZIP_VERSION="6.0-r15"
+# renovate: datasource=repology depName=alpine_3_21/bash versioning=loose
+ENV BASH_VERSION="5.2.37-r0"
+# renovate: datasource=repology depName=alpine_3_21/openssh versioning=loose
+ENV OPENSSH_VERSION="9.9_p2-r0"
+# renovate: datasource=repology depName=alpine_3_21/dumb-init versioning=loose
+ENV DUMB_INIT_VERSION="1.2.5-r3"
+# renovate: datasource=repology depName=alpine_3_21/gcompat versioning=loose
+ENV GCOMPAT_VERSION="1.1.0-r4"
+# renovate: datasource=repology depName=alpine_3_21/coreutils versioning=loose
+ENV COREUTILS_ENV_VERSION="9.5-r2"
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
-        ca-certificates~=${CA_CERTIFICATES_VERSION} \
-        curl~=8 \
-        git~=2 \
-        unzip~=6 \
-        bash~=5 \
-        openssh~=9 \
-        dumb-init~=1 \
-        gcompat~=1 \
-        coreutils-env~=9
+        ca-certificates=${CA_CERTIFICATES_VERSION} \
+        curl=${CURL_VERSION} \
+        git=${GIT_VERSION} \
+        unzip=${UNZIP_VERSION} \
+        bash=${BASH_VERSION} \
+        openssh=${OPENSSH_VERSION} \
+        dumb-init=${DUMB_INIT_VERSION} \
+        gcompat=${GCOMPAT_VERSION} \
+        coreutils-env=${COREUTILS_ENV_VERSION}
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
