@@ -53,21 +53,36 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM debian:${DEBIAN_TAG} AS debian-base
 
+# Define package versions for Debian
+# renovate: datasource=repology depName=debian_12/ca-certificates versioning=loose
+ENV DEBIAN_CA_CERTIFICATES_VERSION="20230311+deb12u1"
+# renovate: datasource=repology depName=debian_12/curl versioning=loose
+ENV DEBIAN_CURL_VERSION="7.88.1-10+deb12u12"
+# renovate: datasource=repology depName=debian_12/git versioning=loose
+ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u2"
+# renovate: datasource=repology depName=debian_12/unzip versioning=loose
+ENV DEBIAN_UNZIP_VERSION="6.0-28"
+# renovate: datasource=repology depName=debian_12/openssh-server versioning=loose
+ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u7"
+# renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
+ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
+# renovate: datasource=repology depName=debian_12/gnupg versioning=loose
+ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1"
+# renovate: datasource=repology depName=debian_12/openssl versioning=loose
+ENV DEBIAN_OPENSSL_VERSION="3.0.17-1~deb12u2"
+
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
-# hadolint ignore explanation
-# DL3008 (pin versions using "=") - Ignored to avoid failing the build
-# hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-        git \
-        unzip \
-        openssh-server \
-        dumb-init \
-        gnupg \
-        openssl && \
+        ca-certificates=${DEBIAN_CA_CERTIFICATES_VERSION} \
+        curl=${DEBIAN_CURL_VERSION} \
+        git=${DEBIAN_GIT_VERSION} \
+        unzip=${DEBIAN_UNZIP_VERSION} \
+        openssh-server=${DEBIAN_OPENSSH_SERVER_VERSION} \
+        dumb-init=${DEBIAN_DUMB_INIT_VERSION} \
+        gnupg=${DEBIAN_GNUPG_VERSION} \
+        openssl=${DEBIAN_OPENSSL_VERSION} && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
