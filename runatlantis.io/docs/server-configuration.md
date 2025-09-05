@@ -844,6 +844,7 @@ By default, any group can plan and apply.
 
 ::: warning NOTE
 Atlantis needs to be able to view the listed group members, inaccessible or non-existent groups are silently ignored.
+:::
 
 ### `--gitlab-hostname` <Badge text="v0.2.0+" type="info"/>
 
