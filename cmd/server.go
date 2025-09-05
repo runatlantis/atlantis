@@ -101,8 +101,9 @@ const (
 	GHAppSlugFlag                    = "gh-app-slug"
 	GHAppInstallationIDFlag          = "gh-app-installation-id"
 	GHOrganizationFlag               = "gh-org"
-	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
-	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
+	GHWebhookSecretFlag              = "gh-webhook-secret"                    // nolint: gosec
+	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply"      // nolint: gosec
+	GHDisableRepoLevelSecurityRules  = "gh-disable-repo-level-security-rules" // nolint: gosec
 	GiteaBaseURLFlag                 = "gitea-base-url"
 	GiteaTokenFlag                   = "gitea-token"
 	GiteaUserFlag                    = "gitea-user"
@@ -544,6 +545,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	GHAllowMergeableBypassApply: {
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
+		defaultValue: false,
+	},
+	GHDisableRepoLevelSecurityRules: {
+		description:  "Feature flag to enable functionality to disable repo level security rules",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {
