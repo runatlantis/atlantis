@@ -847,11 +847,21 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
+	
+	// Mock StatusManager to call the underlying commitUpdater when HandleCommandStart is called
+	When(statusManager.HandleCommandStart(Any[*command.Context](), Eq(command.Plan))).Then(func(params []Param) ReturnValues {
+		ctx := params[0].(*command.Context)
+		commitUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan)
+		return []ReturnValue{nil}
+	})
+	When(statusManager.SetSuccess(Any[*command.Context](), Any[command.Name](), Any[int](), Any[int]())).ThenReturn(nil)
+	
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
+	// The commitUpdater should be called through the StatusManager mock
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Eq(models.PendingCommitStatus), Eq(command.Plan))
 	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
@@ -876,6 +886,14 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 			},
 		}, nil)
 	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
+	
+	// Mock StatusManager to call the underlying commitUpdater when HandleCommandStart is called
+	When(statusManager.HandleCommandStart(Any[*command.Context](), Eq(command.Plan))).Then(func(params []Param) ReturnValues {
+		ctx := params[0].(*command.Context)
+		commitUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan)
+		return []ReturnValue{nil}
+	})
+	
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = true
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
@@ -1126,8 +1144,8 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 		Any[logging.SimpleLogging](),
 		Any[models.Repo](),
 		Any[models.PullRequest](),
-		Eq[models.CommitStatus](models.SuccessCommitStatus),
-		Eq[command.Name](command.PolicyCheck),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.PolicyCheck),
 		Eq(0),
 		Eq(2),
 	)
@@ -1185,8 +1203,8 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 		Any[logging.SimpleLogging](),
 		Any[models.Repo](),
 		Any[models.PullRequest](),
-		Eq[models.CommitStatus](models.SuccessCommitStatus),
-		Eq[command.Name](command.PolicyCheck),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.PolicyCheck),
 		Eq(1),
 		Eq(1),
 	)
