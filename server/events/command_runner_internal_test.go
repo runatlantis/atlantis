@@ -5,8 +5,10 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/status/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	. "github.com/petergtz/pegomock/v4"
 )
 
 func TestApplyUpdateCommitStatus(t *testing.T) {
@@ -88,17 +90,36 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
+			RegisterMockTestingT(t)
 			csu := &MockCSU{}
+			mockStatusManager := mocks.NewMockStatusManager()
+			
+			// Set up expectations based on the test case
+			if c.expStatus == models.FailedCommitStatus {
+				When(mockStatusManager.SetFailure(Any[*command.Context](), Any[command.Name](), Any[error]())).ThenReturn(nil)
+			} else if c.expStatus == models.PendingCommitStatus {
+				When(mockStatusManager.SetPending(Any[*command.Context](), Any[command.Name]())).ThenReturn(nil)
+			} else {
+				When(mockStatusManager.SetSuccess(Any[*command.Context](), Any[command.Name](), Any[int](), Any[int]())).ThenReturn(nil)
+			}
+			
 			cr := &ApplyCommandRunner{
 				commitStatusUpdater: csu,
+				StatusManager:       mockStatusManager,
 			}
-			cr.updateCommitStatus(&command.Context{}, c.pullStatus)
-			Equals(t, models.Repo{}, csu.CalledRepo)
-			Equals(t, models.PullRequest{}, csu.CalledPull)
-			Equals(t, c.expStatus, csu.CalledStatus)
-			Equals(t, c.cmd, csu.CalledCommand)
-			Equals(t, c.expNumSuccess, csu.CalledNumSuccess)
-			Equals(t, c.expNumTotal, csu.CalledNumTotal)
+			ctx := &command.Context{
+				Log: logging.NewNoopLogger(t),
+			}
+			cr.updateCommitStatus(ctx, c.pullStatus)
+			
+			// Verify the correct StatusManager method was called
+			if c.expStatus == models.FailedCommitStatus {
+				mockStatusManager.VerifyWasCalledOnce().SetFailure(Any[*command.Context](), Eq(command.Apply), Any[error]())
+			} else if c.expStatus == models.PendingCommitStatus {
+				mockStatusManager.VerifyWasCalledOnce().SetPending(Any[*command.Context](), Eq(command.Apply))
+			} else {
+				mockStatusManager.VerifyWasCalledOnce().SetSuccess(Any[*command.Context](), Eq(command.Apply), Eq(c.expNumSuccess), Eq(c.expNumTotal))
+			}
 		})
 	}
 }
@@ -154,7 +175,10 @@ func TestPlanUpdatePlanCommitStatus(t *testing.T) {
 			cr := &PlanCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&command.Context{}, c.pullStatus, command.Plan)
+			ctx := &command.Context{
+				Log: logging.NewNoopLogger(t),
+			}
+			cr.updateCommitStatus(ctx, c.pullStatus, command.Plan)
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
