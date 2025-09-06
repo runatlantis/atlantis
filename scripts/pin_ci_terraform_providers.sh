@@ -3,7 +3,7 @@
 # Script to pin terraform providers in e2e tests
 
 RANDOM_PROVIDER_VERSION="3.6.1"
-NULL_PROVIDER_VERSION="3.2.3"
+NULL_PROVIDER_VERSION="3.2.4"
 
 TEST_REPOS_DIR="server/controllers/events/testdata/test-repos"
 
