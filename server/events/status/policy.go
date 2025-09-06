@@ -11,10 +11,10 @@ import (
 type StatusPolicy interface {
 	// DecideOnStart determines what to do when a command starts
 	DecideOnStart(ctx *command.Context, cmdName command.Name) StatusDecision
-	
+
 	// DecideOnEnd determines what to do when a command completes
 	DecideOnEnd(ctx *command.Context, cmdName command.Name, result *command.Result) StatusDecision
-	
+
 	// DecideOnNoProjects determines what to do when no projects are found
 	DecideOnNoProjects(ctx *command.Context, cmdName command.Name) StatusDecision
 }
@@ -22,10 +22,10 @@ type StatusPolicy interface {
 // SilencePolicy implements StatusPolicy with silence flag awareness
 type SilencePolicy struct {
 	// Silence flags from user configuration
-	SilenceNoProjects         bool
-	SilenceVCSStatusNoPlans   bool
+	SilenceNoProjects          bool
+	SilenceVCSStatusNoPlans    bool
 	SilenceVCSStatusNoProjects bool
-	SilenceForkPRErrors       bool
+	SilenceForkPRErrors        bool
 }
 
 // NewSilencePolicy creates a new SilencePolicy with the given silence flags
@@ -150,7 +150,7 @@ func (p *SilencePolicy) DecideOnNoProjects(ctx *command.Context, cmdName command
 func (p *SilencePolicy) shouldSilenceForkPR(ctx *command.Context) bool {
 	// A fork PR is when head repo owner != base repo owner
 	isForkPR := ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner
-	
+
 	// We silence if it's a fork PR and SilenceForkPRErrors is enabled
 	return isForkPR && p.SilenceForkPRErrors
 }

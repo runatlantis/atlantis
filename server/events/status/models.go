@@ -57,7 +57,7 @@ type SilenceReason struct {
 
 var DefaultSilenceReasons = SilenceReason{
 	NoProjects:      "silence enabled and no projects found",
-	NoPlans:         "silence enabled and no plans generated", 
+	NoPlans:         "silence enabled and no plans generated",
 	ForkPRError:     "fork PR with silence enabled",
 	ExplicitSilence: "explicit silence configuration",
 }

@@ -12,13 +12,13 @@ import (
 type StatusCleaner interface {
 	// ClearPendingStatuses clears any pending status checks for the specified commands
 	ClearPendingStatuses(ctx *command.Context, commands []command.Name) error
-	
+
 	// ClearAllStatuses clears all status checks for the PR (plan, apply, policy)
 	ClearAllStatuses(ctx *command.Context) error
-	
+
 	// ClearStatusForCommand clears status for a specific command
 	ClearStatusForCommand(ctx *command.Context, cmdName command.Name) error
-	
+
 	// ResetStatusesToSuccess resets all statuses to success with 0/0 counts
 	ResetStatusesToSuccess(ctx *command.Context) error
 }
@@ -59,12 +59,12 @@ func (c *DefaultStatusCleaner) ClearStatusForCommand(ctx *command.Context, cmdNa
 	ctx.Log.Debug("clearing status for command %s", cmdName.String())
 	// Set success with 0/0 to effectively "clear" the status while keeping it visible
 	return c.CommitStatusUpdater.UpdateCombinedCount(
-		ctx.Log, 
-		ctx.Pull.BaseRepo, 
-		ctx.Pull, 
-		models.SuccessCommitStatus, 
-		cmdName, 
-		0, 
+		ctx.Log,
+		ctx.Pull.BaseRepo,
+		ctx.Pull,
+		models.SuccessCommitStatus,
+		cmdName,
+		0,
 		0,
 	)
 }
@@ -73,15 +73,15 @@ func (c *DefaultStatusCleaner) ClearStatusForCommand(ctx *command.Context, cmdNa
 func (c *DefaultStatusCleaner) ResetStatusesToSuccess(ctx *command.Context) error {
 	ctx.Log.Debug("resetting all statuses to success 0/0")
 	commands := []command.Name{command.Plan, command.PolicyCheck, command.Apply}
-	
+
 	for _, cmdName := range commands {
 		if err := c.CommitStatusUpdater.UpdateCombinedCount(
-			ctx.Log, 
-			ctx.Pull.BaseRepo, 
-			ctx.Pull, 
-			models.SuccessCommitStatus, 
-			cmdName, 
-			0, 
+			ctx.Log,
+			ctx.Pull.BaseRepo,
+			ctx.Pull,
+			models.SuccessCommitStatus,
+			cmdName,
+			0,
 			0,
 		); err != nil {
 			ctx.Log.Warn("failed to reset status for %s: %s", cmdName.String(), err)
@@ -107,4 +107,3 @@ func (h *StatusCleanupHelper) CleanupAfterSilence(ctx *command.Context, reason s
 	ctx.Log.Debug("cleaning up statuses due to silence: %s", reason)
 	return h.Cleaner.ClearAllStatuses(ctx)
 }
-

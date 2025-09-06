@@ -2,7 +2,7 @@ package status
 
 import (
 	"errors"
-	
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -16,16 +16,16 @@ type StatusManager interface {
 	HandleCommandStart(ctx *command.Context, cmdName command.Name) error
 	HandleCommandEnd(ctx *command.Context, cmdName command.Name, result *command.Result) error
 	HandleNoProjectsFound(ctx *command.Context, cmdName command.Name) error
-	
+
 	// Direct status operations (bypass policy)
 	SetPending(ctx *command.Context, cmdName command.Name) error
 	SetSuccess(ctx *command.Context, cmdName command.Name, numSuccess, numTotal int) error
 	SetFailure(ctx *command.Context, cmdName command.Name, err error) error
-	
+
 	// Status clearing operations
 	ClearAllStatuses(ctx *command.Context) error
 	ClearStatusForCommand(ctx *command.Context, cmdName command.Name) error
-	
+
 	// Status querying (future enhancement)
 	GetCurrentStatus(repo models.Repo, pull models.PullRequest) (*StatusState, error)
 }
@@ -117,16 +117,16 @@ func (s *DefaultStatusManager) executeDecision(ctx *command.Context, cmdName com
 	case OperationSet:
 		ctx.Log.Debug("status decision: set - %s", decision.Reason)
 		return s.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, decision.Status, cmdName, decision.NumSuccess, decision.NumTotal)
-		
+
 	case OperationClear:
 		ctx.Log.Debug("status decision: clear - %s", decision.Reason)
 		return s.ClearStatusForCommand(ctx, cmdName)
-		
+
 	case OperationSilence:
 		ctx.Log.Debug("status decision: silence - %s (%s)", decision.Reason, decision.SilenceType)
 		// Do nothing - this is the silence behavior
 		return nil
-		
+
 	default:
 		ctx.Log.Warn("unknown status operation: %d", decision.Operation)
 		return nil
