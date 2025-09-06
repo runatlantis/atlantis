@@ -1,8 +1,11 @@
 package events
 
 import (
+	"errors"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/status"
 )
 
 func NewPolicyCheckCommandRunner(
@@ -13,6 +16,7 @@ func NewPolicyCheckCommandRunner(
 	parallelPoolSize int,
 	silenceVCSStatusNoProjects bool,
 	quietPolicyChecks bool,
+	statusManager status.StatusManager,
 ) *PolicyCheckCommandRunner {
 	return &PolicyCheckCommandRunner{
 		dbUpdater:                  dbUpdater,
@@ -22,6 +26,7 @@ func NewPolicyCheckCommandRunner(
 		parallelPoolSize:           parallelPoolSize,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 		quietPolicyChecks:          quietPolicyChecks,
+		StatusManager:              statusManager,
 	}
 }
 
@@ -31,6 +36,7 @@ type PolicyCheckCommandRunner struct {
 	commitStatusUpdater CommitStatusUpdater
 	prjCmdRunner        ProjectPolicyCheckCommandRunner
 	parallelPoolSize    int
+	StatusManager       status.StatusManager
 	// SilenceVCSStatusNoProjects is whether any plan should set commit status if no projects
 	// are found
 	silenceVCSStatusNoProjects bool
@@ -40,20 +46,15 @@ type PolicyCheckCommandRunner struct {
 func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.ProjectContext) {
 	if len(cmds) == 0 {
 		ctx.Log.Info("no projects to run policy_check in")
-		if !p.silenceVCSStatusNoProjects {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects policy_checked successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
-				ctx.Log.Warn("unable to update commit status: %s", err)
-			}
+		// Use StatusManager to handle no projects found with policy-aware decisions
+		if err := p.StatusManager.HandleNoProjectsFound(ctx, command.PolicyCheck); err != nil {
+			ctx.Log.Warn("unable to handle no projects status: %s", err)
 		}
 		return
 	}
 
-	// So set policy_check commit status to pending
-	if err := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
+	// Set policy_check commit status to pending
+	if err := p.StatusManager.SetPending(ctx, command.PolicyCheck); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
@@ -81,17 +82,21 @@ func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.Proj
 func (p *PolicyCheckCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
 	var numSuccess int
 	var numErrored int
-	status := models.SuccessCommitStatus
 
 	numSuccess = pullStatus.StatusCount(models.PassedPolicyCheckStatus)
 	numErrored = pullStatus.StatusCount(models.ErroredPolicyCheckStatus)
 
 	if numErrored > 0 {
-		status = models.FailedCommitStatus
-	}
-
-	if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, numSuccess, len(pullStatus.Projects)); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
+		// Use a fake error for the failure - StatusManager will handle the status setting
+		err := errors.New("policy check failed for one or more projects")
+		if statusErr := p.StatusManager.SetFailure(ctx, command.PolicyCheck, err); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+	} else {
+		// All successful
+		if statusErr := p.StatusManager.SetSuccess(ctx, command.PolicyCheck, numSuccess, len(pullStatus.Projects)); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
 	}
 }
 

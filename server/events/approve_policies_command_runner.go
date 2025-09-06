@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/status"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
@@ -15,6 +16,7 @@ func NewApprovePoliciesCommandRunner(
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
 	vcsClient vcs.Client,
+	statusManager status.StatusManager,
 ) *ApprovePoliciesCommandRunner {
 	return &ApprovePoliciesCommandRunner{
 		commitStatusUpdater:        commitStatusUpdater,
@@ -25,6 +27,7 @@ func NewApprovePoliciesCommandRunner(
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 		vcsClient:                  vcsClient,
+		StatusManager:              statusManager,
 	}
 }
 
@@ -34,6 +37,7 @@ type ApprovePoliciesCommandRunner struct {
 	dbUpdater           *DBUpdater
 	prjCmdBuilder       ProjectApprovePoliciesCommandBuilder
 	prjCmdRunner        ProjectApprovePoliciesCommandRunner
+	StatusManager       status.StatusManager
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects          bool
