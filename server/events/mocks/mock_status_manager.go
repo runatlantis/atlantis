@@ -138,4 +138,3 @@ func (mock *MockStatusManager) GetCurrentStatus(repo models.Repo, pull models.Pu
 	}
 	return ret0, ret1
 }
-

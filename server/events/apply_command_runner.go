@@ -2,7 +2,7 @@ package events
 
 import (
 	"errors"
-	
+
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -176,7 +176,7 @@ func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []command.ProjectCont
 func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
 	var numSuccess int
 	var numErrored int
-	
+
 	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
 	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 

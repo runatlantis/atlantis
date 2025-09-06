@@ -2,7 +2,7 @@ package events
 
 import (
 	"errors"
-	
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/status"

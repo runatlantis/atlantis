@@ -3,12 +3,12 @@ package events
 import (
 	"testing"
 
+	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/status/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
-	. "github.com/petergtz/pegomock/v4"
 )
 
 func TestApplyUpdateCommitStatus(t *testing.T) {
@@ -93,7 +93,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			RegisterMockTestingT(t)
 			csu := &MockCSU{}
 			mockStatusManager := mocks.NewMockStatusManager()
-			
+
 			// Set up expectations based on the test case
 			if c.expStatus == models.FailedCommitStatus {
 				When(mockStatusManager.SetFailure(Any[*command.Context](), Any[command.Name](), Any[error]())).ThenReturn(nil)
@@ -102,7 +102,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			} else {
 				When(mockStatusManager.SetSuccess(Any[*command.Context](), Any[command.Name](), Any[int](), Any[int]())).ThenReturn(nil)
 			}
-			
+
 			cr := &ApplyCommandRunner{
 				commitStatusUpdater: csu,
 				StatusManager:       mockStatusManager,
@@ -111,7 +111,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 				Log: logging.NewNoopLogger(t),
 			}
 			cr.updateCommitStatus(ctx, c.pullStatus)
-			
+
 			// Verify the correct StatusManager method was called
 			if c.expStatus == models.FailedCommitStatus {
 				mockStatusManager.VerifyWasCalledOnce().SetFailure(Any[*command.Context](), Eq(command.Apply), Any[error]())
