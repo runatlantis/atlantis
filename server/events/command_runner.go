@@ -123,7 +123,9 @@ type DefaultCommandRunner struct {
 	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to disable error comment
-	SilenceForkPRErrorsFlag        string
+	SilenceForkPRErrorsFlag string
+	// SilenceVCSStatusNoProjects is whether to set commit status if no projects are found
+	SilenceVCSStatusNoProjects     bool
 	CommentCommandRunnerByCmd      map[command.Name]CommentCommandRunner `validate:"required"`
 	Drainer                        *Drainer                              `validate:"required"`
 	PreWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner         `validate:"required"`
