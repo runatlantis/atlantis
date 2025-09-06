@@ -851,7 +851,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 	// Mock StatusManager to call the underlying commitUpdater when HandleCommandStart is called
 	When(statusManager.HandleCommandStart(Any[*command.Context](), Eq(command.Plan))).Then(func(params []Param) ReturnValues {
 		ctx := params[0].(*command.Context)
-		commitUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan)
+		_ = commitUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan)
 		return []ReturnValue{nil}
 	})
 	When(statusManager.SetSuccess(Any[*command.Context](), Any[command.Name](), Any[int](), Any[int]())).ThenReturn(nil)
@@ -890,7 +890,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	// Mock StatusManager to call the underlying commitUpdater when HandleCommandStart is called
 	When(statusManager.HandleCommandStart(Any[*command.Context](), Eq(command.Plan))).Then(func(params []Param) ReturnValues {
 		ctx := params[0].(*command.Context)
-		commitUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan)
+		_ = commitUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan)
 		return []ReturnValue{nil}
 	})
 
