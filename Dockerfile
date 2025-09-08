@@ -57,7 +57,7 @@ FROM debian:${DEBIAN_TAG} AS debian-base
 # renovate: datasource=repology depName=debian_12/ca-certificates versioning=loose
 ENV DEBIAN_CA_CERTIFICATES_VERSION="20230311+deb12u1"
 # renovate: datasource=repology depName=debian_12/curl versioning=loose
-ENV DEBIAN_CURL_VERSION="7.88.1-10+deb12u12"
+ENV DEBIAN_CURL_VERSION="7.88.1-10+deb12u14"
 # renovate: datasource=repology depName=debian_12/git versioning=loose
 ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u2"
 # renovate: datasource=repology depName=debian_12/unzip versioning=loose
@@ -67,7 +67,7 @@ ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u7"
 # renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
 ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
 # renovate: datasource=repology depName=debian_12/gnupg versioning=loose
-ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1"
+ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1+deb12u1"
 # renovate: datasource=repology depName=debian_12/openssl versioning=loose
 ENV DEBIAN_OPENSSL_VERSION="3.0.17-1~deb12u2"
 
