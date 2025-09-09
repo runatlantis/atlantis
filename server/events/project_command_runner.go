@@ -247,10 +247,13 @@ type DefaultProjectCommandRunner struct {
 // Plan runs terraform plan for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
 	// Track this plan operation
-	var process *RunningProcess
+	process := &RunningProcess{}
+
+	// Set up a cancel channel so we can listen for cancellation
 	var cancelCh chan struct{}
+
 	if p.ProcessTracker != nil {
-		process, cancelCh = p.ProcessTracker.TrackProcess(0, "plan", ctx.Pull, ctx.ProjectName)
+		process, cancelCh = p.ProcessTracker.TrackProcess(process.PID, "plan", ctx.Pull, ctx.ProjectName)
 		ctx.Log.Info("Started tracking plan operation %d for project %s", process.PID, ctx.ProjectName)
 
 		// Ensure we clean up the process tracking when done

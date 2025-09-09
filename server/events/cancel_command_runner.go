@@ -56,13 +56,17 @@ func (c *CancelCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	runningProcesses := defaultRunner.ProcessTracker.GetRunningProcesses(ctx.Pull)
 
 	if len(runningProcesses) == 0 {
+		// Even if there are no current processes, mark the pull as cancelled so
+		// any future operations will immediately observe cancellation.
+		defaultRunner.ProcessTracker.CancelPull(ctx.Pull)
 		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cancelNoOperationsComment, ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)
 		}
 		return
 	}
 
-	// Cancel all running operations
+	// Cancel all running operations and mark the pull as cancelled for any
+	// subsequent operations.
 	cancelledCount := 0
 	for _, process := range runningProcesses {
 		if err := defaultRunner.ProcessTracker.CancelOperation(process.PID); err != nil {
@@ -72,6 +76,7 @@ func (c *CancelCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 			cancelledCount++
 		}
 	}
+	defaultRunner.ProcessTracker.CancelPull(ctx.Pull)
 
 	// Create a comment with the results
 	var comment string
