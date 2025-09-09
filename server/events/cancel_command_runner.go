@@ -1,17 +1,11 @@
 package events
 
 import (
-	"fmt"
-
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
-const (
-	cancelNoOperationsComment = "No running operations found for this pull request."
-	cancelFailedComment       = "Failed to cancel any operations for this pull request."
-	cancelSuccessComment      = "Cancelled %d running operation(s) for this pull request."
-)
+const cancelComment = "Marked pull request as cancelled. Future plan/apply operations will be skipped until new commits or manual reset."
 
 func NewCancelCommandRunner(
 	vcsClient vcs.Client,
@@ -52,41 +46,10 @@ func (c *CancelCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	// Get running processes for this pull request
-	runningProcesses := defaultRunner.ProcessTracker.GetRunningProcesses(ctx.Pull)
-
-	if len(runningProcesses) == 0 {
-		// Even if there are no current processes, mark the pull as cancelled so
-		// any future operations will immediately observe cancellation.
-		defaultRunner.ProcessTracker.CancelPull(ctx.Pull)
-		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cancelNoOperationsComment, ""); err != nil {
-			ctx.Log.Err("unable to comment: %s", err)
-		}
-		return
-	}
-
-	// Cancel all running operations and mark the pull as cancelled for any
-	// subsequent operations.
-	cancelledCount := 0
-	for _, process := range runningProcesses {
-		if err := defaultRunner.ProcessTracker.CancelOperation(process.PID); err != nil {
-			ctx.Log.Warn("Failed to cancel operation (%s): %s", process.Command, err)
-		} else {
-			ctx.Log.Info("Cancelled operation (%s) for project %s", process.Command, process.Project)
-			cancelledCount++
-		}
-	}
+	// Mark the pull as cancelled
 	defaultRunner.ProcessTracker.CancelPull(ctx.Pull)
-
-	// Create a comment with the results
-	var comment string
-	if cancelledCount > 0 {
-		comment = fmt.Sprintf(cancelSuccessComment, cancelledCount)
-	} else {
-		comment = cancelFailedComment
-	}
-
-	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, comment, ""); err != nil {
+	ctx.Log.Info("Pull request marked as cancelled; future operations will be skipped")
+	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cancelComment, ""); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)
 	}
 }

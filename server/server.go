@@ -732,7 +732,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,
 		CommandRequirementHandler: applyRequirementHandler,
-		ProcessTracker:            events.NewProcessTracker(),
+		ProcessTracker:            events.NewCancellationTracker(),
 	}
 
 	dbUpdater := &events.DBUpdater{

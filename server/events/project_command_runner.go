@@ -241,46 +241,14 @@ type DefaultProjectCommandRunner struct {
 	Webhooks                  WebhooksSender
 	WorkingDirLocker          WorkingDirLocker
 	CommandRequirementHandler CommandRequirementHandler
-	ProcessTracker            ProcessTracker
+	ProcessTracker            CancellationTracker
 }
 
 // Plan runs terraform plan for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
-	// Track this plan operation
-	process := &RunningProcess{}
-
-	// Set up a cancel channel so we can listen for cancellation
-	var cancelCh chan struct{}
-
-	if p.ProcessTracker != nil {
-		process, cancelCh = p.ProcessTracker.TrackProcess(process.PID, "plan", ctx.Pull, ctx.ProjectName)
-		ctx.Log.Info("Started tracking plan operation %d for project %s", process.PID, ctx.ProjectName)
-
-		// Ensure we clean up the process tracking when done
-		defer func() {
-			if p.ProcessTracker != nil {
-				p.ProcessTracker.RemoveProcess(process.PID)
-				ctx.Log.Info("Stopped tracking plan operation %d for project %s", process.PID, ctx.ProjectName)
-			}
-		}()
-	}
-
-	// Check for cancellation before starting
-	if cancelCh != nil {
-		select {
-		case <-cancelCh:
-			ctx.Log.Info("Plan operation %d was cancelled before starting", process.PID)
-			return command.ProjectResult{
-				Command:           command.Plan,
-				Error:             fmt.Errorf("operation was cancelled"),
-				RepoRelDir:        ctx.RepoRelDir,
-				Workspace:         ctx.Workspace,
-				ProjectName:       ctx.ProjectName,
-				SilencePRComments: ctx.SilencePRComments,
-			}
-		default:
-			// Continue with plan
-		}
+	if p.ProcessTracker != nil && p.ProcessTracker.IsPullCancelled(ctx.Pull) {
+		ctx.Log.Info("Skipping plan for project %s because the operation is cancelled", ctx.ProjectName)
+		return command.ProjectResult{Command: command.Plan, Error: fmt.Errorf("operation cancelled"), RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, SilencePRComments: ctx.SilencePRComments}
 	}
 
 	planSuccess, failure, err := p.doPlan(ctx)
@@ -312,38 +280,9 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 
 // Apply runs terraform apply for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
-	// Track this apply operation
-	var process *RunningProcess
-	var cancelCh chan struct{}
-	if p.ProcessTracker != nil {
-		process, cancelCh = p.ProcessTracker.TrackProcess(0, "apply", ctx.Pull, ctx.ProjectName)
-		ctx.Log.Info("Started tracking apply operation %d for project %s", process.PID, ctx.ProjectName)
-
-		// Ensure we clean up the process tracking when done
-		defer func() {
-			if p.ProcessTracker != nil {
-				p.ProcessTracker.RemoveProcess(process.PID)
-				ctx.Log.Info("Stopped tracking apply operation %d for project %s", process.PID, ctx.ProjectName)
-			}
-		}()
-	}
-
-	// Check for cancellation before starting
-	if cancelCh != nil {
-		select {
-		case <-cancelCh:
-			ctx.Log.Info("Apply operation %d was cancelled before starting", process.PID)
-			return command.ProjectResult{
-				Command:           command.Apply,
-				Error:             fmt.Errorf("operation was cancelled"),
-				RepoRelDir:        ctx.RepoRelDir,
-				Workspace:         ctx.Workspace,
-				ProjectName:       ctx.ProjectName,
-				SilencePRComments: ctx.SilencePRComments,
-			}
-		default:
-			// Continue with apply
-		}
+	if p.ProcessTracker != nil && p.ProcessTracker.IsPullCancelled(ctx.Pull) {
+		ctx.Log.Info("Skipping apply for project %s because the operation is cancelled", ctx.ProjectName)
+		return command.ProjectResult{Command: command.Apply, Error: fmt.Errorf("operation cancelled"), RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, SilencePRComments: ctx.SilencePRComments}
 	}
 
 	applyOut, failure, err := p.doApply(ctx)
