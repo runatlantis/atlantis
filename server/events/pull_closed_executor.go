@@ -54,6 +54,7 @@ type PullClosedExecutor struct {
 	Backend                  locking.Backend
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
+	ProcessTracker           CancellationTracker
 }
 
 type templatedProject struct {
@@ -113,6 +114,11 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// Delete pull from DB.
 	if err := p.Backend.DeletePullStatus(pull); err != nil {
 		logger.Err("deleting pull from db: %s", err)
+	}
+
+	// Clear any cancellation marker to avoid unbounded growth.
+	if p.ProcessTracker != nil {
+		p.ProcessTracker.ClearPull(pull)
 	}
 
 	// If there are no locks then there's no need to comment.
