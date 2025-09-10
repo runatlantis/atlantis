@@ -51,7 +51,6 @@ var drainer *events.Drainer
 var deleteLockCommand *mocks.MockDeleteLockCommand
 var commitUpdater *mocks.MockCommitStatusUpdater
 var pullReqStatusFetcher *vcsmocks.MockPullReqStatusFetcher
-var statusManager *mocks.MockStatusManager
 
 // TODO: refactor these into their own unit tests.
 // these were all split out from default command runner in an effort to improve
@@ -117,7 +116,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
 	pullReqStatusFetcher = vcsmocks.NewMockPullReqStatusFetcher()
-	statusManager = mocks.NewMockStatusManager()
 
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
@@ -147,7 +145,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.parallelPoolSize,
 		testConfig.silenceVCSStatusNoProjects,
 		false,
-		statusManager,
 	)
 
 	planCommandRunner = events.NewPlanCommandRunner(
@@ -186,7 +183,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.SilenceNoProjects,
 		testConfig.silenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
-		statusManager,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
@@ -198,7 +194,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.SilenceNoProjects,
 		testConfig.silenceVCSStatusNoProjects,
 		vcsClient,
-		statusManager,
 	)
 
 	unlockCommandRunner = events.NewUnlockCommandRunner(
@@ -241,10 +236,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
 
-	When(statusManager.HandleCommandStart(Any[*command.Context](), Any[command.Name]())).ThenReturn(nil)
-	When(statusManager.HandleCommandEnd(Any[*command.Context](), Any[command.Name](), Any[*command.Result]())).ThenReturn(nil)
-	When(statusManager.HandleNoProjectsFound(Any[*command.Context](), Any[command.Name]())).ThenReturn(nil)
-
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 
@@ -266,7 +257,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
 		PullStatusFetcher:              testConfig.backend,
 		CommitStatusUpdater:            commitUpdater,
-		StatusManager:                  statusManager,
 	}
 
 	return vcsClient
@@ -468,8 +458,8 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-	// With StatusManager, when silence is enabled and no projects found, HandleNoProjectsFound should be called
-	// but no individual status method should be called since the StatusManager handles the silence logic
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.PendingCommitStatus), Eq(command.Apply))
 }
 
 func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) {
@@ -846,21 +836,11 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
-
-	// Mock StatusManager to call the underlying commitUpdater when HandleCommandStart is called
-	When(statusManager.HandleCommandStart(Any[*command.Context](), Eq(command.Plan))).Then(func(params []Param) ReturnValues {
-		ctx := params[0].(*command.Context)
-		_ = commitUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan)
-		return []ReturnValue{nil}
-	})
-	When(statusManager.SetSuccess(Any[*command.Context](), Any[command.Name](), Any[int](), Any[int]())).ThenReturn(nil)
-
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
-	// The commitUpdater should be called through the StatusManager mock
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Eq(models.PendingCommitStatus), Eq(command.Plan))
 	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
@@ -885,14 +865,6 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 			},
 		}, nil)
 	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
-
-	// Mock StatusManager to call the underlying commitUpdater when HandleCommandStart is called
-	When(statusManager.HandleCommandStart(Any[*command.Context](), Eq(command.Plan))).Then(func(params []Param) ReturnValues {
-		ctx := params[0].(*command.Context)
-		_ = commitUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan)
-		return []ReturnValue{nil}
-	})
-
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = true
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
@@ -1139,8 +1111,8 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 		Any[logging.SimpleLogging](),
 		Any[models.Repo](),
 		Any[models.PullRequest](),
-		Eq(models.SuccessCommitStatus),
-		Eq(command.PolicyCheck),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.PolicyCheck),
 		Eq(0),
 		Eq(2),
 	)
@@ -1198,8 +1170,8 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 		Any[logging.SimpleLogging](),
 		Any[models.Repo](),
 		Any[models.PullRequest](),
-		Eq(models.SuccessCommitStatus),
-		Eq(command.PolicyCheck),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.PolicyCheck),
 		Eq(1),
 		Eq(1),
 	)
