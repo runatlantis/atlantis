@@ -1,7 +1,7 @@
 package events
 
 import (
-	"strconv"
+	"fmt"
 
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -269,7 +269,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 		// delete lock only if there are changes
 		ctx.Log.Info("Deleting lock for project '%s' (changes detected)", projCtx.ProjectName)
-		lockID := projCtx.BaseRepo.FullName + "/" + strconv.Itoa(projCtx.Pull.Num) + "/" + projCtx.ProjectName + "/" + projCtx.Workspace
+		lockID := fmt.Sprintf("%s/%s/%s", projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.Workspace)
 
 		_, err := p.lockingLocker.Unlock(lockID)
 		if err != nil {

@@ -17,7 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -989,13 +988,9 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	lockingLocker.VerifyWasCalledOnce().Unlock(fmt.Sprintf("%s/%d/%s/%s", testdata.Pull.BaseRepo.FullName, testdata.Pull.Num, projectCtx.ProjectName, projectCtx.Workspace))
-
-	lockingLocker.VerifyWasCalledOnce().
-		Unlock(testdata.Pull.BaseRepo.FullName + "/" +
-			strconv.Itoa(testdata.Pull.Num) + "/" +
-			projectCtx.ProjectName + "/" +
-			projectCtx.Workspace)
+	// The lock key should be repo/path/workspace format, not repo/pullnum/project/workspace
+	// Since RepoRelDir is not set in projectCtx, it defaults to empty string ""
+	lockingLocker.VerifyWasCalledOnce().Unlock(fmt.Sprintf("%s/%s/%s", testdata.Pull.BaseRepo.FullName, "", projectCtx.Workspace))
 }
 
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
