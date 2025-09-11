@@ -8,7 +8,7 @@ Though written for Google Cloud Run, this deployment architecture also applies t
 :::
 
 ::: info
-This blog post covers the most important parts of the Terraform code. For a complete working example, see our [atlantis-on-gcp-cloud-run repository](https://github.com/runatlantis/atlantis-on-gcp-cloud-run).
+This blog post covers the most important parts of the Terraform code. For a complete working example, see our [atlantis-on-gcp-cloud-run example](https://github.com/runatlantis/atlantis-contrib/tree/main/atlantis-on-cloud-run).
 :::
 
 Most Atlantis deployments run on self-managed VMs. While this is a familiar and straightforward option, it comes with challenges. Identities often become overly powerful, with direct or indirect access — through impersonation — to many resources and projects. High availability is also lacking: Atlantis writes its locking backend directly to disk, so if the VM goes down, Atlantis becomes unavailable. In short, self-managed VMs create a single point of failure, offer no horizontal scaling, and demand ongoing maintenance — from patching and OS upgrades to backups.
@@ -26,7 +26,7 @@ Here’s a high-level overview of the architecture we’ll build:
 3. A Memorystore for Redis instance to provide a central locking backend.
 
 ::: info
-If you're looking to skip ahead, you can find the Terraform code for this architecture in our [atlantis-on-gcp-cloud-run repository](https://github.com/runatlantis/atlantis-on-gcp-cloud-run).
+If you're looking to skip ahead, you can find the Terraform code for this architecture in our [atlantis-on-gcp-cloud-run example](https://github.com/runatlantis/atlantis-contrib/tree/main/atlantis-on-cloud-run).
 
 However, we recommend reading through the rest of this blog post to understand how it all works.
 :::
@@ -102,7 +102,7 @@ workflows:
 ```
 
 ::: info
-The below Terraform configuration highlights only the Atlantis environment variables that are relevant to this blog post. For a complete working example, see our [atlantis-on-gcp-cloud-run repository](https://github.com/runatlantis/atlantis-on-gcp-cloud-run).
+The below Terraform configuration highlights only the Atlantis environment variables that are relevant to this blog post. For a complete working example, see our [atlantis-on-gcp-cloud-run example](https://github.com/runatlantis/atlantis-contrib/tree/main/atlantis-on-cloud-run).
 :::
 
 Begin by creating the management Atlantis instance. Below this Terraform configuration, you’ll find details on the configuration options—such as environment variables and other important settings—that configure Atlantis for this architecture.
@@ -443,6 +443,6 @@ resource "google_compute_backend_service" "atlantis_workloads_webhooks" {
 ## Conclusion
 By deploying Atlantis on Google Cloud Run with a shared Redis locking backend and a shared load balancer, we provide a highly available, horizontally scalable, and secure Atlantis deployment. Each Atlantis instance runs with its own identity and limited permissions, managing only its own projects. 
 
-As there's just so much to cover, and we want to keep this post at a reasonable length, we haven't covered everything. For a complete working example, see our [atlantis-on-gcp-cloud-run repository](https://github.com/runatlantis/atlantis-on-gcp-cloud-run).
+As there's just so much to cover, and we want to keep this post at a reasonable length, we haven't covered everything. For a complete working example, see our [atlantis-on-gcp-cloud-run example](https://github.com/runatlantis/atlantis-contrib/tree/main/atlantis-on-cloud-run).
 
-If you have any questions or feedback, please join the #atlantis Slack channel in the Cloud Native Computing Foundation Slack workspace, or open an issue in the [atlantis-on-gcp-cloud-run repository](https://github.com/runatlantis/atlantis-on-gcp-cloud-run).
+If you have any questions or feedback, please join the #atlantis Slack channel in the Cloud Native Computing Foundation Slack workspace, or open an issue in the [atlantis-on-gcp-cloud-run example](https://github.com/runatlantis/atlantis-contrib/tree/main/atlantis-on-cloud-run).
