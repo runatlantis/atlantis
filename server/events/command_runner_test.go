@@ -961,8 +961,8 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	// The lock key should be repo/path/workspace format, not repo/pullnum/project/workspace
-	// Since RepoRelDir is not set in projectCtx, it defaults to empty string ""
-	lockingLocker.VerifyWasCalledOnce().Unlock(fmt.Sprintf("%s/%s/%s", testdata.Pull.BaseRepo.FullName, "", projectCtx.Workspace))
+	// Since RepoRelDir is not set in projectCtx, it defaults to empty string which becomes "." after path cleaning
+	lockingLocker.VerifyWasCalledOnce().Unlock(fmt.Sprintf("%s/%s/%s", testdata.Pull.BaseRepo.FullName, ".", projectCtx.Workspace))
 }
 
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {

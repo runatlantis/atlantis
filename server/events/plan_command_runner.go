@@ -9,6 +9,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
+// generateLockID creates a consistent lock ID for a project.
+// This ensures the same format is used for both locking and unlocking operations.
+func generateLockID(repoFullName, repoRelDir, workspace string) string {
+	// Use models.NewProject to ensure consistent path cleaning
+	project := models.NewProject(repoFullName, repoRelDir, "")
+	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, workspace)
+}
+
 func NewPlanCommandRunner(
 	silenceVCSStatusNoPlans bool,
 	silenceVCSStatusNoProjects bool,
@@ -269,7 +277,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 		// delete lock only if there are changes
 		ctx.Log.Info("Deleting lock for project '%s' (changes detected)", projCtx.ProjectName)
-		lockID := fmt.Sprintf("%s/%s/%s", projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.Workspace)
+		lockID := generateLockID(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.Workspace)
 
 		_, err := p.lockingLocker.Unlock(lockID)
 		if err != nil {
