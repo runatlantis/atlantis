@@ -32,7 +32,7 @@ However, we recommend reading through the rest of this blog post to understand h
 :::
 
 ## We Left Things Out
-To keep this post a reasonable length, we’ve left out some important details. For instance, we don’t cover setting up networking, DNS or how to pull a Docker image, nor do we dive into every knob and switch in Atlantis—our focus here is on the parts most relevant to the architecture. That said, we strongly recommend running Atlantis in an isolated VPC with [Private Service Access](https://cloud.google.com/vpc/docs/configure-private-services-access) enabled. This ensures Atlantis only talks to Google APIs to do its job, without ever reaching into your other infrastructure.
+To keep this post a reasonable length, we’ve left out some important details. For instance, we don’t cover setting up networking, DNS, how to pull a Docker image or wildcard TLS certificates, nor do we dive into every knob and switch in Atlantis—our focus here is on the parts most relevant to the architecture. That said, we strongly recommend running Atlantis in an isolated VPC with [Private Service Access](https://cloud.google.com/vpc/docs/configure-private-services-access) enabled. This ensures Atlantis only talks to Google APIs to do its job, without ever reaching into your other infrastructure.
 
 ## BoltDB: Great, if you only have one writer
 
