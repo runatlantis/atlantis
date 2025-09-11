@@ -446,3 +446,5 @@ By deploying Atlantis on Google Cloud Run with a shared Redis locking backend an
 As there's just so much to cover, and we want to keep this post at a reasonable length, we haven't covered everything. For a complete working example, see our [atlantis-on-gcp-cloud-run example](https://github.com/runatlantis/atlantis-contrib/tree/main/atlantis-on-cloud-run).
 
 If you have any questions or feedback, please join the #atlantis Slack channel in the Cloud Native Computing Foundation Slack workspace, or open an issue in the [atlantis-on-gcp-cloud-run example](https://github.com/runatlantis/atlantis-contrib/tree/main/atlantis-on-cloud-run).
+
+We also gave a talk on this architecture—slides are available here: [Atlantis on Cloud Run](https://speakerdeck.com/bschaatsbergen/atlantis-on-cloud-run).
