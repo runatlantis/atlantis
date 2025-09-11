@@ -31,6 +31,9 @@ If you're looking to skip ahead, you can find the Terraform code for this archit
 However, we recommend reading through the rest of this blog post to understand how it all works.
 :::
 
+## We Left Things Out
+To keep this post a reasonable length, we’ve left out some important details. For instance, we don’t cover setting up networking, DNS or how to pull a Docker image, nor do we dive into every knob and switch in Atlantis—our focus here is on the parts most relevant to the architecture. That said, we strongly recommend running Atlantis in an isolated VPC with [Private Service Access](https://cloud.google.com/vpc/docs/configure-private-services-access) enabled. This ensures Atlantis only talks to Google APIs to do its job, without ever reaching into your other infrastructure.
+
 ## BoltDB: Great, if you only have one writer
 
 Atlantis uses [BoltDB](https://github.com/boltdb/bolt) as its default locking backend. BoltDB is a simple, embedded key-value store that writes directly to disk. This works well for single-instance deployments, but BoltDB locks Atlantis into a single-node architecture. To achieve high availability and horizontal scaling, you need to replace it with a managed, distributed database that multiple Atlantis instances can safely share.
@@ -404,6 +407,8 @@ resource "google_compute_global_forwarding_rule" "atlantis" {
 
 Each Atlantis instance is registered as a backend service in the load balancer. Importantly, every instance requires two separate backends: one for the main Atlantis HTTP endpoint and another for the `/events` webhook endpoint. This separation allows us to protect the main Atlantis interface behind [Identity-Aware Proxy](https://cloud.google.com/iap/docs/concepts-overview) (IAP), ensuring only authorized users can access it, while keeping the webhook endpoint publicly reachable so GitHub or GitLab can deliver events without restriction.
 
+We highly recommend protecting the `/events` endpoint with a [security policy](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_security_policy) to block unwanted traffic. At a minimum, restrict access to the IP ranges used by your Git provider, and some common web vulnerability patterns. See [Cloud Armor preconfigured WAF rules](https://cloud.google.com/armor/docs/waf-rules).
+
 ```tf
 resource "google_compute_backend_service" "atlantis_workloads" {
   name                  = "atlantis-workloads"
@@ -416,9 +421,7 @@ resource "google_compute_backend_service" "atlantis_workloads" {
     group = google_compute_region_network_endpoint_group.atlantis_workloads.id
   }
   iap {
-    enabled              = true
-    oauth2_client_id     = # ...
-    oauth2_client_secret = # ...
+    enabled = true
   }
   project = "your-project-id"
 }
