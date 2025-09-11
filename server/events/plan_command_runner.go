@@ -1,13 +1,19 @@
 package events
 
 import (
-	"strconv"
-
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
+
+// GenerateLockID creates a consistent lock ID for a project context.
+// This ensures the same format is used for both locking and unlocking operations.
+func GenerateLockID(projCtx command.ProjectContext) string {
+	// Use models.NewProject to ensure consistent path cleaning
+	project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, "")
+	return models.GenerateLockKey(project, projCtx.Workspace)
+}
 
 func NewPlanCommandRunner(
 	silenceVCSStatusNoPlans bool,
@@ -269,7 +275,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 		// delete lock only if there are changes
 		ctx.Log.Info("Deleting lock for project '%s' (changes detected)", projCtx.ProjectName)
-		lockID := projCtx.BaseRepo.FullName + "/" + strconv.Itoa(projCtx.Pull.Num) + "/" + projCtx.ProjectName + "/" + projCtx.Workspace
+		lockID := GenerateLockID(projCtx)
 
 		_, err := p.lockingLocker.Unlock(lockID)
 		if err != nil {
