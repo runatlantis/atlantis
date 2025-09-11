@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1@sha256:38387523653efa0039f8e1c89bb74a30504e76ee9f565e25c9a09841f9427b05
 # what distro is the image being built for
 ARG ALPINE_TAG=3.21.3@sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c
-ARG DEBIAN_TAG=12.10-slim@sha256:4b50eb66f977b4062683ff434ef18ac191da862dbe966961bc11990cf5791a8d
+ARG DEBIAN_TAG=12.11-slim@sha256:b1a741487078b369e78119849663d7f1a5341ef2768798f7b7406c4240f86aef
 # renovate: datasource=docker depName=golang versioning=docker
 ARG GOLANG_TAG=1.24.4-alpine@sha256:68932fa6d4d4059845c8f40ad7e654e626f3ebd3706eef7846f319293ab5cb7a
 
@@ -57,7 +57,7 @@ FROM debian:${DEBIAN_TAG} AS debian-base
 # renovate: datasource=repology depName=debian_12/ca-certificates versioning=loose
 ENV DEBIAN_CA_CERTIFICATES_VERSION="20230311+deb12u1"
 # renovate: datasource=repology depName=debian_12/curl versioning=loose
-ENV DEBIAN_CURL_VERSION="7.88.1-10+deb12u12"
+ENV DEBIAN_CURL_VERSION="7.88.1-10+deb12u14"
 # renovate: datasource=repology depName=debian_12/git versioning=loose
 ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u2"
 # renovate: datasource=repology depName=debian_12/unzip versioning=loose
@@ -67,7 +67,7 @@ ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u7"
 # renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
 ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
 # renovate: datasource=repology depName=debian_12/gnupg versioning=loose
-ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1"
+ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1+deb12u1"
 # renovate: datasource=repology depName=debian_12/openssl versioning=loose
 ENV DEBIAN_OPENSSL_VERSION="3.0.17-1~deb12u2"
 

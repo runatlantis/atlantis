@@ -17,7 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -989,13 +988,9 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	lockingLocker.VerifyWasCalledOnce().Unlock(fmt.Sprintf("%s/%d/%s/%s", testdata.Pull.BaseRepo.FullName, testdata.Pull.Num, projectCtx.ProjectName, projectCtx.Workspace))
-
-	lockingLocker.VerifyWasCalledOnce().
-		Unlock(testdata.Pull.BaseRepo.FullName + "/" +
-			strconv.Itoa(testdata.Pull.Num) + "/" +
-			projectCtx.ProjectName + "/" +
-			projectCtx.Workspace)
+	// Verify that the unlock operation uses the same lock ID format as generateLockID
+	expectedLockID := events.GenerateLockID(projectCtx)
+	lockingLocker.VerifyWasCalledOnce().Unlock(expectedLockID)
 }
 
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
