@@ -1423,7 +1423,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		CommitStatusUpdater:    commitStatusUpdater,
 		Router:                 postWorkflowHookURLGenerator,
 	}
-	statsScope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	// Use NoOp metrics scope for E2E tests to avoid excessive debug logging
+	statsScope, _, _ := metrics.NewNoopScope()
 
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		userConfig.EnablePolicyChecksFlag,
