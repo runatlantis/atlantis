@@ -9,12 +9,20 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
-// generateLockID creates a consistent lock ID for a project.
+// GenerateLockID creates a consistent lock ID for a project.
 // This ensures the same format is used for both locking and unlocking operations.
-func generateLockID(repoFullName, repoRelDir, workspace string) string {
+func GenerateLockID(projCtx command.ProjectContext) string {
+	// Validate that required fields are not empty
+	if projCtx.BaseRepo.FullName == "" {
+		panic("BaseRepo.FullName cannot be empty")
+	}
+	if projCtx.Workspace == "" {
+		panic("Workspace cannot be empty")
+	}
+
 	// Use models.NewProject to ensure consistent path cleaning
-	project := models.NewProject(repoFullName, repoRelDir, "")
-	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, workspace)
+	project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, "")
+	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, projCtx.Workspace)
 }
 
 func NewPlanCommandRunner(
@@ -277,7 +285,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 		// delete lock only if there are changes
 		ctx.Log.Info("Deleting lock for project '%s' (changes detected)", projCtx.ProjectName)
-		lockID := generateLockID(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.Workspace)
+		lockID := GenerateLockID(projCtx)
 
 		_, err := p.lockingLocker.Unlock(lockID)
 		if err != nil {
