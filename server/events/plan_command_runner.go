@@ -12,14 +12,6 @@ import (
 // GenerateLockID creates a consistent lock ID for a project.
 // This ensures the same format is used for both locking and unlocking operations.
 func GenerateLockID(projCtx command.ProjectContext) string {
-	// Validate that required fields are not empty
-	if projCtx.BaseRepo.FullName == "" {
-		panic("BaseRepo.FullName cannot be empty")
-	}
-	if projCtx.Workspace == "" {
-		panic("Workspace cannot be empty")
-	}
-
 	// Use models.NewProject to ensure consistent path cleaning
 	project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, "")
 	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, projCtx.Workspace)
