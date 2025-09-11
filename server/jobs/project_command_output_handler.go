@@ -291,10 +291,14 @@ func (p *AsyncProjectCommandOutputHandler) Deregister(jobID string, ch chan stri
 }
 
 func (p *AsyncProjectCommandOutputHandler) GetReceiverBufferForPull(jobID string) map[chan string]bool {
+	p.receiverBuffersLock.RLock()
+	defer p.receiverBuffersLock.RUnlock()
 	return p.receiverBuffers[jobID]
 }
 
 func (p *AsyncProjectCommandOutputHandler) GetProjectOutputBuffer(jobID string) OutputBuffer {
+	p.projectOutputBuffersLock.RLock()
+	defer p.projectOutputBuffersLock.RUnlock()
 	return p.projectOutputBuffers[jobID]
 }
 
