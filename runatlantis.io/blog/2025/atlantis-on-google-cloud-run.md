@@ -32,6 +32,7 @@ However, we recommend reading through the rest of this blog post to understand h
 :::
 
 ## We Left Things Out
+
 To keep this post a reasonable length, we’ve left out some important details. For instance, we don’t cover setting up networking, DNS, how to pull a Docker image or wildcard TLS certificates, nor do we dive into every knob and switch in Atlantis—our focus here is on the parts most relevant to the architecture. That said, we strongly recommend running Atlantis in an isolated VPC with [Private Service Access](https://cloud.google.com/vpc/docs/configure-private-services-access) enabled. This ensures Atlantis only talks to Google APIs to do its job, without ever reaching into your other infrastructure.
 
 ## BoltDB: Great, if you only have one writer
@@ -39,11 +40,13 @@ To keep this post a reasonable length, we’ve left out some important details. 
 Atlantis uses [BoltDB](https://github.com/boltdb/bolt) as its default locking backend. BoltDB is a simple, embedded key-value store that writes directly to disk. This works well for single-instance deployments, but BoltDB locks Atlantis into a single-node architecture. To achieve high availability and horizontal scaling, you need to replace it with a managed, distributed database that multiple Atlantis instances can safely share.
 
 ## An Atlantis to Rule Them All
+
 To facilitate the creation and management of multiple Atlantis instances, we’ll also deploy a dedicated “management” Atlantis instance. This instance will be responsible for managing the lifecycle of the other Atlantis instances, including creating, updating, and deleting them as needed. I usually keep this in a separate Google Cloud project called `atlantis-mgmt`, along with a dedicated Git repository for this purpose.
 
 Once you have one instance set up, it’s straightforward to replicate it and place it behind a shared load balancer.
 
 ## Redis: A distributed locking backend
+
 Since Atlantis v0.19.0, Redis is a supported locking backend. Redis is an in-memory data structure store that we will use to provide a central locking backend for multiple Atlantis instances. Each instance will connect to the same Redis instance, allowing them to coordinate locks and avoid conflicts.
 
 Redis also supports persistence, through RDB (Redis Database), which performs point-in-time snapshots of the dataset at specified intervals, and AOF (Append Only File), which logs every write operation received by the Redis server. This means that even if the Redis instance goes down, we don't lose our locks.
@@ -220,6 +223,7 @@ Because of how Atlantis operates, its ephemeral storage requirements are limited
 ```
 
 ## Keeping an Instance Warm
+
 Cloud Run instances can scale down to zero when not in use, which can lead to cold starts and loss of the in-memory ephemeral storage. To avoid this, we set `min_instance_count` to 1, ensuring that at least one instance is always running and ready to handle requests.
 
 ```tf
@@ -230,6 +234,7 @@ Cloud Run instances can scale down to zero when not in use, which can lead to co
 ```
 
 ## Impersonation and Least Privilege
+
 Each Atlantis Cloud Run service deployed runs under a service account that defines its identity. Instead of giving this account broad access, we use a service account that only has permission to impersonate other, more restricted service accounts.
 
 This isn't something you'll need to do for the management Atlantis instance, as that gets deployed against a single project anyway, but it's important for the other Atlantis instances that will manage multiple projects and environments. By using impersonation, we can ensure that each Atlantis instance only has the permissions it needs to manage its specific projects.
@@ -239,6 +244,7 @@ For example, you can create one base Atlantis service account (`atlantis-example
 In turn, these environment-specific service accounts are granted only the permissions required against the projects they manage. This ensures that if one Atlantis instance is compromised, the blast radius is limited to only the resources that instance manages.
 
 Here’s an example of how to set this up in Terraform:
+
 ```tf
 locals {
   atlantis_network_service_accounts = [
@@ -441,7 +447,8 @@ resource "google_compute_backend_service" "atlantis_workloads_webhooks" {
 ```
 
 ## Conclusion
-By deploying Atlantis on Google Cloud Run with a shared Redis locking backend and a shared load balancer, we provide a highly available, horizontally scalable, and secure Atlantis deployment. Each Atlantis instance runs with its own identity and limited permissions, managing only its own projects. 
+
+By deploying Atlantis on Google Cloud Run with a shared Redis locking backend and a shared load balancer, we provide a highly available, horizontally scalable, and secure Atlantis deployment. Each Atlantis instance runs with its own identity and limited permissions, managing only its own projects.
 
 As there's just so much to cover, and we want to keep this post at a reasonable length, we haven't covered everything. For a complete working example, see our [atlantis-on-gcp-cloud-run example](https://github.com/runatlantis/atlantis-contrib/tree/main/atlantis-on-cloud-run).
 
