@@ -4,13 +4,14 @@
 package mocks
 
 import (
+	"reflect"
+	"time"
+
 	go_version "github.com/hashicorp/go-version"
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/core/runtime/models"
 	terraform "github.com/runatlantis/atlantis/server/core/terraform"
 	command "github.com/runatlantis/atlantis/server/events/command"
-	"reflect"
-	"time"
 )
 
 type MockAsyncTFExec struct {

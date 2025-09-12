@@ -941,6 +941,7 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 		CommandName:         command.Plan,
 		ExecutionOrderGroup: 0,
 		ProjectName:         "TestProject",
+		RepoRelDir:          ".",
 		Workspace:           "default",
 		BaseRepo:            testdata.GithubRepo,
 		Pull:                testdata.Pull,

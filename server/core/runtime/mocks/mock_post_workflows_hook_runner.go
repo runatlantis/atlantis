@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock/v4"
-	models "github.com/runatlantis/atlantis/server/events/models"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock/v4"
+	models "github.com/runatlantis/atlantis/server/events/models"
 )
 
 type MockPostWorkflowHookRunner struct {

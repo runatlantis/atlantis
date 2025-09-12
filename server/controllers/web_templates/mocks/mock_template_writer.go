@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock/v4"
 	io "io"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock/v4"
 )
 
 type MockTemplateWriter struct {

@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock/v4"
-	webhooks "github.com/runatlantis/atlantis/server/events/webhooks"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock/v4"
+	webhooks "github.com/runatlantis/atlantis/server/events/webhooks"
 )
 
 type MockSlackClient struct {

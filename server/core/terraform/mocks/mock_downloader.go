@@ -5,10 +5,11 @@ package mocks
 
 import (
 	context "context"
-	go_version "github.com/hashicorp/go-version"
-	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 	"time"
+
+	go_version "github.com/hashicorp/go-version"
+	pegomock "github.com/petergtz/pegomock/v4"
 )
 
 type MockDownloader struct {

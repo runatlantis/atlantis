@@ -4,11 +4,12 @@
 package mocks
 
 import (
+	"reflect"
+	"time"
+
 	pegomock "github.com/petergtz/pegomock/v4"
 	logging "github.com/runatlantis/atlantis/server/logging"
 	client_go "gitlab.com/gitlab-org/api/client-go"
-	"reflect"
-	"time"
 )
 
 type MockGitlabMergeRequestGetter struct {

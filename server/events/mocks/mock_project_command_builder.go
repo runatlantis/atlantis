@@ -4,11 +4,12 @@
 package mocks
 
 import (
+	"reflect"
+	"time"
+
 	pegomock "github.com/petergtz/pegomock/v4"
 	events "github.com/runatlantis/atlantis/server/events"
 	command "github.com/runatlantis/atlantis/server/events/command"
-	"reflect"
-	"time"
 )
 
 type MockProjectCommandBuilder struct {

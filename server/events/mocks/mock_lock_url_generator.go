@@ -4,9 +4,10 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock/v4"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock/v4"
 )
 
 type MockLockURLGenerator struct {

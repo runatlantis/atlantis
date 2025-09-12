@@ -4,11 +4,12 @@
 package mocks
 
 import (
+	"reflect"
+	"time"
+
 	pegomock "github.com/petergtz/pegomock/v4"
 	valid "github.com/runatlantis/atlantis/server/core/config/valid"
 	command "github.com/runatlantis/atlantis/server/events/command"
-	"reflect"
-	"time"
 )
 
 type MockEnvStepRunner struct {
