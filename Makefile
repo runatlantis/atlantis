@@ -60,7 +60,7 @@ docker/test: ## Run tests in docker
 
 .PHONY: test-all
 test-all: ## Run tests including integration
-	@go test  $(PKG)
+	@go test -timeout=300s $(PKG)
 
 .PHONY: docker/test-all
 docker/test-all: ## Run all tests in docker

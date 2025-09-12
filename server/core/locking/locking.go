@@ -18,7 +18,6 @@ package locking
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"time"
 
@@ -146,7 +145,7 @@ func (c *Client) GetLock(key string) (*models.ProjectLock, error) {
 }
 
 func (c *Client) key(p models.Project, workspace string) string {
-	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, workspace)
+	return models.GenerateLockKey(p, workspace)
 }
 
 func (c *Client) lockKeyToProjectWorkspace(key string) (models.Project, string, error) {
@@ -199,5 +198,5 @@ func (c *NoOpLocker) GetLock(_ string) (*models.ProjectLock, error) {
 }
 
 func (c *NoOpLocker) key(p models.Project, workspace string) string {
-	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, workspace)
+	return models.GenerateLockKey(p, workspace)
 }
