@@ -265,24 +265,6 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 	ctx.CommandHasErrors = result.HasErrors()
 
-	for i, projResult := range result.ProjectResults {
-		projCtx := projectCmds[i]
-
-		if projResult.PlanStatus() == models.PlannedNoChangesPlanStatus || projResult.PlanStatus() == models.ErroredPlanStatus {
-			ctx.Log.Info("Keeping lock for project '%s' (no changes or error)", projCtx.ProjectName)
-			continue
-		}
-
-		// delete lock only if there are changes
-		ctx.Log.Info("Deleting lock for project '%s' (changes detected)", projCtx.ProjectName)
-		lockID := GenerateLockID(projCtx)
-
-		_, err := p.lockingLocker.Unlock(lockID)
-		if err != nil {
-			ctx.Log.Err("failed unlocking project '%s': %s", projCtx.ProjectName, err)
-		}
-	}
-
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		p.deletePlans(ctx)
