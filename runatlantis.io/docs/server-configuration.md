@@ -95,7 +95,7 @@ Atlantis will automatically run `terraform plan`
 which can run arbitrary code if given a malicious Terraform configuration.
 :::
 
-### `--api-secret` <Badge text="v0.1.0+" type="info"/>
+### `--api-secret` <Badge text="v0.22.2+" type="info"/>
 
 ```bash
 atlantis server --api-secret="secret"
@@ -105,7 +105,7 @@ ATLANTIS_API_SECRET="secret"
 
 Required secret used to validate requests made to the [`/api/*` endpoints](api-endpoints.md).
 
-### `--atlantis-url` <Badge text="v0.1.0+" type="info"/>
+### `--atlantis-url` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --atlantis-url="https://my-domain.com:9090/basepath"
@@ -373,7 +373,7 @@ ATLANTIS_CHECKOUT_STRATEGY="<branch|merge>"
 How to check out pull requests. Use either `branch` or `merge`.
 Defaults to `branch`. See [Checkout Strategy](checkout-strategy.md) for more details.
 
-### `--config` <Badge text="v0.1.0+" type="info"/>
+### `--config` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --config="my/config/file.yaml"
@@ -383,7 +383,7 @@ ATLANTIS_CONFIG="my/config/file.yaml"
 
 YAML config file where flags can also be set. See [Config File](#config-file) for more details.
 
-### `--data-dir` <Badge text="v0.1.0+" type="info"/>
+### `--data-dir` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --data-dir="path/to/data/dir"
@@ -536,26 +536,6 @@ Enable Atlantis to format Terraform plan output into a markdown-diff friendly fo
 
 Useful to enable for use with GitHub.
 
-### `--enable-lock-retry` <Badge text="v0.23.0+" type="info"/>
-
-```bash
-atlantis server --enable-lock-retry
-# or
-ATLANTIS_ENABLE_LOCK_RETRY=true
-```
-
-Enable automatic retry of lock acquisition. When enabled, Atlantis will retry acquiring a lock if it is busy. Defaults to `false`.
-
-### `--enable-plan-queue` <Badge text="v0.23.0+" type="info"/>
-
-```bash
-atlantis server --enable-plan-queue
-# or
-ATLANTIS_ENABLE_PLAN_QUEUE=true
-```
-
-Enable the plan queue feature. When enabled, plan requests are queued if a lock is unavailable, rather than failing immediately. Defaults to `false`.
-
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
 ```bash
@@ -706,7 +686,7 @@ ATLANTIS_GH_APP_SLUG="myappslug"
 
 A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`. You need to obtain this value from your GitHub app, one way is to go to your App settings and open "Public page" from the left sidebar. Your `--gh-app-slug` value will be the last part of the URL, e.g `https://github.com/apps/<slug>`.
 
-### `--gh-hostname` <Badge text="v0.1.0+" type="info"/>
+### `--gh-hostname` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --gh-hostname="my.github.enterprise.com"
@@ -717,7 +697,7 @@ ATLANTIS_GH_HOSTNAME="my.github.enterprise.com"
 Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
 don't set. Defaults to `github.com`.
 
-### `--gh-org` <Badge text="v0.1.0+" type="info"/>
+### `--gh-org` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --gh-org="myorgname"
@@ -745,7 +725,7 @@ Comma-separated list of GitHub teams and permission pairs.
 
 By default, any team can plan and apply.
 
-### `--gh-token` <Badge text="v0.1.0+" type="info"/>
+### `--gh-token` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --gh-token="token"
@@ -765,7 +745,7 @@ ATLANTIS_GH_TOKEN_FILE="/path/to/token"
 
 GitHub token of API user. The token is loaded from disk regularly to allow for rotation of the token without the need to restart the Atlantis server.
 
-### `--gh-user` <Badge text="v0.1.0+" type="info"/>
+### `--gh-user` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --gh-user="myuser"
@@ -775,7 +755,7 @@ ATLANTIS_GH_USER="myuser"
 
 GitHub username of API user. This user is also used by the flag `--hide-user-plan-comments` and will need to be updated if migrating to github EMU.
 
-### `--gh-webhook-secret` <Badge text="v0.1.0+" type="info"/>
+### `--gh-webhook-secret` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --gh-webhook-secret="secret"
@@ -790,7 +770,7 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
-### `--gitea-base-url` <Badge text="v0.32.0+" type="info"/>
+### `--gitea-base-url` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
 atlantis server --gitea-base-url="http://your-gitea.corp:7990/basepath"
@@ -800,7 +780,7 @@ ATLANTIS_GITEA_BASE_URL="http://your-gitea.corp:7990/basepath"
 
 Base URL of Gitea installation. Must include `http://` or `https://`. Defaults to `https://gitea.com` if left empty/absent.
 
-### `--gitea-page-size` <Badge text="v0.32.0+" type="info"/>
+### `--gitea-page-size` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
 atlantis server --gitea-page-size=30
@@ -815,7 +795,7 @@ The default value conforms to the Gitea server's standard config setting: DEFAUL
 The highest valid value depends on the Gitea server's config setting: MAX_RESPONSE_ITEMS
 :::
 
-### `--gitea-token` <Badge text="v0.32.0+" type="info"/>
+### `--gitea-token` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
 atlantis server --gitea-token="token"
@@ -825,7 +805,7 @@ ATLANTIS_GITEA_TOKEN="token"
 
 Gitea app password of API user.
 
-### `--gitea-user` <Badge text="v0.32.0+" type="info"/>
+### `--gitea-user` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
 atlantis server --gitea-user="myuser"
@@ -835,7 +815,7 @@ ATLANTIS_GITEA_USER="myuser"
 
 Gitea username of API user.
 
-### `--gitea-webhook-secret` <Badge text="v0.32.0+" type="info"/>
+### `--gitea-webhook-secret` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
 atlantis server --gitea-webhook-secret="secret"
@@ -850,7 +830,7 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
-### `--gitlab-group-allowlist` <Badge text="v0.40.0+" type="info"/>
+### `--gitlab-group-allowlist` <Badge text="v0.13.0+" type="info"/>
 
 ```bash
 atlantis server --gitlab-group-allowlist="myorg/mygroup:plan, myorg/secteam:apply, myorg/devops:apply, myorg/devops:import"
@@ -864,8 +844,9 @@ By default, any group can plan and apply.
 
 ::: warning NOTE
 Atlantis needs to be able to view the listed group members, inaccessible or non-existent groups are silently ignored.
+:::
 
-### `--gitlab-hostname` <Badge text="v0.40.0+" type="info"/>
+### `--gitlab-hostname` <Badge text="v0.2.0+" type="info"/>
 
 ```bash
 atlantis server --gitlab-hostname="my.gitlab.enterprise.com"
@@ -876,7 +857,7 @@ ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
 don't set. Defaults to `gitlab.com`.
 
-### `--gitlab-token` <Badge text="v0.40.0+" type="info"/>
+### `--gitlab-token` <Badge text="v0.2.0+" type="info"/>
 
 ```bash
 atlantis server --gitlab-token="token"
@@ -886,7 +867,7 @@ ATLANTIS_GITLAB_TOKEN="token"
 
 GitLab token of API user.
 
-### `--gitlab-user` <Badge text="v0.40.0+" type="info"/>
+### `--gitlab-user` <Badge text="v0.2.0+" type="info"/>
 
 ```bash
 atlantis server --gitlab-user="myuser"
@@ -896,7 +877,7 @@ ATLANTIS_GITLAB_USER="myuser"
 
 GitLab username of API user.
 
-### `--gitlab-webhook-secret` <Badge text="v0.40.0+" type="info"/>
+### `--gitlab-webhook-secret` <Badge text="v0.2.0+" type="info"/>
 
 ```bash
 atlantis server --gitlab-webhook-secret="secret"
@@ -911,7 +892,7 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
-### `--help` <Badge text="v0.1.0+" type="info"/>
+### `--help` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --help
@@ -974,27 +955,7 @@ Include git untracked files in the Atlantis modified file list.
 Used for example with CDKTF pre-workflow hooks that dynamically generate
 Terraform files.
 
-### `--lock-retry-delay` <Badge text="v0.23.0+" type="info"/>
-
-```bash
-atlantis server --lock-retry-delay=5
-# or
-ATLANTIS_LOCK_RETRY_DELAY=5
-```
-
-Delay in seconds between lock retry attempts. Defaults to `5`.
-
-### `--lock-retry-max-attempts` <Badge text="v0.23.0+" type="info"/>
-
-```bash
-atlantis server --lock-retry-max-attempts=3
-# or
-ATLANTIS_LOCK_RETRY_MAX_ATTEMPTS=3
-```
-
-Maximum number of attempts to retry acquiring a lock when lock retry is enabled. Defaults to `3`.
-
-### `--locking-db-type` <Badge text="v0.48.0+" type="info"/>
+### `--locking-db-type` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
 atlantis server --locking-db-type="<boltdb|redis>"
@@ -1009,7 +970,7 @@ Notes:
 - If set to `boltdb`, only one process may have access to the boltdb instance.
 - If set to `redis`, then `--redis-host`, `--redis-port`, and `--redis-password` must be set.
 
-### `--log-level` <Badge text="v0.1.0+" type="info"/>
+### `--log-level` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --log-level="<debug|info|warn|error>"
@@ -1080,7 +1041,7 @@ ATLANTIS_PARALLEL_POOL_SIZE=100
 
 Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
 
-### `--port` <Badge text="v0.1.0+" type="info"/>
+### `--port` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
 atlantis server --port=4141
@@ -1100,7 +1061,7 @@ ATLANTIS_QUIET_POLICY_CHECKS=true
 
 Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
 
-### `--redis-db` <Badge text="v0.48.0+" type="info"/>
+### `--redis-db` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
 atlantis server --redis-db=0
@@ -1110,7 +1071,7 @@ ATLANTIS_REDIS_DB=0
 
 The Redis Database to use when using a Locking DB type of `redis`. Defaults to `0`.
 
-### `--redis-host` <Badge text="v0.48.0+" type="info"/>
+### `--redis-host` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
 atlantis server --redis-host="localhost"
@@ -1120,7 +1081,7 @@ ATLANTIS_REDIS_HOST="localhost"
 
 The Redis Hostname for when using a Locking DB type of `redis`.
 
-### `--redis-insecure-skip-verify` <Badge text="v0.48.0+" type="info"/>
+### `--redis-insecure-skip-verify` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
 atlantis server --redis-insecure-skip-verify=false
@@ -1134,7 +1095,7 @@ Controls whether the Redis client verifies the Redis server's certificate chain 
 If this is enabled, TLS is susceptible to machine-in-the-middle attacks unless custom verification is used.
 :::
 
-### `--redis-password` <Badge text="v0.48.0+" type="info"/>
+### `--redis-password` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
 atlantis server --redis-password="password123"
@@ -1144,7 +1105,7 @@ ATLANTIS_REDIS_PASSWORD="password123"
 
 The Redis Password for when using a Locking DB type of `redis`.
 
-### `--redis-port` <Badge text="v0.48.0+" type="info"/>
+### `--redis-port` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
 atlantis server --redis-port=6379
@@ -1154,7 +1115,7 @@ ATLANTIS_REDIS_PORT=6379
 
 The Redis Port for when using a Locking DB type of `redis`. Defaults to `6379`.
 
-### `--redis-tls-enabled` <Badge text="v0.48.0+" type="info"/>
+### `--redis-tls-enabled` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
 atlantis server --redis-tls-enabled=false
@@ -1346,7 +1307,7 @@ ATLANTIS_SLACK_TOKEN='token'
 
 API token for Slack notifications. See [Using Slack hooks](sending-notifications-via-webhooks.md#using-slack-hooks).
 
-### `--ssl-cert-file` <Badge text="v0.44.0+" type="info"/>
+### `--ssl-cert-file` <Badge text="v0.2.4+" type="info"/>
 
 ```bash
 atlantis server --ssl-cert-file="/etc/ssl/certs/my-cert.crt"
@@ -1358,7 +1319,7 @@ File containing x509 Certificate used for serving HTTPS.
 If the cert is signed by a CA, the file should be the concatenation
 of the server's certificate, any intermediates, and the CA's certificate.
 
-### `--ssl-key-file` <Badge text="v0.44.0+" type="info"/>
+### `--ssl-key-file` <Badge text="v0.2.4+" type="info"/>
 
 ```bash
 atlantis server --ssl-key-file="/etc/ssl/private/my-cert.key"
@@ -1410,7 +1371,7 @@ This has no impact if `--tf-download` is set to `false`.
 
 This setting is not yet supported when `--tf-distribution` is set to `opentofu`.
 
-### `--tfe-hostname` <Badge text="v0.45.0+" type="info"/>
+### `--tfe-hostname` <Badge text="v0.8.3+" type="info"/>
 
 ```bash
 atlantis server --tfe-hostname="my-terraform-enterprise.company.com"
@@ -1423,7 +1384,7 @@ Hostname of your Terraform Enterprise installation to be used in conjunction wit
 If using Terraform Cloud (i.e. you don't have your own Terraform Enterprise installation)
 no need to set since it defaults to `app.terraform.io`.
 
-### `--tfe-local-execution-mode` <Badge text="v0.45.0+" type="info"/>
+### `--tfe-local-execution-mode` <Badge text="v0.8.3+" type="info"/>
 
 ```bash
 atlantis server --tfe-local-execution-mode
@@ -1433,7 +1394,7 @@ ATLANTIS_TFE_LOCAL_EXECUTION_MODE=true
 
 Enable if you're using local execution mode (instead of TFE/C's remote execution mode). See [Terraform Cloud](terraform-cloud.md) for more details.
 
-### `--tfe-token` <Badge text="v0.45.0+" type="info"/>
+### `--tfe-token` <Badge text="v0.8.3+" type="info"/>
 
 ```bash
 atlantis server --tfe-token="xxx.atlasv1.yyy"
@@ -1443,7 +1404,7 @@ ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy'
 
 A token for Terraform Cloud/Terraform Enterprise integration. See [Terraform Cloud](terraform-cloud.md) for more details.
 
-### `--use-tf-plugin-cache` <Badge text="v0.46.0+" type="info"/>
+### `--use-tf-plugin-cache` <Badge text="v0.26.0+" type="info"/>
 
 ```bash
 atlantis server --use-tf-plugin-cache=false
@@ -1513,7 +1474,7 @@ ATLANTIS_WEB_USERNAME="atlantis"
 
 Username used for Basic Authentication on the Atlantis web service. Defaults to `atlantis`.
 
-### `--webhook-http-headers` <Badge text="v0.46.0+" type="info"/>
+### `--webhook-http-headers` <Badge text="v0.35.0+" type="info"/>
 
 ```bash
 atlantis server --webhook-http-headers='{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}'
@@ -1525,7 +1486,7 @@ Additional headers added to each HTTP POST payload when using [http webhooks](se
 provided as a JSON string. The map key is the header name and the value is the header value
 (string) or values (array of string).
 
-### `--websocket-check-origin` <Badge text="v0.47.0+" type="info"/>
+### `--websocket-check-origin` <Badge text="v0.19.0+" type="info"/>
 
 ```bash
 atlantis server --websocket-check-origin
@@ -1535,7 +1496,7 @@ ATLANTIS_WEBSOCKET_CHECK_ORIGIN=true
 
 Only allow websockets connection when they originate from the running Atlantis web server
 
-### `--write-git-creds` <Badge text="v0.47.0+" type="info"/>
+### `--write-git-creds` <Badge text="v0.11.0+" type="info"/>
 
 ```bash
 atlantis server --write-git-creds

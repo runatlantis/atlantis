@@ -485,7 +485,7 @@ func (b *BoltDB) commandLockKey(cmdName command.Name) string {
 }
 
 func (b *BoltDB) lockKey(p models.Project, workspace string) string {
-	return fmt.Sprintf("%s/%s/%s", p.RepoFullName, p.Path, workspace)
+	return models.GenerateLockKey(p, workspace)
 }
 
 func (b *BoltDB) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.PullStatus, error) {

@@ -276,6 +276,12 @@ type Plan struct {
 	LocalPath string
 }
 
+// GenerateLockKey creates a consistent lock key from a project and workspace.
+// This ensures the same format is used across all locking operations.
+func GenerateLockKey(project Project, workspace string) string {
+	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, workspace)
+}
+
 // NewProject constructs a Project. Use this constructor because it
 // sets Path correctly.
 func NewProject(repoFullName string, path string, projectName string) Project {
