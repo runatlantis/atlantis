@@ -122,6 +122,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 			// When silence is enabled and no projects are found, don't set any status
 			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
+		// this is to clean up any stale plans that exist from previous runs
+		ctx.Log.Info("deleting stale plans and locks -- no project to run")
+		p.deletePlans(ctx)
 		return
 	}
 
@@ -243,6 +246,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 			// When silence is enabled and no projects are found, don't set any status
 			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
+		// this is to clean up any stale plans that exist from previous runs
+		ctx.Log.Info("deleting stale plans and locks -- no project to run")
+		p.deletePlans(ctx)
 		return
 	}
 
