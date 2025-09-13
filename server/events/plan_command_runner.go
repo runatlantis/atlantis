@@ -37,6 +37,7 @@ func NewPlanCommandRunner(
 	pullStatusFetcher PullStatusFetcher,
 	lockingLocker locking.Locker,
 	discardApprovalOnPlan bool,
+	discardApprovalAfterPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	PendingApplyStatus bool,
 
@@ -60,6 +61,7 @@ func NewPlanCommandRunner(
 		pullStatusFetcher:          pullStatusFetcher,
 		lockingLocker:              lockingLocker,
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
+		DiscardApprovalAfterPlan:   discardApprovalAfterPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 		PendingApplyStatus:         PendingApplyStatus,
 	}
@@ -92,14 +94,26 @@ type PlanCommandRunner struct {
 	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
 	// a plan.
 	DiscardApprovalOnPlan bool
-	pullReqStatusFetcher  vcs.PullReqStatusFetcher
-	SilencePRComments     []string
-	PendingApplyStatus    bool
+	// DiscardApprovalAfterPlan controls if all already existing approvals should be removed/dismissed after executing
+	// a plan.
+	DiscardApprovalAfterPlan bool
+	pullReqStatusFetcher     vcs.PullReqStatusFetcher
+	SilencePRComments        []string
+	PendingApplyStatus       bool
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+
+	// Discard approvals after autoplan completes, regardless of outcome
+	if p.DiscardApprovalAfterPlan {
+		defer func() {
+			if err := p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
+				ctx.Log.Err("removing approvals after autoplan - %s", err)
+			}
+		}()
+	}
 
 	var err error
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
@@ -195,6 +209,15 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+
+	// Discard approvals after plan completes, regardless of outcome
+	if p.DiscardApprovalAfterPlan {
+		defer func() {
+			if err := p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
+				ctx.Log.Err("removing approvals after plan - %s", err)
+			}
+		}()
+	}
 
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
 	if err != nil {
