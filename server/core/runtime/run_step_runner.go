@@ -98,7 +98,7 @@ func (r *RunStepRunner) Run(
 		} else {
 			ctx.Log.Debug("Treating custom policy tool error exit code as a policy failure.  Error output: %s", err)
 		}
-		return "", err
+		return output, err
 	}
 
 	switch postProcessOutput {
