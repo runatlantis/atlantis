@@ -1025,6 +1025,25 @@ possible to diverge from expected behavior, if care is not taken when overriding
 
 Defaults to the atlantis home directory `/home/atlantis/.markdown_templates/` in `/$HOME/.markdown_templates`.
 
+### `--markdown-template-live-reload` <Badge text="v0.21.0+" type="info"/>
+
+```bash
+atlantis server --markdown-template-live-reload
+# or
+ATLANTIS_MARKDOWN_TEMPLATE_LIVE_RELOAD=true
+```
+
+Enable live reloading of markdown templates from the override directory on each render call. This is useful for
+development and testing of custom markdown templates, as it allows you to modify template files without restarting
+the Atlantis server.
+
+**Note:** This feature reloads templates on every render call, which may have a slight performance impact. It is
+recommended to use this feature only during development and disable it in production environments.
+
+Requires `--markdown-template-overrides-dir` to be set to a valid directory containing template overrides.
+
+Defaults to `false`.
+
 ### `--max-comments-per-command` <Badge text="v0.32.0+" type="info"/>
 
 ```bash
