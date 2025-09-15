@@ -58,6 +58,10 @@ type MarkdownRenderer struct {
 	executableName            string
 	hideUnchangedPlanComments bool
 	quietPolicyChecks         bool
+	// markdownTemplateOverridesDir is the directory containing template overrides for live editing.
+	markdownTemplateOverridesDir string
+	// liveReloadEnabled is true if templates should be reloaded on each render call.
+	liveReloadEnabled bool
 }
 
 // commonData is data that all responses have.
@@ -153,31 +157,49 @@ func NewMarkdownRenderer(
 	executableName string,
 	hideUnchangedPlanComments bool,
 	quietPolicyChecks bool,
+	liveReloadEnabled bool,
 ) *MarkdownRenderer {
-	var templates *template.Template
-	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
+	templates := loadTemplates(markdownTemplateOverridesDir)
+	return &MarkdownRenderer{
+		gitlabSupportsCommonMark:     gitlabSupportsCommonMark,
+		disableApplyAll:              disableApplyAll,
+		disableMarkdownFolding:       disableMarkdownFolding,
+		disableApply:                 disableApply,
+		disableRepoLocking:           disableRepoLocking,
+		enableDiffMarkdownFormat:     enableDiffMarkdownFormat,
+		markdownTemplates:            templates,
+		executableName:               executableName,
+		hideUnchangedPlanComments:    hideUnchangedPlanComments,
+		quietPolicyChecks:            quietPolicyChecks,
+		markdownTemplateOverridesDir: markdownTemplateOverridesDir,
+		liveReloadEnabled:            liveReloadEnabled,
+	}
+}
+
+// loadTemplates loads templates from embedded FS and optionally from override directory.
+func loadTemplates(markdownTemplateOverridesDir string) *template.Template {
+	templates, _ := template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
 	if overrides, err := templates.ParseGlob(fmt.Sprintf("%s/*.tmpl", markdownTemplateOverridesDir)); err == nil {
 		// doesn't override if templates directory doesn't exist
 		templates = overrides
 	}
-	return &MarkdownRenderer{
-		gitlabSupportsCommonMark:  gitlabSupportsCommonMark,
-		disableApplyAll:           disableApplyAll,
-		disableMarkdownFolding:    disableMarkdownFolding,
-		disableApply:              disableApply,
-		disableRepoLocking:        disableRepoLocking,
-		enableDiffMarkdownFormat:  enableDiffMarkdownFormat,
-		markdownTemplates:         templates,
-		executableName:            executableName,
-		hideUnchangedPlanComments: hideUnchangedPlanComments,
-		quietPolicyChecks:         quietPolicyChecks,
+	return templates
+}
+
+// reloadTemplates reloads templates if live reload is enabled.
+func (m *MarkdownRenderer) reloadTemplates() {
+	if m.liveReloadEnabled {
+		m.markdownTemplates = loadTemplates(m.markdownTemplateOverridesDir)
 	}
 }
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
 func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd PullCommand) string {
-	commandStr := cases.Title(language.English).String(strings.ReplaceAll(cmd.CommandName().String(), "_", " "))
+	// Reload templates if live reload is enabled
+	m.reloadTemplates()
+
+	commandStr := cases.Title(language.English).String(strings.Replace(cmd.CommandName().String(), "_", " ", -1))
 	var vcsRequestType string
 	if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab {
 		vcsRequestType = "Merge Request"

@@ -121,6 +121,7 @@ const (
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
+	MarkdownTemplateLiveReloadFlag   = "markdown-template-live-reload"
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
 	StatsNamespace                   = "stats-namespace"
@@ -407,6 +408,10 @@ var stringFlags = map[string]stringFlag{
 	MarkdownTemplateOverridesDirFlag: {
 		description:  "Directory for custom overrides to the markdown templates used for comments.",
 		defaultValue: DefaultMarkdownTemplateOverridesDir,
+	},
+	MarkdownTemplateLiveReloadFlag: {
+		description:  "Enable live reloading of markdown templates from the override directory on each render call.",
+		defaultValue: "false",
 	},
 	StatsNamespace: {
 		description:  "Namespace for aggregating stats.",
