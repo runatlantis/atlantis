@@ -1323,4 +1323,3 @@ func TestGitlabClient_UpdateStatusTransitionAlreadyComplete(t *testing.T) {
 
 	Ok(t, err)
 }
-
