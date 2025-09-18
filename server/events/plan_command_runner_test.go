@@ -61,7 +61,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 		{
 			Description:      "When planning with silenced VCS status, don't set any status",
 			VCSStatusSilence: true,
-			ExpVCSStatusSet:  false, // Silence means no status updates at all
+			ExpVCSStatusSet:  false, // No status should be set when silence is enabled
 			ExpSilenced:      true,
 		},
 		{
@@ -827,17 +827,17 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 	}
 }
 
-// TestPlanCommandRunner_SilenceFlagsClearsPendingStatus tests that when silence flags are enabled
-// and no projects are found, the pending status that was set earlier is cleared.
-// This is a regression test for issue #5389 where PRs were getting stuck with pending status.
-func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
+// TestPlanCommandRunner_SilenceFlagsPreventStatus tests that when silence flags are enabled
+// and no projects are found, no VCS status is set at all.
+// This is a regression test for issue #5389 - with the StatusManager approach, we prevent
+// setting pending status in the first place when silence flags are enabled.
+func TestPlanCommandRunner_SilenceFlagsPreventStatus(t *testing.T) {
 	// Test the specific scenario from issue #5389:
 	// When silence flags are enabled and no projects match when_modified patterns,
-	// the pending status should be cleared instead of leaving the PR stuck.
+	// no VCS status should be set at all (neither pending nor success).
 
-	// This test ensures that even when ATLANTIS_SILENCE_VCS_STATUS_NO_PLANS and
-	// ATLANTIS_SILENCE_VCS_STATUS_NO_PROJECTS are true, we still update the status
-	// to clear any pending state that was set earlier (e.g., in command_runner.go)
+	// This test ensures that when ATLANTIS_SILENCE_VCS_STATUS_NO_PLANS and
+	// ATLANTIS_SILENCE_VCS_STATUS_NO_PROJECTS are true, we don't set any status
 
 	t.Run("silence flags with no projects should not set any status", func(t *testing.T) {
 		RegisterMockTestingT(t)
@@ -869,16 +869,16 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 		// We should NOT set any VCS status at all
 
 		// The plan runner is now configured with silence flags
-		// When it finds no projects, it should not set any VCS status
-		// because silence means no status checks at all
+		// When it finds no projects, it should not set any status
+		// (neither pending nor success) because silence is enabled
 
 		// Run through the plan command (which will internally check for projects)
 		cmd := &events.CommentCommand{Name: command.Plan}
 		planCommandRunner.Run(ctx, cmd)
 
-		// CRITICAL VERIFICATION: With silence flags enabled, no status should be set at all
-		// This prevents any VCS status checks from being created (issue #5389)
-		// The silence flags mean "don't create any status checks"
+		// CRITICAL VERIFICATION: With the StatusManager approach, when silence flags are enabled,
+		// no VCS status should be set at all - this completely prevents the pending state issue
+		// by never setting status in the first place
 		commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
 			Any[logging.SimpleLogging](),
 			Any[models.Repo](),
