@@ -246,8 +246,9 @@ type DefaultProjectCommandRunner struct {
 
 // Plan runs terraform plan for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
-	if p.ProcessTracker != nil && p.ProcessTracker.IsPullCancelled(ctx.Pull) {
-		ctx.Log.Info("Skipping plan for project %s because the operation is cancelled", ctx.ProjectName)
+	// Check if the entire pull request has been cancelled
+	if p.ProcessTracker != nil && p.ProcessTracker.IsPullRequestCancelled(ctx.Pull) {
+		ctx.Log.Info("Skipping plan for project %s because the pull request is cancelled", ctx.ProjectName)
 		return command.ProjectResult{Command: command.Plan, Error: fmt.Errorf("operation cancelled"), RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, SilencePRComments: ctx.SilencePRComments}
 	}
 
@@ -262,9 +263,7 @@ func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.P
 		ProjectName:       ctx.ProjectName,
 		SilencePRComments: ctx.SilencePRComments,
 	}
-}
-
-// PolicyCheck evaluates policies defined with Rego for the project described by ctx.
+} // PolicyCheck evaluates policies defined with Rego for the project described by ctx.
 func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
 	return command.ProjectResult{
@@ -280,8 +279,9 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 
 // Apply runs terraform apply for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
-	if p.ProcessTracker != nil && p.ProcessTracker.IsPullCancelled(ctx.Pull) {
-		ctx.Log.Info("Skipping apply for project %s because the operation is cancelled", ctx.ProjectName)
+	// Check if the entire pull request has been cancelled
+	if p.ProcessTracker != nil && p.ProcessTracker.IsPullRequestCancelled(ctx.Pull) {
+		ctx.Log.Info("Skipping apply for project %s because the pull request is cancelled", ctx.ProjectName)
 		return command.ProjectResult{Command: command.Apply, Error: fmt.Errorf("operation cancelled"), RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, SilencePRComments: ctx.SilencePRComments}
 	}
 

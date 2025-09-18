@@ -1,6 +1,8 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -137,9 +139,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
+		result = p.runProjectCmdsWithCancellationCheck(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 	} else {
-		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
+		result = p.runProjectCmdsWithCancellationCheck(ctx, projectCmds, p.prjCmdRunner.Plan, 0)
 	}
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
@@ -267,9 +269,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
+		result = p.runProjectCmdsWithCancellationCheck(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
 	} else {
-		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
+		result = p.runProjectCmdsWithCancellationCheck(ctx, projectCmds, p.prjCmdRunner.Plan, 0)
 	}
 	ctx.CommandHasErrors = result.HasErrors()
 
@@ -396,4 +398,53 @@ func (p *PlanCommandRunner) partitionProjectCmds(
 
 func (p *PlanCommandRunner) isParallelEnabled(projectCmds []command.ProjectContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
+}
+
+// runProjectCmdsWithCancellationCheck runs project commands with support for cancellation between execution order groups
+func (p *PlanCommandRunner) runProjectCmdsWithCancellationCheck(ctx *command.Context, projectCmds []command.ProjectContext, runnerFunc func(command.ProjectContext) command.ProjectResult, poolSize int) command.Result {
+	// Get the process tracker for cancellation checks
+	var processTracker CancellationTracker
+	if runner, ok := p.prjCmdRunner.(*DefaultProjectCommandRunner); ok {
+		processTracker = runner.ProcessTracker
+	}
+
+	groups := splitByExecutionOrderGroup(projectCmds)
+	var results []command.ProjectResult
+
+	for i, group := range groups {
+		// Check for PR-level cancellation before starting each group (except the first)
+		if i > 0 && processTracker != nil && processTracker.IsPullRequestCancelled(ctx.Pull) {
+			ctx.Log.Info("Skipping execution order group %d and all subsequent groups due to pull request cancellation", group[0].ExecutionOrderGroup)
+			// Add cancelled results for all projects in remaining groups
+			for j := i; j < len(groups); j++ {
+				for _, cmd := range groups[j] {
+					results = append(results, command.ProjectResult{
+						Command:     cmd.CommandName,
+						Error:       fmt.Errorf("operation cancelled"),
+						RepoRelDir:  cmd.RepoRelDir,
+						Workspace:   cmd.Workspace,
+						ProjectName: cmd.ProjectName,
+					})
+				}
+			}
+			break
+		}
+
+		// Run the group
+		var groupResult command.Result
+		if poolSize > 0 && len(group) > 1 {
+			groupResult = runProjectCmdsParallel(group, runnerFunc, poolSize)
+		} else {
+			groupResult = runProjectCmds(group, runnerFunc)
+		}
+
+		results = append(results, groupResult.ProjectResults...)
+
+		if groupResult.HasErrors() && group[0].AbortOnExecutionOrderFail {
+			ctx.Log.Info("abort on execution order when failed")
+			break
+		}
+	}
+
+	return command.Result{ProjectResults: results}
 }

@@ -116,9 +116,9 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		logger.Err("deleting pull from db: %s", err)
 	}
 
-	// Clear any cancellation marker to avoid unbounded growth.
+	// Clear any operations to avoid unbounded growth.
 	if p.ProcessTracker != nil {
-		p.ProcessTracker.ClearPull(pull)
+		p.ProcessTracker.ClearPullRequest(pull)
 	}
 
 	// If there are no locks then there's no need to comment.
