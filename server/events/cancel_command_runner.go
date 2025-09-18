@@ -5,7 +5,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
-const cancelComment = "Marked pull request as cancelled. Future plan/apply operations will be skipped until new commits or manual reset."
+const cancelComment = "Cancelled all queued operations and future execution groups for this pull request. Currently running operations will continue to completion."
 
 func NewCancelCommandRunner(
 	vcsClient vcs.Client,
@@ -46,9 +46,9 @@ func (c *CancelCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	// Mark the pull as cancelled
-	defaultRunner.ProcessTracker.CancelPull(ctx.Pull)
-	ctx.Log.Info("Pull request marked as cancelled; future operations will be skipped")
+	// Cancel the entire pull request to prevent future execution order groups from running
+	defaultRunner.ProcessTracker.CancelPullRequest(ctx.Pull)
+	ctx.Log.Info("Cancelled all queued operations and future execution groups for pull request; currently running operations will continue to completion")
 	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cancelComment, ""); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)
 	}
