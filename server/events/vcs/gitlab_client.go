@@ -474,6 +474,14 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 
 			return nil
 		}
+
+		// If the error indicates the status is already 'running', we can treat it as a success.
+		// This can happen with parallel jobs. See https://github.com/runatlantis/atlantis/issues/2685.
+		if gitlabState == gitlab.Running && strings.Contains(err.Error(), "Cannot transition status via :run from :running") {
+			logger.Info("Commit status is already 'running'; ignoring redundant update.")
+			return nil
+		}
+
 		if attempt == maxAttempts {
 			return errors.Wrap(err, fmt.Sprintf("failed to update commit status for '%s' @ '%s' to '%s' after %d attempts", repo.FullName, pull.HeadCommit, src, attempt))
 		}
