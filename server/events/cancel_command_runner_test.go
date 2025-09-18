@@ -111,10 +111,10 @@ func TestCancelCommandRunner_PullRequestLevelCancellation(t *testing.T) {
 	tracker.TrackOperation(opKey3, OperationQueued)
 
 	// Cancel the entire pull request
-	tracker.CancelPullRequest(pull)
+	tracker.Cancel(pull)
 
 	// Verify PR is marked as cancelled
-	assert.True(t, tracker.IsPullRequestCancelled(pull), "Pull request should be cancelled")
+	assert.True(t, tracker.IsCancelled(pull), "Pull request should be cancelled")
 
 	// Verify queued operations are cancelled but running ones continue
 	assert.True(t, tracker.IsOperationCancelled(opKey1), "Queued operation should be cancelled")
