@@ -41,13 +41,13 @@ func (c *CancelCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	if defaultRunner.ProcessTracker == nil {
-		ctx.Log.Err("ProcessTracker is nil")
+	if defaultRunner.CancellationTracker == nil {
+		ctx.Log.Err("CancellationTracker is nil")
 		return
 	}
 
 	// Cancel the entire pull request to prevent future execution order groups from running
-	defaultRunner.ProcessTracker.CancelPullRequest(ctx.Pull)
+	defaultRunner.CancellationTracker.Cancel(ctx.Pull)
 	ctx.Log.Info("Cancelled all queued operations and future execution groups for pull request; currently running operations will continue to completion")
 	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cancelComment, ""); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)

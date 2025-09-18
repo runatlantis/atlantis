@@ -403,9 +403,9 @@ func (p *PlanCommandRunner) isParallelEnabled(projectCmds []command.ProjectConte
 // runProjectCmdsWithCancellationCheck runs project commands with support for cancellation between execution order groups
 func (p *PlanCommandRunner) runProjectCmdsWithCancellationCheck(ctx *command.Context, projectCmds []command.ProjectContext, runnerFunc func(command.ProjectContext) command.ProjectResult, poolSize int) command.Result {
 	// Get the process tracker for cancellation checks
-	var processTracker CancellationTracker
+	var cancellationTracker CancellationTracker
 	if runner, ok := p.prjCmdRunner.(*DefaultProjectCommandRunner); ok {
-		processTracker = runner.ProcessTracker
+		cancellationTracker = runner.CancellationTracker
 	}
 
 	groups := splitByExecutionOrderGroup(projectCmds)
@@ -413,7 +413,7 @@ func (p *PlanCommandRunner) runProjectCmdsWithCancellationCheck(ctx *command.Con
 
 	for i, group := range groups {
 		// Check for PR-level cancellation before starting each group (except the first)
-		if i > 0 && processTracker != nil && processTracker.IsPullRequestCancelled(ctx.Pull) {
+		if i > 0 && cancellationTracker != nil && cancellationTracker.IsCancelled(ctx.Pull) {
 			ctx.Log.Info("Skipping execution order group %d and all subsequent groups due to pull request cancellation", group[0].ExecutionOrderGroup)
 			// Add cancelled results for all projects in remaining groups
 			for j := i; j < len(groups); j++ {

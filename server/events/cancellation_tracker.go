@@ -8,9 +8,9 @@ import (
 )
 
 type CancellationTracker interface {
-	CancelPullRequest(pull models.PullRequest)
-	IsPullRequestCancelled(pull models.PullRequest) bool
-	ClearPullRequest(pull models.PullRequest)
+	Cancel(pull models.PullRequest)
+	IsCancelled(pull models.PullRequest) bool
+	Clear(pull models.PullRequest)
 }
 
 type DefaultCancellationTracker struct {
@@ -24,8 +24,8 @@ func NewCancellationTracker() *DefaultCancellationTracker {
 	}
 }
 
-// CancelPullRequest marks an entire pull request as cancelled, preventing any future operations
-func (p *DefaultCancellationTracker) CancelPullRequest(pull models.PullRequest) {
+// Cancel marks an entire pull request as cancelled, preventing any future operations
+func (p *DefaultCancellationTracker) Cancel(pull models.PullRequest) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -33,16 +33,16 @@ func (p *DefaultCancellationTracker) CancelPullRequest(pull models.PullRequest) 
 	p.cancelledPulls[pullKeyStr] = struct{}{}
 }
 
-// IsPullRequestCancelled checks if the entire pull request has been cancelled
-func (p *DefaultCancellationTracker) IsPullRequestCancelled(pull models.PullRequest) bool {
+// IsCancelled checks if the entire pull request has been cancelled
+func (p *DefaultCancellationTracker) IsCancelled(pull models.PullRequest) bool {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	_, exists := p.cancelledPulls[pullKey(pull)]
 	return exists
 }
 
-// ClearPullRequest removes cancellation for a pull request (called when a PR is closed)
-func (p *DefaultCancellationTracker) ClearPullRequest(pull models.PullRequest) {
+// Clear removes cancellation for a pull request (called when a PR is closed)
+func (p *DefaultCancellationTracker) Clear(pull models.PullRequest) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	delete(p.cancelledPulls, pullKey(pull))
