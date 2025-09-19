@@ -16,6 +16,7 @@ func NewApplyCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
 	prjCmdRunner ProjectApplyCommandRunner,
+	cancellationTracker CancellationTracker,
 	autoMerger *AutoMerger,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
@@ -32,6 +33,7 @@ func NewApplyCommandRunner(
 		commitStatusUpdater:        commitStatusUpdater,
 		prjCmdBuilder:              prjCommandBuilder,
 		prjCmdRunner:               prjCmdRunner,
+		cancellationTracker:        cancellationTracker,
 		autoMerger:                 autoMerger,
 		pullUpdater:                pullUpdater,
 		dbUpdater:                  dbUpdater,
@@ -51,6 +53,7 @@ type ApplyCommandRunner struct {
 	commitStatusUpdater  CommitStatusUpdater
 	prjCmdBuilder        ProjectApplyCommandBuilder
 	prjCmdRunner         ProjectApplyCommandRunner
+	cancellationTracker  CancellationTracker
 	autoMerger           *AutoMerger
 	pullUpdater          *PullUpdater
 	dbUpdater            *DBUpdater
@@ -233,18 +236,16 @@ var applyDisabledComment = "**Error:** Running `atlantis apply` is disabled."
 
 // runProjectCmdsWithCancellationCheck runs project commands with support for cancellation between execution order groups
 func (a *ApplyCommandRunner) runProjectCmdsWithCancellationCheck(ctx *command.Context, projectCmds []command.ProjectContext, runnerFunc func(command.ProjectContext) command.ProjectResult, poolSize int) command.Result {
-	// Get the process tracker for cancellation checks
-	var cancellationTracker CancellationTracker
-	if runner, ok := a.prjCmdRunner.(*DefaultProjectCommandRunner); ok {
-		cancellationTracker = runner.CancellationTracker
-	}
-
 	groups := splitByExecutionOrderGroup(projectCmds)
 	var results []command.ProjectResult
 
+	if a.cancellationTracker != nil {
+		defer a.cancellationTracker.Clear(ctx.Pull)
+	}
+
 	for i, group := range groups {
 		// Check for cancellation before starting each group (except the first)
-		if i > 0 && cancellationTracker != nil && cancellationTracker.IsCancelled(ctx.Pull) {
+		if i > 0 && a.cancellationTracker != nil && a.cancellationTracker.IsCancelled(ctx.Pull) {
 			ctx.Log.Info("Skipping execution order group %d and all subsequent groups due to cancellation", group[0].ExecutionOrderGroup)
 			// Add cancelled results for all projects in remaining groups
 			for j := i; j < len(groups); j++ {

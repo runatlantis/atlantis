@@ -695,6 +695,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir: workingDir,
 	}
 
+	cancellationTracker := events.NewCancellationTracker()
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		VcsClient:        vcsClient,
 		Locker:           projectLocker,
@@ -732,7 +734,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,
 		CommandRequirementHandler: applyRequirementHandler,
-		CancellationTracker:       events.NewCancellationTracker(),
+		CancellationTracker:       cancellationTracker,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -780,6 +782,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
+		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -799,6 +802,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
+		cancellationTracker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,

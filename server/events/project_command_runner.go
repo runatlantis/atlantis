@@ -229,6 +229,7 @@ type DefaultProjectCommandRunner struct {
 	PlanStepRunner            StepRunner
 	ShowStepRunner            StepRunner
 	ApplyStepRunner           StepRunner
+	CancelStepRunner          StepRunner
 	PolicyCheckStepRunner     StepRunner
 	VersionStepRunner         StepRunner
 	ImportStepRunner          StepRunner
@@ -246,12 +247,6 @@ type DefaultProjectCommandRunner struct {
 
 // Plan runs terraform plan for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
-	// Check if the entire pull request has been cancelled
-	if p.CancellationTracker != nil && p.CancellationTracker.IsCancelled(ctx.Pull) {
-		ctx.Log.Info("Skipping plan for project %s because the pull request is cancelled", ctx.ProjectName)
-		return command.ProjectResult{Command: command.Plan, Error: fmt.Errorf("operation cancelled"), RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, SilencePRComments: ctx.SilencePRComments}
-	}
-
 	planSuccess, failure, err := p.doPlan(ctx)
 	return command.ProjectResult{
 		Command:           command.Plan,
@@ -279,12 +274,6 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 
 // Apply runs terraform apply for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
-	// Check if the entire pull request has been cancelled
-	if p.CancellationTracker != nil && p.CancellationTracker.IsCancelled(ctx.Pull) {
-		ctx.Log.Info("Skipping apply for project %s because the pull request is cancelled", ctx.ProjectName)
-		return command.ProjectResult{Command: command.Apply, Error: fmt.Errorf("operation cancelled"), RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, SilencePRComments: ctx.SilencePRComments}
-	}
-
 	applyOut, failure, err := p.doApply(ctx)
 	return command.ProjectResult{
 		Command:           command.Apply,
