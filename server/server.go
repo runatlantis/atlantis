@@ -857,6 +857,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		vcsClient,
 		projectOutputWrapper.ProjectCommandRunner,
 		pullUpdater,
+		workingDirLocker,
 		userConfig.SilenceNoProjects,
 	)
 
