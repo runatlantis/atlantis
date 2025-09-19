@@ -584,6 +584,126 @@ func (g *GithubClient) GetPullRequestMergeabilityInfo(
 	statusContexts []StatusContext,
 	err error,
 ) {
+	if g.config.DisableRepoLevelSecurityRules {
+		return g.getPullRequestMergeabilityInfoWithoutRules(repo, pull)
+	} else {
+		return g.getPullRequestMergeabilityInfoWithRules(repo, pull)
+	}
+}
+
+func (g *GithubClient) getPullRequestMergeabilityInfoWithoutRules(
+	repo models.Repo,
+	pull *github.PullRequest,
+) (
+	reviewDecision githubv4.String,
+	requiredChecks []githubv4.String,
+	requiredWorkflows []WorkflowFileReference,
+	checkRuns []CheckRun,
+	statusContexts []StatusContext,
+	err error,
+) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				ReviewDecision githubv4.String
+				BaseRef        struct {
+					BranchProtectionRule struct {
+						RequiredStatusChecks []struct {
+							Context githubv4.String
+						}
+					}
+				}
+				Commits struct {
+					Nodes []struct {
+						Commit struct {
+							StatusCheckRollup struct {
+								Contexts struct {
+									PageInfo PageInfo
+									Nodes    []struct {
+										Typename      githubv4.String `graphql:"__typename"`
+										CheckRun      CheckRun        `graphql:"... on CheckRun"`
+										StatusContext StatusContext   `graphql:"... on StatusContext"`
+									}
+								} `graphql:"contexts(first: 100, after: $contextCursor)"`
+							}
+						}
+					}
+				} `graphql:"commits(last: 1)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":         githubv4.String(repo.Owner),
+		"name":          githubv4.String(repo.Name),
+		"number":        githubv4.Int(*pull.Number), // #nosec G115: integer overflow conversion int -> int32
+		"contextCursor": (*githubv4.String)(nil),
+	}
+
+	requiredChecksSet := make(map[githubv4.String]any)
+
+pagination:
+	for {
+		err = g.v4Client.Query(g.ctx, &query, variables)
+
+		if err != nil {
+			break pagination
+		}
+
+		reviewDecision = query.Repository.PullRequest.ReviewDecision
+
+		for _, rule := range query.Repository.PullRequest.BaseRef.BranchProtectionRule.RequiredStatusChecks {
+			requiredChecksSet[rule.Context] = struct{}{}
+		}
+
+		if len(query.Repository.PullRequest.Commits.Nodes) == 0 {
+			err = errors.New("no commits found on PR")
+			break pagination
+		}
+
+		for _, context := range query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
+			switch context.Typename {
+			case "CheckRun":
+				checkRuns = append(checkRuns, context.CheckRun.Copy())
+			case "StatusContext":
+				statusContexts = append(statusContexts, context.StatusContext)
+			default:
+				err = fmt.Errorf("unknown type of status check, %q", context.Typename)
+				break pagination
+			}
+		}
+
+		if !query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.HasNextPage {
+			break pagination
+		}
+
+		if query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.EndCursor != nil {
+			variables["contextCursor"] = query.Repository.PullRequest.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.PageInfo.EndCursor
+		}
+	}
+
+	if err != nil {
+		return "", nil, nil, nil, nil, errors.Wrap(err, "fetching branch protections and status checks from GraphQL")
+	}
+
+	for context := range requiredChecksSet {
+		requiredChecks = append(requiredChecks, context)
+	}
+
+	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, nil
+}
+
+func (g *GithubClient) getPullRequestMergeabilityInfoWithRules(
+	repo models.Repo,
+	pull *github.PullRequest,
+) (
+	reviewDecision githubv4.String,
+	requiredChecks []githubv4.String,
+	requiredWorkflows []WorkflowFileReference,
+	checkRuns []CheckRun,
+	statusContexts []StatusContext,
+	err error,
+) {
 	var query struct {
 		Repository struct {
 			PullRequest struct {
