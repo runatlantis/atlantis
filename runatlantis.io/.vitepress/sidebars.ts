@@ -102,6 +102,16 @@ const en = [
     collapsed: false,
     items: [
       {
+        text: "2025",
+        collapsed: true,
+        items: [
+          {
+            text: "Atlantis on Google Cloud Run",
+            link: "/blog/2025/atlantis-on-google-cloud-run"
+          },
+        ]
+      },
+      {
         text: "2024",
         collapsed: true,
         items: [

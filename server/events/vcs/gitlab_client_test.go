@@ -1257,3 +1257,69 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 		})
 	}
 }
+
+func TestGitlabClient_UpdateStatusTransitionAlreadyComplete(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
+	testServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+				w.WriteHeader(http.StatusBadRequest)
+				_, err := w.Write([]byte(`{"message": {"state": ["Cannot transition status via :run from :running"]}}`))
+				Ok(t, err)
+
+			case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha":
+				w.WriteHeader(http.StatusOK)
+
+				getCommitResponse := GetCommitResponse{
+					LastPipeline: GetCommitResponseLastPipeline{
+						ID: gitlabPipelineSuccessMrID,
+					},
+				}
+				getCommitJsonResponse, err := json.Marshal(getCommitResponse)
+				Ok(t, err)
+
+				_, err = w.Write(getCommitJsonResponse)
+				Ok(t, err)
+
+			case "/api/v4/":
+				// Rate limiter requests.
+				w.WriteHeader(http.StatusOK)
+
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		}))
+
+	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+	Ok(t, err)
+	client := &GitlabClient{
+		Client:          internalClient,
+		Version:         nil,
+		PollingInterval: 10 * time.Millisecond,
+	}
+
+	repo := models.Repo{
+		FullName: "runatlantis/atlantis",
+		Owner:    "runatlantis",
+		Name:     "atlantis",
+	}
+	err = client.UpdateStatus(
+		logger,
+		repo,
+		models.PullRequest{
+			Num:        1,
+			BaseRepo:   repo,
+			HeadCommit: "sha",
+			HeadBranch: "test",
+		},
+		models.PendingCommitStatus,
+		updateStatusSrc,
+		updateStatusDescription,
+		updateStatusTargetUrl,
+	)
+
+	Ok(t, err)
+}
