@@ -478,7 +478,7 @@ func (p *PlanCommandRunner) runProjectCmdsWithCancellationCheck(ctx *command.Con
 		groupResult := p.runGroup(group, runnerFunc)
 		results = append(results, groupResult.ProjectResults...)
 
-		if groupResult.HasErrors() && group[0].AbortOnExecutionOrderFail {
+		if groupResult.HasErrors() && group[0].AbortOnExecutionOrderFail && p.isParallelEnabled(group) {
 			ctx.Log.Info("abort on execution order when failed")
 			break
 		}
