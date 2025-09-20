@@ -68,6 +68,7 @@ var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
+var cancellationTracker *mocks.MockCancellationTracker
 
 type TestConfig struct {
 	parallelPoolSize           int
@@ -116,6 +117,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
 	pullReqStatusFetcher = vcsmocks.NewMockPullReqStatusFetcher()
+	cancellationTracker = mocks.NewMockCancellationTracker()
 
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
@@ -156,6 +158,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -175,6 +178,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,

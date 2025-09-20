@@ -1,6 +1,8 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -24,6 +26,7 @@ func NewPlanCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	projectCommandBuilder ProjectPlanCommandBuilder,
 	projectCommandRunner ProjectPlanCommandRunner,
+	cancellationTracker CancellationTracker,
 	dbUpdater *DBUpdater,
 	pullUpdater *PullUpdater,
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
@@ -44,6 +47,7 @@ func NewPlanCommandRunner(
 		commitStatusUpdater:        commitStatusUpdater,
 		prjCmdBuilder:              projectCommandBuilder,
 		prjCmdRunner:               projectCommandRunner,
+		cancellationTracker:        cancellationTracker,
 		dbUpdater:                  dbUpdater,
 		pullUpdater:                pullUpdater,
 		policyCheckCommandRunner:   policyCheckCommandRunner,
@@ -73,6 +77,7 @@ type PlanCommandRunner struct {
 	workingDir                 WorkingDir
 	prjCmdBuilder              ProjectPlanCommandBuilder
 	prjCmdRunner               ProjectPlanCommandRunner
+	cancellationTracker        CancellationTracker
 	dbUpdater                  *DBUpdater
 	pullUpdater                *PullUpdater
 	policyCheckCommandRunner   *PolicyCheckCommandRunner
@@ -137,9 +142,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
+		result = p.runProjectCmdsWithCancellationCheck(ctx, projectCmds, p.prjCmdRunner.Plan)
 	} else {
-		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
+		result = p.runProjectCmdsWithCancellationCheck(ctx, projectCmds, p.prjCmdRunner.Plan)
 	}
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
@@ -267,9 +272,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
+		result = p.runProjectCmdsWithCancellationCheck(ctx, projectCmds, p.prjCmdRunner.Plan)
 	} else {
-		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
+		result = p.runProjectCmdsWithCancellationCheck(ctx, projectCmds, p.prjCmdRunner.Plan)
 	}
 	ctx.CommandHasErrors = result.HasErrors()
 
@@ -327,7 +332,8 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 	var numErrored int
 	status := models.SuccessCommitStatus
 
-	if commandName == command.Plan {
+	switch commandName {
+	case command.Plan:
 		numErrored = pullStatus.StatusCount(models.ErroredPlanStatus)
 		// We consider anything that isn't a plan error as a plan success.
 		// For example, if there is an apply error, that means that at least a
@@ -337,7 +343,7 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
 		}
-	} else if commandName == command.Apply {
+	case command.Apply:
 		numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
 		numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
@@ -395,4 +401,88 @@ func (p *PlanCommandRunner) partitionProjectCmds(
 
 func (p *PlanCommandRunner) isParallelEnabled(projectCmds []command.ProjectContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
+}
+
+// prepareExecutionGroups organizes commands into execution groups
+func (p *PlanCommandRunner) prepareExecutionGroups(
+	projectCmds []command.ProjectContext,
+) [][]command.ProjectContext {
+	groups := splitByExecutionOrderGroup(projectCmds)
+
+	if len(groups) == 1 && !p.isParallelEnabled(projectCmds) {
+		return p.createIndividualCommandGroups(projectCmds)
+	}
+
+	return groups
+}
+
+// createIndividualCommandGroups creates a group for each individual command
+func (p *PlanCommandRunner) createIndividualCommandGroups(
+	projectCmds []command.ProjectContext,
+) [][]command.ProjectContext {
+	groups := make([][]command.ProjectContext, len(projectCmds))
+	for i, cmd := range projectCmds {
+		groups[i] = []command.ProjectContext{cmd}
+	}
+	return groups
+}
+
+// createCancelledResults creates cancelled results for remaining groups
+func (p *PlanCommandRunner) createCancelledResults(
+	remainingGroups [][]command.ProjectContext,
+) []command.ProjectResult {
+	var cancelledResults []command.ProjectResult
+
+	for _, group := range remainingGroups {
+		for _, cmd := range group {
+			cancelledResults = append(cancelledResults, command.ProjectResult{
+				Command:     cmd.CommandName,
+				Error:       fmt.Errorf("operation cancelled"),
+				RepoRelDir:  cmd.RepoRelDir,
+				Workspace:   cmd.Workspace,
+				ProjectName: cmd.ProjectName,
+			})
+		}
+	}
+
+	return cancelledResults
+}
+
+// runGroup executes a group of commands with appropriate parallelism
+func (p *PlanCommandRunner) runGroup(
+	group []command.ProjectContext,
+	runnerFunc func(command.ProjectContext) command.ProjectResult,
+) command.Result {
+	if p.isParallelEnabled(group) && len(group) > 1 {
+		return runProjectCmdsParallel(group, runnerFunc, p.parallelPoolSize)
+	}
+	return runProjectCmds(group, runnerFunc)
+}
+
+// runProjectCmdsWithCancellationCheck runs project commands with support for cancellation between execution order groups
+func (p *PlanCommandRunner) runProjectCmdsWithCancellationCheck(ctx *command.Context, projectCmds []command.ProjectContext, runnerFunc func(command.ProjectContext) command.ProjectResult) command.Result {
+	groups := p.prepareExecutionGroups(projectCmds)
+	if p.cancellationTracker != nil {
+		defer p.cancellationTracker.Clear(ctx.Pull)
+	}
+
+	var results []command.ProjectResult
+	for i, group := range groups {
+		// Check for PR-level cancellation before starting each group (except the first)
+		if i > 0 && p.cancellationTracker != nil && p.cancellationTracker.IsCancelled(ctx.Pull) {
+			ctx.Log.Info("Skipping execution order group %d and all subsequent groups due to pull request cancellation", group[0].ExecutionOrderGroup)
+			results = append(results, p.createCancelledResults(groups[i:])...)
+			break
+		}
+
+		groupResult := p.runGroup(group, runnerFunc)
+		results = append(results, groupResult.ProjectResults...)
+
+		if groupResult.HasErrors() && group[0].AbortOnExecutionOrderFail && p.isParallelEnabled(group) {
+			ctx.Log.Info("abort on execution order when failed")
+			break
+		}
+	}
+
+	return command.Result{ProjectResults: results}
 }
