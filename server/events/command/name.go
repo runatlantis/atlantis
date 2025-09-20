@@ -45,11 +45,11 @@ var AllCommentCommands = []Name{
 	Version,
 	Plan,
 	Apply,
+	Cancel,
 	Unlock,
 	ApprovePolicies,
 	Import,
 	State,
-	Cancel,
 }
 
 // TitleString returns the string representation in title form.
