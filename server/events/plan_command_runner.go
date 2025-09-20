@@ -406,8 +406,8 @@ func (p *PlanCommandRunner) isParallelEnabled(projectCmds []command.ProjectConte
 // runProjectCmdsWithCancellationCheck runs project commands with support for cancellation between execution order groups
 func (p *PlanCommandRunner) runProjectCmdsWithCancellationCheck(ctx *command.Context, projectCmds []command.ProjectContext, runnerFunc func(command.ProjectContext) command.ProjectResult, poolSize int) command.Result {
 	groups := splitByExecutionOrderGroup(projectCmds)
-	// If groups couldn't be formed properly, create one group per command
-	if len(groups) <= 1 {
+	// If execution order groups are not being used and parallel is disabled
+	if len(groups) == 1 && poolSize == 0 {
 		groups = make([][]command.ProjectContext, len(projectCmds))
 		for i, cmd := range projectCmds {
 			groups[i] = []command.ProjectContext{cmd}
