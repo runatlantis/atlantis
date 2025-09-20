@@ -162,9 +162,9 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	var result command.Result
 	if a.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running applies in parallel")
-		result = a.runProjectCmdsWithCancellationCheck(ctx, projectCmds, a.prjCmdRunner.Apply, a.parallelPoolSize)
+		result = a.runProjectCmdsWithCancellationCheck(ctx, projectCmds, a.prjCmdRunner.Apply)
 	} else {
-		result = a.runProjectCmdsWithCancellationCheck(ctx, projectCmds, a.prjCmdRunner.Apply, 0)
+		result = a.runProjectCmdsWithCancellationCheck(ctx, projectCmds, a.prjCmdRunner.Apply)
 	}
 	ctx.CommandHasErrors = result.HasErrors()
 
@@ -233,49 +233,79 @@ var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags
 // applyDisabledComment is posted when apply commands are disabled globally and an apply command is issued.
 var applyDisabledComment = "**Error:** Running `atlantis apply` is disabled."
 
-// runProjectCmdsWithCancellationCheck runs project commands with support for cancellation between execution order groups
-func (a *ApplyCommandRunner) runProjectCmdsWithCancellationCheck(ctx *command.Context, projectCmds []command.ProjectContext, runnerFunc func(command.ProjectContext) command.ProjectResult, poolSize int) command.Result {
+// prepareExecutionGroups organizes commands into execution groups
+func (a *ApplyCommandRunner) prepareExecutionGroups(
+	projectCmds []command.ProjectContext,
+) [][]command.ProjectContext {
 	groups := splitByExecutionOrderGroup(projectCmds)
-	// If execution order groups are not being used and parallel is disabled
-	if len(groups) == 1 && poolSize == 0 {
-		groups = make([][]command.ProjectContext, len(projectCmds))
-		for i, cmd := range projectCmds {
-			groups[i] = []command.ProjectContext{cmd}
+
+	if len(groups) == 1 && !a.isParallelEnabled(projectCmds) {
+		return a.createIndividualCommandGroups(projectCmds)
+	}
+
+	return groups
+}
+
+// createIndividualCommandGroups creates a group for each individual command
+func (a *ApplyCommandRunner) createIndividualCommandGroups(
+	projectCmds []command.ProjectContext,
+) [][]command.ProjectContext {
+	groups := make([][]command.ProjectContext, len(projectCmds))
+	for i, cmd := range projectCmds {
+		groups[i] = []command.ProjectContext{cmd}
+	}
+	return groups
+}
+
+// createCancelledResults creates cancelled results for remaining groups
+func (a *ApplyCommandRunner) createCancelledResults(
+	remainingGroups [][]command.ProjectContext,
+) []command.ProjectResult {
+	var cancelledResults []command.ProjectResult
+
+	for _, group := range remainingGroups {
+		for _, cmd := range group {
+			cancelledResults = append(cancelledResults, command.ProjectResult{
+				Command:     cmd.CommandName,
+				Error:       fmt.Errorf("operation cancelled"),
+				RepoRelDir:  cmd.RepoRelDir,
+				Workspace:   cmd.Workspace,
+				ProjectName: cmd.ProjectName,
+			})
 		}
 	}
-	var results []command.ProjectResult
 
+	return cancelledResults
+}
+
+// runGroup executes a group of commands with appropriate parallelism
+func (a *ApplyCommandRunner) runGroup(
+	group []command.ProjectContext,
+	runnerFunc func(command.ProjectContext) command.ProjectResult,
+) command.Result {
+	if a.isParallelEnabled(group) && len(group) > 1 {
+		return runProjectCmdsParallel(group, runnerFunc, a.parallelPoolSize)
+	}
+	return runProjectCmds(group, runnerFunc)
+}
+
+// runProjectCmdsWithCancellationCheck runs project commands with support for cancellation between execution order groups
+func (a *ApplyCommandRunner) runProjectCmdsWithCancellationCheck(ctx *command.Context, projectCmds []command.ProjectContext, runnerFunc func(command.ProjectContext) command.ProjectResult) command.Result {
+	groups := a.prepareExecutionGroups(projectCmds)
 	if a.cancellationTracker != nil {
 		defer a.cancellationTracker.Clear(ctx.Pull)
 	}
 
+	var results []command.ProjectResult
 	for i, group := range groups {
 		// Check for cancellation before starting each group (except the first)
 		if i > 0 && a.cancellationTracker != nil && a.cancellationTracker.IsCancelled(ctx.Pull) {
 			ctx.Log.Info("Skipping execution order group %d and all subsequent groups due to cancellation", group[0].ExecutionOrderGroup)
-			// Add cancelled results for all projects in remaining groups
-			for j := i; j < len(groups); j++ {
-				for _, cmd := range groups[j] {
-					results = append(results, command.ProjectResult{
-						Command:     cmd.CommandName,
-						Error:       fmt.Errorf("operation cancelled"),
-						RepoRelDir:  cmd.RepoRelDir,
-						Workspace:   cmd.Workspace,
-						ProjectName: cmd.ProjectName,
-					})
-				}
-			}
+			results = append(results, a.createCancelledResults(groups[i:])...)
 			break
 		}
 
-		// Run the group
-		var groupResult command.Result
-		if poolSize > 0 && len(group) > 1 {
-			groupResult = runProjectCmdsParallel(group, runnerFunc, poolSize)
-		} else {
-			groupResult = runProjectCmds(group, runnerFunc)
-		}
-
+		groupResult := a.runGroup(group, runnerFunc)
 		results = append(results, groupResult.ProjectResults...)
 
 		if groupResult.HasErrors() && group[0].AbortOnExecutionOrderFail {
