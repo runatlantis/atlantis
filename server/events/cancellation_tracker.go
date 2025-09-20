@@ -1,5 +1,6 @@
 package events
 
+//go:generate pegomock generate --package mocks -o mocks/mock_cancellation_tracker.go CancellationTracker
 import (
 	"fmt"
 	"sync"
