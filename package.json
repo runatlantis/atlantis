@@ -6,7 +6,7 @@
     "@types/node": "22.13.4",
     "@vueuse/core": "12.8.2",
     "markdown-it-footnote": "4.0.0",
-    "markdownlint-cli": "0.44.0",
+    "markdownlint-cli": "0.45.0",
     "mermaid": "11.10.0",
     "sitemap-ts": "1.8.0",
     "vite": "6.3.6",
