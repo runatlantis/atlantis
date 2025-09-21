@@ -1,8 +1,6 @@
 package events
 
 import (
-	"fmt"
-
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -158,14 +156,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	// Only run commands in parallel if enabled
-	var result command.Result
-	if a.isParallelEnabled(projectCmds) {
-		ctx.Log.Info("Running applies in parallel")
-		result = a.runProjectCmdsWithCancellationCheck(ctx, projectCmds, a.prjCmdRunner.Apply)
-	} else {
-		result = a.runProjectCmdsWithCancellationCheck(ctx, projectCmds, a.prjCmdRunner.Apply)
-	}
+	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
 	ctx.CommandHasErrors = result.HasErrors()
 
 	a.pullUpdater.updatePull(
@@ -232,87 +223,3 @@ var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags
 
 // applyDisabledComment is posted when apply commands are disabled globally and an apply command is issued.
 var applyDisabledComment = "**Error:** Running `atlantis apply` is disabled."
-
-// prepareExecutionGroups organizes commands into execution groups
-func (a *ApplyCommandRunner) prepareExecutionGroups(
-	projectCmds []command.ProjectContext,
-) [][]command.ProjectContext {
-	groups := splitByExecutionOrderGroup(projectCmds)
-
-	if len(groups) == 1 && !a.isParallelEnabled(projectCmds) {
-		return a.createIndividualCommandGroups(projectCmds)
-	}
-
-	return groups
-}
-
-// createIndividualCommandGroups creates a group for each individual command
-func (a *ApplyCommandRunner) createIndividualCommandGroups(
-	projectCmds []command.ProjectContext,
-) [][]command.ProjectContext {
-	groups := make([][]command.ProjectContext, len(projectCmds))
-	for i, cmd := range projectCmds {
-		groups[i] = []command.ProjectContext{cmd}
-	}
-	return groups
-}
-
-// createCancelledResults creates cancelled results for remaining groups
-func (a *ApplyCommandRunner) createCancelledResults(
-	remainingGroups [][]command.ProjectContext,
-) []command.ProjectResult {
-	var cancelledResults []command.ProjectResult
-
-	for _, group := range remainingGroups {
-		for _, cmd := range group {
-			cancelledResults = append(cancelledResults, command.ProjectResult{
-				Command:     cmd.CommandName,
-				Error:       fmt.Errorf("operation cancelled"),
-				RepoRelDir:  cmd.RepoRelDir,
-				Workspace:   cmd.Workspace,
-				ProjectName: cmd.ProjectName,
-			})
-		}
-	}
-
-	return cancelledResults
-}
-
-// runGroup executes a group of commands with appropriate parallelism
-func (a *ApplyCommandRunner) runGroup(
-	group []command.ProjectContext,
-	runnerFunc func(command.ProjectContext) command.ProjectResult,
-) command.Result {
-	if a.isParallelEnabled(group) && len(group) > 1 {
-		return runProjectCmdsParallel(group, runnerFunc, a.parallelPoolSize)
-	}
-	return runProjectCmds(group, runnerFunc)
-}
-
-// runProjectCmdsWithCancellationCheck runs project commands with support for cancellation between execution order groups
-func (a *ApplyCommandRunner) runProjectCmdsWithCancellationCheck(ctx *command.Context, projectCmds []command.ProjectContext, runnerFunc func(command.ProjectContext) command.ProjectResult) command.Result {
-	groups := a.prepareExecutionGroups(projectCmds)
-	if a.cancellationTracker != nil {
-		defer a.cancellationTracker.Clear(ctx.Pull)
-	}
-
-	var results []command.ProjectResult
-	for i, group := range groups {
-		// Check for cancellation before starting each group (except the first)
-		if i > 0 && a.cancellationTracker != nil && a.cancellationTracker.IsCancelled(ctx.Pull) {
-			ctx.Log.Info("Skipping execution order group %d and all subsequent groups due to cancellation", group[0].ExecutionOrderGroup)
-			results = append(results, a.createCancelledResults(groups[i:])...)
-			break
-		}
-
-		groupResult := a.runGroup(group, runnerFunc)
-		results = append(results, groupResult.ProjectResults...)
-
-		if groupResult.HasErrors() && group[0].AbortOnExecutionOrderFail && a.isParallelEnabled(group) {
-			ctx.Log.Info("abort on execution order when failed")
-			break
-		}
-	}
-
-	return command.Result{ProjectResults: results}
-}
