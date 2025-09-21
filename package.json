@@ -4,7 +4,7 @@
   "devDependencies": {
     "@playwright/test": "1.55.0",
     "@types/node": "22.13.4",
-    "@vueuse/core": "12.7.0",
+    "@vueuse/core": "12.8.2",
     "markdown-it-footnote": "4.0.0",
     "markdownlint-cli": "0.44.0",
     "mermaid": "11.10.0",
