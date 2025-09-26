@@ -1,7 +1,7 @@
 # Enhanced Locking Manager and Events System
 
-**Status:** Draft PR #4 - Enhanced Manager and Events
-**Dependencies:** PR #1 (Foundation), PR #2 (Compatibility), PR #3 (Redis)
+**Status:** Complete #5843 - Enhanced Manager and Events
+**Dependencies:** #5842 (Foundation), #5836 (Compatibility), #5840 (Redis)
 **Size:** ~350-400 lines total implementation
 
 ## Overview
@@ -113,11 +113,11 @@ lock, err := manager.LockWithPriority(ctx, project, workspace, user, PriorityHig
 
 ## Dependencies
 
-This PR depends on:
+This implementation depends on:
 
-1. **PR #1**: Enhanced locking foundation and types
-2. **PR #2**: Backward compatibility adapter
-3. **PR #3**: Redis backend implementation
+1. **#5842**: Enhanced locking foundation and types
+2. **#5836**: Backward compatibility adapter
+3. **#5840**: Redis backend implementation
 
 ## File Structure
 

@@ -4,7 +4,7 @@ This document describes the foundation layer of Atlantis's enhanced locking syst
 
 ## Overview
 
-The enhanced locking system is designed to replace the current BoltDB-based locking mechanism with a more scalable and feature-rich solution. The foundation layer (PR #1) establishes the core architecture and interfaces without breaking existing functionality.
+The enhanced locking system is designed to replace the current BoltDB-based locking mechanism with a more scalable and feature-rich solution. The foundation layer (#5842) establishes the core architecture and interfaces without breaking existing functionality.
 
 ## Architecture
 
@@ -27,7 +27,7 @@ The enhanced locking system is designed to replace the current BoltDB-based lock
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
 │  │   Redis     │  │   BoltDB    │  │   Legacy    │     │
 │  │ Backend     │  │  Enhanced   │  │ Fallback    │     │
-│  │(Future PR)  │  │(Future PR)  │  │             │     │
+│  │  (#5840)    │  │   (Core)    │  │             │     │
 │  └─────────────┘  └─────────────┘  └─────────────┘     │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -44,9 +44,9 @@ The main interface for enhanced locking operations:
 
 #### Backend
 The backend interface for different storage implementations:
-- Redis backend (future)
-- Enhanced BoltDB backend (future)
-- Legacy compatibility layer
+- Redis backend (#5840)
+- Enhanced BoltDB backend (integrated)
+- Legacy compatibility layer (#5836)
 
 #### ConfigProvider
 Configuration management interface:
@@ -56,7 +56,7 @@ Configuration management interface:
 
 ## Features
 
-### Foundation Layer (PR #1)
+### Foundation Layer (#5842)
 
 - ✅ **Core Types & Interfaces**: Complete type system for enhanced locking
 - ✅ **Configuration System**: Flexible configuration with feature flags
@@ -65,14 +65,14 @@ Configuration management interface:
 - ✅ **Legacy Compatibility**: Seamless fallback to existing system
 - ✅ **Feature Flags**: Runtime control of enhanced features
 
-### Planned Features (Future PRs)
+### Implemented Features (Current PRs)
 
-- 🔄 **Priority Queuing**: Fair scheduling with anti-starvation
-- 🔄 **Redis Backend**: Distributed locking with Redis
-- 🔄 **Deadlock Detection**: Automatic deadlock detection and resolution
-- 🔄 **Event Streaming**: Real-time lock events
-- 🔄 **Metrics & Monitoring**: Comprehensive observability
-- 🔄 **Performance Optimization**: Connection pooling and caching
+- ✅ **Priority Queuing**: Fair scheduling with anti-starvation (#5841)
+- ✅ **Redis Backend**: Distributed locking with Redis (#5840)
+- ⏳ **Deadlock Detection**: Automatic deadlock detection and resolution (Future)
+- ✅ **Event Streaming**: Real-time lock events (#5843)
+- ✅ **Metrics & Monitoring**: Comprehensive observability (#5843)
+- ⏳ **Performance Optimization**: Connection pooling and caching (Future)
 
 ## Configuration
 
@@ -152,22 +152,22 @@ The enhanced locking system uses a gradual migration approach:
 - ✅ Legacy compatibility layer
 - ❌ **Enhanced features disabled by default**
 
-### Phase 2: Implementation (Future PRs)
-- Redis backend implementation
-- Priority queue implementation
-- Enhanced BoltDB backend
-- Event streaming system
+### Phase 2: Core Features (Completed)
+- ✅ Redis backend implementation (#5840)
+- ✅ Priority queue implementation (#5841)
+- ✅ Enhanced BoltDB backend (integrated)
+- ✅ Event streaming system (#5843)
 
-### Phase 3: Migration (Future PRs)
-- Gradual traffic routing
-- A/B testing framework
-- Data migration tools
-- Performance comparison
+### Phase 3: Production Readiness (Current)
+- ✅ Gradual traffic routing
+- ✅ A/B testing framework
+- 🔄 Data migration tools
+- 🔄 Performance comparison
 
-### Phase 4: Optimization (Future PRs)
-- Performance optimizations
-- Advanced features
-- Monitoring and alerting
+### Phase 4: Advanced Features (Future)
+- ⏳ Performance optimizations
+- ⏳ Advanced features
+- ⏳ Monitoring and alerting
 
 ## Safety Measures
 
@@ -297,7 +297,7 @@ docs/enhanced-locking/
 A: To ensure zero impact on existing installations. Enhanced features will be enabled gradually as they mature.
 
 ### Q: Will existing locks be migrated automatically?
-A: No automatic migration in the foundation layer. Future PRs will include migration tools and strategies.
+A: No automatic migration in the foundation layer. Migration tools and strategies are being developed separately.
 
 ### Q: What happens if Redis is unavailable?
 A: The system will automatically fall back to the legacy BoltDB implementation with logging.
