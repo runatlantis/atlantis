@@ -31,7 +31,11 @@ type EnhancedLockManager struct {
 	running        bool
 	stopChan       chan struct{}
 
-	// Metrics and monitoring
+	// Enhanced PR #4 components
+	eventManager   *EventManager
+	metricsCollector *MetricsCollector
+
+	// Legacy metrics and monitoring
 	metrics        *ManagerMetrics
 	eventCallbacks []EventCallback
 }
