@@ -229,6 +229,7 @@ type DefaultProjectCommandRunner struct {
 	PlanStepRunner            StepRunner
 	ShowStepRunner            StepRunner
 	ApplyStepRunner           StepRunner
+	CancelStepRunner          StepRunner
 	PolicyCheckStepRunner     StepRunner
 	VersionStepRunner         StepRunner
 	ImportStepRunner          StepRunner
@@ -241,6 +242,7 @@ type DefaultProjectCommandRunner struct {
 	Webhooks                  WebhooksSender
 	WorkingDirLocker          WorkingDirLocker
 	CommandRequirementHandler CommandRequirementHandler
+	CancellationTracker       CancellationTracker
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -256,9 +258,7 @@ func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.P
 		ProjectName:       ctx.ProjectName,
 		SilencePRComments: ctx.SilencePRComments,
 	}
-}
-
-// PolicyCheck evaluates policies defined with Rego for the project described by ctx.
+} // PolicyCheck evaluates policies defined with Rego for the project described by ctx.
 func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
 	return command.ProjectResult{
