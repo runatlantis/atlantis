@@ -6,11 +6,11 @@ ARG DEBIAN_TAG=12.12-slim@sha256:df52e55e3361a81ac1bead266f3373ee55d29aa50cf0975
 ARG GOLANG_TAG=1.24.4-alpine@sha256:68932fa6d4d4059845c8f40ad7e654e626f3ebd3706eef7846f319293ab5cb7a
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.11.4
+ARG DEFAULT_TERRAFORM_VERSION=1.13.3
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.10.6
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.59.0
+ARG DEFAULT_CONFTEST_VERSION=0.62.0
 
 # Stage 1: build artifact and download deps
 
@@ -116,7 +116,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.6.1
+ENV GIT_LFS_VERSION=3.7.0
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
