@@ -275,9 +275,25 @@ version: 3
 projects:
 - dir: project1
   terraform_distribution: opentofu
+- dir: project2
+  terraform_distribution: terraform
 ```
 
 Atlantis will automatically download and use this distribution. Valid values are `terraform` and `opentofu`.
+
+When using OpenTofu, you can also specify a specific version:
+
+```yaml
+version: 3
+projects:
+- dir: opentofu-project
+  terraform_distribution: opentofu
+  terraform_version: 1.9.0
+```
+
+:::tip OpenTofu Migration
+If you're migrating from Terraform to OpenTofu, you can run both in the same Atlantis instance by specifying different distributions per project. This allows for gradual migration.
+:::
 
 ### Terraform Versions
 
