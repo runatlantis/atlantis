@@ -6,765 +6,478 @@ import (
 	"sync"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/locking/enhanced/backends"
-	"github.com/runatlantis/atlantis/server/core/locking/enhanced/deadlock"
-	"github.com/runatlantis/atlantis/server/core/locking/enhanced/queue"
-	"github.com/runatlantis/atlantis/server/core/locking/enhanced/timeout"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// EnhancedLockManager implements the LockManager interface with advanced features
+// EnhancedLockManager provides centralized orchestration for the enhanced locking system
+// This is the main integration point for PR #4 - Enhanced Manager and Events
 type EnhancedLockManager struct {
-	backend          Backend
-	config          *EnhancedConfig
-	log             logging.SimpleLogging
+	// Core components
+	backend Backend
+	config  *EnhancedConfig
+	logger  logging.SimpleLogging
 
-	// Advanced components
-	queue           *queue.ResourceBasedQueue
-	timeoutManager  *timeout.TimeoutManager
-	retryManager    *timeout.RetryManager
-	deadlockDetector *deadlock.DeadlockDetector
+	// PR #4 Enhanced components - Event system and metrics collection
+	eventManager     *EventManager
+	metricsCollector *MetricsCollector
 
-	// State management
-	mutex          sync.RWMutex
-	running        bool
-	stopChan       chan struct{}
+	// Legacy components (from previous PRs)
+	legacyManager locking.LockManager
 
-	// Metrics and monitoring
-	metrics        *ManagerMetrics
-	eventCallbacks []EventCallback
-}
-
-// EventCallback handles lock manager events
-type EventCallback func(ctx context.Context, event *ManagerEvent)
-
-// ManagerEvent represents events from the lock manager
-type ManagerEvent struct {
-	Type      string                 `json:"type"`
-	LockID    string                 `json:"lock_id"`
-	Resource  ResourceIdentifier     `json:"resource"`
-	User      string                 `json:"user"`
-	Timestamp time.Time              `json:"timestamp"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
-}
-
-// ManagerMetrics tracks lock manager performance
-type ManagerMetrics struct {
-	TotalRequests     int64         `json:"total_requests"`
-	SuccessfulLocks   int64         `json:"successful_locks"`
-	FailedLocks       int64         `json:"failed_locks"`
-	QueuedRequests    int64         `json:"queued_requests"`
-	AverageWaitTime   time.Duration `json:"average_wait_time"`
-	AverageHoldTime   time.Duration `json:"average_hold_time"`
-	ActiveLocks       int64         `json:"active_locks"`
-	DeadlocksDetected int64         `json:"deadlocks_detected"`
-	DeadlocksResolved int64         `json:"deadlocks_resolved"`
-	StartTime         time.Time     `json:"start_time"`
-	LastUpdated       time.Time     `json:"last_updated"`
+	// Manager state
+	mu       sync.RWMutex
+	started  bool
+	stopCh   chan struct{}
+	workers  int
+	workerWg sync.WaitGroup
 }
 
 // NewEnhancedLockManager creates a new enhanced lock manager
-func NewEnhancedLockManager(backend Backend, config *EnhancedConfig, log logging.SimpleLogging) *EnhancedLockManager {
+func NewEnhancedLockManager(
+	backend Backend,
+	config *EnhancedConfig,
+	legacyManager locking.LockManager,
+	logger logging.SimpleLogging,
+) *EnhancedLockManager {
 	if config == nil {
 		config = DefaultConfig()
 	}
 
 	manager := &EnhancedLockManager{
-		backend:   backend,
-		config:    config,
-		log:       log,
-		running:   false,
-		stopChan:  make(chan struct{}),
-		metrics: &ManagerMetrics{
-			StartTime:   time.Now(),
-			LastUpdated: time.Now(),
-		},
+		backend:       backend,
+		config:        config,
+		legacyManager: legacyManager,
+		logger:        logger,
+		stopCh:        make(chan struct{}),
+		workers:       4, // Default worker pool size
 	}
 
-	// Initialize advanced components if enabled
-	if config.EnablePriorityQueue {
-		manager.queue = queue.NewResourceBasedQueue(config.MaxQueueSize)
-		log.Info("Priority queue enabled with max size: %d", config.MaxQueueSize)
+	// Initialize PR #4 enhanced components
+	if config.EnableEvents {
+		manager.eventManager = NewEventManager(config.EventBufferSize, logger)
+		logger.Info("Enhanced event manager enabled for PR #4")
 	}
 
-	manager.timeoutManager = timeout.NewTimeoutManager(log)
-
-	if config.EnableRetry {
-		retryConfig := &timeout.RetryConfig{
-			MaxAttempts:   config.MaxRetryAttempts,
-			BaseDelay:     config.RetryBaseDelay,
-			MaxDelay:      config.RetryMaxDelay,
-			Multiplier:    2.0,
-			Jitter:        true,
-			JitterPercent: 0.1,
-		}
-		manager.retryManager = timeout.NewRetryManager(retryConfig, log)
-		log.Info("Retry mechanism enabled with max %d attempts", config.MaxRetryAttempts)
-	}
-
-	if config.EnableDeadlockDetection {
-		deadlockConfig := &deadlock.DetectorConfig{
-			Enabled:           true,
-			CheckInterval:     config.DeadlockCheckInterval,
-			MaxWaitTime:       config.DefaultTimeout,
-			ResolutionPolicy:  deadlock.ResolveLowestPriority,
-			HistorySize:       100,
-			EnablePrevention:  true,
-		}
-		manager.deadlockDetector = deadlock.NewDeadlockDetector(deadlockConfig, log)
-		log.Info("Deadlock detection enabled with %v check interval", config.DeadlockCheckInterval)
+	if config.EnableMetrics {
+		manager.metricsCollector = NewMetricsCollector(logger)
+		logger.Info("Enhanced metrics collector enabled for PR #4")
 	}
 
 	return manager
 }
 
-// Start initializes and starts the enhanced lock manager
-func (elm *EnhancedLockManager) Start(ctx context.Context) error {
-	elm.mutex.Lock()
-	defer elm.mutex.Unlock()
+// Start starts the enhanced lock manager and all its components
+func (m *EnhancedLockManager) Start(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	if elm.running {
-		return fmt.Errorf("manager is already running")
+	if m.started {
+		return fmt.Errorf("manager already started")
 	}
 
-	elm.log.Info("Starting enhanced lock manager...")
+	m.logger.Info("Starting Enhanced Lock Manager (PR #4)")
 
-	// Start deadlock detection if enabled
-	if elm.deadlockDetector != nil {
-		elm.deadlockDetector.Start(ctx)
+	// Start event manager if enabled
+	if m.eventManager != nil {
+		if err := m.eventManager.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start event manager: %w", err)
+		}
+		m.logger.Info("Event manager started")
 	}
 
-	// Start background maintenance tasks
-	go elm.maintenanceLoop(ctx)
+	// Start metrics collector if enabled
+	if m.metricsCollector != nil {
+		if err := m.metricsCollector.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start metrics collector: %w", err)
+		}
+		m.logger.Info("Metrics collector started")
+	}
 
-	elm.running = true
-	elm.log.Info("Enhanced lock manager started successfully")
+	// Start worker pool
+	m.startWorkers(ctx)
+
+	// Emit startup event
+	if m.eventManager != nil {
+		event := &LockEvent{
+			Type:      "manager_started",
+			Timestamp: time.Now(),
+			Metadata: map[string]string{
+				"pr":      "4",
+				"version": "enhanced",
+				"workers": fmt.Sprintf("%d", m.workers),
+			},
+		}
+		m.eventManager.Emit(event)
+	}
+
+	m.started = true
+	m.logger.Info("Enhanced Lock Manager started successfully")
 	return nil
 }
 
-// Stop gracefully shuts down the enhanced lock manager
-func (elm *EnhancedLockManager) Stop() error {
-	elm.mutex.Lock()
-	defer elm.mutex.Unlock()
+// Stop gracefully stops the enhanced lock manager
+func (m *EnhancedLockManager) Stop(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	if !elm.running {
+	if !m.started {
 		return nil
 	}
 
-	elm.log.Info("Stopping enhanced lock manager...")
+	m.logger.Info("Stopping Enhanced Lock Manager (PR #4)")
 
-	// Stop deadlock detection
-	if elm.deadlockDetector != nil {
-		elm.deadlockDetector.Stop()
+	// Signal workers to stop
+	close(m.stopCh)
+
+	// Wait for workers to finish
+	done := make(chan struct{})
+	go func() {
+		m.workerWg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		m.logger.Info("All workers stopped")
+	case <-ctx.Done():
+		m.logger.Warn("Context cancelled while waiting for workers")
 	}
 
-	// Stop maintenance loop
-	close(elm.stopChan)
+	// Stop components
+	if m.metricsCollector != nil {
+		if err := m.metricsCollector.Stop(ctx); err != nil {
+			m.logger.Err("Failed to stop metrics collector: %v", err)
+		}
+	}
 
-	// Cleanup timeouts
-	elm.timeoutManager.Cleanup()
+	if m.eventManager != nil {
+		// Emit shutdown event before stopping
+		event := &LockEvent{
+			Type:      "manager_stopped",
+			Timestamp: time.Now(),
+			Metadata: map[string]string{
+				"pr":      "4",
+				"version": "enhanced",
+			},
+		}
+		m.eventManager.Emit(event)
 
-	elm.running = false
-	elm.log.Info("Enhanced lock manager stopped")
+		if err := m.eventManager.Stop(ctx); err != nil {
+			m.logger.Err("Failed to stop event manager: %v", err)
+		}
+	}
+
+	m.started = false
+	m.logger.Info("Enhanced Lock Manager stopped")
 	return nil
 }
 
-// Lock acquires a lock using enhanced features (implements LockManager interface)
-func (elm *EnhancedLockManager) Lock(ctx context.Context, project models.Project, workspace string, user models.User) (*models.ProjectLock, error) {
-	return elm.LockWithPriority(ctx, project, workspace, user, PriorityNormal)
-}
-
-// Unlock releases a lock (implements LockManager interface)
-func (elm *EnhancedLockManager) Unlock(ctx context.Context, project models.Project, workspace string, user models.User) (*models.ProjectLock, error) {
-	elm.metrics.TotalRequests++
-	elm.metrics.LastUpdated = time.Now()
-
-	// Find and release the lock
-	request := elm.createLockRequest(project, workspace, user, PriorityNormal, elm.config.DefaultTimeout)
-
-	// Get current locks to find the target
-	locks, err := elm.backend.ListLocks(ctx)
-	if err != nil {
-		elm.log.Error("Failed to list locks during unlock: %v", err)
-		return nil, err
-	}
-
-	var targetLock *EnhancedLock
-	for _, lock := range locks {
-		if elm.sameResource(request.Resource, lock.Resource) && lock.Owner == user.Username {
-			targetLock = lock
-			break
-		}
-	}
-
-	if targetLock == nil {
-		// No lock found - this is sometimes expected in Atlantis
-		return nil, nil
-	}
-
-	// Clear timeout if set
-	elm.timeoutManager.ClearTimeout(targetLock.ID)
-
-	// Remove from deadlock detection
-	if elm.deadlockDetector != nil {
-		elm.deadlockDetector.RemoveLockRequest(targetLock.ID)
-	}
-
-	// Release the lock
-	err = elm.backend.ReleaseLock(ctx, targetLock.ID)
-	if err != nil {
-		elm.metrics.FailedLocks++
-		return nil, err
-	}
-
-	// Update metrics
-	if targetLock.AcquiredAt.After(time.Time{}) {
-		holdTime := time.Since(targetLock.AcquiredAt)
-		elm.updateAverageHoldTime(holdTime)
-	}
-	elm.metrics.ActiveLocks--
-
-	// Emit event
-	elm.emitEvent(ctx, &ManagerEvent{
-		Type:      "lock_released",
-		LockID:    targetLock.ID,
-		Resource:  targetLock.Resource,
-		User:      user.Username,
-		Timestamp: time.Now(),
-	})
-
-	// Process queue if enabled
-	if elm.queue != nil {
-		go elm.processQueueForResource(ctx, targetLock.Resource)
-	}
-
-	elm.log.Info("Lock released: %s for %s/%s", targetLock.ID, project.RepoFullName, workspace)
-	return elm.backend.ConvertToLegacy(targetLock), nil
-}
-
-// List returns all current locks (implements LockManager interface)
-func (elm *EnhancedLockManager) List(ctx context.Context) ([]*models.ProjectLock, error) {
-	locks, err := elm.backend.ListLocks(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var result []*models.ProjectLock
-	for _, lock := range locks {
-		if lock.State == LockStateAcquired {
-			legacyLock := elm.backend.ConvertToLegacy(lock)
-			if legacyLock != nil {
-				result = append(result, legacyLock)
-			}
-		}
-	}
-
-	return result, nil
-}
-
-// Enhanced methods with additional capabilities
-
-// LockWithPriority acquires a lock with specific priority
-func (elm *EnhancedLockManager) LockWithPriority(ctx context.Context, project models.Project, workspace string, user models.User, priority Priority) (*models.ProjectLock, error) {
-	return elm.LockWithOptions(ctx, project, workspace, user, LockOptions{
-		Priority: priority,
-		Timeout:  elm.config.DefaultTimeout,
-	})
-}
-
-// LockWithTimeout acquires a lock with specific timeout
-func (elm *EnhancedLockManager) LockWithTimeout(ctx context.Context, project models.Project, workspace string, user models.User, timeout time.Duration) (*models.ProjectLock, error) {
-	return elm.LockWithOptions(ctx, project, workspace, user, LockOptions{
-		Priority: PriorityNormal,
-		Timeout:  timeout,
-	})
-}
-
-// LockOptions provides options for lock acquisition
-type LockOptions struct {
-	Priority    Priority
-	Timeout     time.Duration
-	Metadata    map[string]string
-	RetryPolicy *timeout.RetryConfig
-}
-
-// LockWithOptions acquires a lock with full options
-func (elm *EnhancedLockManager) LockWithOptions(ctx context.Context, project models.Project, workspace string, user models.User, options LockOptions) (*models.ProjectLock, error) {
-	elm.metrics.TotalRequests++
-	elm.metrics.LastUpdated = time.Now()
-
-	request := elm.createLockRequest(project, workspace, user, options.Priority, options.Timeout)
-	if options.Metadata != nil {
-		request.Metadata = options.Metadata
-	}
-
+// Lock implements the standard LockManager interface (backward compatibility)
+func (m *EnhancedLockManager) Lock(ctx context.Context, project models.Project, workspace string, user models.User) (*models.ProjectLock, error) {
 	startTime := time.Now()
-	var lock *models.ProjectLock
-	var err error
 
-	// Use retry manager if enabled and configured
-	if elm.retryManager != nil && options.RetryPolicy != nil {
-		retryManager := timeout.NewRetryManager(options.RetryPolicy, elm.log)
-		err = retryManager.Execute(ctx, func(ctx context.Context, attempt int) error {
-			lock, err = elm.attemptLockAcquisition(ctx, request, attempt > 1)
-			return err
-		})
-	} else if elm.retryManager != nil && elm.config.EnableRetry {
-		err = elm.retryManager.Execute(ctx, func(ctx context.Context, attempt int) error {
-			lock, err = elm.attemptLockAcquisition(ctx, request, attempt > 1)
-			return err
-		})
-	} else {
-		lock, err = elm.attemptLockAcquisition(ctx, request, false)
+	// Record metrics
+	if m.metricsCollector != nil {
+		m.metricsCollector.RecordLockRequest("standard")
 	}
 
-	// Update metrics
-	waitTime := time.Since(startTime)
-	elm.updateAverageWaitTime(waitTime)
+	// Emit lock requested event
+	if m.eventManager != nil {
+		event := &LockEvent{
+			Type:      "lock_requested",
+			Timestamp: time.Now(),
+			Owner:     user.Username,
+			Resource: ResourceIdentifier{
+				Type:      ResourceTypeProject,
+				Namespace: project.RepoFullName,
+				Name:      project.Name,
+				Workspace: workspace,
+			},
+			Metadata: map[string]string{
+				"method": "standard",
+				"pr":     "4",
+			},
+		}
+		m.eventManager.Emit(event)
+	}
 
+	// Use legacy manager for actual locking
+	lock, err := m.legacyManager.Lock(ctx, project, workspace, user)
+
+	// Record metrics and events
+	duration := time.Since(startTime)
 	if err != nil {
-		elm.metrics.FailedLocks++
+		if m.metricsCollector != nil {
+			m.metricsCollector.RecordLockFailure("standard", duration)
+		}
+		if m.eventManager != nil {
+			event := &LockEvent{
+				Type:      "lock_failed",
+				Timestamp: time.Now(),
+				Owner:     user.Username,
+				Resource: ResourceIdentifier{
+					Type:      ResourceTypeProject,
+					Namespace: project.RepoFullName,
+					Name:      project.Name,
+					Workspace: workspace,
+				},
+				Metadata: map[string]string{
+					"error": err.Error(),
+					"pr":    "4",
+				},
+			}
+			m.eventManager.Emit(event)
+		}
 		return nil, err
 	}
 
-	elm.metrics.SuccessfulLocks++
-	elm.metrics.ActiveLocks++
+	// Record successful acquisition
+	if m.metricsCollector != nil {
+		m.metricsCollector.RecordLockAcquisition("standard", duration)
+	}
 
-	elm.log.Info("Lock acquired: %s for %s/%s (priority: %v, wait: %v)",
-		request.ID, project.RepoFullName, workspace, options.Priority, waitTime)
+	if m.eventManager != nil {
+		event := &LockEvent{
+			Type:      "lock_acquired",
+			LockID:    fmt.Sprintf("%s:%s", project.RepoFullName, workspace),
+			Timestamp: time.Now(),
+			Owner:     user.Username,
+			Resource: ResourceIdentifier{
+				Type:      ResourceTypeProject,
+				Namespace: project.RepoFullName,
+				Name:      project.Name,
+				Workspace: workspace,
+			},
+			Metadata: map[string]string{
+				"duration_ms": fmt.Sprintf("%d", duration.Milliseconds()),
+				"pr":          "4",
+			},
+		}
+		m.eventManager.Emit(event)
+	}
 
 	return lock, nil
 }
 
-// attemptLockAcquisition attempts to acquire a lock, handling queuing and deadlock prevention
-func (elm *EnhancedLockManager) attemptLockAcquisition(ctx context.Context, request *EnhancedLockRequest, isRetry bool) (*models.ProjectLock, error) {
-	// Check for deadlock prevention if enabled
-	if elm.deadlockDetector != nil && !isRetry {
-		// Get current locks that might block this request
-		currentLocks, err := elm.backend.ListLocks(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check for conflicts: %w", err)
-		}
+// Unlock implements the standard LockManager interface (backward compatibility)
+func (m *EnhancedLockManager) Unlock(ctx context.Context, project models.Project, workspace string, user models.User) (*models.ProjectLock, error) {
+	startTime := time.Now()
 
-		var blockedBy []*EnhancedLock
-		for _, lock := range currentLocks {
-			if elm.sameResource(request.Resource, lock.Resource) && lock.State == LockStateAcquired {
-				blockedBy = append(blockedBy, lock)
-			}
-		}
-
-		if len(blockedBy) > 0 {
-			canProceed, err := elm.deadlockDetector.PreventDeadlock(request, blockedBy)
-			if err != nil {
-				return nil, fmt.Errorf("deadlock prevention check failed: %w", err)
-			}
-			if !canProceed {
-				return nil, &LockError{
-					Type:    "DeadlockPrevented",
-					Message: "lock request would create a deadlock",
-					Code:    ErrCodeDeadlock,
-				}
-			}
-
-			// Add to deadlock tracking
-			elm.deadlockDetector.AddLockRequest(request, blockedBy)
-		}
-	}
-
-	// Try to acquire the lock
-	enhancedLock, acquired, err := elm.backend.TryAcquireLock(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-
-	if acquired {
-		// Lock acquired successfully
-		elm.setupLockTimeout(ctx, enhancedLock)
-
-		// Add to deadlock tracking
-		if elm.deadlockDetector != nil {
-			elm.deadlockDetector.AddLockAcquisition(enhancedLock)
-		}
-
-		// Emit event
-		elm.emitEvent(ctx, &ManagerEvent{
-			Type:      "lock_acquired",
-			LockID:    enhancedLock.ID,
-			Resource:  enhancedLock.Resource,
-			User:      request.User.Username,
+	// Emit unlock event
+	if m.eventManager != nil {
+		event := &LockEvent{
+			Type:      "lock_release_requested",
 			Timestamp: time.Now(),
-		})
-
-		return elm.backend.ConvertToLegacy(enhancedLock), nil
-	}
-
-	// Lock not acquired - handle queuing if enabled
-	if elm.queue != nil && elm.config.EnablePriorityQueue {
-		return elm.handleQueuedRequest(ctx, request)
-	}
-
-	// No queuing - return lock exists error
-	return nil, NewLockExistsError(fmt.Sprintf("%s/%s/%s", request.Resource.Namespace, request.Resource.Name, request.Resource.Workspace))
-}
-
-// handleQueuedRequest handles a request that needs to be queued
-func (elm *EnhancedLockManager) handleQueuedRequest(ctx context.Context, request *EnhancedLockRequest) (*models.ProjectLock, error) {
-	// Add to queue
-	err := elm.queue.Push(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-
-	elm.metrics.QueuedRequests++
-
-	// Emit queued event
-	elm.emitEvent(ctx, &ManagerEvent{
-		Type:      "lock_queued",
-		LockID:    request.ID,
-		Resource:  request.Resource,
-		User:      request.User.Username,
-		Timestamp: time.Now(),
-		Metadata: map[string]interface{}{
-			"priority": request.Priority,
-		},
-	})
-
-	elm.log.Info("Lock request queued: %s for %s/%s (priority: %v)",
-		request.ID, request.Resource.Namespace, request.Resource.Workspace, request.Priority)
-
-	// Wait for lock to become available or timeout
-	return elm.waitForQueuedLock(ctx, request)
-}
-
-// waitForQueuedLock waits for a queued lock request to be processed
-func (elm *EnhancedLockManager) waitForQueuedLock(ctx context.Context, request *EnhancedLockRequest) (*models.ProjectLock, error) {
-	timeout := request.Timeout
-	if timeout <= 0 {
-		timeout = elm.config.QueueTimeout
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	// Poll for lock acquisition
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			// Remove from queue on timeout
-			elm.queue.Remove(request.ID)
-			return nil, NewTimeoutError(timeout)
-
-		case <-ticker.C:
-			// Check if our request has been processed
-			lock, err := elm.backend.GetLock(ctx, request.ID)
-			if err == nil && lock != nil && lock.State == LockStateAcquired {
-				// Lock was acquired!
-				elm.setupLockTimeout(ctx, lock)
-
-				elm.emitEvent(ctx, &ManagerEvent{
-					Type:      "queued_lock_acquired",
-					LockID:    lock.ID,
-					Resource:  lock.Resource,
-					User:      request.User.Username,
-					Timestamp: time.Now(),
-				})
-
-				return elm.backend.ConvertToLegacy(lock), nil
-			}
+			Owner:     user.Username,
+			Resource: ResourceIdentifier{
+				Type:      ResourceTypeProject,
+				Namespace: project.RepoFullName,
+				Name:      project.Name,
+				Workspace: workspace,
+			},
+			Metadata: map[string]string{
+				"pr": "4",
+			},
 		}
-	}
-}
-
-// GetQueuePosition returns the position of a request in the queue
-func (elm *EnhancedLockManager) GetQueuePosition(ctx context.Context, project models.Project, workspace string) (int, error) {
-	if elm.queue == nil {
-		return -1, fmt.Errorf("priority queue is not enabled")
+		m.eventManager.Emit(event)
 	}
 
-	resource := ResourceIdentifier{
-		Type:      ResourceTypeProject,
-		Namespace: project.RepoFullName,
-		Name:      project.Path,
-		Workspace: workspace,
-		Path:      project.Path,
-	}
+	// Use legacy manager for actual unlocking
+	lock, err := m.legacyManager.Unlock(ctx, project, workspace, user)
 
-	queue := elm.queue.GetQueueForResource(resource)
-	if queue == nil {
-		return 0, nil // No queue for this resource
-	}
-
-	// This is a simplified implementation - in practice, you'd need to track specific requests
-	return queue.Size(), nil
-}
-
-// CancelQueuedRequest removes a request from the queue
-func (elm *EnhancedLockManager) CancelQueuedRequest(ctx context.Context, project models.Project, workspace string, user models.User) error {
-	if elm.queue == nil {
-		return fmt.Errorf("priority queue is not enabled")
-	}
-
-	// Find the request ID - this is simplified
-	resource := ResourceIdentifier{
-		Type:      ResourceTypeProject,
-		Namespace: project.RepoFullName,
-		Name:      project.Path,
-		Workspace: workspace,
-		Path:      project.Path,
-	}
-
-	// In practice, you'd maintain a mapping of user requests to IDs
-	elm.log.Info("Queue cancellation requested for %s/%s by %s", project.RepoFullName, workspace, user.Username)
-	return nil
-}
-
-// GetStats returns manager statistics
-func (elm *EnhancedLockManager) GetStats(ctx context.Context) (*BackendStats, error) {
-	backendStats, err := elm.backend.GetStats(ctx)
+	// Record metrics and events
+	duration := time.Since(startTime)
 	if err != nil {
+		m.logger.Err("Failed to unlock %s:%s for user %s: %v", project.RepoFullName, workspace, user.Username, err)
 		return nil, err
 	}
 
-	// Enhance with manager-specific metrics
-	elm.metrics.LastUpdated = time.Now()
-
-	// Add manager metrics to backend stats
-	if backendStats != nil {
-		backendStats.TotalRequests = elm.metrics.TotalRequests
-		backendStats.SuccessfulAcquires = elm.metrics.SuccessfulLocks
-		backendStats.FailedAcquires = elm.metrics.FailedLocks
-		backendStats.AverageWaitTime = elm.metrics.AverageWaitTime
-		backendStats.AverageHoldTime = elm.metrics.AverageHoldTime
+	// Record successful release
+	if m.metricsCollector != nil {
+		m.metricsCollector.RecordLockRelease(duration)
 	}
 
-	return backendStats, nil
+	if m.eventManager != nil {
+		event := &LockEvent{
+			Type:      "lock_released",
+			LockID:    fmt.Sprintf("%s:%s", project.RepoFullName, workspace),
+			Timestamp: time.Now(),
+			Owner:     user.Username,
+			Resource: ResourceIdentifier{
+				Type:      ResourceTypeProject,
+				Namespace: project.RepoFullName,
+				Name:      project.Name,
+				Workspace: workspace,
+			},
+			Metadata: map[string]string{
+				"pr": "4",
+			},
+		}
+		m.eventManager.Emit(event)
+	}
+
+	return lock, nil
 }
 
-// GetHealth checks the health of the lock manager
-func (elm *EnhancedLockManager) GetHealth(ctx context.Context) error {
+// List implements the standard LockManager interface (backward compatibility)
+func (m *EnhancedLockManager) List(ctx context.Context) ([]*models.ProjectLock, error) {
+	if m.metricsCollector != nil {
+		m.metricsCollector.RecordLockRequest("list")
+	}
+
+	return m.legacyManager.List(ctx)
+}
+
+// LockWithPriority provides enhanced locking with priority support
+func (m *EnhancedLockManager) LockWithPriority(ctx context.Context, project models.Project, workspace string, user models.User, priority Priority) (*models.ProjectLock, error) {
+	startTime := time.Now()
+
+	// Record enhanced metrics
+	if m.metricsCollector != nil {
+		m.metricsCollector.RecordLockRequest(fmt.Sprintf("priority_%s", priority.String()))
+	}
+
+	// Emit enhanced lock requested event
+	if m.eventManager != nil {
+		event := &LockEvent{
+			Type:      "enhanced_lock_requested",
+			Timestamp: time.Now(),
+			Owner:     user.Username,
+			Resource: ResourceIdentifier{
+				Type:      ResourceTypeProject,
+				Namespace: project.RepoFullName,
+				Name:      project.Name,
+				Workspace: workspace,
+			},
+			Metadata: map[string]string{
+				"priority": priority.String(),
+				"method":   "enhanced",
+				"pr":       "4",
+			},
+		}
+		m.eventManager.Emit(event)
+	}
+
+	// For now, delegate to standard lock (enhanced priority logic would go here in future PRs)
+	lock, err := m.Lock(ctx, project, workspace, user)
+
+	duration := time.Since(startTime)
+	if err != nil {
+		if m.metricsCollector != nil {
+			m.metricsCollector.RecordLockFailure(fmt.Sprintf("priority_%s", priority.String()), duration)
+		}
+		return nil, err
+	}
+
+	if m.metricsCollector != nil {
+		m.metricsCollector.RecordLockAcquisition(fmt.Sprintf("priority_%s", priority.String()), duration)
+	}
+
+	return lock, nil
+}
+
+// GetStats returns performance and operational statistics
+func (m *EnhancedLockManager) GetStats(ctx context.Context) (*ManagerStats, error) {
+	stats := &ManagerStats{
+		ManagerVersion: "enhanced-pr4",
+		Started:        m.started,
+		Workers:        m.workers,
+		Timestamp:      time.Now(),
+	}
+
+	// Get metrics if available
+	if m.metricsCollector != nil {
+		metricsStats := m.metricsCollector.GetStats()
+		stats.Metrics = metricsStats
+		stats.HealthScore = metricsStats.HealthScore
+	}
+
+	// Get event stats if available
+	if m.eventManager != nil {
+		eventStats := m.eventManager.GetStats()
+		stats.Events = eventStats
+	}
+
+	return stats, nil
+}
+
+// GetHealth performs health check on all components
+func (m *EnhancedLockManager) GetHealth(ctx context.Context) error {
+	if !m.started {
+		return fmt.Errorf("manager not started")
+	}
+
 	// Check backend health
-	if err := elm.backend.HealthCheck(ctx); err != nil {
-		return fmt.Errorf("backend health check failed: %w", err)
+	if m.backend != nil {
+		if err := m.backend.HealthCheck(ctx); err != nil {
+			return fmt.Errorf("backend health check failed: %w", err)
+		}
 	}
 
-	// Check if manager is running
-	elm.mutex.RLock()
-	running := elm.running
-	elm.mutex.RUnlock()
-
-	if !running {
-		return fmt.Errorf("lock manager is not running")
+	// Check legacy manager health if available
+	if healthChecker, ok := m.legacyManager.(interface{ GetHealth(context.Context) error }); ok {
+		if err := healthChecker.GetHealth(ctx); err != nil {
+			return fmt.Errorf("legacy manager health check failed: %w", err)
+		}
 	}
 
 	return nil
 }
 
-// Helper methods
-
-func (elm *EnhancedLockManager) createLockRequest(project models.Project, workspace string, user models.User, priority Priority, timeout time.Duration) *EnhancedLockRequest {
-	return &EnhancedLockRequest{
-		ID: fmt.Sprintf("lock_%d_%s", time.Now().UnixNano(), user.Username),
-		Resource: ResourceIdentifier{
-			Type:      ResourceTypeProject,
-			Namespace: project.RepoFullName,
-			Name:      project.Path,
-			Workspace: workspace,
-			Path:      project.Path,
-		},
-		Priority:    priority,
-		Timeout:     timeout,
-		Metadata:    make(map[string]string),
-		Context:     context.Background(),
-		RequestedAt: time.Now(),
-		Project:     project,
-		Workspace:   workspace,
-		User:        user,
-	}
+// GetEventManager returns the event manager for advanced usage
+func (m *EnhancedLockManager) GetEventManager() *EventManager {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.eventManager
 }
 
-func (elm *EnhancedLockManager) sameResource(r1, r2 ResourceIdentifier) bool {
-	return r1.Namespace == r2.Namespace &&
-		   r1.Name == r2.Name &&
-		   r1.Workspace == r2.Workspace &&
-		   r1.Path == r2.Path
+// GetMetricsCollector returns the metrics collector for advanced usage
+func (m *EnhancedLockManager) GetMetricsCollector() *MetricsCollector {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.metricsCollector
 }
 
-func (elm *EnhancedLockManager) setupLockTimeout(ctx context.Context, lock *EnhancedLock) {
-	if lock.ExpiresAt == nil {
-		return
+// startWorkers starts the worker pool for handling concurrent requests
+func (m *EnhancedLockManager) startWorkers(ctx context.Context) {
+	for i := 0; i < m.workers; i++ {
+		m.workerWg.Add(1)
+		go m.worker(ctx, i)
 	}
-
-	timeout := lock.ExpiresAt.Sub(time.Now())
-	if timeout <= 0 {
-		return
-	}
-
-	elm.timeoutManager.SetTimeout(ctx, lock.ID, lock.Resource, timeout, func(ctx context.Context, lockID string, resource ResourceIdentifier) {
-		elm.log.Info("Lock timeout triggered, releasing lock: %s", lockID)
-
-		err := elm.backend.ReleaseLock(ctx, lockID)
-		if err != nil {
-			elm.log.Error("Failed to release timed-out lock %s: %v", lockID, err)
-		} else {
-			elm.emitEvent(ctx, &ManagerEvent{
-				Type:      "lock_timeout",
-				LockID:    lockID,
-				Resource:  resource,
-				Timestamp: time.Now(),
-			})
-
-			// Process queue for this resource
-			if elm.queue != nil {
-				go elm.processQueueForResource(ctx, resource)
-			}
-		}
-	})
+	m.logger.Info("Started %d workers for enhanced lock manager", m.workers)
 }
 
-func (elm *EnhancedLockManager) processQueueForResource(ctx context.Context, resource ResourceIdentifier) {
-	if elm.queue == nil {
-		return
-	}
+// worker processes lock requests from the queue
+func (m *EnhancedLockManager) worker(ctx context.Context, workerID int) {
+	defer m.workerWg.Done()
 
-	request, err := elm.queue.PopForResource(ctx, resource)
-	if err != nil || request == nil {
-		return // No queued requests
-	}
-
-	elm.log.Info("Processing queued request: %s for resource %s/%s", request.ID, resource.Namespace, resource.Workspace)
-
-	// Try to acquire the lock for the queued request
-	enhancedLock, err := elm.backend.AcquireLock(ctx, request)
-	if err != nil {
-		elm.log.Error("Failed to acquire lock for queued request %s: %v", request.ID, err)
-		return
-	}
-
-	if enhancedLock != nil && enhancedLock.State == LockStateAcquired {
-		elm.setupLockTimeout(ctx, enhancedLock)
-
-		elm.emitEvent(ctx, &ManagerEvent{
-			Type:      "queued_lock_processed",
-			LockID:    enhancedLock.ID,
-			Resource:  enhancedLock.Resource,
-			User:      enhancedLock.Owner,
-			Timestamp: time.Now(),
-		})
-	}
-}
-
-func (elm *EnhancedLockManager) updateAverageWaitTime(waitTime time.Duration) {
-	// Simple moving average - in production, use proper statistical tracking
-	if elm.metrics.AverageWaitTime == 0 {
-		elm.metrics.AverageWaitTime = waitTime
-	} else {
-		elm.metrics.AverageWaitTime = (elm.metrics.AverageWaitTime + waitTime) / 2
-	}
-}
-
-func (elm *EnhancedLockManager) updateAverageHoldTime(holdTime time.Duration) {
-	// Simple moving average - in production, use proper statistical tracking
-	if elm.metrics.AverageHoldTime == 0 {
-		elm.metrics.AverageHoldTime = holdTime
-	} else {
-		elm.metrics.AverageHoldTime = (elm.metrics.AverageHoldTime + holdTime) / 2
-	}
-}
-
-func (elm *EnhancedLockManager) emitEvent(ctx context.Context, event *ManagerEvent) {
-	for _, callback := range elm.eventCallbacks {
-		// Run callbacks in goroutines to avoid blocking
-		go func(cb EventCallback) {
-			defer func() {
-				if r := recover(); r != nil {
-					elm.log.Error("Event callback panicked: %v", r)
-				}
-			}()
-			cb(ctx, event)
-		}(callback)
-	}
-}
-
-// maintenanceLoop runs periodic maintenance tasks
-func (elm *EnhancedLockManager) maintenanceLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
+	m.logger.Debug("Worker %d started", workerID)
+	defer m.logger.Debug("Worker %d stopped", workerID)
 
 	for {
 		select {
+		case <-m.stopCh:
+			return
 		case <-ctx.Done():
 			return
-		case <-elm.stopChan:
-			return
-		case <-ticker.C:
-			elm.performMaintenance(ctx)
+		default:
+			// Worker logic for processing queued requests would go here
+			// For now, just sleep to prevent busy waiting
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
 
-func (elm *EnhancedLockManager) performMaintenance(ctx context.Context) {
-	// Clean up expired locks
-	if expired, err := elm.backend.CleanupExpiredLocks(ctx); err != nil {
-		elm.log.Error("Failed to cleanup expired locks: %v", err)
-	} else if expired > 0 {
-		elm.log.Info("Cleaned up %d expired locks", expired)
-	}
-
-	// Clean up empty queues
-	if elm.queue != nil {
-		elm.queue.CleanupEmptyQueues()
-	}
-
-	// Update metrics
-	elm.metrics.LastUpdated = time.Now()
-}
-
-// Event management
-
-// AddEventCallback adds an event callback
-func (elm *EnhancedLockManager) AddEventCallback(callback EventCallback) {
-	elm.eventCallbacks = append(elm.eventCallbacks, callback)
-}
-
-// Configuration management
-
-// GetConfiguration returns the current configuration
-func (elm *EnhancedLockManager) GetConfiguration() *EnhancedConfig {
-	return elm.config
-}
-
-// UpdateConfiguration updates the configuration (runtime changes)
-func (elm *EnhancedLockManager) UpdateConfiguration(config *EnhancedConfig) error {
-	if config == nil {
-		return fmt.Errorf("configuration cannot be nil")
-	}
-
-	// Validate configuration
-	if err := elm.validateConfig(config); err != nil {
-		return fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	elm.config = config
-	elm.log.Info("Enhanced lock manager configuration updated")
-	return nil
-}
-
-func (elm *EnhancedLockManager) validateConfig(config *EnhancedConfig) error {
-	if config.DefaultTimeout <= 0 {
-		return fmt.Errorf("default timeout must be positive")
-	}
-	if config.MaxTimeout < config.DefaultTimeout {
-		return fmt.Errorf("max timeout must be >= default timeout")
-	}
-	if config.MaxQueueSize < 0 {
-		return fmt.Errorf("max queue size cannot be negative")
-	}
-	if config.MaxRetryAttempts < 0 {
-		return fmt.Errorf("max retry attempts cannot be negative")
-	}
-	return nil
+// ManagerStats provides comprehensive statistics about the enhanced lock manager
+type ManagerStats struct {
+	ManagerVersion string                 `json:"manager_version"`
+	Started        bool                   `json:"started"`
+	Workers        int                    `json:"workers"`
+	HealthScore    int                    `json:"health_score"`
+	Timestamp      time.Time              `json:"timestamp"`
+	Metrics        *MetricsStats          `json:"metrics,omitempty"`
+	Events         *EventStats            `json:"events,omitempty"`
+	Components     map[string]interface{} `json:"components,omitempty"`
 }
