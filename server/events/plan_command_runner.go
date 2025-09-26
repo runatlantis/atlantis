@@ -7,6 +7,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
+// GenerateLockID creates a consistent lock ID for a project context.
+// This ensures the same format is used for both locking and unlocking operations.
+func GenerateLockID(projCtx command.ProjectContext) string {
+	// Use models.NewProject to ensure consistent path cleaning
+	project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, "")
+	return models.GenerateLockKey(project, projCtx.Workspace)
+}
+
 func NewPlanCommandRunner(
 	silenceVCSStatusNoPlans bool,
 	silenceVCSStatusNoProjects bool,
@@ -110,6 +118,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
+		} else {
+			// When silence is enabled and no projects are found, don't set any status
+			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
 		return
 	}
@@ -134,6 +145,10 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		p.deletePlans(ctx)
+		_, err := p.lockingLocker.UnlockByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
+		if err != nil {
+			ctx.Log.Err("deleting locks: %s", err)
+		}
 		result.PlansDeleted = true
 	}
 
@@ -228,6 +243,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 					ctx.Log.Warn("unable to update commit status: %s", err)
 				}
 			}
+		} else {
+			// When silence is enabled and no projects are found, don't set any status
+			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
 		return
 	}
@@ -239,7 +257,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	if !cmd.IsForSpecificProject() {
 		ctx.Log.Debug("deleting previous plans and locks")
 		p.deletePlans(ctx)
-		_, err = p.lockingLocker.UnlockByPull(baseRepo.FullName, pull.Num)
+		_, err := p.lockingLocker.UnlockByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
 		if err != nil {
 			ctx.Log.Err("deleting locks: %s", err)
 		}
@@ -258,6 +276,10 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		p.deletePlans(ctx)
+		_, err := p.lockingLocker.UnlockByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
+		if err != nil {
+			ctx.Log.Err("deleting locks: %s", err)
+		}
 		result.PlansDeleted = true
 	}
 

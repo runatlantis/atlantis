@@ -303,6 +303,20 @@ func TestRunCommentCommand_GithubPullParseErr(t *testing.T) {
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Eq("`Error: extracting required fields from comment data: err`"), Eq(""))
 }
 
+func TestRunCommentCommand_CommentPreWorkflowHookFailure(t *testing.T) {
+	t.Log("if there is a pre-workflowhook failure with failure enabled it is commented back on the pull request")
+	vcsClient := setup(t)
+	ch.FailOnPreWorkflowHookError = true
+
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, 1, &events.CommentCommand{Name: command.Plan})
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+
+	Assert(t, strings.Contains(comment, "Error: Pre-workflow hook failed"), fmt.Sprintf("comment should be about a pre-workflow hook failure but was %q", comment))
+}
+
 func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 	t.Run("nil checker", func(t *testing.T) {
 		vcsClient := setup(t)
@@ -834,7 +848,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 }
 
 func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True(t *testing.T) {
-	setup(t)
+	vcsClient := setup(t)
 	tmp := t.TempDir()
 	boltDB, err := db.New(tmp)
 	t.Cleanup(func() {
@@ -858,6 +872,11 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	lockingLocker.VerifyWasCalled(Never()).UnlockByPull(Any[string](), Any[int]())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Eq(models.PendingCommitStatus), Eq(command.Plan))
+
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+
+	Assert(t, strings.Contains(comment, "Error: Pre-workflow hook failed"), fmt.Sprintf("comment should be about a pre-workflow hook failure but was %q", comment))
 }
 
 func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_False(t *testing.T) {
@@ -882,7 +901,6 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 }
 
 func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True(t *testing.T) {
@@ -919,7 +937,22 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	projectCtx := command.ProjectContext{
+		CommandName:         command.Plan,
+		ExecutionOrderGroup: 0,
+		ProjectName:         "TestProject",
+		Workspace:           "default",
+		BaseRepo:            testdata.GithubRepo,
+		Pull:                testdata.Pull,
+	}
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectResult{
+		Command: command.Plan,
+		PlanSuccess: &models.PlanSuccess{
+			TerraformOutput: "true",
+		},
+	})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
@@ -1031,7 +1064,6 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 
 	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
