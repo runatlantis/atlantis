@@ -87,6 +87,7 @@ var testFlags = map[string]interface{}{
 	ExecutableName:                   "atlantis",
 	FailOnPreWorkflowHookError:       false,
 	GHAllowMergeableBypassApply:      false,
+	GHDisableRepoLevelSecurityRules:  false,
 	GHHostnameFlag:                   "ghhostname",
 	GHTeamAllowlistFlag:              "",
 	GHTokenFlag:                      "token",

@@ -231,10 +231,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
-		if userConfig.GithubAllowMergeableBypassApply {
-			githubConfig = vcs.GithubConfig{
-				AllowMergeableBypassApply: true,
-			}
+		githubConfig = vcs.GithubConfig{
+			AllowMergeableBypassApply:     userConfig.GithubAllowMergeableBypassApply,
+			DisableRepoLevelSecurityRules: userConfig.GithubDisableRepoLevelSecurityRules,
 		}
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {

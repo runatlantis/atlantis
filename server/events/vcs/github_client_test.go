@@ -1768,3 +1768,107 @@ func TestGithubClient_SecondaryRateLimitHandling_CreateComment(t *testing.T) {
 	Assert(t, calls > maxCalls, "Expected more than %d calls due to rate limiting, but got %d", maxCalls, calls)
 
 }
+
+func TestGithubClient_GetPullRequestMergeabilityInfoWithDisableRepoLevelSecurityRules(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	vcsStatusName := "atlantis-test"
+
+	// Test data without rules field
+	testJSON := `{
+		"data": {
+			"repository": {
+				"pullRequest": {
+					"reviewDecision": null,
+					"baseRef": {
+						"branchProtectionRule": {
+							"requiredStatusChecks": [
+								{
+									"context": "my-required-check"
+								}
+							]
+						}
+					},
+					"commits": {
+						"nodes": [
+							{
+								"commit": {
+									"statusCheckRollup": {
+										"contexts": {
+											"pageInfo": {
+												"endCursor": "QWERTY",
+												"hasNextPage": false
+											},
+											"nodes": [
+												{
+													"__typename": "StatusContext",
+													"context": "atlantis/apply",
+													"state": "PENDING",
+													"isRequired": true
+												},
+												{
+													"__typename": "StatusContext",
+													"context": "my-required-check", 
+													"state": "SUCCESS",
+													"isRequired": true
+												}
+											]
+										}
+									}
+								}
+							}
+						]
+					}
+				}
+			}
+		}
+	}`
+
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/octocat/repo/pulls/1":
+				w.Write([]byte(`{"number": 1, "mergeable_state": "blocked"}`)) // nolint: errcheck
+				return
+			case "/api/graphql":
+				w.Write([]byte(testJSON)) // nolint: errcheck
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+
+	// Test with DisableRepoLevelSecurityRules enabled
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass", ""}, vcs.GithubConfig{
+		AllowMergeableBypassApply:     true,
+		DisableRepoLevelSecurityRules: true,
+	}, 0, logging.NewNoopLogger(t))
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	repo := models.Repo{
+		FullName:          "octocat/repo",
+		Owner:             "octocat",
+		Name:              "repo",
+		CloneURL:          "",
+		SanitizedCloneURL: "",
+		VCSHost: models.VCSHost{
+			Type:     models.Github,
+			Hostname: "github.com",
+		},
+	}
+
+	pull := models.PullRequest{
+		Num: 1,
+	}
+
+	// Test that PullIsMergeable works when rules are disabled
+	isMergeable, err := client.PullIsMergeable(logger, repo, pull, vcsStatusName, []string{})
+	Ok(t, err)
+	Equals(t, true, isMergeable) // Should be mergeable since apply check is excluded
+
+}
