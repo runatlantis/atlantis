@@ -128,6 +128,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 			input: `
 version: 3
 automerge: true
+automerge_method: squash
 autodiscover:
   mode: enabled
   ignore_paths:
@@ -164,10 +165,11 @@ allowed_regexp_prefixes:
 					Mode:        &autoDiscoverEnabled,
 					IgnorePaths: []string{"foo/*"},
 				},
-				Automerge:     Bool(true),
-				ParallelApply: Bool(true),
-				ParallelPlan:  Bool(false),
-				RepoLocks:     &raw.RepoLocks{Mode: &repoLocksOnApply},
+				Automerge:       Bool(true),
+				AutomergeMethod: String("squash"),
+				ParallelApply:   Bool(true),
+				ParallelPlan:    Bool(false),
+				RepoLocks:       &raw.RepoLocks{Mode: &repoLocksOnApply},
 				Projects: []raw.Project{
 					{
 						Dir:              String("mydir"),
@@ -259,8 +261,9 @@ func TestConfig_ToValid(t *testing.T) {
 			description: "nothing set",
 			input:       raw.RepoCfg{Version: Int(2)},
 			exp: valid.RepoCfg{
-				Version:   2,
-				Workflows: make(map[string]valid.Workflow),
+				Version:         2,
+				Workflows:       make(map[string]valid.Workflow),
+				AutomergeMethod: raw.DefaultAutomergeMethod,
 			},
 		},
 		{
@@ -273,11 +276,12 @@ func TestConfig_ToValid(t *testing.T) {
 				RepoLocks:    &raw.RepoLocks{},
 			},
 			exp: valid.RepoCfg{
-				Version:      2,
-				AutoDiscover: raw.DefaultAutoDiscover(),
-				Workflows:    map[string]valid.Workflow{},
-				Projects:     nil,
-				RepoLocks:    &valid.DefaultRepoLocks,
+				Version:         2,
+				AutoDiscover:    raw.DefaultAutoDiscover(),
+				Workflows:       map[string]valid.Workflow{},
+				Projects:        nil,
+				RepoLocks:       &valid.DefaultRepoLocks,
+				AutomergeMethod: raw.DefaultAutomergeMethod,
 			},
 		},
 		{
@@ -291,6 +295,7 @@ func TestConfig_ToValid(t *testing.T) {
 				ParallelApply:             nil,
 				AbortOnExecutionOrderFail: false,
 				Workflows:                 map[string]valid.Workflow{},
+				AutomergeMethod:           raw.DefaultAutomergeMethod,
 			},
 		},
 		{
@@ -307,6 +312,7 @@ func TestConfig_ToValid(t *testing.T) {
 				ParallelApply:             Bool(true),
 				AbortOnExecutionOrderFail: true,
 				Workflows:                 map[string]valid.Workflow{},
+				AutomergeMethod:           raw.DefaultAutomergeMethod,
 			},
 		},
 		{
@@ -323,6 +329,7 @@ func TestConfig_ToValid(t *testing.T) {
 				ParallelApply:             Bool(false),
 				AbortOnExecutionOrderFail: false,
 				Workflows:                 map[string]valid.Workflow{},
+				AutomergeMethod:           raw.DefaultAutomergeMethod,
 			},
 		},
 		{
@@ -331,8 +338,9 @@ func TestConfig_ToValid(t *testing.T) {
 				Version: Int(2),
 			},
 			exp: valid.RepoCfg{
-				Version:   2,
-				Workflows: map[string]valid.Workflow{},
+				Version:         2,
+				Workflows:       map[string]valid.Workflow{},
+				AutomergeMethod: raw.DefaultAutomergeMethod,
 			},
 		},
 		{
@@ -346,7 +354,8 @@ func TestConfig_ToValid(t *testing.T) {
 				AutoDiscover: &valid.AutoDiscover{
 					Mode: valid.AutoDiscoverEnabledMode,
 				},
-				Workflows: map[string]valid.Workflow{},
+				Workflows:       map[string]valid.Workflow{},
+				AutomergeMethod: raw.DefaultAutomergeMethod,
 			},
 		},
 		{
@@ -355,8 +364,9 @@ func TestConfig_ToValid(t *testing.T) {
 				Version: Int(2),
 			},
 			exp: valid.RepoCfg{
-				Version:   2,
-				Workflows: map[string]valid.Workflow{},
+				Version:         2,
+				Workflows:       map[string]valid.Workflow{},
+				AutomergeMethod: raw.DefaultAutomergeMethod,
 			},
 		},
 		{
@@ -370,7 +380,8 @@ func TestConfig_ToValid(t *testing.T) {
 				RepoLocks: &valid.RepoLocks{
 					Mode: valid.RepoLocksOnApplyMode,
 				},
-				Workflows: map[string]valid.Workflow{},
+				Workflows:       map[string]valid.Workflow{},
+				AutomergeMethod: raw.DefaultAutomergeMethod,
 			},
 		},
 		{
@@ -401,14 +412,16 @@ func TestConfig_ToValid(t *testing.T) {
 						StateRm:     valid.DefaultStateRmStage,
 					},
 				},
+				AutomergeMethod: raw.DefaultAutomergeMethod,
 			},
 		},
 		{
 			description: "everything set",
 			input: raw.RepoCfg{
-				Version:       Int(2),
-				Automerge:     Bool(true),
-				ParallelApply: Bool(true),
+				Version:         Int(2),
+				Automerge:       Bool(true),
+				AutomergeMethod: String("rebase"),
+				ParallelApply:   Bool(true),
 				AutoDiscover: &raw.AutoDiscover{
 					Mode: &autoDiscoverEnabled,
 				},
@@ -461,9 +474,10 @@ func TestConfig_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.RepoCfg{
-				Version:       2,
-				Automerge:     Bool(true),
-				ParallelApply: Bool(true),
+				Version:         2,
+				Automerge:       Bool(true),
+				AutomergeMethod: "rebase",
+				ParallelApply:   Bool(true),
 				AutoDiscover: &valid.AutoDiscover{
 					Mode: valid.AutoDiscoverEnabledMode,
 				},
