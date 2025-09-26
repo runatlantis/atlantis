@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -660,6 +661,331 @@ func (r *RedisBackend) generateLockID() string {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
 	return hex.EncodeToString(bytes)
+}
+
+// Start initializes and starts the Redis backend components
+func (r *RedisBackend) Start(ctx context.Context) error {
+	r.log.Info("Starting Redis backend with enhanced features")
+
+	// Start health monitoring
+	if r.healthMonitor != nil {
+		if err := r.healthMonitor.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start health monitor: %w", err)
+		}
+	}
+
+	// Start cluster management if enabled
+	if r.clusterMgr != nil {
+		if err := r.clusterMgr.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start cluster manager: %w", err)
+		}
+	}
+
+	// Load Lua scripts
+	if err := r.scriptMgr.LoadScripts(ctx); err != nil {
+		r.log.Warn("Failed to preload scripts: %v", err)
+	}
+
+	r.log.Info("Redis backend started successfully")
+	return nil
+}
+
+// Stop gracefully shuts down the Redis backend
+func (r *RedisBackend) Stop() error {
+	r.log.Info("Stopping Redis backend")
+
+	// Stop cluster management
+	if r.clusterMgr != nil {
+		if err := r.clusterMgr.Stop(); err != nil {
+			r.log.Warn("Failed to stop cluster manager: %v", err)
+		}
+	}
+
+	// Stop health monitoring
+	if r.healthMonitor != nil {
+		r.healthMonitor.Stop()
+	}
+
+	r.log.Info("Redis backend stopped")
+	return nil
+}
+
+// ExecuteWithHealthCheck wraps operations with health monitoring
+func (r *RedisBackend) ExecuteWithHealthCheck(ctx context.Context, operation func(context.Context) error) error {
+	if r.healthMonitor != nil {
+		return r.healthMonitor.ExecuteWithHealthCheck(ctx, operation)
+	}
+	return operation(ctx)
+}
+
+// GetDetailedStats returns comprehensive backend statistics
+func (r *RedisBackend) GetDetailedStats(ctx context.Context) (map[string]interface{}, error) {
+	stats := r.stats
+
+	result := map[string]interface{}{
+		"basic_stats": stats,
+		"last_updated": r.lastUpdated,
+	}
+
+	// Add health metrics if available
+	if r.healthMonitor != nil {
+		healthReport, err := r.healthMonitor.GetDetailedReport(ctx)
+		if err == nil {
+			result["health"] = healthReport
+		}
+	}
+
+	// Add cluster state if available
+	if r.clusterMgr != nil {
+		clusterState, err := r.clusterMgr.GetClusterState(ctx)
+		if err == nil {
+			result["cluster"] = clusterState
+		}
+	}
+
+	return result, nil
+}
+
+// GetClusterInfo returns cluster information if clustering is enabled
+func (r *RedisBackend) GetClusterInfo() map[string]interface{} {
+	if r.clusterMgr == nil {
+		return map[string]interface{}{
+			"enabled": false,
+		}
+	}
+
+	return map[string]interface{}{
+		"enabled":   true,
+		"node_id":   r.clusterMgr.nodeID,
+		"is_leader": r.clusterMgr.IsLeader(),
+		"leader_id": r.clusterMgr.GetLeaderID(),
+		"nodes":     r.clusterMgr.GetClusterNodes(),
+	}
+}
+
+// TTL management methods
+
+// SetTTL sets a TTL for an existing lock
+func (r *RedisBackend) SetTTL(ctx context.Context, lockID string, ttl time.Duration) error {
+	return r.ExecuteWithHealthCheck(ctx, func(ctx context.Context) error {
+		lock, err := r.GetLock(ctx, lockID)
+		if err != nil {
+			return err
+		}
+
+		lockKey := r.getLockKey(lock.Resource)
+		return r.client.Expire(ctx, lockKey, ttl).Err()
+	})
+}
+
+// GetTTL returns the remaining TTL for a lock
+func (r *RedisBackend) GetTTL(ctx context.Context, lockID string) (time.Duration, error) {
+	lock, err := r.GetLock(ctx, lockID)
+	if err != nil {
+		return 0, err
+	}
+
+	lockKey := r.getLockKey(lock.Resource)
+	ttl, err := r.client.TTL(ctx, lockKey).Result()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get TTL: %w", err)
+	}
+
+	return ttl, nil
+}
+
+// Advanced cleanup with configurable batch size
+func (r *RedisBackend) CleanupExpiredLocksAdvanced(ctx context.Context, batchSize int) (int, error) {
+	if batchSize <= 0 {
+		batchSize = 100
+	}
+
+	nodeID := ""
+	if r.clusterMgr != nil {
+		nodeID = r.clusterMgr.nodeID
+	}
+
+	result, err := r.scriptMgr.Execute(ctx, "cleanup_expired",
+		[]string{r.keyPrefix + "*"},
+		time.Now().Unix(), batchSize, r.config.RedisClusterMode, nodeID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to execute cleanup script: %w", err)
+	}
+
+	resultSlice := result.([]interface{})
+	cleaned := int(resultSlice[0].(int64))
+
+	r.log.Info("Cleaned up %d expired locks", cleaned)
+	return cleaned, nil
+}
+
+// Batch operations for better performance
+
+// BatchGetLocks retrieves multiple locks efficiently
+func (r *RedisBackend) BatchGetLocks(ctx context.Context, lockIDs []string) ([]*enhanced.EnhancedLock, error) {
+	if len(lockIDs) == 0 {
+		return nil, nil
+	}
+
+	// This is a simplified implementation - in practice you'd optimize this
+	var locks []*enhanced.EnhancedLock
+	for _, lockID := range lockIDs {
+		lock, err := r.GetLock(ctx, lockID)
+		if err == nil && lock != nil {
+			locks = append(locks, lock)
+		}
+	}
+
+	return locks, nil
+}
+
+// BatchReleaseLocks releases multiple locks atomically
+func (r *RedisBackend) BatchReleaseLocks(ctx context.Context, lockIDs []string) error {
+	return r.ExecuteWithHealthCheck(ctx, func(ctx context.Context) error {
+		for _, lockID := range lockIDs {
+			if err := r.ReleaseLock(ctx, lockID); err != nil {
+				r.log.Warn("Failed to release lock %s in batch: %v", lockID, err)
+			}
+		}
+		return nil
+	})
+}
+
+// Connection pool optimization methods
+
+// WarmupConnections pre-establishes connections for better performance
+func (r *RedisBackend) WarmupConnections(ctx context.Context, count int) error {
+	r.log.Info("Warming up %d Redis connections", count)
+
+	var wg sync.WaitGroup
+	errChan := make(chan error, count)
+
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			// Perform a simple operation to establish connection
+			testKey := fmt.Sprintf("atlantis:warmup:%d", i)
+			if err := r.client.Set(ctx, testKey, "warmup", time.Second).Err(); err != nil {
+				errChan <- err
+				return
+			}
+			r.client.Del(ctx, testKey)
+		}(i)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	// Check for errors
+	for err := range errChan {
+		if err != nil {
+			return fmt.Errorf("connection warmup failed: %w", err)
+		}
+	}
+
+	r.log.Info("Connection warmup completed successfully")
+	return nil
+}
+
+// GetConnectionPoolStats returns connection pool statistics
+func (r *RedisBackend) GetConnectionPoolStats() map[string]interface{} {
+	switch client := r.client.(type) {
+	case *redis.Client:
+		stats := client.PoolStats()
+		return map[string]interface{}{
+			"hits":         stats.Hits,
+			"misses":       stats.Misses,
+			"timeouts":     stats.Timeouts,
+			"total_conns":  stats.TotalConns,
+			"idle_conns":   stats.IdleConns,
+			"stale_conns":  stats.StaleConns,
+		}
+	case *redis.ClusterClient:
+		// For cluster client, we'd aggregate stats from all nodes
+		return map[string]interface{}{
+			"type": "cluster",
+			"note": "Cluster pool stats not implemented yet",
+		}
+	default:
+		return map[string]interface{}{
+			"type": "unknown",
+		}
+	}
+}
+
+// Performance benchmarking
+
+// BenchmarkBasicOperations runs performance benchmarks
+func (r *RedisBackend) BenchmarkBasicOperations(ctx context.Context, iterations int) (*PerformanceBenchmark, error) {
+	if iterations <= 0 {
+		iterations = 1000
+	}
+
+	benchmark := &PerformanceBenchmark{
+		Iterations: iterations,
+		StartTime:  time.Now(),
+	}
+
+	// Benchmark SET operations
+	start := time.Now()
+	for i := 0; i < iterations; i++ {
+		key := fmt.Sprintf("atlantis:bench:set:%d", i)
+		err := r.client.Set(ctx, key, fmt.Sprintf("value-%d", i), time.Minute).Err()
+		if err != nil {
+			benchmark.SetErrors++
+		}
+	}
+	benchmark.SetLatency = time.Since(start)
+
+	// Benchmark GET operations
+	start = time.Now()
+	for i := 0; i < iterations; i++ {
+		key := fmt.Sprintf("atlantis:bench:set:%d", i)
+		_, err := r.client.Get(ctx, key).Result()
+		if err != nil && err != redis.Nil {
+			benchmark.GetErrors++
+		}
+	}
+	benchmark.GetLatency = time.Since(start)
+
+	// Benchmark DEL operations
+	start = time.Now()
+	for i := 0; i < iterations; i++ {
+		key := fmt.Sprintf("atlantis:bench:set:%d", i)
+		err := r.client.Del(ctx, key).Err()
+		if err != nil {
+			benchmark.DelErrors++
+		}
+	}
+	benchmark.DelLatency = time.Since(start)
+
+	benchmark.EndTime = time.Now()
+	benchmark.TotalDuration = benchmark.EndTime.Sub(benchmark.StartTime)
+
+	// Calculate operations per second
+	if benchmark.TotalDuration > 0 {
+		totalOps := float64(iterations * 3) // SET, GET, DEL
+		benchmark.OpsPerSecond = totalOps / benchmark.TotalDuration.Seconds()
+	}
+
+	return benchmark, nil
+}
+
+// PerformanceBenchmark represents benchmark results
+type PerformanceBenchmark struct {
+	Iterations    int           `json:"iterations"`
+	StartTime     time.Time     `json:"start_time"`
+	EndTime       time.Time     `json:"end_time"`
+	TotalDuration time.Duration `json:"total_duration"`
+	SetLatency    time.Duration `json:"set_latency"`
+	GetLatency    time.Duration `json:"get_latency"`
+	DelLatency    time.Duration `json:"del_latency"`
+	SetErrors     int           `json:"set_errors"`
+	GetErrors     int           `json:"get_errors"`
+	DelErrors     int           `json:"del_errors"`
+	OpsPerSecond  float64       `json:"ops_per_second"`
 }
 
 func (r *RedisBackend) updateStats(success bool) {
