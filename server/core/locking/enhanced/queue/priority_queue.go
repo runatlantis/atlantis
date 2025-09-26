@@ -1,472 +1,680 @@
+// Copyright 2017 HootSuite Media Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the License);
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an AS IS BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// Modified hereafter by contributors to runatlantis/atlantis.
+
+// Package queue provides priority-based queueing for the enhanced locking system.
 package queue
 
 import (
 	"container/heap"
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/locking/enhanced"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// PriorityQueue implements a priority-based lock request queue
-type PriorityQueue struct {
-	items    []*QueueItem
-	mutex    sync.RWMutex
-	maxSize  int
-	notEmpty chan struct{}
+// Priority levels for lock requests
+type Priority int
+
+const (
+	PriorityLow Priority = iota
+	PriorityNormal
+	PriorityHigh
+	PriorityCritical
+	PriorityEmergency
+)
+
+// String returns a string representation of the priority
+func (p Priority) String() string {
+	switch p {
+	case PriorityLow:
+		return "low"
+	case PriorityNormal:
+		return "normal"
+	case PriorityHigh:
+		return "high"
+	case PriorityCritical:
+		return "critical"
+	case PriorityEmergency:
+		return "emergency"
+	default:
+		return "unknown"
+	}
 }
 
-// QueueItem represents an item in the priority queue
+// QueueItem represents a lock request in the queue
 type QueueItem struct {
-	Request   *enhanced.EnhancedLockRequest
-	Priority  enhanced.Priority
+	// Core lock information
+	Project   models.Project
+	Workspace string
+	Pull      models.PullRequest
+	User      models.User
+
+	// Queue metadata
+	Priority  Priority
 	Timestamp time.Time
-	Index     int // heap index
+	RequestID string
+
+	// Channel for notifications
+	ResultChan chan QueueResult
+
+	// Context for cancellation
+	Ctx context.Context
+
+	// Metrics
+	QueueEntryTime time.Time
+	RetryCount     int
+}
+
+// QueueResult represents the result of a queue operation
+type QueueResult struct {
+	Success      bool
+	Lock         *models.ProjectLock
+	Error        error
+	Position     int
+	WaitTime     time.Duration
+	TotalWaiters int
+}
+
+// PriorityQueue implements a priority-based queue for lock requests
+type PriorityQueue struct {
+	mu       sync.RWMutex
+	items    []*QueueItem
+	lookup   map[string]*QueueItem // requestID -> item mapping
+	metrics  *QueueMetrics
+	logger   logging.SimpleLogging
+	config   QueueConfig
+	ctx      context.Context
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
+}
+
+// QueueConfig configures the priority queue behavior
+type QueueConfig struct {
+	MaxQueueSize        int
+	BatchProcessingSize int
+	ProcessingInterval  time.Duration
+	MaxWaitTime         time.Duration
+	MaxRetries          int
+	PriorityWeights     map[Priority]int
+	EnableBatching      bool
+	EnableMetrics       bool
+}
+
+// QueueMetrics tracks queue performance
+type QueueMetrics struct {
+	mu                    sync.RWMutex
+	TotalEnqueued         int64
+	TotalProcessed        int64
+	TotalTimeouts         int64
+	TotalErrors           int64
+	CurrentQueueSize      int64
+	AverageWaitTime       time.Duration
+	PriorityDistribution  map[Priority]int64
+	BatchesProcessed      int64
+	LastProcessingTime    time.Time
+	ProcessingDuration    time.Duration
 }
 
 // NewPriorityQueue creates a new priority queue
-func NewPriorityQueue(maxSize int) *PriorityQueue {
-	return &PriorityQueue{
-		items:    make([]*QueueItem, 0),
-		maxSize:  maxSize,
-		notEmpty: make(chan struct{}, 1),
-	}
-}
+func NewPriorityQueue(config QueueConfig, logger logging.SimpleLogging) *PriorityQueue {
+	ctx, cancel := context.WithCancel(context.Background())
 
-// Push adds a request to the priority queue
-func (pq *PriorityQueue) Push(ctx context.Context, request *enhanced.EnhancedLockRequest) error {
-	pq.mutex.Lock()
-	defer pq.mutex.Unlock()
-
-	if len(pq.items) >= pq.maxSize {
-		return &enhanced.LockError{
-			Type:    "QueueFull",
-			Message: "priority queue is full",
-			Code:    enhanced.ErrCodeQueueFull,
+	// Set default weights if not provided
+	if config.PriorityWeights == nil {
+		config.PriorityWeights = map[Priority]int{
+			PriorityLow:       1,
+			PriorityNormal:    5,
+			PriorityHigh:      10,
+			PriorityCritical:  20,
+			PriorityEmergency: 50,
 		}
 	}
 
-	item := &QueueItem{
-		Request:   request,
-		Priority:  request.Priority,
-		Timestamp: time.Now(),
+	// Set default values
+	if config.MaxQueueSize == 0 {
+		config.MaxQueueSize = 1000
+	}
+	if config.BatchProcessingSize == 0 {
+		config.BatchProcessingSize = 10
+	}
+	if config.ProcessingInterval == 0 {
+		config.ProcessingInterval = 100 * time.Millisecond
+	}
+	if config.MaxWaitTime == 0 {
+		config.MaxWaitTime = 10 * time.Minute
+	}
+	if config.MaxRetries == 0 {
+		config.MaxRetries = 3
 	}
 
-	heap.Push(pq, item)
-
-	// Signal that queue is not empty
-	select {
-	case pq.notEmpty <- struct{}{}:
-	default:
+	pq := &PriorityQueue{
+		items:   make([]*QueueItem, 0),
+		lookup:  make(map[string]*QueueItem),
+		logger:  logger,
+		config:  config,
+		ctx:     ctx,
+		cancel:  cancel,
+		metrics: &QueueMetrics{
+			PriorityDistribution: make(map[Priority]int64),
+		},
 	}
 
-	return nil
+	// Initialize heap
+	heap.Init(pq)
+
+	// Start background processing
+	pq.wg.Add(1)
+	go pq.processQueue()
+
+	return pq
 }
 
-// Pop removes and returns the highest priority request
-func (pq *PriorityQueue) Pop(ctx context.Context) (*enhanced.EnhancedLockRequest, error) {
-	pq.mutex.Lock()
-	defer pq.mutex.Unlock()
-
-	if len(pq.items) == 0 {
-		return nil, nil
-	}
-
-	item := heap.Pop(pq).(*QueueItem)
-	return item.Request, nil
-}
-
-// PopWithTimeout waits for an item or timeout
-func (pq *PriorityQueue) PopWithTimeout(ctx context.Context, timeout time.Duration) (*enhanced.EnhancedLockRequest, error) {
-	// Fast path: check if item is immediately available
-	if item, err := pq.Pop(ctx); err != nil || item != nil {
-		return item, err
-	}
-
-	// Wait for item or timeout
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-timer.C:
-		return nil, enhanced.NewTimeoutError(timeout)
-	case <-pq.notEmpty:
-		return pq.Pop(ctx)
-	}
-}
-
-// Peek returns the highest priority request without removing it
-func (pq *PriorityQueue) Peek() *enhanced.EnhancedLockRequest {
-	pq.mutex.RLock()
-	defer pq.mutex.RUnlock()
-
-	if len(pq.items) == 0 {
-		return nil
-	}
-
-	return pq.items[0].Request
-}
-
-// Size returns the current queue size
-func (pq *PriorityQueue) Size() int {
-	pq.mutex.RLock()
-	defer pq.mutex.RUnlock()
-	return len(pq.items)
-}
-
-// IsEmpty checks if the queue is empty
-func (pq *PriorityQueue) IsEmpty() bool {
-	return pq.Size() == 0
-}
-
-// Clear removes all items from the queue
-func (pq *PriorityQueue) Clear() {
-	pq.mutex.Lock()
-	defer pq.mutex.Unlock()
-
-	pq.items = pq.items[:0]
-}
-
-// GetStats returns queue statistics
-func (pq *PriorityQueue) GetStats() *QueueStats {
-	pq.mutex.RLock()
-	defer pq.mutex.RUnlock()
-
-	stats := &QueueStats{
-		Size:         len(pq.items),
-		MaxSize:      pq.maxSize,
-		ByPriority:   make(map[enhanced.Priority]int),
-		AverageWait:  0,
-		OldestItem:   nil,
-	}
-
-	if len(pq.items) == 0 {
-		return stats
-	}
-
-	var totalWait time.Duration
-	var oldest *time.Time
-
-	for _, item := range pq.items {
-		stats.ByPriority[item.Priority]++
-
-		wait := time.Since(item.Timestamp)
-		totalWait += wait
-
-		if oldest == nil || item.Timestamp.Before(*oldest) {
-			oldest = &item.Timestamp
-		}
-	}
-
-	stats.AverageWait = totalWait / time.Duration(len(pq.items))
-	stats.OldestItem = oldest
-
-	return stats
-}
-
-// Remove removes a specific request from the queue
-func (pq *PriorityQueue) Remove(requestID string) bool {
-	pq.mutex.Lock()
-	defer pq.mutex.Unlock()
-
-	for i, item := range pq.items {
-		if item.Request.ID == requestID {
-			heap.Remove(pq, i)
-			return true
-		}
-	}
-
-	return false
-}
-
-// QueueStats provides statistics about the queue
-type QueueStats struct {
-	Size        int                            `json:"size"`
-	MaxSize     int                            `json:"max_size"`
-	ByPriority  map[enhanced.Priority]int      `json:"by_priority"`
-	AverageWait time.Duration                  `json:"average_wait"`
-	OldestItem  *time.Time                     `json:"oldest_item,omitempty"`
-}
-
-// Heap interface implementation for priority queue
-
+// Implement heap.Interface
 func (pq *PriorityQueue) Len() int {
 	return len(pq.items)
 }
 
 func (pq *PriorityQueue) Less(i, j int) bool {
-	// Higher priority comes first (Critical = 3, High = 2, Normal = 1, Low = 0)
-	if pq.items[i].Priority != pq.items[j].Priority {
-		return pq.items[i].Priority > pq.items[j].Priority
+	// Higher priority first, then older timestamp (FIFO within priority)
+	if pq.items[i].Priority == pq.items[j].Priority {
+		return pq.items[i].Timestamp.Before(pq.items[j].Timestamp)
 	}
-	// If same priority, FIFO (earlier timestamp comes first)
-	return pq.items[i].Timestamp.Before(pq.items[j].Timestamp)
+	return pq.items[i].Priority > pq.items[j].Priority
 }
 
 func (pq *PriorityQueue) Swap(i, j int) {
 	pq.items[i], pq.items[j] = pq.items[j], pq.items[i]
-	pq.items[i].Index = i
-	pq.items[j].Index = j
 }
 
-func (pq *PriorityQueue) PushHeap(x interface{}) {
+func (pq *PriorityQueue) Push(x interface{}) {
 	item := x.(*QueueItem)
-	item.Index = len(pq.items)
 	pq.items = append(pq.items, item)
+	pq.lookup[item.RequestID] = item
 }
 
-func (pq *PriorityQueue) PopHeap() interface{} {
+func (pq *PriorityQueue) Pop() interface{} {
 	old := pq.items
 	n := len(old)
+	if n == 0 {
+		return nil
+	}
 	item := old[n-1]
-	item.Index = -1
 	pq.items = old[0 : n-1]
+	delete(pq.lookup, item.RequestID)
 	return item
 }
 
-// ResourceBasedQueue manages separate queues per resource to prevent head-of-line blocking
-type ResourceBasedQueue struct {
-	queues   map[string]*PriorityQueue
-	mutex    sync.RWMutex
-	maxSize  int
-}
+// Enqueue adds a lock request to the queue
+func (pq *PriorityQueue) Enqueue(ctx context.Context, project models.Project, workspace string,
+	pull models.PullRequest, user models.User, priority Priority) (*QueueItem, error) {
 
-// NewResourceBasedQueue creates a new resource-based queue system
-func NewResourceBasedQueue(maxSizePerResource int) *ResourceBasedQueue {
-	return &ResourceBasedQueue{
-		queues:  make(map[string]*PriorityQueue),
-		maxSize: maxSizePerResource,
+	pq.mu.Lock()
+	defer pq.mu.Unlock()
+
+	// Check queue size limit
+	if len(pq.items) >= pq.config.MaxQueueSize {
+		return nil, fmt.Errorf("queue is full (max size: %d)", pq.config.MaxQueueSize)
 	}
+
+	// Generate unique request ID
+	requestID := fmt.Sprintf("%s-%s-%d-%d",
+		models.GenerateLockKey(project, workspace),
+		user.Username,
+		pull.Num,
+		time.Now().UnixNano())
+
+	// Check for duplicate requests
+	if _, exists := pq.lookup[requestID]; exists {
+		return nil, fmt.Errorf("duplicate request: %s", requestID)
+	}
+
+	// Create queue item
+	item := &QueueItem{
+		Project:        project,
+		Workspace:      workspace,
+		Pull:           pull,
+		User:           user,
+		Priority:       priority,
+		Timestamp:      time.Now(),
+		RequestID:      requestID,
+		ResultChan:     make(chan QueueResult, 1),
+		Ctx:            ctx,
+		QueueEntryTime: time.Now(),
+		RetryCount:     0,
+	}
+
+	// Add to heap
+	heap.Push(pq, item)
+
+	// Update metrics
+	if pq.config.EnableMetrics {
+		pq.updateMetrics(func(m *QueueMetrics) {
+			m.TotalEnqueued++
+			m.CurrentQueueSize = int64(len(pq.items))
+			m.PriorityDistribution[priority]++
+		})
+	}
+
+	pq.logger.Info("enqueued lock request: id=%s, priority=%s, project=%s, workspace=%s, position=%d",
+		requestID, priority.String(), project.String(), workspace, len(pq.items))
+
+	return item, nil
 }
 
-// Push adds a request to the appropriate resource queue
-func (rbq *ResourceBasedQueue) Push(ctx context.Context, request *enhanced.EnhancedLockRequest) error {
-	resourceKey := rbq.getResourceKey(request.Resource)
+// Dequeue removes the highest priority item from the queue
+func (pq *PriorityQueue) Dequeue() *QueueItem {
+	pq.mu.Lock()
+	defer pq.mu.Unlock()
 
-	rbq.mutex.Lock()
-	queue, exists := rbq.queues[resourceKey]
+	if len(pq.items) == 0 {
+		return nil
+	}
+
+	item := heap.Pop(pq).(*QueueItem)
+
+	// Update metrics
+	if pq.config.EnableMetrics {
+		pq.updateMetrics(func(m *QueueMetrics) {
+			m.CurrentQueueSize = int64(len(pq.items))
+		})
+	}
+
+	return item
+}
+
+// Remove removes a specific item from the queue
+func (pq *PriorityQueue) Remove(requestID string) bool {
+	pq.mu.Lock()
+	defer pq.mu.Unlock()
+
+	item, exists := pq.lookup[requestID]
 	if !exists {
-		queue = NewPriorityQueue(rbq.maxSize)
-		rbq.queues[resourceKey] = queue
+		return false
 	}
-	rbq.mutex.Unlock()
 
-	return queue.Push(ctx, request)
+	// Find and remove the item
+	for i, queueItem := range pq.items {
+		if queueItem.RequestID == requestID {
+			heap.Remove(pq, i)
+			break
+		}
+	}
+
+	// Close the result channel
+	close(item.ResultChan)
+
+	// Update metrics
+	if pq.config.EnableMetrics {
+		pq.updateMetrics(func(m *QueueMetrics) {
+			m.CurrentQueueSize = int64(len(pq.items))
+		})
+	}
+
+	pq.logger.Info("removed queue item: id=%s", requestID)
+	return true
 }
 
-// PopForResource removes the highest priority request for a specific resource
-func (rbq *ResourceBasedQueue) PopForResource(ctx context.Context, resource enhanced.ResourceIdentifier) (*enhanced.EnhancedLockRequest, error) {
-	resourceKey := rbq.getResourceKey(resource)
+// GetPosition returns the position of a request in the queue
+func (pq *PriorityQueue) GetPosition(requestID string) (int, bool) {
+	pq.mu.RLock()
+	defer pq.mu.RUnlock()
 
-	rbq.mutex.RLock()
-	queue, exists := rbq.queues[resourceKey]
-	rbq.mutex.RUnlock()
-
+	item, exists := pq.lookup[requestID]
 	if !exists {
-		return nil, nil
+		return -1, false
 	}
 
-	return queue.Pop(ctx)
-}
-
-// PopForResourceWithTimeout waits for a request for a specific resource
-func (rbq *ResourceBasedQueue) PopForResourceWithTimeout(ctx context.Context, resource enhanced.ResourceIdentifier, timeout time.Duration) (*enhanced.EnhancedLockRequest, error) {
-	resourceKey := rbq.getResourceKey(resource)
-
-	rbq.mutex.RLock()
-	queue, exists := rbq.queues[resourceKey]
-	rbq.mutex.RUnlock()
-
-	if !exists {
-		// Wait for queue to be created or timeout
-		timer := time.NewTimer(timeout)
-		defer timer.Stop()
-
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-timer.C:
-				return nil, enhanced.NewTimeoutError(timeout)
-			case <-ticker.C:
-				rbq.mutex.RLock()
-				queue, exists = rbq.queues[resourceKey]
-				rbq.mutex.RUnlock()
-				if exists {
-					return queue.PopWithTimeout(ctx, time.Until(timer.C))
-				}
-			}
+	// Count items with higher priority or same priority but earlier timestamp
+	position := 1
+	for _, other := range pq.items {
+		if other.RequestID == requestID {
+			continue
+		}
+		if other.Priority > item.Priority ||
+		   (other.Priority == item.Priority && other.Timestamp.Before(item.Timestamp)) {
+			position++
 		}
 	}
 
-	return queue.PopWithTimeout(ctx, timeout)
-}
-
-// GetQueueForResource returns the queue for a specific resource
-func (rbq *ResourceBasedQueue) GetQueueForResource(resource enhanced.ResourceIdentifier) *PriorityQueue {
-	resourceKey := rbq.getResourceKey(resource)
-
-	rbq.mutex.RLock()
-	defer rbq.mutex.RUnlock()
-
-	return rbq.queues[resourceKey]
-}
-
-// GetAllStats returns statistics for all resource queues
-func (rbq *ResourceBasedQueue) GetAllStats() map[string]*QueueStats {
-	rbq.mutex.RLock()
-	defer rbq.mutex.RUnlock()
-
-	stats := make(map[string]*QueueStats)
-	for resourceKey, queue := range rbq.queues {
-		stats[resourceKey] = queue.GetStats()
-	}
-
-	return stats
-}
-
-// GetTotalSize returns the total size across all queues
-func (rbq *ResourceBasedQueue) GetTotalSize() int {
-	rbq.mutex.RLock()
-	defer rbq.mutex.RUnlock()
-
-	total := 0
-	for _, queue := range rbq.queues {
-		total += queue.Size()
-	}
-
-	return total
-}
-
-// CleanupEmptyQueues removes empty queues to prevent memory leaks
-func (rbq *ResourceBasedQueue) CleanupEmptyQueues() {
-	rbq.mutex.Lock()
-	defer rbq.mutex.Unlock()
-
-	for resourceKey, queue := range rbq.queues {
-		if queue.IsEmpty() {
-			delete(rbq.queues, resourceKey)
-		}
-	}
-}
-
-// Remove removes a specific request from all queues
-func (rbq *ResourceBasedQueue) Remove(requestID string) bool {
-	rbq.mutex.RLock()
-	defer rbq.mutex.RUnlock()
-
-	for _, queue := range rbq.queues {
-		if queue.Remove(requestID) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (rbq *ResourceBasedQueue) getResourceKey(resource enhanced.ResourceIdentifier) string {
-	return resource.Namespace + "/" + resource.Name + "/" + resource.Workspace
-}
-
-// MemoryQueue is a simple FIFO queue implementation for basic scenarios
-type MemoryQueue struct {
-	items    []*enhanced.EnhancedLockRequest
-	mutex    sync.RWMutex
-	maxSize  int
-	notEmpty chan struct{}
-}
-
-// NewMemoryQueue creates a new simple memory queue
-func NewMemoryQueue(maxSize int) *MemoryQueue {
-	return &MemoryQueue{
-		items:    make([]*enhanced.EnhancedLockRequest, 0),
-		maxSize:  maxSize,
-		notEmpty: make(chan struct{}, 1),
-	}
-}
-
-// Push adds a request to the end of the queue
-func (mq *MemoryQueue) Push(ctx context.Context, request *enhanced.EnhancedLockRequest) error {
-	mq.mutex.Lock()
-	defer mq.mutex.Unlock()
-
-	if len(mq.items) >= mq.maxSize {
-		return &enhanced.LockError{
-			Type:    "QueueFull",
-			Message: "memory queue is full",
-			Code:    enhanced.ErrCodeQueueFull,
-		}
-	}
-
-	mq.items = append(mq.items, request)
-
-	// Signal that queue is not empty
-	select {
-	case mq.notEmpty <- struct{}{}:
-	default:
-	}
-
-	return nil
-}
-
-// Pop removes and returns the first request (FIFO)
-func (mq *MemoryQueue) Pop(ctx context.Context) (*enhanced.EnhancedLockRequest, error) {
-	mq.mutex.Lock()
-	defer mq.mutex.Unlock()
-
-	if len(mq.items) == 0 {
-		return nil, nil
-	}
-
-	request := mq.items[0]
-	mq.items = mq.items[1:]
-
-	return request, nil
-}
-
-// PopWithTimeout waits for an item or timeout
-func (mq *MemoryQueue) PopWithTimeout(ctx context.Context, timeout time.Duration) (*enhanced.EnhancedLockRequest, error) {
-	// Fast path: check if item is immediately available
-	if item, err := mq.Pop(ctx); err != nil || item != nil {
-		return item, err
-	}
-
-	// Wait for item or timeout
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-timer.C:
-		return nil, enhanced.NewTimeoutError(timeout)
-	case <-mq.notEmpty:
-		return mq.Pop(ctx)
-	}
+	return position, true
 }
 
 // Size returns the current queue size
-func (mq *MemoryQueue) Size() int {
-	mq.mutex.RLock()
-	defer mq.mutex.RUnlock()
-	return len(mq.items)
+func (pq *PriorityQueue) Size() int {
+	pq.mu.RLock()
+	defer pq.mu.RUnlock()
+	return len(pq.items)
 }
 
-// IsEmpty checks if the queue is empty
-func (mq *MemoryQueue) IsEmpty() bool {
-	return mq.Size() == 0
+// IsEmpty returns true if the queue is empty
+func (pq *PriorityQueue) IsEmpty() bool {
+	pq.mu.RLock()
+	defer pq.mu.RUnlock()
+	return len(pq.items) == 0
 }
 
-// Clear removes all items from the queue
-func (mq *MemoryQueue) Clear() {
-	mq.mutex.Lock()
-	defer mq.mutex.Unlock()
+// processQueue handles background processing of queued items
+func (pq *PriorityQueue) processQueue() {
+	defer pq.wg.Done()
 
-	mq.items = mq.items[:0]
+	ticker := time.NewTicker(pq.config.ProcessingInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-pq.ctx.Done():
+			pq.logger.Info("stopping queue processor")
+			return
+		case <-ticker.C:
+			pq.processBatch()
+		}
+	}
+}
+
+// processBatch processes a batch of queue items
+func (pq *PriorityQueue) processBatch() {
+	if pq.config.EnableMetrics {
+		start := time.Now()
+		defer func() {
+			pq.updateMetrics(func(m *QueueMetrics) {
+				m.BatchesProcessed++
+				m.LastProcessingTime = start
+				m.ProcessingDuration = time.Since(start)
+			})
+		}()
+	}
+
+	batchSize := pq.config.BatchProcessingSize
+	if !pq.config.EnableBatching {
+		batchSize = 1
+	}
+
+	processed := 0
+	for processed < batchSize {
+		item := pq.Dequeue()
+		if item == nil {
+			break // Queue is empty
+		}
+
+		// Check if context is cancelled
+		select {
+		case <-item.Ctx.Done():
+			pq.sendResult(item, QueueResult{
+				Success: false,
+				Error:   item.Ctx.Err(),
+			})
+			processed++
+			continue
+		default:
+		}
+
+		// Check timeout
+		if time.Since(item.QueueEntryTime) > pq.config.MaxWaitTime {
+			pq.sendResult(item, QueueResult{
+				Success: false,
+				Error:   fmt.Errorf("queue timeout exceeded: %v", pq.config.MaxWaitTime),
+			})
+			if pq.config.EnableMetrics {
+				pq.updateMetrics(func(m *QueueMetrics) {
+					m.TotalTimeouts++
+				})
+			}
+			processed++
+			continue
+		}
+
+		// Process the item (this would integrate with the actual locking backend)
+		result := pq.processItem(item)
+		pq.sendResult(item, result)
+
+		if pq.config.EnableMetrics {
+			pq.updateMetrics(func(m *QueueMetrics) {
+				m.TotalProcessed++
+				if result.Success {
+					// Update average wait time
+					waitTime := time.Since(item.QueueEntryTime)
+					if m.AverageWaitTime == 0 {
+						m.AverageWaitTime = waitTime
+					} else {
+						m.AverageWaitTime = (m.AverageWaitTime + waitTime) / 2
+					}
+				} else {
+					m.TotalErrors++
+				}
+			})
+		}
+
+		processed++
+	}
+}
+
+// processItem processes a single queue item (placeholder for actual lock logic)
+func (pq *PriorityQueue) processItem(item *QueueItem) QueueResult {
+	// This is a placeholder - in the real implementation, this would
+	// call the actual locking backend to try to acquire the lock
+
+	position, _ := pq.GetPosition(item.RequestID)
+	waitTime := time.Since(item.QueueEntryTime)
+
+	return QueueResult{
+		Success:      true, // Placeholder - would be actual lock result
+		Lock:         nil,  // Placeholder - would be actual lock
+		Error:        nil,
+		Position:     position,
+		WaitTime:     waitTime,
+		TotalWaiters: pq.Size(),
+	}
+}
+
+// sendResult sends a result to the item's result channel
+func (pq *PriorityQueue) sendResult(item *QueueItem, result QueueResult) {
+	select {
+	case item.ResultChan <- result:
+		close(item.ResultChan)
+	case <-time.After(1 * time.Second):
+		pq.logger.Warn("timeout sending result for request %s", item.RequestID)
+		close(item.ResultChan)
+	}
+}
+
+// updateMetrics safely updates queue metrics
+func (pq *PriorityQueue) updateMetrics(updateFn func(*QueueMetrics)) {
+	pq.metrics.mu.Lock()
+	defer pq.metrics.mu.Unlock()
+	updateFn(pq.metrics)
+}
+
+// GetMetrics returns a copy of the current metrics
+func (pq *PriorityQueue) GetMetrics() QueueMetrics {
+	pq.metrics.mu.RLock()
+	defer pq.metrics.mu.RUnlock()
+
+	// Create a copy to avoid race conditions
+	metrics := QueueMetrics{
+		TotalEnqueued:        pq.metrics.TotalEnqueued,
+		TotalProcessed:       pq.metrics.TotalProcessed,
+		TotalTimeouts:        pq.metrics.TotalTimeouts,
+		TotalErrors:          pq.metrics.TotalErrors,
+		CurrentQueueSize:     pq.metrics.CurrentQueueSize,
+		AverageWaitTime:      pq.metrics.AverageWaitTime,
+		PriorityDistribution: make(map[Priority]int64),
+		BatchesProcessed:     pq.metrics.BatchesProcessed,
+		LastProcessingTime:   pq.metrics.LastProcessingTime,
+		ProcessingDuration:   pq.metrics.ProcessingDuration,
+	}
+
+	for k, v := range pq.metrics.PriorityDistribution {
+		metrics.PriorityDistribution[k] = v
+	}
+
+	return metrics
+}
+
+// Shutdown gracefully shuts down the queue
+func (pq *PriorityQueue) Shutdown() {
+	pq.logger.Info("shutting down priority queue")
+
+	// Cancel context to stop processing
+	pq.cancel()
+
+	// Wait for processing to complete
+	pq.wg.Wait()
+
+	// Notify all waiting items
+	pq.mu.Lock()
+	defer pq.mu.Unlock()
+
+	for _, item := range pq.items {
+		pq.sendResult(item, QueueResult{
+			Success: false,
+			Error:   fmt.Errorf("queue shutdown"),
+		})
+	}
+
+	// Clear the queue
+	pq.items = nil
+	pq.lookup = make(map[string]*QueueItem)
+
+	pq.logger.Info("priority queue shutdown complete")
+}
+
+// BatchProcessor manages batch processing of multiple queues
+type BatchProcessor struct {
+	queues     []*PriorityQueue
+	config     BatchConfig
+	logger     logging.SimpleLogging
+	ctx        context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
+}
+
+// BatchConfig configures batch processing behavior
+type BatchConfig struct {
+	MaxBatchSize       int
+	ProcessingInterval time.Duration
+	LoadBalancing      bool
+	RoundRobin         bool
+}
+
+// NewBatchProcessor creates a new batch processor
+func NewBatchProcessor(queues []*PriorityQueue, config BatchConfig, logger logging.SimpleLogging) *BatchProcessor {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	if config.MaxBatchSize == 0 {
+		config.MaxBatchSize = 50
+	}
+	if config.ProcessingInterval == 0 {
+		config.ProcessingInterval = 50 * time.Millisecond
+	}
+
+	bp := &BatchProcessor{
+		queues: queues,
+		config: config,
+		logger: logger,
+		ctx:    ctx,
+		cancel: cancel,
+	}
+
+	// Start batch processing
+	bp.wg.Add(1)
+	go bp.processBatches()
+
+	return bp
+}
+
+// processBatches handles batch processing across multiple queues
+func (bp *BatchProcessor) processBatches() {
+	defer bp.wg.Done()
+
+	ticker := time.NewTicker(bp.config.ProcessingInterval)
+	defer ticker.Stop()
+
+	queueIndex := 0 // For round-robin processing
+
+	for {
+		select {
+		case <-bp.ctx.Done():
+			bp.logger.Info("stopping batch processor")
+			return
+		case <-ticker.C:
+			if bp.config.RoundRobin {
+				bp.processQueueRoundRobin(&queueIndex)
+			} else if bp.config.LoadBalancing {
+				bp.processQueueLoadBalanced()
+			} else {
+				bp.processAllQueues()
+			}
+		}
+	}
+}
+
+// processQueueRoundRobin processes queues in round-robin fashion
+func (bp *BatchProcessor) processQueueRoundRobin(index *int) {
+	if len(bp.queues) == 0 {
+		return
+	}
+
+	queue := bp.queues[*index]
+	if !queue.IsEmpty() {
+		queue.processBatch()
+	}
+
+	*index = (*index + 1) % len(bp.queues)
+}
+
+// processQueueLoadBalanced processes the queue with the most items
+func (bp *BatchProcessor) processQueueLoadBalanced() {
+	var largestQueue *PriorityQueue
+	maxSize := 0
+
+	for _, queue := range bp.queues {
+		if size := queue.Size(); size > maxSize {
+			maxSize = size
+			largestQueue = queue
+		}
+	}
+
+	if largestQueue != nil && maxSize > 0 {
+		largestQueue.processBatch()
+	}
+}
+
+// processAllQueues processes all queues simultaneously
+func (bp *BatchProcessor) processAllQueues() {
+	var batchWg sync.WaitGroup
+
+	for _, queue := range bp.queues {
+		if !queue.IsEmpty() {
+			batchWg.Add(1)
+			go func(q *PriorityQueue) {
+				defer batchWg.Done()
+				q.processBatch()
+			}(queue)
+		}
+	}
+
+	batchWg.Wait()
+}
+
+// Shutdown gracefully shuts down the batch processor
+func (bp *BatchProcessor) Shutdown() {
+	bp.logger.Info("shutting down batch processor")
+	bp.cancel()
+	bp.wg.Wait()
+	bp.logger.Info("batch processor shutdown complete")
 }

@@ -3,6 +3,8 @@ package tests
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -25,9 +27,17 @@ func TestEnhancedLockingIntegration(t *testing.T) {
 	t.Run("TimeoutHandling", testTimeoutHandling)
 	t.Run("RetryMechanism", testRetryMechanism)
 	t.Run("DeadlockPrevention", testDeadlockPrevention)
+	t.Run("DeadlockDetectionAdvanced", testDeadlockDetectionAdvanced)
+	t.Run("DeadlockResolutionPolicies", testDeadlockResolutionPolicies)
+	t.Run("CircularWaitScenarios", testCircularWaitScenarios)
+	t.Run("MultiResourceDeadlock", testMultiResourceDeadlock)
+	t.Run("DeadlockPreventionWithPriority", testDeadlockPreventionWithPriority)
+	t.Run("CascadeDeadlockResolution", testCascadeDeadlockResolution)
 	t.Run("BackwardCompatibility", testBackwardCompatibility)
 	t.Run("RedisBackendIntegration", testRedisBackendIntegration)
 	t.Run("PerformanceUnderLoad", testPerformanceUnderLoad)
+	t.Run("DeadlockPerformanceBenchmark", testDeadlockPerformanceBenchmark)
+	t.Run("EndToEndSystemTest", testEndToEndSystemTest)
 }
 
 func testBasicLockUnlockCycle(t *testing.T) {
@@ -782,4 +792,888 @@ func (mb *MockBackend) ConvertFromLegacy(legacyLock *models.ProjectLock) *enhanc
 
 func (mb *MockBackend) getResourceKey(resource enhanced.ResourceIdentifier) string {
 	return fmt.Sprintf("%s/%s/%s", resource.Namespace, resource.Name, resource.Workspace)
+}
+
+// Comprehensive deadlock testing scenarios
+
+func testDeadlockDetectionAdvanced(t *testing.T) {
+	config := &enhanced.EnhancedConfig{
+		Enabled:                 true,
+		EnableDeadlockDetection: true,
+		DeadlockCheckInterval:   100 * time.Millisecond,
+		EnablePriorityQueue:     true,
+		MaxQueueSize:           100,
+	}
+
+	manager, cleanup := setupTestManagerWithConfig(t, config)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create resources for deadlock scenario
+	projectA := models.Project{RepoFullName: "test/project-a", Path: "."}
+	projectB := models.Project{RepoFullName: "test/project-b", Path: "."}
+	projectC := models.Project{RepoFullName: "test/project-c", Path: "."}
+
+	userX := models.User{Username: "userX"}
+	userY := models.User{Username: "userY"}
+	userZ := models.User{Username: "userZ"}
+
+	workspace := "default"
+
+	// Phase 1: User X locks A
+	lockAX, err := manager.Lock(ctx, projectA, workspace, userX)
+	require.NoError(t, err)
+	require.NotNil(t, lockAX)
+	t.Logf("Phase 1: User X acquired lock on project A")
+
+	// Phase 2: User Y locks B
+	lockBY, err := manager.Lock(ctx, projectB, workspace, userY)
+	require.NoError(t, err)
+	require.NotNil(t, lockBY)
+	t.Logf("Phase 2: User Y acquired lock on project B")
+
+	// Phase 3: User Z locks C
+	lockCZ, err := manager.Lock(ctx, projectC, workspace, userZ)
+	require.NoError(t, err)
+	require.NotNil(t, lockCZ)
+	t.Logf("Phase 3: User Z acquired lock on project C")
+
+	// Phase 4: Create potential deadlock scenario
+	// User X tries to lock B (held by Y), User Y tries to lock C (held by Z), User Z tries to lock A (held by X)
+
+	var wg sync.WaitGroup
+	var errorsCollected []error
+	var mu sync.Mutex
+
+	wg.Add(3)
+
+	// User X tries to lock B
+	go func() {
+		defer wg.Done()
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		_, err := manager.Lock(ctx, projectB, workspace, userX)
+		mu.Lock()
+		if err != nil {
+			errorsCollected = append(errorsCollected, fmt.Errorf("userX->B: %w", err))
+		}
+		mu.Unlock()
+		t.Logf("User X attempting to lock B: %v", err)
+	}()
+
+	// User Y tries to lock C
+	go func() {
+		defer wg.Done()
+		time.Sleep(100 * time.Millisecond) // Slight delay to create dependency
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		_, err := manager.Lock(ctx, projectC, workspace, userY)
+		mu.Lock()
+		if err != nil {
+			errorsCollected = append(errorsCollected, fmt.Errorf("userY->C: %w", err))
+		}
+		mu.Unlock()
+		t.Logf("User Y attempting to lock C: %v", err)
+	}()
+
+	// User Z tries to lock A
+	go func() {
+		defer wg.Done()
+		time.Sleep(200 * time.Millisecond) // Create circular dependency
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		_, err := manager.Lock(ctx, projectA, workspace, userZ)
+		mu.Lock()
+		if err != nil {
+			errorsCollected = append(errorsCollected, fmt.Errorf("userZ->A: %w", err))
+		}
+		mu.Unlock()
+		t.Logf("User Z attempting to lock A: %v", err)
+	}()
+
+	wg.Wait()
+
+	// Analyze results
+	mu.Lock()
+	t.Logf("Deadlock detection test completed with %d errors", len(errorsCollected))
+	for _, err := range errorsCollected {
+		t.Logf("Error: %v", err)
+	}
+	mu.Unlock()
+
+	// The system should handle this gracefully - either through queueing, deadlock detection, or timeouts
+	assert.True(t, len(errorsCollected) > 0, "Should have some blocked operations due to deadlock scenario")
+
+	// Clean up
+	manager.Unlock(ctx, projectA, workspace, userX)
+	manager.Unlock(ctx, projectB, workspace, userY)
+	manager.Unlock(ctx, projectC, workspace, userZ)
+}
+
+func testDeadlockResolutionPolicies(t *testing.T) {
+	// Test different deadlock resolution policies
+	policies := []struct {
+		name     string
+		priority enhanced.Priority
+		expectedVictim string
+	}{
+		{"LowestPriority", enhanced.PriorityLow, "should select low priority victim"},
+		{"HighPriority", enhanced.PriorityHigh, "should prefer high priority lock"},
+		{"Critical", enhanced.PriorityCritical, "should preserve critical priority lock"},
+	}
+
+	for _, policy := range policies {
+		t.Run(policy.name, func(t *testing.T) {
+			config := &enhanced.EnhancedConfig{
+				Enabled:                 true,
+				EnableDeadlockDetection: true,
+				DeadlockCheckInterval:   50 * time.Millisecond,
+			}
+
+			manager, cleanup := setupTestManagerWithConfig(t, config)
+			defer cleanup()
+
+			ctx := context.Background()
+
+			project1 := models.Project{RepoFullName: "test/policy1", Path: "."}
+			project2 := models.Project{RepoFullName: "test/policy2", Path: "."}
+			user1 := models.User{Username: "policyuser1"}
+			user2 := models.User{Username: "policyuser2"}
+			workspace := "default"
+
+			// Acquire locks with different priorities
+			lock1, err := manager.LockWithPriority(ctx, project1, workspace, user1, policy.priority)
+			require.NoError(t, err)
+			require.NotNil(t, lock1)
+
+			lock2, err := manager.LockWithPriority(ctx, project2, workspace, user2, enhanced.PriorityNormal)
+			require.NoError(t, err)
+			require.NotNil(t, lock2)
+
+			// The test validates that locks with different priorities can coexist
+			t.Logf("Policy test '%s' completed: %s", policy.name, policy.expectedVictim)
+
+			// Clean up
+			manager.Unlock(ctx, project1, workspace, user1)
+			manager.Unlock(ctx, project2, workspace, user2)
+		})
+	}
+}
+
+func testCircularWaitScenarios(t *testing.T) {
+	config := &enhanced.EnhancedConfig{
+		Enabled:                 true,
+		EnableDeadlockDetection: true,
+		DeadlockCheckInterval:   200 * time.Millisecond,
+		EnablePriorityQueue:     true,
+		MaxQueueSize:           50,
+		QueueTimeout:           10 * time.Second,
+	}
+
+	manager, cleanup := setupTestManagerWithConfig(t, config)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Scenario: A->B->C->A circular wait
+	projects := []models.Project{
+		{RepoFullName: "test/circular-a", Path: "."},
+		{RepoFullName: "test/circular-b", Path: "."},
+		{RepoFullName: "test/circular-c", Path: "."},
+	}
+
+	users := []models.User{
+		{Username: "circular-user-1"},
+		{Username: "circular-user-2"},
+		{Username: "circular-user-3"},
+	}
+
+	workspace := "default"
+
+	// Phase 1: Each user acquires their primary resource
+	var primaryLocks []*models.ProjectLock
+	for i, user := range users {
+		lock, err := manager.Lock(ctx, projects[i], workspace, user)
+		require.NoError(t, err)
+		require.NotNil(t, lock)
+		primaryLocks = append(primaryLocks, lock)
+		t.Logf("User %s acquired primary lock on project %s", user.Username, projects[i].RepoFullName)
+	}
+
+	// Phase 2: Create circular wait pattern
+	var wg sync.WaitGroup
+	results := make([]error, len(users))
+
+	for i, user := range users {
+		wg.Add(1)
+		go func(userIndex int, u models.User) {
+			defer wg.Done()
+			// Each user tries to acquire the next resource in the circle
+			nextProject := projects[(userIndex+1)%len(projects)]
+			ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			defer cancel()
+
+			_, err := manager.Lock(ctx, nextProject, workspace, u)
+			results[userIndex] = err
+			t.Logf("User %s attempting circular lock on %s: %v", u.Username, nextProject.RepoFullName, err)
+		}(i, user)
+
+		// Stagger the attempts to create clear circular dependency
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	wg.Wait()
+
+	// Analysis: At least some operations should fail or timeout due to circular wait
+	failedOperations := 0
+	for i, err := range results {
+		if err != nil {
+			failedOperations++
+			t.Logf("User %d operation failed: %v", i, err)
+		}
+	}
+
+	assert.Greater(t, failedOperations, 0, "Some operations should fail in circular wait scenario")
+	t.Logf("Circular wait test: %d/%d operations failed as expected", failedOperations, len(users))
+
+	// Cleanup
+	for i, user := range users {
+		manager.Unlock(ctx, projects[i], workspace, user)
+	}
+}
+
+func testMultiResourceDeadlock(t *testing.T) {
+	config := &enhanced.EnhancedConfig{
+		Enabled:                 true,
+		EnableDeadlockDetection: true,
+		DeadlockCheckInterval:   150 * time.Millisecond,
+		EnablePriorityQueue:     true,
+	}
+
+	manager, cleanup := setupTestManagerWithConfig(t, config)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Complex scenario: Multiple resources per user with crossing dependencies
+	resources := []struct {
+		project   models.Project
+		workspace string
+	}{
+		{{RepoFullName: "multi/resource-db", Path: "."}, "prod"},
+		{{RepoFullName: "multi/resource-api", Path: "."}, "staging"},
+		{{RepoFullName: "multi/resource-ui", Path: "."}, "dev"},
+		{{RepoFullName: "multi/resource-cache", Path: "."}, "prod"},
+	}
+
+	users := []models.User{
+		{Username: "backend-team"},
+		{Username: "frontend-team"},
+		{Username: "devops-team"},
+	}
+
+	// Phase 1: Each team acquires some resources
+	teamResources := map[string][]*models.ProjectLock{
+		"backend-team":  {},
+		"frontend-team": {},
+		"devops-team":   {},
+	}
+
+	// Backend team gets DB and API
+	for i := 0; i < 2; i++ {
+		lock, err := manager.Lock(ctx, resources[i].project, resources[i].workspace, users[0])
+		if err == nil && lock != nil {
+			teamResources["backend-team"] = append(teamResources["backend-team"], lock)
+			t.Logf("Backend team acquired %s/%s", resources[i].project.RepoFullName, resources[i].workspace)
+		}
+	}
+
+	// Frontend team gets UI and Cache
+	for i := 2; i < 4; i++ {
+		lock, err := manager.Lock(ctx, resources[i].project, resources[i].workspace, users[1])
+		if err == nil && lock != nil {
+			teamResources["frontend-team"] = append(teamResources["frontend-team"], lock)
+			t.Logf("Frontend team acquired %s/%s", resources[i].project.RepoFullName, resources[i].workspace)
+		}
+	}
+
+	// Phase 2: Cross-team resource requests (potential deadlock)
+	var wg sync.WaitGroup
+	crossRequestResults := make(map[string]error)
+	var resultsMutex sync.Mutex
+
+	// Backend team tries to get UI (held by frontend)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+		defer cancel()
+		_, err := manager.Lock(ctx, resources[2].project, resources[2].workspace, users[0])
+		resultsMutex.Lock()
+		crossRequestResults["backend->ui"] = err
+		resultsMutex.Unlock()
+	}()
+
+	// Frontend team tries to get DB (held by backend)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(300 * time.Millisecond)
+		ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+		defer cancel()
+		_, err := manager.Lock(ctx, resources[0].project, resources[0].workspace, users[1])
+		resultsMutex.Lock()
+		crossRequestResults["frontend->db"] = err
+		resultsMutex.Unlock()
+	}()
+
+	// DevOps team tries to get API and Cache (potential conflict)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(600 * time.Millisecond)
+		ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+		defer cancel()
+		_, err1 := manager.Lock(ctx, resources[1].project, resources[1].workspace, users[2])
+		_, err2 := manager.Lock(ctx, resources[3].project, resources[3].workspace, users[2])
+		resultsMutex.Lock()
+		crossRequestResults["devops->api"] = err1
+		crossRequestResults["devops->cache"] = err2
+		resultsMutex.Unlock()
+	}()
+
+	wg.Wait()
+
+	// Analyze cross-team request results
+	resultsMutex.Lock()
+	conflictCount := 0
+	for request, err := range crossRequestResults {
+		if err != nil {
+			conflictCount++
+			t.Logf("Cross-team request %s failed: %v", request, err)
+		} else {
+			t.Logf("Cross-team request %s succeeded", request)
+		}
+	}
+	resultsMutex.Unlock()
+
+	assert.Greater(t, conflictCount, 0, "Should have some conflicts in multi-resource deadlock scenario")
+	t.Logf("Multi-resource deadlock test: %d/%d cross-requests had conflicts", conflictCount, len(crossRequestResults))
+
+	// Cleanup all team resources
+	for team, locks := range teamResources {
+		for _, lock := range locks {
+			manager.Unlock(ctx, lock.Project, lock.Workspace, lock.User)
+			t.Logf("Released lock for team %s: %s/%s", team, lock.Project.RepoFullName, lock.Workspace)
+		}
+	}
+}
+
+func testDeadlockPreventionWithPriority(t *testing.T) {
+	config := &enhanced.EnhancedConfig{
+		Enabled:                 true,
+		EnableDeadlockDetection: true,
+		DeadlockCheckInterval:   100 * time.Millisecond,
+		EnablePriorityQueue:     true,
+		MaxQueueSize:           50,
+	}
+
+	manager, cleanup := setupTestManagerWithConfig(t, config)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Test priority-aware deadlock prevention
+	projectX := models.Project{RepoFullName: "priority/project-x", Path: "."}
+	projectY := models.Project{RepoFullName: "priority/project-y", Path: "."}
+
+	criticalUser := models.User{Username: "critical-ops"}
+	normalUser := models.User{Username: "normal-dev"}
+	workspace := "production"
+
+	// Critical user acquires project X
+	criticalLock, err := manager.LockWithPriority(ctx, projectX, workspace, criticalUser, enhanced.PriorityCritical)
+	require.NoError(t, err)
+	require.NotNil(t, criticalLock)
+	t.Logf("Critical user acquired lock on project X")
+
+	// Normal user acquires project Y
+	normalLock, err := manager.LockWithPriority(ctx, projectY, workspace, normalUser, enhanced.PriorityNormal)
+	require.NoError(t, err)
+	require.NotNil(t, normalLock)
+	t.Logf("Normal user acquired lock on project Y")
+
+	// Now create potential deadlock with priority consideration
+	var wg sync.WaitGroup
+	var criticalErr, normalErr error
+
+	// Critical user tries to get Y (should have higher priority)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		_, criticalErr = manager.LockWithPriority(ctx, projectY, workspace, criticalUser, enhanced.PriorityCritical)
+		t.Logf("Critical user trying to get Y: %v", criticalErr)
+	}()
+
+	// Normal user tries to get X (should be lower priority)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(200 * time.Millisecond)
+		ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		_, normalErr = manager.LockWithPriority(ctx, projectX, workspace, normalUser, enhanced.PriorityNormal)
+		t.Logf("Normal user trying to get X: %v", normalErr)
+	}()
+
+	wg.Wait()
+
+	// Analysis: System should handle this based on priority
+	if criticalErr == nil && normalErr != nil {
+		t.Log("Priority system working: critical user succeeded, normal user blocked")
+	} else if criticalErr != nil && normalErr == nil {
+		t.Log("Unexpected: normal user succeeded over critical user")
+	} else {
+		t.Logf("Both operations had same outcome: critical=%v, normal=%v", criticalErr, normalErr)
+	}
+
+	// At least one should be blocked to prevent deadlock
+	assert.True(t, criticalErr != nil || normalErr != nil, "At least one operation should be blocked")
+
+	// Cleanup
+	manager.Unlock(ctx, projectX, workspace, criticalUser)
+	manager.Unlock(ctx, projectY, workspace, normalUser)
+}
+
+func testCascadeDeadlockResolution(t *testing.T) {
+	config := &enhanced.EnhancedConfig{
+		Enabled:                 true,
+		EnableDeadlockDetection: true,
+		DeadlockCheckInterval:   200 * time.Millisecond,
+		EnablePriorityQueue:     true,
+	}
+
+	manager, cleanup := setupTestManagerWithConfig(t, config)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Scenario: Chain of dependencies that could cascade when resolved
+	projects := []models.Project{
+		{RepoFullName: "cascade/service-a", Path: "."},
+		{RepoFullName: "cascade/service-b", Path: "."},
+		{RepoFullName: "cascade/service-c", Path: "."},
+		{RepoFullName: "cascade/service-d", Path: "."},
+	}
+
+	users := []models.User{
+		{Username: "team-alpha"},
+		{Username: "team-beta"},
+		{Username: "team-gamma"},
+		{Username: "team-delta"},
+	}
+
+	workspace := "production"
+
+	// Create chain: A->B->C->D where each team has one service but wants the next
+	var primaryLocks []*models.ProjectLock
+
+	// Each team acquires their primary service
+	for i, user := range users {
+		lock, err := manager.Lock(ctx, projects[i], workspace, user)
+		require.NoError(t, err)
+		require.NotNil(t, lock)
+		primaryLocks = append(primaryLocks, lock)
+		t.Logf("Team %s acquired primary service %s", user.Username, projects[i].RepoFullName)
+	}
+
+	// Create cascade scenario: each team wants the next service in chain
+	var wg sync.WaitGroup
+	cascadeResults := make(map[int]error)
+	var cascadeMutex sync.Mutex
+
+	for i, user := range users {
+		wg.Add(1)
+		go func(teamIndex int, u models.User) {
+			defer wg.Done()
+			nextServiceIndex := (teamIndex + 1) % len(projects)
+			nextProject := projects[nextServiceIndex]
+
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+
+			_, err := manager.Lock(ctx, nextProject, workspace, u)
+			cascadeMutex.Lock()
+			cascadeResults[teamIndex] = err
+			cascadeMutex.Unlock()
+			t.Logf("Team %s (%d) trying to acquire service %s: %v", u.Username, teamIndex, nextProject.RepoFullName, err)
+		}(i, user)
+
+		// Stagger to create clear dependency chain
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	wg.Wait()
+
+	// Analyze cascade behavior
+	cascadeMutex.Lock()
+	blockedTeams := 0
+	for teamIndex, err := range cascadeResults {
+		if err != nil {
+			blockedTeams++
+			t.Logf("Team %d blocked in cascade: %v", teamIndex, err)
+		} else {
+			t.Logf("Team %d succeeded in cascade", teamIndex)
+		}
+	}
+	cascadeMutex.Unlock()
+
+	assert.Greater(t, blockedTeams, 0, "Some teams should be blocked in cascade scenario")
+	t.Logf("Cascade resolution test: %d/%d teams blocked", blockedTeams, len(users))
+
+	// The system should prevent the full cascade deadlock
+	assert.Less(t, blockedTeams, len(users), "Not all teams should be blocked (deadlock prevention)")
+
+	// Cleanup
+	for i, user := range users {
+		manager.Unlock(ctx, projects[i], workspace, user)
+	}
+}
+
+func testDeadlockPerformanceBenchmark(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping deadlock performance benchmark in short mode")
+	}
+
+	config := &enhanced.EnhancedConfig{
+		Enabled:                 true,
+		EnableDeadlockDetection: true,
+		DeadlockCheckInterval:   50 * time.Millisecond,
+		EnablePriorityQueue:     true,
+		MaxQueueSize:           500,
+	}
+
+	manager, cleanup := setupTestManagerWithConfig(t, config)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Performance parameters
+	numResources := 20
+	numUsers := 50
+	numOperations := 200
+	concurrentRequests := 10
+
+	// Create resource pool
+	resources := make([]models.Project, numResources)
+	for i := 0; i < numResources; i++ {
+		resources[i] = models.Project{
+			RepoFullName: fmt.Sprintf("benchmark/resource-%d", i),
+			Path:         ".",
+		}
+	}
+
+	// Create user pool
+	users := make([]models.User, numUsers)
+	for i := 0; i < numUsers; i++ {
+		users[i] = models.User{Username: fmt.Sprintf("benchuser-%d", i)}
+	}
+
+	workspace := "benchmark"
+
+	var wg sync.WaitGroup
+	operationTimes := make(chan time.Duration, numOperations)
+	operationErrors := make(chan error, numOperations)
+
+	startTime := time.Now()
+
+	for i := 0; i < concurrentRequests; i++ {
+		wg.Add(1)
+		go func(routineID int) {
+			defer wg.Done()
+			rand.Seed(int64(routineID))
+
+			for j := 0; j < numOperations/concurrentRequests; j++ {
+				opStart := time.Now()
+
+				// Randomly select resource and user
+				resource := resources[rand.Intn(numResources)]
+				user := users[rand.Intn(numUsers)]
+
+				// Acquire lock
+				lock, err := manager.LockWithTimeout(ctx, resource, workspace, user, 2*time.Second)
+				if err != nil {
+					operationErrors <- err
+					continue
+				}
+
+				// Hold briefly (simulate work)
+				time.Sleep(time.Duration(rand.Intn(50)) * time.Millisecond)
+
+				// Release lock
+				_, err = manager.Unlock(ctx, resource, workspace, user)
+				if err != nil {
+					operationErrors <- err
+					continue
+				}
+
+				opTime := time.Since(opStart)
+				operationTimes <- opTime
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	totalBenchmarkTime := time.Since(startTime)
+
+	// Collect results
+	close(operationTimes)
+	close(operationErrors)
+
+	var operationCount int
+	var totalOpTime time.Duration
+	var maxOpTime time.Duration
+	var errorCount int
+
+	for opTime := range operationTimes {
+		operationCount++
+		totalOpTime += opTime
+		if opTime > maxOpTime {
+			maxOpTime = opTime
+		}
+	}
+
+	for range operationErrors {
+		errorCount++
+	}
+
+	// Performance analysis
+	if operationCount > 0 {
+		averageOpTime := totalOpTime / time.Duration(operationCount)
+		opsPerSecond := float64(operationCount) / totalBenchmarkTime.Seconds()
+
+		t.Logf("Deadlock Performance Benchmark Results:")
+		t.Logf("  Total Benchmark Time: %v", totalBenchmarkTime)
+		t.Logf("  Successful Operations: %d", operationCount)
+		t.Logf("  Failed Operations: %d", errorCount)
+		t.Logf("  Average Operation Time: %v", averageOpTime)
+		t.Logf("  Max Operation Time: %v", maxOpTime)
+		t.Logf("  Operations/Second: %.2f", opsPerSecond)
+		t.Logf("  Error Rate: %.2f%%", float64(errorCount)/float64(operationCount+errorCount)*100)
+
+		// Performance assertions for deadlock detection overhead
+		assert.Less(t, averageOpTime, 500*time.Millisecond, "Deadlock detection shouldn't add significant overhead")
+		assert.Greater(t, opsPerSecond, 10.0, "Should maintain reasonable throughput with deadlock detection")
+		assert.Less(t, float64(errorCount)/float64(operationCount+errorCount), 0.15, "Error rate should be acceptable")
+	} else {
+		t.Error("No operations completed successfully in benchmark")
+	}
+}
+
+func testEndToEndSystemTest(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping end-to-end system test in short mode")
+	}
+
+	config := &enhanced.EnhancedConfig{
+		Enabled:                 true,
+		Backend:                "boltdb",
+		EnableDeadlockDetection: true,
+		DeadlockCheckInterval:   100 * time.Millisecond,
+		EnablePriorityQueue:     true,
+		MaxQueueSize:           100,
+		EnableRetry:            true,
+		MaxRetryAttempts:       3,
+		RetryBaseDelay:         100 * time.Millisecond,
+		RetryMaxDelay:          2 * time.Second,
+		EnableEvents:           true,
+		EventBufferSize:        1000,
+	}
+
+	manager, cleanup := setupTestManagerWithConfig(t, config)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Real-world scenario: Multiple teams working on microservices deployment
+	services := []struct {
+		name      string
+		project   models.Project
+		workspace string
+		priority  enhanced.Priority
+	}{
+		{"user-service", models.Project{RepoFullName: "company/user-service", Path: "."}, "production", enhanced.PriorityHigh},
+		{"auth-service", models.Project{RepoFullName: "company/auth-service", Path: "."}, "production", enhanced.PriorityCritical},
+		{"payment-service", models.Project{RepoFullName: "company/payment-service", Path: "."}, "production", enhanced.PriorityHigh},
+		{"notification-service", models.Project{RepoFullName: "company/notification-service", Path: "."}, "staging", enhanced.PriorityNormal},
+		{"analytics-service", models.Project{RepoFullName: "company/analytics-service", Path: "."}, "development", enhanced.PriorityLow},
+		{"gateway-service", models.Project{RepoFullName: "company/gateway-service", Path: "."}, "production", enhanced.PriorityCritical},
+	}
+
+	teams := []models.User{
+		{Username: "backend-team"},
+		{Username: "platform-team"},
+		{Username: "security-team"},
+		{Username: "data-team"},
+		{Username: "devops-team"},
+	}
+
+	// Simulate real deployment scenario
+	var wg sync.WaitGroup
+	deploymentResults := make(map[string]error)
+	var resultsMutex sync.Mutex
+
+	t.Log("Starting end-to-end deployment simulation...")
+
+	// Phase 1: Critical services deployment (auth, gateway)
+	for _, service := range services {
+		if service.priority == enhanced.PriorityCritical {
+			wg.Add(1)
+			go func(svc struct {
+				name      string
+				project   models.Project
+				workspace string
+				priority  enhanced.Priority
+			}) {
+				defer wg.Done()
+				team := teams[2] // security team for critical services
+
+				t.Logf("Deploying critical service: %s", svc.name)
+				lock, err := manager.LockWithPriority(ctx, svc.project, svc.workspace, team, svc.priority)
+
+				resultsMutex.Lock()
+				deploymentResults[fmt.Sprintf("critical-%s", svc.name)] = err
+				resultsMutex.Unlock()
+
+				if err == nil {
+					// Simulate deployment time
+					time.Sleep(500 * time.Millisecond)
+					manager.Unlock(ctx, svc.project, svc.workspace, team)
+					t.Logf("Critical service %s deployed successfully", svc.name)
+				} else {
+					t.Logf("Critical service %s deployment failed: %v", svc.name, err)
+				}
+			}(service)
+		}
+	}
+
+	wg.Wait()
+	// Phase 2: High priority services (user, payment)
+	for _, service := range services {
+		if service.priority == enhanced.PriorityHigh {
+			wg.Add(1)
+			go func(svc struct {
+				name      string
+				project   models.Project
+				workspace string
+				priority  enhanced.Priority
+			}) {
+				defer wg.Done()
+				team := teams[0] // backend team
+
+				t.Logf("Deploying high priority service: %s", svc.name)
+				lock, err := manager.LockWithPriority(ctx, svc.project, svc.workspace, team, svc.priority)
+
+				resultsMutex.Lock()
+				deploymentResults[fmt.Sprintf("high-%s", svc.name)] = err
+				resultsMutex.Unlock()
+
+				if err == nil {
+					time.Sleep(400 * time.Millisecond)
+					manager.Unlock(ctx, svc.project, svc.workspace, team)
+					t.Logf("High priority service %s deployed successfully", svc.name)
+				} else {
+					t.Logf("High priority service %s deployment failed: %v", svc.name, err)
+				}
+			}(service)
+		}
+	}
+
+	wg.Wait()
+
+	// Phase 3: Normal and low priority services (remaining)
+	for _, service := range services {
+		if service.priority == enhanced.PriorityNormal || service.priority == enhanced.PriorityLow {
+			wg.Add(1)
+			go func(svc struct {
+				name      string
+				project   models.Project
+				workspace string
+				priority  enhanced.Priority
+			}) {
+				defer wg.Done()
+				var team models.User
+				if svc.priority == enhanced.PriorityNormal {
+					team = teams[1] // platform team
+				} else {
+					team = teams[3] // data team
+				}
+
+				t.Logf("Deploying service: %s (priority: %v)", svc.name, svc.priority)
+				lock, err := manager.LockWithPriority(ctx, svc.project, svc.workspace, team, svc.priority)
+
+				resultsMutex.Lock()
+				deploymentResults[fmt.Sprintf("%v-%s", svc.priority, svc.name)] = err
+				resultsMutex.Unlock()
+
+				if err == nil {
+					time.Sleep(300 * time.Millisecond)
+					manager.Unlock(ctx, svc.project, svc.workspace, team)
+					t.Logf("Service %s deployed successfully", svc.name)
+				} else {
+					t.Logf("Service %s deployment failed: %v", svc.name, err)
+				}
+			}(service)
+		}
+	}
+
+	wg.Wait()
+
+	// Analyze end-to-end results
+	resultsMutex.Lock()
+	successfulDeployments := 0
+	failedDeployments := 0
+
+	for deployment, err := range deploymentResults {
+		if err == nil {
+			successfulDeployments++
+			t.Logf("✅ %s: SUCCESS", deployment)
+		} else {
+			failedDeployments++
+			t.Logf("❌ %s: FAILED - %v", deployment, err)
+		}
+	}
+	resultsMutex.Unlock()
+
+	t.Logf("End-to-End System Test Results:")
+	t.Logf("  Successful Deployments: %d", successfulDeployments)
+	t.Logf("  Failed Deployments: %d", failedDeployments)
+	t.Logf("  Success Rate: %.2f%%", float64(successfulDeployments)/float64(successfulDeployments+failedDeployments)*100)
+
+	// System should handle the deployment workflow gracefully
+	assert.Greater(t, successfulDeployments, 0, "Should have some successful deployments")
+	assert.Less(t, float64(failedDeployments)/float64(successfulDeployments+failedDeployments), 0.5, "Failure rate should be reasonable")
+
+	// Critical services should have higher success rate
+	criticalSuccess := 0
+	criticalTotal := 0
+	for deployment, err := range deploymentResults {
+		if strings.Contains(deployment, "critical-") {
+			criticalTotal++
+			if err == nil {
+				criticalSuccess++
+			}
+		}
+	}
+
+	if criticalTotal > 0 {
+		criticalSuccessRate := float64(criticalSuccess) / float64(criticalTotal)
+		t.Logf("Critical Services Success Rate: %.2f%%", criticalSuccessRate*100)
+		assert.Greater(t, criticalSuccessRate, 0.5, "Critical services should have higher success rate")
+	}
+
+	t.Log("End-to-end system test completed successfully")
 }

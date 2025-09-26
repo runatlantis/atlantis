@@ -23,6 +23,11 @@ type RedisBackend struct {
 	defaultTTL  time.Duration
 	log         logging.SimpleLogging
 
+	// Enhanced components
+	scriptMgr     *ScriptManager
+	healthMonitor *HealthMonitor
+	clusterMgr    *ClusterManager
+
 	// Metrics
 	stats       *enhanced.BackendStats
 	lastUpdated time.Time
@@ -33,7 +38,7 @@ type RedisBackend struct {
 
 // NewRedisBackend creates a new Redis backend for enhanced locking
 func NewRedisBackend(client redis.UniversalClient, config *enhanced.EnhancedConfig, log logging.SimpleLogging) *RedisBackend {
-	return &RedisBackend{
+	rb := &RedisBackend{
 		client:      client,
 		keyPrefix:   config.RedisKeyPrefix,
 		defaultTTL:  config.RedisLockTTL,
@@ -45,6 +50,21 @@ func NewRedisBackend(client redis.UniversalClient, config *enhanced.EnhancedConf
 		},
 		lastUpdated: time.Now(),
 	}
+
+	// Initialize enhanced components
+	rb.scriptMgr = NewScriptManager(client)
+
+	// Initialize health monitoring
+	healthConfig := DefaultHealthConfig()
+	rb.healthMonitor = NewHealthMonitor(client, healthConfig, log)
+
+	// Initialize cluster management if enabled
+	if config.RedisClusterMode {
+		clusterConfig := DefaultClusterConfig()
+		rb.clusterMgr = NewClusterManager(client, clusterConfig, log)
+	}
+
+	return rb
 }
 
 // AcquireLock attempts to acquire a lock with enhanced capabilities
@@ -79,40 +99,7 @@ func (r *RedisBackend) AcquireLock(ctx context.Context, request *enhanced.Enhanc
 		Time:      lock.AcquiredAt,
 	}
 
-	// Lua script for atomic lock acquisition with queue support
-	luaScript := `
-		local lockKey = KEYS[1]
-		local queueKey = KEYS[2]
-		local lockData = ARGV[1]
-		local ttl = tonumber(ARGV[2])
-		local priority = tonumber(ARGV[3])
-		local queueEnabled = ARGV[4] == "true"
-
-		-- Check if lock already exists
-		local existing = redis.call('GET', lockKey)
-		if existing then
-			if queueEnabled then
-				-- Add to queue with priority score (higher priority = lower score for min priority queue)
-				local score = (4 - priority) * 1000000 + redis.call('TIME')[1]
-				redis.call('ZADD', queueKey, score, lockData)
-				return {false, "queued"}
-			end
-			return {false, "exists"}
-		end
-
-		-- Acquire the lock
-		if ttl > 0 then
-			redis.call('SETEX', lockKey, ttl, lockData)
-		else
-			redis.call('SET', lockKey, lockData)
-		end
-
-		-- Publish lock acquired event
-		redis.call('PUBLISH', 'atlantis:lock:acquired', lockKey)
-
-		return {true, "acquired"}
-	`
-
+	// Use enhanced script manager for atomic operations
 	lockData, err := json.Marshal(lock)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal lock data: %w", err)
@@ -123,8 +110,17 @@ func (r *RedisBackend) AcquireLock(ctx context.Context, request *enhanced.Enhanc
 		ttlSeconds = int64(lock.ExpiresAt.Sub(time.Now()).Seconds())
 	}
 
-	result, err := r.client.Eval(ctx, luaScript, []string{lockKey, queueKey},
-		string(lockData), ttlSeconds, int(request.Priority), r.config.EnablePriorityQueue).Result()
+	// Enhanced arguments for clustering support
+	clusterMode := r.config.RedisClusterMode
+	nodeID := ""
+	if r.clusterMgr != nil {
+		nodeID = r.clusterMgr.nodeID
+	}
+
+	result, err := r.scriptMgr.Execute(ctx, "acquire_lock",
+		[]string{lockKey, queueKey, fmt.Sprintf("atlantis:node:%s", nodeID)},
+		string(lockData), ttlSeconds, int(request.Priority),
+		r.config.EnablePriorityQueue, clusterMode, nodeID, 1000)
 	if err != nil {
 		r.updateStats(false)
 		return nil, fmt.Errorf("failed to execute lock acquisition script: %w", err)

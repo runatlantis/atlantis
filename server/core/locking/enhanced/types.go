@@ -1,15 +1,16 @@
+// Package enhanced provides the enhanced locking system for Atlantis
+// This package implements advanced locking features including Redis backend,
+// priority queuing, and distributed coordination.
 package enhanced
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-// Priority levels for enhanced locking
+// Priority levels for lock requests
 type Priority int
 
 const (
@@ -19,260 +20,371 @@ const (
 	PriorityCritical
 )
 
-// LockState represents the current state of a lock
-type LockState string
+// LockRequest represents a request for a project lock with enhanced features
+type LockRequest struct {
+	// Core lock information
+	Project   models.Project
+	Workspace string
+	User      models.User
+	Pull      models.PullRequest
 
-const (
-	LockStateAcquired LockState = "acquired"
-	LockStatePending  LockState = "pending"
-	LockStateExpired  LockState = "expired"
-	LockStateReleased LockState = "released"
-)
+	// Enhanced features
+	Priority     Priority
+	Timeout      time.Duration
+	Tags         map[string]string
+	RequestID    string
+	RequestTime  time.Time
 
-// ResourceType defines the type of resource being locked
-type ResourceType string
-
-const (
-	ResourceTypeProject   ResourceType = "project"
-	ResourceTypeWorkspace ResourceType = "workspace"
-	ResourceTypeGlobal    ResourceType = "global"
-	ResourceTypeCustom    ResourceType = "custom"
-)
-
-// EnhancedLockRequest represents a request for an enhanced lock
-type EnhancedLockRequest struct {
-	ID          string                 `json:"id"`
-	Resource    ResourceIdentifier     `json:"resource"`
-	Priority    Priority               `json:"priority"`
-	Timeout     time.Duration          `json:"timeout"`
-	Metadata    map[string]string      `json:"metadata,omitempty"`
-	Context     context.Context        `json:"-"`
-	RequestedAt time.Time              `json:"requested_at"`
-
-	// Backward compatibility fields
-	Project   models.Project `json:"project"`
-	Workspace string         `json:"workspace"`
-	User      models.User    `json:"user"`
+	// Retry configuration
+	MaxRetries   int
+	RetryBackoff time.Duration
 }
 
-// ResourceIdentifier uniquely identifies a lockable resource
-type ResourceIdentifier struct {
-	Type      ResourceType `json:"type"`
-	Namespace string       `json:"namespace"` // Repository namespace
-	Name      string       `json:"name"`      // Resource name
-	Workspace string       `json:"workspace,omitempty"`
-	Path      string       `json:"path,omitempty"`
+// LockResponse represents the response to a lock request
+type LockResponse struct {
+	// Success information
+	Acquired     bool
+	Lock         *EnhancedLock
+	LockKey      string
+
+	// Queue information
+	QueuePosition int
+	EstimatedWait time.Duration
+
+	// Error information
+	Error        error
+	ErrorCode    string
+	Reason       string
 }
 
-// EnhancedLock represents an acquired lock with enhanced capabilities
+// EnhancedLock represents an enhanced project lock with additional metadata
 type EnhancedLock struct {
-	ID          string             `json:"id"`
-	Resource    ResourceIdentifier `json:"resource"`
-	State       LockState          `json:"state"`
-	Priority    Priority           `json:"priority"`
-	Owner       string             `json:"owner"`
-	AcquiredAt  time.Time          `json:"acquired_at"`
-	ExpiresAt   *time.Time         `json:"expires_at,omitempty"`
-	Metadata    map[string]string  `json:"metadata,omitempty"`
-	Version     int64              `json:"version"` // For optimistic locking
+	// Legacy compatibility
+	models.ProjectLock
 
-	// Backward compatibility - embed original lock
-	OriginalLock *models.ProjectLock `json:"original_lock,omitempty"`
+	// Enhanced features
+	ID           string
+	Priority     Priority
+	Tags         map[string]string
+	TTL          time.Duration
+	ExpiresAt    time.Time
+
+	// Queue information
+	QueueTime    time.Duration
+	AcquireTime  time.Time
+
+	// Distributed features
+	NodeID       string
+	Version      int64
+	Checksum     string
+}
+
+// QueueEntry represents an entry in the lock queue
+type QueueEntry struct {
+	Request      LockRequest
+	Position     int
+	EnqueueTime  time.Time
+	EstimatedWait time.Duration
+
+	// Priority boosting for anti-starvation
+	OriginalPriority Priority
+	CurrentPriority  Priority
+	BoostCount       int
 }
 
 // LockEvent represents events in the locking system
 type LockEvent struct {
-	Type      string             `json:"type"`
-	LockID    string             `json:"lock_id"`
-	Resource  ResourceIdentifier `json:"resource"`
-	Owner     string             `json:"owner"`
-	Timestamp time.Time          `json:"timestamp"`
-	Metadata  map[string]string  `json:"metadata,omitempty"`
+	Type        EventType
+	LockID      string
+	LockKey     string
+	User        string
+	Timestamp   time.Time
+	Details     map[string]interface{}
 }
 
-// Config holds configuration for enhanced locking
-type EnhancedConfig struct {
-	// Core configuration
-	Enabled                bool          `mapstructure:"enabled"`
-	Backend                string        `mapstructure:"backend"` // "redis", "boltdb"
-	DefaultTimeout         time.Duration `mapstructure:"default_timeout"`
-	MaxTimeout             time.Duration `mapstructure:"max_timeout"`
+// EventType represents the type of lock event
+type EventType string
 
-	// Queue configuration
-	EnablePriorityQueue    bool          `mapstructure:"enable_priority_queue"`
-	MaxQueueSize          int           `mapstructure:"max_queue_size"`
-	QueueTimeout          time.Duration `mapstructure:"queue_timeout"`
-
-	// Retry configuration
-	EnableRetry           bool          `mapstructure:"enable_retry"`
-	MaxRetryAttempts      int           `mapstructure:"max_retry_attempts"`
-	RetryBaseDelay        time.Duration `mapstructure:"retry_base_delay"`
-	RetryMaxDelay         time.Duration `mapstructure:"retry_max_delay"`
-
-	// Deadlock detection
-	EnableDeadlockDetection bool        `mapstructure:"enable_deadlock_detection"`
-	DeadlockCheckInterval   time.Duration `mapstructure:"deadlock_check_interval"`
-
-	// Events
-	EnableEvents          bool          `mapstructure:"enable_events"`
-	EventBufferSize       int           `mapstructure:"event_buffer_size"`
-
-	// Redis specific
-	RedisClusterMode      bool          `mapstructure:"redis_cluster_mode"`
-	RedisKeyPrefix        string        `mapstructure:"redis_key_prefix"`
-	RedisLockTTL          time.Duration `mapstructure:"redis_lock_ttl"`
-
-	// Backward compatibility
-	LegacyFallback        bool          `mapstructure:"legacy_fallback"`
-	PreserveLegacyFormat  bool          `mapstructure:"preserve_legacy_format"`
-}
-
-// DefaultConfig returns default configuration for enhanced locking
-func DefaultConfig() *EnhancedConfig {
-	return &EnhancedConfig{
-		Enabled:                 false, // Opt-in for backward compatibility
-		Backend:                 "boltdb",
-		DefaultTimeout:          30 * time.Minute,
-		MaxTimeout:              2 * time.Hour,
-		EnablePriorityQueue:     false,
-		MaxQueueSize:           1000,
-		QueueTimeout:           10 * time.Minute,
-		EnableRetry:            false,
-		MaxRetryAttempts:       3,
-		RetryBaseDelay:         time.Second,
-		RetryMaxDelay:          30 * time.Second,
-		EnableDeadlockDetection: false,
-		DeadlockCheckInterval:   30 * time.Second,
-		EnableEvents:           false,
-		EventBufferSize:        1000,
-		RedisClusterMode:       false,
-		RedisKeyPrefix:         "atlantis:enhanced:lock:",
-		RedisLockTTL:           time.Hour,
-		LegacyFallback:         true,
-		PreserveLegacyFormat:   true,
-	}
-}
-
-// Backend interface for enhanced locking backends
-type Backend interface {
-	// Core locking operations
-	AcquireLock(ctx context.Context, request *EnhancedLockRequest) (*EnhancedLock, error)
-	ReleaseLock(ctx context.Context, lockID string) error
-	GetLock(ctx context.Context, lockID string) (*EnhancedLock, error)
-	ListLocks(ctx context.Context) ([]*EnhancedLock, error)
-
-	// Enhanced operations
-	TryAcquireLock(ctx context.Context, request *EnhancedLockRequest) (*EnhancedLock, bool, error)
-	RefreshLock(ctx context.Context, lockID string, extension time.Duration) error
-	TransferLock(ctx context.Context, lockID string, newOwner string) error
-
-	// Queue operations
-	EnqueueLockRequest(ctx context.Context, request *EnhancedLockRequest) error
-	DequeueNextRequest(ctx context.Context) (*EnhancedLockRequest, error)
-	GetQueueStatus(ctx context.Context) (*QueueStatus, error)
-
-	// Health and metrics
-	HealthCheck(ctx context.Context) error
-	GetStats(ctx context.Context) (*BackendStats, error)
-
-	// Event subscription
-	Subscribe(ctx context.Context, eventTypes []string) (<-chan *LockEvent, error)
-
-	// Cleanup and maintenance
-	CleanupExpiredLocks(ctx context.Context) (int, error)
-
-	// Backward compatibility
-	GetLegacyLock(project models.Project, workspace string) (*models.ProjectLock, error)
-	ConvertToLegacy(lock *EnhancedLock) *models.ProjectLock
-	ConvertFromLegacy(lock *models.ProjectLock) *EnhancedLock
-}
-
-// QueueStatus provides information about the current queue state
-type QueueStatus struct {
-	Size            int                     `json:"size"`
-	PendingRequests []*EnhancedLockRequest  `json:"pending_requests"`
-	OldestRequest   *time.Time              `json:"oldest_request,omitempty"`
-	QueuesByPriority map[Priority]int       `json:"queues_by_priority"`
-}
-
-// BackendStats provides performance and operational statistics
-type BackendStats struct {
-	ActiveLocks        int64         `json:"active_locks"`
-	TotalRequests      int64         `json:"total_requests"`
-	SuccessfulAcquires int64         `json:"successful_acquires"`
-	FailedAcquires     int64         `json:"failed_acquires"`
-	AverageWaitTime    time.Duration `json:"average_wait_time"`
-	AverageHoldTime    time.Duration `json:"average_hold_time"`
-	QueueDepth         int           `json:"queue_depth"`
-	HealthScore        int           `json:"health_score"` // 0-100
-	LastUpdated        time.Time     `json:"last_updated"`
-}
-
-// LockManager interface for enhanced lock management
-type LockManager interface {
-	// Core operations
-	Lock(ctx context.Context, project models.Project, workspace string, user models.User) (*models.ProjectLock, error)
-	Unlock(ctx context.Context, project models.Project, workspace string, user models.User) (*models.ProjectLock, error)
-	List(ctx context.Context) ([]*models.ProjectLock, error)
-
-	// Enhanced operations with priority
-	LockWithPriority(ctx context.Context, project models.Project, workspace string, user models.User, priority Priority) (*models.ProjectLock, error)
-	LockWithTimeout(ctx context.Context, project models.Project, workspace string, user models.User, timeout time.Duration) (*models.ProjectLock, error)
-
-	// Queue management
-	GetQueuePosition(ctx context.Context, project models.Project, workspace string) (int, error)
-	CancelQueuedRequest(ctx context.Context, project models.Project, workspace string, user models.User) error
-
-	// Statistics and monitoring
-	GetStats(ctx context.Context) (*BackendStats, error)
-	GetHealth(ctx context.Context) error
-}
-
-// Error types for enhanced locking
-type LockError struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
-	Code    string `json:"code"`
-}
-
-func (e *LockError) Error() string {
-	return fmt.Sprintf("lock error [%s]: %s", e.Code, e.Message)
-}
-
-// Common error codes
 const (
-	ErrCodeLockExists       = "LOCK_EXISTS"
-	ErrCodeLockNotFound     = "LOCK_NOT_FOUND"
-	ErrCodeLockExpired      = "LOCK_EXPIRED"
-	ErrCodeTimeout          = "TIMEOUT"
-	ErrCodeQueueFull        = "QUEUE_FULL"
-	ErrCodeDeadlock         = "DEADLOCK"
-	ErrCodeBackendError     = "BACKEND_ERROR"
-	ErrCodeInvalidRequest   = "INVALID_REQUEST"
-	ErrCodePermissionDenied = "PERMISSION_DENIED"
+	EventLockRequested  EventType = "lock_requested"
+	EventLockAcquired   EventType = "lock_acquired"
+	EventLockReleased   EventType = "lock_released"
+	EventLockExpired    EventType = "lock_expired"
+	EventLockQueued     EventType = "lock_queued"
+	EventLockTimeout    EventType = "lock_timeout"
+	EventLockError      EventType = "lock_error"
 )
 
-// Helper functions for creating common errors
-func NewLockExistsError(resource string) *LockError {
-	return &LockError{
-		Type:    "LockExists",
-		Message: fmt.Sprintf("lock already exists for resource: %s", resource),
-		Code:    ErrCodeLockExists,
+// Backend represents the enhanced locking backend interface
+type Backend interface {
+	// Core locking operations
+	TryLock(ctx context.Context, request LockRequest) (*LockResponse, error)
+	Unlock(ctx context.Context, lockKey string) error
+	GetLock(ctx context.Context, lockKey string) (*EnhancedLock, error)
+	ListLocks(ctx context.Context) ([]EnhancedLock, error)
+
+	// Queue operations
+	GetQueueStatus(ctx context.Context, lockKey string) (*QueueStatus, error)
+	GetUserQueue(ctx context.Context, user string) ([]QueueEntry, error)
+
+	// Advanced features
+	RefreshLock(ctx context.Context, lockKey string, ttl time.Duration) error
+	TransferLock(ctx context.Context, lockKey string, newUser models.User) error
+
+	// Batch operations
+	BatchUnlock(ctx context.Context, lockKeys []string) error
+	BatchGetLocks(ctx context.Context, lockKeys []string) ([]EnhancedLock, error)
+
+	// Monitoring and health
+	HealthCheck(ctx context.Context) error
+	GetMetrics(ctx context.Context) (*Metrics, error)
+}
+
+// QueueStatus represents the status of the lock queue
+type QueueStatus struct {
+	LockKey       string
+	QueueLength   int
+	AverageWait   time.Duration
+	CurrentHolder *EnhancedLock
+	NextInQueue   *QueueEntry
+}
+
+// Metrics represents locking system metrics
+type Metrics struct {
+	TotalLocks        int64
+	ActiveLocks       int64
+	QueuedRequests    int64
+	AverageWaitTime   time.Duration
+	LockSuccessRate   float64
+	BackendLatency    time.Duration
+	LastUpdated       time.Time
+}
+
+// EnhancedLocker is the main interface for the enhanced locking system
+type EnhancedLocker interface {
+	// Core operations
+	Lock(ctx context.Context, request LockRequest) (*LockResponse, error)
+	Unlock(ctx context.Context, lockKey string) error
+	GetLock(ctx context.Context, lockKey string) (*EnhancedLock, error)
+
+	// Queue management
+	GetQueueStatus(ctx context.Context, lockKey string) (*QueueStatus, error)
+	CancelQueuedRequest(ctx context.Context, requestID string) error
+
+	// Batch operations
+	UnlockByPull(ctx context.Context, repoFullName string, pullNum int) ([]EnhancedLock, error)
+
+	// Administrative operations
+	ForceUnlock(ctx context.Context, lockKey string, reason string) error
+	GetMetrics(ctx context.Context) (*Metrics, error)
+	HealthCheck(ctx context.Context) error
+}
+
+// Config represents the enhanced locking configuration
+type Config struct {
+	// Backend configuration
+	Backend     string        `mapstructure:"backend" json:"backend"`
+	RedisConfig RedisConfig   `mapstructure:"redis" json:"redis"`
+
+	// Feature flags
+	EnablePriorityQueue bool `mapstructure:"enable_priority_queue" json:"enable_priority_queue"`
+	EnableRetries       bool `mapstructure:"enable_retries" json:"enable_retries"`
+	EnableMetrics       bool `mapstructure:"enable_metrics" json:"enable_metrics"`
+
+	// Timeouts and limits
+	DefaultTimeout      time.Duration `mapstructure:"default_timeout" json:"default_timeout"`
+	MaxTimeout          time.Duration `mapstructure:"max_timeout" json:"max_timeout"`
+	MaxQueueSize        int           `mapstructure:"max_queue_size" json:"max_queue_size"`
+
+	// Anti-starvation
+	StarvationThreshold time.Duration `mapstructure:"starvation_threshold" json:"starvation_threshold"`
+	MaxPriorityBoost    int           `mapstructure:"max_priority_boost" json:"max_priority_boost"`
+}
+
+// RedisConfig represents Redis-specific configuration
+type RedisConfig struct {
+	Addresses        []string      `mapstructure:"addresses" json:"addresses"`
+	Password         string        `mapstructure:"password" json:"password"`
+	DB               int           `mapstructure:"db" json:"db"`
+	PoolSize         int           `mapstructure:"pool_size" json:"pool_size"`
+	KeyPrefix        string        `mapstructure:"key_prefix" json:"key_prefix"`
+	DefaultTTL       time.Duration `mapstructure:"default_ttl" json:"default_ttl"`
+	ConnectionTimeout time.Duration `mapstructure:"connection_timeout" json:"connection_timeout"`
+	ReadTimeout      time.Duration `mapstructure:"read_timeout" json:"read_timeout"`
+	WriteTimeout     time.Duration `mapstructure:"write_timeout" json:"write_timeout"`
+	ClusterMode      bool          `mapstructure:"cluster_mode" json:"cluster_mode"`
+}
+
+// EventHandler handles lock events
+type EventHandler interface {
+	HandleEvent(ctx context.Context, event LockEvent) error
+}
+
+// LockEventStream provides real-time lock events
+type LockEventStream interface {
+	Subscribe(ctx context.Context, filter EventFilter) (<-chan LockEvent, error)
+	Unsubscribe(subscriptionID string) error
+}
+
+// EventFilter filters lock events
+type EventFilter struct {
+	EventTypes []EventType
+	Users      []string
+	Projects   []string
+	LockKeys   []string
+}
+
+// DefaultConfig returns the default enhanced locking configuration
+func DefaultConfig() *Config {
+	return &Config{
+		Backend: "boltdb", // Start with legacy backend for safety
+		RedisConfig: RedisConfig{
+			Addresses:         []string{"localhost:6379"},
+			Password:          "",
+			DB:                0,
+			PoolSize:          10,
+			KeyPrefix:         "atlantis:enhanced:lock:",
+			DefaultTTL:        time.Hour,
+			ConnectionTimeout: 5 * time.Second,
+			ReadTimeout:       3 * time.Second,
+			WriteTimeout:      3 * time.Second,
+			ClusterMode:       false,
+		},
+		EnablePriorityQueue:  false,
+		EnableRetries:        false,
+		EnableMetrics:        true,
+		DefaultTimeout:       30 * time.Second,
+		MaxTimeout:           5 * time.Minute,
+		MaxQueueSize:         1000,
+		StarvationThreshold:  2 * time.Minute,
+		MaxPriorityBoost:     3,
 	}
 }
 
-func NewLockNotFoundError(lockID string) *LockError {
-	return &LockError{
-		Type:    "LockNotFound",
-		Message: fmt.Sprintf("lock not found: %s", lockID),
-		Code:    ErrCodeLockNotFound,
+// Validate validates the enhanced locking configuration
+func (c *Config) Validate() error {
+	if c.Backend != "boltdb" && c.Backend != "redis" {
+		return &ConfigError{
+			Field: "backend",
+			Value: c.Backend,
+			Msg:   "must be 'boltdb' or 'redis'",
+		}
+	}
+
+	if c.DefaultTimeout <= 0 {
+		return &ConfigError{
+			Field: "default_timeout",
+			Value: c.DefaultTimeout,
+			Msg:   "must be positive",
+		}
+	}
+
+	if c.MaxTimeout < c.DefaultTimeout {
+		return &ConfigError{
+			Field: "max_timeout",
+			Value: c.MaxTimeout,
+			Msg:   "must be >= default_timeout",
+		}
+	}
+
+	if c.MaxQueueSize <= 0 {
+		return &ConfigError{
+			Field: "max_queue_size",
+			Value: c.MaxQueueSize,
+			Msg:   "must be positive",
+		}
+	}
+
+	// Validate Redis config if Redis backend is selected
+	if c.Backend == "redis" {
+		return c.RedisConfig.Validate()
+	}
+
+	return nil
+}
+
+// Validate validates Redis configuration
+func (r *RedisConfig) Validate() error {
+	if len(r.Addresses) == 0 {
+		return &ConfigError{
+			Field: "redis.addresses",
+			Value: r.Addresses,
+			Msg:   "cannot be empty",
+		}
+	}
+
+	if r.PoolSize <= 0 {
+		return &ConfigError{
+			Field: "redis.pool_size",
+			Value: r.PoolSize,
+			Msg:   "must be positive",
+		}
+	}
+
+	if r.DefaultTTL <= 0 {
+		return &ConfigError{
+			Field: "redis.default_ttl",
+			Value: r.DefaultTTL,
+			Msg:   "must be positive",
+		}
+	}
+
+	return nil
+}
+
+// ConfigError represents a configuration validation error
+type ConfigError struct {
+	Field string
+	Value interface{}
+	Msg   string
+}
+
+func (e *ConfigError) Error() string {
+	return "config error in field " + e.Field + ": " + e.Msg
+}
+
+// GenerateLockKey generates a consistent lock key for a project and workspace
+func GenerateLockKey(project models.Project, workspace string) string {
+	return models.GenerateLockKey(project, workspace)
+}
+
+// IsValidPriority checks if a priority value is valid
+func IsValidPriority(p Priority) bool {
+	return p >= PriorityLow && p <= PriorityCritical
+}
+
+// PriorityString returns the string representation of a priority
+func (p Priority) String() string {
+	switch p {
+	case PriorityLow:
+		return "low"
+	case PriorityNormal:
+		return "normal"
+	case PriorityHigh:
+		return "high"
+	case PriorityCritical:
+		return "critical"
+	default:
+		return "unknown"
 	}
 }
 
-func NewTimeoutError(timeout time.Duration) *LockError {
-	return &LockError{
-		Type:    "Timeout",
-		Message: fmt.Sprintf("operation timed out after %v", timeout),
-		Code:    ErrCodeTimeout,
+// ParsePriority parses a priority string
+func ParsePriority(s string) (Priority, error) {
+	switch s {
+	case "low":
+		return PriorityLow, nil
+	case "normal":
+		return PriorityNormal, nil
+	case "high":
+		return PriorityHigh, nil
+	case "critical":
+		return PriorityCritical, nil
+	default:
+		return PriorityNormal, &ConfigError{
+			Field: "priority",
+			Value: s,
+			Msg:   "must be one of: low, normal, high, critical",
+		}
 	}
 }

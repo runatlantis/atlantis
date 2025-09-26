@@ -132,6 +132,16 @@ type UserConfig struct {
 	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
 	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
+
+	// Enhanced locking system configuration
+	EnhancedLockingEnabled     bool            `mapstructure:"enhanced-locking-enabled"`
+	EnhancedLockingBackend     string          `mapstructure:"enhanced-locking-backend"`
+	EnhancedLockingRedisAddr   string          `mapstructure:"enhanced-locking-redis-addr"`
+	EnhancedLockingRedisPass   string          `mapstructure:"enhanced-locking-redis-password"`
+	EnhancedLockingRedisDB     int             `mapstructure:"enhanced-locking-redis-db"`
+	EnhancedLockingPriorityQueue bool          `mapstructure:"enhanced-locking-priority-queue"`
+	EnhancedLockingRetries     bool            `mapstructure:"enhanced-locking-retries"`
+	EnhancedLockingMetrics     bool            `mapstructure:"enhanced-locking-metrics"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName
