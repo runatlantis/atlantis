@@ -83,6 +83,7 @@ var testFlags = map[string]interface{}{
 	DisableRepoLockingFlag:           true,
 	DisableGlobalApplyLockFlag:       false,
 	DiscardApprovalOnPlanFlag:        true,
+	DiscardApprovalAfterPlanFlag:     true,
 	EmojiReaction:                    "eyes",
 	ExecutableName:                   "atlantis",
 	FailOnPreWorkflowHookError:       false,
