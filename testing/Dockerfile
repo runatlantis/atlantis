@@ -1,4 +1,4 @@
-FROM golang:1.24.4@sha256:10c131810f80a4802c49cab0961bbe18a16f4bb2fb99ef16deaa23e4246fc817
+FROM golang:1.25.1@sha256:8305f5fa8ea63c7b5bc85bd223ccc62941f852318ebfbd22f53bbd0b358c07e1
 
 RUN apt-get update && apt-get --no-install-recommends -y install unzip \
     && apt-get clean \
