@@ -635,7 +635,8 @@ func TestGitHubWorkflow(t *testing.T) {
 				disableAutoplan:         c.DisableAutoplan,
 				disablePreWorkflowHooks: c.DisablePreWorkflowHooks,
 			}
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, opt)
+			ctrl, vcsClient, githubGetter, atlantisWorkspace, cleanup := setupE2E(t, c.RepoDir, opt)
+			defer cleanup()
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
@@ -802,7 +803,8 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 			// reset userConfig
 			userConfig = server.UserConfig{}
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, setupOption{})
+			ctrl, vcsClient, githubGetter, atlantisWorkspace, cleanup := setupE2E(t, c.RepoDir, setupOption{})
+			defer cleanup()
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
 
@@ -1202,7 +1204,8 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			userConfig.EnablePolicyChecksFlag = c.PolicyCheck
 			userConfig.QuietPolicyChecks = c.ExpQuietPolicyChecks
 
-			ctrl, vcsClient, githubGetter, atlantisWorkspace := setupE2E(t, c.RepoDir, setupOption{userConfig: userConfig})
+			ctrl, vcsClient, githubGetter, atlantisWorkspace, cleanup := setupE2E(t, c.RepoDir, setupOption{userConfig: userConfig})
+			defer cleanup()
 
 			// Set the repo to be cloned through the testing backdoor.
 			repoDir, headSHA := initializeRepo(t, c.RepoDir)
@@ -1296,7 +1299,7 @@ type setupOption struct {
 	userConfig              server.UserConfig
 }
 
-func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace, func()) {
 	allowForkPRs := false
 	discardApprovalOnPlan := true
 	dataDir, binDir, cacheDir := mkSubDirs(t)
@@ -1423,7 +1426,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		CommitStatusUpdater:    commitStatusUpdater,
 		Router:                 postWorkflowHookURLGenerator,
 	}
-	statsScope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	statsScope, closer, _ := metrics.NewLoggingScope(logger, "atlantis")
 
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		userConfig.EnablePolicyChecksFlag,
@@ -1676,7 +1679,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab, models.Github, models.BitbucketCloud},
 		VCSClient:                    e2eVCSClient,
 	}
-	return ctrl, e2eVCSClient, e2eGithubGetter, workingDir
+	cleanup := func() {
+		closer.Close()
+	}
+	return ctrl, e2eVCSClient, e2eGithubGetter, workingDir, cleanup
 }
 
 type mockLockURLGenerator struct{}
