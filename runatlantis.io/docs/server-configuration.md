@@ -579,6 +579,44 @@ It's not supposed to be used with `--disable-apply-all`.
 The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects.
 :::
 
+### `--enhanced-locking-backend` <Badge text="v0.31.0+" type="info"/>
+
+```bash
+atlantis server --enhanced-locking-backend="redis"
+# or
+ATLANTIS_ENHANCED_LOCKING_BACKEND="redis"
+```
+
+Specify the backend type for enhanced locking. Options are:
+- `boltdb` - Use BoltDB for enhanced locking (default)
+- `redis` - Use Redis for enhanced locking
+
+Default is `boltdb`.
+
+### `--enhanced-locking-default-timeout` <Badge text="v0.31.0+" type="info"/>
+
+```bash
+atlantis server --enhanced-locking-default-timeout="60s"
+# or
+ATLANTIS_ENHANCED_LOCKING_DEFAULT_TIMEOUT="60s"
+```
+
+Set the default timeout for enhanced locking operations. This determines how long the system will wait for locks before timing out.
+
+Default is `30s`.
+
+### `--enhanced-locking-enabled` <Badge text="v0.31.0+" type="info"/>
+
+```bash
+atlantis server --enhanced-locking-enabled
+# or
+ATLANTIS_ENHANCED_LOCKING_ENABLED=true
+```
+
+Enable the enhanced locking system with priority queuing, deadlock detection, and Redis backend support. When enabled, Atlantis uses the advanced locking features instead of the default locking mechanism.
+
+Default is `false`.
+
 ### `--executable-name` <Badge text="v0.42.0+" type="info"/>
 
 ```bash

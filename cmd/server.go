@@ -87,6 +87,9 @@ const (
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableProfilingAPI               = "enable-profiling-api"
+	EnhancedLockingEnabledFlag       = "enhanced-locking-enabled"
+	EnhancedLockingBackendFlag       = "enhanced-locking-backend"
+	EnhancedLockingDefaultTimeoutFlag = "enhanced-locking-default-timeout"
 	ExecutableName                   = "executable-name"
 	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
@@ -295,6 +298,14 @@ var stringFlags = map[string]stringFlag{
 	EmojiReaction: {
 		description:  "Emoji Reaction to use to react to comments.",
 		defaultValue: DefaultEmojiReaction,
+	},
+	EnhancedLockingBackendFlag: {
+		description:  "Enhanced locking backend type. Options: boltdb, redis.",
+		defaultValue: "boltdb",
+	},
+	EnhancedLockingDefaultTimeoutFlag: {
+		description:  "Default timeout for enhanced locking operations.",
+		defaultValue: "30s",
 	},
 	ExecutableName: {
 		description:  "Comment command executable name.",
@@ -532,6 +543,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnableProfilingAPI: {
 		description:  "Enable net/http/pprof routes in server for continuous profiling.",
+		defaultValue: false,
+	},
+	EnhancedLockingEnabledFlag: {
+		description:  "Enable enhanced locking system with priority queuing, deadlock detection, and Redis backend support.",
 		defaultValue: false,
 	},
 	EnableDiffMarkdownFormat: {
