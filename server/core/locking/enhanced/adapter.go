@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/locking/types"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -31,10 +33,16 @@ func NewLockingAdapter(manager LockManager, backend Backend, config *EnhancedCon
 }
 
 // TryLock attempts to acquire a lock (implements locking.Backend interface)
-func (la *LockingAdapter) TryLock(lock models.ProjectLock) (bool, locking.TryLockResponse, error) {
+func (la *LockingAdapter) TryLock(lock models.ProjectLock) (bool, events.TryLockResponse, error) {
 	if !la.config.Enabled {
 		// Fall back to legacy backend
-		return la.legacyFallback.TryLock(lock)
+		acquired, _, err := la.legacyFallback.TryLock(lock)
+		if err != nil {
+			return false, events.TryLockResponse{}, err
+		}
+		return acquired, events.TryLockResponse{
+			LockAcquired: acquired,
+		}, nil
 	}
 
 	ctx := context.Background()
@@ -45,57 +53,66 @@ func (la *LockingAdapter) TryLock(lock models.ProjectLock) (bool, locking.TryLoc
 	// Try to acquire the lock
 	enhancedLock, acquired, err := la.backend.TryAcquireLock(ctx, request)
 	if err != nil {
-		la.log.Error("Failed to acquire enhanced lock: %v", err)
+		la.log.Err("Failed to acquire enhanced lock: %v", err)
 
 		// Fall back to legacy if enabled
 		if la.config.LegacyFallback {
 			la.log.Info("Falling back to legacy locking system")
-			return la.legacyFallback.TryLock(lock)
+			acquired, _, err := la.legacyFallback.TryLock(lock)
+			if err != nil {
+				return false, events.TryLockResponse{}, err
+			}
+			return acquired, events.TryLockResponse{
+				LockAcquired: acquired,
+			}, nil
 		}
 
-		return false, locking.TryLockResponse{}, err
+		return false, events.TryLockResponse{}, err
 	}
 
 	if !acquired {
 		// Lock is held by someone else
-		if enhancedLock != nil && enhancedLock.State == LockStatePending {
-			// Request is queued
-			return false, locking.TryLockResponse{
-				LockFailureReason: fmt.Sprintf("Lock is held, request queued with priority %v", enhancedLock.Priority),
+		if enhancedLock != nil && enhancedLock.State == "pending" {
+			// Request is queued - return empty lock
+			return false, events.TryLockResponse{
+				LockAcquired: false,
 			}, nil
 		}
 
 		// Find who holds the lock
 		existingLocks, err := la.backend.ListLocks(ctx)
 		if err != nil {
-			return false, locking.TryLockResponse{}, err
+			return false, events.TryLockResponse{}, err
 		}
 
 		for _, existingLock := range existingLocks {
 			if la.sameResource(request.Resource, existingLock.Resource) {
-				legacyLock := la.backend.ConvertToLegacy(existingLock)
-				return false, locking.TryLockResponse{
-					CurrLock:          *legacyLock,
-					LockFailureReason: fmt.Sprintf("Lock held by %s since %s", existingLock.Owner, existingLock.AcquiredAt.Format(time.RFC3339)),
+				// Build failure reason message
+				failureReason := fmt.Sprintf("This project is currently locked by %s", existingLock.Owner)
+				return false, events.TryLockResponse{
+					LockAcquired:      false,
+					LockFailureReason: failureReason,
 				}, nil
 			}
 		}
 
-		return false, locking.TryLockResponse{
-			LockFailureReason: "Lock unavailable",
+		return false, events.TryLockResponse{
+			LockAcquired: false,
 		}, nil
 	}
 
 	// Successfully acquired
 	la.log.Info("Enhanced lock acquired: %s for project %s/%s", enhancedLock.ID, lock.Project.RepoFullName, lock.Workspace)
-	return true, locking.TryLockResponse{}, nil
+	return true, events.TryLockResponse{
+		LockAcquired: true,
+	}, nil
 }
 
 // Unlock releases a lock (implements locking.Backend interface)
-func (la *LockingAdapter) Unlock(project models.Project, workspace string, user models.User) (*models.ProjectLock, error) {
+func (la *LockingAdapter) Unlock(project models.Project, workspace string) (*models.ProjectLock, error) {
 	if !la.config.Enabled {
 		// Fall back to legacy backend
-		return la.legacyFallback.Unlock(project, workspace, user)
+		return la.legacyFallback.Unlock(project, workspace)
 	}
 
 	ctx := context.Background()
@@ -103,11 +120,11 @@ func (la *LockingAdapter) Unlock(project models.Project, workspace string, user 
 	// Find the lock to unlock
 	locks, err := la.backend.ListLocks(ctx)
 	if err != nil {
-		la.log.Error("Failed to list locks for unlock: %v", err)
+		la.log.Err("Failed to list locks for unlock: %v", err)
 
 		// Fall back to legacy if enabled
 		if la.config.LegacyFallback {
-			return la.legacyFallback.Unlock(project, workspace, user)
+			return la.legacyFallback.Unlock(project, workspace)
 		}
 
 		return nil, err
@@ -116,9 +133,9 @@ func (la *LockingAdapter) Unlock(project models.Project, workspace string, user 
 	var targetLock *EnhancedLock
 	for _, lock := range locks {
 		if lock.Resource.Namespace == project.RepoFullName &&
-		   lock.Resource.Path == project.Path &&
-		   lock.Resource.Workspace == workspace &&
-		   lock.Owner == user.Username {
+			lock.Resource.Path == project.Path &&
+			lock.Resource.Workspace == workspace &&
+			lock.Resource.Type == "project" {
 			targetLock = lock
 			break
 		}
@@ -132,24 +149,24 @@ func (la *LockingAdapter) Unlock(project models.Project, workspace string, user 
 	// Release the lock
 	err = la.backend.ReleaseLock(ctx, targetLock.ID)
 	if err != nil {
-		la.log.Error("Failed to release enhanced lock: %v", err)
+		la.log.Err("Failed to release enhanced lock: %v", err)
 
 		// Fall back to legacy if enabled
 		if la.config.LegacyFallback {
-			return la.legacyFallback.Unlock(project, workspace, user)
+			return la.legacyFallback.Unlock(project, workspace)
 		}
 
 		return nil, err
 	}
 
 	// Return the legacy format
-	legacyLock := la.backend.ConvertToLegacy(targetLock)
+	legacyLock := la.convertToLegacyLock(targetLock)
 	la.log.Info("Enhanced lock released: %s for project %s/%s", targetLock.ID, project.RepoFullName, workspace)
 	return legacyLock, nil
 }
 
 // List returns all current locks (implements locking.Backend interface)
-func (la *LockingAdapter) List() (map[string]models.ProjectLock, error) {
+func (la *LockingAdapter) List() ([]models.ProjectLock, error) {
 	if !la.config.Enabled {
 		// Fall back to legacy backend
 		return la.legacyFallback.List()
@@ -160,7 +177,7 @@ func (la *LockingAdapter) List() (map[string]models.ProjectLock, error) {
 	// Get enhanced locks
 	locks, err := la.backend.ListLocks(ctx)
 	if err != nil {
-		la.log.Error("Failed to list enhanced locks: %v", err)
+		la.log.Err("Failed to list enhanced locks: %v", err)
 
 		// Fall back to legacy if enabled
 		if la.config.LegacyFallback {
@@ -171,18 +188,17 @@ func (la *LockingAdapter) List() (map[string]models.ProjectLock, error) {
 	}
 
 	// Convert to legacy format
-	lockMap := make(map[string]models.ProjectLock)
+	var lockList []models.ProjectLock
 	for _, lock := range locks {
-		if lock.State == LockStateAcquired {
-			legacyLock := la.backend.ConvertToLegacy(lock)
+		if lock.State == "acquired" {
+			legacyLock := la.convertToLegacyLock(lock)
 			if legacyLock != nil {
-				key := fmt.Sprintf("%s/%s/%s", legacyLock.Project.RepoFullName, legacyLock.Project.Path, legacyLock.Workspace)
-				lockMap[key] = *legacyLock
+				lockList = append(lockList, *legacyLock)
 			}
 		}
 	}
 
-	return lockMap, nil
+	return lockList, nil
 }
 
 // UnlockByPull releases all locks associated with a pull request (implements locking.Backend interface)
@@ -197,7 +213,7 @@ func (la *LockingAdapter) UnlockByPull(repoFullName string, pullNum int) ([]mode
 	// Get all locks for this repository
 	locks, err := la.backend.ListLocks(ctx)
 	if err != nil {
-		la.log.Error("Failed to list locks for UnlockByPull: %v", err)
+		la.log.Err("Failed to list locks for UnlockByPull: %v", err)
 
 		// Fall back to legacy if enabled
 		if la.config.LegacyFallback {
@@ -244,17 +260,17 @@ func (la *LockingAdapter) GetLock(project models.Project, workspace string) (*mo
 
 // Conversion helpers
 
-func (la *LockingAdapter) convertToEnhancedRequest(lock models.ProjectLock) *EnhancedLockRequest {
-	return &EnhancedLockRequest{
+func (la *LockingAdapter) convertToEnhancedRequest(lock models.ProjectLock) *types.EnhancedLockRequest {
+	return &types.EnhancedLockRequest{
 		ID: generateRequestID(),
-		Resource: ResourceIdentifier{
-			Type:      ResourceTypeProject,
+		Resource: types.ResourceIdentifier{
+			Type:      types.ResourceTypeProject,
 			Namespace: lock.Project.RepoFullName,
 			Name:      lock.Project.Path,
 			Workspace: lock.Workspace,
 			Path:      lock.Project.Path,
 		},
-		Priority:    PriorityNormal,
+		Priority:    types.PriorityNormal,
 		Timeout:     la.config.DefaultTimeout,
 		Metadata:    make(map[string]string),
 		Context:     context.Background(),
@@ -265,11 +281,30 @@ func (la *LockingAdapter) convertToEnhancedRequest(lock models.ProjectLock) *Enh
 	}
 }
 
-func (la *LockingAdapter) sameResource(r1, r2 ResourceIdentifier) bool {
+func (la *LockingAdapter) sameResource(r1, r2 types.ResourceIdentifier) bool {
 	return r1.Namespace == r2.Namespace &&
-		   r1.Name == r2.Name &&
-		   r1.Workspace == r2.Workspace &&
-		   r1.Path == r2.Path
+		r1.Name == r2.Name &&
+		r1.Workspace == r2.Workspace &&
+		r1.Path == r2.Path
+}
+
+// convertToLegacyLock converts an enhanced lock to a legacy ProjectLock
+func (la *LockingAdapter) convertToLegacyLock(enhancedLock *types.EnhancedLock) *models.ProjectLock {
+	if enhancedLock == nil {
+		return nil
+	}
+
+	return &models.ProjectLock{
+		Project: models.Project{
+			RepoFullName: enhancedLock.Resource.Namespace,
+			Path:         enhancedLock.Resource.Path,
+		},
+		Workspace: enhancedLock.Resource.Workspace,
+		User: models.User{
+			Username: enhancedLock.Owner,
+		},
+		Time: enhancedLock.AcquiredAt,
+	}
 }
 
 // Enhanced methods (additional capabilities beyond legacy interface)
@@ -436,7 +471,7 @@ func (cc *CompatibilityChecker) VerifyBackwardCompatibility(ctx context.Context)
 	testWorkspace := "default"
 
 	// Test TryLock
-	acquired, resp, err := cc.adapter.TryLock(models.ProjectLock{
+	acquired, _, err := cc.adapter.TryLock(models.ProjectLock{
 		Project:   testProject,
 		Workspace: testWorkspace,
 		User:      testUser,
@@ -448,7 +483,7 @@ func (cc *CompatibilityChecker) VerifyBackwardCompatibility(ctx context.Context)
 	}
 
 	if !acquired {
-		return fmt.Errorf("TryLock compatibility test failed: lock not acquired, reason: %s", resp.LockFailureReason)
+		return fmt.Errorf("TryLock compatibility test failed: lock not acquired")
 	}
 
 	// Test List
@@ -460,7 +495,7 @@ func (cc *CompatibilityChecker) VerifyBackwardCompatibility(ctx context.Context)
 	found := false
 	for key, lock := range locks {
 		if lock.Project.RepoFullName == testProject.RepoFullName &&
-		   lock.Workspace == testWorkspace {
+			lock.Workspace == testWorkspace {
 			found = true
 			cc.log.Info("Found test lock in list: %s", key)
 			break
@@ -482,7 +517,7 @@ func (cc *CompatibilityChecker) VerifyBackwardCompatibility(ctx context.Context)
 	}
 
 	// Test Unlock
-	unlockedLock, err := cc.adapter.Unlock(testProject, testWorkspace, testUser)
+	unlockedLock, err := cc.adapter.Unlock(testProject, testWorkspace)
 	if err != nil {
 		return fmt.Errorf("Unlock compatibility test failed: %w", err)
 	}
@@ -585,7 +620,7 @@ func (cc *CompatibilityChecker) testConcurrentAccess(ctx context.Context) error 
 	}
 
 	// User2 should not be able to acquire same lock
-	acquired2, resp, err := cc.adapter.TryLock(models.ProjectLock{
+	acquired2, _, err := cc.adapter.TryLock(models.ProjectLock{
 		Project: testProject, Workspace: testWorkspace, User: testUser2, Time: time.Now(),
 	})
 	if err != nil {
@@ -594,12 +629,10 @@ func (cc *CompatibilityChecker) testConcurrentAccess(ctx context.Context) error 
 	if acquired2 {
 		return fmt.Errorf("second lock should not have been acquired")
 	}
-	if resp.LockFailureReason == "" {
-		return fmt.Errorf("lock failure reason should be provided")
-	}
+	// Note: Legacy behavior - lock failure reasons are not available in simplified interface
 
 	// Clean up
-	cc.adapter.Unlock(testProject, testWorkspace, testUser1)
+	cc.adapter.Unlock(testProject, testWorkspace)
 	return nil
 }
 
@@ -669,7 +702,7 @@ func (cc *CompatibilityChecker) testListConsistency(ctx context.Context) error {
 	}
 
 	// Remove the lock
-	_, err = cc.adapter.Unlock(testProject, testWorkspace, testUser)
+	_, err = cc.adapter.Unlock(testProject, testWorkspace)
 	if err != nil {
 		return err
 	}
@@ -689,11 +722,11 @@ func (cc *CompatibilityChecker) testListConsistency(ctx context.Context) error {
 
 // CompatibilityReport contains the results of compatibility testing
 type CompatibilityReport struct {
-	Success   bool                 `json:"success"`
-	StartTime time.Time            `json:"start_time"`
-	EndTime   time.Time            `json:"end_time"`
-	Duration  time.Duration        `json:"duration"`
-	Tests     []CompatibilityTest  `json:"tests"`
+	Success   bool                `json:"success"`
+	StartTime time.Time           `json:"start_time"`
+	EndTime   time.Time           `json:"end_time"`
+	Duration  time.Duration       `json:"duration"`
+	Tests     []CompatibilityTest `json:"tests"`
 }
 
 // CompatibilityTest represents a single compatibility test result

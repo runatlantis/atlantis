@@ -36,10 +36,10 @@ type MetricsCollector struct {
 	requestTypeMetrics map[string]*RequestTypeMetrics
 
 	// Time-based metrics for rate calculations
-	startTime         time.Time
-	lastUpdateTime    time.Time
-	metricsHistory    []*MetricsSnapshot
-	maxHistorySize    int
+	startTime      time.Time
+	lastUpdateTime time.Time
+	metricsHistory []*MetricsSnapshot
+	maxHistorySize int
 
 	// Manager state
 	started  bool
@@ -49,30 +49,30 @@ type MetricsCollector struct {
 
 // PriorityMetrics tracks metrics for each priority level
 type PriorityMetrics struct {
-	Requests     int64         `json:"requests"`
-	Acquisitions int64         `json:"acquisitions"`
-	Failures     int64         `json:"failures"`
+	Requests      int64         `json:"requests"`
+	Acquisitions  int64         `json:"acquisitions"`
+	Failures      int64         `json:"failures"`
 	TotalWaitTime time.Duration `json:"total_wait_time"`
 	AvgWaitTime   time.Duration `json:"avg_wait_time"`
 }
 
 // RequestTypeMetrics tracks metrics for different request types
 type RequestTypeMetrics struct {
-	Requests     int64         `json:"requests"`
-	Acquisitions int64         `json:"acquisitions"`
-	Failures     int64         `json:"failures"`
+	Requests      int64         `json:"requests"`
+	Acquisitions  int64         `json:"acquisitions"`
+	Failures      int64         `json:"failures"`
 	TotalWaitTime time.Duration `json:"total_wait_time"`
 	AvgWaitTime   time.Duration `json:"avg_wait_time"`
 }
 
 // MetricsSnapshot represents metrics at a point in time
 type MetricsSnapshot struct {
-	Timestamp    time.Time `json:"timestamp"`
-	TotalRequests int64     `json:"total_requests"`
-	SuccessRate   float64   `json:"success_rate"`
+	Timestamp     time.Time     `json:"timestamp"`
+	TotalRequests int64         `json:"total_requests"`
+	SuccessRate   float64       `json:"success_rate"`
 	AvgWaitTime   time.Duration `json:"avg_wait_time"`
-	RequestRate   float64   `json:"request_rate"` // requests per second
-	HealthScore   int       `json:"health_score"`
+	RequestRate   float64       `json:"request_rate"` // requests per second
+	HealthScore   int           `json:"health_score"`
 }
 
 // MetricsStats provides comprehensive metrics statistics
@@ -96,7 +96,7 @@ type MetricsStats struct {
 	MaxHoldTime time.Duration `json:"max_hold_time"`
 
 	// Rates
-	RequestRate  float64 `json:"request_rate"`  // requests per second
+	RequestRate    float64 `json:"request_rate"`    // requests per second
 	ThroughputRate float64 `json:"throughput_rate"` // successful acquisitions per second
 
 	// Health and quality
@@ -109,8 +109,8 @@ type MetricsStats struct {
 	RequestTypeBreakdown map[string]*RequestTypeMetrics `json:"request_type_breakdown"`
 
 	// Time information
-	CollectionStartTime time.Time `json:"collection_start_time"`
-	LastUpdateTime      time.Time `json:"last_update_time"`
+	CollectionStartTime time.Time     `json:"collection_start_time"`
+	LastUpdateTime      time.Time     `json:"last_update_time"`
 	UptimeDuration      time.Duration `json:"uptime_duration"`
 }
 

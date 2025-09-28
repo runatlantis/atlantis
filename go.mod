@@ -34,6 +34,7 @@ require (
 	github.com/moby/patternmatcher v0.6.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/opentofu/tofudl v0.0.1
+	github.com/petergtz/pegomock v2.9.0+incompatible
 	github.com/petergtz/pegomock/v4 v4.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.7.3
@@ -113,6 +114,7 @@ require (
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.38.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect

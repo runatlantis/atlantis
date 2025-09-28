@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/locking/enhanced"
+	"github.com/runatlantis/atlantis/server/core/locking/types"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -23,34 +23,34 @@ type DeadlockDetector struct {
 
 // DetectorConfig configures deadlock detection behavior
 type DetectorConfig struct {
-	Enabled           bool                    `json:"enabled"`
-	CheckInterval     time.Duration           `json:"check_interval"`
-	MaxWaitTime       time.Duration           `json:"max_wait_time"`
-	ResolutionPolicy  ResolutionPolicy        `json:"resolution_policy"`
-	HistorySize       int                     `json:"history_size"`
-	EnablePrevention  bool                    `json:"enable_prevention"`
+	Enabled          bool             `json:"enabled"`
+	CheckInterval    time.Duration    `json:"check_interval"`
+	MaxWaitTime      time.Duration    `json:"max_wait_time"`
+	ResolutionPolicy ResolutionPolicy `json:"resolution_policy"`
+	HistorySize      int              `json:"history_size"`
+	EnablePrevention bool             `json:"enable_prevention"`
 }
 
 // ResolutionPolicy defines how deadlocks should be resolved
 type ResolutionPolicy string
 
 const (
-	ResolveLIFO         ResolutionPolicy = "lifo"         // Last In, First Out
-	ResolveFIFO         ResolutionPolicy = "fifo"         // First In, First Out
+	ResolveLIFO           ResolutionPolicy = "lifo"            // Last In, First Out
+	ResolveFIFO           ResolutionPolicy = "fifo"            // First In, First Out
 	ResolveLowestPriority ResolutionPolicy = "lowest_priority" // Abort lowest priority
-	ResolveRandomVictim   ResolutionPolicy = "random"       // Random victim selection
-	ResolveYoungestFirst  ResolutionPolicy = "youngest"     // Abort youngest lock
+	ResolveRandomVictim   ResolutionPolicy = "random"          // Random victim selection
+	ResolveYoungestFirst  ResolutionPolicy = "youngest"        // Abort youngest lock
 )
 
 // DefaultDetectorConfig returns default deadlock detection configuration
 func DefaultDetectorConfig() *DetectorConfig {
 	return &DetectorConfig{
-		Enabled:           true,
-		CheckInterval:     30 * time.Second,
-		MaxWaitTime:       5 * time.Minute,
-		ResolutionPolicy:  ResolveLowestPriority,
-		HistorySize:       1000,
-		EnablePrevention:  true,
+		Enabled:          true,
+		CheckInterval:    30 * time.Second,
+		MaxWaitTime:      5 * time.Minute,
+		ResolutionPolicy: ResolveLowestPriority,
+		HistorySize:      1000,
+		EnablePrevention: true,
 	}
 }
 
@@ -104,7 +104,7 @@ func (dd *DeadlockDetector) Stop() {
 }
 
 // AddLockRequest adds a lock request to the wait-for graph
-func (dd *DeadlockDetector) AddLockRequest(request *enhanced.EnhancedLockRequest, blockedBy []*enhanced.EnhancedLock) error {
+func (dd *DeadlockDetector) AddLockRequest(request *types.EnhancedLockRequest, blockedBy []*types.EnhancedLock) error {
 	if !dd.config.Enabled {
 		return nil
 	}
@@ -114,7 +114,7 @@ func (dd *DeadlockDetector) AddLockRequest(request *enhanced.EnhancedLockRequest
 
 	// Add the waiting relationship to the graph
 	for _, lock := range blockedBy {
-		dd.waitGraph.AddEdge(request.ID, lock.Owner)
+		dd.waitGraph.AddEdge(request.GetID(), lock.GetOwner())
 	}
 
 	dd.metrics.IncrementWaitingRequests()
@@ -135,7 +135,7 @@ func (dd *DeadlockDetector) RemoveLockRequest(requestID string) {
 }
 
 // AddLockAcquisition records a lock acquisition
-func (dd *DeadlockDetector) AddLockAcquisition(lock *enhanced.EnhancedLock) {
+func (dd *DeadlockDetector) AddLockAcquisition(lock *types.EnhancedLock) {
 	if !dd.config.Enabled {
 		return
 	}
@@ -144,7 +144,7 @@ func (dd *DeadlockDetector) AddLockAcquisition(lock *enhanced.EnhancedLock) {
 	defer dd.mutex.Unlock()
 
 	// Remove from wait graph since lock is acquired
-	dd.waitGraph.RemoveNode(lock.ID)
+	dd.waitGraph.RemoveNode(lock.GetID())
 }
 
 // CheckForDeadlocks performs immediate deadlock detection
@@ -161,10 +161,10 @@ func (dd *DeadlockDetector) CheckForDeadlocks(ctx context.Context) ([]*Deadlock,
 
 	for _, cycle := range cycles {
 		deadlock := &Deadlock{
-			ID:          generateDeadlockID(),
-			Cycle:       cycle,
-			DetectedAt:  time.Now(),
-			Resolved:    false,
+			ID:         generateDeadlockID(),
+			Cycle:      cycle,
+			DetectedAt: time.Now(),
+			Resolved:   false,
 		}
 
 		// Analyze the deadlock for additional context
@@ -191,7 +191,7 @@ func (dd *DeadlockDetector) ResolveDeadlock(ctx context.Context, deadlock *Deadl
 	// Select victim based on resolution policy
 	victim := dd.selectVictim(deadlock)
 	if victim == "" {
-		return &enhanced.LockError{
+		return &types.LockError{
 			Type:    "ResolutionFailed",
 			Message: "failed to select victim for deadlock resolution",
 			Code:    "RESOLUTION_FAILED",
@@ -228,7 +228,7 @@ func (dd *DeadlockDetector) ResolveDeadlock(ctx context.Context, deadlock *Deadl
 }
 
 // PreventDeadlock checks if a new lock request would create a deadlock
-func (dd *DeadlockDetector) PreventDeadlock(request *enhanced.EnhancedLockRequest, blockedBy []*enhanced.EnhancedLock) (bool, error) {
+func (dd *DeadlockDetector) PreventDeadlock(request *types.EnhancedLockRequest, blockedBy []*types.EnhancedLock) (bool, error) {
 	if !dd.config.EnablePrevention {
 		return true, nil // Allow if prevention is disabled
 	}
@@ -239,7 +239,7 @@ func (dd *DeadlockDetector) PreventDeadlock(request *enhanced.EnhancedLockReques
 	// Temporarily add the edges to simulate the request
 	tempGraph := dd.waitGraph.Clone()
 	for _, lock := range blockedBy {
-		tempGraph.AddEdge(request.ID, lock.Owner)
+		tempGraph.AddEdge(request.GetID(), lock.GetOwner())
 	}
 
 	// Check if this would create a cycle
@@ -248,7 +248,7 @@ func (dd *DeadlockDetector) PreventDeadlock(request *enhanced.EnhancedLockReques
 
 	if wouldDeadlock {
 		dd.metrics.IncrementPreventedDeadlocks()
-		dd.log.Info("Prevented potential deadlock for request: %s", request.ID)
+		dd.log.Info("Prevented potential deadlock for request: %s", request.GetID())
 	}
 
 	return !wouldDeadlock, nil
@@ -278,14 +278,14 @@ func (dd *DeadlockDetector) detectLoop(ctx context.Context) {
 		case <-ticker.C:
 			deadlocks, err := dd.CheckForDeadlocks(ctx)
 			if err != nil {
-				dd.log.Error("Error during deadlock detection: %v", err)
+				dd.log.Err("Error during deadlock detection: %v", err)
 				continue
 			}
 
 			// Resolve detected deadlocks
 			for _, deadlock := range deadlocks {
 				if err := dd.ResolveDeadlock(ctx, deadlock); err != nil {
-					dd.log.Error("Error resolving deadlock %s: %v", deadlock.ID, err)
+					dd.log.Err("Error resolving deadlock %s: %v", deadlock.ID, err)
 				}
 			}
 		}
@@ -360,8 +360,8 @@ func (dd *DeadlockDetector) selectRandomInCycle(cycle []string) string {
 func (dd *DeadlockDetector) analyzeDeadlock(deadlock *Deadlock) {
 	// Add metadata about the deadlock
 	deadlock.Metadata = map[string]interface{}{
-		"cycle_length":    len(deadlock.Cycle),
-		"detection_time":  deadlock.DetectedAt,
+		"cycle_length":      len(deadlock.Cycle),
+		"detection_time":    deadlock.DetectedAt,
 		"resolution_policy": dd.config.ResolutionPolicy,
 	}
 }
@@ -369,7 +369,7 @@ func (dd *DeadlockDetector) analyzeDeadlock(deadlock *Deadlock) {
 // Deadlock represents a detected deadlock situation
 type Deadlock struct {
 	ID         string                 `json:"id"`
-	Cycle      []string               `json:"cycle"`       // Node IDs in the cycle
+	Cycle      []string               `json:"cycle"` // Node IDs in the cycle
 	DetectedAt time.Time              `json:"detected_at"`
 	Resolved   bool                   `json:"resolved"`
 	ResolvedAt time.Time              `json:"resolved_at,omitempty"`
@@ -385,8 +385,8 @@ type ResolutionHook interface {
 
 // WaitForGraph represents the wait-for graph for deadlock detection
 type WaitForGraph struct {
-	nodes map[string]bool          // Set of nodes
-	edges map[string][]string      // Adjacency list
+	nodes map[string]bool     // Set of nodes
+	edges map[string][]string // Adjacency list
 	mutex sync.RWMutex
 }
 
@@ -541,13 +541,13 @@ func (wfg *WaitForGraph) GetStats() map[string]interface{} {
 
 // DeadlockMetrics tracks deadlock-related metrics
 type DeadlockMetrics struct {
-	DeadlocksDetected     int64      `json:"deadlocks_detected"`
-	DeadlocksResolved     int64      `json:"deadlocks_resolved"`
-	PreventedDeadlocks    int64      `json:"prevented_deadlocks"`
-	WaitingRequests       int64      `json:"waiting_requests"`
-	ResolutionHistory     []*Deadlock `json:"resolution_history"`
-	MaxHistorySize        int        `json:"max_history_size"`
-	mutex                 sync.RWMutex
+	DeadlocksDetected  int64       `json:"deadlocks_detected"`
+	DeadlocksResolved  int64       `json:"deadlocks_resolved"`
+	PreventedDeadlocks int64       `json:"prevented_deadlocks"`
+	WaitingRequests    int64       `json:"waiting_requests"`
+	ResolutionHistory  []*Deadlock `json:"resolution_history"`
+	MaxHistorySize     int         `json:"max_history_size"`
+	mutex              sync.RWMutex
 }
 
 // NewDeadlockMetrics creates new deadlock metrics
@@ -619,5 +619,5 @@ func (dm *DeadlockMetrics) GetSnapshot() *DeadlockMetrics {
 // generateDeadlockID generates a unique ID for a deadlock
 func generateDeadlockID() string {
 	return "deadlock_" + time.Now().Format("20060102_150405") + "_" +
-		   time.Now().Format("000")
+		time.Now().Format("000")
 }

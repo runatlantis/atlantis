@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/locking/enhanced/backends"
 	"github.com/runatlantis/atlantis/server/core/locking/enhanced/deadlock"
 	"github.com/runatlantis/atlantis/server/core/locking/enhanced/queue"
 	"github.com/runatlantis/atlantis/server/core/locking/enhanced/timeout"
@@ -16,20 +15,20 @@ import (
 
 // EnhancedLockManager implements the LockManager interface with advanced features
 type EnhancedLockManager struct {
-	backend          Backend
-	config          *EnhancedConfig
-	log             logging.SimpleLogging
+	backend Backend
+	config  *EnhancedConfig
+	log     logging.SimpleLogging
 
 	// Advanced components
-	queue           *queue.ResourceBasedQueue
-	timeoutManager  *timeout.TimeoutManager
-	retryManager    *timeout.RetryManager
+	queue            *queue.ResourceBasedQueue
+	timeoutManager   *timeout.TimeoutManager
+	retryManager     *timeout.RetryManager
 	deadlockDetector *deadlock.DeadlockDetector
 
 	// State management
-	mutex          sync.RWMutex
-	running        bool
-	stopChan       chan struct{}
+	mutex    sync.RWMutex
+	running  bool
+	stopChan chan struct{}
 
 	// Metrics and monitoring
 	metrics        *ManagerMetrics
@@ -71,11 +70,11 @@ func NewEnhancedLockManager(backend Backend, config *EnhancedConfig, log logging
 	}
 
 	manager := &EnhancedLockManager{
-		backend:   backend,
-		config:    config,
-		log:       log,
-		running:   false,
-		stopChan:  make(chan struct{}),
+		backend:  backend,
+		config:   config,
+		log:      log,
+		running:  false,
+		stopChan: make(chan struct{}),
 		metrics: &ManagerMetrics{
 			StartTime:   time.Now(),
 			LastUpdated: time.Now(),
@@ -105,12 +104,12 @@ func NewEnhancedLockManager(backend Backend, config *EnhancedConfig, log logging
 
 	if config.EnableDeadlockDetection {
 		deadlockConfig := &deadlock.DetectorConfig{
-			Enabled:           true,
-			CheckInterval:     config.DeadlockCheckInterval,
-			MaxWaitTime:       config.DefaultTimeout,
-			ResolutionPolicy:  deadlock.ResolveLowestPriority,
-			HistorySize:       100,
-			EnablePrevention:  true,
+			Enabled:          true,
+			CheckInterval:    config.DeadlockCheckInterval,
+			MaxWaitTime:      config.DefaultTimeout,
+			ResolutionPolicy: deadlock.ResolveLowestPriority,
+			HistorySize:      100,
+			EnablePrevention: true,
 		}
 		manager.deadlockDetector = deadlock.NewDeadlockDetector(deadlockConfig, log)
 		log.Info("Deadlock detection enabled with %v check interval", config.DeadlockCheckInterval)
@@ -186,7 +185,7 @@ func (elm *EnhancedLockManager) Unlock(ctx context.Context, project models.Proje
 	// Get current locks to find the target
 	locks, err := elm.backend.ListLocks(ctx)
 	if err != nil {
-		elm.log.Error("Failed to list locks during unlock: %v", err)
+		elm.log.Err("Failed to list locks during unlock: %v", err)
 		return nil, err
 	}
 
@@ -508,16 +507,14 @@ func (elm *EnhancedLockManager) CancelQueuedRequest(ctx context.Context, project
 		return fmt.Errorf("priority queue is not enabled")
 	}
 
-	// Find the request ID - this is simplified
-	resource := ResourceIdentifier{
-		Type:      ResourceTypeProject,
-		Namespace: project.RepoFullName,
-		Name:      project.Path,
-		Workspace: workspace,
-		Path:      project.Path,
-	}
-
-	// In practice, you'd maintain a mapping of user requests to IDs
+	// In practice, you'd maintain a mapping of user requests to IDs and use the resource identifier
+	// resource := types.ResourceIdentifier{
+	//	Type:      types.ResourceTypeProject,
+	//	Namespace: project.RepoFullName,
+	//	Name:      project.Path,
+	//	Workspace: workspace,
+	//	Path:      project.Path,
+	// }
 	elm.log.Info("Queue cancellation requested for %s/%s by %s", project.RepoFullName, workspace, user.Username)
 	return nil
 }
@@ -588,9 +585,9 @@ func (elm *EnhancedLockManager) createLockRequest(project models.Project, worksp
 
 func (elm *EnhancedLockManager) sameResource(r1, r2 ResourceIdentifier) bool {
 	return r1.Namespace == r2.Namespace &&
-		   r1.Name == r2.Name &&
-		   r1.Workspace == r2.Workspace &&
-		   r1.Path == r2.Path
+		r1.Name == r2.Name &&
+		r1.Workspace == r2.Workspace &&
+		r1.Path == r2.Path
 }
 
 func (elm *EnhancedLockManager) setupLockTimeout(ctx context.Context, lock *EnhancedLock) {
@@ -608,7 +605,7 @@ func (elm *EnhancedLockManager) setupLockTimeout(ctx context.Context, lock *Enha
 
 		err := elm.backend.ReleaseLock(ctx, lockID)
 		if err != nil {
-			elm.log.Error("Failed to release timed-out lock %s: %v", lockID, err)
+			elm.log.Err("Failed to release timed-out lock %s: %v", lockID, err)
 		} else {
 			elm.emitEvent(ctx, &ManagerEvent{
 				Type:      "lock_timeout",
@@ -640,7 +637,7 @@ func (elm *EnhancedLockManager) processQueueForResource(ctx context.Context, res
 	// Try to acquire the lock for the queued request
 	enhancedLock, err := elm.backend.AcquireLock(ctx, request)
 	if err != nil {
-		elm.log.Error("Failed to acquire lock for queued request %s: %v", request.ID, err)
+		elm.log.Err("Failed to acquire lock for queued request %s: %v", request.ID, err)
 		return
 	}
 
@@ -681,7 +678,7 @@ func (elm *EnhancedLockManager) emitEvent(ctx context.Context, event *ManagerEve
 		go func(cb EventCallback) {
 			defer func() {
 				if r := recover(); r != nil {
-					elm.log.Error("Event callback panicked: %v", r)
+					elm.log.Err("Event callback panicked: %v", r)
 				}
 			}()
 			cb(ctx, event)
@@ -709,7 +706,7 @@ func (elm *EnhancedLockManager) maintenanceLoop(ctx context.Context) {
 func (elm *EnhancedLockManager) performMaintenance(ctx context.Context) {
 	// Clean up expired locks
 	if expired, err := elm.backend.CleanupExpiredLocks(ctx); err != nil {
-		elm.log.Error("Failed to cleanup expired locks: %v", err)
+		elm.log.Err("Failed to cleanup expired locks: %v", err)
 	} else if expired > 0 {
 		elm.log.Info("Cleaned up %d expired locks", expired)
 	}

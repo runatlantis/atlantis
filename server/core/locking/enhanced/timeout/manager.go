@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/locking/enhanced"
+	"github.com/runatlantis/atlantis/server/core/locking/types"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -19,7 +19,7 @@ type TimeoutManager struct {
 }
 
 // TimeoutCallback is called when a timeout occurs
-type TimeoutCallback func(ctx context.Context, lockID string, resource enhanced.ResourceIdentifier)
+type TimeoutCallback func(ctx context.Context, lockID string, resource types.ResourceIdentifier)
 
 // NewTimeoutManager creates a new timeout manager
 func NewTimeoutManager(log logging.SimpleLogging) *TimeoutManager {
@@ -30,7 +30,7 @@ func NewTimeoutManager(log logging.SimpleLogging) *TimeoutManager {
 }
 
 // SetTimeout sets a timeout for a lock operation
-func (tm *TimeoutManager) SetTimeout(ctx context.Context, lockID string, resource enhanced.ResourceIdentifier, timeout time.Duration, callback TimeoutCallback) {
+func (tm *TimeoutManager) SetTimeout(ctx context.Context, lockID string, resource types.ResourceIdentifier, timeout time.Duration, callback TimeoutCallback) {
 	if timeout <= 0 {
 		return
 	}
@@ -75,7 +75,7 @@ func (tm *TimeoutManager) ClearTimeout(lockID string) bool {
 }
 
 // ExtendTimeout extends an existing timeout
-func (tm *TimeoutManager) ExtendTimeout(ctx context.Context, lockID string, resource enhanced.ResourceIdentifier, extension time.Duration, callback TimeoutCallback) bool {
+func (tm *TimeoutManager) ExtendTimeout(ctx context.Context, lockID string, resource types.ResourceIdentifier, extension time.Duration, callback TimeoutCallback) bool {
 	if val, ok := tm.timers.Load(lockID); ok {
 		if timer, ok := val.(*time.Timer); ok {
 			timer.Stop()
@@ -125,10 +125,10 @@ func (tm *TimeoutManager) Cleanup() {
 
 // TimeoutMetrics tracks timeout-related metrics
 type TimeoutMetrics struct {
-	Created   int64 `json:"created"`
-	Cleared   int64 `json:"cleared"`
-	Extended  int64 `json:"extended"`
-	Timeouts  int64 `json:"timeouts"`
+	Created  int64 `json:"created"`
+	Cleared  int64 `json:"cleared"`
+	Extended int64 `json:"extended"`
+	Timeouts int64 `json:"timeouts"`
 }
 
 // NewTimeoutMetrics creates new timeout metrics
@@ -259,7 +259,7 @@ func (rm *RetryManager) calculateDelay(attempt int) time.Duration {
 	// Apply jitter if enabled
 	if rm.config.Jitter {
 		jitterAmount := delay * rm.config.JitterPercent
-		jitter := (2*time.Now().UnixNano()%int64(jitterAmount)) - int64(jitterAmount)
+		jitter := (2 * time.Now().UnixNano() % int64(jitterAmount)) - int64(jitterAmount)
 		delay += float64(jitter)
 	}
 
@@ -273,12 +273,12 @@ func (rm *RetryManager) calculateDelay(attempt int) time.Duration {
 
 // isRetryableError determines if an error should trigger a retry
 func (rm *RetryManager) isRetryableError(err error) bool {
-	if lockErr, ok := err.(*enhanced.LockError); ok {
+	if lockErr, ok := err.(*types.LockError); ok {
 		switch lockErr.Code {
-		case enhanced.ErrCodeTimeout, enhanced.ErrCodeBackendError:
+		case types.ErrCodeTimeout, types.ErrCodeBackendError:
 			return true
-		case enhanced.ErrCodeLockExists, enhanced.ErrCodeLockNotFound,
-			 enhanced.ErrCodeInvalidRequest, enhanced.ErrCodePermissionDenied:
+		case types.ErrCodeLockExists, types.ErrCodeLockNotFound,
+			types.ErrCodeInvalidRequest, types.ErrCodePermissionDenied:
 			return false
 		default:
 			return true
@@ -296,10 +296,10 @@ func (rm *RetryManager) GetMetrics() *RetryMetrics {
 
 // RetryMetrics tracks retry-related metrics
 type RetryMetrics struct {
-	Attempts       int64 `json:"attempts"`
-	Failures       int64 `json:"failures"`
-	RetrySuccess   int64 `json:"retry_success"`
-	RetryFailures  int64 `json:"retry_failures"`
+	Attempts      int64 `json:"attempts"`
+	Failures      int64 `json:"failures"`
+	RetrySuccess  int64 `json:"retry_success"`
+	RetryFailures int64 `json:"retry_failures"`
 }
 
 // NewRetryMetrics creates new retry metrics
@@ -376,7 +376,7 @@ func NewCircuitBreaker(config *CircuitBreakerConfig) *CircuitBreaker {
 // Execute executes an operation through the circuit breaker
 func (cb *CircuitBreaker) Execute(ctx context.Context, operation func() error) error {
 	if !cb.allowRequest() {
-		return &enhanced.LockError{
+		return &types.LockError{
 			Type:    "CircuitOpen",
 			Message: "circuit breaker is open",
 			Code:    "CIRCUIT_OPEN",
@@ -458,30 +458,30 @@ func (cb *CircuitBreaker) GetMetrics() map[string]interface{} {
 	defer cb.mutex.RUnlock()
 
 	return map[string]interface{}{
-		"state":     cb.state,
-		"failures":  cb.failures,
-		"successes": cb.successes,
+		"state":             cb.state,
+		"failures":          cb.failures,
+		"successes":         cb.successes,
 		"last_state_change": cb.lastState,
-		"next_check": cb.nextCheck,
+		"next_check":        cb.nextCheck,
 	}
 }
 
 // RateLimiter implements token bucket rate limiting
 type RateLimiter struct {
-	tokens      float64
-	maxTokens   float64
-	refillRate  float64
-	lastRefill  time.Time
-	mutex       sync.Mutex
+	tokens     float64
+	maxTokens  float64
+	refillRate float64
+	lastRefill time.Time
+	mutex      sync.Mutex
 }
 
 // NewRateLimiter creates a new rate limiter
 func NewRateLimiter(maxTokens, refillRate float64) *RateLimiter {
 	return &RateLimiter{
-		tokens:      maxTokens,
-		maxTokens:   maxTokens,
-		refillRate:  refillRate,
-		lastRefill:  time.Now(),
+		tokens:     maxTokens,
+		maxTokens:  maxTokens,
+		refillRate: refillRate,
+		lastRefill: time.Now(),
 	}
 }
 
@@ -518,14 +518,14 @@ func (rl *RateLimiter) GetTokens() float64 {
 
 // AdaptiveTimeoutManager adjusts timeouts based on system load and performance
 type AdaptiveTimeoutManager struct {
-	baseTimeout    time.Duration
-	minTimeout     time.Duration
-	maxTimeout     time.Duration
-	loadFactor     float64
-	successRate    float64
-	averageLatency time.Duration
-	mutex          sync.RWMutex
-	measurements   []time.Duration
+	baseTimeout     time.Duration
+	minTimeout      time.Duration
+	maxTimeout      time.Duration
+	loadFactor      float64
+	successRate     float64
+	averageLatency  time.Duration
+	mutex           sync.RWMutex
+	measurements    []time.Duration
 	maxMeasurements int
 }
 
@@ -604,11 +604,11 @@ func (atm *AdaptiveTimeoutManager) GetMetrics() map[string]interface{} {
 	defer atm.mutex.RUnlock()
 
 	return map[string]interface{}{
-		"base_timeout":     atm.baseTimeout,
-		"current_timeout":  atm.GetTimeout(),
-		"load_factor":      atm.loadFactor,
-		"success_rate":     atm.successRate,
-		"average_latency":  atm.averageLatency,
-		"measurements":     len(atm.measurements),
+		"base_timeout":    atm.baseTimeout,
+		"current_timeout": atm.GetTimeout(),
+		"load_factor":     atm.loadFactor,
+		"success_rate":    atm.successRate,
+		"average_latency": atm.averageLatency,
+		"measurements":    len(atm.measurements),
 	}
 }

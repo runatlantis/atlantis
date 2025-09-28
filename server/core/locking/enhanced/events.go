@@ -37,22 +37,22 @@ type EventSubscriber interface {
 
 // EventHistoryEntry represents a historical event with metadata
 type EventHistoryEntry struct {
-	Event     *LockEvent `json:"event"`
-	ProcessedAt time.Time `json:"processed_at"`
-	Subscribers []string  `json:"subscribers"`
-	Errors      []string  `json:"errors,omitempty"`
+	Event       *LockEvent `json:"event"`
+	ProcessedAt time.Time  `json:"processed_at"`
+	Subscribers []string   `json:"subscribers"`
+	Errors      []string   `json:"errors,omitempty"`
 }
 
 // EventStats provides statistics about event processing
 type EventStats struct {
-	TotalEvents      int64                  `json:"total_events"`
-	EventsByType     map[string]int64       `json:"events_by_type"`
-	ActiveSubscribers int                   `json:"active_subscribers"`
-	BufferUtilization float64              `json:"buffer_utilization"`
-	ProcessingRate    float64              `json:"processing_rate"` // events per second
-	LastEventTime     *time.Time           `json:"last_event_time,omitempty"`
-	ErrorRate         float64              `json:"error_rate"`
-	HistorySize       int                  `json:"history_size"`
+	TotalEvents       int64            `json:"total_events"`
+	EventsByType      map[string]int64 `json:"events_by_type"`
+	ActiveSubscribers int              `json:"active_subscribers"`
+	BufferUtilization float64          `json:"buffer_utilization"`
+	ProcessingRate    float64          `json:"processing_rate"` // events per second
+	LastEventTime     *time.Time       `json:"last_event_time,omitempty"`
+	ErrorRate         float64          `json:"error_rate"`
+	HistorySize       int              `json:"history_size"`
 }
 
 // NewEventManager creates a new event manager

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/locking/enhanced"
+	"github.com/runatlantis/atlantis/server/core/locking/types"
 )
 
 // PriorityQueue implements a priority-based lock request queue
@@ -19,8 +19,8 @@ type PriorityQueue struct {
 
 // QueueItem represents an item in the priority queue
 type QueueItem struct {
-	Request   *enhanced.EnhancedLockRequest
-	Priority  enhanced.Priority
+	Request   *types.EnhancedLockRequest
+	Priority  types.Priority
 	Timestamp time.Time
 	Index     int // heap index
 }
@@ -34,22 +34,22 @@ func NewPriorityQueue(maxSize int) *PriorityQueue {
 	}
 }
 
-// Push adds a request to the priority queue
-func (pq *PriorityQueue) Push(ctx context.Context, request *enhanced.EnhancedLockRequest) error {
+// Enqueue adds a request to the priority queue
+func (pq *PriorityQueue) Enqueue(ctx context.Context, request *types.EnhancedLockRequest) error {
 	pq.mutex.Lock()
 	defer pq.mutex.Unlock()
 
 	if len(pq.items) >= pq.maxSize {
-		return &enhanced.LockError{
+		return &types.LockError{
 			Type:    "QueueFull",
 			Message: "priority queue is full",
-			Code:    enhanced.ErrCodeQueueFull,
+			Code:    types.ErrCodeQueueFull,
 		}
 	}
 
 	item := &QueueItem{
 		Request:   request,
-		Priority:  request.Priority,
+		Priority:  request.GetPriority(),
 		Timestamp: time.Now(),
 	}
 
@@ -64,8 +64,8 @@ func (pq *PriorityQueue) Push(ctx context.Context, request *enhanced.EnhancedLoc
 	return nil
 }
 
-// Pop removes and returns the highest priority request
-func (pq *PriorityQueue) Pop(ctx context.Context) (*enhanced.EnhancedLockRequest, error) {
+// Dequeue removes and returns the highest priority request
+func (pq *PriorityQueue) Dequeue(ctx context.Context) (*types.EnhancedLockRequest, error) {
 	pq.mutex.Lock()
 	defer pq.mutex.Unlock()
 
@@ -77,10 +77,10 @@ func (pq *PriorityQueue) Pop(ctx context.Context) (*enhanced.EnhancedLockRequest
 	return item.Request, nil
 }
 
-// PopWithTimeout waits for an item or timeout
-func (pq *PriorityQueue) PopWithTimeout(ctx context.Context, timeout time.Duration) (*enhanced.EnhancedLockRequest, error) {
+// DequeueWithTimeout waits for an item or timeout
+func (pq *PriorityQueue) DequeueWithTimeout(ctx context.Context, timeout time.Duration) (*types.EnhancedLockRequest, error) {
 	// Fast path: check if item is immediately available
-	if item, err := pq.Pop(ctx); err != nil || item != nil {
+	if item, err := pq.Dequeue(ctx); err != nil || item != nil {
 		return item, err
 	}
 
@@ -92,14 +92,14 @@ func (pq *PriorityQueue) PopWithTimeout(ctx context.Context, timeout time.Durati
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-timer.C:
-		return nil, enhanced.NewTimeoutError(timeout)
+		return nil, types.NewTimeoutError(timeout)
 	case <-pq.notEmpty:
-		return pq.Pop(ctx)
+		return pq.Dequeue(ctx)
 	}
 }
 
 // Peek returns the highest priority request without removing it
-func (pq *PriorityQueue) Peek() *enhanced.EnhancedLockRequest {
+func (pq *PriorityQueue) Peek() *types.EnhancedLockRequest {
 	pq.mutex.RLock()
 	defer pq.mutex.RUnlock()
 
@@ -136,11 +136,11 @@ func (pq *PriorityQueue) GetStats() *QueueStats {
 	defer pq.mutex.RUnlock()
 
 	stats := &QueueStats{
-		Size:         len(pq.items),
-		MaxSize:      pq.maxSize,
-		ByPriority:   make(map[enhanced.Priority]int),
-		AverageWait:  0,
-		OldestItem:   nil,
+		Size:        len(pq.items),
+		MaxSize:     pq.maxSize,
+		ByPriority:  make(map[types.Priority]int),
+		AverageWait: 0,
+		OldestItem:  nil,
 	}
 
 	if len(pq.items) == 0 {
@@ -184,11 +184,11 @@ func (pq *PriorityQueue) Remove(requestID string) bool {
 
 // QueueStats provides statistics about the queue
 type QueueStats struct {
-	Size        int                            `json:"size"`
-	MaxSize     int                            `json:"max_size"`
-	ByPriority  map[enhanced.Priority]int      `json:"by_priority"`
-	AverageWait time.Duration                  `json:"average_wait"`
-	OldestItem  *time.Time                     `json:"oldest_item,omitempty"`
+	Size        int                    `json:"size"`
+	MaxSize     int                    `json:"max_size"`
+	ByPriority  map[types.Priority]int `json:"by_priority"`
+	AverageWait time.Duration          `json:"average_wait"`
+	OldestItem  *time.Time             `json:"oldest_item,omitempty"`
 }
 
 // Heap interface implementation for priority queue
@@ -212,13 +212,13 @@ func (pq *PriorityQueue) Swap(i, j int) {
 	pq.items[j].Index = j
 }
 
-func (pq *PriorityQueue) PushHeap(x interface{}) {
+func (pq *PriorityQueue) Push(x interface{}) {
 	item := x.(*QueueItem)
 	item.Index = len(pq.items)
 	pq.items = append(pq.items, item)
 }
 
-func (pq *PriorityQueue) PopHeap() interface{} {
+func (pq *PriorityQueue) Pop() interface{} {
 	old := pq.items
 	n := len(old)
 	item := old[n-1]
@@ -229,9 +229,9 @@ func (pq *PriorityQueue) PopHeap() interface{} {
 
 // ResourceBasedQueue manages separate queues per resource to prevent head-of-line blocking
 type ResourceBasedQueue struct {
-	queues   map[string]*PriorityQueue
-	mutex    sync.RWMutex
-	maxSize  int
+	queues  map[string]*PriorityQueue
+	mutex   sync.RWMutex
+	maxSize int
 }
 
 // NewResourceBasedQueue creates a new resource-based queue system
@@ -243,7 +243,7 @@ func NewResourceBasedQueue(maxSizePerResource int) *ResourceBasedQueue {
 }
 
 // Push adds a request to the appropriate resource queue
-func (rbq *ResourceBasedQueue) Push(ctx context.Context, request *enhanced.EnhancedLockRequest) error {
+func (rbq *ResourceBasedQueue) Push(ctx context.Context, request *types.EnhancedLockRequest) error {
 	resourceKey := rbq.getResourceKey(request.Resource)
 
 	rbq.mutex.Lock()
@@ -254,11 +254,11 @@ func (rbq *ResourceBasedQueue) Push(ctx context.Context, request *enhanced.Enhan
 	}
 	rbq.mutex.Unlock()
 
-	return queue.Push(ctx, request)
+	return queue.Enqueue(ctx, request)
 }
 
 // PopForResource removes the highest priority request for a specific resource
-func (rbq *ResourceBasedQueue) PopForResource(ctx context.Context, resource enhanced.ResourceIdentifier) (*enhanced.EnhancedLockRequest, error) {
+func (rbq *ResourceBasedQueue) PopForResource(ctx context.Context, resource types.ResourceIdentifier) (*types.EnhancedLockRequest, error) {
 	resourceKey := rbq.getResourceKey(resource)
 
 	rbq.mutex.RLock()
@@ -269,11 +269,11 @@ func (rbq *ResourceBasedQueue) PopForResource(ctx context.Context, resource enha
 		return nil, nil
 	}
 
-	return queue.Pop(ctx)
+	return queue.Dequeue(ctx)
 }
 
 // PopForResourceWithTimeout waits for a request for a specific resource
-func (rbq *ResourceBasedQueue) PopForResourceWithTimeout(ctx context.Context, resource enhanced.ResourceIdentifier, timeout time.Duration) (*enhanced.EnhancedLockRequest, error) {
+func (rbq *ResourceBasedQueue) PopForResourceWithTimeout(ctx context.Context, resource types.ResourceIdentifier, timeout time.Duration) (*types.EnhancedLockRequest, error) {
 	resourceKey := rbq.getResourceKey(resource)
 
 	rbq.mutex.RLock()
@@ -282,6 +282,7 @@ func (rbq *ResourceBasedQueue) PopForResourceWithTimeout(ctx context.Context, re
 
 	if !exists {
 		// Wait for queue to be created or timeout
+		startTime := time.Now()
 		timer := time.NewTimer(timeout)
 		defer timer.Stop()
 
@@ -293,23 +294,28 @@ func (rbq *ResourceBasedQueue) PopForResourceWithTimeout(ctx context.Context, re
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-timer.C:
-				return nil, enhanced.NewTimeoutError(timeout)
+				return nil, types.NewTimeoutError(timeout)
 			case <-ticker.C:
 				rbq.mutex.RLock()
 				queue, exists = rbq.queues[resourceKey]
 				rbq.mutex.RUnlock()
 				if exists {
-					return queue.PopWithTimeout(ctx, time.Until(timer.C))
+					elapsed := time.Since(startTime)
+					remaining := timeout - elapsed
+					if remaining <= 0 {
+						return nil, types.NewTimeoutError(timeout)
+					}
+					return queue.DequeueWithTimeout(ctx, remaining)
 				}
 			}
 		}
 	}
 
-	return queue.PopWithTimeout(ctx, timeout)
+	return queue.DequeueWithTimeout(ctx, timeout)
 }
 
 // GetQueueForResource returns the queue for a specific resource
-func (rbq *ResourceBasedQueue) GetQueueForResource(resource enhanced.ResourceIdentifier) *PriorityQueue {
+func (rbq *ResourceBasedQueue) GetQueueForResource(resource types.ResourceIdentifier) *PriorityQueue {
 	resourceKey := rbq.getResourceKey(resource)
 
 	rbq.mutex.RLock()
@@ -370,13 +376,13 @@ func (rbq *ResourceBasedQueue) Remove(requestID string) bool {
 	return false
 }
 
-func (rbq *ResourceBasedQueue) getResourceKey(resource enhanced.ResourceIdentifier) string {
+func (rbq *ResourceBasedQueue) getResourceKey(resource types.ResourceIdentifier) string {
 	return resource.Namespace + "/" + resource.Name + "/" + resource.Workspace
 }
 
 // MemoryQueue is a simple FIFO queue implementation for basic scenarios
 type MemoryQueue struct {
-	items    []*enhanced.EnhancedLockRequest
+	items    []*types.EnhancedLockRequest
 	mutex    sync.RWMutex
 	maxSize  int
 	notEmpty chan struct{}
@@ -385,22 +391,22 @@ type MemoryQueue struct {
 // NewMemoryQueue creates a new simple memory queue
 func NewMemoryQueue(maxSize int) *MemoryQueue {
 	return &MemoryQueue{
-		items:    make([]*enhanced.EnhancedLockRequest, 0),
+		items:    make([]*types.EnhancedLockRequest, 0),
 		maxSize:  maxSize,
 		notEmpty: make(chan struct{}, 1),
 	}
 }
 
-// Push adds a request to the end of the queue
-func (mq *MemoryQueue) Push(ctx context.Context, request *enhanced.EnhancedLockRequest) error {
+// Enqueue adds a request to the end of the queue
+func (mq *MemoryQueue) Enqueue(ctx context.Context, request *types.EnhancedLockRequest) error {
 	mq.mutex.Lock()
 	defer mq.mutex.Unlock()
 
 	if len(mq.items) >= mq.maxSize {
-		return &enhanced.LockError{
+		return &types.LockError{
 			Type:    "QueueFull",
 			Message: "memory queue is full",
-			Code:    enhanced.ErrCodeQueueFull,
+			Code:    types.ErrCodeQueueFull,
 		}
 	}
 
@@ -415,8 +421,8 @@ func (mq *MemoryQueue) Push(ctx context.Context, request *enhanced.EnhancedLockR
 	return nil
 }
 
-// Pop removes and returns the first request (FIFO)
-func (mq *MemoryQueue) Pop(ctx context.Context) (*enhanced.EnhancedLockRequest, error) {
+// Dequeue removes and returns the first request (FIFO)
+func (mq *MemoryQueue) Dequeue(ctx context.Context) (*types.EnhancedLockRequest, error) {
 	mq.mutex.Lock()
 	defer mq.mutex.Unlock()
 
@@ -430,10 +436,10 @@ func (mq *MemoryQueue) Pop(ctx context.Context) (*enhanced.EnhancedLockRequest, 
 	return request, nil
 }
 
-// PopWithTimeout waits for an item or timeout
-func (mq *MemoryQueue) PopWithTimeout(ctx context.Context, timeout time.Duration) (*enhanced.EnhancedLockRequest, error) {
+// DequeueWithTimeout waits for an item or timeout
+func (mq *MemoryQueue) DequeueWithTimeout(ctx context.Context, timeout time.Duration) (*types.EnhancedLockRequest, error) {
 	// Fast path: check if item is immediately available
-	if item, err := mq.Pop(ctx); err != nil || item != nil {
+	if item, err := mq.Dequeue(ctx); err != nil || item != nil {
 		return item, err
 	}
 
@@ -445,9 +451,9 @@ func (mq *MemoryQueue) PopWithTimeout(ctx context.Context, timeout time.Duration
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-timer.C:
-		return nil, enhanced.NewTimeoutError(timeout)
+		return nil, types.NewTimeoutError(timeout)
 	case <-mq.notEmpty:
-		return mq.Pop(ctx)
+		return mq.Dequeue(ctx)
 	}
 }
 

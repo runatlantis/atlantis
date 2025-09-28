@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,10 +17,10 @@ import (
 
 // RedisBackend implements enhanced locking using Redis
 type RedisBackend struct {
-	client      redis.UniversalClient
-	keyPrefix   string
-	defaultTTL  time.Duration
-	log         logging.SimpleLogging
+	client     redis.UniversalClient
+	keyPrefix  string
+	defaultTTL time.Duration
+	log        logging.SimpleLogging
 
 	// Metrics
 	stats       *enhanced.BackendStats
@@ -34,11 +33,11 @@ type RedisBackend struct {
 // NewRedisBackend creates a new Redis backend for enhanced locking
 func NewRedisBackend(client redis.UniversalClient, config *enhanced.EnhancedConfig, log logging.SimpleLogging) *RedisBackend {
 	return &RedisBackend{
-		client:      client,
-		keyPrefix:   config.RedisKeyPrefix,
-		defaultTTL:  config.RedisLockTTL,
-		log:         log,
-		config:      config,
+		client:     client,
+		keyPrefix:  config.RedisKeyPrefix,
+		defaultTTL: config.RedisLockTTL,
+		log:        log,
+		config:     config,
 		stats: &enhanced.BackendStats{
 			HealthScore: 100,
 			LastUpdated: time.Now(),
