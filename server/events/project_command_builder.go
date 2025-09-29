@@ -328,7 +328,6 @@ func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, mod
 		return false, nil
 	}
 	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-	ctx.Log.Debug("Getting file content for file '%s' of pull request %d", repoCfgFile, ctx.Pull.Num)
 	hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.HeadRepo, ctx.Pull.HeadBranch, repoCfgFile)
 
 	if err != nil {

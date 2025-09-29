@@ -1081,6 +1081,7 @@ func (g *GithubClient) ExchangeCode(logger logging.SimpleLogging, code string) (
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
 func (g *GithubClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+	logger.Debug("Getting GitHub file content for file '%s'", fileName)
 	opt := github.RepositoryContentGetOptions{Ref: branch}
 
 	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, repo.Owner, repo.Name, fileName, &opt)
