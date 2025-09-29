@@ -1695,11 +1695,12 @@ projects:
 // Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 	cases := []struct {
-		AtlantisYAML   		 string
-		IsFork         		 bool
-		ExpectedCtxs   		 int
-		ExpectedClones 		 InvocationCountMatcher
-		ModifiedFiles  		 []string
+		AtlantisYAML             string
+		IsFork                   bool
+		ExpectedCtxs             int
+		ExpectedClones           int
+		ExpectedGetFileContents  int
+		ModifiedFiles            []string
 		IncludeGitUntrackedFiles bool
 	}{
 		{
@@ -1708,7 +1709,8 @@ version: 3
 projects:
 - dir: dir1`,
 			ExpectedCtxs:             0,
-			ExpectedClones:           Never(),
+			ExpectedClones:           0,
+			ExpectedGetFileContents:  1,
 			ModifiedFiles:            []string{"dir2/main.tf"},
 			IncludeGitUntrackedFiles: false,
 		},
@@ -1718,7 +1720,8 @@ version: 3
 projects:
 - dir: dir1`,
 			ExpectedCtxs:             0,
-			ExpectedClones:           Once(),
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  0,
 			ModifiedFiles:            []string{"dir2/main.tf"},
 			IncludeGitUntrackedFiles: true,
 		},
@@ -1727,17 +1730,19 @@ projects:
 version: 3
 projects:
 - dir: dir1`,
-			IsFork:         true,
-			ExpectedCtxs:   0,
-			ExpectedClones: Never(),
-			ModifiedFiles:  []string{"dir2/main.tf"},
+			IsFork:                  true,
+			ExpectedCtxs:            0,
+			ExpectedClones:          0,
+			ExpectedGetFileContents: 1,
+			ModifiedFiles:           []string{"dir2/main.tf"},
 		},
 		{
 			AtlantisYAML: `
 version: 3
 parallel_plan: true`,
 			ExpectedCtxs:             0,
-			ExpectedClones:           Once(),
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  1,
 			ModifiedFiles:            []string{"README.md"},
 			IncludeGitUntrackedFiles: false,
 		},
@@ -1749,7 +1754,8 @@ autodiscover:
 projects:
 - dir: dir1`,
 			ExpectedCtxs:             0,
-			ExpectedClones:           Once(),
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  1,
 			ModifiedFiles:            []string{"dir2/main.tf"},
 			IncludeGitUntrackedFiles: false,
 		},
@@ -1825,10 +1831,13 @@ projects:
 
 		Ok(t, err)
 		Equals(t, c.ExpectedCtxs, len(actCtxs))
-		workingDir.VerifyWasCalled(c.ExpectedClones).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
+		workingDir.VerifyWasCalled(Times(c.ExpectedClones)).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
 			Any[models.PullRequest](), Any[string]())
-		_, actRepo, _, _ := vcsClient.VerifyWasCalled(Once()).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]()).GetCapturedArguments()
-		Equals(t, headRepo, actRepo)
+		res := vcsClient.VerifyWasCalled(Times(c.ExpectedGetFileContents)).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())
+		if c.ExpectedGetFileContents > 0 {
+			_, actRepo, _, _ := res.GetCapturedArguments()
+			Equals(t, headRepo, actRepo)
+		}
 	}
 }
 
