@@ -422,6 +422,7 @@ func (c *GiteaClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
 func (c *GiteaClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+	logger.Debug("Getting Gitea file content for file '%s'", fileName)
 	content, resp, err := c.giteaClient.GetContents(repo.Owner, repo.Name, branch, fileName)
 
 	if err != nil {
