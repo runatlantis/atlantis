@@ -279,7 +279,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	}
 	ctx := command.ProjectContext{
 		PullReqStatus: models.PullReqStatus{
-			Mergeable: false,
+			MergeableStatus: models.MergeableStatus{IsMergeable: false},
 		},
 		ApplyRequirements: []string{"mergeable"},
 	}
@@ -449,7 +449,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 					ApprovalStatus: models.ApprovalStatus{
 						IsApproved: true,
 					},
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
 				},
 			}
 			expEnvs := map[string]string{

@@ -279,7 +279,7 @@ terraform {
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
 				PullRequestStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Log:   logger,
 				Scope: scope,
@@ -1799,7 +1799,7 @@ projects:
 			Log:      logger,
 			Scope:    scope,
 			PullRequestStatus: models.PullReqStatus{
-				Mergeable: true,
+				MergeableStatus: models.MergeableStatus{IsMergeable: true},
 			},
 		})
 		Ok(t, err)
@@ -1861,7 +1861,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 
 	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
 		PullRequestStatus: models.PullReqStatus{
-			Mergeable: true,
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
 		},
 		Log:   logger,
 		Scope: scope,

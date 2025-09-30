@@ -33,8 +33,8 @@ import (
 )
 
 type PullReqStatus struct {
-	ApprovalStatus ApprovalStatus
-	Mergeable      bool
+	ApprovalStatus  ApprovalStatus
+	MergeableStatus MergeableStatus
 }
 
 // Repo is a VCS repository.
@@ -149,6 +149,12 @@ type ApprovalStatus struct {
 	IsApproved bool
 	ApprovedBy string
 	Date       time.Time
+}
+
+type MergeableStatus struct {
+	IsMergeable bool
+	// Short human readable explanation of why the PR is (or is not) mergeable
+	Reason string
 }
 
 // PullRequest is a VCS pull request.

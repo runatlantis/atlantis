@@ -203,27 +203,31 @@ func (b *Client) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) {
+func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge", b.BaseURL, projectKey, repo.Name, pull.Num)
 	resp, err := b.makeRequest("GET", path, nil)
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 	var mergeStatus MergeStatus
 	if err := json.Unmarshal(resp, &mergeStatus); err != nil {
-		return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		return models.MergeableStatus{}, errors.Wrapf(err, "Could not parse response %q", string(resp))
 	}
 	if err := validator.New().Struct(mergeStatus); err != nil {
-		return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		return models.MergeableStatus{}, errors.Wrapf(err, "API response %q was missing fields", string(resp))
 	}
 	if *mergeStatus.CanMerge && !*mergeStatus.Conflicted {
-		return true, nil
+		return models.MergeableStatus{
+			IsMergeable: true,
+		}, nil
 	}
-	return false, nil
+	return models.MergeableStatus{
+		IsMergeable: false,
+	}, nil
 }
 
 // UpdateStatus updates the status of a commit.

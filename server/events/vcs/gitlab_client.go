@@ -303,14 +303,14 @@ func (g *GitlabClient) PullIsApproved(logger logging.SimpleLogging, repo models.
 // See:
 // - https://gitlab.com/gitlab-org/gitlab-ee/issues/3169
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
-func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (bool, error) {
+func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if GitLab merge request %d is mergeable", pull.Num)
 	mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
 	if resp != nil {
 		logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repo.FullName, pull.Num, resp.StatusCode)
 	}
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 
 	// Prevent nil pointer error when mr.HeadPipeline is empty
@@ -328,7 +328,7 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		logger.Debug("GET /projects/%d returned: %d", mr.ProjectID, resp.StatusCode)
 	}
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 
 	// Get Commit Statuses
@@ -337,7 +337,7 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		logger.Debug("GET /projects/%d/commits/%s/statuses returned: %d", mr.ProjectID, commit, resp.StatusCode)
 	}
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 
 	for _, status := range statuses {
@@ -346,7 +346,9 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
-			return false, nil
+			return models.MergeableStatus{
+				IsMergeable: false,
+			}, nil
 		}
 	}
 
@@ -354,7 +356,7 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 
 	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus(logger)
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 
 	if supportsDetailedMergeStatus {
@@ -376,10 +378,14 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		(allowSkippedPipeline || !isPipelineSkipped) {
 
 		logger.Debug("Merge request is mergeable")
-		return true, nil
+		return models.MergeableStatus{
+			IsMergeable: true,
+		}, nil
 	}
 	logger.Debug("Merge request is not mergeable")
-	return false, nil
+	return models.MergeableStatus{
+		IsMergeable: false,
+	}, nil
 }
 
 func (g *GitlabClient) SupportsDetailedMergeStatus(logger logging.SimpleLogging) (bool, error) {
