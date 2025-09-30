@@ -370,12 +370,21 @@ func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, mod
 
 // autoDiscoverModeEnabled determines whether to use autodiscover
 func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Context, repoCfg valid.RepoCfg) bool {
-	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
-	globalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if globalAutoDiscover != nil {
-		defaultAutoDiscoverMode = globalAutoDiscover.Mode
+	return repoCfg.AutoDiscoverEnabled(p.getAutoDiscover(ctx, repoCfg).Mode)
+}
+
+// autoDiscoverModeEnabled determines whether to use autodiscover
+func (p *DefaultProjectCommandBuilder) getAutoDiscover(ctx *command.Context, repoCfg valid.RepoCfg) valid.AutoDiscover {
+	if repoCfg.AutoDiscover != nil {
+		return *repoCfg.AutoDiscover
 	}
-	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
+	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
+	if fromGlobalAutoDiscover != nil {
+		return *fromGlobalAutoDiscover
+	}
+	return valid.AutoDiscover{
+		Mode: valid.AutoDiscoverMode(p.AutoDiscoverMode),
+	}
 }
 
 // getMergedProjectCfgs gets all merged project configs for building commands given a context and a clone repo
@@ -404,7 +413,7 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 
 	if p.autoDiscoverModeEnabled(ctx, repoCfg) {
 		ctx.Log.Info("automatic project discovery enabled. Will run automatic detection")
-
+		autoDiscover := p.getAutoDiscover(ctx, repoCfg)
 		// build a module index for projects that are explicitly included
 		allModifiedProjects := p.ProjectFinder.DetermineProjects(
 			ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
@@ -421,7 +430,7 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 		}
 		for _, mp := range allModifiedProjects {
 			path := filepath.Clean(mp.Path)
-			if repoCfg.IsPathIgnoredForAutoDiscover(path) {
+			if autoDiscover.IsPathIgnored(path) {
 				continue
 			}
 			_, dirExists := configuredProjDirs[path]
