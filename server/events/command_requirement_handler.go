@@ -61,7 +61,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 				return fmt.Sprintf("All policies must pass for project before running %s.", cmd), nil
 			}
 		case raw.MergeableRequirement:
-			if !ctx.PullReqStatus.Mergeable {
+			if !ctx.PullReqStatus.MergeableStatus.IsMergeable {
 				return fmt.Sprintf("Pull request must be mergeable before running %s.", cmd), nil
 			}
 		case raw.UnDivergedRequirement:
