@@ -1305,3 +1305,110 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 		})
 	}
 }
+
+// Test policy check logic.
+func TestDefaultProjectCommandRunner_CustomPolicyCheck(t *testing.T) {
+	cases := []struct {
+		description string
+
+		runOutput string
+		runErr    error
+
+		expOut     []models.PolicySetResult
+		expFailure string
+	}{
+		{
+			description: "passes custom policy",
+			runOutput:   "policy checked: success",
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "Custom",
+					PolicyOutput:  "policy checked: success",
+					Passed:        true,
+					ReqApprovals:  1,
+				},
+			},
+		},
+		{
+			description: "fails custom policy",
+			runOutput:   "policy checked: failure",
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "Custom",
+					PolicyOutput:  "policy checked: failure",
+					Passed:        false,
+					ReqApprovals:  1,
+				},
+			},
+			expFailure: "Some policy sets did not pass.",
+		},
+		{
+			description: "errors custom policy",
+			runOutput:   "policy checked: error",
+			runErr:      errors.New("exit status 1: running \"custom-policy-check.sh\" in \"/some/repo/dir\":\npolicy checked: error"),
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName: "Custom",
+					PolicyOutput:  "policy checked: error",
+					Passed:        false,
+					ReqApprovals:  1,
+				},
+			},
+			expFailure: "Some policy sets did not pass.",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockRun := mocks.NewMockCustomStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:           mockLocker,
+				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+				WorkingDir:       mockWorkingDir,
+				LockURLGenerator: mockURLGenerator{},
+				RunStepRunner:    mockRun,
+			}
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[string](),
+			)).ThenReturn(repoDir, nil)
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
+
+			ctx := command.ProjectContext{
+				User:              testdata.User,
+				Log:               logging.NewNoopLogger(t),
+				Workspace:         "default",
+				RepoRelDir:        ".",
+				CustomPolicyCheck: true,
+				Steps: []valid.Step{
+					{
+						StepName: "run",
+					},
+				},
+			}
+			When(mockRun.Run(ctx, nil, "", repoDir, map[string]string{}, true, "")).ThenReturn(c.runOutput, c.runErr)
+
+			res := runner.PolicyCheck(ctx)
+
+			Equals(t, c.runErr, res.Error)
+			Equals(t, c.expOut, res.PolicyCheckResults.PolicySetResults)
+			Equals(t, c.expFailure, res.Failure)
+		})
+	}
+}
