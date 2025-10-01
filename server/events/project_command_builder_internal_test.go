@@ -1367,6 +1367,86 @@ projects:
 			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
 			expLen:        3,
 		},
+		"autodiscover enabled, disabled at repo level": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: disabled
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        1,
+		},
+		"autodiscover respects ignore_paths in repo config": {
+			globalCfg: `
+repos:
+- id: /.*/
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - project3
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        2,
+		},
+		"autodiscover respects ignore_paths in global config": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+    ignore_paths:
+    - project3
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        2,
+		},
+		"autodiscover skips ignore_paths in repo when configured in global": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+    ignore_paths:
+    - project[0-9]
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - project3
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        1,
+		},
 	}
 
 	for name, c := range cases {

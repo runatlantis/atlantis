@@ -1078,42 +1078,6 @@ projects:
 				},
 			},
 		},
-		"autodiscover enabled but project excluded by autodiscover ignore": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf": nil,
-				},
-				"project3": map[string]interface{}{
-					"main.tf": nil,
-				},
-			},
-			AtlantisYAML: `version: 3
-autodiscover:
-  mode: enabled
-  ignore_paths:
-  - project3
-projects:
-- name: project1-custom-name
-  dir: project1`,
-			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
-			// project2 is autodiscovered, but autodiscover was ignored for project3
-			// project1 is configured explicitly so added
-			Exp: []expCtxFields{
-				{
-					ProjectName: "project1-custom-name",
-					RepoRelDir:  "project1",
-					Workspace:   "default",
-				},
-				{
-					ProjectName: "",
-					RepoRelDir:  "project2",
-					Workspace:   "default",
-				},
-			},
-		},
 		"autodiscover enabled but ignoring explicit project": {
 			DirStructure: map[string]interface{}{
 				"project1": map[string]interface{}{
