@@ -21,54 +21,6 @@ type DefaultCommandRequirementHandler struct {
 	WorkingDir WorkingDir
 }
 
-func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
-	for _, req := range ctx.PlanRequirements {
-		switch req {
-		case raw.ApprovedRequirement:
-			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
-				return "Pull request must be approved according to the project's approval rules before running plan.", nil
-			}
-		case raw.MergeableRequirement:
-			if !ctx.PullReqStatus.Mergeable {
-				return "Pull request must be mergeable before running plan.", nil
-			}
-		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
-				return "Default branch must be rebased onto pull request before running plan.", nil
-			}
-		}
-	}
-	// Passed all plan requirements configured.
-	return "", nil
-}
-
-func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
-	for _, req := range ctx.ApplyRequirements {
-		switch req {
-		case raw.ApprovedRequirement:
-			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
-				return "Pull request must be approved according to the project's approval rules before running apply.", nil
-			}
-		// this should come before mergeability check since mergeability is a superset of this check.
-		case valid.PoliciesPassedCommandReq:
-			// We should rely on this function instead of plan status, since plan status after a failed apply will not carry the policy error over.
-			if !ctx.PolicyCleared() {
-				return "All policies must pass for project before running apply.", nil
-			}
-		case raw.MergeableRequirement:
-			if !ctx.PullReqStatus.Mergeable {
-				return "Pull request must be mergeable before running apply.", nil
-			}
-		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
-				return "Default branch must be rebased onto pull request before running apply.", nil
-			}
-		}
-	}
-	// Passed all apply requirements configured.
-	return "", nil
-}
-
 func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) (failure string, err error) {
 	for _, dependOnProject := range ctx.DependsOn {
 
@@ -83,12 +35,30 @@ func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx comma
 	return "", nil
 }
 
+func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
+	return a.validateCommandRequirement(repoDir, ctx, command.Plan, ctx.ApplyRequirements)
+}
+
+func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
+	return a.validateCommandRequirement(repoDir, ctx, command.Apply, ctx.ApplyRequirements)
+}
+
 func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
-	for _, req := range ctx.ImportRequirements {
+	return a.validateCommandRequirement(repoDir, ctx, command.Import, ctx.ImportRequirements)
+}
+
+func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir string, ctx command.ProjectContext, cmd command.Name, requirements []string) (failure string, err error) {
+	for _, req := range requirements {
 		switch req {
 		case raw.ApprovedRequirement:
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
-				return "Pull request must be approved according to the project's approval rules before running import.", nil
+				return fmt.Sprintf("Pull request must be approved according to the project's approval rules before running %s.", cmd), nil
+			}
+		// this should come before mergeability check since mergeability is a superset of this check.
+		case valid.PoliciesPassedCommandReq:
+			// We should rely on this function instead of plan status, since plan status after a failed apply will not carry the policy error over.
+			if !ctx.PolicyCleared() {
+				return fmt.Sprintf("All policies must pass for project before running %s.", cmd), nil
 			}
 		case raw.MergeableRequirement:
 			if !ctx.PullReqStatus.Mergeable {
@@ -96,10 +66,10 @@ func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string,
 			}
 		case raw.UnDivergedRequirement:
 			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
-				return "Default branch must be rebased onto pull request before running import.", nil
+				return fmt.Sprintf("Default branch must be rebased onto pull request before running %s.", cmd), nil
 			}
 		}
 	}
-	// Passed all import requirements configured.
+	// Passed all requirements configured.
 	return "", nil
 }
