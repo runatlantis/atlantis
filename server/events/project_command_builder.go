@@ -416,7 +416,6 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 
 	if p.autoDiscoverModeEnabled(ctx, repoCfg) {
 		ctx.Log.Info("automatic project discovery enabled. Will run automatic detection")
-		autoDiscover := p.getAutoDiscover(ctx, repoCfg)
 		// build a module index for projects that are explicitly included
 		allModifiedProjects := p.ProjectFinder.DetermineProjects(
 			ctx.Log, modifiedFiles, ctx.Pull.BaseRepo.FullName, repoDir, p.AutoplanFileList, moduleInfo)
@@ -433,7 +432,7 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 		}
 		for _, mp := range allModifiedProjects {
 			path := filepath.Clean(mp.Path)
-			if p.isPathIgnored(ctx, repoCfg, path) {
+			if p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) {
 				continue
 			}
 			_, dirExists := configuredProjDirs[path]
