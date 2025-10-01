@@ -36,7 +36,7 @@ func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx comma
 }
 
 func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
-	return a.validateCommandRequirement(repoDir, ctx, command.Plan, ctx.ApplyRequirements)
+	return a.validateCommandRequirement(repoDir, ctx, command.Plan, ctx.PlanRequirements)
 }
 
 func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
