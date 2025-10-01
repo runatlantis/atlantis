@@ -1078,7 +1078,7 @@ projects:
 				},
 			},
 		},
-		"autodiscover enabled but project excluded by autodiscover ignore": {
+		"autodiscover enabled but ignoring explicit project": {
 			DirStructure: map[string]interface{}{
 				"project1": map[string]interface{}{
 					"main.tf": nil,
@@ -1094,13 +1094,13 @@ projects:
 autodiscover:
   mode: enabled
   ignore_paths:
-  - project3
+  - project1
 projects:
 - name: project1-custom-name
   dir: project1`,
-			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
-			// project2 is autodiscovered, but autodiscover was ignored for project3
-			// project1 is configured explicitly so added
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			// project2 is autodiscover-ignored, but configured explicitly so added
+			// project1 is autodiscoverd as normal
 			Exp: []expCtxFields{
 				{
 					ProjectName: "project1-custom-name",
