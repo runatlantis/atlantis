@@ -370,21 +370,24 @@ func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, mod
 
 // autoDiscoverModeEnabled determines whether to use autodiscover
 func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Context, repoCfg valid.RepoCfg) bool {
-	return repoCfg.AutoDiscoverEnabled(p.getAutoDiscover(ctx, repoCfg).Mode)
+	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
+	globalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
+	if globalAutoDiscover != nil {
+		defaultAutoDiscoverMode = globalAutoDiscover.Mode
+	}
+	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
 }
 
-// autoDiscoverModeEnabled determines whether to use autodiscover
-func (p *DefaultProjectCommandBuilder) getAutoDiscover(ctx *command.Context, repoCfg valid.RepoCfg) valid.AutoDiscover {
+// isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery
+func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
 	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
 	if fromGlobalAutoDiscover != nil {
-		return *fromGlobalAutoDiscover
+		return fromGlobalAutoDiscover.IsPathIgnored(path)
 	}
 	if repoCfg.AutoDiscover != nil {
-		return *repoCfg.AutoDiscover
+		return repoCfg.AutoDiscover.IsPathIgnored(path)
 	}
-	return valid.AutoDiscover{
-		Mode: valid.AutoDiscoverMode(p.AutoDiscoverMode),
-	}
+	return false
 }
 
 // getMergedProjectCfgs gets all merged project configs for building commands given a context and a clone repo
@@ -430,7 +433,7 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 		}
 		for _, mp := range allModifiedProjects {
 			path := filepath.Clean(mp.Path)
-			if autoDiscover.IsPathIgnored(path) {
+			if p.isPathIgnored(ctx, repoCfg, path) {
 				continue
 			}
 			_, dirExists := configuredProjDirs[path]
