@@ -62,7 +62,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 			}
 		case raw.MergeableRequirement:
 			if !ctx.PullReqStatus.Mergeable {
-				return "Pull request must be mergeable before running import.", nil
+				return fmt.Sprintf("Pull request must be mergeable before running %s.", cmd), nil
 			}
 		case raw.UnDivergedRequirement:
 			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
