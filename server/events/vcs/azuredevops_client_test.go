@@ -320,7 +320,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 		testName     string
 		mergeStatus  string
 		policy       Policy
-		expMergeable bool
+		expMergeable models.MergeableStatus
 	}{
 		{
 			"merge conflicts",
@@ -330,7 +330,9 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				"foo",
 				"approved",
 			},
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 		{
 			"rejected policy status",
@@ -340,8 +342,9 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				"foo",
 				"rejected",
 			},
-			false,
-		},
+			models.MergeableStatus{
+				IsMergeable: false,
+			}},
 		{
 			"merge succeeded",
 			azuredevops.MergeSucceeded.String(),
@@ -350,8 +353,9 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				"foo",
 				"approved",
 			},
-			true,
-		},
+			models.MergeableStatus{
+				IsMergeable: true,
+			}},
 		{
 			"pending policy status",
 			azuredevops.MergeSucceeded.String(),
@@ -360,7 +364,9 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				"foo",
 				"pending",
 			},
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 		{
 			"atlantis apply status rejected",
@@ -370,7 +376,9 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				"apply",
 				"rejected",
 			},
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 	}
 

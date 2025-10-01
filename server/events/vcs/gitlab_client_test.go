@@ -703,105 +703,133 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 		status        models.CommitStatus
 		gitlabVersion []string
 		mrID          int
-		expState      bool
+		expState      models.MergeableStatus
 	}{
 		{
 			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			defaultMr,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			defaultMr,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			defaultMr,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.PendingCommitStatus,
 			gitlabServerVersions,
 			defaultMr,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.SuccessCommitStatus,
 			gitlabServerVersions,
 			defaultMr,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			ciMustPassSuccessMR,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			ciMustPassFailureMR,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			needRebaseMR,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.PendingCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.SuccessCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 	}
 	for _, serverVersion := range gitlabServerVersions {
