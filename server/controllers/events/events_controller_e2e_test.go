@@ -1211,7 +1211,9 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
 			When(vcsClient.PullIsMergeable(
-				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq("atlantis-test"), Eq([]string{}))).ThenReturn(true, nil)
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq("atlantis-test"), Eq([]string{}))).ThenReturn(models.MergeableStatus{
+				IsMergeable: true,
+			}, nil)
 			When(vcsClient.PullIsApproved(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(models.ApprovalStatus{
 				IsApproved: true,

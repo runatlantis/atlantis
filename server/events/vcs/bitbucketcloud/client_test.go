@@ -231,7 +231,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	cases := map[string]struct {
 		DiffStat     string
-		ExpMergeable bool
+		ExpMergeable models.MergeableStatus
 	}{
 		"mergeable": {
 			DiffStat: `{
@@ -257,7 +257,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				"page": 1,
 				"size": 1
 			}`,
-			ExpMergeable: true,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		"merge conflict": {
 			DiffStat: `{
@@ -291,7 +293,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			  "page": 1,
 			  "size": 1
 			}`,
-			ExpMergeable: false,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 		"merge conflict due to file deleted": {
 			DiffStat: `{
@@ -317,7 +321,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			  "page": 1,
 			  "size": 1
 			}`,
-			ExpMergeable: false,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 	}
 
