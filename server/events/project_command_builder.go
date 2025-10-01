@@ -375,12 +375,12 @@ func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Cont
 
 // autoDiscoverModeEnabled determines whether to use autodiscover
 func (p *DefaultProjectCommandBuilder) getAutoDiscover(ctx *command.Context, repoCfg valid.RepoCfg) valid.AutoDiscover {
-	if repoCfg.AutoDiscover != nil {
-		return *repoCfg.AutoDiscover
-	}
 	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
 	if fromGlobalAutoDiscover != nil {
 		return *fromGlobalAutoDiscover
+	}
+	if repoCfg.AutoDiscover != nil {
+		return *repoCfg.AutoDiscover
 	}
 	return valid.AutoDiscover{
 		Mode: valid.AutoDiscoverMode(p.AutoDiscoverMode),

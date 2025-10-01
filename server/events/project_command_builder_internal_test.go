@@ -1390,8 +1390,6 @@ autodiscover:
 			globalCfg: `
 repos:
 - id: /.*/
-  autodiscover:
-    mode: enabled
 `,
 			repoCfg: `
 version: 3
@@ -1426,14 +1424,14 @@ projects:
 			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
 			expLen:        2,
 		},
-		"autodiscover skips ignore_paths in global when configured in repo": {
+		"autodiscover skips ignore_paths in repo when configured in global": {
 			globalCfg: `
 repos:
 - id: /.*/
   autodiscover:
     mode: enabled
     ignore_paths:
-    - project3
+    - project[0-9]
 `,
 			repoCfg: `
 version: 3
@@ -1444,7 +1442,7 @@ projects:
 autodiscover:
   mode: enabled
   ignore_paths:
-  - project[0-9]
+  - project3
 `,
 			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
 			expLen:        1,
