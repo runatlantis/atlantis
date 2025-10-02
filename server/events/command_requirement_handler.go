@@ -29,7 +29,7 @@ func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, c
 				return "Pull request must be approved according to the project's approval rules before running plan.", nil
 			}
 		case raw.MergeableRequirement:
-			if !ctx.PullReqStatus.Mergeable {
+			if !ctx.PullReqStatus.MergeableStatus.IsMergeable {
 				return "Pull request must be mergeable before running plan.", nil
 			}
 		case raw.UnDivergedRequirement:
@@ -56,7 +56,7 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 				return "All policies must pass for project before running apply.", nil
 			}
 		case raw.MergeableRequirement:
-			if !ctx.PullReqStatus.Mergeable {
+			if !ctx.PullReqStatus.MergeableStatus.IsMergeable {
 				return "Pull request must be mergeable before running apply.", nil
 			}
 		case raw.UnDivergedRequirement:
@@ -91,7 +91,7 @@ func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string,
 				return "Pull request must be approved according to the project's approval rules before running import.", nil
 			}
 		case raw.MergeableRequirement:
-			if !ctx.PullReqStatus.Mergeable {
+			if !ctx.PullReqStatus.MergeableStatus.IsMergeable {
 				return "Pull request must be mergeable before running import.", nil
 			}
 		case raw.UnDivergedRequirement:

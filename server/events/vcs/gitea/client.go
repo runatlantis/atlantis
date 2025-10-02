@@ -283,18 +283,20 @@ func (c *GiteaClient) PullIsApproved(logger logging.SimpleLogging, repo models.R
 }
 
 // PullIsMergeable returns true if the pull request is mergeable
-func (c *GiteaClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) {
+func (c *GiteaClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if Gitea pull request %d is mergeable", pull.Num)
 
 	pullRequest, _, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pull.Num))
 
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 
 	logger.Debug("Gitea pull request is mergeable: %v (%v)", pullRequest.Mergeable, pull.Num)
 
-	return pullRequest.Mergeable, nil
+	return models.MergeableStatus{
+		IsMergeable: pullRequest.Mergeable,
+	}, nil
 }
 
 // UpdateStatus updates the commit status to state for pull. src is the

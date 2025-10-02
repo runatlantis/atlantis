@@ -192,32 +192,38 @@ func (g *AzureDevopsClient) DiscardReviews(logger logging.SimpleLogging, repo mo
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) { //nolint: revive
+func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) { //nolint: revive
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
-		return false, errors.Wrap(err, "getting pull request")
+		return models.MergeableStatus{}, errors.Wrap(err, "getting pull request")
 	}
 
 	if *adPull.MergeStatus != azuredevops.MergeSucceeded.String() {
-		return false, nil
+		return models.MergeableStatus{
+			IsMergeable: false,
+		}, nil
 	}
 
 	if *adPull.IsDraft {
-		return false, nil
+		return models.MergeableStatus{
+			IsMergeable: false,
+		}, nil
 	}
 
 	if *adPull.Status != azuredevops.PullActive.String() {
-		return false, nil
+		return models.MergeableStatus{
+			IsMergeable: false,
+		}, nil
 	}
 
 	projectID := *adPull.Repository.Project.ID
 	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, pull.Num)
 	policyEvaluations, _, err := g.Client.PolicyEvaluations.List(g.ctx, owner, project, artifactID, &azuredevops.PolicyEvaluationsListOptions{})
 	if err != nil {
-		return false, errors.Wrap(err, "getting policy evaluations")
+		return models.MergeableStatus{}, errors.Wrap(err, "getting policy evaluations")
 	}
 
 	for _, policyEvaluation := range policyEvaluations {
@@ -235,11 +241,15 @@ func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo m
 		}
 
 		if *policyEvaluation.Configuration.IsBlocking && *policyEvaluation.Status != azuredevops.PolicyEvaluationApproved {
-			return false, nil
+			return models.MergeableStatus{
+				IsMergeable: false,
+			}, nil
 		}
 	}
 
-	return true, nil
+	return models.MergeableStatus{
+		IsMergeable: true,
+	}, nil
 }
 
 // GetPullRequest returns the pull request.
