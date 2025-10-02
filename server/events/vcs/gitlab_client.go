@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -419,27 +420,55 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 
 	retries := 1
 	delay := 2 * time.Second
-	var commit *gitlab.Commit
+	var commitStatuses []*gitlab.CommitStatus
 	var resp *gitlab.Response
 	var err error
 
+	// get the last commit status with the same ref
+	getCommitStatusesOptions := &gitlab.GetCommitStatusesOptions{
+		ListOptions: gitlab.ListOptions{
+			Sort: "desc",
+		},
+		Ref: gitlab.Ptr(pull.HeadBranch),
+	}
+
 	// Try a couple of times to get the pipeline ID for the commit
 	for i := 0; i <= retries; i++ {
-		commit, resp, err = g.Client.Commits.GetCommit(repo.FullName, pull.HeadCommit, nil)
+		commitStatuses, resp, err = g.Client.Commits.GetCommitStatuses(repo.FullName, pull.HeadCommit, getCommitStatusesOptions)
+
 		if resp != nil {
-			logger.Debug("GET /projects/%s/repository/commits/%d: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
+			logger.Debug("GET /projects/%s/repository/commits/%d/statuses: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
 		}
 		if err != nil {
 			return err
 		}
-		if commit.LastPipeline != nil {
-			logger.Info("Pipeline found for commit %s, setting pipeline ID to %d", pull.HeadCommit, commit.LastPipeline.ID)
-			// Set the pipeline ID to the last pipeline that ran for the commit
-			setCommitStatusOptions.PipelineID = gitlab.Ptr(commit.LastPipeline.ID)
+		if len(commitStatuses) > 0 {
+			var pipelineIds []int
+
+			// Loop through the commitStatuses and collect unique pipelineId
+			for _, commitStatus := range commitStatuses {
+				if !(slices.Contains(pipelineIds, commitStatus.PipelineId)) {
+					pipelineIds = append(pipelineIds, commitStatus.PipelineId)
+				}
+			}
+
+			// Check that all commit statuses has identical pipeline ID reflected by only one item in pipelineIds
+			if len(pipelineIds) == 1 {
+				logger.Info("Exactly one PipelineID found for commit %s and ref %s, setting new status PipelineID to %d", pull.HeadCommit, pull.HeadBranch, pipelineIds[0])
+
+				// Set the pipeline ID to the only item in pipelineIds
+				setCommitStatusOptions.PipelineID = gitlab.Ptr(pipelineIds[0])
+			} else {
+				logger.Warn("Commit %s has statuses from more than one PipelineID (ids=%v) for ref %s. Set PipelineID from the last commit status: %s", pull.HeadCommit, pipelineIds, pull.HeadBranch, commitStatuses[0].PipelineId)
+
+				// Set the pipeline ID from the latest commit status
+				setCommitStatusOptions.PipelineID = gitlab.Ptr(commitStatuses[0].PipelineId)
+			}
+
 			break
 		}
 		if i != retries {
-			logger.Info("No pipeline found for commit %s, retrying in %s", pull.HeadCommit, delay)
+			logger.Info("No pipeline found for commit %s and ref %s, retrying in %s", pull.HeadCommit, pull.HeadBranch, delay)
 			time.Sleep(delay)
 		} else {
 			// If we've exhausted all retries, set the Ref to the branch name
@@ -462,7 +491,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			"attempt", attempt,
 			"max_attempts", maxAttempts,
 			"repo", repo.FullName,
-			"commit", commit.ShortID,
+			"commit", pull.HeadCommit,
 			"state", state.String(),
 		)
 
