@@ -82,6 +82,7 @@ const (
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
 	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
+	DiscardApprovalAfterPlanFlag     = "discard-approval-after-plan"
 	EmojiReaction                    = "emoji-reaction"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
@@ -519,7 +520,11 @@ var boolFlags = map[string]boolFlag{
 		description: "Disable atlantis global apply lock in UI",
 	},
 	DiscardApprovalOnPlanFlag: {
-		description:  "Enables the discarding of approval if a new plan has been executed. Currently only Github is supported",
+		description:  "Enables the discarding of approval if a new plan has been executed. Currently supported on GitHub, GitLab, and Gitea",
+		defaultValue: false,
+	},
+	DiscardApprovalAfterPlanFlag: {
+		description:  "Discard approval after plan has been executed (regardless of trigger). Currently supported on GitHub, GitLab, and Gitea",
 		defaultValue: false,
 	},
 	EnablePolicyChecksFlag: {
