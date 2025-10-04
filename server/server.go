@@ -128,6 +128,7 @@ type Server struct {
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
 	EnableProfilingAPI             bool
+	backend                        locking.Backend
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -1032,6 +1033,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
 		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
+		backend:                        backend,
 	}
 
 	validate := validator.New(validator.WithRequiredStructEnabled())
@@ -1133,6 +1135,11 @@ func (s *Server) Start() error {
 		s.Logger.Err(err.Error())
 	}
 
+	// Best effort attempt to close the backend
+	if err := s.closeBackend(); err != nil {
+		s.Logger.Err("while closing backend: %v", err)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
@@ -1157,6 +1164,21 @@ func (s *Server) waitForDrain() {
 		case <-ticker.C:
 			s.Logger.Info("Waiting for in-progress operations to complete, current in-progress ops: %d", s.Drainer.GetStatus().InProgressOps)
 		}
+	}
+}
+
+// closeBackend best effort attempts to close the backend
+func (s *Server) closeBackend() error {
+	if s.backend == nil {
+		return nil
+	}
+	done := make(chan error, 1)
+	go func() { done <- s.backend.Close() }()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(1 * time.Second):
+		return errors.New("backend close timed out after 1s")
 	}
 }
 
