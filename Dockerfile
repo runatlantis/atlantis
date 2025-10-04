@@ -176,12 +176,10 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# lmassa test
-
 # renovate: datasource=repology depName=alpine_3_21/ca-certificates versioning=loose
-ENV CA_CERTIFICATES_VERSION="20250619-r0"
+ENV CA_CERTIFICATES_VERSION="20250911-r0"
 # renovate: datasource=repology depName=alpine_3_21/curl versioning=loose
-ENV CURL_VERSION="8.12.1-r1"
+ENV CURL_VERSION="8.14.1-r2"
 # renovate: datasource=repology depName=alpine_3_21/git versioning=loose
 ENV GIT_VERSION="2.47.3-r0"
 # renovate: datasource=repology depName=alpine_3_21/unzip versioning=loose
