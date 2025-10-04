@@ -75,6 +75,7 @@ func TestServer_CloseBackend(t *testing.T) {
 				}
 
 				err := s.closeBackend()
+
 				// "sleep" until after longest timeout
 				time.Sleep(1 * time.Second)
 
