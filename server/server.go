@@ -1135,8 +1135,8 @@ func (s *Server) Start() error {
 		s.Logger.Err(err.Error())
 	}
 
-	// Best effort attempt to close the backend
-	if err := s.closeBackend(); err != nil {
+	// Attempt to close the backend
+	if err := s.closeBackend(1 * time.Second); err != nil {
 		s.Logger.Err("while closing backend: %v", err)
 	}
 
@@ -1167,8 +1167,8 @@ func (s *Server) waitForDrain() {
 	}
 }
 
-// closeBackend best effort attempts to close the backend
-func (s *Server) closeBackend() error {
+// closeBackend attempts to close the backend, waiting up to the given timeout.
+func (s *Server) closeBackend(timeout time.Duration) error {
 	s.Logger.Info("Shutting down backend")
 	if s.backend == nil {
 		return nil
@@ -1178,8 +1178,8 @@ func (s *Server) closeBackend() error {
 	select {
 	case err := <-done:
 		return err
-	case <-time.After(1 * time.Second):
-		return errors.New("backend close timed out after 1s")
+	case <-time.After(timeout):
+		return fmt.Errorf("backend close timed out after %s", timeout)
 	}
 }
 
