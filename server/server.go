@@ -1169,6 +1169,7 @@ func (s *Server) waitForDrain() {
 
 // closeBackend best effort attempts to close the backend
 func (s *Server) closeBackend() error {
+	s.Logger.Info("Shutting down backend")
 	if s.backend == nil {
 		return nil
 	}
