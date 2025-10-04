@@ -74,7 +74,7 @@ func TestServer_CloseBackend(t *testing.T) {
 					Logger:  logging.NewNoopLogger(t),
 				}
 
-				err := s.closeBackend()
+				err := s.closeBackend(time.Second)
 
 				// "sleep" until after longest timeout
 				time.Sleep(1 * time.Second)
