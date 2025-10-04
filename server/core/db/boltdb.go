@@ -61,7 +61,6 @@ func New(dataDir string) (*BoltDB, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "starting BoltDB")
 	}
-	// todo: close BoltDB when server is sigtermed
 	return &BoltDB{
 		db:                    db,
 		locksBucketName:       []byte(locksBucketName),
