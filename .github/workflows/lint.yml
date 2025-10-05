@@ -68,7 +68,7 @@ jobs:
         uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6
         with:
           # renovate: datasource=github-releases depName=golangci/golangci-lint
-          version: v1.64.4
+          version: v2.5.0
 
   skip-lint:
     needs: [changes]
