@@ -657,6 +657,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"REVIEW_REQUIRED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state dirty",
 			},
 		},
 		{
@@ -665,6 +666,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"REVIEW_REQUIRED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state unknown",
 			},
 		},
 		{
@@ -673,6 +675,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"REVIEW_REQUIRED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			},
 		},
 		{
@@ -739,6 +742,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"APPROVED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state <unknown>",
 			},
 		},
 		{
@@ -771,6 +775,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"APPROVED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			},
 		},
 		{
@@ -811,6 +816,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"APPROVED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			},
 		},
 		{
@@ -819,6 +825,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"APPROVED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			},
 		},
 		{
@@ -835,6 +842,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"APPROVED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			},
 		},
 		{
@@ -843,6 +851,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"APPROVED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			},
 		},
 		{
@@ -867,6 +876,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"APPROVED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			},
 		},
 		{
@@ -875,6 +885,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"APPROVED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			},
 		},
 		{
@@ -907,6 +918,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"APPROVED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			},
 		},
 	}
