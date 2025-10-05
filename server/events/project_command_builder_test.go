@@ -1562,7 +1562,7 @@ projects:
 				"main.tf": baseVersionConfig,
 			},
 			"project2": map[string]interface{}{
-				"main.tf": strings.Replace(baseVersionConfig, "0.12.8", "0.12.9", -1),
+				"main.tf": strings.ReplaceAll(baseVersionConfig, "0.12.8", "0.12.9"),
 			},
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},

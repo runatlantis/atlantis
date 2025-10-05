@@ -1067,7 +1067,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:       true,
 			mergeMethodOption: "merge",
 			expMethod:         "",
-			expErr:            "Merge method 'merge' is not allowed by the repository Pull Request settings",
+			expErr:            "merge method 'merge' is not allowed by the repository Pull Request settings",
 		},
 		"merge with rebase: overridden by command: rebase not allowed": {
 			allowMerge:        true,
@@ -1075,7 +1075,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:       true,
 			mergeMethodOption: "rebase",
 			expMethod:         "",
-			expErr:            "Merge method 'rebase' is not allowed by the repository Pull Request settings",
+			expErr:            "merge method 'rebase' is not allowed by the repository Pull Request settings",
 		},
 		"merge with squash: overridden by command: squash not allowed": {
 			allowMerge:        true,
@@ -1083,7 +1083,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:       false,
 			mergeMethodOption: "squash",
 			expMethod:         "",
-			expErr:            "Merge method 'squash' is not allowed by the repository Pull Request settings",
+			expErr:            "merge method 'squash' is not allowed by the repository Pull Request settings",
 		},
 		"merge with unknown: overridden by command: unknown doesn't exist": {
 			allowMerge:        true,
@@ -1091,7 +1091,7 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:       true,
 			mergeMethodOption: "unknown",
 			expMethod:         "",
-			expErr:            "Merge method 'unknown' is unknown. Specify one of the valid values: 'merge, rebase, squash'",
+			expErr:            "merge method 'unknown' is unknown. Specify one of the valid values: 'merge, rebase, squash'",
 		},
 	}
 
@@ -1102,18 +1102,18 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			jsBytes, err := os.ReadFile("testdata/github-repo.json")
 			Ok(t, err)
 			resp := string(jsBytes)
-			resp = strings.Replace(resp,
+			resp = strings.ReplaceAll(resp,
 				`"allow_squash_merge": true`,
 				fmt.Sprintf(`"allow_squash_merge": %t`, c.allowSquash),
-				-1)
-			resp = strings.Replace(resp,
+			)
+			resp = strings.ReplaceAll(resp,
 				`"allow_merge_commit": true`,
 				fmt.Sprintf(`"allow_merge_commit": %t`, c.allowMerge),
-				-1)
-			resp = strings.Replace(resp,
+			)
+			resp = strings.ReplaceAll(resp,
 				`"allow_rebase_merge": true`,
 				fmt.Sprintf(`"allow_rebase_merge": %t`, c.allowRebase),
-				-1)
+			)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
