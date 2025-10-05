@@ -531,30 +531,35 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 			"dirty",
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state dirty",
 			},
 		},
 		{
 			"unknown",
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state unknown",
 			},
 		},
 		{
 			"blocked",
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state blocked",
 			},
 		},
 		{
 			"behind",
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state behind",
 			},
 		},
 		{
 			"random",
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state random",
 			},
 		},
 		{
@@ -579,6 +584,7 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 			"",
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state <unknown>",
 			},
 		},
 	}
@@ -691,6 +697,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"REVIEW_REQUIRED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state behind",
 			},
 		},
 		{
@@ -699,6 +706,7 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			`"REVIEW_REQUIRED"`,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR is in state random",
 			},
 		},
 		{

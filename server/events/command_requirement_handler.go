@@ -62,7 +62,11 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 			}
 		case raw.MergeableRequirement:
 			if !ctx.PullReqStatus.MergeableStatus.IsMergeable {
-				return fmt.Sprintf("Pull request must be mergeable before running %s.", cmd), nil
+				suffix := ""
+				if ctx.PullReqStatus.MergeableStatus.Reason != "" {
+					suffix = fmt.Sprintf(" (%s)", ctx.PullReqStatus.MergeableStatus.Reason)
+				}
+				return fmt.Sprintf("Pull request must be mergeable before running %s%s.", cmd, suffix), nil
 			}
 		case raw.UnDivergedRequirement:
 			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {

@@ -855,7 +855,11 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
-	switch githubPR.GetMergeableState() {
+	state := githubPR.GetMergeableState()
+	if state == "" {
+		state = "<unknown>"
+	}
+	switch state {
 	case "clean", "unstable", "has_hooks":
 		return models.MergeableStatus{
 			IsMergeable: true,
@@ -867,16 +871,24 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 			if err != nil {
 				return models.MergeableStatus{}, errors.Wrap(err, "getting pull request status")
 			}
+			if isMergeableMinusApply {
+				return models.MergeableStatus{
+					IsMergeable: true,
+				}, nil
+			}
 			return models.MergeableStatus{
-				IsMergeable: isMergeableMinusApply,
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			}, nil
 		}
 		return models.MergeableStatus{
 			IsMergeable: false,
+			Reason:      "PR is in state blocked",
 		}, nil
 	default:
 		return models.MergeableStatus{
 			IsMergeable: false,
+			Reason:      fmt.Sprintf("PR is in state %s", state),
 		}, nil
 	}
 }

@@ -74,6 +74,20 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 			wantErr:     assert.NoError,
 		},
 		{
+			name: "fail by no mergeable with reason",
+			ctx: command.ProjectContext{
+				PlanRequirements: []string{raw.MergeableRequirement},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable: false,
+						Reason:      "some reason",
+					},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running plan (some reason).",
+			wantErr:     assert.NoError,
+		},
+		{
 			name: "fail by diverged",
 			ctx: command.ProjectContext{
 				PlanRequirements: []string{raw.UnDivergedRequirement},
