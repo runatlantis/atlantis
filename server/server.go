@@ -1169,10 +1169,11 @@ func (s *Server) waitForDrain() {
 
 // closeBackend attempts to close the backend, waiting up to the given timeout.
 func (s *Server) closeBackend(timeout time.Duration) error {
-	s.Logger.Info("Shutting down backend")
 	if s.backend == nil {
 		return nil
 	}
+	s.Logger.Info("Shutting down backend")
+
 	done := make(chan error, 1)
 	go func() { done <- s.backend.Close() }()
 	select {

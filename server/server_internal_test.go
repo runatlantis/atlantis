@@ -27,10 +27,14 @@ import (
 )
 
 func TestServer_CloseBackend(t *testing.T) {
+
+	timeout := time.Second
+
 	type backendCase struct {
-		description string
-		closeFn     func() error
-		expectedErr string
+		description      string
+		closeFn          func() error
+		expectedErr      string
+		expectedDuration time.Duration
 	}
 
 	cases := []backendCase{
@@ -49,7 +53,8 @@ func TestServer_CloseBackend(t *testing.T) {
 				time.Sleep(1500 * time.Millisecond)
 				return nil
 			},
-			expectedErr: "timed out",
+			expectedErr:      "timed out",
+			expectedDuration: time.Second,
 		},
 		{
 			description: "nil backend",
@@ -74,16 +79,20 @@ func TestServer_CloseBackend(t *testing.T) {
 					Logger:  logging.NewNoopLogger(t),
 				}
 
-				err := s.closeBackend(time.Second)
+				start := time.Now()
+				err := s.closeBackend(timeout)
+				duration := time.Since(start)
 
-				// "sleep" until after longest timeout
-				time.Sleep(1 * time.Second)
+				assert.Equal(t, tt.expectedDuration, duration)
 
 				if tt.expectedErr == "" {
 					assert.NoError(t, err)
 				} else {
 					assert.ErrorContains(t, err, tt.expectedErr)
 				}
+
+				// Make sure enough fake time so nothing is left running
+				time.Sleep(2 * time.Second)
 			})
 		})
 	}
