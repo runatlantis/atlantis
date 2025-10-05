@@ -1102,18 +1102,18 @@ func TestGithubClient_MergePullCorrectMethod(t *testing.T) {
 			jsBytes, err := os.ReadFile("testdata/github-repo.json")
 			Ok(t, err)
 			resp := string(jsBytes)
-			resp = strings.Replace(resp,
+			resp = strings.ReplaceAll(resp,
 				`"allow_squash_merge": true`,
 				fmt.Sprintf(`"allow_squash_merge": %t`, c.allowSquash),
-				-1)
-			resp = strings.Replace(resp,
+			)
+			resp = strings.ReplaceAll(resp,
 				`"allow_merge_commit": true`,
 				fmt.Sprintf(`"allow_merge_commit": %t`, c.allowMerge),
-				-1)
-			resp = strings.Replace(resp,
+			)
+			resp = strings.ReplaceAll(resp,
 				`"allow_rebase_merge": true`,
 				fmt.Sprintf(`"allow_rebase_merge": %t`, c.allowRebase),
-				-1)
+			)
 
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
