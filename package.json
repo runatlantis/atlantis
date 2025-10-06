@@ -2,7 +2,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "devDependencies": {
-    "@playwright/test": "1.55.0",
+    "@playwright/test": "1.55.1",
     "@types/node": "22.13.4",
     "@vueuse/core": "12.8.2",
     "markdown-it-footnote": "4.0.0",
