@@ -525,43 +525,67 @@ func TestGithubClient_PullIsMergeable(t *testing.T) {
 	vcsStatusName := "atlantis-test"
 	cases := []struct {
 		state        string
-		expMergeable bool
+		expMergeable models.MergeableStatus
 	}{
 		{
 			"dirty",
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state dirty",
+			},
 		},
 		{
 			"unknown",
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state unknown",
+			},
 		},
 		{
 			"blocked",
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked",
+			},
 		},
 		{
 			"behind",
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state behind",
+			},
 		},
 		{
 			"random",
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state random",
+			},
 		},
 		{
 			"unstable",
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"has_hooks",
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"clean",
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"",
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state <unknown>",
+			},
 		},
 	}
 
@@ -625,199 +649,277 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 		state                     string
 		statusCheckRollupFilePath string
 		reviewDecision            string
-		expMergeable              bool
+		expMergeable              models.MergeableStatus
 	}{
 		{
 			"dirty",
 			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state dirty",
+			},
 		},
 		{
 			"unknown",
 			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state unknown",
+			},
 		},
 		{
 			"blocked",
 			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
 		},
 		{
 			"blocked",
 			"ruleset-atlantis-apply-pending.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-atlantis-apply-pending.json",
 			"null",
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"behind",
 			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state behind",
+			},
 		},
 		{
 			"random",
 			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state random",
+			},
 		},
 		{
 			"unstable",
 			"ruleset-atlantis-apply-pending.json",
 			`"REVIEW_REQUIRED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"has_hooks",
 			"ruleset-atlantis-apply-pending.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"clean",
 			"ruleset-atlantis-apply-pending.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"",
 			"ruleset-atlantis-apply-pending.json",
 			`"APPROVED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state <unknown>",
+			},
 		},
 		{
 			"blocked",
 			"ruleset-atlantis-apply-expected.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-optional-check-failed.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-optional-status-failed.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-check-pending.json",
 			`"APPROVED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
 		},
 		{
 			"blocked",
 			"ruleset-check-pending-other-atlantis.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-check-skipped.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-check-neutral.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-evaluate-workflow-failed.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"branch-protection-expected.json",
 			`"APPROVED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
 		},
 		{
 			"blocked",
 			"branch-protection-failed.json",
 			`"APPROVED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
 		},
 		{
 			"blocked",
 			"branch-protection-passed.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-check-expected.json",
 			`"APPROVED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
 		},
 		{
 			"blocked",
 			"ruleset-check-failed.json",
 			`"APPROVED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
 		},
 		{
 			"blocked",
 			"ruleset-check-failed-other-atlantis.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-check-passed.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-workflow-expected.json",
 			`"APPROVED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
 		},
 		{
 			"blocked",
 			"ruleset-workflow-failed.json",
 			`"APPROVED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
 		},
 		{
 			"blocked",
 			"ruleset-workflow-passed.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-workflow-passed-multiple-runs.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-workflow-passed-sha-match.json",
 			`"APPROVED"`,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			"blocked",
 			"ruleset-workflow-passed-sha-mismatch.json",
 			`"APPROVED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
 		},
 	}
 

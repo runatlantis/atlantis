@@ -839,11 +839,11 @@ func GetVCSStatusNameFromRequiredCheck(requiredCheck githubv4.String) string {
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
-func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
+func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if GitHub pull request %d is mergeable", pull.Num)
 	githubPR, err := g.GetPullRequest(logger, repo, pull.Num)
 	if err != nil {
-		return false, errors.Wrap(err, "getting pull request")
+		return models.MergeableStatus{}, errors.Wrap(err, "getting pull request")
 	}
 
 	// We map our mergeable check to when the GitHub merge button is clickable.
@@ -855,21 +855,41 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
-	switch githubPR.GetMergeableState() {
+	state := githubPR.GetMergeableState()
+	if state == "" {
+		state = "<unknown>"
+	}
+	switch state {
 	case "clean", "unstable", "has_hooks":
-		return true, nil
+		return models.MergeableStatus{
+			IsMergeable: true,
+		}, nil
 	case "blocked":
 		if g.config.AllowMergeableBypassApply {
 			logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
 			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname, ignoreVCSStatusNames)
 			if err != nil {
-				return false, errors.Wrap(err, "getting pull request status")
+				return models.MergeableStatus{}, errors.Wrap(err, "getting pull request status")
 			}
-			return isMergeableMinusApply, nil
+			if isMergeableMinusApply {
+				return models.MergeableStatus{
+					IsMergeable: true,
+				}, nil
+			}
+			return models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			}, nil
 		}
-		return false, nil
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "PR is in state blocked",
+		}, nil
 	default:
-		return false, nil
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      fmt.Sprintf("PR is in state %s", state),
+		}, nil
 	}
 }
 

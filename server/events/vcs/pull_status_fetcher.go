@@ -38,7 +38,7 @@ func (f *pullReqStatusFetcher) FetchPullStatus(logger logging.SimpleLogging, pul
 	}
 
 	return models.PullReqStatus{
-		ApprovalStatus: approvalStatus,
-		Mergeable:      mergeable,
+		ApprovalStatus:  approvalStatus,
+		MergeableStatus: mergeable,
 	}, err
 }
