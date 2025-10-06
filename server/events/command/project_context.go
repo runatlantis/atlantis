@@ -159,7 +159,7 @@ func (p ProjectContext) GetShowResultFileName() string {
 	if p.ProjectName == "" {
 		return fmt.Sprintf("%s.json", p.Workspace)
 	}
-	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
+	projName := strings.ReplaceAll(p.ProjectName, "/", planfileSlashReplace)
 	return fmt.Sprintf("%s-%s.json", projName, p.Workspace)
 }
 
@@ -168,7 +168,7 @@ func (p ProjectContext) GetPolicyCheckResultFileName() string {
 	if p.ProjectName == "" {
 		return fmt.Sprintf("%s-policyout.json", p.Workspace)
 	}
-	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
+	projName := strings.ReplaceAll(p.ProjectName, "/", planfileSlashReplace)
 	return fmt.Sprintf("%s-%s-policyout.json", projName, p.Workspace)
 }
 

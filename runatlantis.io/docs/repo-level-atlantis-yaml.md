@@ -407,6 +407,8 @@ the manual configuration will take precedence.
 Use this feature when some projects require specific configuration in a repo with many projects yet
 it's still desirable for Atlantis to plan/apply for projects not enumerated in the config.
 
+This setting is ignored if it is configured on the server, see [Server Side Repo Config](server-side-repo-config.md#repo)
+
 ```yaml
 autodiscover:
    mode: "enabled"
