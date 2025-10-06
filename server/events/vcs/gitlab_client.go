@@ -348,6 +348,7 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
 			return models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s has status %s", status.Name, status.Status),
 			}, nil
 		}
 	}
@@ -359,6 +360,30 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		return models.MergeableStatus{}, err
 	}
 
+	if mr.ApprovalsBeforeMerge > 0 {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      fmt.Sprintf("Still require %d approvals", mr.ApprovalsBeforeMerge),
+		}, nil
+	}
+	if !mr.BlockingDiscussionsResolved {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "Blocking discussions unresolved",
+		}, nil
+	}
+	if mr.WorkInProgress {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "Work in progress",
+		}, nil
+	}
+	if isPipelineSkipped && !allowSkippedPipeline {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "Work in progress",
+		}, nil
+	}
 	if supportsDetailedMergeStatus {
 		logger.Debug("Detailed merge status: '%s'", mr.DetailedMergeStatus)
 	} else {
@@ -372,9 +397,6 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 			mr.DetailedMergeStatus == "need_rebase")) ||
 		(!supportsDetailedMergeStatus &&
 			mr.MergeStatus == "can_be_merged")) && //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
-		mr.ApprovalsBeforeMerge <= 0 &&
-		mr.BlockingDiscussionsResolved &&
-		!mr.WorkInProgress &&
 		(allowSkippedPipeline || !isPipelineSkipped) {
 
 		logger.Debug("Merge request is mergeable")
