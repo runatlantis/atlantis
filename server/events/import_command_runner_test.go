@@ -28,8 +28,8 @@ func TestImportCommandRunner_Run(t *testing.T) {
 		{
 			name: "success with zero projects",
 			pullReqStatus: models.PullReqStatus{
-				ApprovalStatus: models.ApprovalStatus{IsApproved: true},
-				Mergeable:      true,
+				ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+				MergeableStatus: models.MergeableStatus{IsMergeable: true},
 			},
 			projectCmds: []command.ProjectContext{},
 			expComment:  "Ran Import for 0 projects:",
@@ -37,8 +37,8 @@ func TestImportCommandRunner_Run(t *testing.T) {
 		{
 			name: "failure with multiple projects",
 			pullReqStatus: models.PullReqStatus{
-				ApprovalStatus: models.ApprovalStatus{IsApproved: true},
-				Mergeable:      true,
+				ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+				MergeableStatus: models.MergeableStatus{IsMergeable: true},
 			},
 			projectCmds: []command.ProjectContext{{}, {}},
 			expComment:  "**Import Failed**: import cannot run on multiple projects. please specify one project.",
@@ -46,8 +46,8 @@ func TestImportCommandRunner_Run(t *testing.T) {
 		{
 			name: "no comment with zero projects and silencing",
 			pullReqStatus: models.PullReqStatus{
-				ApprovalStatus: models.ApprovalStatus{IsApproved: true},
-				Mergeable:      true,
+				ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+				MergeableStatus: models.MergeableStatus{IsMergeable: true},
 			},
 			projectCmds:  []command.ProjectContext{},
 			silenced:     true,
@@ -77,7 +77,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 
 			importCommandRunner.Run(ctx, cmd)
 
-			Assert(t, ctx.PullRequestStatus.Mergeable == true, "PullRequestStatus must be set for import_requirements")
+			Assert(t, ctx.PullRequestStatus.MergeableStatus.IsMergeable == true, "PullRequestStatus must be set for import_requirements")
 			if tt.expNoComment {
 				vcsClient.VerifyWasCalled(Never()).CreateComment(
 					Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
