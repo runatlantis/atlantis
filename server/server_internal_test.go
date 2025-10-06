@@ -85,6 +85,7 @@ func TestServer_CloseBackend(t *testing.T) {
 
 				assert.Equal(t, tt.expectedDuration, duration)
 
+				//nolint:testifylint // testing error behavior, not precondition
 				if tt.expectedErr == "" {
 					assert.NoError(t, err)
 				} else {
