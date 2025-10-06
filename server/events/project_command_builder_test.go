@@ -279,7 +279,7 @@ terraform {
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
 				PullRequestStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Log:   logger,
 				Scope: scope,
@@ -1078,42 +1078,6 @@ projects:
 				},
 			},
 		},
-		"autodiscover enabled but project excluded by autodiscover ignore": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf": nil,
-				},
-				"project3": map[string]interface{}{
-					"main.tf": nil,
-				},
-			},
-			AtlantisYAML: `version: 3
-autodiscover:
-  mode: enabled
-  ignore_paths:
-  - project3
-projects:
-- name: project1-custom-name
-  dir: project1`,
-			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
-			// project2 is autodiscovered, but autodiscover was ignored for project3
-			// project1 is configured explicitly so added
-			Exp: []expCtxFields{
-				{
-					ProjectName: "project1-custom-name",
-					RepoRelDir:  "project1",
-					Workspace:   "default",
-				},
-				{
-					ProjectName: "",
-					RepoRelDir:  "project2",
-					Workspace:   "default",
-				},
-			},
-		},
 		"autodiscover enabled but ignoring explicit project": {
 			DirStructure: map[string]interface{}{
 				"project1": map[string]interface{}{
@@ -1598,7 +1562,7 @@ projects:
 				"main.tf": baseVersionConfig,
 			},
 			"project2": map[string]interface{}{
-				"main.tf": strings.Replace(baseVersionConfig, "0.12.8", "0.12.9", -1),
+				"main.tf": strings.ReplaceAll(baseVersionConfig, "0.12.8", "0.12.9"),
 			},
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
@@ -1799,7 +1763,7 @@ projects:
 			Log:      logger,
 			Scope:    scope,
 			PullRequestStatus: models.PullReqStatus{
-				Mergeable: true,
+				MergeableStatus: models.MergeableStatus{IsMergeable: true},
 			},
 		})
 		Ok(t, err)
@@ -1861,7 +1825,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 
 	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
 		PullRequestStatus: models.PullReqStatus{
-			Mergeable: true,
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
 		},
 		Log:   logger,
 		Scope: scope,

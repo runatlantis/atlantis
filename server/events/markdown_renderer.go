@@ -255,7 +255,7 @@ func loadTemplatesWithLogging(markdownTemplateOverridesDir string, logger loggin
 // Render formats the data into a markdown string.
 // nolint: interfacer
 func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd PullCommand) string {
-	commandStr := cases.Title(language.English).String(strings.Replace(cmd.CommandName().String(), "_", " ", -1))
+	commandStr := cases.Title(language.English).String(strings.ReplaceAll(cmd.CommandName().String(), "_", " "))
 	var vcsRequestType string
 	if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab {
 		vcsRequestType = "Merge Request"
@@ -402,7 +402,7 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 			}
 			// Error out if no template was found, only if there are no errors or failures.
 			// This is because some errors and failures rely on additional context rendered by templates, but not all errors or failures.
-		} else if !(result.Error != nil || result.Failure != "") {
+		} else if result.Error == nil && result.Failure == "" {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
 		// Render error or failure templates. Done outside of previous block so that other context can be rendered for use here.
@@ -480,11 +480,11 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 		return fmt.Sprintf("no template matched–this is a bug: command=%s", common.Command)
 	}
 
-	switch {
-	case common.Command == planCommandTitle:
+	switch common.Command {
+	case planCommandTitle:
 		numPlanFailures := len(results) - numPlanSuccesses
 		return m.renderTemplateTrimSpace(tmpl, planResultData{resultsTmplData, common, numPlansWithChanges, numPlansWithNoChanges, numPlanFailures})
-	case common.Command == applyCommandTitle:
+	case applyCommandTitle:
 		return m.renderTemplateTrimSpace(tmpl, applyResultData{resultsTmplData, common, numApplySuccesses, numApplyFailures, numApplyErrors})
 	}
 	return m.renderTemplateTrimSpace(tmpl, resultData{resultsTmplData, common})
