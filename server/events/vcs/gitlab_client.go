@@ -405,10 +405,31 @@ func gitlabIsMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, support
 	}
 
 	if supportsDetailedMergeStatus {
+		if mr.DetailedMergeStatus == "need_rebase" {
+			// https://docs.gitlab.com/api/projects/#project-merge-method
+			// +----------------------+---------------+---------------------------------------------+
+			// | Constant Name        | API value     | Description in UI                           |
+			// +----------------------+---------------+---------------------------------------------+
+			// | NoFastForwardMerge   | merge         | Merge Commit                                |
+			// | RebaseMerge          | rebase_merge  | Merge commit with semi-linear history       |
+			// | FastForwardMerge     | ff            | Fast-forward merge                          |
+			// +----------------------+---------------+---------------------------------------------+
+			//
+			// If an MR needs to be rebased (i.e., is behind), and the project is in RebaseMerge or FastForwardMerge state
+			// gitlab doesn't allow you to merge it, and we shouldn't either
+			if project.MergeMethod == gitlab.RebaseMerge || project.MergeMethod == gitlab.FastForwardMerge {
+				return models.MergeableStatus{
+					IsMergeable: false,
+					Reason:      fmt.Sprintf("Merge status is need_rebase and merge method is %s", project.MergeMethod),
+				}
+			}
+			return models.MergeableStatus{
+				IsMergeable: true,
+			}
+		}
 		if mr.DetailedMergeStatus == "mergeable" ||
 			mr.DetailedMergeStatus == "ci_still_running" ||
-			mr.DetailedMergeStatus == "ci_must_pass" ||
-			mr.DetailedMergeStatus == "need_rebase" {
+			mr.DetailedMergeStatus == "ci_must_pass" {
 			return models.MergeableStatus{
 				IsMergeable: true,
 			}
