@@ -142,7 +142,7 @@ If you set `atlantis/apply` to the mergeable requirement, use the `--gh-allow-me
 
 #### GitLab
 
-For GitLab, a merge request will be merged if there are no conflicts, no unresolved discussions if it is a project requirement and if all necessary approvers have approved the pull request.
+For GitLab, a merge request will be merged if there are no conflicts, no unresolved discussions if it is a project requirement and if all necessary approvers have approved the pull request. Additionally, if a merge request needs to be rebased, it will only be considered mergeable if the project's merge method is set to "Merge Commit".
 
 For pipelines, if the project requires that pipelines must succeed, all builds except the apply command status will be checked.
 
