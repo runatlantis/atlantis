@@ -905,7 +905,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 							}
 
 							w.WriteHeader(http.StatusOK)
-							w.Write(response)
+							w.Write(response) // nolint: errcheck
 
 						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v", projectID):
 							w.WriteHeader(http.StatusOK)
