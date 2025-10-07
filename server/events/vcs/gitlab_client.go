@@ -364,7 +364,7 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 
 	res := gitlabIsMergeable(mr, project, supportsDetailedMergeStatus)
 	if res.IsMergeable {
-		logger.Debug("Merge request is not mergeable")
+		logger.Debug("Merge request is mergeable")
 	} else {
 		logger.Debug("Merge request is not mergeable")
 	}
