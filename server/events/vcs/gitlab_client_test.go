@@ -841,6 +841,15 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.SuccessCommitStatus,
 			gitlabServerVersions,
+			noHeadPipelineMR,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
 			remainingApprovalsMR,
 			models.MergeableStatus{
 				IsMergeable: false,
