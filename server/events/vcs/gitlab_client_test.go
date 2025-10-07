@@ -921,15 +921,17 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 							w.Write(projectSuccess) // nolint: errcheck
 						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
 							w.WriteHeader(http.StatusOK)
-							response := fmt.Sprintf(
-								`[{"id":133702594,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"ApplySuccess","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}]`,
-								c.status, c.statusName,
-							)
+							response := fmt.Sprintf(`[{"id":133702594,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"ApplySuccess","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}]`, c.status, c.statusName)
 							w.Write([]byte(response)) // nolint: errcheck
 						case r.RequestURI == "/api/v4/version":
 							w.WriteHeader(http.StatusOK)
 							w.Header().Set("Content-Type", "application/json")
-							_ = json.NewEncoder(w).Encode(map[string]string{"Version": serverVersion})
+							type version struct {
+								Version string
+							}
+							v := version{Version: serverVersion}
+							err := json.NewEncoder(w).Encode(v)
+							Ok(t, err)
 						default:
 							t.Errorf("got unexpected request at %q", r.RequestURI)
 							http.Error(w, "not found", http.StatusNotFound)
