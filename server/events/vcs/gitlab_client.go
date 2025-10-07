@@ -316,10 +316,8 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 	// Prevent nil pointer error when mr.HeadPipeline is empty
 	// See: https://github.com/runatlantis/atlantis/issues/1852
 	commit := pull.HeadCommit
-	isPipelineSkipped := false
 	if mr.HeadPipeline != nil {
 		commit = mr.HeadPipeline.SHA
-		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
 	}
 
 	// Get project configuration
@@ -353,31 +351,6 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		}
 	}
 
-	if mr.ApprovalsBeforeMerge > 0 {
-		return models.MergeableStatus{
-			IsMergeable: false,
-			Reason:      fmt.Sprintf("Still require %d approvals", mr.ApprovalsBeforeMerge),
-		}, nil
-	}
-	if !mr.BlockingDiscussionsResolved {
-		return models.MergeableStatus{
-			IsMergeable: false,
-			Reason:      "Blocking discussions unresolved",
-		}, nil
-	}
-	if mr.WorkInProgress {
-		return models.MergeableStatus{
-			IsMergeable: false,
-			Reason:      "Work in progress",
-		}, nil
-	}
-	if isPipelineSkipped && !project.AllowMergeOnSkippedPipeline {
-		return models.MergeableStatus{
-			IsMergeable: false,
-			Reason:      "Pipeline was skipped",
-		}, nil
-	}
-
 	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus(logger)
 	if err != nil {
 		return models.MergeableStatus{}, err
@@ -385,35 +358,77 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 
 	if supportsDetailedMergeStatus {
 		logger.Debug("Detailed merge status: '%s'", mr.DetailedMergeStatus)
+	} else {
+		logger.Debug("Merge status: '%s'", mr.MergeStatus) //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
+	}
+
+	res := gitlabIsMergeable(mr, project, supportsDetailedMergeStatus)
+	if res.IsMergeable {
+		logger.Debug("Merge request is mergeable")
+	} else {
+		logger.Debug("Merge request is not mergeable")
+	}
+	return res, nil
+}
+
+// gitlabIsMergeable a pure function that encapsulates the tricky logic behind determining whether a gitlab MR is mergeable
+// It doesn't make any external calls and cannot error, so is much easier to test
+func gitlabIsMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetailedMergeStatus bool) models.MergeableStatus {
+	isPipelineSkipped := false
+	if mr.HeadPipeline != nil {
+		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
+	}
+
+	if mr.ApprovalsBeforeMerge > 0 {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      fmt.Sprintf("Still require %d approvals", mr.ApprovalsBeforeMerge),
+		}
+	}
+	if !mr.BlockingDiscussionsResolved {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "Blocking discussions unresolved",
+		}
+	}
+	if mr.WorkInProgress {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "Work in progress",
+		}
+	}
+	if isPipelineSkipped && !project.AllowMergeOnSkippedPipeline {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "Pipeline was skipped",
+		}
+	}
+
+	if supportsDetailedMergeStatus {
 		if mr.DetailedMergeStatus == "mergeable" ||
 			mr.DetailedMergeStatus == "ci_still_running" ||
 			mr.DetailedMergeStatus == "ci_must_pass" ||
 			mr.DetailedMergeStatus == "need_rebase" {
-			logger.Debug("Merge request is mergeable")
 			return models.MergeableStatus{
 				IsMergeable: true,
-			}, nil
+			}
 		}
-		logger.Debug("Merge request is not mergeable")
 		return models.MergeableStatus{
 			IsMergeable: false,
 			Reason:      fmt.Sprintf("Merge status is %s", mr.DetailedMergeStatus),
-		}, nil
+		}
 	}
 
-	logger.Debug("Merge status: '%s'", mr.MergeStatus) //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
-	mergeStatus := mr.MergeStatus                      //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
+	mergeStatus := mr.MergeStatus //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
 	if mergeStatus == "can_be_merged" {
-		logger.Debug("Merge request is mergeable")
 		return models.MergeableStatus{
 			IsMergeable: true,
-		}, nil
+		}
 	}
-	logger.Debug("Merge request is not mergeable")
 	return models.MergeableStatus{
 		IsMergeable: false,
 		Reason:      fmt.Sprintf("Merge status is %s", mergeStatus),
-	}, nil
+	}
 }
 
 func (g *GitlabClient) SupportsDetailedMergeStatus(logger logging.SimpleLogging) (bool, error) {

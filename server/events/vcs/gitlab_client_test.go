@@ -693,6 +693,9 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	workInProgressMR := 7
 	pipelineSkippedMR := 8
 
+	// Any IsMergeable logic that depends on data from the project itself is too difficult to test here.
+	// See TestGitlabClient_gitlabPullIsMergeable
+
 	projectSuccess, err := os.ReadFile("testdata/gitlab-project-success.json")
 	Ok(t, err)
 
@@ -968,6 +971,156 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				Equals(t, c.expState, mergeable)
 			})
 		}
+	}
+}
+
+func TestGitlabClient_gitlabIsMergeable(t *testing.T) {
+	// Test the helper gitlabIsMergeable directly
+
+	cases := []struct {
+		description                 string
+		mr                          *gitlab.MergeRequest
+		project                     *gitlab.Project
+		supportsDetailedMergeStatus bool
+		expected                    models.MergeableStatus
+	}{
+		{
+			description: "requires approvals",
+			mr: &gitlab.MergeRequest{
+				ApprovalsBeforeMerge: 2,
+			},
+			project: &gitlab.Project{},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Still require 2 approvals",
+			},
+		},
+		{
+			description: "blocking discussions unresolved",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: false,
+			},
+			project: &gitlab.Project{},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocking discussions unresolved",
+			},
+		},
+		{
+			description: "work in progress",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				WorkInProgress:              true,
+			},
+			project: &gitlab.Project{},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Work in progress",
+			},
+		},
+		{
+			description: "pipeline skipped and not allowed",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				HeadPipeline:                &gitlab.Pipeline{Status: "skipped"},
+			},
+			project: &gitlab.Project{
+				AllowMergeOnSkippedPipeline: false,
+			},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline was skipped",
+			},
+		},
+		{
+			description: "pipeline skipped and is allowed",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				HeadPipeline:                &gitlab.Pipeline{Status: "skipped"},
+				DetailedMergeStatus:         "mergeable",
+			},
+			supportsDetailedMergeStatus: true,
+			project: &gitlab.Project{
+				AllowMergeOnSkippedPipeline: true,
+			},
+			expected: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			description: "detailed merge status mergeable",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				DetailedMergeStatus:         "mergeable",
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected:                    models.MergeableStatus{IsMergeable: true},
+		},
+		{
+			description: "detailed merge status need_rebase",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				DetailedMergeStatus:         "need_rebase",
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected:                    models.MergeableStatus{IsMergeable: true},
+		},
+		{
+			description: "detailed merge status not mergeable",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				DetailedMergeStatus:         "blocked",
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Merge status is blocked",
+			},
+		},
+		{
+			description: "detailed merge status can_be_merged (not a valid detailed status)",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				DetailedMergeStatus:         "can_be_merged",
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Merge status is can_be_merged",
+			},
+		},
+		{
+			description: "legacy merge status can_be_merged",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				MergeStatus:                 "can_be_merged",
+			},
+			project:  &gitlab.Project{},
+			expected: models.MergeableStatus{IsMergeable: true},
+		},
+		{
+			description: "legacy merge status cannot be merged",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				MergeStatus:                 "cannot_be_merged",
+			},
+			project: &gitlab.Project{},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Merge status is cannot_be_merged",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			actual := gitlabIsMergeable(c.mr, c.project, c.supportsDetailedMergeStatus)
+			Equals(t, c.expected, actual)
+		})
 	}
 }
 
