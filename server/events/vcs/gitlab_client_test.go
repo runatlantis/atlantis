@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -669,6 +670,12 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 	}
 }
 
+func mustReadFile(t *testing.T, filename string) []byte {
+	ret, err := os.ReadFile(filename)
+	Ok(t, err)
+	return ret
+}
+
 func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	gitlabClientUnderTest = true
@@ -679,24 +686,26 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	vcsStatusName := "atlantis-test"
 	defaultMr := 1
 	noHeadPipelineMR := 2
-	ciMustPassSuccessMR := 3
-	ciMustPassFailureMR := 4
-	needRebaseMR := 5
-
-	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
-	Ok(t, err)
+	ciMustPassMR := 3
+	needRebaseMR := 4
+	remainingApprovalsMR := 5
+	blockingDiscussionsUnresolvedMR := 6
+	workInProgressMR := 7
+	pipelineSkippedMR := 8
 
 	projectSuccess, err := os.ReadFile("testdata/gitlab-project-success.json")
 	Ok(t, err)
 
-	detailedMergeStatusCiMustPass, err := os.ReadFile("testdata/gitlab-detailed-merge-status-ci-must-pass.json")
-	Ok(t, err)
-
-	detailedMergeStatusNeedRebase, err := os.ReadFile("testdata/gitlab-detailed-merge-status-need-rebase.json")
-	Ok(t, err)
-
-	headPipelineNotAvailable, err := os.ReadFile("testdata/gitlab-head-pipeline-not-available.json")
-	Ok(t, err)
+	mrs := map[int][]byte{
+		defaultMr:                       mustReadFile(t, "testdata/gitlab-pipeline-success.json"),
+		noHeadPipelineMR:                mustReadFile(t, "testdata/gitlab-head-pipeline-not-available.json"),
+		ciMustPassMR:                    mustReadFile(t, "testdata/gitlab-detailed-merge-status-ci-must-pass.json"),
+		needRebaseMR:                    mustReadFile(t, "testdata/gitlab-detailed-merge-status-need-rebase.json"),
+		remainingApprovalsMR:            mustReadFile(t, "testdata/gitlab-pipeline-remaining-approvals.json"),
+		blockingDiscussionsUnresolvedMR: mustReadFile(t, "testdata/gitlab-pipeline-blocking-discussions-unresolved.json"),
+		workInProgressMR:                mustReadFile(t, "testdata/gitlab-pipeline-work-in-progress.json"),
+		pipelineSkippedMR:               mustReadFile(t, "testdata/gitlab-pipeline-with-pipeline-skipped.json"),
+	}
 
 	cases := []struct {
 		statusName    string
@@ -730,6 +739,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			defaultMr,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
 			},
 		},
 		{
@@ -739,6 +749,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			defaultMr,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
 			},
 		},
 		{
@@ -754,7 +765,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
-			ciMustPassSuccessMR,
+			ciMustPassMR,
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
@@ -763,9 +774,10 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
-			ciMustPassFailureMR,
+			ciMustPassMR,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
 			},
 		},
 		{
@@ -802,6 +814,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			noHeadPipelineMR,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
 			},
 		},
 		{
@@ -811,6 +824,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			noHeadPipelineMR,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
 			},
 		},
 		{
@@ -820,6 +834,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			noHeadPipelineMR,
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
 			},
 		},
 		{
@@ -831,39 +846,84 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: true,
 			},
 		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			remainingApprovalsMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Still require 2 approvals",
+			},
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			blockingDiscussionsUnresolvedMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocking discussions unresolved",
+			},
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			workInProgressMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Work in progress",
+			},
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			pipelineSkippedMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline was skipped",
+			},
+		},
 	}
 	for _, serverVersion := range gitlabServerVersions {
 		for _, c := range cases {
 			t.Run(c.statusName, func(t *testing.T) {
 				testServer := httptest.NewServer(
 					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						switch r.RequestURI {
-						case "/api/v4/":
+						switch {
+						case r.RequestURI == "/api/v4/":
 							// Rate limiter requests.
 							w.WriteHeader(http.StatusOK)
-						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", defaultMr):
+
+						case strings.HasPrefix(r.RequestURI, "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/"):
+							// Extract merge request ID
+							mrPart := strings.TrimPrefix(r.RequestURI, "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/")
+							mrID, err := strconv.Atoi(mrPart)
+							if err != nil {
+								t.Errorf("invalid MR id in URI %q", r.RequestURI)
+								http.Error(w, "bad request", http.StatusBadRequest)
+								return
+							}
+							response, ok := mrs[mrID]
+							if !ok {
+								t.Errorf("invalid MR id %d", mrID)
+								http.Error(w, "not found", http.StatusNotFound)
+								return
+							}
+
 							w.WriteHeader(http.StatusOK)
-							w.Write(pipelineSuccess) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", noHeadPipelineMR):
-							w.WriteHeader(http.StatusOK)
-							w.Write(headPipelineNotAvailable) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", ciMustPassSuccessMR):
-							w.WriteHeader(http.StatusOK)
-							w.Write(detailedMergeStatusCiMustPass) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", ciMustPassFailureMR):
-							w.WriteHeader(http.StatusOK)
-							w.Write(detailedMergeStatusCiMustPass) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", needRebaseMR):
-							w.WriteHeader(http.StatusOK)
-							w.Write(detailedMergeStatusNeedRebase) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/%v", projectID):
+							w.Write(response) // nolint: errcheck
+
+						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v", projectID):
 							w.WriteHeader(http.StatusOK)
 							w.Write(projectSuccess) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
+						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
 							w.WriteHeader(http.StatusOK)
 							response := fmt.Sprintf(`[{"id":133702594,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"ApplySuccess","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}]`, c.status, c.statusName)
 							w.Write([]byte(response)) // nolint: errcheck
-						case "/api/v4/version":
+						case r.RequestURI == "/api/v4/version":
 							w.WriteHeader(http.StatusOK)
 							w.Header().Set("Content-Type", "application/json")
 							type version struct {
