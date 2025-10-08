@@ -1,9 +1,12 @@
 package events
 
 import (
+	"errors"
+
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/status"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
@@ -22,6 +25,7 @@ func NewApplyCommandRunner(
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
+	statusManager status.StatusManager,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
 		vcsClient:                  vcsClient,
@@ -38,6 +42,7 @@ func NewApplyCommandRunner(
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
+		StatusManager:              statusManager,
 	}
 }
 
@@ -54,6 +59,7 @@ type ApplyCommandRunner struct {
 	dbUpdater            *DBUpdater
 	parallelPoolSize     int
 	pullReqStatusFetcher vcs.PullReqStatusFetcher
+	StatusManager        status.StatusManager
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects bool
@@ -112,7 +118,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 
 	if err != nil {
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+		if statusErr := a.StatusManager.SetFailure(ctx, cmd.CommandName(), err); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
@@ -122,34 +128,9 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	// If there are no projects to apply, don't respond to the PR and ignore
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")
-		if !a.silenceVCSStatusNoProjects {
-			if cmd.IsForSpecificProject() {
-				// With a specific apply, just reset the status so it's not stuck in pending state
-				pullStatus, err := a.Backend.GetPullStatus(pull)
-				if err != nil {
-					ctx.Log.Warn("unable to fetch pull status: %s", err)
-					return
-				}
-				if pullStatus == nil {
-					// default to 0/0
-					ctx.Log.Debug("setting VCS status to 0/0 success as no previous state was found")
-					if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
-						ctx.Log.Warn("unable to update commit status: %s", err)
-					}
-					return
-				}
-				ctx.Log.Debug("resetting VCS status")
-				a.updateCommitStatus(ctx, *pullStatus)
-			} else {
-				// With a generic apply, we set successful commit statuses
-				// with 0/0 projects planned successfully because some users require
-				// the Atlantis status to be passing for all pull requests.
-				// Does not apply to skipped runs for specific projects
-				ctx.Log.Debug("setting VCS status to success with no projects found")
-				if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
-					ctx.Log.Warn("unable to update commit status: %s", err)
-				}
-			}
+		// Use StatusManager to handle no projects found with policy-aware decisions
+		if err := a.StatusManager.HandleNoProjectsFound(ctx, cmd.CommandName()); err != nil {
+			ctx.Log.Warn("unable to handle no projects status: %s", err)
 		}
 		return
 	}
@@ -195,29 +176,26 @@ func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []command.ProjectCont
 func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
 	var numSuccess int
 	var numErrored int
-	status := models.SuccessCommitStatus
 
 	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
 	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
 	if numErrored > 0 {
-		status = models.FailedCommitStatus
+		// Use a fake error for the failure - StatusManager will handle the status setting
+		err := errors.New("apply failed for one or more projects")
+		if statusErr := a.StatusManager.SetFailure(ctx, command.Apply, err); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
 	} else if numSuccess < len(pullStatus.Projects) {
-		// If there are plans that haven't been applied yet, we'll use a pending
-		// status.
-		status = models.PendingCommitStatus
-	}
-
-	if err := a.commitStatusUpdater.UpdateCombinedCount(
-		ctx.Log,
-		ctx.Pull.BaseRepo,
-		ctx.Pull,
-		status,
-		command.Apply,
-		numSuccess,
-		len(pullStatus.Projects),
-	); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
+		// If there are plans that haven't been applied yet, set pending
+		if statusErr := a.StatusManager.SetPending(ctx, command.Apply); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+	} else {
+		// All successful
+		if statusErr := a.StatusManager.SetSuccess(ctx, command.Apply, numSuccess, len(pullStatus.Projects)); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
 	}
 }
 

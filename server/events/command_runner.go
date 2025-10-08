@@ -23,6 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/status"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -133,6 +134,8 @@ type DefaultCommandRunner struct {
 	TeamAllowlistChecker           command.TeamAllowlistChecker          `validate:"required"`
 	VarFileAllowlistChecker        *VarFileAllowlistChecker              `validate:"required"`
 	CommitStatusUpdater            CommitStatusUpdater                   `validate:"required"`
+	// StatusManager provides centralized status management
+	StatusManager status.StatusManager `validate:"required"`
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -205,15 +208,9 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		Name: command.Autoplan,
 	}
 
-	// Only set pending status if silence is not enabled
-	// The PlanCommandRunner will handle the final status decision based on project results
-	if !c.SilenceVCSStatusNoProjects {
-		// Update the combined plan commit status to pending
-		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-			ctx.Log.Warn("unable to update plan commit status: %s", err)
-		}
-	} else {
-		ctx.Log.Debug("silence enabled - not setting pending VCS status")
+	// Use StatusManager to handle command start with policy-aware decisions
+	if err := c.StatusManager.HandleCommandStart(ctx, command.Plan); err != nil {
+		ctx.Log.Warn("unable to handle command start status: %s", err)
 	}
 
 	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
@@ -374,22 +371,9 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	// Only set pending status if silence is not enabled
-	// The command runners will handle the final status decision based on project results
-	if !c.SilenceVCSStatusNoProjects {
-		// Update the combined plan or apply commit status to pending
-		switch cmd.Name {
-		case command.Plan:
-			if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-				ctx.Log.Warn("unable to update plan commit status: %s", err)
-			}
-		case command.Apply:
-			if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
-				ctx.Log.Warn("unable to update apply commit status: %s", err)
-			}
-		}
-	} else {
-		ctx.Log.Debug("silence enabled - not setting pending VCS status")
+	// Use StatusManager to handle command start with policy-aware decisions
+	if err := c.StatusManager.HandleCommandStart(ctx, cmd.Name); err != nil {
+		ctx.Log.Warn("unable to handle command start status: %s", err)
 	}
 
 	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)

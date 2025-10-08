@@ -63,6 +63,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/status"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
@@ -416,6 +417,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient, giteaClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
 
+	// Create StatusManager with silence policy
+	statusPolicy := status.NewSilencePolicy(
+		userConfig.SilenceNoProjects,
+		userConfig.SilenceVCSStatusNoPlans,
+		userConfig.SilenceVCSStatusNoProjects,
+		userConfig.SilenceForkPRErrors,
+	)
+	statusManager := status.NewStatusManager(commitStatusUpdater, statusPolicy, logger)
+
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
 
 	if err != nil {
@@ -765,6 +775,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceVCSStatusNoProjects,
 		userConfig.QuietPolicyChecks,
+		statusManager,
 	)
 
 	pullReqStatusFetcher := vcs.NewPullReqStatusFetcher(vcsClient, userConfig.VCSStatusName, strings.Split(userConfig.IgnoreVCSStatusNames, ","))
@@ -804,6 +815,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
+		statusManager,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -815,6 +827,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoPlans,
 		vcsClient,
+		statusManager,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
@@ -907,6 +920,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}
+
+	commandRunner.StatusManager = statusManager
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
 		return nil, err

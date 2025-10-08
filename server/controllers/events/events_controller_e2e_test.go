@@ -34,6 +34,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/status"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
@@ -1313,6 +1314,15 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	logging.SuppressDefaultLogging()
 	logger := logging.NewNoopLogger(t)
 
+	// Create StatusManager with policy
+	statusPolicy := status.NewSilencePolicy(
+		false, // silenceNoProjects
+		false, // silenceVCSStatusNoPlans
+		false, // silenceVCSStatusNoProjects
+		false, // silenceForkPRErrors
+	)
+	e2eStatusManager := status.NewStatusManager(e2eStatusUpdater, statusPolicy, logger)
+
 	eventParser := &events.EventParser{
 		GithubUser:  "github-user",
 		GithubToken: "github-token",
@@ -1541,6 +1551,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		parallelPoolSize,
 		false,
 		userConfig.QuietPolicyChecks,
+		e2eStatusManager,
 	)
 
 	e2ePullReqStatusFetcher := vcs.NewPullReqStatusFetcher(e2eVCSClient, "atlantis-test", []string{})
@@ -1581,6 +1592,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		silenceNoProjects,
 		false,
 		e2ePullReqStatusFetcher,
+		e2eStatusManager,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -1592,6 +1604,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		silenceNoProjects,
 		false,
 		e2eVCSClient,
+		e2eStatusManager,
 	)
 
 	unlockCommandRunner := events.NewUnlockCommandRunner(
@@ -1650,6 +1663,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		PullStatusFetcher:              backend,
 		DisableAutoplan:                opt.disableAutoplan,
 		CommitStatusUpdater:            commitStatusUpdater,
+		StatusManager:                  e2eStatusManager,
 	}
 
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
