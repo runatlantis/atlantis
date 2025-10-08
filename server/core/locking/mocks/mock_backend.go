@@ -45,6 +45,21 @@ func (mock *MockBackend) CheckCommandLock(cmdName command.Name) (*command.Lock, 
 	return _ret0, _ret1
 }
 
+func (mock *MockBackend) Close() error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockBackend().")
+	}
+	_params := []pegomock.Param{}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Close", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(error)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockBackend) DeletePullStatus(pull models.PullRequest) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockBackend().")
@@ -310,6 +325,23 @@ func (c *MockBackend_CheckCommandLock_OngoingVerification) GetAllCapturedArgumen
 		}
 	}
 	return
+}
+
+func (verifier *VerifierMockBackend) Close() *MockBackend_Close_OngoingVerification {
+	_params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Close", _params, verifier.timeout)
+	return &MockBackend_Close_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockBackend_Close_OngoingVerification struct {
+	mock              *MockBackend
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockBackend_Close_OngoingVerification) GetCapturedArguments() {
+}
+
+func (c *MockBackend_Close_OngoingVerification) GetAllCapturedArguments() {
 }
 
 func (verifier *VerifierMockBackend) DeletePullStatus(pull models.PullRequest) *MockBackend_DeletePullStatus_OngoingVerification {

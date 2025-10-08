@@ -42,6 +42,8 @@ type Backend interface {
 	LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error)
 	UnlockCommand(cmdName command.Name) error
 	CheckCommandLock(cmdName command.Name) (*command.Lock, error)
+
+	Close() error
 }
 
 // TryLockResponse results from an attempted lock.
