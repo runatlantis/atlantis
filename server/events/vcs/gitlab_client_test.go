@@ -711,11 +711,11 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	}
 
 	cases := []struct {
-		statusName    string
-		status        models.CommitStatus
-		gitlabVersion []string
-		mrID          int
-		expState      models.MergeableStatus
+		statusName     string
+		status         models.CommitStatus
+		gitlabVersions []string
+		mrID           int
+		expState       models.MergeableStatus
 	}{
 		{
 			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
@@ -783,13 +783,25 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
 			},
 		},
+		// This MR should be listed as not mergeable, however in older versions they don't have detailed_merge_status
+		// so our code can only see the merge_status field (deprecated in 15.6), which says can_be_merged
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
-			models.FailedCommitStatus,
-			gitlabServerVersions,
+			models.SuccessCommitStatus,
+			[]string{gitlabVersionUnder15_6},
 			needRebaseMR,
 			models.MergeableStatus{
 				IsMergeable: true,
+			},
+		},
+		{
+			fmt.Sprintf("%s/apply", vcsStatusName),
+			models.SuccessCommitStatus,
+			[]string{gitlabVersion15_6, gitlabVersionOver15_6},
+			needRebaseMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Merge status is need_rebase",
 			},
 		},
 		{
@@ -890,8 +902,8 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			},
 		},
 	}
-	for _, serverVersion := range gitlabServerVersions {
-		for _, c := range cases {
+	for _, c := range cases {
+		for _, serverVersion := range c.gitlabVersions {
 			t.Run(c.statusName, func(t *testing.T) {
 				testServer := httptest.NewServer(
 					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
