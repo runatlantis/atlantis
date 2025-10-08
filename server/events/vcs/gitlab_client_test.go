@@ -1058,45 +1058,16 @@ func TestGitlabClient_gitlabIsMergeable(t *testing.T) {
 			expected:                    models.MergeableStatus{IsMergeable: true},
 		},
 		{
-			description: "detailed merge status need_rebase with 'merge' merge method",
+			description: "detailed merge status need_rebase",
 			mr: &gitlab.MergeRequest{
 				BlockingDiscussionsResolved: true,
 				DetailedMergeStatus:         "need_rebase",
 			},
-			project: &gitlab.Project{
-				MergeMethod: gitlab.NoFastForwardMerge,
-			},
-			supportsDetailedMergeStatus: true,
-			expected:                    models.MergeableStatus{IsMergeable: true},
-		},
-		{
-			description: "detailed merge status need_rebase with 'rebase_merge' merge method",
-			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				DetailedMergeStatus:         "need_rebase",
-			},
-			project: &gitlab.Project{
-				MergeMethod: gitlab.RebaseMerge,
-			},
+			project:                     &gitlab.Project{},
 			supportsDetailedMergeStatus: true,
 			expected: models.MergeableStatus{
 				IsMergeable: false,
-				Reason:      "Merge status is need_rebase and merge method is rebase_merge",
-			},
-		},
-		{
-			description: "detailed merge status need_rebase with 'ff' merge method ",
-			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				DetailedMergeStatus:         "need_rebase",
-			},
-			project: &gitlab.Project{
-				MergeMethod: gitlab.FastForwardMerge,
-			},
-			supportsDetailedMergeStatus: true,
-			expected: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      "Merge status is need_rebase and merge method is ff",
+				Reason:      "Merge status is need_rebase",
 			},
 		},
 		{
