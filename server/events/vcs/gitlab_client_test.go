@@ -783,8 +783,8 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
 			},
 		},
-		// This MR should be listed as not mergeable, however in older versions they don't have detailed_merge_status
-		// so our code can only see the merge_status field (deprecated in 15.6), which says can_be_merged
+		// This MR should be listed as not mergeable. However, in older versions they don't have detailed_merge_status,
+		// so our code can only see the merge_status field (deprecated in 15.6), which says can_be_merged.
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.SuccessCommitStatus,
