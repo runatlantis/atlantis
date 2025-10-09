@@ -407,8 +407,7 @@ func gitlabIsMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, support
 	if supportsDetailedMergeStatus {
 		if mr.DetailedMergeStatus == "mergeable" ||
 			mr.DetailedMergeStatus == "ci_still_running" ||
-			mr.DetailedMergeStatus == "ci_must_pass" ||
-			mr.DetailedMergeStatus == "need_rebase" {
+			mr.DetailedMergeStatus == "ci_must_pass" {
 			return models.MergeableStatus{
 				IsMergeable: true,
 			}
