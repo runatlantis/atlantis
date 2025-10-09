@@ -181,15 +181,18 @@ jobs:
       if: env.PUSH == 'true' && github.event_name != 'pull_request'
       run: |
         # Sign dev tags, version tags, and latest tags
-        echo "${TAGS}" | xargs -I {} cosign sign \
-          --yes \
-          -a actor=${{ github.actor}} \
-          -a ref_name=${{ github.ref_name}} \
-          -a ref=${{ github.sha }} \
-          {}@${DIGEST}
+        for tag in ${TAGS}; do
+          echo "Signing $tag"
+          cosign sign \
+            --yes \
+            -a actor=${{ github.actor}} \
+            -a ref_name=${{ github.ref_name}} \
+            -a ref=${{ github.sha }} \
+            "$tag"
+        done
+ 
       env:
         TAGS: ${{ steps.meta.outputs.tags }}
-        DIGEST: ${{ steps.build.outputs.digest }}
 
   test:
     needs: [changes]
