@@ -223,17 +223,17 @@ func (mock *MockClient) PullIsApproved(logger logging.SimpleLogging, repo models
 	return _ret0, _ret1
 }
 
-func (mock *MockClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
+func (mock *MockClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
 	_params := []pegomock.Param{logger, repo, pull, vcsstatusname, ignoreVCSStatusNames}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("PullIsMergeable", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var _ret0 bool
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("PullIsMergeable", _params, []reflect.Type{reflect.TypeOf((*models.MergeableStatus)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 models.MergeableStatus
 	var _ret1 error
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(bool)
+			_ret0 = _result[0].(models.MergeableStatus)
 		}
 		if _result[1] != nil {
 			_ret1 = _result[1].(error)
