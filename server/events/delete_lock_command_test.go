@@ -8,6 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -42,7 +43,7 @@ func TestDeleteLock_Success(t *testing.T) {
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
-	workingDir := events.NewMockWorkingDir()
+	workingDir := mocks.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	workspace := "workspace"
 	path := "path"
@@ -84,7 +85,7 @@ func TestDeleteLocksByPull_LockerErr(t *testing.T) {
 	pullNum := 2
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
-	workingDir := events.NewMockWorkingDir()
+	workingDir := mocks.NewMockWorkingDir()
 	When(l.UnlockByPull(repoName, pullNum)).ThenReturn(nil, errors.New("err"))
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:     l,
@@ -103,7 +104,7 @@ func TestDeleteLocksByPull_None(t *testing.T) {
 	pullNum := 2
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
-	workingDir := events.NewMockWorkingDir()
+	workingDir := mocks.NewMockWorkingDir()
 	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{}, nil)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:     l,
@@ -126,7 +127,7 @@ func TestDeleteLocksByPull_SingleSuccess(t *testing.T) {
 
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
-	workingDir := events.NewMockWorkingDir()
+	workingDir := mocks.NewMockWorkingDir()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: repoName},
 		Num:      pullNum,
@@ -165,7 +166,7 @@ func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
 
 	RegisterMockTestingT(t)
 	l := lockmocks.NewMockLocker()
-	workingDir := events.NewMockWorkingDir()
+	workingDir := mocks.NewMockWorkingDir()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: repoName},
 		Num:      pullNum,
