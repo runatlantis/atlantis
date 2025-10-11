@@ -757,6 +757,8 @@ func TestGitlabClient_PullIsApproved(t *testing.T) {
 			Equals(t, c.expState, approved)
 		})
 	}
+}
+
 func mustReadFile(t *testing.T, filename string) []byte {
 	ret, err := os.ReadFile(filename)
 	Ok(t, err)
