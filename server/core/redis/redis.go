@@ -443,3 +443,7 @@ func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.Project
 		Status:       p.PlanStatus(),
 	}
 }
+
+func (r *RedisDB) Close() error {
+	return r.client.Close()
+}

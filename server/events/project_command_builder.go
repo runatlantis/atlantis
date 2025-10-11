@@ -378,6 +378,19 @@ func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Cont
 	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
 }
 
+// isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery
+func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
+	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
+	if fromGlobalAutoDiscover != nil {
+		return fromGlobalAutoDiscover.IsPathIgnored(path)
+	}
+	if repoCfg.AutoDiscover != nil {
+		return repoCfg.AutoDiscover.IsPathIgnored(path)
+	}
+
+	return false
+}
+
 // getMergedProjectCfgs gets all merged project configs for building commands given a context and a clone repo
 func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context, repoDir string, modifiedFiles []string, repoCfg valid.RepoCfg) ([]valid.MergedProjectCfg, error) {
 	mergedCfgs := make([]valid.MergedProjectCfg, 0)
@@ -421,7 +434,7 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 		}
 		for _, mp := range allModifiedProjects {
 			path := filepath.Clean(mp.Path)
-			if repoCfg.IsPathIgnoredForAutoDiscover(path) {
+			if p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) {
 				continue
 			}
 			_, dirExists := configuredProjDirs[path]
@@ -512,7 +525,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		}
 		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
 	} else {
-		ctx.Log.Info("repo config file %s is absent, using global defaults", repoCfg)
+		ctx.Log.Info("repo config file %s is absent, using global defaults", repoCfgFile)
 	}
 
 	mergedProjectCfgs, err := p.getMergedProjectCfgs(ctx, repoDir, modifiedFiles, repoCfg)
