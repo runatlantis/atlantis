@@ -1,11 +1,9 @@
-package events_test
+package workspace_test
 
 import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
-	"os/exec"
-	"strings"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
@@ -19,30 +17,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-// Helper functions for Github app tests
-func runCmdGithubApp(t *testing.T, dir string, name string, args ...string) string {
-	t.Helper()
-	cpCmd := exec.Command(name, args...)
-	cpCmd.Dir = dir
-	cpOut, err := cpCmd.CombinedOutput()
-	Assert(t, err == nil, "err running %q: %s", strings.Join(append([]string{name}, args...), " "), cpOut)
-	return string(cpOut)
-}
-
-func initRepoGithubApp(t *testing.T) string {
-	repoDir := t.TempDir()
-	runCmdGithubApp(t, repoDir, "git", "init", "--initial-branch=main")
-	runCmdGithubApp(t, repoDir, "touch", ".gitkeep")
-	runCmdGithubApp(t, repoDir, "git", "add", ".gitkeep")
-	runCmdGithubApp(t, repoDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
-	runCmdGithubApp(t, repoDir, "git", "config", "--local", "user.name", "atlantisbot")
-	runCmdGithubApp(t, repoDir, "git", "config", "--local", "commit.gpgsign", "false")
-	runCmdGithubApp(t, repoDir, "git", "commit", "-m", "initial commit")
-	runCmdGithubApp(t, repoDir, "git", "checkout", "-b", "branch")
-	return repoDir
-}
-
-func disableSSLVerificationGithubApp() func() {
+func disableSSLVerification() func() {
 	orig := http.DefaultTransport.(*http.Transport).TLSClientConfig
 	// nolint: gosec
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -54,8 +29,8 @@ func disableSSLVerificationGithubApp() func() {
 // Test that if we don't have any existing files, we check out the repo with a github app.
 func TestClone_GithubAppNoneExisting(t *testing.T) {
 	// Initialize the git repo.
-	repoDir := initRepoGithubApp(t)
-	expCommit := runCmdGithubApp(t, repoDir, "git", "rev-parse", "HEAD")
+	repoDir := initRepo(t)
+	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
 
 	dataDir := t.TempDir()
 
@@ -67,7 +42,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 	}
 
-	defer disableSSLVerificationGithubApp()()
+	defer disableSSLVerification()()
 	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
 
