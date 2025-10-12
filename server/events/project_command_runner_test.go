@@ -73,6 +73,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	expEnvs := map[string]string{
 		"name": "value",
 	}
+
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
@@ -97,11 +98,12 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		Workspace:  "default",
 		RepoRelDir: ".",
 	}
+
 	// Each step will output its step name.
 	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 	When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-	When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
+	When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)).ThenReturn("run", nil)
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
@@ -118,7 +120,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		case "apply":
 			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 		case "run":
-			mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, "")
+			mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)
 		}
 	}
 }
@@ -458,7 +460,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 			When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, "")).ThenReturn("run", nil)
+			When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)).ThenReturn("run", nil)
 			When(mockEnv.Run(ctx, nil, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
 
 			res := runner.Apply(ctx)
@@ -474,7 +476,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				case "apply":
 					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, "")
+					mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)
 				case "env":
 					mockEnv.VerifyWasCalledOnce().Run(ctx, nil, "", "value", repoDir, expEnvs)
 				}
