@@ -37,6 +37,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/events/workspace"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -1298,7 +1299,7 @@ type setupOption struct {
 	userConfig              server.UserConfig
 }
 
-func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *events.FileWorkspace) {
+func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers.VCSEventsController, *vcsmocks.MockClient, *mocks.MockGithubPullGetter, *workspace.FileWorkspace) {
 	allowForkPRs := false
 	discardApprovalOnPlan := true
 	dataDir, binDir, cacheDir := mkSubDirs(t)
@@ -1354,7 +1355,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		NoOpLocker: noOpLocker,
 		VCSClient:  e2eVCSClient,
 	}
-	workingDir := &events.FileWorkspace{
+	workingDir := &workspace.FileWorkspace{
 		DataDir:                     dataDir,
 		TestingOverrideHeadCloneURL: "override-me",
 	}
@@ -1370,7 +1371,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	defaultTFDistribution := terraformClient.DefaultDistribution()
 	defaultTFVersion := terraformClient.DefaultVersion()
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := workspace.NewDefaultWorkingDirLocker()
 	parser := &config.ParserValidator{}
 
 	globalCfgArgs := valid.GlobalCfgArgs{

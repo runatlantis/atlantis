@@ -1,31 +1,44 @@
-package events_test
+package workspace_test
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/workspace"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-// disableSSLVerification disables ssl verification for the global http client
-// and returns a function to be called in a defer that will re-enable it.
-func disableSSLVerification() func() {
-	orig := http.DefaultTransport.(*http.Transport).TLSClientConfig
-	// nolint: gosec
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	return func() {
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = orig
+func runCmd(t *testing.T, dir string, name string, args ...string) string {
+	t.Helper()
+	cpCmd := exec.Command(name, args...)
+	cpCmd.Dir = dir
+	cpOut, err := cpCmd.CombinedOutput()
+	Assert(t, err == nil, "err running %q: %s", strings.Join(append([]string{name}, args...), " "), cpOut)
+	return string(cpOut)
+}
+
+func runCmdErrCode(t *testing.T, dir string, errCode int, name string, args ...string) string {
+	t.Helper()
+	cpCmd := exec.Command(name, args...)
+	cpCmd.Dir = dir
+	cpOut, err := cpCmd.CombinedOutput()
+	cmd := strings.Join(append([]string{name}, args...), " ")
+	if err != nil {
+		if eerr, ok := err.(*exec.ExitError); ok {
+			Assert(t, errCode == eerr.ExitCode(), "unexpected exit code: want %v, got %v, running %q: %s", errCode, eerr.ExitCode(), cmd, cpCmd)
+			return string(cpOut)
+		}
 	}
+	Assert(t, false, "invalid exit code, running %q: %s", cmd, cpOut)
+	return string(cpOut)
 }
 
 // Test that if we don't have any existing files, we check out the repo.
@@ -38,7 +51,7 @@ func TestClone_NoneExisting(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -67,7 +80,7 @@ func TestClone_MainBranchWithMergeStrategy(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		TestingOverrideHeadCloneURL: overrideURL,
@@ -135,7 +148,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	dataDir := t.TempDir()
 
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		CheckoutDepth:               50,
@@ -185,7 +198,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	// Run the clone for the first time.
 	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		CheckoutDepth:               50,
@@ -235,7 +248,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	// Run the clone for the first time.
 	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		CheckoutDepth:               50,
@@ -290,7 +303,7 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 	// We're set up, now trigger the Atlantis clone.
 	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		CheckoutDepth:               50,
@@ -346,7 +359,7 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 		dataDir := t.TempDir()
 
-		wd := &events.FileWorkspace{
+		wd := &workspace.FileWorkspace{
 			DataDir:       dataDir,
 			CheckoutMerge: true,
 			// retrieve two commits in each branch:
@@ -377,7 +390,7 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 		dataDir := t.TempDir()
 
-		wd := &events.FileWorkspace{
+		wd := &workspace.FileWorkspace{
 			DataDir:       dataDir,
 			CheckoutMerge: true,
 			// 1 is not enough to retrieve merge-base, so full clone should be performed
@@ -415,7 +428,7 @@ func TestClone_NoReclone(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -458,7 +471,7 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -530,7 +543,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	// Run the clone.
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:             repoDir,
 		CheckoutMerge:       false,
 		CheckoutDepth:       50,
@@ -637,7 +650,7 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	// Run the clone.
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:             repoDir,
 		CheckoutMerge:       true,
 		CheckoutDepth:       50,

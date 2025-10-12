@@ -1,4 +1,4 @@
-package events
+package workspace
 
 import (
 	"strings"

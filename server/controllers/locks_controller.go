@@ -12,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/workspace"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -24,8 +25,8 @@ type LocksController struct {
 	ApplyLocker        locking.ApplyLocker          `validate:"required"`
 	VCSClient          vcs.Client                   `validate:"required"`
 	LockDetailTemplate web_templates.TemplateWriter `validate:"required"`
-	WorkingDir         events.WorkingDir            `validate:"required"`
-	WorkingDirLocker   events.WorkingDirLocker      `validate:"required"`
+	WorkingDir         workspace.WorkingDir         `validate:"required"`
+	WorkingDirLocker   workspace.WorkingDirLocker   `validate:"required"`
 	Backend            locking.Backend              `validate:"required"`
 	DeleteLockCommand  events.DeleteLockCommand     `validate:"required"`
 }

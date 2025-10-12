@@ -13,21 +13,22 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	workspacemocks "github.com/runatlantis/atlantis/server/events/workspace/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 var preWh events.DefaultPreWorkflowHooksCommandRunner
-var preWhWorkingDir *mocks.MockWorkingDir
-var preWhWorkingDirLocker *mocks.MockWorkingDirLocker
+var preWhWorkingDir *workspacemocks.MockWorkingDir
+var preWhWorkingDirLocker *workspacemocks.MockWorkingDirLocker
 var whPreWorkflowHookRunner *runtime_mocks.MockPreWorkflowHookRunner
 var preCommitStatusUpdater *mocks.MockCommitStatusUpdater
 
 func preWorkflowHooksSetup(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
-	preWhWorkingDir = mocks.NewMockWorkingDir()
-	preWhWorkingDirLocker = mocks.NewMockWorkingDirLocker()
+	preWhWorkingDir = workspacemocks.NewMockWorkingDir()
+	preWhWorkingDirLocker = workspacemocks.NewMockWorkingDirLocker()
 	whPreWorkflowHookRunner = runtime_mocks.NewMockPreWorkflowHookRunner()
 	preCommitStatusUpdater = mocks.NewMockCommitStatusUpdater()
 	preWorkflowHookURLGenerator := mocks.NewMockPreWorkflowHookURLGenerator()

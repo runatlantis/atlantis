@@ -12,7 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/mocks"
+	workspacemocks "github.com/runatlantis/atlantis/server/events/workspace/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +27,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 	tests := []struct {
 		name        string
 		ctx         command.ProjectContext
-		setup       func(workingDir *mocks.MockWorkingDir)
+		setup       func(workingDir *workspacemocks.MockWorkingDir)
 		wantFailure string
 		wantErr     assert.ErrorAssertionFunc
 	}{
@@ -46,7 +46,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 				},
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
-			setup: func(workingDir *mocks.MockWorkingDir) {
+			setup: func(workingDir *workspacemocks.MockWorkingDir) {
 				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(false)
 			},
 			wantErr: assert.NoError,
@@ -92,7 +92,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				PlanRequirements: []string{raw.UnDivergedRequirement},
 			},
-			setup: func(workingDir *mocks.MockWorkingDir) {
+			setup: func(workingDir *workspacemocks.MockWorkingDir) {
 				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running plan.",
@@ -102,7 +102,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			if tt.setup != nil {
 				tt.setup(workingDir)
@@ -127,7 +127,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 	tests := []struct {
 		name        string
 		ctx         command.ProjectContext
-		setup       func(workingDir *mocks.MockWorkingDir)
+		setup       func(workingDir *workspacemocks.MockWorkingDir)
 		wantFailure string
 		wantErr     assert.ErrorAssertionFunc
 	}{
@@ -146,7 +146,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				},
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
-			setup: func(workingDir *mocks.MockWorkingDir) {
+			setup: func(workingDir *workspacemocks.MockWorkingDir) {
 				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(false)
 			},
 			wantErr: assert.NoError,
@@ -202,7 +202,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				ApplyRequirements: []string{raw.UnDivergedRequirement},
 			},
-			setup: func(workingDir *mocks.MockWorkingDir) {
+			setup: func(workingDir *workspacemocks.MockWorkingDir) {
 				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running apply.",
@@ -212,7 +212,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			if tt.setup != nil {
 				tt.setup(workingDir)
@@ -230,7 +230,7 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 	tests := []struct {
 		name        string
 		ctx         command.ProjectContext
-		setup       func(workingDir *mocks.MockWorkingDir)
+		setup       func(workingDir *workspacemocks.MockWorkingDir)
 		wantFailure string
 		wantErr     assert.ErrorAssertionFunc
 	}{
@@ -341,7 +341,7 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			gotFailure, err := a.ValidateProjectDependencies(tt.ctx)
 			if !tt.wantErr(t, err, fmt.Sprintf("ValidateProjectDependencies(%v)", tt.ctx)) {
@@ -362,7 +362,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 	tests := []struct {
 		name        string
 		ctx         command.ProjectContext
-		setup       func(workingDir *mocks.MockWorkingDir)
+		setup       func(workingDir *workspacemocks.MockWorkingDir)
 		wantFailure string
 		wantErr     assert.ErrorAssertionFunc
 	}{
@@ -381,7 +381,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 				},
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
-			setup: func(workingDir *mocks.MockWorkingDir) {
+			setup: func(workingDir *workspacemocks.MockWorkingDir) {
 				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(false)
 			},
 			wantErr: assert.NoError,
@@ -413,7 +413,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				ImportRequirements: []string{raw.UnDivergedRequirement},
 			},
-			setup: func(workingDir *mocks.MockWorkingDir) {
+			setup: func(workingDir *workspacemocks.MockWorkingDir) {
 				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running import.",
@@ -423,7 +423,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			if tt.setup != nil {
 				tt.setup(workingDir)

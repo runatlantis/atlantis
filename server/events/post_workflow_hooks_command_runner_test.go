@@ -16,6 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	workspacemocks "github.com/runatlantis/atlantis/server/events/workspace/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -44,16 +45,16 @@ func (m WorkflowHookCommandContextMatcher) String() string {
 }
 
 var postWh events.DefaultPostWorkflowHooksCommandRunner
-var postWhWorkingDir *mocks.MockWorkingDir
-var postWhWorkingDirLocker *mocks.MockWorkingDirLocker
+var postWhWorkingDir *workspacemocks.MockWorkingDir
+var postWhWorkingDirLocker *workspacemocks.MockWorkingDirLocker
 var whPostWorkflowHookRunner *runtime_mocks.MockPostWorkflowHookRunner
 var postCommitStatusUpdater *mocks.MockCommitStatusUpdater
 
 func postWorkflowHooksSetup(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
-	postWhWorkingDir = mocks.NewMockWorkingDir()
-	postWhWorkingDirLocker = mocks.NewMockWorkingDirLocker()
+	postWhWorkingDir = workspacemocks.NewMockWorkingDir()
+	postWhWorkingDirLocker = workspacemocks.NewMockWorkingDirLocker()
 	whPostWorkflowHookRunner = runtime_mocks.NewMockPostWorkflowHookRunner()
 	postCommitStatusUpdater = mocks.NewMockCommitStatusUpdater()
 	postWorkflowHookURLGenerator := mocks.NewMockPostWorkflowHookURLGenerator()

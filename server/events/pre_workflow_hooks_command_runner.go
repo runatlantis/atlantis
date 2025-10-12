@@ -10,6 +10,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/workspace"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
@@ -28,8 +29,8 @@ type PreWorkflowHooksCommandRunner interface {
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
 type DefaultPreWorkflowHooksCommandRunner struct {
 	VCSClient             vcs.Client                    `validate:"required"`
-	WorkingDirLocker      WorkingDirLocker              `validate:"required"`
-	WorkingDir            WorkingDir                    `validate:"required"`
+	WorkingDirLocker      workspace.WorkingDirLocker    `validate:"required"`
+	WorkingDir            workspace.WorkingDir          `validate:"required"`
 	GlobalCfg             valid.GlobalCfg               `validate:"required"`
 	PreWorkflowHookRunner runtime.PreWorkflowHookRunner `validate:"required"`
 	CommitStatusUpdater   CommitStatusUpdater           `validate:"required"`

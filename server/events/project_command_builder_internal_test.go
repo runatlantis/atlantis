@@ -13,6 +13,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/events/workspace"
+	workspacemocks "github.com/runatlantis/atlantis/server/events/workspace/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
@@ -629,7 +631,7 @@ projects:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
@@ -656,7 +658,7 @@ projects:
 				&DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},
 				&CommentParser{ExecutableName: "atlantis"},
@@ -844,7 +846,7 @@ projects:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
@@ -873,7 +875,7 @@ projects:
 				&DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},
 				&CommentParser{ExecutableName: "atlantis"},
@@ -1089,7 +1091,7 @@ workflows:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
@@ -1120,7 +1122,7 @@ workflows:
 				&DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},
 				&CommentParser{ExecutableName: "atlantis"},
@@ -1243,7 +1245,7 @@ projects:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
@@ -1272,7 +1274,7 @@ projects:
 				&DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},
 				&CommentParser{ExecutableName: "atlantis"},
@@ -1463,7 +1465,7 @@ autodiscover:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
@@ -1494,7 +1496,7 @@ autodiscover:
 				&DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},
 				&CommentParser{ExecutableName: "atlantis"},

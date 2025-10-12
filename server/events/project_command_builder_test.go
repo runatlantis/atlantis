@@ -15,9 +15,10 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/events/workspace"
+	workspacemocks "github.com/runatlantis/atlantis/server/events/workspace/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
@@ -239,7 +240,7 @@ terraform {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
 			tmpDir := DirStructure(t, c.TestDirStructure)
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
@@ -258,7 +259,7 @@ terraform {
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				events.NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{ExecutableName: "atlantis"},
@@ -600,7 +601,7 @@ projects:
 					"main.tf": nil,
 				})
 
-				workingDir := mocks.NewMockWorkingDir()
+				workingDir := workspacemocks.NewMockWorkingDir()
 				When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 					Any[string]())).ThenReturn(tmpDir, nil)
 				When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
@@ -624,7 +625,7 @@ projects:
 					&events.DefaultProjectFinder{},
 					vcsClient,
 					workingDir,
-					events.NewDefaultWorkingDirLocker(),
+					workspace.NewDefaultWorkingDirLocker(),
 					valid.NewGlobalCfgFromArgs(globalCfgArgs),
 					&events.DefaultPendingPlanFinder{},
 					&events.CommentParser{ExecutableName: "atlantis"},
@@ -788,7 +789,7 @@ projects:
 			RegisterMockTestingT(t)
 			tmpDir := DirStructure(t, c.DirectoryStructure)
 
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
@@ -812,7 +813,7 @@ projects:
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				events.NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{ExecutableName: "atlantis"},
@@ -1153,7 +1154,7 @@ projects:
 			RegisterMockTestingT(t)
 			tmpDir := DirStructure(t, c.DirStructure)
 
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
@@ -1177,7 +1178,7 @@ projects:
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				events.NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{ExecutableName: "atlantis"},
@@ -1255,7 +1256,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
 	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
 
-	workingDir := mocks.NewMockWorkingDir()
+	workingDir := workspacemocks.NewMockWorkingDir()
 	When(workingDir.GetPullDir(
 		Any[models.Repo](),
 		Any[models.PullRequest]())).
@@ -1275,7 +1276,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,
-		events.NewDefaultWorkingDirLocker(),
+		workspace.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{ExecutableName: "atlantis"},
@@ -1323,7 +1324,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 // allow plans for other workspace names.
 func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
 	RegisterMockTestingT(t)
-	workingDir := mocks.NewMockWorkingDir()
+	workingDir := workspacemocks.NewMockWorkingDir()
 
 	tmpDir := DirStructure(t, map[string]interface{}{
 		"pulldir": map[string]interface{}{
@@ -1361,7 +1362,7 @@ projects:
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,
-		events.NewDefaultWorkingDirLocker(),
+		workspace.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{ExecutableName: "atlantis"},
@@ -1429,7 +1430,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				"main.tf": nil,
 			})
 
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
@@ -1449,7 +1450,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				events.NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{ExecutableName: "atlantis"},
@@ -1585,7 +1586,7 @@ projects:
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(testCase.ModifiedFiles, nil)
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
@@ -1611,7 +1612,7 @@ projects:
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				events.NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{ExecutableName: "atlantis"},
@@ -1719,7 +1720,7 @@ projects:
 		When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(true)
 		When(vcsClient.GetFileContent(
 			Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
-		workingDir := mocks.NewMockWorkingDir()
+		workingDir := workspacemocks.NewMockWorkingDir()
 
 		logger := logging.NewNoopLogger(t)
 
@@ -1735,7 +1736,7 @@ projects:
 			&events.DefaultProjectFinder{},
 			vcsClient,
 			workingDir,
-			events.NewDefaultWorkingDirLocker(),
+			workspace.NewDefaultWorkingDirLocker(),
 			valid.NewGlobalCfgFromArgs(globalCfgArgs),
 			&events.DefaultPendingPlanFinder{},
 			&events.CommentParser{ExecutableName: "atlantis"},
@@ -1783,7 +1784,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
 	userConfig := defaultUserConfig
 
-	workingDir := mocks.NewMockWorkingDir()
+	workingDir := workspacemocks.NewMockWorkingDir()
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(tmpDir, nil)
 	vcsClient := vcsmocks.NewMockClient()
@@ -1804,7 +1805,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		&events.DefaultProjectFinder{},
 		vcsClient,
 		workingDir,
-		events.NewDefaultWorkingDirLocker(),
+		workspace.NewDefaultWorkingDirLocker(),
 		globalCfg,
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{ExecutableName: "atlantis"},
@@ -1871,7 +1872,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
 	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
 
-	workingDir := mocks.NewMockWorkingDir()
+	workingDir := workspacemocks.NewMockWorkingDir()
 	When(workingDir.GetPullDir(
 		Any[models.Repo](),
 		Any[models.PullRequest]())).
@@ -1892,7 +1893,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		&events.DefaultProjectFinder{},
 		nil,
 		workingDir,
-		events.NewDefaultWorkingDirLocker(),
+		workspace.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
 		&events.DefaultPendingPlanFinder{},
 		&events.CommentParser{ExecutableName: "atlantis"},
@@ -2000,7 +2001,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 			RegisterMockTestingT(t)
 			tmpDir := DirStructure(t, c.DirectoryStructure)
 
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
@@ -2022,7 +2023,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				events.NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{ExecutableName: "atlantis"},
@@ -2111,7 +2112,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 			RegisterMockTestingT(t)
 			tmpDir := DirStructure(t, c.DirectoryStructure)
 
-			workingDir := mocks.NewMockWorkingDir()
+			workingDir := workspacemocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
@@ -2133,7 +2134,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				&events.DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				events.NewDefaultWorkingDirLocker(),
+				workspace.NewDefaultWorkingDirLocker(),
 				valid.NewGlobalCfgFromArgs(globalCfgArgs),
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{ExecutableName: "atlantis"},

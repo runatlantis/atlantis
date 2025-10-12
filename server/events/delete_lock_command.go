@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/workspace"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -17,8 +18,8 @@ type DeleteLockCommand interface {
 // DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
 type DefaultDeleteLockCommand struct {
 	Locker           locking.Locker
-	WorkingDir       WorkingDir
-	WorkingDirLocker WorkingDirLocker
+	WorkingDir       workspace.WorkingDir
+	WorkingDirLocker workspace.WorkingDirLocker
 	Backend          locking.Backend
 }
 

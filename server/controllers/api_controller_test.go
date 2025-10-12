@@ -17,6 +17,7 @@ import (
 	. "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	workspacemocks "github.com/runatlantis/atlantis/server/events/workspace/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
@@ -264,10 +265,10 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	scope, _, _ := metrics.NewLoggingScope(logger, "null")
 	vcsClient := NewMockClient()
-	workingDir := NewMockWorkingDir()
+	workingDir := workspacemocks.NewMockWorkingDir()
 	Ok(t, err)
 
-	workingDirLocker := NewMockWorkingDirLocker()
+	workingDirLocker := workspacemocks.NewMockWorkingDirLocker()
 	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir))).
 		ThenReturn(func() {}, nil)
 

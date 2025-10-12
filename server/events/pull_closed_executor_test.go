@@ -32,6 +32,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	workspacemocks "github.com/runatlantis/atlantis/server/events/workspace/mocks"
 	loggermocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -40,7 +41,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	t.Log("when workspace.Delete returns an error, we return it")
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
-	w := mocks.NewMockWorkingDir()
+	w := workspacemocks.NewMockWorkingDir()
 	tmp := t.TempDir()
 	db, err := db.New(tmp)
 	t.Cleanup(func() {
@@ -62,7 +63,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	t.Log("when locker.UnlockByPull returns an error, we return it")
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
-	w := mocks.NewMockWorkingDir()
+	w := workspacemocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	tmp := t.TempDir()
 	db, err := db.New(tmp)
@@ -86,7 +87,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	t.Log("when there are no locks to clean up, we don't comment")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockWorkingDir()
+	w := workspacemocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	cp := vcsmocks.NewMockClient()
 	tmp := t.TempDir()
@@ -186,7 +187,7 @@ func TestCleanUpPullComments(t *testing.T) {
 	}
 	for _, c := range cases {
 		func() {
-			w := mocks.NewMockWorkingDir()
+			w := workspacemocks.NewMockWorkingDir()
 			cp := vcsmocks.NewMockClient()
 			l := lockmocks.NewMockLocker()
 			tmp := t.TempDir()
@@ -271,7 +272,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		_, err = db.UpdatePullWithResults(testdata.Pull, result)
 		Ok(t, err)
 
-		workingDir := mocks.NewMockWorkingDir()
+		workingDir := workspacemocks.NewMockWorkingDir()
 		locker := lockmocks.NewMockLocker()
 		client := vcsmocks.NewMockClient()
 		logger := loggermocks.NewMockSimpleLogging()
@@ -316,7 +317,7 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	// Create mocks
-	workingDir := mocks.NewMockWorkingDir()
+	workingDir := workspacemocks.NewMockWorkingDir()
 	locker := lockmocks.NewMockLocker()
 	client := vcsmocks.NewMockClient()
 	resourceCleaner := mocks.NewMockResourceCleaner()
