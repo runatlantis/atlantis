@@ -50,7 +50,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		WorkingDir:         w,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
-		Database:            db,
+		Database:           db,
 	}
 	err = errors.New("err")
 	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
@@ -73,7 +73,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		Locker:             l,
 		WorkingDir:         w,
-		Database:            db,
+		Database:           db,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	err = errors.New("err")
@@ -99,7 +99,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 		Locker:     l,
 		VCSClient:  cp,
 		WorkingDir: w,
-		Database:    db,
+		Database:   db,
 	}
 	When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
@@ -199,7 +199,7 @@ func TestCleanUpPullComments(t *testing.T) {
 				Locker:     l,
 				VCSClient:  cp,
 				WorkingDir: w,
-				Database:    db,
+				Database:   db,
 			}
 			t.Log("testing: " + c.Description)
 			When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(c.Locks, nil)
@@ -258,7 +258,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		}); err != nil {
 			panic(errors.Wrap(err, "could not create bucket"))
 		}
-		db, _ := db.NewWithDB(boltDB, lockBucket, configBucket)
+		database, _ := boltdb.NewWithDB(boltDB, lockBucket, configBucket)
 		result := []command.ProjectResult{
 			{
 				RepoRelDir:  testdata.GithubRepo.FullName,
@@ -268,7 +268,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		}
 
 		// Create a new record for pull
-		_, err = db.UpdatePullWithResults(testdata.Pull, result)
+		_, err = database.UpdatePullWithResults(testdata.Pull, result)
 		Ok(t, err)
 
 		workingDir := mocks.NewMockWorkingDir()
@@ -279,7 +279,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		pullClosedExecutor := events.PullClosedExecutor{
 			Locker:                   locker,
 			WorkingDir:               workingDir,
-			Database:                  db,
+			Database:                 database,
 			VCSClient:                client,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: prjCmdOutHandler,
@@ -352,7 +352,7 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 		Locker:                   locker,
 		VCSClient:                client,
 		WorkingDir:               workingDir,
-		Database:                  db,
+		Database:                 db,
 		PullClosedTemplate:       &events.PullClosedEventTemplate{},
 		LogStreamResourceCleaner: resourceCleaner,
 	}

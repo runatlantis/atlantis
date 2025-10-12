@@ -43,4 +43,3 @@ type Database interface {
 
 	Close() error
 }
-
