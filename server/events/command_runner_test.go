@@ -237,7 +237,10 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
 
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope, closer, _ := metrics.NewLoggingScope(logger, "atlantis")
+	t.Cleanup(func() {
+		closer.Close()
+	})
 
 	ch = events.DefaultCommandRunner{
 		VCSClient:                      vcsClient,
