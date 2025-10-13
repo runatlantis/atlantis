@@ -883,7 +883,10 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			"blocked",
 			"ruleset-workflow-failed-first-check-successful.json",
 			`"APPROVED"`,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
 		},
 		{
 			"blocked",
