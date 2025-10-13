@@ -493,6 +493,17 @@ ATLANTIS_DISABLE_UNLOCK_LABEL="do-not-unlock"
 
 Stops atlantis from unlocking a pull request with this label. Defaults to "" (feature disabled).
 
+### `--discard-approval-after-plan`
+
+```bash
+atlantis server --discard-approval-after-plan
+# or
+ATLANTIS_DISCARD_APPROVAL_AFTER_PLAN=true
+```
+
+If set, discard approval **after** a plan has been executed (regardless of whether it's triggered via a comment or from the PR being newly created). This addresses race conditions where someone could approve a plan when a PR is immediately opened and the plan is not ready yet. Currently supported on GitHub, GitLab, and Gitea. For GitLab a bot, group or project token is required for this feature.
+ Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
+
 ### `--discard-approval-on-plan` <Badge text="v0.29.0+" type="info"/>
 
 ```bash
@@ -501,7 +512,7 @@ atlantis server --discard-approval-on-plan
 ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
 ```
 
-If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.  
+If set, discard approval if a new plan has been executed. Currently supported on GitHub, GitLab, and Gitea. For GitLab a bot, group or project token is required for this feature.  
  Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
 
 ### `--emoji-reaction` <Badge text="v0.29.0+" type="info"/>

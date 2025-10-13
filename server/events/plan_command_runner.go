@@ -33,6 +33,7 @@ func NewPlanCommandRunner(
 	pullStatusFetcher PullStatusFetcher,
 	lockingLocker locking.Locker,
 	discardApprovalOnPlan bool,
+	discardApprovalAfterPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
@@ -53,6 +54,7 @@ func NewPlanCommandRunner(
 		pullStatusFetcher:          pullStatusFetcher,
 		lockingLocker:              lockingLocker,
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
+		DiscardApprovalAfterPlan:   discardApprovalAfterPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 	}
 }
@@ -83,8 +85,11 @@ type PlanCommandRunner struct {
 	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
 	// a plan.
 	DiscardApprovalOnPlan bool
-	pullReqStatusFetcher  vcs.PullReqStatusFetcher
-	SilencePRComments     []string
+	// DiscardApprovalAfterPlan controls if all already existing approvals should be removed/dismissed after executing
+	// a plan.
+	DiscardApprovalAfterPlan bool
+	pullReqStatusFetcher     vcs.PullReqStatusFetcher
+	SilencePRComments        []string
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -153,6 +158,13 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 
 	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
+
+	// Discard approvals after autoplan completion if flag is set
+	if p.DiscardApprovalAfterPlan {
+		if err := p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
+			ctx.Log.Err("removing approvals after autoplan - %s", err)
+		}
+	}
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
@@ -287,6 +299,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		ctx,
 		cmd,
 		result)
+
+	// Discard approvals after plan completion if flag is set
+	if p.DiscardApprovalAfterPlan {
+		if err := p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
+			ctx.Log.Err("removing approvals after plan - %s", err)
+		}
+	}
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {

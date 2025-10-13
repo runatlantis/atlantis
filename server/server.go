@@ -786,6 +786,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		backend,
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
+		userConfig.DiscardApprovalAfterPlanFlag,
 		pullReqStatusFetcher,
 	)
 
