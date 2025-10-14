@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
@@ -43,7 +43,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	w := workspacemocks.NewMockWorkingDir()
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -51,7 +51,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		WorkingDir:         w,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
-		Backend:            db,
+		Database:           db,
 	}
 	err = errors.New("err")
 	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
@@ -66,7 +66,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	w := workspacemocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -74,7 +74,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		Locker:             l,
 		WorkingDir:         w,
-		Backend:            db,
+		Database:           db,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	err = errors.New("err")
@@ -91,7 +91,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	l := lockmocks.NewMockLocker()
 	cp := vcsmocks.NewMockClient()
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -100,7 +100,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 		Locker:     l,
 		VCSClient:  cp,
 		WorkingDir: w,
-		Backend:    db,
+		Database:   db,
 	}
 	When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
@@ -191,7 +191,7 @@ func TestCleanUpPullComments(t *testing.T) {
 			cp := vcsmocks.NewMockClient()
 			l := lockmocks.NewMockLocker()
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
@@ -200,7 +200,7 @@ func TestCleanUpPullComments(t *testing.T) {
 				Locker:     l,
 				VCSClient:  cp,
 				WorkingDir: w,
-				Backend:    db,
+				Database:   db,
 			}
 			t.Log("testing: " + c.Description)
 			When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(c.Locks, nil)
@@ -259,7 +259,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		}); err != nil {
 			panic(errors.Wrap(err, "could not create bucket"))
 		}
-		db, _ := db.NewWithDB(boltDB, lockBucket, configBucket)
+		database, _ := boltdb.NewWithDB(boltDB, lockBucket, configBucket)
 		result := []command.ProjectResult{
 			{
 				RepoRelDir:  testdata.GithubRepo.FullName,
@@ -269,7 +269,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		}
 
 		// Create a new record for pull
-		_, err = db.UpdatePullWithResults(testdata.Pull, result)
+		_, err = database.UpdatePullWithResults(testdata.Pull, result)
 		Ok(t, err)
 
 		workingDir := workspacemocks.NewMockWorkingDir()
@@ -280,7 +280,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		pullClosedExecutor := events.PullClosedExecutor{
 			Locker:                   locker,
 			WorkingDir:               workingDir,
-			Backend:                  db,
+			Database:                 database,
 			VCSClient:                client,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: prjCmdOutHandler,
@@ -324,7 +324,7 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 
 	// Create temporary database
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -353,7 +353,7 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 		Locker:                   locker,
 		VCSClient:                client,
 		WorkingDir:               workingDir,
-		Backend:                  db,
+		Database:                 db,
 		PullClosedTemplate:       &events.PullClosedEventTemplate{},
 		LogStreamResourceCleaner: resourceCleaner,
 	}

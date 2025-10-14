@@ -1,6 +1,7 @@
 package events
 
 import (
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/workspace"
@@ -20,7 +21,7 @@ type DefaultDeleteLockCommand struct {
 	Locker           locking.Locker
 	WorkingDir       workspace.WorkingDir
 	WorkingDirLocker workspace.WorkingDirLocker
-	Backend          locking.Backend
+	Database         db.Database
 }
 
 // DeleteLock handles deleting the lock at id

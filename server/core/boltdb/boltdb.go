@@ -1,5 +1,5 @@
-// Package db handles our database layer.
-package db
+// Package boltdb handles our database layer using BoltDB.
+package boltdb
 
 import (
 	"bytes"

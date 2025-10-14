@@ -8,6 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 
 	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -27,7 +28,7 @@ type LocksController struct {
 	LockDetailTemplate web_templates.TemplateWriter `validate:"required"`
 	WorkingDir         workspace.WorkingDir         `validate:"required"`
 	WorkingDirLocker   workspace.WorkingDirLocker   `validate:"required"`
-	Backend            locking.Backend              `validate:"required"`
+	Database           db.Database                  `validate:"required"`
 	DeleteLockCommand  events.DeleteLockCommand     `validate:"required"`
 }
 
@@ -127,7 +128,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	// installations of Atlantis will have locks in their DB that do not have
 	// this field on PullRequest. We skip commenting in this case.
 	if lock.Pull.BaseRepo != (models.Repo{}) {
-		if err := l.Backend.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
+		if err := l.Database.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
 			l.Logger.Err("unable to update project status: %s", err)
 		}
 
