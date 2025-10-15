@@ -20,30 +20,30 @@ import (
 	"time"
 
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/locking"
-	"github.com/runatlantis/atlantis/server/core/locking/mocks"
+	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/db/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestServer_CloseBackend(t *testing.T) {
+func TestServer_CloseDatabase(t *testing.T) {
 
 	timeout := time.Second
 
-	type backendCase struct {
+	type databaseCase struct {
 		description      string
 		closeFn          func() error
 		expectedErr      string
 		expectedDuration time.Duration
 	}
 
-	cases := []backendCase{
+	cases := []databaseCase{
 		{
 			description: "closes successfully",
 			closeFn:     func() error { return nil },
 		},
 		{
-			description: "returns backend error",
+			description: "returns database error",
 			closeFn:     func() error { return errors.New("boom") },
 			expectedErr: "boom",
 		},
@@ -57,30 +57,30 @@ func TestServer_CloseBackend(t *testing.T) {
 			expectedDuration: time.Second,
 		},
 		{
-			description: "nil backend",
-			closeFn:     nil, // nil means backend itself is nil
+			description: "nil database",
+			closeFn:     nil, // nil means database itself is nil
 		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.description, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				var backend locking.Backend
+				var database db.Database
 				if tt.closeFn != nil {
-					m := mocks.NewMockBackend(WithT(t))
+					m := mocks.NewMockDatabase(WithT(t))
 					When(m.Close()).Then(func([]Param) ReturnValues {
 						return []ReturnValue{tt.closeFn()}
 					})
-					backend = m
+					database = m
 				}
 
 				s := &Server{
-					backend: backend,
-					Logger:  logging.NewNoopLogger(t),
+					database: database,
+					Logger:   logging.NewNoopLogger(t),
 				}
 
 				start := time.Now()
-				err := s.closeBackend(timeout)
+				err := s.closeDatabase(timeout)
 				duration := time.Since(start)
 
 				assert.Equal(t, tt.expectedDuration, duration)
