@@ -184,6 +184,7 @@ const (
 	PostProcessRunOutputShow            = "show"
 	PostProcessRunOutputHide            = "hide"
 	PostProcessRunOutputStripRefreshing = "strip_refreshing"
+	PostProcessRunOutputFilterRegexKey  = "filter_regex"
 )
 
 type Stage struct {
@@ -206,8 +207,9 @@ type Step struct {
 	// RunCommand is either a custom run step or the command to run
 	// during an env step to populate the environment variable dynamically.
 	RunCommand string
-	// Output is option for post-processing a RunCommand output
-	Output PostProcessRunOutputOption
+	// Output includes the options for post-processing a RunCommand output
+	// these will be executed in the received order
+	Output []PostProcessRunOutputOption
 	// EnvVarName is the name of the
 	// environment variable that should be set by this step.
 	EnvVarName string
@@ -215,6 +217,9 @@ type Step struct {
 	EnvVarValue string
 	// The Shell to use for RunCommand execution.
 	RunShell *CommandShell
+	// FilterRegex is a list of regexes for post-processing a RunCommand output
+	// these will be executed in the received order
+	FilterRegexes []*regexp.Regexp
 }
 
 type Workflow struct {
