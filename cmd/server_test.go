@@ -84,6 +84,8 @@ var testFlags = map[string]interface{}{
 	DisableGlobalApplyLockFlag:       false,
 	DiscardApprovalOnPlanFlag:        true,
 	EmojiReaction:                    "eyes",
+	EmojiRunReaction:                 "rocket",
+	EmojiErrorReaction:               "bomb",
 	ExecutableName:                   "atlantis",
 	FailOnPreWorkflowHookError:       false,
 	GHAllowMergeableBypassApply:      false,
