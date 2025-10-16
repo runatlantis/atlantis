@@ -3,8 +3,9 @@
 # Table of Contents <!-- omit in toc -->
 - [Reporting Issues](#reporting-issues)
 - [Reporting Security Issues](#reporting-security-issues)
-- [Updating The Website](#updating-the-website)
+- [Creating a Pull Request](#creating-a-pull-request)
 - [Developing](#developing)
+  - [Updating The Website](#updating-the-website)
   - [Running Atlantis Locally](#running-atlantis-locally)
   - [Running Atlantis With Local Changes](#running-atlantis-with-local-changes)
     - [Rebuilding](#rebuilding)
@@ -28,12 +29,22 @@
 # Reporting Security Issues
 We take security issues seriously. Please report a security vulnerability to the maintainers using [private vulnerability reporting](https://github.com/runatlantis/atlantis/security/advisories/new).
 
-# Updating The Website
+# Creating a Pull Request
+* Fork the [Atlantis repo](https://github.com/runatlantis/atlantis)
+* Create a new branch, commit your changes
+  * Make sure to sign your commits, for example by adding `-s` when committing, see more [here](https://probot.github.io/apps/dco/).
+* Create a PR
+  * Make sure your title follows Conventional Commits by using a prefix like `fix:` or `feat:`, see more [here](https://www.conventionalcommits.org/en/v1.0.0/).
+  * Link to any issues, including one you may have made
+
+If you have any questions about the contribution process, see [Atlantis Contributors on Slack](https://cloud-native.slack.com/archives/C07T45G27EZ).
+
+# Developing
+
+## Updating The Website
 * To view the generated website locally, run `npm website:dev` and then
 open your browser to http://localhost:8080.
 * The website will be regenerated when your pull request is merged to main.
-
-# Developing
 
 ## Running Atlantis Locally
 * Clone the repo from https://github.com/runatlantis/atlantis/
