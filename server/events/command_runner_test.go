@@ -20,9 +20,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -76,7 +76,7 @@ type TestConfig struct {
 	silenceVCSStatusNoProjects bool
 	StatusName                 string
 	discardApprovalOnPlan      bool
-	backend                    locking.Backend
+	database                   db.Database
 	DisableUnlockLabel         string
 }
 
@@ -85,7 +85,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	// create an empty DB
 	tmp := t.TempDir()
-	defaultBoltDB, err := db.New(tmp)
+	defaultBoltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		defaultBoltDB.Close()
 	})
@@ -96,7 +96,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		SilenceNoProjects:     false,
 		StatusName:            "atlantis-test",
 		discardApprovalOnPlan: false,
-		backend:               defaultBoltDB,
+		database:              defaultBoltDB,
 		DisableUnlockLabel:    "do-not-unlock",
 	}
 
@@ -123,7 +123,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	lockingLocker = lockingmocks.NewMockLocker()
 
 	dbUpdater = &events.DBUpdater{
-		Backend: testConfig.backend,
+		Database: testConfig.database,
 	}
 
 	pullUpdater = &events.PullUpdater{
@@ -162,7 +162,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		autoMerger,
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
-		testConfig.backend,
+		testConfig.database,
 		lockingLocker,
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
@@ -178,7 +178,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		testConfig.backend,
+		testConfig.database,
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
 		testConfig.silenceVCSStatusNoProjects,
@@ -255,7 +255,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              testConfig.backend,
+		PullStatusFetcher:              testConfig.database,
 		CommitStatusUpdater:            commitUpdater,
 	}
 
@@ -789,13 +789,13 @@ func TestRunUnlockCommandDoesntRetrieveLabelsIfDisableUnlockLabelNotSet(t *testi
 func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -819,13 +819,13 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_False(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{
@@ -850,13 +850,13 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True(t *testing.T) {
 	vcsClient := setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{
@@ -882,13 +882,13 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_False(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
@@ -906,13 +906,13 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -927,13 +927,13 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True
 func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -967,13 +967,13 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -990,13 +990,13 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	vcsClient := setup(t)
 
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
@@ -1045,13 +1045,13 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	})
 
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -1072,13 +1072,13 @@ func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
 	t.Log("if \"atlantis approve_policies\" is run by non policy owner policy check status fails.")
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -1121,13 +1121,13 @@ func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
 	t.Log("if \"atlantis approve_policies\" is run by policy owner all policy checks are approved.")
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -1180,13 +1180,13 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run with failing policy check then apply is not performed")
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -1263,13 +1263,13 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	pull := testdata.Pull
 	pull.BaseRepo = testdata.GithubRepo
 	_, err = boltDB.UpdatePullWithResults(pull, []command.ProjectResult{
