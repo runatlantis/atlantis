@@ -263,7 +263,6 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 	parser := NewMockEventParsing()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	scope := metricstest.NewLoggingScope(t, logger, "null")
-
 	vcsClient := NewMockClient()
 	workingDir := NewMockWorkingDir()
 	Ok(t, err)

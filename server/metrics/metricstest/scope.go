@@ -13,7 +13,6 @@ func NewLoggingScope(t *testing.T, logger logging.SimpleLogging, statsNamespace 
 	scope, closer, err := metrics.NewLoggingScope(logger, "atlantis")
 	if err != nil {
 		t.Fatalf("failed to create metrics logging scope: %v", err)
-
 	}
 	t.Cleanup(func() {
 		closer.Close()
