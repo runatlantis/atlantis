@@ -433,8 +433,8 @@ func TestClone_NoReclone(t *testing.T) {
 }
 
 // Test that if the repo is already cloned but is at the wrong commit, we
-// reclone.
-func TestClone_RecloneWrongCommit(t *testing.T) {
+// fetch and reset
+func TestClone_ResetOnWrongCommit(t *testing.T) {
 	repoDir := initRepo(t)
 	dataDir := t.TempDir()
 
