@@ -28,6 +28,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/events/workspace"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -239,9 +240,9 @@ type DefaultProjectCommandRunner struct {
 	EnvStepRunner             EnvStepRunner
 	MultiEnvStepRunner        MultiEnvStepRunner
 	PullApprovedChecker       runtime.PullApprovedChecker
-	WorkingDir                WorkingDir
+	WorkingDir                workspace.WorkingDir
 	Webhooks                  WebhooksSender
-	WorkingDirLocker          WorkingDirLocker
+	WorkingDirLocker          workspace.WorkingDirLocker
 	CommandRequirementHandler CommandRequirementHandler
 }
 

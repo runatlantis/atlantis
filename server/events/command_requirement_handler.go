@@ -7,6 +7,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/workspace"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_command_requirement_handler.go CommandRequirementHandler
@@ -18,7 +19,7 @@ type CommandRequirementHandler interface {
 }
 
 type DefaultCommandRequirementHandler struct {
-	WorkingDir WorkingDir
+	WorkingDir workspace.WorkingDir
 }
 
 func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) (failure string, err error) {

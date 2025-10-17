@@ -21,6 +21,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/workspace"
 )
 
 const (
@@ -42,8 +43,8 @@ func NewInstrumentedProjectCommandBuilder(
 	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
 	vcsClient vcs.Client,
-	workingDir WorkingDir,
-	workingDirLocker WorkingDirLocker,
+	workingDir workspace.WorkingDir,
+	workingDirLocker workspace.WorkingDirLocker,
 	globalCfg valid.GlobalCfg,
 	pendingPlanFinder *DefaultPendingPlanFinder,
 	commentBuilder CommentBuilder,
@@ -102,8 +103,8 @@ func NewProjectCommandBuilder(
 	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
 	vcsClient vcs.Client,
-	workingDir WorkingDir,
-	workingDirLocker WorkingDirLocker,
+	workingDir workspace.WorkingDir,
+	workingDirLocker workspace.WorkingDirLocker,
 	globalCfg valid.GlobalCfg,
 	pendingPlanFinder *DefaultPendingPlanFinder,
 	commentBuilder CommentBuilder,
@@ -215,9 +216,9 @@ type DefaultProjectCommandBuilder struct {
 	// Used to make API calls to a VCS host like GitHub or GitLab.
 	VCSClient vcs.Client
 	// Handles the workspace on disk for running commands.
-	WorkingDir WorkingDir
+	WorkingDir workspace.WorkingDir
 	// Used to prevent multiple commands from executing at the same time for a single repo, pull, and workspace.
-	WorkingDirLocker WorkingDirLocker
+	WorkingDirLocker workspace.WorkingDirLocker
 	// The final parsed version of the server-side repo config.
 	GlobalCfg valid.GlobalCfg
 	// Finds unapplied plans.

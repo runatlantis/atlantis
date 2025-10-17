@@ -32,6 +32,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/events/workspace"
+	workspacemocks "github.com/runatlantis/atlantis/server/events/workspace/mocks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -45,7 +47,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	mockApply := mocks.NewMockStepRunner()
 	mockRun := mocks.NewMockCustomStepRunner()
 	realEnv := runtime.EnvStepRunner{}
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockWorkingDir := workspacemocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
 	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
 
@@ -60,7 +62,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		PullApprovedChecker:       nil,
 		WorkingDir:                mockWorkingDir,
 		Webhooks:                  nil,
-		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		WorkingDirLocker:          workspace.NewDefaultWorkingDirLocker(),
 		CommandRequirementHandler: mockCommandRequirementHandler,
 	}
 
@@ -236,7 +238,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 // Test what happens if there's no working dir. This signals that the project
 // was never planned.
 func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockWorkingDir := workspacemocks.NewMockWorkingDir()
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir: mockWorkingDir,
 	}
@@ -250,10 +252,10 @@ func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 // Test that if approval is required and the PR isn't approved we give an error.
 func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 	RegisterMockTestingT(t)
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockWorkingDir := workspacemocks.NewMockWorkingDir()
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		WorkingDirLocker: workspace.NewDefaultWorkingDirLocker(),
 		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: mockWorkingDir,
 		},
@@ -271,10 +273,10 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 // Test that if mergeable is required and the PR isn't mergeable we give an error.
 func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 	RegisterMockTestingT(t)
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockWorkingDir := workspacemocks.NewMockWorkingDir()
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		WorkingDirLocker: workspace.NewDefaultWorkingDirLocker(),
 		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: mockWorkingDir,
 		},
@@ -295,10 +297,10 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 // Test that if undiverged is required and the PR is diverged we give an error.
 func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	RegisterMockTestingT(t)
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockWorkingDir := workspacemocks.NewMockWorkingDir()
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
-		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		WorkingDirLocker: workspace.NewDefaultWorkingDirLocker(),
 		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: mockWorkingDir,
 		},
@@ -403,7 +405,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			mockApply := mocks.NewMockStepRunner()
 			mockRun := mocks.NewMockCustomStepRunner()
 			mockEnv := mocks.NewMockEnvStepRunner()
-			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockWorkingDir := workspacemocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
 			applyReqHandler := &events.DefaultCommandRequirementHandler{
@@ -420,7 +422,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				EnvStepRunner:             mockEnv,
 				WorkingDir:                mockWorkingDir,
 				Webhooks:                  mockSender,
-				WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+				WorkingDirLocker:          workspace.NewDefaultWorkingDirLocker(),
 				CommandRequirementHandler: applyReqHandler,
 			}
 			repoDir := t.TempDir()
@@ -489,7 +491,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockApply := mocks.NewMockStepRunner()
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockWorkingDir := workspacemocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
 	mockSender := mocks.NewMockWebhooksSender()
 	applyReqHandler := &events.DefaultCommandRequirementHandler{
@@ -501,7 +503,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		LockURLGenerator:          mockURLGenerator{},
 		ApplyStepRunner:           mockApply,
 		WorkingDir:                mockWorkingDir,
-		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		WorkingDirLocker:          workspace.NewDefaultWorkingDirLocker(),
 		CommandRequirementHandler: applyReqHandler,
 		Webhooks:                  mockSender,
 	}
@@ -561,7 +563,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	env := runtime.EnvStepRunner{
 		RunStepRunner: &run,
 	}
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockWorkingDir := workspacemocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
 	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
 
@@ -572,7 +574,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		EnvStepRunner:             &env,
 		WorkingDir:                mockWorkingDir,
 		Webhooks:                  nil,
-		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		WorkingDirLocker:          workspace.NewDefaultWorkingDirLocker(),
 		CommandRequirementHandler: mockCommandRequirementHandler,
 	}
 
@@ -691,7 +693,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			mockInit := mocks.NewMockStepRunner()
 			mockImport := mocks.NewMockStepRunner()
 			mockStateRm := mocks.NewMockStepRunner()
-			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockWorkingDir := workspacemocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
 			applyReqHandler := &events.DefaultCommandRequirementHandler{
@@ -706,7 +708,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 				StateRmStepRunner:         mockStateRm,
 				WorkingDir:                mockWorkingDir,
 				Webhooks:                  mockSender,
-				WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+				WorkingDirLocker:          workspace.NewDefaultWorkingDirLocker(),
 				CommandRequirementHandler: applyReqHandler,
 			}
 			ctx := command.ProjectContext{
@@ -1236,7 +1238,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			mockApply := mocks.NewMockStepRunner()
 			mockRun := mocks.NewMockCustomStepRunner()
 			mockEnv := mocks.NewMockEnvStepRunner()
-			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockWorkingDir := workspacemocks.NewMockWorkingDir()
 			mockLocker := mocks.NewMockProjectLocker()
 			mockSender := mocks.NewMockWebhooksSender()
 
@@ -1251,7 +1253,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				EnvStepRunner:    mockEnv,
 				WorkingDir:       mockWorkingDir,
 				Webhooks:         mockSender,
-				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+				WorkingDirLocker: workspace.NewDefaultWorkingDirLocker(),
 			}
 			repoDir := t.TempDir()
 			When(mockWorkingDir.GetWorkingDir(

@@ -1,19 +1,30 @@
-package events_test
+package workspace_test
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/events"
-	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	vcsMocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	"github.com/runatlantis/atlantis/server/events/workspace"
+	workspaceMocks "github.com/runatlantis/atlantis/server/events/workspace/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+func disableSSLVerification() func() {
+	orig := http.DefaultTransport.(*http.Transport).TLSClientConfig
+	// nolint: gosec
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	return func() {
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = orig
+	}
+}
 
 // Test that if we don't have any existing files, we check out the repo with a github app.
 func TestClone_GithubAppNoneExisting(t *testing.T) {
@@ -25,7 +36,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workspace.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -35,7 +46,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
 
-	gwd := &events.GithubAppWorkingDir{
+	gwd := &workspace.GithubAppWorkingDir{
 		WorkingDir: wd,
 		Credentials: &vcs.GithubAppCredentials{
 			Key:      []byte(testdata.GithubPrivateKey),
@@ -61,11 +72,11 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	RegisterMockTestingT(t)
 
-	workingDir := eventMocks.NewMockWorkingDir()
+	workingDir := workspaceMocks.NewMockWorkingDir()
 
 	credentials := vcsMocks.NewMockGithubCredentials()
 
-	ghAppWorkingDir := events.GithubAppWorkingDir{
+	ghAppWorkingDir := workspace.GithubAppWorkingDir{
 		WorkingDir:     workingDir,
 		Credentials:    credentials,
 		GithubHostname: "some-host",
@@ -106,11 +117,11 @@ func TestMergeAgain_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	RegisterMockTestingT(t)
 
-	workingDir := eventMocks.NewMockWorkingDir()
+	workingDir := workspaceMocks.NewMockWorkingDir()
 
 	credentials := vcsMocks.NewMockGithubCredentials()
 
-	ghAppWorkingDir := events.GithubAppWorkingDir{
+	ghAppWorkingDir := workspace.GithubAppWorkingDir{
 		WorkingDir:     workingDir,
 		Credentials:    credentials,
 		GithubHostname: "some-host",

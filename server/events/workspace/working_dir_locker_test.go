@@ -11,162 +11,162 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package events_test
+package workspace_test
 
 import (
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/workspace"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 var repo = "repo/owner"
-var workspace = "default"
+var workspaceName = "default"
 var path = "."
 
 func TestTryLock(t *testing.T) {
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := workspace.NewDefaultWorkingDirLocker()
 
 	// The first lock should succeed.
-	unlockFn, err := locker.TryLock(repo, 1, workspace, path)
+	unlockFn, err := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err)
 
-	// Now another lock for the same repo, workspace, and pull should fail
-	_, err = locker.TryLock(repo, 1, workspace, path)
+	// Now another lock for the same repo, workspaceName, and pull should fail
+	_, err = locker.TryLock(repo, 1, workspaceName, path)
 	ErrEquals(t, "the default workspace at path . is currently locked by another"+
 		" command that is running for this pull request.\n"+
 		"Wait until the previous command is complete and try again", err)
 
 	// Unlock should work.
 	unlockFn()
-	_, err = locker.TryLock(repo, 1, workspace, path)
+	_, err = locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err)
 }
 
 func TestTryLockDifferentWorkspaces(t *testing.T) {
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := workspace.NewDefaultWorkingDirLocker()
 
 	t.Log("a lock for the same repo and pull but different workspace should succeed")
-	_, err := locker.TryLock(repo, 1, workspace, path)
+	_, err := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err)
 	_, err = locker.TryLock(repo, 1, "new-workspace", path)
 	Ok(t, err)
 
 	t.Log("and both should now be locked")
-	_, err = locker.TryLock(repo, 1, workspace, path)
+	_, err = locker.TryLock(repo, 1, workspaceName, path)
 	Assert(t, err != nil, "exp err")
 	_, err = locker.TryLock(repo, 1, "new-workspace", path)
 	Assert(t, err != nil, "exp err")
 }
 
 func TestTryLockDifferentRepo(t *testing.T) {
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := workspace.NewDefaultWorkingDirLocker()
 
 	t.Log("a lock for a different repo but the same workspace and pull should succeed")
-	_, err := locker.TryLock(repo, 1, workspace, path)
+	_, err := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err)
 	newRepo := "owner/newrepo"
-	_, err = locker.TryLock(newRepo, 1, workspace, path)
+	_, err = locker.TryLock(newRepo, 1, workspaceName, path)
 	Ok(t, err)
 
 	t.Log("and both should now be locked")
-	_, err = locker.TryLock(repo, 1, workspace, path)
+	_, err = locker.TryLock(repo, 1, workspaceName, path)
 	ErrContains(t, "currently locked", err)
-	_, err = locker.TryLock(newRepo, 1, workspace, path)
+	_, err = locker.TryLock(newRepo, 1, workspaceName, path)
 	ErrContains(t, "currently locked", err)
 }
 
 func TestTryLockDifferentPulls(t *testing.T) {
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := workspace.NewDefaultWorkingDirLocker()
 
 	t.Log("a lock for a different pull but the same repo and workspace should succeed")
-	_, err := locker.TryLock(repo, 1, workspace, path)
+	_, err := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err)
 	newPull := 2
-	_, err = locker.TryLock(repo, newPull, workspace, path)
+	_, err = locker.TryLock(repo, newPull, workspaceName, path)
 	Ok(t, err)
 
 	t.Log("and both should now be locked")
-	_, err = locker.TryLock(repo, 1, workspace, path)
+	_, err = locker.TryLock(repo, 1, workspaceName, path)
 	ErrContains(t, "currently locked", err)
-	_, err = locker.TryLock(repo, newPull, workspace, path)
+	_, err = locker.TryLock(repo, newPull, workspaceName, path)
 	ErrContains(t, "currently locked", err)
 }
 
 func TestTryLockDifferentPaths(t *testing.T) {
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := workspace.NewDefaultWorkingDirLocker()
 
 	t.Log("a lock for a different path but the same repo, pull, and workspace should succeed")
-	_, err := locker.TryLock(repo, 1, workspace, path)
+	_, err := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err)
 	newPath := "new-path"
-	_, err = locker.TryLock(repo, 1, workspace, newPath)
+	_, err = locker.TryLock(repo, 1, workspaceName, newPath)
 	Ok(t, err)
 
 	t.Log("and both should now be locked")
-	_, err = locker.TryLock(repo, 1, workspace, path)
+	_, err = locker.TryLock(repo, 1, workspaceName, path)
 	ErrContains(t, "currently locked", err)
-	_, err = locker.TryLock(repo, 1, workspace, newPath)
+	_, err = locker.TryLock(repo, 1, workspaceName, newPath)
 	ErrContains(t, "currently locked", err)
 }
 
 func TestUnlock(t *testing.T) {
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := workspace.NewDefaultWorkingDirLocker()
 
 	t.Log("unlocking should work")
-	unlockFn, err := locker.TryLock(repo, 1, workspace, path)
+	unlockFn, err := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err)
 	unlockFn()
-	_, err = locker.TryLock(repo, 1, workspace, "")
+	_, err = locker.TryLock(repo, 1, workspaceName, "")
 	Ok(t, err)
 }
 
 func TestUnlockDifferentWorkspaces(t *testing.T) {
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := workspace.NewDefaultWorkingDirLocker()
 	t.Log("unlocking should work for different workspaces")
-	unlockFn1, err1 := locker.TryLock(repo, 1, workspace, path)
+	unlockFn1, err1 := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err1)
 	unlockFn2, err2 := locker.TryLock(repo, 1, "new-workspace", path)
 	Ok(t, err2)
 	unlockFn1()
 	unlockFn2()
 
-	_, err := locker.TryLock(repo, 1, workspace, path)
+	_, err := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err)
 	_, err = locker.TryLock(repo, 1, "new-workspace", path)
 	Ok(t, err)
 }
 
 func TestUnlockDifferentRepos(t *testing.T) {
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := workspace.NewDefaultWorkingDirLocker()
 	t.Log("unlocking should work for different repos")
-	unlockFn1, err1 := locker.TryLock(repo, 1, workspace, path)
+	unlockFn1, err1 := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err1)
 	newRepo := "owner/newrepo"
-	unlockFn2, err2 := locker.TryLock(newRepo, 1, workspace, path)
+	unlockFn2, err2 := locker.TryLock(newRepo, 1, workspaceName, path)
 	Ok(t, err2)
 	unlockFn1()
 	unlockFn2()
 
-	_, err := locker.TryLock(repo, 1, workspace, path)
+	_, err := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err)
-	_, err = locker.TryLock(newRepo, 1, workspace, path)
+	_, err = locker.TryLock(newRepo, 1, workspaceName, path)
 	Ok(t, err)
 }
 
 func TestUnlockDifferentPulls(t *testing.T) {
-	locker := events.NewDefaultWorkingDirLocker()
+	locker := workspace.NewDefaultWorkingDirLocker()
 	t.Log("unlocking should work for different pulls")
-	unlockFn1, err1 := locker.TryLock(repo, 1, workspace, path)
+	unlockFn1, err1 := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err1)
 	newPull := 2
-	unlockFn2, err2 := locker.TryLock(repo, newPull, workspace, path)
+	unlockFn2, err2 := locker.TryLock(repo, newPull, workspaceName, path)
 	Ok(t, err2)
 	unlockFn1()
 	unlockFn2()
 
-	_, err := locker.TryLock(repo, 1, workspace, path)
+	_, err := locker.TryLock(repo, 1, workspaceName, path)
 	Ok(t, err)
-	_, err = locker.TryLock(repo, newPull, workspace, path)
+	_, err = locker.TryLock(repo, newPull, workspaceName, path)
 	Ok(t, err)
 }

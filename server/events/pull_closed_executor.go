@@ -28,6 +28,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/workspace"
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
@@ -51,7 +52,7 @@ type PullCleaner interface {
 type PullClosedExecutor struct {
 	Locker                   locking.Locker
 	VCSClient                vcs.Client
-	WorkingDir               WorkingDir
+	WorkingDir               workspace.WorkingDir
 	Database                 db.Database
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner

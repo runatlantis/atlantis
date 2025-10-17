@@ -11,7 +11,7 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package events
+package workspace
 
 import (
 	"fmt"
@@ -34,8 +34,7 @@ const workingDirPrefix = "repos"
 var cloneLocks sync.Map
 var recheckRequiredMap sync.Map
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/events/workspace --package mocks -o mocks/mock_working_dir.go WorkingDir
 
 // WorkingDir handles the workspace on disk for running commands.
 type WorkingDir interface {
