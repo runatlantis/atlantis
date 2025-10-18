@@ -433,21 +433,21 @@ func TestClone_NoReclone(t *testing.T) {
 }
 
 // Test that if the repo is already cloned but is at the wrong commit, we
-// reclone.
-func TestClone_RecloneWrongCommit(t *testing.T) {
+// fetch and reset
+func TestClone_ResetOnWrongCommit(t *testing.T) {
 	repoDir := initRepo(t)
 	dataDir := t.TempDir()
 
 	// Copy the repo to our data dir.
 	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
-	runCmd(t, dataDir, "cp", "-R", repoDir, "repos/0/default")
+	runCmd(t, dataDir, "git", "clone", repoDir, "repos/0/default")
 
 	// Now add a commit to the repo, so the one in the data dir is out of date.
 	runCmd(t, repoDir, "git", "checkout", "branch")
 	runCmd(t, repoDir, "touch", "newfile")
 	runCmd(t, repoDir, "git", "add", "newfile")
 	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
-	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
 	// Pretend that terraform has created a plan file, we'll check for it later
 	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
@@ -470,10 +470,10 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 		HeadCommit: expCommit,
 	}, "default")
 	Ok(t, err)
-	assert.NoFileExists(t, planFile, "Plan file should have been wiped out by Clone")
+	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
 
 	// Use rev-parse to verify at correct commit.
-	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
 	Equals(t, expCommit, actCommit)
 }
 

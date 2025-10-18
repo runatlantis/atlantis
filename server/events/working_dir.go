@@ -133,8 +133,8 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 			logger.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 			return cloneDir, nil
 		}
-		logger.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
-		// We'll fall through to re-clone.
+		logger.Info("repo was already cloned but is not at correct commit, moving from %q to %q", currCommit, p.HeadCommit)
+		return cloneDir, w.updateToRef(logger, c, p.HeadCommit)
 	}
 
 	// Otherwise we clone the repo.
@@ -253,6 +253,25 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
 	return hasDiverged
+}
+
+func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
+
+	// Use reset --hard to move HEAD to the target ref
+
+	if err := w.wrappedGit(logger, c, "fetch"); err != nil {
+		return err
+	}
+
+	if err := w.wrappedGit(logger, c, "reset", "--hard", targetRef); err != nil {
+		return err
+	}
+
+	if !w.CheckoutMerge {
+		return nil
+	}
+
+	return w.mergeToBaseBranch(logger, c)
 }
 
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
