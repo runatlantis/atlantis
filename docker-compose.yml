@@ -1,7 +1,7 @@
 # Note: This file is only used for Atlantis local development
 services:
   ngrok:
-    image: ngrok/ngrok:latest@sha256:0dd920ebf242aa564c4f6f29063d655ac4d25566a09d49e0015749dfc28f6068
+    image: ngrok/ngrok:latest@sha256:50234a734982cdb63d762c2f9983546257f414aa2535917d66ba9433da74f525
     ports:
       - 4040:4040
     command:
