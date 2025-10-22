@@ -2,7 +2,7 @@
 # what distro is the image being built for
 ARG ALPINE_TAG=3.21.3@sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c
 ARG DEBIAN_TAG=12.12-slim@sha256:7e490910eea2861b9664577a96b54ce68ea3e02ce7f51d89cb0103a6f9c386e0
-# renovate: datasource=docker depName=golang versioning=docker
+# renovate: datasource=docker depName=golang:alpine versioning=docker
 ARG GOLANG_TAG=1.25.1-alpine@sha256:b6ed3fd0452c0e9bcdef5597f29cc1418f61672e9d3a2f55bf02e7222c014abd
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
