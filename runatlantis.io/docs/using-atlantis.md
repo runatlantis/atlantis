@@ -199,6 +199,30 @@ The automatic `env/{workspace}.tfvars` file inclusion happens during the `atlant
 
 ---
 
+## Atlantis cancel
+
+```bash
+atlantis cancel
+```
+
+### Explanation
+Cancels all **queued commands** for the current pull request.
+
+::: warning NOTE
+This command **does not** stop or interrupt commands that are already running. It only removes subsequent commands that are waiting in the queue. The currently running command will continue to completion.
+:::
+
+This is useful if you have multiple commands queued (e.g., atlantis apply for several projects) and you realize you made a mistake in your PR. Using cancel prevents the queued plans from executing. Especially with long-running operations, this can save time and resources.
+
+### Examples
+```bash
+# An apply is currently running, and another is queued.
+# This command will cancel the queued apply but not the running one.
+atlantis cancel
+```
+
+---
+
 ## atlantis import
 
 ```bash
