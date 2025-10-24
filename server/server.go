@@ -407,8 +407,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	webhooksManager, err := webhooks.NewMultiWebhookSender(
 		webhooksConfig,
 		webhooks.Clients{
-			Slack: webhooks.NewSlackClient(userConfig.SlackToken),
-			Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
+			Slack:   webhooks.NewSlackClient(userConfig.SlackToken),
+			Http:    &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
+			MSTeams: webhooks.NewMSTeamsClient(),
 		},
 	)
 	if err != nil {
