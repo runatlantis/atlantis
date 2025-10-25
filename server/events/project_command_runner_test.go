@@ -51,7 +51,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:                    mockLocker,
-		LockURLGenerator:          mockURLGenerator{},
+		URLGenerator:              mockURLGenerator{},
 		InitStepRunner:            mockInit,
 		PlanStepRunner:            mockPlan,
 		ApplyStepRunner:           mockApply,
@@ -108,6 +108,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
+	Equals(t, fmt.Sprintf("https://%s", ctx.JobID), res.PlanSuccess.JobURL)
 	t.Logf("output is %s", res.PlanSuccess.TerraformOutput)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
 	expSteps := []string{"run", "apply", "plan", "init", "env"}
@@ -412,7 +413,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 
 			runner := events.DefaultProjectCommandRunner{
 				Locker:                    mockLocker,
-				LockURLGenerator:          mockURLGenerator{},
+				URLGenerator:              mockURLGenerator{},
 				InitStepRunner:            mockInit,
 				PlanStepRunner:            mockPlan,
 				ApplyStepRunner:           mockApply,
@@ -498,7 +499,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:                    mockLocker,
-		LockURLGenerator:          mockURLGenerator{},
+		URLGenerator:              mockURLGenerator{},
 		ApplyStepRunner:           mockApply,
 		WorkingDir:                mockWorkingDir,
 		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
@@ -567,7 +568,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:                    mockLocker,
-		LockURLGenerator:          mockURLGenerator{},
+		URLGenerator:              mockURLGenerator{},
 		RunStepRunner:             &run,
 		EnvStepRunner:             &env,
 		WorkingDir:                mockWorkingDir,
@@ -700,7 +701,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 
 			runner := events.DefaultProjectCommandRunner{
 				Locker:                    mockLocker,
-				LockURLGenerator:          mockURLGenerator{},
+				URLGenerator:              mockURLGenerator{},
 				InitStepRunner:            mockInit,
 				ImportStepRunner:          mockImport,
 				StateRmStepRunner:         mockStateRm,
@@ -745,6 +746,10 @@ type mockURLGenerator struct{}
 
 func (m mockURLGenerator) GenerateLockURL(lockID string) string {
 	return "https://" + lockID
+}
+
+func (m mockURLGenerator) GenerateProjectJobURL(ctx command.ProjectContext) (string, error) {
+	return "https://" + ctx.JobID, nil
 }
 
 // Test approve policies logic.
@@ -1243,7 +1248,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			runner := events.DefaultProjectCommandRunner{
 				Locker:           mockLocker,
 				VcsClient:        mockVcsClient,
-				LockURLGenerator: mockURLGenerator{},
+				URLGenerator:     mockURLGenerator{},
 				InitStepRunner:   mockInit,
 				PlanStepRunner:   mockPlan,
 				ApplyStepRunner:  mockApply,
