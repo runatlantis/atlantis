@@ -815,6 +815,8 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 				runCmd(t, "", "cp", oldLockFilePath, fmt.Sprintf("%s/.terraform.lock.hcl", repoDir))
 				runCmd(t, repoDir, "git", "add", ".terraform.lock.hcl")
 				runCmd(t, repoDir, "git", "commit", "-am", "stage .terraform.lock.hcl")
+				// Update target sha since there's now an extra commit
+				headSHA = strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 			}
 
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
