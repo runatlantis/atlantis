@@ -224,26 +224,28 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) {
+func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
 	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
 	// We'll only loop 1000 times as a safety measure.
 	maxLoops := 1000
 	for i := 0; i < maxLoops; i++ {
 		resp, err := b.makeRequest("GET", nextPageURL, nil)
 		if err != nil {
-			return false, err
+			return models.MergeableStatus{}, err
 		}
 		var diffStat DiffStat
 		if err := json.Unmarshal(resp, &diffStat); err != nil {
-			return false, errors.Wrapf(err, "Could not parse response %q", string(resp))
+			return models.MergeableStatus{}, errors.Wrapf(err, "Could not parse response %q", string(resp))
 		}
 		if err := validator.New().Struct(diffStat); err != nil {
-			return false, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+			return models.MergeableStatus{}, errors.Wrapf(err, "API response %q was missing fields", string(resp))
 		}
 		for _, v := range diffStat.Values {
 			// These values are undocumented, found via manual testing.
 			if *v.Status == "merge conflict" || *v.Status == "local deleted" {
-				return false, nil
+				return models.MergeableStatus{
+					IsMergeable: false,
+				}, nil
 			}
 		}
 		if diffStat.Next == nil || *diffStat.Next == "" {
@@ -251,7 +253,9 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		}
 		nextPageURL = *diffStat.Next
 	}
-	return true, nil
+	return models.MergeableStatus{
+		IsMergeable: true,
+	}, nil
 }
 
 // UpdateStatus updates the status of a commit.
@@ -362,7 +366,7 @@ func (b *Client) SupportsSingleFileDownload(models.Repo) bool {
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (b *Client) GetFileContent(_ logging.SimpleLogging, _ models.PullRequest, _ string) (bool, []byte, error) {
+func (b *Client) GetFileContent(_ logging.SimpleLogging, _ models.Repo, _ string, _ string) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("not implemented")
 }
 

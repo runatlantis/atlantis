@@ -303,23 +303,21 @@ func (g *GitlabClient) PullIsApproved(logger logging.SimpleLogging, repo models.
 // See:
 // - https://gitlab.com/gitlab-org/gitlab-ee/issues/3169
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
-func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (bool, error) {
+func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if GitLab merge request %d is mergeable", pull.Num)
 	mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
 	if resp != nil {
 		logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repo.FullName, pull.Num, resp.StatusCode)
 	}
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 
 	// Prevent nil pointer error when mr.HeadPipeline is empty
 	// See: https://github.com/runatlantis/atlantis/issues/1852
 	commit := pull.HeadCommit
-	isPipelineSkipped := false
 	if mr.HeadPipeline != nil {
 		commit = mr.HeadPipeline.SHA
-		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
 	}
 
 	// Get project configuration
@@ -328,7 +326,7 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		logger.Debug("GET /projects/%d returned: %d", mr.ProjectID, resp.StatusCode)
 	}
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 
 	// Get Commit Statuses
@@ -337,7 +335,7 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		logger.Debug("GET /projects/%d/commits/%s/statuses returned: %d", mr.ProjectID, commit, resp.StatusCode)
 	}
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 
 	for _, status := range statuses {
@@ -346,15 +344,16 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
-			return false, nil
+			return models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s has status %s", status.Name, status.Status),
+			}, nil
 		}
 	}
 
-	allowSkippedPipeline := project.AllowMergeOnSkippedPipeline && isPipelineSkipped
-
 	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus(logger)
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 
 	if supportsDetailedMergeStatus {
@@ -363,23 +362,72 @@ func (g *GitlabClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 		logger.Debug("Merge status: '%s'", mr.MergeStatus) //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
 	}
 
-	if ((supportsDetailedMergeStatus &&
-		(mr.DetailedMergeStatus == "mergeable" ||
-			mr.DetailedMergeStatus == "ci_still_running" ||
-			mr.DetailedMergeStatus == "ci_must_pass" ||
-			mr.DetailedMergeStatus == "need_rebase")) ||
-		(!supportsDetailedMergeStatus &&
-			mr.MergeStatus == "can_be_merged")) && //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
-		mr.ApprovalsBeforeMerge <= 0 &&
-		mr.BlockingDiscussionsResolved &&
-		!mr.WorkInProgress &&
-		(allowSkippedPipeline || !isPipelineSkipped) {
-
+	res := gitlabIsMergeable(mr, project, supportsDetailedMergeStatus)
+	if res.IsMergeable {
 		logger.Debug("Merge request is mergeable")
-		return true, nil
+	} else {
+		logger.Debug("Merge request is not mergeable")
 	}
-	logger.Debug("Merge request is not mergeable")
-	return false, nil
+	return res, nil
+}
+
+// gitlabIsMergeable a pure function that encapsulates the tricky logic behind determining whether a gitlab MR is mergeable
+// It doesn't make any external calls and cannot error, so is much easier to test
+func gitlabIsMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetailedMergeStatus bool) models.MergeableStatus {
+	isPipelineSkipped := false
+	if mr.HeadPipeline != nil {
+		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
+	}
+
+	if mr.ApprovalsBeforeMerge > 0 {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      fmt.Sprintf("Still require %d approvals", mr.ApprovalsBeforeMerge),
+		}
+	}
+	if !mr.BlockingDiscussionsResolved {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "Blocking discussions unresolved",
+		}
+	}
+	if mr.WorkInProgress {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "Work in progress",
+		}
+	}
+	if isPipelineSkipped && !project.AllowMergeOnSkippedPipeline {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "Pipeline was skipped",
+		}
+	}
+
+	if supportsDetailedMergeStatus {
+		if mr.DetailedMergeStatus == "mergeable" ||
+			mr.DetailedMergeStatus == "ci_still_running" ||
+			mr.DetailedMergeStatus == "ci_must_pass" {
+			return models.MergeableStatus{
+				IsMergeable: true,
+			}
+		}
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      fmt.Sprintf("Merge status is %s", mr.DetailedMergeStatus),
+		}
+	}
+
+	mergeStatus := mr.MergeStatus //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
+	if mergeStatus == "can_be_merged" {
+		return models.MergeableStatus{
+			IsMergeable: true,
+		}
+	}
+	return models.MergeableStatus{
+		IsMergeable: false,
+		Reason:      fmt.Sprintf("Merge status is %s", mergeStatus),
+	}
 }
 
 func (g *GitlabClient) SupportsDetailedMergeStatus(logger logging.SimpleLogging) (bool, error) {
@@ -474,6 +522,14 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 
 			return nil
 		}
+
+		// If the error indicates the status is already 'running', we can treat it as a success.
+		// This can happen with parallel jobs. See https://github.com/runatlantis/atlantis/issues/2685.
+		if gitlabState == gitlab.Running && strings.Contains(err.Error(), "Cannot transition status via :run from :running") {
+			logger.Info("Commit status is already 'running'; ignoring redundant update.")
+			return nil
+		}
+
 		if attempt == maxAttempts {
 			return errors.Wrap(err, fmt.Sprintf("failed to update commit status for '%s' @ '%s' to '%s' after %d attempts", repo.FullName, pull.HeadCommit, src, attempt))
 		}
@@ -673,13 +729,13 @@ func (g *GitlabClient) GetTeamNamesForUser(logger logging.SimpleLogging, _ model
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (g *GitlabClient) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {
+func (g *GitlabClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
 	logger.Debug("Getting GitLab file content for file '%s'", fileName)
-	opt := gitlab.GetRawFileOptions{Ref: gitlab.Ptr(pull.HeadBranch)}
+	opt := gitlab.GetRawFileOptions{Ref: gitlab.Ptr(branch)}
 
-	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, fileName, &opt)
+	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(repo.FullName, fileName, &opt)
 	if resp != nil {
-		logger.Debug("GET /projects/%s/repository/files/%s/raw returned: %d", pull.BaseRepo.FullName, fileName, resp.StatusCode)
+		logger.Debug("GET /projects/%s/repository/files/%s/raw returned: %d", repo.FullName, fileName, resp.StatusCode)
 	}
 	if resp != nil && resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil

@@ -564,7 +564,7 @@ func (g *GithubClient) WorkflowRunMatchesWorkflowFileReference(workflowRun Workf
 		return false, err
 	}
 
-	if !(repoId == workflowFileReference.RepositoryId && workflowRun.File.Path == workflowFileReference.Path) {
+	if repoId != workflowFileReference.RepositoryId || workflowRun.File.Path != workflowFileReference.Path {
 		return false, nil
 	} else if workflowFileReference.Sha != nil {
 		return strings.Contains(string(workflowRun.File.RepositoryFileUrl), string(*workflowFileReference.Sha)), nil
@@ -839,11 +839,11 @@ func GetVCSStatusNameFromRequiredCheck(requiredCheck githubv4.String) string {
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
-func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
+func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if GitHub pull request %d is mergeable", pull.Num)
 	githubPR, err := g.GetPullRequest(logger, repo, pull.Num)
 	if err != nil {
-		return false, errors.Wrap(err, "getting pull request")
+		return models.MergeableStatus{}, errors.Wrap(err, "getting pull request")
 	}
 
 	// We map our mergeable check to when the GitHub merge button is clickable.
@@ -855,21 +855,41 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
-	switch githubPR.GetMergeableState() {
+	state := githubPR.GetMergeableState()
+	if state == "" {
+		state = "<unknown>"
+	}
+	switch state {
 	case "clean", "unstable", "has_hooks":
-		return true, nil
+		return models.MergeableStatus{
+			IsMergeable: true,
+		}, nil
 	case "blocked":
 		if g.config.AllowMergeableBypassApply {
 			logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
 			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname, ignoreVCSStatusNames)
 			if err != nil {
-				return false, errors.Wrap(err, "getting pull request status")
+				return models.MergeableStatus{}, errors.Wrap(err, "getting pull request status")
 			}
-			return isMergeableMinusApply, nil
+			if isMergeableMinusApply {
+				return models.MergeableStatus{
+					IsMergeable: true,
+				}, nil
+			}
+			return models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			}, nil
 		}
-		return false, nil
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "PR is in state blocked",
+		}, nil
 	default:
-		return false, nil
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      fmt.Sprintf("PR is in state %s", state),
+		}, nil
 	}
 }
 
@@ -966,11 +986,11 @@ func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 
 		isMethodAllowed, isMethodExist := mergeMethodsAllow[method]
 		if !isMethodExist {
-			return fmt.Errorf("Merge method '%s' is unknown. Specify one of the valid values: '%s'", method, strings.Join(mergeMethodsName, ", "))
+			return fmt.Errorf("merge method '%s' is unknown. Specify one of the valid values: '%s'", method, strings.Join(mergeMethodsName, ", "))
 		}
 
 		if !isMethodAllowed() {
-			return fmt.Errorf("Merge method '%s' is not allowed by the repository Pull Request settings", method)
+			return fmt.Errorf("merge method '%s' is not allowed by the repository Pull Request settings", method)
 		}
 	} else {
 		method = defaultMergeMethod
@@ -1080,12 +1100,13 @@ func (g *GithubClient) ExchangeCode(logger logging.SimpleLogging, code string) (
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (g *GithubClient) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {
-	logger.Debug("Getting file content for %s in GitHub pull request %d", fileName, pull.Num)
-	opt := github.RepositoryContentGetOptions{Ref: pull.HeadBranch}
-	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, pull.BaseRepo.Owner, pull.BaseRepo.Name, fileName, &opt)
+func (g *GithubClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+	logger.Debug("Getting GitHub file content for file '%s'", fileName)
+	opt := github.RepositoryContentGetOptions{Ref: branch}
+
+	fileContent, _, resp, err := g.client.Repositories.GetContents(g.ctx, repo.Owner, repo.Name, fileName, &opt)
 	if resp != nil {
-		logger.Debug("GET /repos/%v/%v/contents/%s returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, fileName, resp.StatusCode)
+		logger.Debug("GET /repos/%v/%v/contents/%s returned: %v", repo.Owner, repo.Name, fileName, resp.StatusCode)
 	}
 
 	if resp.StatusCode == http.StatusNotFound {

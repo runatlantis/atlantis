@@ -41,6 +41,7 @@ import (
 	prometheus "github.com/uber-go/tally/v4/prometheus"
 	"github.com/urfave/negroni/v3"
 
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	cfg "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -128,6 +129,7 @@ type Server struct {
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
 	EnableProfilingAPI             bool
+	database                       db.Database
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -490,18 +492,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	var lockingClient locking.Locker
 	var applyLockingClient locking.ApplyLocker
-	var backend locking.Backend
+	var database db.Database
 
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
 		logger.Info("Utilizing Redis DB")
-		backend, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
+		database, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
 		if err != nil {
 			return nil, err
 		}
 	case "boltdb":
 		logger.Info("Utilizing BoltDB")
-		backend, err = db.New(userConfig.DataDir)
+		database, err = boltdb.New(userConfig.DataDir)
 		if err != nil {
 			return nil, err
 		}
@@ -512,14 +514,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		logger.Info("Repo Locking is disabled")
 		lockingClient = noOpLocker
 	} else {
-		lockingClient = locking.NewClient(backend)
+		lockingClient = locking.NewClient(database)
 	}
-	disableGlobalApplyLock := false
-	if userConfig.DisableGlobalApplyLock {
-		disableGlobalApplyLock = true
-	}
+	disableGlobalApplyLock := userConfig.DisableGlobalApplyLock
 
-	applyLockingClient = locking.NewApplyClient(backend, disableApply, disableGlobalApplyLock)
+	applyLockingClient = locking.NewApplyClient(database, disableApply, disableGlobalApplyLock)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
@@ -571,7 +570,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Locker:           lockingClient,
 		WorkingDir:       workingDir,
 		WorkingDirLocker: workingDirLocker,
-		Backend:          backend,
+		Database:         database,
 	}
 
 	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
@@ -580,7 +579,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		&events.PullClosedExecutor{
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
-			Backend:                  backend,
+			Database:                 database,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 			VCSClient:                vcsClient,
@@ -735,7 +734,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	dbUpdater := &events.DBUpdater{
-		Backend: backend,
+		Database: database,
 	}
 
 	pullUpdater := &events.PullUpdater{
@@ -785,7 +784,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		autoMerger,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
-		backend,
+		database,
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
@@ -801,7 +800,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		backend,
+		database,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
@@ -904,7 +903,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              backend,
+		PullStatusFetcher:              database,
 		TeamAllowlistChecker:           teamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
@@ -923,7 +922,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockDetailTemplate: web_templates.LockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
-		Backend:            backend,
+		Database:           database,
 		DeleteLockCommand:  deleteLockCommand,
 	}
 
@@ -940,7 +939,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		ProjectJobsTemplate:      web_templates.ProjectJobsTemplate,
 		ProjectJobsErrorTemplate: web_templates.ProjectJobsErrorTemplate,
-		Backend:                  backend,
+		Database:                 database,
 		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
@@ -1032,6 +1031,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
 		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
+		database:                       database,
 	}
 
 	validate := validator.New(validator.WithRequiredStructEnabled())
@@ -1133,6 +1133,11 @@ func (s *Server) Start() error {
 		s.Logger.Err(err.Error())
 	}
 
+	// Attempt to close the database
+	if err := s.closeDatabase(1 * time.Second); err != nil {
+		s.Logger.Err("while closing database: %v", err)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
@@ -1157,6 +1162,23 @@ func (s *Server) waitForDrain() {
 		case <-ticker.C:
 			s.Logger.Info("Waiting for in-progress operations to complete, current in-progress ops: %d", s.Drainer.GetStatus().InProgressOps)
 		}
+	}
+}
+
+// closeDatabase attempts to close the database, waiting up to the given timeout.
+func (s *Server) closeDatabase(timeout time.Duration) error {
+	if s.database == nil {
+		return nil
+	}
+	s.Logger.Info("Shutting down database")
+
+	done := make(chan error, 1)
+	go func() { done <- s.database.Close() }()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(timeout):
+		return fmt.Errorf("database close timed out after %s", timeout)
 	}
 }
 
@@ -1301,7 +1323,7 @@ func ParseAtlantisURL(u string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !(parsed.Scheme == "http" || parsed.Scheme == "https") {
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return nil, errors.New("http or https must be specified")
 	}
 	// We want the path to end without a trailing slash so we know how to

@@ -11,14 +11,14 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package db_test
+package boltdb_test
 
 import (
 	"os"
 	"testing"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -894,7 +894,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 }
 
 // newTestDB returns a TestDB using a temporary path.
-func newTestDB() (*bolt.DB, *db.BoltDB) {
+func newTestDB() (*bolt.DB, *boltdb.BoltDB) {
 	// Retrieve a temporary path.
 	f, err := os.CreateTemp("", "")
 	if err != nil {
@@ -919,13 +919,13 @@ func newTestDB() (*bolt.DB, *db.BoltDB) {
 	}); err != nil {
 		panic(errors.Wrap(err, "could not create bucket"))
 	}
-	b, _ := db.NewWithDB(boltDB, lockBucket, configBucket)
+	b, _ := boltdb.NewWithDB(boltDB, lockBucket, configBucket)
 	return boltDB, b
 }
 
-func newTestDB2(t *testing.T) *db.BoltDB {
+func newTestDB2(t *testing.T) *boltdb.BoltDB {
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
 	Ok(t, err)
 	return boltDB
 }
