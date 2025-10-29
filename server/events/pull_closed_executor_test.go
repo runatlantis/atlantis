@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +42,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	w := mocks.NewMockWorkingDir()
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -50,7 +50,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		WorkingDir:         w,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
-		Backend:            db,
+		Database:           db,
 	}
 	err = errors.New("err")
 	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
@@ -65,7 +65,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	w := mocks.NewMockWorkingDir()
 	l := lockmocks.NewMockLocker()
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -73,7 +73,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		Locker:             l,
 		WorkingDir:         w,
-		Backend:            db,
+		Database:           db,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	err = errors.New("err")
@@ -90,7 +90,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	l := lockmocks.NewMockLocker()
 	cp := vcsmocks.NewMockClient()
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -99,7 +99,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 		Locker:     l,
 		VCSClient:  cp,
 		WorkingDir: w,
-		Backend:    db,
+		Database:   db,
 	}
 	When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
@@ -190,7 +190,7 @@ func TestCleanUpPullComments(t *testing.T) {
 			cp := vcsmocks.NewMockClient()
 			l := lockmocks.NewMockLocker()
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
@@ -199,7 +199,7 @@ func TestCleanUpPullComments(t *testing.T) {
 				Locker:     l,
 				VCSClient:  cp,
 				WorkingDir: w,
-				Backend:    db,
+				Database:   db,
 			}
 			t.Log("testing: " + c.Description)
 			When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(c.Locks, nil)
@@ -258,7 +258,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		}); err != nil {
 			panic(errors.Wrap(err, "could not create bucket"))
 		}
-		db, _ := db.NewWithDB(boltDB, lockBucket, configBucket)
+		database, _ := boltdb.NewWithDB(boltDB, lockBucket, configBucket)
 		result := []command.ProjectResult{
 			{
 				RepoRelDir:  testdata.GithubRepo.FullName,
@@ -268,7 +268,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		}
 
 		// Create a new record for pull
-		_, err = db.UpdatePullWithResults(testdata.Pull, result)
+		_, err = database.UpdatePullWithResults(testdata.Pull, result)
 		Ok(t, err)
 
 		workingDir := mocks.NewMockWorkingDir()
@@ -279,7 +279,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		pullClosedExecutor := events.PullClosedExecutor{
 			Locker:                   locker,
 			WorkingDir:               workingDir,
-			Backend:                  db,
+			Database:                 database,
 			VCSClient:                client,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: prjCmdOutHandler,
@@ -308,4 +308,87 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		assert.Empty(t, dfPrjCmdOutputHandler.GetProjectOutputBuffer(ctx.PullInfo()))
 		assert.Empty(t, dfPrjCmdOutputHandler.GetReceiverBufferForPull(ctx.PullInfo()))
 	})
+}
+
+func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
+	t.Log("CleanUpPull should call LogStreamResourceCleaner.CleanUp with complete PullInfo including RepoFullName and Path")
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+
+	// Create mocks
+	workingDir := mocks.NewMockWorkingDir()
+	locker := lockmocks.NewMockLocker()
+	client := vcsmocks.NewMockClient()
+	resourceCleaner := mocks.NewMockResourceCleaner()
+
+	// Create temporary database
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
+	Ok(t, err)
+
+	// Create test data with multiple projects to verify all fields are populated correctly
+	testProjects := []command.ProjectResult{
+		{
+			RepoRelDir:  "path/to/project1",
+			Workspace:   "default",
+			ProjectName: "project1",
+		},
+		{
+			RepoRelDir:  "path/to/project2",
+			Workspace:   "staging",
+			ProjectName: "project2",
+		},
+	}
+
+	// Add pull status to database
+	_, err = db.UpdatePullWithResults(testdata.Pull, testProjects)
+	Ok(t, err)
+
+	// Create executor
+	pce := events.PullClosedExecutor{
+		Locker:                   locker,
+		VCSClient:                client,
+		WorkingDir:               workingDir,
+		Database:                 db,
+		PullClosedTemplate:       &events.PullClosedEventTemplate{},
+		LogStreamResourceCleaner: resourceCleaner,
+	}
+
+	// Setup mock expectations
+	When(locker.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
+
+	// Execute CleanUpPull
+	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+	Ok(t, err)
+
+	// Verify ResourceCleaner.CleanUp was called twice (once for each project)
+	resourceCleaner.VerifyWasCalled(Times(2)).CleanUp(Any[jobs.PullInfo]())
+
+	// Get the captured arguments to verify they contain all required fields
+	capturedArgs := resourceCleaner.VerifyWasCalled(Times(2)).CleanUp(Any[jobs.PullInfo]()).GetAllCapturedArguments()
+
+	// Verify first project's PullInfo
+	expectedPullInfo1 := jobs.PullInfo{
+		PullNum:      testdata.Pull.Num,
+		Repo:         testdata.Pull.BaseRepo.Name,
+		RepoFullName: testdata.Pull.BaseRepo.FullName,
+		ProjectName:  "project1",
+		Path:         "path/to/project1",
+		Workspace:    "default",
+	}
+	Equals(t, expectedPullInfo1, capturedArgs[0])
+
+	// Verify second project's PullInfo
+	expectedPullInfo2 := jobs.PullInfo{
+		PullNum:      testdata.Pull.Num,
+		Repo:         testdata.Pull.BaseRepo.Name,
+		RepoFullName: testdata.Pull.BaseRepo.FullName,
+		ProjectName:  "project2",
+		Path:         "path/to/project2",
+		Workspace:    "staging",
+	}
+	Equals(t, expectedPullInfo2, capturedArgs[1])
 }

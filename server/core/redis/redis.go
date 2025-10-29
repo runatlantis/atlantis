@@ -414,7 +414,7 @@ func (r *RedisDB) deletePull(key string) error {
 }
 
 func (r *RedisDB) lockKey(p models.Project, workspace string) string {
-	return fmt.Sprintf("pr/%s/%s/%s", p.RepoFullName, p.Path, workspace)
+	return fmt.Sprintf("pr/%s", models.GenerateLockKey(p, workspace))
 }
 
 func (r *RedisDB) commandLockKey(cmdName command.Name) string {
@@ -442,4 +442,8 @@ func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.Project
 		PolicyStatus: p.PolicyStatus(),
 		Status:       p.PlanStatus(),
 	}
+}
+
+func (r *RedisDB) Close() error {
+	return r.client.Close()
 }

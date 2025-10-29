@@ -279,7 +279,7 @@ terraform {
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
 				PullRequestStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Log:   logger,
 				Scope: scope,
@@ -1078,42 +1078,6 @@ projects:
 				},
 			},
 		},
-		"autodiscover enabled but project excluded by autodiscover ignore": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
-					"main.tf": nil,
-				},
-				"project2": map[string]interface{}{
-					"main.tf": nil,
-				},
-				"project3": map[string]interface{}{
-					"main.tf": nil,
-				},
-			},
-			AtlantisYAML: `version: 3
-autodiscover:
-  mode: enabled
-  ignore_paths:
-  - project3
-projects:
-- name: project1-custom-name
-  dir: project1`,
-			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
-			// project2 is autodiscovered, but autodiscover was ignored for project3
-			// project1 is configured explicitly so added
-			Exp: []expCtxFields{
-				{
-					ProjectName: "project1-custom-name",
-					RepoRelDir:  "project1",
-					Workspace:   "default",
-				},
-				{
-					ProjectName: "",
-					RepoRelDir:  "project2",
-					Workspace:   "default",
-				},
-			},
-		},
 		"autodiscover enabled but ignoring explicit project": {
 			DirStructure: map[string]interface{}{
 				"project1": map[string]interface{}{
@@ -1598,7 +1562,7 @@ projects:
 				"main.tf": baseVersionConfig,
 			},
 			"project2": map[string]interface{}{
-				"main.tf": strings.Replace(baseVersionConfig, "0.12.8", "0.12.9", -1),
+				"main.tf": strings.ReplaceAll(baseVersionConfig, "0.12.8", "0.12.9"),
 			},
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
@@ -1696,8 +1660,10 @@ projects:
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 	cases := []struct {
 		AtlantisYAML             string
+		IsFork                   bool
 		ExpectedCtxs             int
-		ExpectedClones           InvocationCountMatcher
+		ExpectedClones           int
+		ExpectedGetFileContents  int
 		ModifiedFiles            []string
 		IncludeGitUntrackedFiles bool
 	}{
@@ -1707,7 +1673,8 @@ version: 3
 projects:
 - dir: dir1`,
 			ExpectedCtxs:             0,
-			ExpectedClones:           Never(),
+			ExpectedClones:           0,
+			ExpectedGetFileContents:  1,
 			ModifiedFiles:            []string{"dir2/main.tf"},
 			IncludeGitUntrackedFiles: false,
 		},
@@ -1717,16 +1684,29 @@ version: 3
 projects:
 - dir: dir1`,
 			ExpectedCtxs:             0,
-			ExpectedClones:           Once(),
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  0,
 			ModifiedFiles:            []string{"dir2/main.tf"},
 			IncludeGitUntrackedFiles: true,
 		},
 		{
 			AtlantisYAML: `
 version: 3
+projects:
+- dir: dir1`,
+			IsFork:                  true,
+			ExpectedCtxs:            0,
+			ExpectedClones:          0,
+			ExpectedGetFileContents: 1,
+			ModifiedFiles:           []string{"dir2/main.tf"},
+		},
+		{
+			AtlantisYAML: `
+version: 3
 parallel_plan: true`,
 			ExpectedCtxs:             0,
-			ExpectedClones:           Once(),
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  1,
 			ModifiedFiles:            []string{"README.md"},
 			IncludeGitUntrackedFiles: false,
 		},
@@ -1738,7 +1718,8 @@ autodiscover:
 projects:
 - dir: dir1`,
 			ExpectedCtxs:             0,
-			ExpectedClones:           Once(),
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  1,
 			ModifiedFiles:            []string{"dir2/main.tf"},
 			IncludeGitUntrackedFiles: false,
 		},
@@ -1754,7 +1735,7 @@ projects:
 			Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 		When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(true)
 		When(vcsClient.GetFileContent(
-			Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
+			Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
 		workingDir := mocks.NewMockWorkingDir()
 
 		logger := logging.NewNoopLogger(t)
@@ -1792,20 +1773,35 @@ projects:
 
 		var actCtxs []command.ProjectContext
 		var err error
+
+		baseRepo := models.Repo{Owner: "owner"}
+		headRepo := baseRepo
+		if c.IsFork {
+			headRepo.Owner = "repoForker"
+		}
+
 		actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
-			HeadRepo: models.Repo{},
-			Pull:     models.PullRequest{},
-			User:     models.User{},
-			Log:      logger,
-			Scope:    scope,
+			HeadRepo: headRepo,
+			Pull: models.PullRequest{
+				BaseRepo: baseRepo,
+			},
+			User:  models.User{},
+			Log:   logger,
+			Scope: scope,
 			PullRequestStatus: models.PullReqStatus{
-				Mergeable: true,
+				MergeableStatus: models.MergeableStatus{IsMergeable: true},
 			},
 		})
+
 		Ok(t, err)
 		Equals(t, c.ExpectedCtxs, len(actCtxs))
-		workingDir.VerifyWasCalled(c.ExpectedClones).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
+		workingDir.VerifyWasCalled(Times(c.ExpectedClones)).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
 			Any[models.PullRequest](), Any[string]())
+		res := vcsClient.VerifyWasCalled(Times(c.ExpectedGetFileContents)).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())
+		if c.ExpectedGetFileContents > 0 {
+			_, actRepo, _, _ := res.GetCapturedArguments()
+			Equals(t, headRepo, actRepo)
+		}
 	}
 }
 
@@ -1861,7 +1857,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 
 	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
 		PullRequestStatus: models.PullReqStatus{
-			Mergeable: true,
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
 		},
 		Log:   logger,
 		Scope: scope,

@@ -172,7 +172,7 @@ func (g *AzureDevopsClient) PullIsApproved(logger logging.SimpleLogging, repo mo
 			continue
 		}
 
-		if review.IdentityRef.GetUniqueName() == adPull.GetCreatedBy().GetUniqueName() {
+		if review.GetUniqueName() == adPull.GetCreatedBy().GetUniqueName() {
 			continue
 		}
 
@@ -192,32 +192,38 @@ func (g *AzureDevopsClient) DiscardReviews(logger logging.SimpleLogging, repo mo
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) { //nolint: revive
+func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) { //nolint: revive
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
-		return false, errors.Wrap(err, "getting pull request")
+		return models.MergeableStatus{}, errors.Wrap(err, "getting pull request")
 	}
 
 	if *adPull.MergeStatus != azuredevops.MergeSucceeded.String() {
-		return false, nil
+		return models.MergeableStatus{
+			IsMergeable: false,
+		}, nil
 	}
 
 	if *adPull.IsDraft {
-		return false, nil
+		return models.MergeableStatus{
+			IsMergeable: false,
+		}, nil
 	}
 
 	if *adPull.Status != azuredevops.PullActive.String() {
-		return false, nil
+		return models.MergeableStatus{
+			IsMergeable: false,
+		}, nil
 	}
 
 	projectID := *adPull.Repository.Project.ID
 	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, pull.Num)
 	policyEvaluations, _, err := g.Client.PolicyEvaluations.List(g.ctx, owner, project, artifactID, &azuredevops.PolicyEvaluationsListOptions{})
 	if err != nil {
-		return false, errors.Wrap(err, "getting policy evaluations")
+		return models.MergeableStatus{}, errors.Wrap(err, "getting policy evaluations")
 	}
 
 	for _, policyEvaluation := range policyEvaluations {
@@ -235,11 +241,15 @@ func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo m
 		}
 
 		if *policyEvaluation.Configuration.IsBlocking && *policyEvaluation.Status != azuredevops.PolicyEvaluationApproved {
-			return false, nil
+			return models.MergeableStatus{
+				IsMergeable: false,
+			}, nil
 		}
 	}
 
-	return true, nil
+	return models.MergeableStatus{
+		IsMergeable: true,
+	}, nil
 }
 
 // GetPullRequest returns the pull request.
@@ -302,7 +312,7 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 			}
 		}
 		if iterationID := status.IterationID; iterationID != nil {
-			if !(*iterationID >= 1) {
+			if *iterationID < 1 {
 				return errors.New("supportsIterations was true but got invalid iteration ID or no matching iteration commit SHA was found")
 			}
 		}
@@ -416,7 +426,7 @@ func (g *AzureDevopsClient) SupportsSingleFileDownload(repo models.Repo) bool { 
 	return false
 }
 
-func (g *AzureDevopsClient) GetFileContent(_ logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) { //nolint: revive
+func (g *AzureDevopsClient) GetFileContent(_ logging.SimpleLogging, _ models.Repo, _ string, _ string) (bool, []byte, error) { //nolint: revive
 	return false, []byte{}, fmt.Errorf("not implemented")
 }
 
