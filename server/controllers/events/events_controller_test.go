@@ -889,11 +889,11 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			Ok(t, err)
 			logger := logging.NewNoopLogger(t)
 			scope, closer, _ := metrics.NewLoggingScope(logger, "null")
-	t.Cleanup(func() {
-		if closer != nil {
-			closer.Close()
-		}
-	})
+			t.Cleanup(func() {
+				if closer != nil {
+					closer.Close()
+				}
+			})
 			ec := &events_controllers.VCSEventsController{
 				PullCleaner: pullCleaner,
 				Parser: &events.EventParser{
