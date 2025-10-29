@@ -228,7 +228,12 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope, closer, _ := metrics.NewLoggingScope(logger, "null")
+	t.Cleanup(func() {
+		if closer != nil {
+			closer.Close()
+		}
+	})
 	e := events_controllers.VCSEventsController{
 		Logger:                       logger,
 		Scope:                        scope,
@@ -262,7 +267,12 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope, closer, _ := metrics.NewLoggingScope(logger, "null")
+	t.Cleanup(func() {
+		if closer != nil {
+			closer.Close()
+		}
+	})
 	e := events_controllers.VCSEventsController{
 		Logger:                       logger,
 		Scope:                        scope,
@@ -296,7 +306,12 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope, closer, _ := metrics.NewLoggingScope(logger, "null")
+	t.Cleanup(func() {
+		if closer != nil {
+			closer.Close()
+		}
+	})
 	e := events_controllers.VCSEventsController{
 		Logger:                 logger,
 		Scope:                  scope,
@@ -331,7 +346,12 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope, closer, _ := metrics.NewLoggingScope(logger, "null")
+	t.Cleanup(func() {
+		if closer != nil {
+			closer.Close()
+		}
+	})
 	e := events_controllers.VCSEventsController{
 		Logger:                 logger,
 		Scope:                  scope,
@@ -868,7 +888,12 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			allowlist, err := events.NewRepoAllowlistChecker("*")
 			Ok(t, err)
 			logger := logging.NewNoopLogger(t)
-			scope, _, _ := metrics.NewLoggingScope(logger, "null")
+			scope, closer, _ := metrics.NewLoggingScope(logger, "null")
+	t.Cleanup(func() {
+		if closer != nil {
+			closer.Close()
+		}
+	})
 			ec := &events_controllers.VCSEventsController{
 				PullCleaner: pullCleaner,
 				Parser: &events.EventParser{
@@ -1002,7 +1027,12 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope, closer, _ := metrics.NewLoggingScope(logger, "null")
+	t.Cleanup(func() {
+		if closer != nil {
+			closer.Close()
+		}
+	})
 	e := events_controllers.VCSEventsController{
 		ExecutableName:                  "atlantis",
 		EmojiReaction:                   "eyes",
