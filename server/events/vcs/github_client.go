@@ -765,7 +765,7 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 	latestCheckRunNumber := githubv4.Int(-1)
 	var latestCheckRun *CheckRun
 	for _, checkRun := range checkRuns {
-		if checkRun.CheckSuite.WorkflowRun == nil {
+		if checkRun.CheckSuite.WorkflowRun == nil || checkRun.CheckSuite.WorkflowRun.File.RepositoryName == "" {
 			continue
 		}
 		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun, expectedWorkflow)
