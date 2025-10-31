@@ -30,6 +30,7 @@ type UserConfig struct {
 	BitbucketBaseURL            string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken              string `mapstructure:"bitbucket-token"`
 	BitbucketUser               string `mapstructure:"bitbucket-user"`
+	BitbucketEmail              string `mapstructure:"bitbucket-email"`
 	BitbucketWebhookSecret      string `mapstructure:"bitbucket-webhook-secret"`
 	CheckoutDepth               int    `mapstructure:"checkout-depth"`
 	CheckoutStrategy            string `mapstructure:"checkout-strategy"`
