@@ -506,6 +506,8 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 
 	// Simulate the merge strategy
 	runCmd(t, checkoutDir, "git", "checkout", "branch")
+	runCmd(t, checkoutDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, checkoutDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, checkoutDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "origin/main")
 
 	// Now add a commit to the repo, so the one in the data dir is out of date.
