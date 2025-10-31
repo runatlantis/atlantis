@@ -113,6 +113,7 @@ const (
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	GitlabPendingApplyStatusFlag     = "gitlab-pending-apply-status"
 	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
@@ -565,6 +566,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	ParallelApplyFlag: {
 		description:  "Run apply operations in parallel.",
+		defaultValue: false,
+	},
+	GitlabPendingApplyStatusFlag: {
+		description:  "Set apply job status as pending when there are planned changes that haven't been applied yet. Currently only supported for GitLab.",
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {
