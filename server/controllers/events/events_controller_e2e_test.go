@@ -1472,6 +1472,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	Ok(t, err)
 
+	cancellationTracker := events.NewCancellationTracker()
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		VcsClient:        e2eVCSClient,
 		Locker:           projectLocker,
@@ -1507,6 +1509,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: workingDir,
 		},
+		CancellationTracker: cancellationTracker,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -1556,6 +1559,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -1575,6 +1579,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
