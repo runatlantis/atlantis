@@ -108,33 +108,17 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 	if _, err := os.Stat(cloneDir); err == nil {
 		logger.Debug("clone directory '%s' already exists, checking if it's at the right commit", cloneDir)
 
-		// We use git rev-parse to see if our repo is at the right commit.
-		// If just checking out the pull request branch or if there is no
-		// pull request (API triggered with a custom git ref), we can use HEAD.
-		// If doing a merge, then HEAD won't be at the pull request's HEAD
-		// because we'll already have performed a merge. Instead, we'll check
-		// HEAD^2 since that will be the commit before our merge.
-		pullHead := "HEAD"
-		if w.CheckoutMerge && c.pr.Num > 0 {
-			pullHead = "HEAD^2"
-		}
-		revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
-		revParseCmd.Dir = cloneDir
-		outputRevParseCmd, err := revParseCmd.CombinedOutput()
+		isUpToDate, err := w.isBranchAtTargetRef(logger, c, p.HeadCommit)
 		if err != nil {
-			logger.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
+			logger.Warn("will re-clone repo, could not determine if was at correct commit: %v", err)
 			return cloneDir, w.forceClone(logger, c)
 		}
-		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
-
-		// We're prefix matching here because BitBucket doesn't give us the full
-		// commit, only a 12 character prefix.
-		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			logger.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
+		if isUpToDate {
+			logger.Info("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 			return cloneDir, nil
 		}
-		logger.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
-		// We'll fall through to re-clone.
+		logger.Info("repo was already cloned but branch is not at correct commit, updating to %q", p.HeadCommit)
+		return cloneDir, w.updateToRef(logger, c, p.HeadCommit)
 	}
 
 	// Otherwise we clone the repo.
@@ -253,6 +237,70 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
 	return hasDiverged
+}
+
+func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
+
+	// We use both `head` and `origin` remotes, update them both
+	if err := w.wrappedGit(logger, c, "fetch", "--all"); err != nil {
+		return err
+	}
+
+	// For branch strategy it's easy: just *go to* the ref we're supposed to be at.
+	if !w.CheckoutMerge {
+		return w.wrappedGit(logger, c, "reset", "--hard", targetRef)
+	}
+
+	// For merge strategy, we have to "redo" the merge
+
+	// First go back to origin/main as if we just checked out
+	if err := w.wrappedGit(logger, c, "reset", "--hard", fmt.Sprintf("origin/%s", c.pr.BaseBranch)); err != nil {
+		return err
+	}
+
+	// Next perform the merge
+	if err := w.mergeToBaseBranch(logger, c); err != nil {
+		return err
+	}
+
+	// Now just as a final check make sure we got ourselves to the right commit
+	isUpToDate, err := w.isBranchAtTargetRef(logger, c, targetRef)
+	if err != nil {
+		return err
+	}
+
+	if !isUpToDate {
+		return fmt.Errorf("post-merge verification failed: HEAD^2 != %s", targetRef)
+	}
+
+	return nil
+}
+
+// isBranchAtTargetRef confirm
+func (w *FileWorkspace) isBranchAtTargetRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) (bool, error) {
+	// We use git rev-parse to see if our repo is at the right commit.
+	// If just checking out the pull request branch or if there is no
+	// pull request (API triggered with a custom git ref), we can use HEAD.
+	// If doing a merge, then HEAD won't be at the pull request's HEAD
+	// because we'll already have performed a merge. Instead, we'll check
+	// HEAD^2 since that will be the commit before our merge.
+	pullHead := "HEAD"
+	if w.CheckoutMerge && c.pr.Num > 0 {
+		pullHead = "HEAD^2"
+	}
+	revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
+	revParseCmd.Dir = c.dir
+	outputRevParseCmd, err := revParseCmd.CombinedOutput()
+	if err != nil {
+		return false, err
+	}
+	currCommit := strings.Trim(string(outputRevParseCmd), "\n")
+
+	logger.Debug("Comparing PR ref %q to local ref %q", targetRef, currCommit)
+
+	// We're prefix matching here because BitBucket doesn't give us the full
+	// commit, only a 12 character prefix.
+	return strings.HasPrefix(currCommit, targetRef), nil
 }
 
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
