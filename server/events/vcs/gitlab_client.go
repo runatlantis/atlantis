@@ -612,12 +612,19 @@ func (g *GitlabClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 		g.WaitForSuccessPipeline(logger, context.Background(), pull)
 	}
 
+	// Handle merge method
+	// Gitlab currently only supports squash as a merge method
+	// via a dedicated field
+	// https://docs.gitlab.com/api/merge_requests/#merge-a-merge-request
+	squash := pullOptions.MergeMethod == "squash"
+	
 	_, resp, err = g.Client.MergeRequests.AcceptMergeRequest(
 		pull.BaseRepo.FullName,
 		pull.Num,
 		&gitlab.AcceptMergeRequestOptions{
 			MergeCommitMessage:       &commitMsg,
 			ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
+			Squash:                   &squash,
 		})
 	if resp != nil {
 		logger.Debug("PUT /projects/%s/merge_requests/%d/merge returned: %d", pull.BaseRepo.FullName, pull.Num, resp.StatusCode)

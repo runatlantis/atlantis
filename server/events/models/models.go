@@ -186,13 +186,13 @@ type PullRequest struct {
 	BaseRepo Repo
 }
 
-// PullRequestOptions is used to set optional paralmeters for PullRequest
+// PullRequestOptions is used to set optional parameters for PullRequest
 type PullRequestOptions struct {
 	// When DeleteSourceBranchOnMerge flag is set to true VCS deletes the source branch after the PR is merged
 	// Applied by GitLab & AzureDevops
 	DeleteSourceBranchOnMerge bool
-	// MergeMethod specifies the merge method for the VCS
-	// Implemented only for Github
+	// MergeMethod specifies the merge method for the VCS (merge, squash, rebase)
+	// Supported by GitHub and GitLab VCS providers
 	MergeMethod string
 }
 
