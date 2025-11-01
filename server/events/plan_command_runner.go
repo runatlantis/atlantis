@@ -34,26 +34,29 @@ func NewPlanCommandRunner(
 	lockingLocker locking.Locker,
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
+	GitlabPendingApplyStatusFlag bool,
+
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
-		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
-		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
-		vcsClient:                  vcsClient,
-		pendingPlanFinder:          pendingPlanFinder,
-		workingDir:                 workingDir,
-		commitStatusUpdater:        commitStatusUpdater,
-		prjCmdBuilder:              projectCommandBuilder,
-		prjCmdRunner:               projectCommandRunner,
-		dbUpdater:                  dbUpdater,
-		pullUpdater:                pullUpdater,
-		policyCheckCommandRunner:   policyCheckCommandRunner,
-		autoMerger:                 autoMerger,
-		parallelPoolSize:           parallelPoolSize,
-		SilenceNoProjects:          SilenceNoProjects,
-		pullStatusFetcher:          pullStatusFetcher,
-		lockingLocker:              lockingLocker,
-		DiscardApprovalOnPlan:      discardApprovalOnPlan,
-		pullReqStatusFetcher:       pullReqStatusFetcher,
+		silenceVCSStatusNoPlans:      silenceVCSStatusNoPlans,
+		silenceVCSStatusNoProjects:   silenceVCSStatusNoProjects,
+		vcsClient:                    vcsClient,
+		pendingPlanFinder:            pendingPlanFinder,
+		workingDir:                   workingDir,
+		commitStatusUpdater:          commitStatusUpdater,
+		prjCmdBuilder:                projectCommandBuilder,
+		prjCmdRunner:                 projectCommandRunner,
+		dbUpdater:                    dbUpdater,
+		pullUpdater:                  pullUpdater,
+		policyCheckCommandRunner:     policyCheckCommandRunner,
+		autoMerger:                   autoMerger,
+		parallelPoolSize:             parallelPoolSize,
+		SilenceNoProjects:            SilenceNoProjects,
+		pullStatusFetcher:            pullStatusFetcher,
+		lockingLocker:                lockingLocker,
+		DiscardApprovalOnPlan:        discardApprovalOnPlan,
+		pullReqStatusFetcher:         pullReqStatusFetcher,
+		GitlabPendingApplyStatusFlag: GitlabPendingApplyStatusFlag,
 	}
 }
 
@@ -82,9 +85,10 @@ type PlanCommandRunner struct {
 	lockingLocker              locking.Locker
 	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
 	// a plan.
-	DiscardApprovalOnPlan bool
-	pullReqStatusFetcher  vcs.PullReqStatusFetcher
-	SilencePRComments     []string
+	DiscardApprovalOnPlan        bool
+	pullReqStatusFetcher         vcs.PullReqStatusFetcher
+	SilencePRComments            []string
+	GitlabPendingApplyStatusFlag bool
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -345,8 +349,13 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
 		} else if numSuccess < len(pullStatus.Projects) {
-			// If there are plans that haven't been applied yet, no need to update the status
-			return
+			// Default behavior is to not update the status if there are plans that haven't been applied yet
+			// If instead you are using Gitlab and want to have the apply job in pending state
+			// until all applies are executed, then set GitlabPendingApplyStatusFlag = true
+			if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab && p.GitlabPendingApplyStatusFlag {
+
+				status = models.PendingCommitStatus
+			}
 		}
 	}
 
