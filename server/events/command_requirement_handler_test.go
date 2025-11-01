@@ -59,7 +59,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
 				},
 			},
-			wantFailure: "Pull request must be approved according to the project's approval rules before running plan.",
+			wantFailure: "Pull request must be approved by at least one person other than the author before running plan.",
 			wantErr:     assert.NoError,
 		},
 		{
@@ -159,7 +159,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
 				},
 			},
-			wantFailure: "Pull request must be approved according to the project's approval rules before running apply.",
+			wantFailure: "Pull request must be approved by at least one person other than the author before running apply.",
 			wantErr:     assert.NoError,
 		},
 		{
@@ -394,7 +394,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
 				},
 			},
-			wantFailure: "Pull request must be approved according to the project's approval rules before running import.",
+			wantFailure: "Pull request must be approved by at least one person other than the author before running import.",
 			wantErr:     assert.NoError,
 		},
 		{
