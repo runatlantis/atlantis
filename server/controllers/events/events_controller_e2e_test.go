@@ -1427,7 +1427,12 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		CommitStatusUpdater:    commitStatusUpdater,
 		Router:                 postWorkflowHookURLGenerator,
 	}
-	statsScope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	statsScope, closer, _ := metrics.NewLoggingScope(logger, "atlantis")
+	t.Cleanup(func() {
+		if closer != nil {
+			closer.Close()
+		}
+	})
 
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		userConfig.EnablePolicyChecksFlag,
