@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -245,6 +246,7 @@ func TestRenderProjectResults(t *testing.T) {
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
@@ -290,6 +292,7 @@ $$$
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
@@ -337,6 +340,7 @@ $$$
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
@@ -649,6 +653,7 @@ $$$
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
@@ -660,6 +665,7 @@ $$$
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url2",
 						TerraformOutput: "terraform-output2",
 						LockURL:         "lock-url2",
 						ApplyCmd:        "atlantis apply -d path2 -w workspace",
@@ -903,6 +909,7 @@ Ran Plan for dir: $path$ workspace: $workspace$
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
@@ -1632,6 +1639,7 @@ func TestRenderProjectResultsDisableApplyAll(t *testing.T) {
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
@@ -1666,6 +1674,7 @@ $$$
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
@@ -1703,6 +1712,7 @@ $$$
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
@@ -1714,6 +1724,7 @@ $$$
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url2",
 						TerraformOutput: "terraform-output2",
 						LockURL:         "lock-url2",
 						ApplyCmd:        "atlantis apply -d path2 -w workspace",
@@ -1832,6 +1843,7 @@ func TestRenderProjectResultsDisableApply(t *testing.T) {
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
@@ -1862,6 +1874,7 @@ $$$
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
@@ -1895,6 +1908,7 @@ $$$
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
@@ -1906,6 +1920,7 @@ $$$
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url2",
 						TerraformOutput: "terraform-output2",
 						LockURL:         "lock-url2",
 						ApplyCmd:        "atlantis apply -d path2 -w workspace",
@@ -2375,6 +2390,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 							RepoRelDir: ".",
 							Workspace:  "default",
 							PlanSuccess: &models.PlanSuccess{
+								JobURL:          "job-url",
 								TerraformOutput: c.Output,
 								LockURL:         "lock-url",
 								RePlanCmd:       "replancmd",
@@ -2606,6 +2622,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 				Workspace:  "staging",
 				PlanSuccess: &models.PlanSuccess{
 					TerraformOutput: tfOut,
+					JobURL:          "job-url",
 					LockURL:         "staging-lock-url",
 					ApplyCmd:        "staging-apply-cmd",
 					RePlanCmd:       "staging-replan-cmd",
@@ -2616,6 +2633,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 				Workspace:  "production",
 				PlanSuccess: &models.PlanSuccess{
 					TerraformOutput: tfOut,
+					JobURL:          "job-url",
 					LockURL:         "production-lock-url",
 					ApplyCmd:        "production-apply-cmd",
 					RePlanCmd:       "production-replan-cmd",
@@ -2763,6 +2781,7 @@ Ran Plan for 2 projects:
 						RepoRelDir: ".",
 						Workspace:  "production",
 						PlanSuccess: &models.PlanSuccess{
+							JobURL:          "job-url",
 							TerraformOutput: "tf out",
 							LockURL:         "lock-url",
 							RePlanCmd:       "re-plan cmd",
@@ -2857,6 +2876,7 @@ func TestRenderProjectResultsWithRepoLockingDisabled(t *testing.T) {
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
@@ -2900,6 +2920,7 @@ $$$
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
@@ -2945,6 +2966,7 @@ $$$
 			[]command.ProjectResult{
 				{
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						RePlanCmd:       "atlantis plan -d path -w workspace",
@@ -3030,6 +3052,7 @@ $$$
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
@@ -3041,6 +3064,7 @@ $$$
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url2",
 						TerraformOutput: "terraform-output2",
 						LockURL:         "lock-url2",
 						ApplyCmd:        "atlantis apply -d path2 -w workspace",
@@ -3186,6 +3210,7 @@ Ran Plan for dir: $path$ workspace: $workspace$
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
@@ -3423,6 +3448,7 @@ func TestRenderProjectResultsWithGitLab(t *testing.T) {
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
@@ -3434,6 +3460,7 @@ func TestRenderProjectResultsWithGitLab(t *testing.T) {
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url2",
 						TerraformOutput: "terraform-output2",
 						LockURL:         "lock-url2",
 						ApplyCmd:        "atlantis apply -d path2 -w workspace",
@@ -3744,6 +3771,7 @@ var cases = []struct {
 			{
 				PlanSuccess: &models.PlanSuccess{
 					TerraformOutput: tfOutput,
+					JobURL:          "job-url",
 					LockURL:         "lock-url",
 					RePlanCmd:       "atlantis plan -d path -w workspace",
 					ApplyCmd:        "atlantis apply -d path -w workspace",
@@ -4077,6 +4105,7 @@ func TestRenderProjectResultsHideUnchangedPlans(t *testing.T) {
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "terraform-output",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
@@ -4088,6 +4117,7 @@ func TestRenderProjectResultsHideUnchangedPlans(t *testing.T) {
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url2",
 						TerraformOutput: "No changes. Infrastructure is up-to-date.",
 						LockURL:         "lock-url2",
 						ApplyCmd:        "atlantis apply -d path2 -w workspace",
@@ -4099,6 +4129,7 @@ func TestRenderProjectResultsHideUnchangedPlans(t *testing.T) {
 					RepoRelDir:  "path3",
 					ProjectName: "projectname2",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url3",
 						TerraformOutput: "terraform-output3",
 						LockURL:         "lock-url3",
 						ApplyCmd:        "atlantis apply -d path3 -w workspace",
@@ -4170,6 +4201,7 @@ $$$
 					Workspace:  "workspace",
 					RepoRelDir: "path",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
 						TerraformOutput: "No changes. Infrastructure is up-to-date.",
 						LockURL:         "lock-url",
 						ApplyCmd:        "atlantis apply -d path -w workspace",
@@ -4181,6 +4213,7 @@ $$$
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url2",
 						TerraformOutput: "No changes. Infrastructure is up-to-date.",
 						LockURL:         "lock-url2",
 						ApplyCmd:        "atlantis apply -d path2 -w workspace",
@@ -4192,6 +4225,7 @@ $$$
 					RepoRelDir:  "path3",
 					ProjectName: "projectname2",
 					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url3",
 						TerraformOutput: "No changes. Infrastructure is up-to-date.",
 						LockURL:         "lock-url3",
 						ApplyCmd:        "atlantis apply -d path3 -w workspace",
@@ -4269,6 +4303,116 @@ Ran Plan for 3 projects:
 						log := fmt.Sprintf("[INFO] %s", logText)
 						Equals(t, normalize(c.Expected)+
 							fmt.Sprintf("\n<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log), normalize(s))
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestRenderCustomPlanSuccessTemplate(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := fmt.Sprintf("%s/tempates.tmpl", tmpDir)
+	_, err := os.Create(filePath)
+	Ok(t, err)
+	err = os.WriteFile(filePath, []byte("{{ define \"planSuccessUnwrapped\" -}}To **see** this plan, click [here]({{ .JobURL }}){{- end}}\n"), 0600)
+	Ok(t, err)
+
+	cases := []struct {
+		Description    string
+		Command        command.Name
+		SubCommand     string
+		ProjectResults []command.ProjectResult
+		VCSHost        models.VCSHostType
+		Expected       string
+	}{
+		{
+			"single successful plan",
+			command.Plan,
+			"",
+			[]command.ProjectResult{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						JobURL:          "job-url",
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+				},
+			},
+			models.Github,
+			`
+Ran Plan for dir: $path$ workspace: $workspace$
+
+To **see** this plan, click [here](job-url)
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+	}
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		tmpDir,     // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			res := command.Result{ProjectResults: c.ProjectResults}
+
+			// Loop over verbose and non-verbose cases
+			for _, verbose := range []bool{true, false} {
+				t.Run(fmt.Sprintf("Verbose: %v", verbose), func(t *testing.T) {
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						SubName: c.SubCommand,
+						Verbose: verbose,
+					}
+
+					output := r.Render(ctx, res, cmd)
+					expectedOutput := normalize(c.Expected)
+
+					// If verbose is true, add log details
+					if verbose {
+						log := fmt.Sprintf("[INFO] %s", logText)
+						expectedOutput = normalize(c.Expected + fmt.Sprintf(
+							"<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log))
+					}
+
+					// Use cmp.Diff for better failure messages
+					if diff := cmp.Diff(expectedOutput, normalize(output)); diff != "" {
+						t.Errorf("Mismatch (-expected +actual):\n%s", diff)
 					}
 				})
 			}
