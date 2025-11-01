@@ -18,6 +18,7 @@ import (
 type Client struct {
 	HTTPClient  *http.Client
 	Username    string
+	Email       string
 	Password    string
 	BaseURL     string
 	AtlantisURL string
@@ -27,13 +28,14 @@ type Client struct {
 // URL for Atlantis that will be linked to from the build status icons. This
 // linking is annoying because we don't have anywhere good to link but a URL is
 // required.
-func NewClient(httpClient *http.Client, username string, password string, atlantisURL string) *Client {
+func NewClient(httpClient *http.Client, username, email, password, atlantisURL string) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
 	return &Client{
 		HTTPClient:  httpClient,
 		Username:    username,
+		Email:       email,
 		Password:    password,
 		BaseURL:     BaseURL,
 		AtlantisURL: atlantisURL,
@@ -316,7 +318,7 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	if err != nil {
 		return nil, err
 	}
-	req.SetBasicAuth(b.Username, b.Password)
+	req.SetBasicAuth(b.Email, b.Password)
 	if body != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}

@@ -67,6 +67,7 @@ const (
 	BitbucketBaseURLFlag             = "bitbucket-base-url"
 	BitbucketTokenFlag               = "bitbucket-token"
 	BitbucketUserFlag                = "bitbucket-user"
+	BitbucketEmailFlag               = "bitbucket-email"
 	BitbucketWebhookSecretFlag       = "bitbucket-webhook-secret"
 	CheckoutDepthFlag                = "checkout-depth"
 	CheckoutStrategyFlag             = "checkout-strategy"
@@ -251,6 +252,9 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultAutoplanFileList,
 	},
 	BitbucketUserFlag: {
+		description: "Bitbucket username for git operations.",
+	},
+	BitbucketEmailFlag: {
 		description: "Bitbucket username of API user.",
 	},
 	BitbucketTokenFlag: {
@@ -1037,6 +1041,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 	if strings.Contains(userConfig.RepoAllowlist, "://") {
 		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoAllowlistFlag)
+	}
+	if (userConfig.BitbucketUser != "" && userConfig.BitbucketEmail == "") ||
+		(userConfig.BitbucketUser == "" && userConfig.BitbucketEmail != "") {
+		return fmt.Errorf("--%s must be specified alongside --%s", BitbucketEmailFlag, BitbucketUserFlag)
 	}
 
 	parsed, err := url.Parse(userConfig.BitbucketBaseURL)

@@ -299,6 +299,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			bitbucketCloudClient = bitbucketcloud.NewClient(
 				http.DefaultClient,
 				userConfig.BitbucketUser,
+				userConfig.BitbucketEmail,
 				userConfig.BitbucketToken,
 				userConfig.AtlantisURL)
 		} else {
