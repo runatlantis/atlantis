@@ -663,6 +663,9 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
+  * `ATLANTIS_PR_APPROVED` - "true" if the PR is approved
+  * `ATLANTIS_PR_MERGEABLE` - "true" if the PR is mergeable
+
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
