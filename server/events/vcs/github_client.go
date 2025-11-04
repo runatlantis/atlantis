@@ -482,12 +482,14 @@ func (original WorkflowFileReference) Copy() WorkflowFileReference {
 	return copy
 }
 
+type WorkflowRunFile struct {
+	Path              githubv4.String
+	RepositoryFileUrl githubv4.String
+	RepositoryName    githubv4.String
+}
+
 type WorkflowRun struct {
-	File struct {
-		Path              githubv4.String
-		RepositoryFileUrl githubv4.String
-		RepositoryName    githubv4.String
-	}
+	File      *WorkflowRunFile
 	RunNumber githubv4.Int
 }
 
@@ -523,6 +525,14 @@ func (original CheckRun) Copy() CheckRun {
 		Conclusion: original.Conclusion,
 		IsRequired: original.IsRequired,
 		CheckSuite: original.CheckSuite.Copy(),
+	}
+	if original.CheckSuite.WorkflowRun != nil {
+		copy.CheckSuite.WorkflowRun = new(WorkflowRun)
+		*copy.CheckSuite.WorkflowRun = *original.CheckSuite.WorkflowRun
+		if original.CheckSuite.WorkflowRun.File != nil {
+			copy.CheckSuite.WorkflowRun.File = new(WorkflowRunFile)
+			*copy.CheckSuite.WorkflowRun.File = *original.CheckSuite.WorkflowRun.File
+		}
 	}
 
 	return copy
@@ -568,19 +578,19 @@ func (g *GithubClient) LookupRepoId(repo githubv4.String) (githubv4.Int, error) 
 	return query.Repository.DatabaseId, nil
 }
 
-func (g *GithubClient) WorkflowRunMatchesWorkflowFileReference(workflowRun WorkflowRun, workflowFileReference WorkflowFileReference) (bool, error) {
+func (g *GithubClient) WorkflowRunMatchesWorkflowFileReference(workflowRunFile WorkflowRunFile, workflowFileReference WorkflowFileReference) (bool, error) {
 	// Unfortunately, the GitHub API doesn't expose the repositoryId for the WorkflowRunFile from the statusCheckRollup.
 	// Conversely, it doesn't expose the repository name for the WorkflowFileReference from the RepositoryRuleConnection.
 	// Therefore, a second query is required to lookup the association between repositoryId and repositoryName.
-	repoId, err := g.LookupRepoId(workflowRun.File.RepositoryName)
+	repoId, err := g.LookupRepoId(workflowRunFile.RepositoryName)
 	if err != nil {
 		return false, err
 	}
 
-	if repoId != workflowFileReference.RepositoryId || workflowRun.File.Path != workflowFileReference.Path {
+	if repoId != workflowFileReference.RepositoryId || workflowRunFile.Path != workflowFileReference.Path {
 		return false, nil
 	} else if workflowFileReference.Sha != nil {
-		return strings.Contains(string(workflowRun.File.RepositoryFileUrl), string(*workflowFileReference.Sha)), nil
+		return strings.Contains(string(workflowRunFile.RepositoryFileUrl), string(*workflowFileReference.Sha)), nil
 	} else {
 		return true, nil
 	}
@@ -782,10 +792,10 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 	latestCheckSuiteNumber := githubv4.Int(-1)
 	var latestCheckSuite *CheckSuite
 	for _, checkRun := range checkRuns {
-		if checkRun.CheckSuite.WorkflowRun == nil || checkRun.CheckSuite.WorkflowRun.File.RepositoryName == "" {
+		if checkRun.CheckSuite.WorkflowRun == nil || checkRun.CheckSuite.WorkflowRun.File == nil {
 			continue
 		}
-		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun, expectedWorkflow)
+		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun.File, expectedWorkflow)
 		if err != nil {
 			return false, err
 		}
