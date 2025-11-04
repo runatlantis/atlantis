@@ -292,7 +292,7 @@ func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.
 func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
 	approvedOut, failure, err := p.doApprovePolicies(ctx)
 	return command.ProjectResult{
-		Command:            command.PolicyCheck,
+		Command:            command.ApprovePolicies,
 		Failure:            failure,
 		Error:              err,
 		PolicyCheckResults: approvedOut,
