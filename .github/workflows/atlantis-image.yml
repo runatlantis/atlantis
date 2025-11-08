@@ -85,7 +85,7 @@ jobs:
         go-version-file: "go.mod"
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+      uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       with:
         image: tonistiigi/binfmt:latest
         platforms: arm64,arm
@@ -105,7 +105,7 @@ jobs:
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5
+      uses: docker/metadata-action@318604b99e75e41977312d83839a89be02ca4893 # v5
       env:
         SUFFIX: ${{ format('-{0}', matrix.image_type) }}
       with:
