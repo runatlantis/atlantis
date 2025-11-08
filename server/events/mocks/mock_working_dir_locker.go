@@ -43,6 +43,14 @@ func (mock *MockWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 	return _ret0, _ret1
 }
 
+func (mock *MockWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
+	}
+	_params := []pegomock.Param{repoFullName, pullNum}
+	pegomock.GetGenericMockFrom(mock).Invoke("UnlockByPull", _params, []reflect.Type{})
+}
+
 func (mock *MockWorkingDirLocker) VerifyWasCalledOnce() *VerifierMockWorkingDirLocker {
 	return &VerifierMockWorkingDirLocker{
 		mock:                   mock,
@@ -121,6 +129,41 @@ func (c *MockWorkingDirLocker_TryLock_OngoingVerification) GetAllCapturedArgumen
 			_param3 = make([]string, len(c.methodInvocations))
 			for u, param := range _params[3] {
 				_param3[u] = param.(string)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int) *MockWorkingDirLocker_UnlockByPull_OngoingVerification {
+	_params := []pegomock.Param{repoFullName, pullNum}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UnlockByPull", _params, verifier.timeout)
+	return &MockWorkingDirLocker_UnlockByPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDirLocker_UnlockByPull_OngoingVerification struct {
+	mock              *MockWorkingDirLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDirLocker_UnlockByPull_OngoingVerification) GetCapturedArguments() (string, int) {
+	repoFullName, pullNum := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1]
+}
+
+func (c *MockWorkingDirLocker_UnlockByPull_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]int, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(int)
 			}
 		}
 	}
