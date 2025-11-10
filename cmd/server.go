@@ -110,10 +110,10 @@ const (
 	GiteaPageSizeFlag                = "gitea-page-size"
 	GitlabGroupAllowlistFlag         = "gitlab-group-allowlist"
 	GitlabHostnameFlag               = "gitlab-hostname"
+	GitlabPendingApplyStatusFlag     = "gitlab-pending-apply-status"
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
-	GitlabPendingApplyStatusFlag     = "gitlab-pending-apply-status"
 	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"

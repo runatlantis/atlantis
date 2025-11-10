@@ -501,7 +501,7 @@ atlantis server --discard-approval-on-plan
 ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
 ```
 
-If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.  
+If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.
  Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
 
 ### `--emoji-reaction` <Badge text="v0.29.0+" type="info"/>
@@ -856,6 +856,22 @@ ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 
 Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
 don't set. Defaults to `gitlab.com`.
+
+
+### `--gitlab-pending-apply-status` <Badge text="v0.36.0+" type="info"/>
+```bash
+atlantis server --gitlab-pending-apply-status
+# or (recommended)
+ATLANTIS_GITLAB_PENDING_APPLY_STATUS=true
+```
+
+Set the commit status to pending when there are planned changes that haven't been applied yet on GitLab.
+This prevents merge requests from being merged until all Terraform applies are completed if you have `Pipelines must succeed` enabled on your repository.
+
+When enabled, after running `atlantis plan`, the MR status will show as pending if there are changes
+to apply. Once all projects are successfully applied (or show no changes), the status will update to success.
+
+Defaults to `false`.
 
 ### `--gitlab-token` <Badge text="v0.2.0+" type="info"/>
 

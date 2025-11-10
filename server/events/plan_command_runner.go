@@ -349,12 +349,15 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
 		} else if numSuccess < len(pullStatus.Projects) {
-			// Default behavior is to not update the status if there are plans that haven't been applied yet
-			// If instead you are using Gitlab and want to have the apply job in pending state
-			// until all applies are executed, then set GitlabPendingApplyStatusFlag = true
+			// When there are planned changes that haven't been applied yet:
+			// - GitLab: Set status to pending if GitlabPendingApplyStatusFlag is enabled
+			//           This prevents MR merging until all applies complete
+			// - Other VCS: Leave status unchanged (existing behavior)
 			if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab && p.GitlabPendingApplyStatusFlag {
-
 				status = models.PendingCommitStatus
+			} else {
+				// Otherwise, status remains SuccessCommitStatus (no update needed)
+				return
 			}
 		}
 	}

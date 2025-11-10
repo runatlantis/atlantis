@@ -70,14 +70,15 @@ var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 
 type TestConfig struct {
-	parallelPoolSize           int
-	SilenceNoProjects          bool
-	silenceVCSStatusNoPlans    bool
-	silenceVCSStatusNoProjects bool
-	StatusName                 string
-	discardApprovalOnPlan      bool
-	database                   db.Database
-	DisableUnlockLabel         string
+	parallelPoolSize             int
+	SilenceNoProjects            bool
+	silenceVCSStatusNoPlans      bool
+	silenceVCSStatusNoProjects   bool
+	StatusName                   string
+	discardApprovalOnPlan        bool
+	database                     db.Database
+	DisableUnlockLabel           string
+	GitlabPendingApplyStatusFlag bool
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -166,6 +167,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		lockingLocker,
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
+		testConfig.GitlabPendingApplyStatusFlag,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
