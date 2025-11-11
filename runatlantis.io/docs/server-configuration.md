@@ -304,6 +304,30 @@ ATLANTIS_AZUREDEVOPS_WEBHOOK_USER="username@example.com"
 
 Azure DevOps basic authentication username for inbound webhooks.
 
+### `--bitbucket-api-user` <Badge text="v0.36.0+" type="info"/>
+
+```bash
+atlantis server --bitbucket-api-user="apiuser@example.com"
+# or
+ATLANTIS_BITBUCKET_API_USER="apiuser@example.com"
+```
+
+Bitbucket username (usually an email) used for API authentication with Bitbucket Cloud. This is used for API calls only. If not specified, Atlantis will use the value of `--bitbucket-user` for API authentication to maintain backward compatibility.
+
+**Note:**
+
+- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026(see [here](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
+
+**Config file key:**
+
+```yaml
+bitbucket-api-user: apiuser@example.com
+```
+
+**Environment variable:** `ATLANTIS_BITBUCKET_API_USER`
+
+**Note:** This flag is only relevant for Bitbucket Cloud (bitbucket.org) integrations.
+
 ### `--bitbucket-base-url` <Badge text="v0.36.0+" type="info"/>
 
 ```bash
@@ -334,7 +358,7 @@ atlantis server --bitbucket-user="myuser"
 ATLANTIS_BITBUCKET_USER="myuser"
 ```
 
-Bitbucket username of API user.
+Bitbucket username used for git operations. For Bitbucket Cloud, if `--bitbucket-api-user` is not specified, this value will also be used for API authentication.
 
 ### `--bitbucket-webhook-secret` <Badge text="v0.36.0+" type="info"/>
 

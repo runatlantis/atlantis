@@ -300,6 +300,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				http.DefaultClient,
 				userConfig.BitbucketUser,
 				userConfig.BitbucketToken,
+				userConfig.BitbucketApiUser,
 				userConfig.AtlantisURL)
 		} else {
 			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketServer)
