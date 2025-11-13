@@ -186,35 +186,3 @@ go generate server/events/project_command_builder.go
 ```
 
 Alternatively, you can run `make go-generate` to execute `go generate` across all packages
-
-
-# Backporting Fixes
-Atlantis now uses a [cherry-pick-bot](https://github.com/googleapis/repo-automation-bots/tree/main/packages/cherry-pick-bot) from Google. The bot assists in maintaining changes across releases branches by easily cherry-picking changes via pull requests.
-
-Maintainers and Core Contributors can add a comment to a pull request:
-
-```sh
-/cherry-pick target-branch-name
-```
-
-target-branch-name is the branch to cherry-pick to. cherry-pick-bot will cherry-pick the merged commit to a new branch (created from the target branch) and open a new pull request to the target branch.
-
-The bot will immediately try to cherry-pick a merged PR. On unmerged pull request, it will not do anything immediately, but wait until merge. You can comment multiple times on a PR for multiple release branches.
-
-## Manual Backporting Fixes
-The bot will fail to cherry-pick if the feature branches' git history is not linear (merge commits instead of rebase). In that case, you will need to manually cherry-pick the squashed merged commit from main to the release branch
-
-1. Switch to the release branch intended for the fix.
-1. Run `git cherry-pick <sha>` with the commit hash from the main branch.
-1. Push the newly cherry-picked commit up to the remote release branch.
-
-# Creating a New Release
-1. (Major/Minor release only) Create a new release branch `release-x.y`
-1. Go to https://github.com/runatlantis/atlantis/releases and click "Draft a new release"
-    1. Prefix version with `v` and increment based on last release.
-    1. The title of the release is the same as the tag (ex. v0.2.2)
-    1. Fill in description by clicking on the "Generate Release Notes" button.
-        1. You may have to manually move around some commit titles as they are determined by PR labels (see .github/labeler.yml & .github/release.yml)
-    1. (Latest Major/Minor branches only) Make sure the release is set as latest
-        1. Don't set "latest release" for patches on older release branches.
-1. Check and update the default version in `Chart.yaml` in [the official Helm chart](https://github.com/runatlantis/helm-charts/blob/main/charts/atlantis/values.yaml) as needed.
