@@ -684,6 +684,8 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	gitlabVersionUnder15_6 := "15.3.2-ce"
 	gitlabServerVersions := []string{gitlabVersionOver15_6, gitlabVersion15_6, gitlabVersionUnder15_6}
 	vcsStatusName := "atlantis-test"
+	otherVCSStatusName := "other-atlantis-test"
+	ignoredVCSStatusNames := []string{otherVCSStatusName}
 	defaultMr := 1
 	noHeadPipelineMR := 2
 	ciMustPassMR := 3
@@ -711,11 +713,12 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	}
 
 	cases := []struct {
-		statusName     string
-		status         models.CommitStatus
-		gitlabVersions []string
-		mrID           int
-		expState       models.MergeableStatus
+		statusName         string
+		status             models.CommitStatus
+		gitlabVersions     []string
+		mrID               int
+		expState           models.MergeableStatus
+		ignoredStatusNames []string
 	}{
 		{
 			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
@@ -725,6 +728,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
@@ -734,6 +738,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan: resource/default", vcsStatusName),
@@ -744,6 +749,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
@@ -754,6 +760,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
@@ -763,6 +770,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
@@ -772,6 +780,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
@@ -782,6 +791,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
 			},
+			nil,
 		},
 		// This MR should be listed as not mergeable. However, in older versions they don't have detailed_merge_status,
 		// so our code can only see the merge_status field (deprecated in 15.6), which says can_be_merged.
@@ -793,6 +803,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
@@ -803,6 +814,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      "Merge status is need_rebase",
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
@@ -812,6 +824,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
@@ -821,6 +834,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan: resource/default", vcsStatusName),
@@ -831,6 +845,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
@@ -841,6 +856,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
@@ -851,6 +867,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
@@ -860,6 +877,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
@@ -870,6 +888,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      "Still require 2 approvals",
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
@@ -880,6 +899,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      "Blocking discussions unresolved",
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
@@ -890,6 +910,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      "Work in progress",
 			},
+			nil,
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
@@ -900,6 +921,72 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: false,
 				Reason:      "Pipeline was skipped",
 			},
+			nil,
+		},
+		// Other vcsStatusNames should be mergeable when explicitly ignored.
+		{
+			fmt.Sprintf("%s/plan", otherVCSStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+			ignoredVCSStatusNames,
+		},
+		{
+			fmt.Sprintf("%s/plan", otherVCSStatusName),
+			models.PendingCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+			ignoredVCSStatusNames,
+		},
+		{
+			fmt.Sprintf("%s/plan", otherVCSStatusName),
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+			ignoredVCSStatusNames,
+		},
+		// Ignoring other statusNames should not affect whether or not our
+		// statuses are mergeable.
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+			ignoredVCSStatusNames,
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.PendingCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
+			},
+			ignoredVCSStatusNames,
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			noHeadPipelineMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+			},
+			ignoredVCSStatusNames,
 		},
 	}
 	for _, c := range cases {
@@ -977,7 +1064,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 						Num:        c.mrID,
 						BaseRepo:   repo,
 						HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
-					}, vcsStatusName, []string{})
+					}, vcsStatusName, c.ignoredStatusNames)
 
 				Ok(t, err)
 				Equals(t, c.expState, mergeable)
