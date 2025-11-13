@@ -977,7 +977,7 @@ Comma separated list of VCS status names from other atlantis services.
 When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks
 (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
 from other Atlantis services when checking if the PR is mergeable.
-Currently only implemented for GitHub.
+Currently only implemented for GitHub or GitLab.
 
 ### `--include-git-untracked-files` <Badge text="v0.27.0+" type="info"/>
 
