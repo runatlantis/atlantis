@@ -111,6 +111,7 @@ const (
 	GiteaPageSizeFlag                = "gitea-page-size"
 	GitlabGroupAllowlistFlag         = "gitlab-group-allowlist"
 	GitlabHostnameFlag               = "gitlab-hostname"
+	GitlabPendingApplyStatusFlag     = "gitlab-pending-apply-status"
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
@@ -569,6 +570,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	ParallelApplyFlag: {
 		description:  "Run apply operations in parallel.",
+		defaultValue: false,
+	},
+	GitlabPendingApplyStatusFlag: {
+		description:  "Set apply job status as pending when there are planned changes that haven't been applied yet. Currently only supported for GitLab.",
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {

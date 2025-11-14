@@ -72,6 +72,7 @@ type UserConfig struct {
 	GiteaPageSize                   int    `mapstructure:"gitea-page-size"`
 	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
 	GitlabGroupAllowlist            string `mapstructure:"gitlab-group-allowlist"`
+	GitlabPendingApplyStatusFlag    bool   `mapstructure:"gitlab-pending-apply-status"`
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`

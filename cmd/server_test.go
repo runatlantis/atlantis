@@ -110,6 +110,7 @@ var testFlags = map[string]interface{}{
 	GitlabTokenFlag:                  "gitlab-token",
 	GitlabUserFlag:                   "gitlab-user",
 	GitlabWebhookSecretFlag:          "gitlab-secret",
+	GitlabPendingApplyStatusFlag:     false,
 	HideUnchangedPlanComments:        false,
 	HidePrevPlanComments:             false,
 	IncludeGitUntrackedFiles:         false,
