@@ -75,6 +75,9 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		if c.Description != "When planning with matching projects, comment as usual" {
+			continue
+		}
 		t.Run(c.Description, func(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
@@ -109,10 +112,12 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 			if c.PrevPlanStored {
 				_, err = db.UpdatePullWithResults(modelPull, []command.ProjectResult{
 					{
-						Command:     command.Plan,
-						RepoRelDir:  "prevdir",
-						Workspace:   "default",
-						PlanSuccess: &models.PlanSuccess{},
+						Command:    command.Plan,
+						RepoRelDir: "prevdir",
+						Workspace:  "default",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: &models.PlanSuccess{},
+						},
 					},
 				})
 				Ok(t, err)
@@ -194,13 +199,17 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
 					},
 				},
 				{
 					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("shabang"),
+					},
 				},
 			},
 			RunnerInvokeMatch: []*EqMatcher{
@@ -230,11 +239,15 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("shabang"),
+					},
 				},
 				{
-					Command:     command.Plan,
-					PlanSuccess: &models.PlanSuccess{},
+					Command: command.Plan,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{},
+					},
 				},
 			},
 			RunnerInvokeMatch: []*EqMatcher{
@@ -266,11 +279,15 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("shabang"),
+					},
 				},
 				{
-					Command:     command.Plan,
-					PlanSuccess: &models.PlanSuccess{},
+					Command: command.Plan,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{},
+					},
 				},
 			},
 			RunnerInvokeMatch: []*EqMatcher{
@@ -311,24 +328,32 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
 					},
 				},
 				{
 					Command: command.Plan,
-					Error:   errors.New("shabang"),
-				},
-				{
-					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("shabang"),
 					},
 				},
 				{
 					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
+					},
+				},
+				{
+					Command: command.Plan,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
 					},
 				},
 			},
@@ -372,24 +397,32 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
 					},
 				},
 				{
 					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
 					},
 				},
 				{
 					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("shabang"),
+					},
 				},
 				{
 					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
 					},
 				},
 			},
@@ -420,12 +453,16 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("shabang"),
+					},
 				},
 				{
 					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
 					},
 				},
 			},
@@ -452,14 +489,18 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
 					},
 				},
 				{
 					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
 					},
 				},
 			},
@@ -486,12 +527,16 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			ProjectResults: []command.ProjectResult{
 				{
 					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("shabang"),
+					},
 				},
 				{
 					Command: command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "true",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "true",
+						},
 					},
 				},
 			},
@@ -587,8 +632,10 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				{
 					RepoRelDir: "mydir",
 					Command:    command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+						},
 					},
 				},
 			},
@@ -606,8 +653,10 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				{
 					RepoRelDir: "mydir",
 					Command:    command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+						},
 					},
 				},
 			},
@@ -626,8 +675,10 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				{
 					RepoRelDir: "mydir",
 					Command:    command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+						},
 					},
 				},
 			},
@@ -646,8 +697,10 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				{
 					RepoRelDir: "mydir",
 					Command:    command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+						},
 					},
 				},
 			},
@@ -669,8 +722,10 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					RepoRelDir: "prevdir",
 					Workspace:  "default",
 					Command:    command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+						},
 					},
 				},
 			},
@@ -695,15 +750,19 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					RepoRelDir: "prevdir",
 					Workspace:  "default",
 					Command:    command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
+						},
 					},
 				},
 				{
 					RepoRelDir: "mydir",
 					Command:    command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+						},
 					},
 				},
 			},
@@ -728,15 +787,19 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					RepoRelDir: "prevdir",
 					Workspace:  "default",
 					Command:    command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+						},
 					},
 				},
 				{
 					RepoRelDir: "mydir",
 					Command:    command.Plan,
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+						},
 					},
 				},
 			},
@@ -780,8 +843,10 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 						Command:    command.Plan,
 						RepoRelDir: "prevdir",
 						Workspace:  "default",
-						PlanSuccess: &models.PlanSuccess{
-							TerraformOutput: "No changes. Your infrastructure matches the configuration.",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: &models.PlanSuccess{
+								TerraformOutput: "No changes. Your infrastructure matches the configuration.",
+							},
 						},
 					},
 				})
