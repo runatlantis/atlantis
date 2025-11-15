@@ -25,106 +25,106 @@ func NewMockProjectCommandRunner(options ...pegomock.Option) *MockProjectCommand
 func (mock *MockProjectCommandRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockProjectCommandRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
+func (mock *MockProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
 	}
 	_params := []pegomock.Param{ctx}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("Apply", _params, []reflect.Type{reflect.TypeOf((*command.ProjectResult)(nil)).Elem()})
-	var _ret0 command.ProjectResult
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Apply", _params, []reflect.Type{reflect.TypeOf((*command.ProjectCommandOutput)(nil)).Elem()})
+	var _ret0 command.ProjectCommandOutput
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(command.ProjectResult)
+			_ret0 = _result[0].(command.ProjectCommandOutput)
 		}
 	}
 	return _ret0
 }
 
-func (mock *MockProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
+func (mock *MockProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectCommandOutput {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
 	}
 	_params := []pegomock.Param{ctx}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("ApprovePolicies", _params, []reflect.Type{reflect.TypeOf((*command.ProjectResult)(nil)).Elem()})
-	var _ret0 command.ProjectResult
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("ApprovePolicies", _params, []reflect.Type{reflect.TypeOf((*command.ProjectCommandOutput)(nil)).Elem()})
+	var _ret0 command.ProjectCommandOutput
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(command.ProjectResult)
+			_ret0 = _result[0].(command.ProjectCommandOutput)
 		}
 	}
 	return _ret0
 }
 
-func (mock *MockProjectCommandRunner) Import(ctx command.ProjectContext) command.ProjectResult {
+func (mock *MockProjectCommandRunner) Import(ctx command.ProjectContext) command.ProjectCommandOutput {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
 	}
 	_params := []pegomock.Param{ctx}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("Import", _params, []reflect.Type{reflect.TypeOf((*command.ProjectResult)(nil)).Elem()})
-	var _ret0 command.ProjectResult
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Import", _params, []reflect.Type{reflect.TypeOf((*command.ProjectCommandOutput)(nil)).Elem()})
+	var _ret0 command.ProjectCommandOutput
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(command.ProjectResult)
+			_ret0 = _result[0].(command.ProjectCommandOutput)
 		}
 	}
 	return _ret0
 }
 
-func (mock *MockProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
+func (mock *MockProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectCommandOutput {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
 	}
 	_params := []pegomock.Param{ctx}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("Plan", _params, []reflect.Type{reflect.TypeOf((*command.ProjectResult)(nil)).Elem()})
-	var _ret0 command.ProjectResult
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Plan", _params, []reflect.Type{reflect.TypeOf((*command.ProjectCommandOutput)(nil)).Elem()})
+	var _ret0 command.ProjectCommandOutput
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(command.ProjectResult)
+			_ret0 = _result[0].(command.ProjectCommandOutput)
 		}
 	}
 	return _ret0
 }
 
-func (mock *MockProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
+func (mock *MockProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectCommandOutput {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
 	}
 	_params := []pegomock.Param{ctx}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("PolicyCheck", _params, []reflect.Type{reflect.TypeOf((*command.ProjectResult)(nil)).Elem()})
-	var _ret0 command.ProjectResult
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("PolicyCheck", _params, []reflect.Type{reflect.TypeOf((*command.ProjectCommandOutput)(nil)).Elem()})
+	var _ret0 command.ProjectCommandOutput
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(command.ProjectResult)
+			_ret0 = _result[0].(command.ProjectCommandOutput)
 		}
 	}
 	return _ret0
 }
 
-func (mock *MockProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectResult {
+func (mock *MockProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectCommandOutput {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
 	}
 	_params := []pegomock.Param{ctx}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("StateRm", _params, []reflect.Type{reflect.TypeOf((*command.ProjectResult)(nil)).Elem()})
-	var _ret0 command.ProjectResult
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("StateRm", _params, []reflect.Type{reflect.TypeOf((*command.ProjectCommandOutput)(nil)).Elem()})
+	var _ret0 command.ProjectCommandOutput
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(command.ProjectResult)
+			_ret0 = _result[0].(command.ProjectCommandOutput)
 		}
 	}
 	return _ret0
 }
 
-func (mock *MockProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectResult {
+func (mock *MockProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectCommandOutput {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandRunner().")
 	}
 	_params := []pegomock.Param{ctx}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("Version", _params, []reflect.Type{reflect.TypeOf((*command.ProjectResult)(nil)).Elem()})
-	var _ret0 command.ProjectResult
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Version", _params, []reflect.Type{reflect.TypeOf((*command.ProjectCommandOutput)(nil)).Elem()})
+	var _ret0 command.ProjectCommandOutput
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(command.ProjectResult)
+			_ret0 = _result[0].(command.ProjectCommandOutput)
 		}
 	}
 	return _ret0

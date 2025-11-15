@@ -511,7 +511,9 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 				Command:    command.Plan,
 				RepoRelDir: ".",
 				Workspace:  "default",
-				Failure:    "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 		})
 	Ok(t, err)
@@ -561,7 +563,9 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
-				Failure:    "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 		})
 	Ok(t, err)
@@ -607,12 +611,16 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
-				Failure:    "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			{
-				RepoRelDir:   ".",
-				Workspace:    "staging",
-				ApplySuccess: "success!",
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "success!",
+				},
 			},
 		})
 	Ok(t, err)
@@ -671,7 +679,9 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
-				Failure:    "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 		})
 	Ok(t, err)
@@ -680,9 +690,11 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 	status, err := rdb.UpdatePullWithResults(pull,
 		[]command.ProjectResult{
 			{
-				RepoRelDir:   ".",
-				Workspace:    "staging",
-				ApplySuccess: "success!",
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "success!",
+				},
 			},
 		})
 
@@ -735,24 +747,30 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 				Command:    command.Plan,
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
-				Failure:    "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			{
 				Command:     command.Plan,
 				RepoRelDir:  "projectname",
 				Workspace:   "default",
 				ProjectName: "projectname",
-				Failure:     "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			{
 				Command:    command.Plan,
 				RepoRelDir: "staythesame",
 				Workspace:  "default",
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: "tf out",
-					LockURL:         "lock-url",
-					RePlanCmd:       "plan command",
-					ApplyCmd:        "apply command",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "tf out",
+						LockURL:         "lock-url",
+						RePlanCmd:       "plan command",
+						ApplyCmd:        "apply command",
+					},
 				},
 			},
 		})
@@ -761,23 +779,29 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 	updateStatus, err := rdb.UpdatePullWithResults(pull,
 		[]command.ProjectResult{
 			{
-				Command:      command.Apply,
-				RepoRelDir:   "mergeme",
-				Workspace:    "default",
-				ApplySuccess: "applied!",
+				Command:    command.Apply,
+				RepoRelDir: "mergeme",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "applied!",
+				},
 			},
 			{
 				Command:     command.Apply,
 				RepoRelDir:  "projectname",
 				Workspace:   "default",
 				ProjectName: "projectname",
-				Error:       errors.New("apply error"),
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New("apply error"),
+				},
 			},
 			{
-				Command:      command.Apply,
-				RepoRelDir:   "newresult",
-				Workspace:    "default",
-				ApplySuccess: "success!",
+				Command:    command.Apply,
+				RepoRelDir: "newresult",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "success!",
+				},
 			},
 		})
 	Ok(t, err)
@@ -848,12 +872,14 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				Command:    command.PolicyCheck,
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
-				Failure:    "policy failure",
-				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
-						{
-							PolicySetName: "policy1",
-							ReqApprovals:  1,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "policy failure",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								ReqApprovals:  1,
+							},
 						},
 					},
 				},
@@ -863,12 +889,14 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				RepoRelDir:  "projectname",
 				Workspace:   "default",
 				ProjectName: "projectname",
-				Failure:     "policy failure",
-				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
-						{
-							PolicySetName: "policy1",
-							ReqApprovals:  1,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "policy failure",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								ReqApprovals:  1,
+							},
 						},
 					},
 				},
@@ -882,12 +910,14 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				Command:    command.ApprovePolicies,
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
-				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
-						{
-							PolicySetName: "policy1",
-							ReqApprovals:  1,
-							CurApprovals:  1,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								ReqApprovals:  1,
+								CurApprovals:  1,
+							},
 						},
 					},
 				},

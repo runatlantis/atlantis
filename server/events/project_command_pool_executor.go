@@ -8,7 +8,24 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
-type prjCmdRunnerFunc func(ctx command.ProjectContext) command.ProjectResult
+type prjCmdRunnerFunc func(ctx command.ProjectContext) command.ProjectCommandOutput
+
+func RunOneProjectCmd(
+	runnerFunc prjCmdRunnerFunc,
+	cmd command.ProjectContext,
+) command.ProjectResult {
+	projectCommandOutput := runnerFunc(cmd)
+
+	return command.ProjectResult{
+		ProjectCommandOutput: projectCommandOutput,
+		Command:              cmd.CommandName,
+		SubCommand:           cmd.SubCommand,
+		RepoRelDir:           cmd.RepoRelDir,
+		Workspace:            cmd.Workspace,
+		ProjectName:          cmd.ProjectName,
+		SilencePRComments:    cmd.SilencePRComments,
+	}
+}
 
 func runProjectCmdsParallel(
 	cmds []command.ProjectContext,
@@ -26,7 +43,7 @@ func runProjectCmdsParallel(
 
 		execute = func() {
 			defer wg.Done()
-			res := runnerFunc(pCmd)
+			res := RunOneProjectCmd(runnerFunc, pCmd)
 			mux.Lock()
 			results = append(results, res)
 			mux.Unlock()
@@ -45,7 +62,7 @@ func runProjectCmds(
 ) command.Result {
 	var results []command.ProjectResult
 	for _, pCmd := range cmds {
-		res := runnerFunc(pCmd)
+		res := RunOneProjectCmd(runnerFunc, pCmd)
 
 		results = append(results, res)
 	}

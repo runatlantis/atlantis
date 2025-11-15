@@ -36,7 +36,9 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			cr: command.Result{
 				ProjectResults: []command.ProjectResult{
 					{
-						PlanSuccess: &models.PlanSuccess{},
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: &models.PlanSuccess{},
+						},
 					},
 				},
 			},
@@ -46,7 +48,9 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			cr: command.Result{
 				ProjectResults: []command.ProjectResult{
 					{
-						ApplySuccess: "success",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							ApplySuccess: "success",
+						},
 					},
 				},
 			},
@@ -56,7 +60,9 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			cr: command.Result{
 				ProjectResults: []command.ProjectResult{
 					{
-						Error: errors.New("err"),
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Error: errors.New("err"),
+						},
 					},
 				},
 			},
@@ -66,7 +72,9 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			cr: command.Result{
 				ProjectResults: []command.ProjectResult{
 					{
-						Failure: "failure",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Failure: "failure",
+						},
 					},
 				},
 			},
@@ -76,10 +84,14 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			cr: command.Result{
 				ProjectResults: []command.ProjectResult{
 					{
-						PlanSuccess: &models.PlanSuccess{},
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: &models.PlanSuccess{},
+						},
 					},
 					{
-						ApplySuccess: "success",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							ApplySuccess: "success",
+						},
 					},
 				},
 			},
@@ -89,10 +101,14 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			cr: command.Result{
 				ProjectResults: []command.ProjectResult{
 					{
-						PlanSuccess: &models.PlanSuccess{},
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: &models.PlanSuccess{},
+						},
 					},
 					{
-						Failure: "failed",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Failure: "failed",
+						},
 					},
 				},
 			},

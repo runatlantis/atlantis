@@ -230,7 +230,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 	cases := []struct {
 		Description       string
 		ProjectContexts   []command.ProjectContext
-		ProjectResults    []command.ProjectResult
+		ProjectResults    []command.ProjectCommandOutput
 		RunnerInvokeMatch []*EqMatcher
 		ExpComment        string
 		ApplyFailed       bool
@@ -251,14 +251,12 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 			},
 			RunnerInvokeMatch: []*EqMatcher{
@@ -286,13 +284,11 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -328,21 +324,18 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+
+					Error: errors.New("shabang"),
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -382,21 +375,17 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:               "Fourth",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -427,13 +416,11 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -458,13 +445,11 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:         "Second",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -489,13 +474,11 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:         "Second",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
