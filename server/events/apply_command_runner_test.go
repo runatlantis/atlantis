@@ -228,12 +228,12 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	cases := []struct {
-		Description       string
-		ProjectContexts   []command.ProjectContext
-		ProjectResults    []command.ProjectCommandOutput
-		RunnerInvokeMatch []*EqMatcher
-		ExpComment        string
-		ApplyFailed       bool
+		Description           string
+		ProjectContexts       []command.ProjectContext
+		ProjectCommandOutputs []command.ProjectCommandOutput
+		RunnerInvokeMatch     []*EqMatcher
+		ExpComment            string
+		ApplyFailed           bool
 	}{
 		{
 			Description: "When first apply fails, the second don't run",
@@ -251,7 +251,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectCommandOutput{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
 					ApplySuccess: "Great success!",
 				},
@@ -284,7 +284,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectCommandOutput{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
 					Error: errors.New("shabang"),
 				},
@@ -324,7 +324,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectCommandOutput{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
 					ApplySuccess: "Great success!",
 				},
@@ -375,7 +375,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:               "Fourth",
 				},
 			},
-			ProjectResults: []command.ProjectCommandOutput{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
 					ApplySuccess: "Great success!",
 				},
@@ -416,7 +416,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectCommandOutput{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
 					Error: errors.New("shabang"),
 				},
@@ -445,7 +445,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:         "Second",
 				},
 			},
-			ProjectResults: []command.ProjectCommandOutput{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
 					Error: errors.New("shabang"),
 				},
@@ -474,7 +474,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:         "Second",
 				},
 			},
-			ProjectResults: []command.ProjectCommandOutput{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
 					ApplySuccess: "Great success!",
 				},
@@ -520,7 +520,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 
 			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Apply(c.ProjectContexts[i])).ThenReturn(c.ProjectResults[i])
+				When(projectCommandRunner.Apply(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutputs[i])
 			}
 
 			applyCommandRunner.Run(ctx, cmd)
