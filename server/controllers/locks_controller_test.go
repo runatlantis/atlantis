@@ -303,9 +303,11 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			Command:    command.Plan,
 			RepoRelDir: projectPath,
 			Workspace:  workspaceName,
-			PlanSuccess: &models.PlanSuccess{
-				TerraformOutput: "tf-output",
-				LockURL:         "lock-url",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "tf-output",
+					LockURL:         "lock-url",
+				},
 			},
 		},
 	})

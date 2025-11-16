@@ -272,7 +272,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 			}
 		}
 
-		res := a.ProjectPlanCommandRunner.Plan(cmd)
+		res := events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
 		projectResults = append(projectResults, res)
 
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
@@ -320,7 +320,7 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 			}
 		}
 
-		res := a.ProjectApplyCommandRunner.Apply(cmd)
+		res := events.RunOneProjectCmd(a.ProjectApplyCommandRunner.Apply, cmd)
 		projectResults = append(projectResults, res)
 
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
