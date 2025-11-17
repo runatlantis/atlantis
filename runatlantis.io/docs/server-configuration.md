@@ -881,8 +881,8 @@ ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
 don't set. Defaults to `gitlab.com`.
 
-
 ### `--gitlab-pending-apply-status` <Badge text="v0.36.0+" type="info"/>
+
 ```bash
 atlantis server --gitlab-pending-apply-status
 # or (recommended)
