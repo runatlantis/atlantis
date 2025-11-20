@@ -723,9 +723,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RunStepRunner: runStepRunner,
 		},
 		VersionStepRunner: &runtime.VersionStepRunner{
-			TerraformExecutor: terraformClient,
+			TerraformExecutor:     terraformClient,
 			DefaultTFDistribution: defaultTfDistribution,
-			DefaultTFVersion:  defaultTfVersion,
+			DefaultTFVersion:      defaultTfVersion,
 		},
 		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
 		StateRmStepRunner:         runtime.NewStateRmStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
