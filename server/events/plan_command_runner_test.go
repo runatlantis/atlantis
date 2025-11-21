@@ -897,7 +897,7 @@ func TestPlanCommandRunner_GitlabPendingApplyStatus(t *testing.T) {
 	cases := []struct {
 		Description            string
 		VCSType                models.VCSHostType
-		GitlabPendingApplyFlag bool
+		PendingApplyFlag       bool
 		ProjectResults         []command.ProjectResult
 		ExpApplyStatus         models.CommitStatus
 		ExpVCSApplyStatusTotal int
@@ -905,9 +905,9 @@ func TestPlanCommandRunner_GitlabPendingApplyStatus(t *testing.T) {
 		ExpShouldUpdateStatus  bool
 	}{
 		{
-			Description:            "GitLab with flag enabled and unapplied plans should set pending status",
-			VCSType:                models.Gitlab,
-			GitlabPendingApplyFlag: true,
+			Description:      "GitLab with flag enabled and unapplied plans should set pending status",
+			VCSType:          models.Gitlab,
+			PendingApplyFlag: true,
 			ProjectResults: []command.ProjectResult{
 				{
 					Command:    command.Plan,
@@ -923,9 +923,9 @@ func TestPlanCommandRunner_GitlabPendingApplyStatus(t *testing.T) {
 			ExpShouldUpdateStatus:  true,
 		},
 		{
-			Description:            "GitLab with flag disabled and unapplied plans should NOT update apply status",
-			VCSType:                models.Gitlab,
-			GitlabPendingApplyFlag: false,
+			Description:      "GitLab with flag disabled and unapplied plans should NOT update apply status",
+			VCSType:          models.Gitlab,
+			PendingApplyFlag: false,
 			ProjectResults: []command.ProjectResult{
 				{
 					Command:    command.Plan,
@@ -938,9 +938,9 @@ func TestPlanCommandRunner_GitlabPendingApplyStatus(t *testing.T) {
 			ExpShouldUpdateStatus: false,
 		},
 		{
-			Description:            "GitHub with flag enabled should NOT update apply status (default behavior)",
-			VCSType:                models.Github,
-			GitlabPendingApplyFlag: true,
+			Description:      "GitHub with flag enabled should NOT update apply status (default behavior)",
+			VCSType:          models.Github,
+			PendingApplyFlag: true,
 			ProjectResults: []command.ProjectResult{
 				{
 					Command:    command.Plan,
@@ -953,9 +953,9 @@ func TestPlanCommandRunner_GitlabPendingApplyStatus(t *testing.T) {
 			ExpShouldUpdateStatus: false,
 		},
 		{
-			Description:            "GitLab with all plans applied should set success status",
-			VCSType:                models.Gitlab,
-			GitlabPendingApplyFlag: true,
+			Description:      "GitLab with all plans applied should set success status",
+			VCSType:          models.Gitlab,
+			PendingApplyFlag: true,
 			ProjectResults: []command.ProjectResult{
 				{
 					Command:    command.Plan,
@@ -971,9 +971,9 @@ func TestPlanCommandRunner_GitlabPendingApplyStatus(t *testing.T) {
 			ExpShouldUpdateStatus:  true,
 		},
 		{
-			Description:            "Bitbucket with flag enabled should NOT update apply status",
-			VCSType:                models.BitbucketCloud,
-			GitlabPendingApplyFlag: true,
+			Description:      "Bitbucket with flag enabled should NOT update apply status",
+			VCSType:          models.BitbucketCloud,
+			PendingApplyFlag: true,
 			ProjectResults: []command.ProjectResult{
 				{
 					Command:    command.Plan,
@@ -998,7 +998,7 @@ func TestPlanCommandRunner_GitlabPendingApplyStatus(t *testing.T) {
 
 			_ = setup(t, func(tc *TestConfig) {
 				tc.database = db
-				tc.GitlabPendingApplyStatusFlag = c.GitlabPendingApplyFlag
+				tc.PendingApplyStatusFlag = c.PendingApplyFlag
 			})
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")

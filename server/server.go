@@ -789,7 +789,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
-		userConfig.GitlabPendingApplyStatusFlag,
+		userConfig.PendingApplyStatusFlag,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(

@@ -111,7 +111,6 @@ const (
 	GiteaPageSizeFlag                = "gitea-page-size"
 	GitlabGroupAllowlistFlag         = "gitlab-group-allowlist"
 	GitlabHostnameFlag               = "gitlab-hostname"
-	GitlabPendingApplyStatusFlag     = "gitlab-pending-apply-status"
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
@@ -124,6 +123,7 @@ const (
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
+	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
 	PortFlag                         = "port"
@@ -572,7 +572,7 @@ var boolFlags = map[string]boolFlag{
 		description:  "Run apply operations in parallel.",
 		defaultValue: false,
 	},
-	GitlabPendingApplyStatusFlag: {
+	PendingApplyStatusFlag: {
 		description:  "Set apply job status as pending when there are planned changes that haven't been applied yet. Currently only supported for GitLab.",
 		defaultValue: false,
 	},

@@ -72,7 +72,6 @@ type UserConfig struct {
 	GiteaPageSize                   int    `mapstructure:"gitea-page-size"`
 	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
 	GitlabGroupAllowlist            string `mapstructure:"gitlab-group-allowlist"`
-	GitlabPendingApplyStatusFlag    bool   `mapstructure:"gitlab-pending-apply-status"`
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
@@ -87,6 +86,7 @@ type UserConfig struct {
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`
+	PendingApplyStatusFlag          bool   `mapstructure:"pending-apply-status"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
 	Port                            int    `mapstructure:"port"`
