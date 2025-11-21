@@ -489,6 +489,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ExecutableName,
 		userConfig.HideUnchangedPlanComments,
 		userConfig.QuietPolicyChecks,
+		logger,
 	)
 
 	var lockingClient locking.Locker
