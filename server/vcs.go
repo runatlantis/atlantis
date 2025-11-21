@@ -10,6 +10,7 @@ import (
 
 type VCSFeature struct {
 	Name            string
+	Description     string
 	SupportedVCSs   []models.VCSHostType
 	UserConfigField string
 }
@@ -25,18 +26,49 @@ type VCSSupportSummary struct {
 func GetVCSFeatures() VCSFeatures {
 	return []VCSFeature{
 		{
-			Name: "CommentEmojiReaction",
+			Name:        "CommentEmojiReaction",
+			Description: "Adds an emoji onto a comment when Atlantis is processing it",
+			SupportedVCSs: []models.VCSHostType{
+				models.Github,
+				models.Gitlab,
+				models.AzureDevops,
+			},
+			UserConfigField: "emoji-reaction",
+		},
+		{
+			Name:        "DiscardApprovalOnPlan",
+			Description: "Discard approval if a new plan has been executed",
 			SupportedVCSs: []models.VCSHostType{
 				models.Github,
 				models.Gitlab,
 			},
-			UserConfigField: "emoji-reaction",
+			UserConfigField: "discard-approval-on-plan",
+		},
+		{
+			Name:        "SingleFileDownload",
+			Description: "Whether we can download a single file from the VCS",
+			SupportedVCSs: []models.VCSHostType{
+				models.Github,
+				models.Gitlab,
+				models.Gitea,
+			},
+		},
+		{
+			Name:        "DetailedPullIsMergeable",
+			Description: "Whether PullIsMergeable returns a detailed reason as to why it's unmergeable",
+			SupportedVCSs: []models.VCSHostType{
+				models.Github,
+				models.Gitlab,
+			},
 		},
 	}
 }
 
 // isUserConfigFieldSpecified helper to determine whether a given on userConfig was specified
 func isUserConfigFieldSpecified(userConfig UserConfig, field string) bool {
+	if field == "" {
+		return false
+	}
 	v := reflect.ValueOf(userConfig)
 	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
@@ -98,6 +130,7 @@ func (v VCSFeatures) Validate(configuredVCSs []models.VCSHostType, userConfig Us
 				warnings = append(warnings, fmt.Sprintf("Specified field %q for feature %s, which is not supported on %s", vcsFeature.UserConfigField, vcsFeature.Name, configuredVCS))
 				continue
 			}
+			// At this point, the VCS is not supported, but there is no flag attempting its use for this feature, so nothing to do.
 		}
 	}
 	return VCSSupportSummary{
