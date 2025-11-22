@@ -43,9 +43,9 @@ func NewSlack(wr *regexp.Regexp, br *regexp.Regexp, channel string, client Slack
 }
 
 // Send sends the webhook to Slack if workspace and branch matches their respective regex.
-func (s *SlackWebhook) Send(_ logging.SimpleLogging, applyResult ApplyResult) error {
-	if !s.WorkspaceRegex.MatchString(applyResult.Workspace) || !s.BranchRegex.MatchString(applyResult.Pull.BaseBranch) {
+func (s *SlackWebhook) Send(_ logging.SimpleLogging, eventResult EventResult) error {
+	if !s.WorkspaceRegex.MatchString(eventResult.Workspace) || !s.BranchRegex.MatchString(eventResult.Pull.BaseBranch) {
 		return nil
 	}
-	return s.Client.PostMessage(s.Channel, applyResult)
+	return s.Client.PostMessage(s.Channel, eventResult)
 }

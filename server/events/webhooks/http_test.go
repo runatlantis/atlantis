@@ -12,7 +12,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var httpApplyResult = webhooks.ApplyResult{
+var httpApplyResult = webhooks.EventResult{
 	Workspace: "production",
 	Repo: models.Repo{
 		FullName: "runatlantis/atlantis",

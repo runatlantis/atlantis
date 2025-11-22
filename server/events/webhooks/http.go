@@ -21,18 +21,18 @@ type HttpWebhook struct {
 }
 
 // Send sends the webhook to URL if workspace and branch matches their respective regex.
-func (h *HttpWebhook) Send(_ logging.SimpleLogging, applyResult ApplyResult) error {
-	if !h.WorkspaceRegex.MatchString(applyResult.Workspace) || !h.BranchRegex.MatchString(applyResult.Pull.BaseBranch) {
+func (h *HttpWebhook) Send(_ logging.SimpleLogging, eventResult EventResult) error {
+	if !h.WorkspaceRegex.MatchString(eventResult.Workspace) || !h.BranchRegex.MatchString(eventResult.Pull.BaseBranch) {
 		return nil
 	}
-	if err := h.doSend(applyResult); err != nil {
+	if err := h.doSend(eventResult); err != nil {
 		return errors.Wrap(err, fmt.Sprintf("sending webhook to %q", h.URL))
 	}
 	return nil
 }
 
-func (h *HttpWebhook) doSend(applyResult ApplyResult) error {
-	body, err := json.Marshal(applyResult)
+func (h *HttpWebhook) doSend(eventResult EventResult) error {
+	body, err := json.Marshal(eventResult)
 	if err != nil {
 		return err
 	}
