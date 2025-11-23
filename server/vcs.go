@@ -2,17 +2,19 @@ package server
 
 import (
 	"fmt"
-	"reflect"
 	"slices"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 type VCSFeature struct {
-	Name            string
-	Description     string
-	SupportedVCSs   []models.VCSHostType
+	Name          string
+	Description   string
+	SupportedVCSs []models.VCSHostType
+	// Which field, if any, in UserConfig enables or configures this feature
 	UserConfigField string
+	// Per VCS notes, for documentation. Supports markdown
+	Notes map[models.VCSHostType]string
 }
 
 type VCSFeatures []VCSFeature
@@ -34,6 +36,11 @@ func GetVCSFeatures() VCSFeatures {
 				models.AzureDevops,
 			},
 			UserConfigField: "emoji-reaction",
+			Notes: map[models.VCSHostType]string{
+				models.Github:      "[Supported Emojis](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)",
+				models.Gitlab:      "[Supported Emojis](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)",
+				models.AzureDevops: "[Supported Emojis](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)",
+			},
 		},
 		{
 			Name:        "DiscardApprovalOnPlan",
@@ -43,6 +50,9 @@ func GetVCSFeatures() VCSFeatures {
 				models.Gitlab,
 			},
 			UserConfigField: "discard-approval-on-plan",
+			Notes: map[models.VCSHostType]string{
+				models.Gitlab: "A group or Project token is required for this feature, see [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)",
+			},
 		},
 		{
 			Name:        "SingleFileDownload",
@@ -61,40 +71,22 @@ func GetVCSFeatures() VCSFeatures {
 				models.Gitlab,
 			},
 		},
+		{
+			Name:            "HidePreviousPlanComments",
+			Description:     "Hide previous plan comments to declutter PRs",
+			UserConfigField: "hide-prev-plan-comments",
+			SupportedVCSs: []models.VCSHostType{
+				models.Github,
+				models.BitbucketCloud,
+				models.Gitlab,
+				models.Gitea,
+			},
+			Notes: map[models.VCSHostType]string{
+				models.BitbucketCloud: "comments are deleted rather than hidden as Bitbucket does not support hiding comments.",
+				models.Github:         "Ensure the `--gh-user` is set appropriately or comments will not be hidden. When using the GitHub App, you need to set `--gh-app-slug` to enable this feature.",
+			},
+		},
 	}
-}
-
-// isUserConfigFieldSpecified helper to determine whether a given on userConfig was specified
-func isUserConfigFieldSpecified(userConfig UserConfig, field string) bool {
-	if field == "" {
-		return false
-	}
-	v := reflect.ValueOf(userConfig)
-	if v.Kind() == reflect.Pointer {
-		v = v.Elem()
-	}
-	if v.Kind() != reflect.Struct {
-		return false
-	}
-
-	t := v.Type()
-	for i := 0; i < t.NumField(); i++ {
-		sf := t.Field(i)
-		if sf.Tag.Get("mapstructure") == field {
-			fv := v.Field(i)
-			if !fv.IsValid() {
-				return false
-			}
-			if fv.IsZero() {
-				// zero value → treat as "not specified"
-				return false
-			}
-			return true
-		}
-	}
-
-	// no such tag at all
-	return false
 }
 
 // IsSupportedBy does the specified vcs support this feature?
@@ -106,7 +98,7 @@ func (v VCSFeature) IsSupportedBy(vcsType models.VCSHostType) bool {
 func (v VCSFeatures) Validate(configuredVCSs []models.VCSHostType, userConfig UserConfig) VCSSupportSummary {
 
 	for _, vcsFeature := range v {
-		isFieldSpecified := isUserConfigFieldSpecified(userConfig, vcsFeature.UserConfigField)
+		isFieldSpecified := userConfig.isUserConfigFieldSpecified(vcsFeature.UserConfigField)
 		if isFieldSpecified {
 			// Since we've specified a field, it means we want to use this feature.
 			// If none of the configured VCSs support this feature, that's an error
@@ -121,7 +113,7 @@ func (v VCSFeatures) Validate(configuredVCSs []models.VCSHostType, userConfig Us
 	// Additionally, we should warn if a user specifies multiple VCSs, but one of them won't implement the feature
 	var warnings []string
 	for _, vcsFeature := range v {
-		isFieldSpecified := isUserConfigFieldSpecified(userConfig, vcsFeature.UserConfigField)
+		isFieldSpecified := userConfig.isUserConfigFieldSpecified(vcsFeature.UserConfigField)
 		for _, configuredVCS := range configuredVCSs {
 			if vcsFeature.IsSupportedBy(configuredVCS) {
 				continue

@@ -525,8 +525,9 @@ atlantis server --discard-approval-on-plan
 ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
 ```
 
-If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.  
- Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
+If set, discard approval if a new plan has been executed.
+
+See per VCS support and notes [here](/docs/per-vcs-features.html#discardapprovalonplan).
 
 ### `--emoji-reaction` <Badge text="v0.29.0+" type="info"/>
 
@@ -536,17 +537,11 @@ atlantis server --emoji-reaction eyes
 ATLANTIS_EMOJI_REACTION=eyes
 ```
 
-The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
+The emoji reaction to use for marking processed comments.
+
+See per VCS support and notes [here](/docs/per-vcs-features.html#commentemojireaction).
+
 Defaults to "" (empty string).
-
-::: warning NOTE
-Each VCS provider supports a different list of emojis:
-
-- [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
-- [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
-- [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
-
-   :::
 
 ### `--enable-diff-markdown-format` <Badge text="v0.25.0+" type="info"/>
 
@@ -932,14 +927,9 @@ atlantis server --hide-prev-plan-comments
 ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
 ```
 
-Hide previous plan comments to declutter PRs. This is only supported in
-GitHub and GitLab and Bitbucket currently and is not enabled by default.
+Hide previous plan comments to declutter PRs, disabled by default.
 
-For Bitbucket, the comments are deleted rather than hidden as Bitbucket does not support hiding comments.
-
-For GitHub, ensure the `--gh-user` is set appropriately or comments will not be hidden.
-
-When using the GitHub App, you need to set `--gh-app-slug` to enable this feature.
+See per VCS support and notes [here](/docs/per-vcs-features.html#hidepreviousplancomments).
 
 ### `--hide-unchanged-plan-comments` <Badge text="v0.29.0+" type="info"/>
 

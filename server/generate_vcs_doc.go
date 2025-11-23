@@ -44,14 +44,23 @@ func getMarkdown() string {
 		}
 		out += fmt.Sprintf("%s\n\n", f.Description)
 
-		out += "| *VCS* | *Supported* |\n"
-		out += "|---|---------|\n"
+		if f.Notes == nil {
+			out += "| *VCS* | *Supported* |\n"
+			out += "|---|---------|\n"
+		} else {
+			out += "| *VCS* | *Supported* | *Notes* |\n"
+			out += "|---|---------|-------|\n"
+		}
 
 		for _, vcs := range allVCSs {
+			supportedChar := "✘"
 			if f.IsSupportedBy(vcs) {
-				out += fmt.Sprintf("| %s | ✔ |\n", vcs.String())
+				supportedChar = "✔"
+			}
+			if f.Notes == nil {
+				out += fmt.Sprintf("| %s | %s |\n", vcs.String(), supportedChar)
 			} else {
-				out += fmt.Sprintf("| %s | ✘ |\n", vcs.String())
+				out += fmt.Sprintf("| %s | %s | %s |\n", vcs.String(), supportedChar, f.Notes[vcs])
 			}
 		}
 		out += "\n"

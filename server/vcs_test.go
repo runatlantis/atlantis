@@ -42,14 +42,14 @@ func TestVCSFeaturesValidate(t *testing.T) {
 					SupportedVCSs: []models.VCSHostType{
 						models.Github,
 					},
-					UserConfigField: "automerge",
+					UserConfigField: "data-dir",
 				},
 			},
 			userConfig: server.UserConfig{
-				Automerge: true,
+				DataDir: "foobar",
 			},
 			expectedResult: server.VCSSupportSummary{
-				Err: errors.New(`no configured VCS supports feature foo, cannot specify field "automerge"`),
+				Err: errors.New(`no configured VCS supports feature foo, cannot specify field "data-dir"`),
 			},
 		},
 		{
@@ -60,7 +60,7 @@ func TestVCSFeaturesValidate(t *testing.T) {
 					SupportedVCSs: []models.VCSHostType{
 						models.Github,
 					},
-					UserConfigField: "automerge",
+					UserConfigField: "data-dir",
 				},
 			},
 			configuredVCS: []models.VCSHostType{
@@ -68,11 +68,11 @@ func TestVCSFeaturesValidate(t *testing.T) {
 				models.Gitlab,
 			},
 			userConfig: server.UserConfig{
-				Automerge: true,
+				DataDir: "foobar",
 			},
 			expectedResult: server.VCSSupportSummary{
 				Warnings: []string{
-					`Specified field "automerge" for feature foo, which is not supported on Gitlab`,
+					`Specified field "data-dir" for feature foo, which is not supported on Gitlab`,
 				},
 			},
 		},
@@ -85,7 +85,7 @@ func TestVCSFeaturesValidate(t *testing.T) {
 						models.Github,
 						models.Gitlab,
 					},
-					UserConfigField: "automerge",
+					UserConfigField: "data-dir",
 				},
 			},
 			configuredVCS: []models.VCSHostType{
@@ -93,7 +93,7 @@ func TestVCSFeaturesValidate(t *testing.T) {
 				models.Gitlab,
 			},
 			userConfig: server.UserConfig{
-				Automerge: true,
+				DataDir: "data-dir",
 			},
 		},
 		{
@@ -105,7 +105,7 @@ func TestVCSFeaturesValidate(t *testing.T) {
 						models.Github,
 						models.Gitlab,
 					},
-					UserConfigField: "automerge",
+					UserConfigField: "data-dir",
 				},
 			},
 			configuredVCS: []models.VCSHostType{
