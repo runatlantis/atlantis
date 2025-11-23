@@ -133,6 +133,11 @@ type UserConfig struct {
 	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
 	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
+
+	// Enhanced locking configuration
+	EnhancedLockingEnabled          bool   `mapstructure:"enhanced-locking-enabled"`
+	EnhancedLockingBackend          string `mapstructure:"enhanced-locking-backend"`
+	EnhancedLockingDefaultTimeout   string `mapstructure:"enhanced-locking-default-timeout"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName
