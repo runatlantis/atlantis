@@ -93,28 +93,29 @@ type Repo struct {
 }
 
 type MergedProjectCfg struct {
-	PlanRequirements          []string
-	ApplyRequirements         []string
-	ImportRequirements        []string
-	Workflow                  Workflow
-	AllowedWorkflows          []string
-	DependsOn                 []string
-	RepoRelDir                string
-	Workspace                 string
-	Name                      string
-	AutoplanEnabled           bool
-	AutoMergeDisabled         bool
-	AutoMergeMethod           string
-	TerraformDistribution     *string
-	TerraformVersion          *version.Version
-	RepoCfgVersion            int
-	PolicySets                PolicySets
-	DeleteSourceBranchOnMerge bool
-	ExecutionOrderGroup       int
-	RepoLocks                 RepoLocks
-	PolicyCheck               bool
-	CustomPolicyCheck         bool
-	SilencePRComments         []string
+	PlanRequirements           []string
+	ApplyRequirements          []string
+	ImportRequirements         []string
+	Workflow                   Workflow
+	AllowedWorkflows           []string
+	DependsOn                  []string
+	RepoRelDir                 string
+	Workspace                  string
+	Name                       string
+	AutoplanEnabled            bool
+	AutoMergeDisabled          bool
+	AutoMergeMethod            string
+	TerraformDistribution      *string
+	TerraformVersion           *version.Version
+	RepoCfgVersion             int
+	PolicySets                 PolicySets
+	DeleteSourceBranchOnMerge  bool
+	ExecutionOrderGroup        int
+	DestroyExecutionOrderGroup *int
+	RepoLocks                  RepoLocks
+	PolicyCheck                bool
+	CustomPolicyCheck          bool
+	SilencePRComments          []string
 }
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.
@@ -404,25 +405,26 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 	)
 
 	return MergedProjectCfg{
-		PlanRequirements:          planReqs,
-		ApplyRequirements:         applyReqs,
-		ImportRequirements:        importReqs,
-		Workflow:                  workflow,
-		RepoRelDir:                proj.Dir,
-		Workspace:                 proj.Workspace,
-		DependsOn:                 proj.DependsOn,
-		Name:                      proj.GetName(),
-		AutoplanEnabled:           proj.Autoplan.Enabled,
-		TerraformDistribution:     proj.TerraformDistribution,
-		TerraformVersion:          proj.TerraformVersion,
-		RepoCfgVersion:            rCfg.Version,
-		PolicySets:                g.PolicySets,
-		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
-		ExecutionOrderGroup:       proj.ExecutionOrderGroup,
-		RepoLocks:                 repoLocks,
-		PolicyCheck:               policyCheck,
-		CustomPolicyCheck:         customPolicyCheck,
-		SilencePRComments:         silencePRComments,
+		PlanRequirements:           planReqs,
+		ApplyRequirements:          applyReqs,
+		ImportRequirements:         importReqs,
+		Workflow:                   workflow,
+		RepoRelDir:                 proj.Dir,
+		Workspace:                  proj.Workspace,
+		DependsOn:                  proj.DependsOn,
+		Name:                       proj.GetName(),
+		AutoplanEnabled:            proj.Autoplan.Enabled,
+		TerraformDistribution:      proj.TerraformDistribution,
+		TerraformVersion:           proj.TerraformVersion,
+		RepoCfgVersion:             rCfg.Version,
+		PolicySets:                 g.PolicySets,
+		DeleteSourceBranchOnMerge:  deleteSourceBranchOnMerge,
+		ExecutionOrderGroup:        proj.ExecutionOrderGroup,
+		DestroyExecutionOrderGroup: proj.DestroyExecutionOrderGroup,
+		RepoLocks:                  repoLocks,
+		PolicyCheck:                policyCheck,
+		CustomPolicyCheck:          customPolicyCheck,
+		SilencePRComments:          silencePRComments,
 	}
 }
 

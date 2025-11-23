@@ -142,25 +142,26 @@ func (r RepoCfg) ValidateWorkspaceAllowed(repoRelDir string, workspace string) e
 }
 
 type Project struct {
-	Dir                       string
-	BranchRegex               *regexp.Regexp
-	Workspace                 string
-	Name                      *string
-	WorkflowName              *string
-	TerraformDistribution     *string
-	TerraformVersion          *version.Version
-	Autoplan                  Autoplan
-	PlanRequirements          []string
-	ApplyRequirements         []string
-	ImportRequirements        []string
-	DependsOn                 []string
-	DeleteSourceBranchOnMerge *bool
-	RepoLocking               *bool
-	RepoLocks                 *RepoLocks
-	ExecutionOrderGroup       int
-	PolicyCheck               *bool
-	CustomPolicyCheck         *bool
-	SilencePRComments         []string
+	Dir                        string
+	BranchRegex                *regexp.Regexp
+	Workspace                  string
+	Name                       *string
+	WorkflowName               *string
+	TerraformDistribution      *string
+	TerraformVersion           *version.Version
+	Autoplan                   Autoplan
+	PlanRequirements           []string
+	ApplyRequirements          []string
+	ImportRequirements         []string
+	DependsOn                  []string
+	DeleteSourceBranchOnMerge  *bool
+	RepoLocking                *bool
+	RepoLocks                  *RepoLocks
+	ExecutionOrderGroup        int
+	DestroyExecutionOrderGroup *int
+	PolicyCheck                *bool
+	CustomPolicyCheck          *bool
+	SilencePRComments          []string
 }
 
 // GetName returns the name of the project or an empty string if there is no
