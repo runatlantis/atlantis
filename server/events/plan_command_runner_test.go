@@ -175,20 +175,22 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When first plan fails, the second don't run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       0,
-					Workspace:                 "first",
-					ProjectName:               "First",
-					ParallelPlanEnabled:       true,
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          0,
+					EffectiveExecutionOrderGroup: 0,
+					Workspace:                    "first",
+					ProjectName:                  "First",
+					ParallelPlanEnabled:          true,
+					AbortOnExecutionOrderFail:    true,
 				},
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       1,
-					Workspace:                 "second",
-					ProjectName:               "Second",
-					ParallelPlanEnabled:       true,
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          1,
+					EffectiveExecutionOrderGroup: 1,
+					Workspace:                    "second",
+					ProjectName:                  "Second",
+					ParallelPlanEnabled:          true,
+					AbortOnExecutionOrderFail:    true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -213,18 +215,20 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When first fails, the second will not run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       0,
-					ProjectName:               "First",
-					ParallelPlanEnabled:       true,
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          0,
+					EffectiveExecutionOrderGroup: 0,
+					ProjectName:                  "First",
+					ParallelPlanEnabled:          true,
+					AbortOnExecutionOrderFail:    true,
 				},
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       1,
-					ProjectName:               "Second",
-					ParallelPlanEnabled:       true,
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          1,
+					EffectiveExecutionOrderGroup: 1,
+					ProjectName:                  "Second",
+					ParallelPlanEnabled:          true,
+					AbortOnExecutionOrderFail:    true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -247,20 +251,22 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When first fails by autorun, the second will not run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:               command.Plan,
-					AutoplanEnabled:           true,
-					ExecutionOrderGroup:       0,
-					ProjectName:               "First",
-					ParallelPlanEnabled:       true,
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					AutoplanEnabled:              true,
+					ExecutionOrderGroup:          0,
+					EffectiveExecutionOrderGroup: 0,
+					ProjectName:                  "First",
+					ParallelPlanEnabled:          true,
+					AbortOnExecutionOrderFail:    true,
 				},
 				{
-					CommandName:               command.Plan,
-					AutoplanEnabled:           true,
-					ExecutionOrderGroup:       1,
-					ProjectName:               "Second",
-					ParallelPlanEnabled:       true,
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					AutoplanEnabled:              true,
+					ExecutionOrderGroup:          1,
+					EffectiveExecutionOrderGroup: 1,
+					ProjectName:                  "Second",
+					ParallelPlanEnabled:          true,
+					AbortOnExecutionOrderFail:    true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -283,29 +289,33 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When both in a group of two succeeds, the following two will run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       0,
-					ProjectName:               "First",
-					ParallelPlanEnabled:       true,
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          0,
+					EffectiveExecutionOrderGroup: 0,
+					ProjectName:                  "First",
+					ParallelPlanEnabled:          true,
+					AbortOnExecutionOrderFail:    true,
 				},
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       0,
-					ProjectName:               "Second",
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          0,
+					EffectiveExecutionOrderGroup: 0,
+					ProjectName:                  "Second",
+					AbortOnExecutionOrderFail:    true,
 				},
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       1,
-					ProjectName:               "Third",
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          1,
+					EffectiveExecutionOrderGroup: 1,
+					ProjectName:                  "Third",
+					AbortOnExecutionOrderFail:    true,
 				},
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       1,
-					ProjectName:               "Fourth",
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          1,
+					EffectiveExecutionOrderGroup: 1,
+					ProjectName:                  "Fourth",
+					AbortOnExecutionOrderFail:    true,
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -344,29 +354,33 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			Description: "When one out of two fails, the following two will not run",
 			ProjectContexts: []command.ProjectContext{
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       0,
-					ProjectName:               "First",
-					ParallelPlanEnabled:       true,
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          0,
+					EffectiveExecutionOrderGroup: 0,
+					ProjectName:                  "First",
+					ParallelPlanEnabled:          true,
+					AbortOnExecutionOrderFail:    true,
 				},
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       0,
-					ProjectName:               "Second",
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          0,
+					EffectiveExecutionOrderGroup: 0,
+					ProjectName:                  "Second",
+					AbortOnExecutionOrderFail:    true,
 				},
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       1,
-					ProjectName:               "Third",
-					AbortOnExecutionOrderFail: true,
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          1,
+					EffectiveExecutionOrderGroup: 1,
+					ProjectName:                  "Third",
+					AbortOnExecutionOrderFail:    true,
 				},
 				{
-					CommandName:               command.Plan,
-					ExecutionOrderGroup:       1,
-					AbortOnExecutionOrderFail: true,
-					ProjectName:               "Fourth",
+					CommandName:                  command.Plan,
+					ExecutionOrderGroup:          1,
+					EffectiveExecutionOrderGroup: 1,
+					AbortOnExecutionOrderFail:    true,
+					ProjectName:                  "Fourth",
 				},
 			},
 			ProjectResults: []command.ProjectResult{
@@ -889,4 +903,150 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 			Any[int](),
 		)
 	})
+}
+
+func TestPlanCommandRunner_ResetsPolicyStatus(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	// create a DB with a project that has pending policy status
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		db.Close()
+	})
+
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = db
+	})
+	_ = vcsClient
+
+	scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+	// Store a project with pending policy status
+	_, err = db.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: ".",
+			Workspace:  "default",
+			PlanSuccess: &models.PlanSuccess{
+				TerraformOutput: "plan output",
+			},
+			PolicyCheckResults: &models.PolicyCheckResults{
+				PolicySetResults: []models.PolicySetResult{
+					{
+						PolicySetName: "policy1",
+						Passed:        false,
+						ReqApprovals:  1,
+						CurApprovals:  0,
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	// Verify policy status exists before plan
+	pullStatus, err := db.GetPullStatus(modelPull)
+	require.NoError(t, err)
+	require.NotNil(t, pullStatus)
+	require.Len(t, pullStatus.Projects, 1)
+	require.NotNil(t, pullStatus.Projects[0].PolicyStatus)
+	require.Len(t, pullStatus.Projects[0].PolicyStatus, 1)
+
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logger,
+		Scope:    scopeNull,
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+
+	When(projectCommandBuilder.BuildPlanCommands(ctx, &events.CommentCommand{Name: command.Plan})).
+		ThenReturn([]command.ProjectContext{}, nil)
+
+	planCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Plan})
+
+	// Verify policy status was cleared
+	pullStatus, err = db.GetPullStatus(modelPull)
+	require.NoError(t, err)
+	require.NotNil(t, pullStatus)
+	require.Len(t, pullStatus.Projects, 1)
+	// PolicyStatus should be nil after reset
+	require.Nil(t, pullStatus.Projects[0].PolicyStatus)
+}
+
+func TestAutoplanCommandRunner_ResetsPolicyStatus(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	// create a DB with a project that has pending policy status
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		db.Close()
+	})
+
+	_ = setup(t, func(tc *TestConfig) {
+		tc.database = db
+	})
+
+	scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+	// Store a project with pending policy status
+	_, err = db.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: ".",
+			Workspace:  "default",
+			PlanSuccess: &models.PlanSuccess{
+				TerraformOutput: "plan output",
+			},
+			PolicyCheckResults: &models.PolicyCheckResults{
+				PolicySetResults: []models.PolicySetResult{
+					{
+						PolicySetName: "policy1",
+						Passed:        false,
+						ReqApprovals:  1,
+						CurApprovals:  0,
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	// Verify policy status exists before autoplan
+	pullStatus, err := db.GetPullStatus(modelPull)
+	require.NoError(t, err)
+	require.NotNil(t, pullStatus)
+	require.Len(t, pullStatus.Projects, 1)
+	require.NotNil(t, pullStatus.Projects[0].PolicyStatus)
+	require.Len(t, pullStatus.Projects[0].PolicyStatus, 1)
+
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logger,
+		Scope:    scopeNull,
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.AutoTrigger,
+	}
+
+	When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{}, nil)
+
+	planCommandRunner.Run(ctx, nil)
+
+	// Verify policy status was cleared
+	pullStatus, err = db.GetPullStatus(modelPull)
+	require.NoError(t, err)
+	require.NotNil(t, pullStatus)
+	require.Len(t, pullStatus.Projects, 1)
+	// PolicyStatus should be nil after reset
+	require.Nil(t, pullStatus.Projects[0].PolicyStatus)
 }
