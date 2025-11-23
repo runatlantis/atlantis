@@ -127,6 +127,15 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		prjCfg.TerraformVersion = terraformClient.DetectVersion(ctx.Log, filepath.Join(repoDir, prjCfg.RepoRelDir))
 	}
 
+	// Detect destroy flag in original comment flags (unescaped)
+	isDestroy := false
+	for _, f := range commentFlags {
+		if f == "-destroy" {
+			isDestroy = true
+			break
+		}
+	}
+
 	projectCmdContext := newProjectCommandContext(
 		ctx,
 		cmdName,
@@ -146,6 +155,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		ctx.PullRequestStatus,
 		ctx.PullStatus,
 		ctx.TeamAllowlistChecker,
+		isDestroy,
 	)
 
 	projectCmds = append(projectCmds, projectCmdContext)
@@ -200,6 +210,12 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		ctx.Log.Debug("Building project command context for %s", command.PolicyCheck)
 		steps := prjCfg.Workflow.PolicyCheck.Steps
 
+		// Get isDestroy from the plan context that was just created
+		isDestroy := false
+		if len(projectCmds) > 0 {
+			isDestroy = projectCmds[0].IsDestroy
+		}
+
 		projectCmds = append(projectCmds, newProjectCommandContext(
 			ctx,
 			command.PolicyCheck,
@@ -219,6 +235,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			ctx.PullRequestStatus,
 			ctx.PullStatus,
 			ctx.TeamAllowlistChecker,
+			isDestroy,
 		))
 	}
 
@@ -245,6 +262,7 @@ func newProjectCommandContext(ctx *command.Context,
 	pullReqStatus models.PullReqStatus,
 	pullStatus *models.PullStatus,
 	teamAllowlistChecker command.TeamAllowlistChecker,
+	isDestroy bool,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
@@ -268,7 +286,7 @@ func newProjectCommandContext(ctx *command.Context,
 		}
 	}
 
-	return command.ProjectContext{
+	pc := command.ProjectContext{
 		CommandName:                cmd,
 		ApplyCmd:                   applyCmd,
 		ApprovePoliciesCmd:         approvePoliciesCmd,
@@ -309,10 +327,16 @@ func newProjectCommandContext(ctx *command.Context,
 		PullStatus:                 pullStatus,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
+		DestroyExecutionOrderGroup: projCfg.DestroyExecutionOrderGroup,
 		AbortOnExecutionOrderFail:  abortOnExecutionOrderFail,
 		SilencePRComments:          projCfg.SilencePRComments,
 		TeamAllowlistChecker:       teamAllowlistChecker,
 	}
+	pc.IsDestroy = isDestroy
+	// Default effective group equals normal execution group; will be recalculated later if needed.
+	// EffectiveExecutionOrderGroup remains 0 in non-destroy executions for compatibility with legacy tests.
+	// It will be calculated only in destroy scenarios.
+	return pc
 }
 
 func escapeArgs(args []string) []string {
