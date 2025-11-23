@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -294,7 +295,23 @@ func (w *FileWorkspace) isBranchAtTargetRef(logger logging.SimpleLogging, c wrap
 	if err != nil {
 		return false, err
 	}
-	currCommit := strings.Trim(string(outputRevParseCmd), "\n")
+
+	// Sanitize git warnings (warning: refname 'HEAD' is ambiguous).
+	lines := strings.Split(strings.TrimSpace(string(outputRevParseCmd)), "\n")
+	var currCommit string
+	shaRegex := regexp.MustCompile(`^[0-9a-f]{7,40}$`)
+	for i := len(lines) - 1; i >= 0; i-- {
+		l := strings.TrimSpace(lines[i])
+		if shaRegex.MatchString(l) {
+			currCommit = l
+			break
+		}
+	}
+
+	// fallback to old behavior if no matching line found
+	if currCommit == "" {
+		currCommit = strings.Trim(string(outputRevParseCmd), "\n")
+	}
 
 	logger.Debug("Comparing PR ref %q to local ref %q", targetRef, currCommit)
 
