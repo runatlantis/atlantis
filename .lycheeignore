@@ -1,3 +1,4 @@
 # Ignore file for the https://github.com/lycheeverse/lychee/ website link checker
 
 # These sites have bot protection which causes a 403 Network error: Forbidden when checking
+https://medium.com/
