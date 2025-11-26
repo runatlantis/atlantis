@@ -21,28 +21,9 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
-
-//go:generate pegomock generate --package mocks -o mocks/mock_backend.go Backend
-
-// Backend is an implementation of the locking API we require.
-type Backend interface {
-	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
-	Unlock(project models.Project, workspace string) (*models.ProjectLock, error)
-	List() ([]models.ProjectLock, error)
-	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
-	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
-	UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error
-	GetPullStatus(pull models.PullRequest) (*models.PullStatus, error)
-	DeletePullStatus(pull models.PullRequest) error
-	UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error)
-
-	LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error)
-	UnlockCommand(cmdName command.Name) error
-	CheckCommandLock(cmdName command.Name) (*command.Lock, error)
-}
 
 // TryLockResponse results from an attempted lock.
 type TryLockResponse struct {
@@ -56,7 +37,7 @@ type TryLockResponse struct {
 
 // Client is used to perform locking actions.
 type Client struct {
-	backend Backend
+	database db.Database
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_locker.go Locker
@@ -70,9 +51,9 @@ type Locker interface {
 }
 
 // NewClient returns a new locking client.
-func NewClient(backend Backend) *Client {
+func NewClient(database db.Database) *Client {
 	return &Client{
-		backend: backend,
+		database: database,
 	}
 }
 
@@ -88,7 +69,7 @@ func (c *Client) TryLock(p models.Project, workspace string, pull models.PullReq
 		User:      user,
 		Pull:      pull,
 	}
-	lockAcquired, currLock, err := c.backend.TryLock(lock)
+	lockAcquired, currLock, err := c.database.TryLock(lock)
 	if err != nil {
 		return TryLockResponse{}, err
 	}
@@ -104,14 +85,14 @@ func (c *Client) Unlock(key string) (*models.ProjectLock, error) {
 	if err != nil {
 		return nil, err
 	}
-	return c.backend.Unlock(project, workspace)
+	return c.database.Unlock(project, workspace)
 }
 
 // List returns a map of all locks with their lock key as the map key.
 // The lock key can be used in GetLock() and Unlock().
 func (c *Client) List() (map[string]models.ProjectLock, error) {
 	m := make(map[string]models.ProjectLock)
-	locks, err := c.backend.List()
+	locks, err := c.database.List()
 	if err != nil {
 		return m, err
 	}
@@ -123,7 +104,7 @@ func (c *Client) List() (map[string]models.ProjectLock, error) {
 
 // UnlockByPull deletes all locks associated with that pull request.
 func (c *Client) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
-	return c.backend.UnlockByPull(repoFullName, pullNum)
+	return c.database.UnlockByPull(repoFullName, pullNum)
 }
 
 // GetLock attempts to get the lock stored at key. If successful,
@@ -136,7 +117,7 @@ func (c *Client) GetLock(key string) (*models.ProjectLock, error) {
 		return nil, err
 	}
 
-	projectLock, err := c.backend.GetLock(project, workspace)
+	projectLock, err := c.database.GetLock(project, workspace)
 	if err != nil {
 		return nil, err
 	}

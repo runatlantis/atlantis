@@ -102,6 +102,12 @@
       versioning: 'go',
       groupName: 'go',
     },
+    {
+      "matchFileNames": ["Dockerfile"],
+      "matchPackageNames": ["golang"],
+      "versioning": "docker",
+      "allowedVersions": "/-alpine$/"
+    }
   ],
   customManagers: [
     {

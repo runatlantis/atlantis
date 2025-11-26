@@ -598,7 +598,7 @@ Compact:
 |-----|--------|---------|----------|----------------------|
 | run | string | none    | no       | Run a custom command |
 
-Full
+Full example:
 
 ```yaml
 - run:
@@ -610,13 +610,27 @@ Full
     output: show
 ```
 
-| Key | Type                                                         | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                             |
-|-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| run | map\[string -> string\] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
+Full example, filtering output and masking matching text (`mySecret: "foo"` -> `mySecret: "<redacted>"`):
+
+```yaml
+- run:
+    command: custom-command arg1 arg2
+    shell: sh
+    shellArgs:
+     - "--debug"
+     - "-c"
+    output:
+      - strip_refreshing
+      - filter_regex: "((?i)secret:\\s\")[^\"]*"
+```
+
+| Key | Type | Default | Required | Description |
+|-----|-----|-----|-----|-----|
+| run | map\[string -> string\] | none | no | Run a custom command |
+| run.command | string | none | yes | Shell command to run |
 | run.shell | string | "sh" | no | Name of the shell to use for command execution |
 | run.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
-| run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
+| run.output | string or []string or []any | "show" | no | How to post-process the output of this command when posted in the PR comment. The options are:<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command <br/> `filter_regex: "<regex_pattern>"` - masks sensitive text in Atlantis comments by replacing regex matches with &lt;redacted&gt;. Can be used multiple times (processed in order). Only filters inline comments - full plan links still show unfiltered results. |
 
 #### Native Environment Variables
 
@@ -649,6 +663,9 @@ Full
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
+  * `ATLANTIS_PR_APPROVED` - "true" if the PR is approved
+  * `ATLANTIS_PR_MERGEABLE` - "true" if the PR is mergeable
+
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis

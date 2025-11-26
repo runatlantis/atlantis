@@ -208,7 +208,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 			// here because when constructing the cases we don't yet know the
 			// temp dir.
 			Equals(t, c.ExpDescription, desc)
-			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
+			expOut := strings.ReplaceAll(c.ExpOut, "$DIR", tmpDir)
 			projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
 				Any[models.WorkflowHookCommandContext](), Eq(expOut), Eq(false))
 		})

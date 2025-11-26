@@ -10,6 +10,7 @@ func TestStrip(t *testing.T) {
 	}{
 		{
 			name: "strip ansi",
+			//nolint:staticcheck // keep literal ANSI escape chars to match actual output
 			str: `
 [32m+[0m create
 [0m[1mPlan:[0m 3 to add, 0 to change, 0 to destroy.

@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/go-github/v71/github"
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -88,7 +88,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 		Matched           bool
 		Targeted          bool
 		VCSStatusSilence  bool
-		PrevApplyStored   bool // stores a 1/1 passing apply in the backend
+		PrevApplyStored   bool // stores a 1/1 passing apply in the database
 		ExpVCSStatusSet   bool
 		ExpVCSStatusTotal int
 		ExpVCSStatusSucc  int
@@ -140,7 +140,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
@@ -149,7 +149,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 			vcsClient := setup(t, func(tc *TestConfig) {
 				tc.SilenceNoProjects = true
 				tc.silenceVCSStatusNoProjects = c.VCSStatusSilence
-				tc.backend = db
+				tc.database = db
 			})
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")

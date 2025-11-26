@@ -21,8 +21,8 @@ import (
 	"strings"
 
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/db/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking"
-	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
@@ -38,10 +38,10 @@ var pl = models.ProjectLock{Project: project, Pull: pull, User: user, Workspace:
 
 func TestTryLock_Err(t *testing.T) {
 	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.TryLock(Any[models.ProjectLock]())).ThenReturn(false, models.ProjectLock{}, errExpected)
-	t.Log("when the backend returns an error, TryLock should return that error")
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	When(database.TryLock(Any[models.ProjectLock]())).ThenReturn(false, models.ProjectLock{}, errExpected)
+	t.Log("when the database returns an error, TryLock should return that error")
+	l := locking.NewClient(database)
 	_, err := l.TryLock(project, workspace, pull, user)
 	Equals(t, err, err)
 }
@@ -49,9 +49,9 @@ func TestTryLock_Err(t *testing.T) {
 func TestTryLock_Success(t *testing.T) {
 	RegisterMockTestingT(t)
 	currLock := models.ProjectLock{}
-	backend := mocks.NewMockBackend()
-	When(backend.TryLock(Any[models.ProjectLock]())).ThenReturn(true, currLock, nil)
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	When(database.TryLock(Any[models.ProjectLock]())).ThenReturn(true, currLock, nil)
+	l := locking.NewClient(database)
 	r, err := l.TryLock(project, workspace, pull, user)
 	Ok(t, err)
 	Equals(t, locking.TryLockResponse{LockAcquired: true, CurrLock: currLock, LockKey: "owner/repo/path/workspace"}, r)
@@ -59,8 +59,8 @@ func TestTryLock_Success(t *testing.T) {
 
 func TestUnlock_InvalidKey(t *testing.T) {
 	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	l := locking.NewClient(database)
 
 	_, err := l.Unlock("invalidkey")
 	Assert(t, err != nil, "expected err")
@@ -69,19 +69,19 @@ func TestUnlock_InvalidKey(t *testing.T) {
 
 func TestUnlock_Err(t *testing.T) {
 	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.Unlock(Any[models.Project](), Any[string]())).ThenReturn(nil, errExpected)
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	When(database.Unlock(Any[models.Project](), Any[string]())).ThenReturn(nil, errExpected)
+	l := locking.NewClient(database)
 	_, err := l.Unlock("owner/repo/path/workspace")
 	Equals(t, err, err)
-	backend.VerifyWasCalledOnce().Unlock(project, "workspace")
+	database.VerifyWasCalledOnce().Unlock(project, "workspace")
 }
 
 func TestUnlock(t *testing.T) {
 	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.Unlock(Any[models.Project](), Any[string]())).ThenReturn(&pl, nil)
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	When(database.Unlock(Any[models.Project](), Any[string]())).ThenReturn(&pl, nil)
+	l := locking.NewClient(database)
 	lock, err := l.Unlock("owner/repo/path/workspace")
 	Ok(t, err)
 	Equals(t, &pl, lock)
@@ -89,18 +89,18 @@ func TestUnlock(t *testing.T) {
 
 func TestList_Err(t *testing.T) {
 	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.List()).ThenReturn(nil, errExpected)
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	When(database.List()).ThenReturn(nil, errExpected)
+	l := locking.NewClient(database)
 	_, err := l.List()
 	Equals(t, errExpected, err)
 }
 
 func TestList(t *testing.T) {
 	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.List()).ThenReturn([]models.ProjectLock{pl}, nil)
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	When(database.List()).ThenReturn([]models.ProjectLock{pl}, nil)
+	l := locking.NewClient(database)
 	list, err := l.List()
 	Ok(t, err)
 	Equals(t, map[string]models.ProjectLock{
@@ -110,17 +110,17 @@ func TestList(t *testing.T) {
 
 func TestUnlockByPull(t *testing.T) {
 	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.UnlockByPull("owner/repo", 1)).ThenReturn(nil, errExpected)
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	When(database.UnlockByPull("owner/repo", 1)).ThenReturn(nil, errExpected)
+	l := locking.NewClient(database)
 	_, err := l.UnlockByPull("owner/repo", 1)
 	Equals(t, errExpected, err)
 }
 
 func TestGetLock_BadKey(t *testing.T) {
 	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	l := locking.NewClient(database)
 	_, err := l.GetLock("invalidkey")
 	Assert(t, err != nil, "err should not be nil")
 	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected different err")
@@ -128,18 +128,18 @@ func TestGetLock_BadKey(t *testing.T) {
 
 func TestGetLock_Err(t *testing.T) {
 	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.GetLock(project, workspace)).ThenReturn(nil, errExpected)
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	When(database.GetLock(project, workspace)).ThenReturn(nil, errExpected)
+	l := locking.NewClient(database)
 	_, err := l.GetLock("owner/repo/path/workspace")
 	Equals(t, errExpected, err)
 }
 
 func TestGetLock(t *testing.T) {
 	RegisterMockTestingT(t)
-	backend := mocks.NewMockBackend()
-	When(backend.GetLock(project, workspace)).ThenReturn(&pl, nil)
-	l := locking.NewClient(backend)
+	database := mocks.NewMockDatabase()
+	When(database.GetLock(project, workspace)).ThenReturn(&pl, nil)
+	l := locking.NewClient(database)
 	lock, err := l.GetLock("owner/repo/path/workspace")
 	Ok(t, err)
 	Equals(t, &pl, lock)
@@ -192,61 +192,61 @@ func TestApplyLocker(t *testing.T) {
 	}
 
 	t.Run("LockApply", func(t *testing.T) {
-		t.Run("backend errors", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+		t.Run("database errors", func(t *testing.T) {
+			database := mocks.NewMockDatabase()
 
-			When(backend.LockCommand(Any[command.Name](), Any[time.Time]())).ThenReturn(nil, errExpected)
-			l := locking.NewApplyClient(backend, false, false)
+			When(database.LockCommand(Any[command.Name](), Any[time.Time]())).ThenReturn(nil, errExpected)
+			l := locking.NewApplyClient(database, false, false)
 			lock, err := l.LockApply()
 			Equals(t, errExpected, err)
 			Assert(t, !lock.Locked, "exp false")
 		})
 
 		t.Run("can't lock if apply is omitted from userConfig.AllowCommands", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			database := mocks.NewMockDatabase()
 
-			l := locking.NewApplyClient(backend, true, false)
+			l := locking.NewApplyClient(database, true, false)
 			_, err := l.LockApply()
 			ErrEquals(t, "apply is omitted from AllowCommands; Apply commands are locked globally until flag is updated", err)
 
-			backend.VerifyWasCalled(Never()).LockCommand(Any[command.Name](), Any[time.Time]())
+			database.VerifyWasCalled(Never()).LockCommand(Any[command.Name](), Any[time.Time]())
 		})
 
 		t.Run("succeeds", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			database := mocks.NewMockDatabase()
 
-			When(backend.LockCommand(Any[command.Name](), Any[time.Time]())).ThenReturn(applyLock, nil)
-			l := locking.NewApplyClient(backend, false, false)
+			When(database.LockCommand(Any[command.Name](), Any[time.Time]())).ThenReturn(applyLock, nil)
+			l := locking.NewApplyClient(database, false, false)
 			lock, _ := l.LockApply()
 			Assert(t, lock.Locked, "exp lock present")
 		})
 	})
 
 	t.Run("UnlockApply", func(t *testing.T) {
-		t.Run("backend fails", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+		t.Run("database fails", func(t *testing.T) {
+			database := mocks.NewMockDatabase()
 
-			When(backend.UnlockCommand(Any[command.Name]())).ThenReturn(errExpected)
-			l := locking.NewApplyClient(backend, false, false)
+			When(database.UnlockCommand(Any[command.Name]())).ThenReturn(errExpected)
+			l := locking.NewApplyClient(database, false, false)
 			err := l.UnlockApply()
 			Equals(t, errExpected, err)
 		})
 
 		t.Run("can't lock if apply is omitted from userConfig.AllowCommands", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			database := mocks.NewMockDatabase()
 
-			l := locking.NewApplyClient(backend, true, false)
+			l := locking.NewApplyClient(database, true, false)
 			err := l.UnlockApply()
 			ErrEquals(t, "apply commands are disabled until AllowCommands flag is updated", err)
 
-			backend.VerifyWasCalled(Never()).UnlockCommand(Any[command.Name]())
+			database.VerifyWasCalled(Never()).UnlockCommand(Any[command.Name]())
 		})
 
 		t.Run("succeeds", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			database := mocks.NewMockDatabase()
 
-			When(backend.UnlockCommand(Any[command.Name]())).ThenReturn(nil)
-			l := locking.NewApplyClient(backend, false, false)
+			When(database.UnlockCommand(Any[command.Name]())).ThenReturn(nil)
+			l := locking.NewApplyClient(database, false, false)
 			err := l.UnlockApply()
 			Equals(t, nil, err)
 		})
@@ -255,30 +255,30 @@ func TestApplyLocker(t *testing.T) {
 
 	t.Run("CheckApplyLock", func(t *testing.T) {
 		t.Run("fails", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			database := mocks.NewMockDatabase()
 
-			When(backend.CheckCommandLock(Any[command.Name]())).ThenReturn(nil, errExpected)
-			l := locking.NewApplyClient(backend, false, false)
+			When(database.CheckCommandLock(Any[command.Name]())).ThenReturn(nil, errExpected)
+			l := locking.NewApplyClient(database, false, false)
 			lock, err := l.CheckApplyLock()
 			Equals(t, errExpected, err)
 			Equals(t, lock.Locked, false)
 		})
 
 		t.Run("when apply is not in AllowCommands always return a lock", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			database := mocks.NewMockDatabase()
 
-			l := locking.NewApplyClient(backend, true, false)
+			l := locking.NewApplyClient(database, true, false)
 			lock, err := l.CheckApplyLock()
 			Ok(t, err)
 			Equals(t, lock.Locked, true)
-			backend.VerifyWasCalled(Never()).CheckCommandLock(Any[command.Name]())
+			database.VerifyWasCalled(Never()).CheckCommandLock(Any[command.Name]())
 		})
 
 		t.Run("UnlockCommand succeeds", func(t *testing.T) {
-			backend := mocks.NewMockBackend()
+			database := mocks.NewMockDatabase()
 
-			When(backend.CheckCommandLock(Any[command.Name]())).ThenReturn(applyLock, nil)
-			l := locking.NewApplyClient(backend, false, false)
+			When(database.CheckCommandLock(Any[command.Name]())).ThenReturn(applyLock, nil)
+			l := locking.NewApplyClient(database, false, false)
 			lock, err := l.CheckApplyLock()
 			Equals(t, nil, err)
 			Assert(t, lock.Locked, "exp lock present")

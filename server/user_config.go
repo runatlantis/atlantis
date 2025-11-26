@@ -27,6 +27,7 @@ type UserConfig struct {
 	AzureDevopsWebhookPassword  string `mapstructure:"azuredevops-webhook-password"`
 	AzureDevopsWebhookUser      string `mapstructure:"azuredevops-webhook-user"`
 	AzureDevOpsHostname         string `mapstructure:"azuredevops-hostname"`
+	BitbucketApiUser            string `mapstructure:"bitbucket-api-user"`
 	BitbucketBaseURL            string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken              string `mapstructure:"bitbucket-token"`
 	BitbucketUser               string `mapstructure:"bitbucket-user"`

@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/go-github/v71/github"
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -26,7 +26,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 		Matched           bool
 		Targeted          bool
 		VCSStatusSilence  bool
-		PrevPlanStored    bool // stores a 1/1 passing plan in the backend
+		PrevPlanStored    bool // stores a 1/1 passing plan in the database
 		ExpVCSStatusSet   bool
 		ExpVCSStatusTotal int
 		ExpVCSStatusSucc  int
@@ -78,7 +78,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
@@ -87,7 +87,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 			vcsClient := setup(t, func(tc *TestConfig) {
 				tc.SilenceNoProjects = true
 				tc.silenceVCSStatusNoProjects = c.VCSStatusSilence
-				tc.backend = db
+				tc.database = db
 			})
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
@@ -508,14 +508,14 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			// vcsClient := setup(t)
 
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {
-				tc.backend = db
+				tc.database = db
 			})
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
@@ -570,7 +570,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 		Description            string
 		ProjectContexts        []command.ProjectContext
 		ProjectResults         []command.ProjectResult
-		PrevPlanStored         bool // stores a previous "No changes" plan in the backend
+		PrevPlanStored         bool // stores a previous "No changes" plan in the database
 		DoNotUpdateApply       bool // certain circumtances we want to skip the call to update apply
 		ExpVCSApplyStatusTotal int
 		ExpVCSApplyStatusSucc  int
@@ -750,14 +750,14 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {
-				tc.backend = db
+				tc.database = db
 			})
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")

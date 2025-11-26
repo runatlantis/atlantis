@@ -64,6 +64,7 @@ const (
 	AutoplanModules                  = "autoplan-modules"
 	AutoplanModulesFromProjects      = "autoplan-modules-from-projects"
 	AutoplanFileListFlag             = "autoplan-file-list"
+	BitbucketApiUserFlag             = "bitbucket-api-user"
 	BitbucketBaseURLFlag             = "bitbucket-base-url"
 	BitbucketTokenFlag               = "bitbucket-token"
 	BitbucketUserFlag                = "bitbucket-user"
@@ -250,8 +251,11 @@ var stringFlags = map[string]stringFlag{
 			" A custom Workflow that uses autoplan 'when_modified' will ignore this value.",
 		defaultValue: DefaultAutoplanFileList,
 	},
+	BitbucketApiUserFlag: {
+		description: "Bitbucket username for API calls. If not set, defaults to bitbucket-user for backward compatibility. Can also be specified via the ATLANTIS_BITBUCKET_API_USER environment variable.",
+	},
 	BitbucketUserFlag: {
-		description: "Bitbucket username of API user.",
+		description: "Bitbucket username for git operations.",
 	},
 	BitbucketTokenFlag: {
 		description: "Bitbucket app password of API user. Can also be specified via the ATLANTIS_BITBUCKET_TOKEN environment variable.",

@@ -111,7 +111,7 @@ func (c *GiteaClient) GetModifiedFiles(logger logging.SimpleLogging, repo models
 
 	for page < nextPage {
 		page = +1
-		listOptions.ListOptions.Page = page
+		listOptions.Page = page
 		files, resp, err := c.giteaClient.ListPullRequestFiles(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 		if err != nil {
 			logger.Debug("[page %d] GET /repos/%v/%v/pulls/%d/files returned: %v", page, repo.Owner, repo.Name, pull.Num, resp.StatusCode)
@@ -253,7 +253,7 @@ func (c *GiteaClient) PullIsApproved(logger logging.SimpleLogging, repo models.R
 
 	for page < nextPage {
 		page = +1
-		listOptions.ListOptions.Page = page
+		listOptions.Page = page
 		pullReviews, resp, err := c.giteaClient.ListPullReviews(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 
 		if err != nil {
@@ -283,18 +283,20 @@ func (c *GiteaClient) PullIsApproved(logger logging.SimpleLogging, repo models.R
 }
 
 // PullIsMergeable returns true if the pull request is mergeable
-func (c *GiteaClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (bool, error) {
+func (c *GiteaClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if Gitea pull request %d is mergeable", pull.Num)
 
 	pullRequest, _, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pull.Num))
 
 	if err != nil {
-		return false, err
+		return models.MergeableStatus{}, err
 	}
 
 	logger.Debug("Gitea pull request is mergeable: %v (%v)", pullRequest.Mergeable, pull.Num)
 
-	return pullRequest.Mergeable, nil
+	return models.MergeableStatus{
+		IsMergeable: pullRequest.Mergeable,
+	}, nil
 }
 
 // UpdateStatus updates the commit status to state for pull. src is the
@@ -354,7 +356,7 @@ func (c *GiteaClient) DiscardReviews(_ logging.SimpleLogging, repo models.Repo, 
 
 	for page < nextPage {
 		page = +1
-		listOptions.ListOptions.Page = page
+		listOptions.Page = page
 		pullReviews, resp, err := c.giteaClient.ListPullReviews(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 
 		if err != nil {
@@ -421,13 +423,12 @@ func (c *GiteaClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (c *GiteaClient) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {
-	logger.Debug("Getting file content for %s in Gitea pull request %d", fileName, pull.Num)
-
-	content, resp, err := c.giteaClient.GetContents(pull.BaseRepo.Owner, pull.BaseRepo.Name, pull.HeadCommit, fileName)
+func (c *GiteaClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+	logger.Debug("Getting Gitea file content for file '%s'", fileName)
+	content, resp, err := c.giteaClient.GetContents(repo.Owner, repo.Name, branch, fileName)
 
 	if err != nil {
-		logger.Debug("GET /repos/%v/%v/contents/%s?ref=%v returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, fileName, pull.HeadCommit, resp.StatusCode)
+		logger.Debug("GET /repos/%v/%v/contents/%s?ref=%v returned: %v", repo.Owner, repo.Name, fileName, branch, resp.StatusCode)
 		return false, nil, err
 	}
 
@@ -480,7 +481,7 @@ func (c *GiteaClient) GetPullLabels(logger logging.SimpleLogging, repo models.Re
 
 	for page < nextPage {
 		page = +1
-		opts.ListOptions.Page = page
+		opts.Page = page
 
 		labels, resp, err := c.giteaClient.GetIssueLabels(repo.Owner, repo.Name, int64(pull.Num), opts)
 

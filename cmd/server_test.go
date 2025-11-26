@@ -69,6 +69,7 @@ var testFlags = map[string]interface{}{
 	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
 	AutoplanFileListFlag:             "**/*.tf,**/*.yml",
+	BitbucketApiUserFlag:             "bitbucket-api-user",
 	BitbucketBaseURLFlag:             "https://bitbucket-base-url.com",
 	BitbucketTokenFlag:               "bitbucket-token",
 	BitbucketUserFlag:                "bitbucket-user",

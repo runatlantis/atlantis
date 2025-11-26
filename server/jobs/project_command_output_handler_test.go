@@ -1,6 +1,7 @@
 package jobs_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -128,7 +129,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		close(ch)
 
 		expectedMsgs := []string{Msg, Msg}
-		assert.Equal(t, len(expectedMsgs), len(receivedMsgs))
+		assert.Len(t, receivedMsgs, len(expectedMsgs))
 		for i := range expectedMsgs {
 			assert.Equal(t, expectedMsgs[i], receivedMsgs[i])
 		}
@@ -251,4 +252,176 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		assert.True(t, <-opComplete)
 	})
+}
+
+// TestRaceConditionPrevention tests that our fixes prevent the specific race conditions
+func TestRaceConditionPrevention(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	prjCmdOutputChan := make(chan *jobs.ProjectCmdOutputLine)
+	handler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutputChan, logger)
+
+	// Start the handler
+	go handler.Handle()
+
+	ctx := createTestProjectCmdContext(t)
+	pullInfo := jobs.PullInfo{
+		PullNum:      ctx.Pull.Num,
+		Repo:         ctx.BaseRepo.Name,
+		RepoFullName: ctx.BaseRepo.FullName,
+		ProjectName:  ctx.ProjectName,
+		Path:         ctx.RepoRelDir,
+		Workspace:    ctx.Workspace,
+	}
+
+	t.Run("concurrent pullToJobMapping access", func(t *testing.T) {
+		var wg sync.WaitGroup
+		numGoroutines := 50
+
+		// This test specifically targets the original race condition
+		// that was fixed by using sync.Map for pullToJobMapping
+
+		// Concurrent writers (Handle() method updates the mapping)
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				// Send message which triggers Handle() to update pullToJobMapping
+				handler.Send(ctx, fmt.Sprintf("message-%d", id), false)
+			}(i)
+		}
+
+		// Concurrent readers (GetPullToJobMapping() method reads the mapping)
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				// This would race with Handle() before the sync.Map fix
+				mappings := handler.GetPullToJobMapping()
+				_ = mappings
+			}()
+		}
+
+		// Concurrent readers of GetJobIDMapForPull
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				// This would also race with Handle() before the fix
+				jobMap := handler.(*jobs.AsyncProjectCommandOutputHandler).GetJobIDMapForPull(pullInfo)
+				_ = jobMap
+			}()
+		}
+
+		wg.Wait()
+	})
+
+	t.Run("concurrent buffer access", func(t *testing.T) {
+		var wg sync.WaitGroup
+		numGoroutines := 30
+
+		// First populate some data
+		handler.Send(ctx, "initial", false)
+		time.Sleep(5 * time.Millisecond)
+
+		// Test the race condition we fixed in GetProjectOutputBuffer
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				// This would race with completeJob() before the RLock fix
+				buffer := handler.(*jobs.AsyncProjectCommandOutputHandler).GetProjectOutputBuffer(ctx.JobID)
+				_ = buffer
+			}()
+		}
+
+		// Concurrent operations that modify the buffer
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				if id%10 == 0 {
+					// Occasionally complete a job to test completeJob() race
+					handler.Send(ctx, "", true)
+				} else {
+					handler.Send(ctx, "test", false)
+				}
+			}(i)
+		}
+
+		wg.Wait()
+	})
+
+	// Clean up
+	close(prjCmdOutputChan)
+}
+
+// TestHighConcurrencyStress performs stress testing with many concurrent operations
+func TestHighConcurrencyStress(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping stress test in short mode")
+	}
+
+	logger := logging.NewNoopLogger(t)
+	prjCmdOutputChan := make(chan *jobs.ProjectCmdOutputLine)
+	handler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutputChan, logger)
+
+	// Start the handler
+	go handler.Handle()
+
+	var wg sync.WaitGroup
+	numWorkers := 20
+	operationsPerWorker := 100
+
+	// Multiple workers performing mixed operations
+	wg.Add(numWorkers)
+	for worker := 0; worker < numWorkers; worker++ {
+		go func(workerID int) {
+			defer wg.Done()
+
+			ctx := createTestProjectCmdContext(t)
+			ctx.JobID = "worker-job-" + fmt.Sprintf("%d", workerID)
+			ctx.Pull.Num = workerID
+
+			pullInfo := jobs.PullInfo{
+				PullNum:      ctx.Pull.Num,
+				Repo:         ctx.BaseRepo.Name,
+				RepoFullName: ctx.BaseRepo.FullName,
+				ProjectName:  ctx.ProjectName,
+				Path:         ctx.RepoRelDir,
+				Workspace:    ctx.Workspace,
+			}
+
+			for op := 0; op < operationsPerWorker; op++ {
+				switch op % 6 {
+				case 0:
+					// Send messages
+					handler.Send(ctx, "stress test message", false)
+				case 1:
+					// Read pull to job mapping
+					mappings := handler.GetPullToJobMapping()
+					_ = mappings
+				case 2:
+					// Read job ID map for pull
+					jobMap := handler.(*jobs.AsyncProjectCommandOutputHandler).GetJobIDMapForPull(pullInfo)
+					_ = jobMap
+				case 3:
+					// Read project output buffer
+					buffer := handler.(*jobs.AsyncProjectCommandOutputHandler).GetProjectOutputBuffer(ctx.JobID)
+					_ = buffer
+				case 4:
+					// Read receiver buffer
+					receivers := handler.(*jobs.AsyncProjectCommandOutputHandler).GetReceiverBufferForPull(ctx.JobID)
+					_ = receivers
+				case 5:
+					// Occasional cleanup
+					if op%20 == 0 {
+						handler.CleanUp(pullInfo)
+					}
+				}
+			}
+		}(worker)
+	}
+
+	wg.Wait()
+	close(prjCmdOutputChan)
 }

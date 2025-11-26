@@ -41,8 +41,8 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				PlanRequirements: fullRequirements,
 				PullReqStatus: models.PullReqStatus{
-					ApprovalStatus: models.ApprovalStatus{IsApproved: true},
-					Mergeable:      true,
+					ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
@@ -66,9 +66,25 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 			name: "fail by no mergeable",
 			ctx: command.ProjectContext{
 				PlanRequirements: []string{raw.MergeableRequirement},
-				PullReqStatus:    models.PullReqStatus{Mergeable: false},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
 			},
 			wantFailure: "Pull request must be mergeable before running plan.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "fail by no mergeable with reason",
+			ctx: command.ProjectContext{
+				PlanRequirements: []string{raw.MergeableRequirement},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable: false,
+						Reason:      "some reason",
+					},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running plan (some reason).",
 			wantErr:     assert.NoError,
 		},
 		{
@@ -125,8 +141,8 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				ApplyRequirements: fullRequirements,
 				PullReqStatus: models.PullReqStatus{
-					ApprovalStatus: models.ApprovalStatus{IsApproved: true},
-					Mergeable:      true,
+					ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
@@ -174,7 +190,9 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			name: "fail by no mergeable",
 			ctx: command.ProjectContext{
 				ApplyRequirements: []string{raw.MergeableRequirement},
-				PullReqStatus:     models.PullReqStatus{Mergeable: false},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
 			},
 			wantFailure: "Pull request must be mergeable before running apply.",
 			wantErr:     assert.NoError,
@@ -358,8 +376,8 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				ImportRequirements: fullRequirements,
 				PullReqStatus: models.PullReqStatus{
-					ApprovalStatus: models.ApprovalStatus{IsApproved: true},
-					Mergeable:      true,
+					ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
@@ -383,7 +401,9 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 			name: "fail by no mergeable",
 			ctx: command.ProjectContext{
 				ImportRequirements: []string{raw.MergeableRequirement},
-				PullReqStatus:      models.PullReqStatus{Mergeable: false},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
 			},
 			wantFailure: "Pull request must be mergeable before running import.",
 			wantErr:     assert.NoError,

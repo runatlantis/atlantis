@@ -81,7 +81,7 @@ func (d *ClientProxy) DiscardReviews(logger logging.SimpleLogging, repo models.R
 	return d.clients[repo.VCSHost.Type].DiscardReviews(logger, repo, pull)
 }
 
-func (d *ClientProxy) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
+func (d *ClientProxy) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	return d.clients[repo.VCSHost.Type].PullIsMergeable(logger, repo, pull, vcsstatusname, ignoreVCSStatusNames)
 }
 
@@ -101,8 +101,8 @@ func (d *ClientProxy) GetTeamNamesForUser(logger logging.SimpleLogging, repo mod
 	return d.clients[repo.VCSHost.Type].GetTeamNamesForUser(logger, repo, user)
 }
 
-func (d *ClientProxy) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {
-	return d.clients[pull.BaseRepo.VCSHost.Type].GetFileContent(logger, pull, fileName)
+func (d *ClientProxy) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+	return d.clients[repo.VCSHost.Type].GetFileContent(logger, repo, branch, fileName)
 }
 
 func (d *ClientProxy) SupportsSingleFileDownload(repo models.Repo) bool {

@@ -71,7 +71,7 @@ workflows:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -128,7 +128,7 @@ projects:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -189,7 +189,7 @@ projects:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -258,7 +258,7 @@ projects:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -414,7 +414,7 @@ workflows:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -477,7 +477,7 @@ projects:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -543,7 +543,7 @@ workflows:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -595,7 +595,7 @@ projects:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -685,7 +685,7 @@ projects:
 							BaseRepo: baseRepo,
 						},
 						PullRequestStatus: models.PullReqStatus{
-							Mergeable: true,
+							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
 					}, cmd, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
 
@@ -809,7 +809,7 @@ projects:
 				Log:                logging.NewNoopLogger(t),
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "myproject_1",
@@ -902,7 +902,7 @@ projects:
 						Log:   logging.NewNoopLogger(t),
 						Scope: statsScope,
 						PullRequestStatus: models.PullReqStatus{
-							Mergeable: true,
+							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
 					}, cmd, "", "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true)
 
@@ -992,7 +992,7 @@ repos:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -1054,7 +1054,7 @@ workflows:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -1148,7 +1148,7 @@ workflows:
 						BaseRepo: baseRepo,
 					},
 					PullRequestStatus: models.PullReqStatus{
-						Mergeable: true,
+						MergeableStatus: models.MergeableStatus{IsMergeable: true},
 					},
 				}, command.Plan, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
 
@@ -1300,7 +1300,7 @@ projects:
 							BaseRepo: baseRepo,
 						},
 						PullRequestStatus: models.PullReqStatus{
-							Mergeable: true,
+							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
 					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true)
 					Equals(t, c.expLen, len(ctxs))
@@ -1366,6 +1366,86 @@ projects:
 `,
 			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
 			expLen:        3,
+		},
+		"autodiscover enabled, disabled at repo level": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: disabled
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        1,
+		},
+		"autodiscover respects ignore_paths in repo config": {
+			globalCfg: `
+repos:
+- id: /.*/
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - project3
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        2,
+		},
+		"autodiscover respects ignore_paths in global config": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+    ignore_paths:
+    - project3
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        2,
+		},
+		"autodiscover skips ignore_paths in repo when configured in global": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+    ignore_paths:
+    - project[0-9]
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - project3
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        1,
 		},
 	}
 

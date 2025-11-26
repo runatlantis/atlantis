@@ -224,7 +224,7 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 			// Replace the actual dir with ??? to allow for comparison.
 			var actPlansComparable []events.PendingPlan
 			for _, p := range actPlans {
-				p.RepoDir = strings.Replace(p.RepoDir, tmpDir, "???", -1)
+				p.RepoDir = strings.ReplaceAll(p.RepoDir, tmpDir, "???")
 				actPlansComparable = append(actPlansComparable, p)
 			}
 			Equals(t, c.expPlans, actPlansComparable)

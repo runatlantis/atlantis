@@ -3,8 +3,9 @@
 # Table of Contents <!-- omit in toc -->
 - [Reporting Issues](#reporting-issues)
 - [Reporting Security Issues](#reporting-security-issues)
-- [Updating The Website](#updating-the-website)
+- [Creating a Pull Request](#creating-a-pull-request)
 - [Developing](#developing)
+  - [Updating The Website](#updating-the-website)
   - [Running Atlantis Locally](#running-atlantis-locally)
   - [Running Atlantis With Local Changes](#running-atlantis-with-local-changes)
     - [Rebuilding](#rebuilding)
@@ -28,12 +29,22 @@
 # Reporting Security Issues
 We take security issues seriously. Please report a security vulnerability to the maintainers using [private vulnerability reporting](https://github.com/runatlantis/atlantis/security/advisories/new).
 
-# Updating The Website
+# Creating a Pull Request
+* Fork the [Atlantis repo](https://github.com/runatlantis/atlantis)
+* Create a new branch, commit your changes
+  * Make sure to sign your commits, for example by adding `-s` when committing, see more [here](https://probot.github.io/apps/dco/).
+* Create a PR
+  * Make sure your title follows Conventional Commits by using a prefix like `fix:` or `feat:`, see more [here](https://www.conventionalcommits.org/en/v1.0.0/).
+  * Link to any issues, including one you may have made
+
+If you have any questions about the contribution process, see [Atlantis Contributors on Slack](https://cloud-native.slack.com/archives/C07T45G27EZ).
+
+# Developing
+
+## Updating The Website
 * To view the generated website locally, run `npm website:dev` and then
 open your browser to http://localhost:8080.
 * The website will be regenerated when your pull request is merged to main.
-
-# Developing
 
 ## Running Atlantis Locally
 * Clone the repo from https://github.com/runatlantis/atlantis/
@@ -175,35 +186,3 @@ go generate server/events/project_command_builder.go
 ```
 
 Alternatively, you can run `make go-generate` to execute `go generate` across all packages
-
-
-# Backporting Fixes
-Atlantis now uses a [cherry-pick-bot](https://github.com/googleapis/repo-automation-bots/tree/main/packages/cherry-pick-bot) from Google. The bot assists in maintaining changes across releases branches by easily cherry-picking changes via pull requests.
-
-Maintainers and Core Contributors can add a comment to a pull request:
-
-```sh
-/cherry-pick target-branch-name
-```
-
-target-branch-name is the branch to cherry-pick to. cherry-pick-bot will cherry-pick the merged commit to a new branch (created from the target branch) and open a new pull request to the target branch.
-
-The bot will immediately try to cherry-pick a merged PR. On unmerged pull request, it will not do anything immediately, but wait until merge. You can comment multiple times on a PR for multiple release branches.
-
-## Manual Backporting Fixes
-The bot will fail to cherry-pick if the feature branches' git history is not linear (merge commits instead of rebase). In that case, you will need to manually cherry-pick the squashed merged commit from main to the release branch
-
-1. Switch to the release branch intended for the fix.
-1. Run `git cherry-pick <sha>` with the commit hash from the main branch.
-1. Push the newly cherry-picked commit up to the remote release branch.
-
-# Creating a New Release
-1. (Major/Minor release only) Create a new release branch `release-x.y`
-1. Go to https://github.com/runatlantis/atlantis/releases and click "Draft a new release"
-    1. Prefix version with `v` and increment based on last release.
-    1. The title of the release is the same as the tag (ex. v0.2.2)
-    1. Fill in description by clicking on the "Generate Release Notes" button.
-        1. You may have to manually move around some commit titles as they are determined by PR labels (see .github/labeler.yml & .github/release.yml)
-    1. (Latest Major/Minor branches only) Make sure the release is set as latest
-        1. Don't set "latest release" for patches on older release branches.
-1. Check and update the default version in `Chart.yaml` in [the official Helm chart](https://github.com/runatlantis/helm-charts/blob/main/charts/atlantis/values.yaml) as needed.

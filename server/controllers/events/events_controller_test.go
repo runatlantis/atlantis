@@ -886,7 +886,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			// Build HTTP request.
 			requestBytes, err := os.ReadFile(filepath.Join("testdata", "bb-server-pull-deleted-event.json"))
 			// Replace the eventKey field with our event type.
-			requestJSON := strings.Replace(string(requestBytes), `"eventKey":"pr:deleted",`, fmt.Sprintf(`"eventKey":"%s",`, c.header), -1)
+			requestJSON := strings.ReplaceAll(string(requestBytes), `"eventKey":"pr:deleted",`, fmt.Sprintf(`"eventKey":"%s",`, c.header))
 			Ok(t, err)
 			req, err := http.NewRequest("POST", "/events", bytes.NewBuffer([]byte(requestJSON)))
 			Ok(t, err)

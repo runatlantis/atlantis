@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -669,6 +670,12 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 	}
 }
 
+func mustReadFile(t *testing.T, filename string) []byte {
+	ret, err := os.ReadFile(filename)
+	Ok(t, err)
+	return ret
+}
+
 func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	gitlabClientUnderTest = true
@@ -679,163 +686,259 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	vcsStatusName := "atlantis-test"
 	defaultMr := 1
 	noHeadPipelineMR := 2
-	ciMustPassSuccessMR := 3
-	ciMustPassFailureMR := 4
-	needRebaseMR := 5
+	ciMustPassMR := 3
+	needRebaseMR := 4
+	remainingApprovalsMR := 5
+	blockingDiscussionsUnresolvedMR := 6
+	workInProgressMR := 7
+	pipelineSkippedMR := 8
 
-	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
-	Ok(t, err)
+	// Any IsMergeable logic that depends on data from the project itself is too difficult to test here.
+	// See TestGitlabClient_gitlabPullIsMergeable
 
 	projectSuccess, err := os.ReadFile("testdata/gitlab-project-success.json")
 	Ok(t, err)
 
-	detailedMergeStatusCiMustPass, err := os.ReadFile("testdata/gitlab-detailed-merge-status-ci-must-pass.json")
-	Ok(t, err)
-
-	detailedMergeStatusNeedRebase, err := os.ReadFile("testdata/gitlab-detailed-merge-status-need-rebase.json")
-	Ok(t, err)
-
-	headPipelineNotAvailable, err := os.ReadFile("testdata/gitlab-head-pipeline-not-available.json")
-	Ok(t, err)
+	mrs := map[int][]byte{
+		defaultMr:                       mustReadFile(t, "testdata/gitlab-pipeline-success.json"),
+		noHeadPipelineMR:                mustReadFile(t, "testdata/gitlab-head-pipeline-not-available.json"),
+		ciMustPassMR:                    mustReadFile(t, "testdata/gitlab-detailed-merge-status-ci-must-pass.json"),
+		needRebaseMR:                    mustReadFile(t, "testdata/gitlab-detailed-merge-status-need-rebase.json"),
+		remainingApprovalsMR:            mustReadFile(t, "testdata/gitlab-pipeline-remaining-approvals.json"),
+		blockingDiscussionsUnresolvedMR: mustReadFile(t, "testdata/gitlab-pipeline-blocking-discussions-unresolved.json"),
+		workInProgressMR:                mustReadFile(t, "testdata/gitlab-pipeline-work-in-progress.json"),
+		pipelineSkippedMR:               mustReadFile(t, "testdata/gitlab-pipeline-with-pipeline-skipped.json"),
+	}
 
 	cases := []struct {
-		statusName    string
-		status        models.CommitStatus
-		gitlabVersion []string
-		mrID          int
-		expState      bool
+		statusName     string
+		status         models.CommitStatus
+		gitlabVersions []string
+		mrID           int
+		expState       models.MergeableStatus
 	}{
 		{
 			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			defaultMr,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			defaultMr,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			defaultMr,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.PendingCommitStatus,
 			gitlabServerVersions,
 			defaultMr,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.SuccessCommitStatus,
 			gitlabServerVersions,
 			defaultMr,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
-			ciMustPassSuccessMR,
-			true,
+			ciMustPassMR,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
-			ciMustPassFailureMR,
-			false,
+			ciMustPassMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+			},
+		},
+		// This MR should be listed as not mergeable. However, in older versions they don't have detailed_merge_status,
+		// so our code can only see the merge_status field (deprecated in 15.6), which says can_be_merged.
+		{
+			fmt.Sprintf("%s/apply", vcsStatusName),
+			models.SuccessCommitStatus,
+			[]string{gitlabVersionUnder15_6},
+			needRebaseMR,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
-			models.FailedCommitStatus,
-			gitlabServerVersions,
+			models.SuccessCommitStatus,
+			[]string{gitlabVersion15_6, gitlabVersionOver15_6},
 			needRebaseMR,
-			true,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Merge status is need_rebase",
+			},
 		},
 		{
 			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.PendingCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			false,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+			},
 		},
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.SuccessCommitStatus,
 			gitlabServerVersions,
 			noHeadPipelineMR,
-			true,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			remainingApprovalsMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Still require 2 approvals",
+			},
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			blockingDiscussionsUnresolvedMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocking discussions unresolved",
+			},
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			workInProgressMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Work in progress",
+			},
+		},
+		{
+			fmt.Sprintf("%s/plan", vcsStatusName),
+			models.SuccessCommitStatus,
+			gitlabServerVersions,
+			pipelineSkippedMR,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline was skipped",
+			},
 		},
 	}
-	for _, serverVersion := range gitlabServerVersions {
-		for _, c := range cases {
+	for _, c := range cases {
+		for _, serverVersion := range c.gitlabVersions {
 			t.Run(c.statusName, func(t *testing.T) {
 				testServer := httptest.NewServer(
 					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						switch r.RequestURI {
-						case "/api/v4/":
+						switch {
+						case r.RequestURI == "/api/v4/":
 							// Rate limiter requests.
 							w.WriteHeader(http.StatusOK)
-						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", defaultMr):
+
+						case strings.HasPrefix(r.RequestURI, "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/"):
+							// Extract merge request ID
+							mrPart := strings.TrimPrefix(r.RequestURI, "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/")
+							mrID, err := strconv.Atoi(mrPart)
+							if err != nil {
+								t.Errorf("invalid MR id in URI %q", r.RequestURI)
+								http.Error(w, "bad request", http.StatusBadRequest)
+								return
+							}
+							response, ok := mrs[mrID]
+							if !ok {
+								t.Errorf("invalid MR id %d", mrID)
+								http.Error(w, "not found", http.StatusNotFound)
+								return
+							}
+
 							w.WriteHeader(http.StatusOK)
-							w.Write(pipelineSuccess) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", noHeadPipelineMR):
-							w.WriteHeader(http.StatusOK)
-							w.Write(headPipelineNotAvailable) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", ciMustPassSuccessMR):
-							w.WriteHeader(http.StatusOK)
-							w.Write(detailedMergeStatusCiMustPass) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", ciMustPassFailureMR):
-							w.WriteHeader(http.StatusOK)
-							w.Write(detailedMergeStatusCiMustPass) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/runatlantis%%2Fatlantis/merge_requests/%v", needRebaseMR):
-							w.WriteHeader(http.StatusOK)
-							w.Write(detailedMergeStatusNeedRebase) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/%v", projectID):
+							w.Write(response) // nolint: errcheck
+
+						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v", projectID):
 							w.WriteHeader(http.StatusOK)
 							w.Write(projectSuccess) // nolint: errcheck
-						case fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
+						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
 							w.WriteHeader(http.StatusOK)
 							response := fmt.Sprintf(`[{"id":133702594,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"ApplySuccess","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}]`, c.status, c.statusName)
 							w.Write([]byte(response)) // nolint: errcheck
-						case "/api/v4/version":
+						case r.RequestURI == "/api/v4/version":
 							w.WriteHeader(http.StatusOK)
 							w.Header().Set("Content-Type", "application/json")
 							type version struct {
@@ -880,6 +983,159 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 				Equals(t, c.expState, mergeable)
 			})
 		}
+	}
+}
+
+func TestGitlabClient_gitlabIsMergeable(t *testing.T) {
+	// Test the helper gitlabIsMergeable directly
+
+	cases := []struct {
+		description                 string
+		mr                          *gitlab.MergeRequest
+		project                     *gitlab.Project
+		supportsDetailedMergeStatus bool
+		expected                    models.MergeableStatus
+	}{
+		{
+			description: "requires approvals",
+			mr: &gitlab.MergeRequest{
+				ApprovalsBeforeMerge: 2,
+			},
+			project: &gitlab.Project{},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Still require 2 approvals",
+			},
+		},
+		{
+			description: "blocking discussions unresolved",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: false,
+			},
+			project: &gitlab.Project{},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocking discussions unresolved",
+			},
+		},
+		{
+			description: "work in progress",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				WorkInProgress:              true,
+			},
+			project: &gitlab.Project{},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Work in progress",
+			},
+		},
+		{
+			description: "pipeline skipped and not allowed",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				HeadPipeline:                &gitlab.Pipeline{Status: "skipped"},
+			},
+			project: &gitlab.Project{
+				AllowMergeOnSkippedPipeline: false,
+			},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline was skipped",
+			},
+		},
+		{
+			description: "pipeline skipped and is allowed",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				HeadPipeline:                &gitlab.Pipeline{Status: "skipped"},
+				DetailedMergeStatus:         "mergeable",
+			},
+			supportsDetailedMergeStatus: true,
+			project: &gitlab.Project{
+				AllowMergeOnSkippedPipeline: true,
+			},
+			expected: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			description: "detailed merge status mergeable",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				DetailedMergeStatus:         "mergeable",
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected:                    models.MergeableStatus{IsMergeable: true},
+		},
+		{
+			description: "detailed merge status need_rebase",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				DetailedMergeStatus:         "need_rebase",
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Merge status is need_rebase",
+			},
+		},
+		{
+			description: "detailed merge status not mergeable",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				DetailedMergeStatus:         "blocked",
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Merge status is blocked",
+			},
+		},
+		{
+			description: "detailed merge status can_be_merged (not a valid detailed status)",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				DetailedMergeStatus:         "can_be_merged",
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Merge status is can_be_merged",
+			},
+		},
+		{
+			description: "legacy merge status can_be_merged",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				MergeStatus:                 "can_be_merged",
+			},
+			project:  &gitlab.Project{},
+			expected: models.MergeableStatus{IsMergeable: true},
+		},
+		{
+			description: "legacy merge status cannot be merged",
+			mr: &gitlab.MergeRequest{
+				BlockingDiscussionsResolved: true,
+				MergeStatus:                 "cannot_be_merged",
+			},
+			project: &gitlab.Project{},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Merge status is cannot_be_merged",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			actual := gitlabIsMergeable(c.mr, c.project, c.supportsDetailedMergeStatus)
+			Equals(t, c.expected, actual)
+		})
 	}
 }
 
@@ -1256,4 +1512,70 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGitlabClient_UpdateStatusTransitionAlreadyComplete(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
+	testServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+				w.WriteHeader(http.StatusBadRequest)
+				_, err := w.Write([]byte(`{"message": {"state": ["Cannot transition status via :run from :running"]}}`))
+				Ok(t, err)
+
+			case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha":
+				w.WriteHeader(http.StatusOK)
+
+				getCommitResponse := GetCommitResponse{
+					LastPipeline: GetCommitResponseLastPipeline{
+						ID: gitlabPipelineSuccessMrID,
+					},
+				}
+				getCommitJsonResponse, err := json.Marshal(getCommitResponse)
+				Ok(t, err)
+
+				_, err = w.Write(getCommitJsonResponse)
+				Ok(t, err)
+
+			case "/api/v4/":
+				// Rate limiter requests.
+				w.WriteHeader(http.StatusOK)
+
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		}))
+
+	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+	Ok(t, err)
+	client := &GitlabClient{
+		Client:          internalClient,
+		Version:         nil,
+		PollingInterval: 10 * time.Millisecond,
+	}
+
+	repo := models.Repo{
+		FullName: "runatlantis/atlantis",
+		Owner:    "runatlantis",
+		Name:     "atlantis",
+	}
+	err = client.UpdateStatus(
+		logger,
+		repo,
+		models.PullRequest{
+			Num:        1,
+			BaseRepo:   repo,
+			HeadCommit: "sha",
+			HeadBranch: "test",
+		},
+		models.PendingCommitStatus,
+		updateStatusSrc,
+		updateStatusDescription,
+		updateStatusTargetUrl,
+	)
+
+	Ok(t, err)
 }
