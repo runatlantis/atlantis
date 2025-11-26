@@ -70,7 +70,14 @@ jobs:
         id: lychee
         uses: lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2 # v2.6.1
         with:
-          args: --verbose --no-progress --max-concurrency 5 --max-retries 0 --accept 200,429 ./runatlantis.io
+          args: >-
+            --verbose
+            --no-progress
+            --max-concurrency 5
+            --max-retries 0
+            --accept 200,429
+            --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+            ./runatlantis.io
 
       - name: setup npm
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
