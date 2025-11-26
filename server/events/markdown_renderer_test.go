@@ -4398,14 +4398,14 @@ func TestLiveReload(t *testing.T) {
 
 			// Test that the template is updated or not based on live reload setting
 			rendered = renderer.Render(ctx, res, cmd)
-		if tt.expectReload {
-			Assert(t, strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' in rendered output, got: %s", rendered)
-			Assert(t, !strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' to NOT be in rendered output, got: %s", rendered)
-		} else {
-			Assert(t, strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' to still be in rendered output (live reload disabled), got: %s", rendered)
-			Assert(t, !strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' to NOT be in rendered output (live reload disabled), got: %s", rendered)
-		}
-	})
+			if tt.expectReload {
+				Assert(t, strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' in rendered output, got: %s", rendered)
+				Assert(t, !strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' to NOT be in rendered output, got: %s", rendered)
+			} else {
+				Assert(t, strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' to still be in rendered output (live reload disabled), got: %s", rendered)
+				Assert(t, !strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' to NOT be in rendered output (live reload disabled), got: %s", rendered)
+			}
+		})
 	}
 }
 

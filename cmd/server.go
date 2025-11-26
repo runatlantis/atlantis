@@ -409,10 +409,6 @@ var stringFlags = map[string]stringFlag{
 		description:  "Directory for custom overrides to the markdown templates used for comments.",
 		defaultValue: DefaultMarkdownTemplateOverridesDir,
 	},
-	MarkdownTemplateLiveReloadFlag: {
-		description:  "Enable live reloading of markdown templates from the override directory on each render call.",
-		defaultValue: "false",
-	},
 	StatsNamespace: {
 		description:  "Namespace for aggregating stats.",
 		defaultValue: DefaultStatsNamespace,
@@ -648,6 +644,10 @@ var boolFlags = map[string]boolFlag{
 	UseTFPluginCache: {
 		description:  "Enable the use of the Terraform plugin cache",
 		defaultValue: true,
+	},
+	MarkdownTemplateLiveReloadFlag: {
+		description:  "Enable live reloading of markdown templates from the override directory on each render call.",
+		defaultValue: false,
 	},
 }
 var intFlags = map[string]intFlag{

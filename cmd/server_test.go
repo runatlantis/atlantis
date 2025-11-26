@@ -116,6 +116,7 @@ var testFlags = map[string]interface{}{
 	LockingDBType:                    "boltdb",
 	LogLevelFlag:                     "debug",
 	MarkdownTemplateOverridesDirFlag: "/path2",
+	MarkdownTemplateLiveReloadFlag:   false,
 	MaxCommentsPerCommand:            10,
 	StatsNamespace:                   "atlantis",
 	AllowDraftPRs:                    true,
