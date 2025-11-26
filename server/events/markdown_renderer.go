@@ -18,6 +18,7 @@ import (
 	"embed"
 	"fmt"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -55,6 +56,7 @@ type MarkdownRenderer struct {
 	disableRepoLocking        bool
 	enableDiffMarkdownFormat  bool
 	markdownTemplates         *template.Template
+	templatesMu               sync.RWMutex // protects markdownTemplates
 	executableName            string
 	hideUnchangedPlanComments bool
 	quietPolicyChecks         bool
@@ -189,7 +191,9 @@ func loadTemplates(markdownTemplateOverridesDir string) *template.Template {
 // reloadTemplates reloads templates if live reload is enabled.
 func (m *MarkdownRenderer) reloadTemplates() {
 	if m.liveReloadEnabled {
+		m.templatesMu.Lock()
 		m.markdownTemplates = loadTemplates(m.markdownTemplateOverridesDir)
+		m.templatesMu.Unlock()
 	}
 }
 
@@ -198,6 +202,11 @@ func (m *MarkdownRenderer) reloadTemplates() {
 func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd PullCommand) string {
 	// Reload templates if live reload is enabled
 	m.reloadTemplates()
+
+	// Get a local copy of templates under read lock
+	m.templatesMu.RLock()
+	templates := m.markdownTemplates
+	m.templatesMu.RUnlock()
 
 	commandStr := cases.Title(language.English).String(strings.Replace(cmd.CommandName().String(), "_", " ", -1))
 	var vcsRequestType string
@@ -223,18 +232,16 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 		VcsRequestType:            vcsRequestType,
 	}
 
-	templates := m.markdownTemplates
-
 	if res.Error != nil {
 		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), "", common})
 	}
 	if res.Failure != "" {
 		return m.renderTemplateTrimSpace(templates.Lookup("failureWithLog"), failureData{res.Failure, "", common})
 	}
-	return m.renderProjectResults(ctx, res.ProjectResults, common)
+	return m.renderProjectResults(ctx, res.ProjectResults, common, templates)
 }
 
-func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []command.ProjectResult, common commonData) string {
+func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []command.ProjectResult, common commonData, templates *template.Template) string {
 	vcsHost := ctx.Pull.BaseRepo.VCSHost.Type
 
 	var resultsTmplData []projectResultTmplData
@@ -247,8 +254,6 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 	numApplySuccesses := 0
 	numApplyFailures := 0
 	numApplyErrors := 0
-
-	templates := m.markdownTemplates
 
 	for _, result := range results {
 		resultData := projectResultTmplData{

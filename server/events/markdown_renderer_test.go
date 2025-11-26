@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
@@ -4397,13 +4398,59 @@ func TestLiveReload(t *testing.T) {
 
 			// Test that the template is updated or not based on live reload setting
 			rendered = renderer.Render(ctx, res, cmd)
-			if tt.expectReload {
-				Assert(t, strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' in rendered output, got: %s", rendered)
-				Assert(t, !strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' to NOT be in rendered output, got: %s", rendered)
-			} else {
-				Assert(t, strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' to still be in rendered output (live reload disabled), got: %s", rendered)
-				Assert(t, !strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' to NOT be in rendered output (live reload disabled), got: %s", rendered)
-			}
-		})
+		if tt.expectReload {
+			Assert(t, strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' in rendered output, got: %s", rendered)
+			Assert(t, !strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' to NOT be in rendered output, got: %s", rendered)
+		} else {
+			Assert(t, strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' to still be in rendered output (live reload disabled), got: %s", rendered)
+			Assert(t, !strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' to NOT be in rendered output (live reload disabled), got: %s", rendered)
+		}
+	})
 	}
+}
+
+// TestMarkdownRendererRace tests that concurrent calls to Render don't cause data races.
+func TestMarkdownRendererRace(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		true,       // liveReloadEnabled
+	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res := command.Result{
+				Error: errors.New("error"),
+			}
+			cmd := &events.CommentCommand{
+				Name: command.Apply,
+			}
+			r.Render(ctx, res, cmd)
+		}()
+	}
+	wg.Wait()
 }
