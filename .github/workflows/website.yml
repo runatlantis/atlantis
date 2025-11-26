@@ -23,10 +23,6 @@ permissions:
   # Required: allow read access to the content for analysis.
   contents: read
 
-env:
-  # https://www.whatismybrowser.com/guides/the-latest-user-agent/chrome
-  CHROME_UA: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
-
 jobs:
   changes:
     outputs:
@@ -80,7 +76,6 @@ jobs:
             --max-concurrency 5
             --max-retries 0
             --accept 200,429
-            --user-agent "${CHROME_UA}"
             ./runatlantis.io
 
       - name: setup npm
