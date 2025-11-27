@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -204,4 +205,37 @@ func (u UserConfig) ToLogLevel() logging.LogLevel {
 		return logging.Error
 	}
 	return logging.Info
+}
+
+// isUserConfigFieldSpecified helper to determine whether a given on userConfig was specified
+func (u UserConfig) isUserConfigFieldSpecified(field string) bool {
+	if field == "" {
+		return false
+	}
+	v := reflect.ValueOf(u)
+	if v.Kind() == reflect.Pointer {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return false
+	}
+
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if sf.Tag.Get("mapstructure") == field {
+			fv := v.Field(i)
+			if !fv.IsValid() {
+				return false
+			}
+			if fv.IsZero() {
+				// zero value → treat as "not specified"
+				return false
+			}
+			return true
+		}
+	}
+
+	// no such tag at all
+	return false
 }
