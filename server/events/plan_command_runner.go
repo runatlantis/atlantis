@@ -34,7 +34,7 @@ func NewPlanCommandRunner(
 	lockingLocker locking.Locker,
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
-	PendingApplyStatusFlag bool,
+	PendingApplyStatus bool,
 
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
@@ -56,7 +56,7 @@ func NewPlanCommandRunner(
 		lockingLocker:              lockingLocker,
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
-		PendingApplyStatusFlag:     PendingApplyStatusFlag,
+		PendingApplyStatus:         PendingApplyStatus,
 	}
 }
 
@@ -85,10 +85,10 @@ type PlanCommandRunner struct {
 	lockingLocker              locking.Locker
 	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
 	// a plan.
-	DiscardApprovalOnPlan  bool
-	pullReqStatusFetcher   vcs.PullReqStatusFetcher
-	SilencePRComments      []string
-	PendingApplyStatusFlag bool
+	DiscardApprovalOnPlan bool
+	pullReqStatusFetcher  vcs.PullReqStatusFetcher
+	SilencePRComments     []string
+	PendingApplyStatus    bool
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -350,13 +350,14 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 			status = models.FailedCommitStatus
 		} else if numSuccess < len(pullStatus.Projects) {
 			// When there are planned changes that haven't been applied yet:
-			// - GitLab: Set status to pending if PendingApplyStatusFlag is enabled
+			// - GitLab: Set status to pending if PendingApplyStatus is enabled
 			//           This prevents MR merging until all applies complete
 			// - Other VCS: Leave status unchanged (existing behavior)
-			if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab && p.PendingApplyStatusFlag {
+			if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab && p.PendingApplyStatus {
+				ctx.Log.Debug("Pending Apply Status is set. Pipeline status will be marked as pending since there are changes to apply")
 				status = models.PendingCommitStatus
 			} else {
-				if p.PendingApplyStatusFlag {
+				if p.PendingApplyStatus {
 					// If a VCS uses this flag other than Gitlab, we log the warning to the user
 					ctx.Log.Warn("Flag --pending-apply-status is not yet supported by your VCS. Pipeline status will not be marked as pending")
 				}

@@ -1073,13 +1073,15 @@ atlantis server --pending-apply-status
 ATLANTIS_PENDING_APPLY_STATUS=true
 ```
 
-Set the commit status to pending when there are planned changes that haven't been applied yet on GitLab.
+Set the commit status to pending when there are planned changes that haven't been applied.
 This prevents merge requests from being merged until all Terraform applies are completed if you have `Pipelines must succeed` enabled on your repository.
 
 When enabled, after running `atlantis plan`, the MR status will show as pending if there are changes
 to apply. Once all projects are successfully applied (or show no changes), the status will update to success.
 
 Defaults to `false`.
+
+Only supported on GitLab
 
 ### `--port` <Badge text="v0.1.3+" type="info"/>
 

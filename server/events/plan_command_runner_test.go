@@ -998,7 +998,7 @@ func TestPlanCommandRunner_GitlabPendingApplyStatus(t *testing.T) {
 
 			_ = setup(t, func(tc *TestConfig) {
 				tc.database = db
-				tc.PendingApplyStatusFlag = c.PendingApplyFlag
+				tc.PendingApplyStatus = c.PendingApplyFlag
 			})
 
 			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")

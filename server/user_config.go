@@ -86,7 +86,7 @@ type UserConfig struct {
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`
-	PendingApplyStatusFlag          bool   `mapstructure:"pending-apply-status"`
+	PendingApplyStatus              bool   `mapstructure:"pending-apply-status"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
 	Port                            int    `mapstructure:"port"`
