@@ -890,7 +890,7 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 		)
 	})
 }
-func TestPlanCommandRunner_GitlabPendingApplyStatus(t *testing.T) {
+func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 
