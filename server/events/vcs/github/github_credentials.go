@@ -1,4 +1,4 @@
-package vcs
+package github
 
 import (
 	"context"

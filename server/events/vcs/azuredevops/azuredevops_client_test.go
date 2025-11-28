@@ -1,4 +1,4 @@
-package vcs_test
+package azuredevops_test
 
 import (
 	"context"
@@ -13,7 +13,8 @@ import (
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
+	azuredevopsclient "github.com/runatlantis/atlantis/server/events/vcs/azuredevops"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -102,10 +103,10 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 			client.Client.VsaexBaseURL = *testServerURL
 			Ok(t, err)
-			defer disableSSLVerification()()
+			defer common.DisableSSLVerification()()
 
 			merge, _, err := client.Client.PullRequests.Merge(context.Background(),
 				"owner",
@@ -219,9 +220,9 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 			Ok(t, err)
-			defer disableSSLVerification()()
+			defer common.DisableSSLVerification()()
 
 			repo := models.Repo{
 				FullName: "owner/project/repo",
@@ -286,9 +287,9 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+	client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 	Ok(t, err)
-	defer disableSSLVerification()()
+	defer common.DisableSSLVerification()()
 
 	files, err := client.GetModifiedFiles(
 		logger,
@@ -417,10 +418,10 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 			Ok(t, err)
 
-			defer disableSSLVerification()()
+			defer common.DisableSSLVerification()()
 
 			actMergeable, err := client.PullIsMergeable(
 				logger,
@@ -514,10 +515,10 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 			Ok(t, err)
 
-			defer disableSSLVerification()()
+			defer common.DisableSSLVerification()()
 
 			approvalStatus, err := client.PullIsApproved(
 				logger,
@@ -562,9 +563,9 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+		client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
 		Ok(t, err)
-		defer disableSSLVerification()()
+		defer common.DisableSSLVerification()()
 
 		_, err = client.GetPullRequest(
 			logger,
@@ -584,7 +585,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 }
 
 func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
-	client, err := vcs.NewAzureDevopsClient("hostname", "user", "token")
+	client, err := azuredevopsclient.NewAzureDevopsClient("hostname", "user", "token")
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
@@ -645,7 +646,7 @@ func TestAzureDevopsClient_GitStatusContextFromSrc(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		result := vcs.GitStatusContextFromSrc(c.src)
+		result := azuredevopsclient.GitStatusContextFromSrc(c.src)
 		expName := c.expName
 		expGenre := c.expGenre
 		Equals(t, &expName, result.Name)

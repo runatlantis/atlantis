@@ -1,4 +1,4 @@
-package vcs_test
+package common_test
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -18,7 +18,7 @@ func TestWriteGitCreds_WriteFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 
-	err := vcs.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
+	err := common.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
 	expContents := `https://user:token@hostname`
@@ -39,7 +39,7 @@ func TestWriteGitCreds_Appends(t *testing.T) {
 	err := os.WriteFile(credsFile, []byte("contents"), 0600)
 	Ok(t, err)
 
-	err = vcs.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
+	err = common.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
 	expContents := "contents\nhttps://user:token@hostname"
@@ -60,7 +60,7 @@ func TestWriteGitCreds_NoModification(t *testing.T) {
 	err := os.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
-	err = vcs.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
+	err = common.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
@@ -78,7 +78,7 @@ func TestWriteGitCreds_ReplaceApp(t *testing.T) {
 	err := os.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
-	err = vcs.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
+	err = common.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
 	expContents := "line1\nhttps://x-access-token:token@github.com\nline2"
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
@@ -97,7 +97,7 @@ func TestWriteGitCreds_AppendAppWhenFileNotEmpty(t *testing.T) {
 	err := os.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
-	err = vcs.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
+	err = common.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
 	expContents := "line1\nhttps://user:token@host.com\nline2\nhttps://x-access-token:token@github.com"
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
@@ -116,7 +116,7 @@ func TestWriteGitCreds_AppendApp(t *testing.T) {
 	err := os.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
-	err = vcs.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
+	err = common.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
 	expContents := "https://x-access-token:token@github.com"
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
@@ -136,7 +136,7 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 	Ok(t, err)
 
 	expErr := fmt.Sprintf("open %s: permission denied", credsFile)
-	actErr := vcs.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
+	actErr := common.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	ErrContains(t, expErr, actErr)
 }
 
@@ -145,7 +145,7 @@ func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	credsFile := "/this/dir/does/not/exist/.git-credentials" // nolint: gosec
 	expErr := fmt.Sprintf("writing generated .git-credentials file with user, token and hostname to %s: open %s: no such file or directory", credsFile, credsFile)
-	actErr := vcs.WriteGitCreds("user", "token", "hostname", "/this/dir/does/not/exist", logger, false)
+	actErr := common.WriteGitCreds("user", "token", "hostname", "/this/dir/does/not/exist", logger, false)
 	ErrEquals(t, expErr, actErr)
 }
 
@@ -155,7 +155,7 @@ func TestWriteGitCreds_ConfigureGitCredentialHelper(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 
-	err := vcs.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
+	err := common.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
 	expOutput := `store`
@@ -170,7 +170,7 @@ func TestWriteGitCreds_ConfigureGitUrlOverride(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 
-	err := vcs.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
+	err := common.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
 	expOutput := `ssh://git@hostname`

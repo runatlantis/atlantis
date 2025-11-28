@@ -1,4 +1,4 @@
-package vcs_test
+package github_test
 
 import (
 	"crypto/tls"

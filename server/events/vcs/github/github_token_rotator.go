@@ -1,9 +1,10 @@
-package vcs
+package github
 
 import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/scheduled"
 )
@@ -67,7 +68,7 @@ func (r *githubTokenRotator) rotate() error {
 	r.log.Debug("Token successfully refreshed")
 
 	// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#http-based-git-access-by-an-installation
-	if err := WriteGitCreds(r.gitUser, token, r.githubHostname, r.homeDirPath, r.log, true); err != nil {
+	if err := common.WriteGitCreds(r.gitUser, token, r.githubHostname, r.homeDirPath, r.log, true); err != nil {
 		return errors.Wrap(err, "Writing ~/.git-credentials file")
 	}
 	return nil
