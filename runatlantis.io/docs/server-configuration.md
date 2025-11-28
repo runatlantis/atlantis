@@ -881,6 +881,18 @@ ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
 don't set. Defaults to `gitlab.com`.
 
+### `--gitlab-status-retry-enabled`
+
+```bash
+atlantis server --gitlab-status-retry-enabled
+# or
+ATLANTIS_GITLAB_STATUS_RETRY_ENABLED=true
+```
+
+Enable enhanced retry logic for GitLab pipeline status updates with exponential backoff.
+
+* Defaults to `false`.
+
 ### `--gitlab-token` <Badge text="v0.2.0+" type="info"/>
 
 ```bash
