@@ -10,7 +10,6 @@ import (
 	"unicode/utf8"
 
 	validator "github.com/go-playground/validator/v10"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -65,10 +64,10 @@ func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 		}
 		var diffStat DiffStat
 		if err := json.Unmarshal(resp, &diffStat); err != nil {
-			return nil, errors.Wrapf(err, "Could not parse response %q", string(resp))
+			return nil, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
 		}
 		if err := validator.New().Struct(diffStat); err != nil {
-			return nil, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+			return nil, fmt.Errorf("API response %q was missing fields: %w", string(resp), err)
 		}
 		for _, v := range diffStat.Values {
 			if v.Old != nil {
@@ -105,7 +104,7 @@ func (b *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, p
 		"raw": comment,
 	}})
 	if err != nil {
-		return errors.Wrap(err, "json encoding")
+		return fmt.Errorf("json encoding: %w", err)
 	}
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/comments", b.BaseURL, repo.FullName, pullNum)
 	_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
@@ -122,7 +121,7 @@ func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 	// there is no way to hide comment, so delete them instead
 	me, err := b.GetMyUUID()
 	if err != nil {
-		return errors.Wrapf(err, "Cannot get my uuid! Please check required scope of the auth token!")
+		return fmt.Errorf("Cannot get my uuid! Please check required scope of the auth token!: %w", err)
 	}
 	logger.Debug("My bitbucket user UUID is: %s", me)
 
@@ -172,7 +171,7 @@ func (b *Client) GetPullRequestComments(repo models.Repo, pullNum int) (comments
 
 	var pulls PullRequestComments
 	if err := json.Unmarshal(res, &pulls); err != nil {
-		return comments, errors.Wrapf(err, "Could not parse response %q", string(res))
+		return comments, fmt.Errorf("Could not parse response %q: %w", string(res), err)
 	}
 	return pulls.Values, nil
 }
@@ -188,11 +187,11 @@ func (b *Client) GetMyUUID() (uuid string, err error) {
 
 		var user User
 		if err := json.Unmarshal(resp, &user); err != nil {
-			return uuid, errors.Wrapf(err, "Could not parse response %q", string(resp))
+			return uuid, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
 		}
 
 		if err := validator.New().Struct(user); err != nil {
-			return uuid, errors.Wrapf(err, "API response %q was missing a field", string(resp))
+			return uuid, fmt.Errorf("API response %q was missing a field: %w", string(resp), err)
 		}
 
 		uuid = *user.UUID
@@ -213,10 +212,10 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return approvalStatus, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		return approvalStatus, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return approvalStatus, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		return approvalStatus, fmt.Errorf("API response %q was missing fields: %w", string(resp), err)
 	}
 	authorUUID := *pullResp.Author.UUID
 	for _, participant := range pullResp.Participants {
@@ -243,10 +242,10 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		}
 		var diffStat DiffStat
 		if err := json.Unmarshal(resp, &diffStat); err != nil {
-			return models.MergeableStatus{}, errors.Wrapf(err, "Could not parse response %q", string(resp))
+			return models.MergeableStatus{}, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
 		}
 		if err := validator.New().Struct(diffStat); err != nil {
-			return models.MergeableStatus{}, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+			return models.MergeableStatus{}, fmt.Errorf("API response %q was missing fields: %w", string(resp), err)
 		}
 		for _, v := range diffStat.Values {
 			// These values are undocumented, found via manual testing.
@@ -300,7 +299,7 @@ func (b *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 
 	path := fmt.Sprintf("%s/2.0/repositories/%s/commit/%s/statuses/build", b.BaseURL, repo.FullName, pull.HeadCommit)
 	if err != nil {
-		return errors.Wrap(err, "json encoding")
+		return fmt.Errorf("json encoding: %w", err)
 	}
 	_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
 	return err
@@ -343,7 +342,7 @@ func (b *Client) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models
 func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]byte, error) {
 	req, err := b.prepRequest(method, path, reqBody)
 	if err != nil {
-		return nil, errors.Wrap(err, "constructing request")
+		return nil, fmt.Errorf("constructing request: %w", err)
 	}
 	resp, err := b.HTTPClient.Do(req)
 	if err != nil {
@@ -358,7 +357,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	}
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, errors.Wrapf(err, "reading response from request %q", requestStr)
+		return nil, fmt.Errorf("reading response from request %q: %w", requestStr, err)
 	}
 	return respBody, nil
 }

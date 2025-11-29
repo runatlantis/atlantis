@@ -1,9 +1,9 @@
 package vcs
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/scheduled"
 )
@@ -62,13 +62,13 @@ func (r *githubTokenRotator) rotate() error {
 
 	token, err := r.githubCredentials.GetToken()
 	if err != nil {
-		return errors.Wrap(err, "Getting github token")
+		return fmt.Errorf("Getting github token: %w", err)
 	}
 	r.log.Debug("Token successfully refreshed")
 
 	// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#http-based-git-access-by-an-installation
 	if err := WriteGitCreds(r.gitUser, token, r.githubHostname, r.homeDirPath, r.log, true); err != nil {
-		return errors.Wrap(err, "Writing ~/.git-credentials file")
+		return fmt.Errorf("Writing ~/.git-credentials file: %w", err)
 	}
 	return nil
 }

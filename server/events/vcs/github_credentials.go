@@ -10,7 +10,6 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v71/github"
-	"github.com/pkg/errors"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_github_credentials.go GithubCredentials
@@ -132,7 +131,7 @@ func (c *GithubAppCredentials) GetUser() (string, error) {
 	client, err := c.Client()
 
 	if err != nil {
-		return "", errors.Wrap(err, "initializing client")
+		return "", fmt.Errorf("initializing client: %w", err)
 	}
 
 	ghClient := github.NewClient(client)
@@ -142,7 +141,7 @@ func (c *GithubAppCredentials) GetUser() (string, error) {
 	app, _, err := ghClient.Apps.Get(ctx, c.AppSlug)
 
 	if err != nil {
-		return "", errors.Wrap(err, "getting app details")
+		return "", fmt.Errorf("getting app details: %w", err)
 	}
 	// Currently there is no way to get the bot's login info, so this is a
 	// hack until Github exposes that.
@@ -153,7 +152,7 @@ func (c *GithubAppCredentials) GetUser() (string, error) {
 func (c *GithubAppCredentials) GetToken() (string, error) {
 	tr, err := c.transport()
 	if err != nil {
-		return "", errors.Wrap(err, "transport failed")
+		return "", fmt.Errorf("transport failed: %w", err)
 	}
 
 	return tr.Token(context.Background())

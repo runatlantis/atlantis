@@ -8,6 +8,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
+	"fmt"
 	"math/big"
 	"net"
 	"os"
@@ -15,7 +17,6 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/redis"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -933,7 +934,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {
 	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", false, false, 0)
 	if err != nil {
-		panic(errors.Wrap(err, "failed to create test redis client"))
+		panic(fmt.Errorf("failed to create test redis client: %w", err))
 	}
 	return r
 }
@@ -941,7 +942,7 @@ func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {
 func newTestRedisTLS(mr *miniredis.Miniredis) *redis.RedisDB {
 	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", true, true, 0)
 	if err != nil {
-		panic(errors.Wrap(err, "failed to create test redis client"))
+		panic(fmt.Errorf("failed to create test redis client: %w", err))
 	}
 	return r
 }

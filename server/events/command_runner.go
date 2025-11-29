@@ -14,12 +14,12 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/google/go-github/v71/github"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -435,11 +435,11 @@ func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseR
 	}
 	ghPull, err := c.GithubPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to GitHub")
+		return models.PullRequest{}, models.Repo{}, fmt.Errorf("making pull request API call to GitHub: %w", err)
 	}
 	pull, _, headRepo, err := c.EventParser.ParseGithubPull(logger, ghPull)
 	if err != nil {
-		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+		return pull, headRepo, fmt.Errorf("extracting required fields from comment data: %w", err)
 	}
 	return pull, headRepo, nil
 }
@@ -450,11 +450,11 @@ func (c *DefaultCommandRunner) getGiteaData(logger logging.SimpleLogging, baseRe
 	}
 	giteaPull, err := c.GiteaPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Gitea")
+		return models.PullRequest{}, models.Repo{}, fmt.Errorf("making pull request API call to Gitea: %w", err)
 	}
 	pull, _, headRepo, err := c.EventParser.ParseGiteaPull(giteaPull)
 	if err != nil {
-		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+		return pull, headRepo, fmt.Errorf("extracting required fields from comment data: %w", err)
 	}
 	return pull, headRepo, nil
 }
@@ -465,7 +465,7 @@ func (c *DefaultCommandRunner) getGitlabData(logger logging.SimpleLogging, baseR
 	}
 	mr, err := c.GitlabMergeRequestGetter.GetMergeRequest(logger, baseRepo.FullName, pullNum)
 	if err != nil {
-		return models.PullRequest{}, errors.Wrap(err, "making merge request API call to GitLab")
+		return models.PullRequest{}, fmt.Errorf("making merge request API call to GitLab: %w", err)
 	}
 	pull := c.EventParser.ParseGitlabMergeRequest(mr, baseRepo)
 	return pull, nil
@@ -477,11 +477,11 @@ func (c *DefaultCommandRunner) getAzureDevopsData(logger logging.SimpleLogging, 
 	}
 	adPull, err := c.AzureDevopsPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Azure DevOps")
+		return models.PullRequest{}, models.Repo{}, fmt.Errorf("making pull request API call to Azure DevOps: %w", err)
 	}
 	pull, _, headRepo, err := c.EventParser.ParseAzureDevopsPull(adPull)
 	if err != nil {
-		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+		return pull, headRepo, fmt.Errorf("extracting required fields from comment data: %w", err)
 	}
 	return pull, headRepo, nil
 }

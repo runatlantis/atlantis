@@ -6,11 +6,10 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // Attribution: This code is taken from https://github.com/google/go-github.

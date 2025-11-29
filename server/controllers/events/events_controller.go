@@ -15,6 +15,7 @@ package events
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -25,7 +26,6 @@ import (
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/google/go-github/v71/github"
 	"github.com/microcosm-cc/bluemonday"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -232,7 +232,7 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 	}
 	if len(e.BitbucketWebhookSecret) > 0 {
 		if err := bitbucketcloud.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
-			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", errors.Wrap(err, "request did not pass validation").Error())
+			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
 			return
 		}
 	}
@@ -268,7 +268,7 @@ func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r
 	}
 	if len(e.BitbucketWebhookSecret) > 0 {
 		if err := bitbucketserver.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
-			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", errors.Wrap(err, "request did not pass validation").Error())
+			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
 			return
 		}
 	}
@@ -328,7 +328,7 @@ func (e *VCSEventsController) handleGiteaPost(w http.ResponseWriter, r *http.Req
 
 	if len(e.GiteaWebhookSecret) > 0 {
 		if err := gitea.ValidateSignature(body, signature, e.GiteaWebhookSecret); err != nil {
-			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", errors.Wrap(err, "request did not pass validation").Error())
+			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
 			return
 		}
 	}
@@ -414,7 +414,7 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 	baseRepo, user, pullNum, err := e.Parser.ParseGithubIssueCommentEvent(logger, event)
 
 	if err != nil {
-		wrapped := errors.Wrapf(err, "Failed parsing event: %s", githubReqID)
+		wrapped := fmt.Errorf("Failed parsing event: %s: %w", githubReqID, err)
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{
@@ -539,7 +539,7 @@ func (e *VCSEventsController) handleBitbucketServerPullRequestEvent(logger loggi
 func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.SimpleLogging, pullEvent *github.PullRequestEvent, githubReqID string) HTTPResponse {
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGithubPullEvent(logger, pullEvent)
 	if err != nil {
-		wrapped := errors.Wrapf(err, "Error parsing pull data: %s %s", err, githubReqID)
+		wrapped := fmt.Errorf("Error parsing pull data: %s %s: %w", err, githubReqID, err)
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{
@@ -570,7 +570,7 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 			e.commentNotAllowlisted(baseRepo, pull.Num)
 		}
 
-		err := errors.Errorf("Pull request event from non-allowlisted repo '%s/%s'", baseRepo.VCSHost.Hostname, baseRepo.FullName)
+		err := fmt.Errorf("Pull request event from non-allowlisted repo '%s/%s'", baseRepo.VCSHost.Hostname, baseRepo.FullName)
 
 		return HTTPResponse{
 			body: err.Error(),

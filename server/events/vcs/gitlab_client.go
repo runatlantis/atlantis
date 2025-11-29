@@ -15,6 +15,7 @@ package vcs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/jpillora/backoff"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -82,7 +82,7 @@ func NewGitlabClient(hostname string, token string, configuredGroups []string, l
 
 		url, err := url.Parse(absoluteURL)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing URL %q", absoluteURL)
+			return nil, fmt.Errorf("parsing URL %q: %w", absoluteURL, err)
 		}
 
 		// Warn if this hostname isn't resolvable. The GitLab client
@@ -150,7 +150,7 @@ func (g *GitlabClient) GetModifiedFiles(logger logging.SimpleLogging, repo model
 				break
 			}
 			if time.Since(pollingStart) > g.PollingTimeout {
-				return nil, errors.Errorf("giving up polling %q after %s", apiURL, g.PollingTimeout.String())
+				return nil, fmt.Errorf("giving up polling %q after %s", apiURL, g.PollingTimeout.String())
 			}
 			time.Sleep(g.PollingInterval)
 		}
@@ -220,7 +220,7 @@ func (g *GitlabClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 			logger.Debug("GET /projects/%s/merge_requests/%d/notes returned: %d", repo.FullName, pullNum, resp.StatusCode)
 		}
 		if err != nil {
-			return errors.Wrap(err, "listing comments")
+			return fmt.Errorf("listing comments: %w", err)
 		}
 		allComments = append(allComments, comments...)
 		if resp.NextPage == 0 {
@@ -231,7 +231,7 @@ func (g *GitlabClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 
 	currentUser, _, err := g.Client.Users.CurrentUser()
 	if err != nil {
-		return errors.Wrap(err, "error getting currentuser")
+		return fmt.Errorf("error getting currentuser: %w", err)
 	}
 
 	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>", command)
@@ -267,7 +267,7 @@ func (g *GitlabClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 			logger.Debug("PUT /projects/%s/merge_requests/%d/notes/%d returned: %d", repo.FullName, pullNum, comment.ID, resp.StatusCode)
 		}
 		if err != nil {
-			return errors.Wrapf(err, "updating comment %d", comment.ID)
+			return fmt.Errorf("updating comment %d: %w", comment.ID, err)
 		}
 	}
 
@@ -531,7 +531,7 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		}
 
 		if attempt == maxAttempts {
-			return errors.Wrap(err, fmt.Sprintf("failed to update commit status for '%s' @ '%s' to '%s' after %d attempts", repo.FullName, pull.HeadCommit, src, attempt))
+			return fmt.Errorf("failed to update commit status for '%s' @ '%s' to '%s' after %d attempts: %w", repo.FullName, pull.HeadCommit, src, attempt, err)
 		}
 
 		if resp != nil {
@@ -598,14 +598,14 @@ func (g *GitlabClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 
 	mr, err := g.GetMergeRequest(logger, pull.BaseRepo.FullName, pull.Num)
 	if err != nil {
-		return errors.Wrap(err, "unable to merge merge request, it was not possible to retrieve the merge request")
+		return fmt.Errorf("unable to merge merge request, it was not possible to retrieve the merge request: %w", err)
 	}
 	project, resp, err := g.Client.Projects.GetProject(mr.ProjectID, nil)
 	if resp != nil {
 		logger.Debug("GET /projects/%d returned: %d", mr.ProjectID, resp.StatusCode)
 	}
 	if err != nil {
-		return errors.Wrap(err, "unable to merge merge request, it was not possible to check the project requirements")
+		return fmt.Errorf("unable to merge merge request, it was not possible to check the project requirements: %w", err)
 	}
 
 	if project != nil && project.OnlyAllowMergeIfPipelineSucceeds {
@@ -623,7 +623,7 @@ func (g *GitlabClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 		logger.Debug("PUT /projects/%s/merge_requests/%d/merge returned: %d", pull.BaseRepo.FullName, pull.Num, resp.StatusCode)
 	}
 	if err != nil {
-		return errors.Wrap(err, "unable to merge merge request, it may not be in a mergeable state")
+		return fmt.Errorf("unable to merge merge request, it may not be in a mergeable state: %w", err)
 	}
 	return nil
 }
@@ -643,7 +643,7 @@ func (g *GitlabClient) DiscardReviews(logger logging.SimpleLogging, repo models.
 		logger.Debug("PUT /projects/%s/merge_requests/%d/reset_approvals returned: %d", repo.FullName, pull.Num, resp.StatusCode)
 	}
 	if err != nil {
-		return errors.Wrap(err, "unable to reset approvals")
+		return fmt.Errorf("unable to reset approvals: %w", err)
 	}
 
 	return nil
@@ -665,7 +665,7 @@ func (g *GitlabClient) GetVersion(logger logging.SimpleLogging) (*version.Versio
 	split := strings.Split(versionResp.Version, "-")
 	parsedVersion, err := version.NewVersion(split[0])
 	if err != nil {
-		return nil, errors.Wrapf(err, "parsing response to /version: %q", versionResp.Version)
+		return nil, fmt.Errorf("parsing response to /version: %q: %w", versionResp.Version, err)
 	}
 	return parsedVersion, nil
 }
@@ -703,7 +703,7 @@ func (g *GitlabClient) GetTeamNamesForUser(logger logging.SimpleLogging, _ model
 		return teamNames, nil
 	}
 	if err != nil {
-		return nil, errors.Wrapf(err, "GET /users returned: %d", resp.StatusCode)
+		return nil, fmt.Errorf("GET /users returned: %d: %w", resp.StatusCode, err)
 	} else if len(users) == 0 {
 		return nil, errors.New("GET /users returned no user")
 	} else if len(users) > 1 {
@@ -717,7 +717,7 @@ func (g *GitlabClient) GetTeamNamesForUser(logger logging.SimpleLogging, _ model
 			continue
 		}
 		if err != nil {
-			return nil, errors.Wrapf(err, "GET /groups/%s/members/%d returned: %d", groupName, userID, resp.StatusCode)
+			return nil, fmt.Errorf("GET /groups/%s/members/%d returned: %d: %w", groupName, userID, resp.StatusCode, err)
 		}
 		if resp.StatusCode == http.StatusOK && membership.State == "active" {
 			teamNames = append(teamNames, groupName)

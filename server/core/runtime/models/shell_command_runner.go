@@ -2,13 +2,13 @@ package models
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -114,7 +114,7 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 		ctx.Log.Debug("starting '%s %q' in '%s'", s.shell.String(), s.command, s.workingDir)
 		err := s.cmd.Start()
 		if err != nil {
-			err = errors.Wrapf(err, "running '%s %q' in '%s'", s.shell.String(), s.command, s.workingDir)
+			err = fmt.Errorf("running '%s %q' in '%s': %w", s.shell.String(), s.command, s.workingDir, err)
 			ctx.Log.Err(err.Error())
 			outCh <- Line{Err: err}
 			return
@@ -127,7 +127,7 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 				ctx.Log.Debug("writing %q to remote command's stdin", line)
 				_, err := io.WriteString(stdin, line)
 				if err != nil {
-					err = errors.Wrapf(err, "writing %q to process", line)
+					err = fmt.Errorf("writing %q to process: %w", line, err)
 					ctx.Log.Err(err.Error())
 				}
 			}
@@ -174,7 +174,7 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 
 		// We're done now. Send an error if there was one.
 		if err != nil {
-			err = errors.Wrapf(err, "running '%s' '%s' in '%s'", s.shell.String(), s.command, s.workingDir)
+			err = fmt.Errorf("running '%s' '%s' in '%s': %w", s.shell.String(), s.command, s.workingDir, err)
 			log.Err(err.Error())
 			outCh <- Line{Err: err}
 		} else {

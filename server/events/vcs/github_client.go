@@ -16,6 +16,7 @@ package vcs
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -27,7 +28,6 @@ import (
 
 	"github.com/gofri/go-github-ratelimit/github_ratelimit"
 	"github.com/google/go-github/v71/github"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -122,12 +122,12 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 	logger.Debug("Creating new GitHub client for host: %s", hostname)
 	transport, err := credentials.Client()
 	if err != nil {
-		return nil, errors.Wrap(err, "error initializing github authentication transport")
+		return nil, fmt.Errorf("error initializing github authentication transport: %w", err)
 	}
 
 	transportWithRateLimit, err := github_ratelimit.NewRateLimitWaiterClient(transport.Transport)
 	if err != nil {
-		return nil, errors.Wrap(err, "error initializing github rate limit transport")
+		return nil, fmt.Errorf("error initializing github rate limit transport: %w", err)
 	}
 
 	var graphqlURL string
@@ -152,7 +152,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 	logger.Debug("GH User: %s", user)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "getting user")
+		return nil, fmt.Errorf("getting user: %w", err)
 	}
 
 	return &GithubClient{
@@ -282,7 +282,7 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 			logger.Debug("GET /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
 		}
 		if err != nil {
-			return errors.Wrap(err, "listing comments")
+			return fmt.Errorf("listing comments: %w", err)
 		}
 		allComments = append(allComments, comments...)
 		if resp.NextPage == 0 {
@@ -331,7 +331,7 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 		}
 		logger.Debug("Hiding comment %s", comment.GetNodeID())
 		if err := g.v4Client.Mutate(g.ctx, &m, input, nil); err != nil {
-			return errors.Wrapf(err, "minimize comment %s", comment.GetNodeID())
+			return fmt.Errorf("minimize comment %s: %w", comment.GetNodeID(), err)
 		}
 	}
 
@@ -373,7 +373,7 @@ func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (
 			return GithubPRReviewSummary{
 				query.Repository.PullRequest.ReviewDecision,
 				allReviews,
-			}, errors.Wrap(err, "getting reviewDecision")
+			}, fmt.Errorf("getting reviewDecision: %w", err)
 		}
 
 		allReviews = append(allReviews, query.Repository.PullRequest.Reviews.Nodes...)
@@ -406,7 +406,7 @@ func (g *GithubClient) PullIsApproved(logger logging.SimpleLogging, repo models.
 			logger.Debug("GET /repos/%v/%v/pulls/%d/reviews returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
 		}
 		if err != nil {
-			return approvalStatus, errors.Wrap(err, "getting reviews")
+			return approvalStatus, fmt.Errorf("getting reviews: %w", err)
 		}
 		for _, review := range pageReviews {
 			if review != nil && review.GetState() == "APPROVED" {
@@ -453,7 +453,7 @@ func (g *GithubClient) DiscardReviews(logger logging.SimpleLogging, repo models.
 		mutationResult := &mutation
 		err := g.v4Client.Mutate(g.ctx, mutationResult, input, nil)
 		if err != nil {
-			return errors.Wrap(err, "dismissing reviewDecision")
+			return fmt.Errorf("dismissing reviewDecision: %w", err)
 		}
 	}
 	return nil
@@ -547,7 +547,7 @@ func (g *GithubClient) LookupRepoId(repo githubv4.String) (githubv4.Int, error) 
 	err := g.v4Client.Query(g.ctx, &query, variables)
 
 	if err != nil {
-		return githubv4.Int(0), errors.Wrap(err, "getting repository id from GraphQL")
+		return githubv4.Int(0), fmt.Errorf("getting repository id from GraphQL: %w", err)
 	}
 
 	g.repoIdCache.Set(repo, query.Repository.DatabaseId)
@@ -707,7 +707,7 @@ pagination:
 	}
 
 	if err != nil {
-		return "", nil, nil, nil, nil, errors.Wrap(err, "fetching rulesets, branch protections and status checks from GraphQL")
+		return "", nil, nil, nil, nil, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
 	}
 
 	for context := range requiredChecksSet {
@@ -843,7 +843,7 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 	logger.Debug("Checking if GitHub pull request %d is mergeable", pull.Num)
 	githubPR, err := g.GetPullRequest(logger, repo, pull.Num)
 	if err != nil {
-		return models.MergeableStatus{}, errors.Wrap(err, "getting pull request")
+		return models.MergeableStatus{}, fmt.Errorf("getting pull request: %w", err)
 	}
 
 	// We map our mergeable check to when the GitHub merge button is clickable.
@@ -869,7 +869,7 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 			logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
 			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname, ignoreVCSStatusNames)
 			if err != nil {
-				return models.MergeableStatus{}, errors.Wrap(err, "getting pull request status")
+				return models.MergeableStatus{}, fmt.Errorf("getting pull request status: %w", err)
 			}
 			if isMergeableMinusApply {
 				return models.MergeableStatus{
@@ -962,7 +962,7 @@ func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 		logger.Debug("GET /repos/%v/%v returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, resp.StatusCode)
 	}
 	if err != nil {
-		return errors.Wrap(err, "fetching repo info")
+		return fmt.Errorf("fetching repo info: %w", err)
 	}
 
 	const (
@@ -1021,7 +1021,7 @@ func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 		logger.Debug("POST /repos/%v/%v/pulls/%d/merge returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
 	}
 	if err != nil {
-		return errors.Wrap(err, "merging pull request")
+		return fmt.Errorf("merging pull request: %w", err)
 	}
 	if !mergeResult.GetMerged() {
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMessage())

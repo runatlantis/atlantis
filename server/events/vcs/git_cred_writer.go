@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -24,7 +23,7 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 	// If the file doesn't exist, write it.
 	if _, err := os.Stat(credsFile); err != nil {
 		if err := os.WriteFile(credsFile, []byte(config), 0600); err != nil {
-			return errors.Wrapf(err, "writing generated %s file with user, token and hostname to %s", credsFilename, credsFile)
+			return fmt.Errorf("writing generated %s file with user, token and hostname to %s: %w", credsFilename, credsFile, err)
 		}
 		logger.Info("wrote git credentials to %s", credsFile)
 	} else {
@@ -45,7 +44,7 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 			if hasGHToken {
 				// Need to replace the line.
 				if err := fileLineReplace(config, gitUser, gitHostname, credsFile); err != nil {
-					return errors.Wrap(err, "replacing git credentials line for github app")
+					return fmt.Errorf("replacing git credentials line for github app: %w", err)
 				}
 				logger.Info("updated git credentials in %s", credsFile)
 			} else {
@@ -66,13 +65,13 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 
 	credentialCmd := exec.Command("git", "config", "--global", "credential.helper", "store")
 	if out, err := credentialCmd.CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "There was an error running %s: %s", strings.Join(credentialCmd.Args, " "), string(out))
+		return fmt.Errorf("There was an error running %s: %s: %w", strings.Join(credentialCmd.Args, " "), string(out), err)
 	}
 	logger.Info("successfully ran %s", strings.Join(credentialCmd.Args, " "))
 
 	urlCmd := exec.Command("git", "config", "--global", fmt.Sprintf("url.https://%s@%s.insteadOf", gitUser, gitHostname), fmt.Sprintf("ssh://git@%s", gitHostname)) // nolint: gosec
 	if out, err := urlCmd.CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "There was an error running %s: %s", strings.Join(urlCmd.Args, " "), string(out))
+		return fmt.Errorf("There was an error running %s: %s: %w", strings.Join(urlCmd.Args, " "), string(out), err)
 	}
 	logger.Info("successfully ran %s", strings.Join(urlCmd.Args, " "))
 	return nil
@@ -81,7 +80,7 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 func fileHasLine(line string, filename string) (bool, error) {
 	currContents, err := os.ReadFile(filename) // nolint: gosec
 	if err != nil {
-		return false, errors.Wrapf(err, "reading %s", filename)
+		return false, fmt.Errorf("reading %s: %w", filename, err)
 	}
 	for _, l := range strings.Split(string(currContents), "\n") {
 		if l == line {
