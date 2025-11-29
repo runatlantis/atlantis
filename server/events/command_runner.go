@@ -431,7 +431,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GithubPullGetter == nil {
-		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support GitHub")
+		return models.PullRequest{}, models.Repo{}, errors.New("atlantis not configured to support GitHub")
 	}
 	ghPull, err := c.GithubPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
@@ -446,7 +446,7 @@ func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseR
 
 func (c *DefaultCommandRunner) getGiteaData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GiteaPullGetter == nil {
-		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support Gitea")
+		return models.PullRequest{}, models.Repo{}, errors.New("atlantis not configured to support Gitea")
 	}
 	giteaPull, err := c.GiteaPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
@@ -461,7 +461,7 @@ func (c *DefaultCommandRunner) getGiteaData(logger logging.SimpleLogging, baseRe
 
 func (c *DefaultCommandRunner) getGitlabData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, error) {
 	if c.GitlabMergeRequestGetter == nil {
-		return models.PullRequest{}, errors.New("Atlantis not configured to support GitLab")
+		return models.PullRequest{}, errors.New("atlantis not configured to support GitLab")
 	}
 	mr, err := c.GitlabMergeRequestGetter.GetMergeRequest(logger, baseRepo.FullName, pullNum)
 	if err != nil {
@@ -522,7 +522,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	case models.Gitea:
 		pull, headRepo, err = c.getGiteaData(log, baseRepo, pullNum)
 	default:
-		err = errors.New("Unknown VCS type–this is a bug")
+		err = errors.New("unknown VCS type–this is a bug")
 	}
 
 	if err != nil {

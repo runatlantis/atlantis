@@ -83,10 +83,10 @@ func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 		}
 		var changes Changes
 		if err := json.Unmarshal(resp, &changes); err != nil {
-			return nil, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
+			return nil, fmt.Errorf("parsing response %q: %w", string(resp), err)
 		}
 		if err := validator.New().Struct(changes); err != nil {
-			return nil, fmt.Errorf("API response %q was missing fields: %w", string(resp), err)
+			return nil, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 		}
 		for _, v := range changes.Values {
 			files = append(files, *v.Path.ToString)
@@ -126,7 +126,7 @@ func (b *Client) GetProjectKey(repoName string, cloneURL string) (string, error)
 	}
 	matches := capture.FindStringSubmatch(cloneURL)
 	if len(matches) != 2 {
-		return "", fmt.Errorf("could not extract project key from %q, regex returned %q", cloneURL, strings.Join(matches, ","))
+		return "", fmt.Errorf("extracting project key from %q, regex returned %q", cloneURL, strings.Join(matches, ","))
 	}
 	return matches[1], nil
 }
@@ -181,10 +181,10 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return approvalStatus, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
+		return approvalStatus, fmt.Errorf("parsing response %q: %w", string(resp), err)
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return approvalStatus, fmt.Errorf("API response %q was missing fields: %w", string(resp), err)
+		return approvalStatus, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	for _, reviewer := range pullResp.Reviewers {
 		if *reviewer.Approved {
@@ -214,10 +214,10 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 	var mergeStatus MergeStatus
 	if err := json.Unmarshal(resp, &mergeStatus); err != nil {
-		return models.MergeableStatus{}, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
+		return models.MergeableStatus{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
 	}
 	if err := validator.New().Struct(mergeStatus); err != nil {
-		return models.MergeableStatus{}, fmt.Errorf("API response %q was missing fields: %w", string(resp), err)
+		return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	if *mergeStatus.CanMerge && !*mergeStatus.Conflicted {
 		return models.MergeableStatus{
@@ -279,10 +279,10 @@ func (b *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return fmt.Errorf("Could not parse response %q: %w", string(resp), err)
+		return fmt.Errorf("parsing response %q: %w", string(resp), err)
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return fmt.Errorf("API response %q was missing fields: %w", string(resp), err)
+		return fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
 	_, err = b.makeRequest("POST", path, nil)

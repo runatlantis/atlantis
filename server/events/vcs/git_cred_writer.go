@@ -65,13 +65,13 @@ func WriteGitCreds(gitUser string, gitToken string, gitHostname string, home str
 
 	credentialCmd := exec.Command("git", "config", "--global", "credential.helper", "store")
 	if out, err := credentialCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("There was an error running %s: %s: %w", strings.Join(credentialCmd.Args, " "), string(out), err)
+		return fmt.Errorf("running %s: %s: %w", strings.Join(credentialCmd.Args, " "), string(out), err)
 	}
 	logger.Info("successfully ran %s", strings.Join(credentialCmd.Args, " "))
 
 	urlCmd := exec.Command("git", "config", "--global", fmt.Sprintf("url.https://%s@%s.insteadOf", gitUser, gitHostname), fmt.Sprintf("ssh://git@%s", gitHostname)) // nolint: gosec
 	if out, err := urlCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("There was an error running %s: %s: %w", strings.Join(urlCmd.Args, " "), string(out), err)
+		return fmt.Errorf("running %s: %s: %w", strings.Join(urlCmd.Args, " "), string(out), err)
 	}
 	logger.Info("successfully ran %s", strings.Join(urlCmd.Args, " "))
 	return nil

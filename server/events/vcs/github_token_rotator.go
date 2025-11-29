@@ -62,13 +62,13 @@ func (r *githubTokenRotator) rotate() error {
 
 	token, err := r.githubCredentials.GetToken()
 	if err != nil {
-		return fmt.Errorf("Getting github token: %w", err)
+		return fmt.Errorf("getting github token: %w", err)
 	}
 	r.log.Debug("Token successfully refreshed")
 
 	// https://developer.github.com/apps/building-github-apps/authenticating-with-github-apps/#http-based-git-access-by-an-installation
 	if err := WriteGitCreds(r.gitUser, token, r.githubHostname, r.homeDirPath, r.log, true); err != nil {
-		return fmt.Errorf("Writing ~/.git-credentials file: %w", err)
+		return fmt.Errorf("writing ~/.git-credentials file: %w", err)
 	}
 	return nil
 }

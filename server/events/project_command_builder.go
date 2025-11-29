@@ -449,7 +449,7 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 			absProjectDir := filepath.Join(repoDir, mp.Path)
 			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir)
 			if err != nil {
-				return nil, fmt.Errorf("Looking for Terraform Cloud workspace from configuration in '%s': %w", absProjectDir, err)
+				return nil, fmt.Errorf("looking for Terraform Cloud workspace from configuration in '%s': %w", absProjectDir, err)
 			}
 
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)

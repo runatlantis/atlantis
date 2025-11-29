@@ -171,7 +171,7 @@ func (b *Client) GetPullRequestComments(repo models.Repo, pullNum int) (comments
 
 	var pulls PullRequestComments
 	if err := json.Unmarshal(res, &pulls); err != nil {
-		return comments, fmt.Errorf("Could not parse response %q: %w", string(res), err)
+		return comments, fmt.Errorf("parsing response %q: %w", string(res), err)
 	}
 	return pulls.Values, nil
 }
@@ -187,11 +187,11 @@ func (b *Client) GetMyUUID() (uuid string, err error) {
 
 		var user User
 		if err := json.Unmarshal(resp, &user); err != nil {
-			return uuid, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
+			return uuid, fmt.Errorf("parsing response %q: %w", string(resp), err)
 		}
 
 		if err := validator.New().Struct(user); err != nil {
-			return uuid, fmt.Errorf("API response %q was missing a field: %w", string(resp), err)
+			return uuid, fmt.Errorf("response %q was missing a field: %w", string(resp), err)
 		}
 
 		uuid = *user.UUID
@@ -212,10 +212,10 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return approvalStatus, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
+		return approvalStatus, fmt.Errorf("parsing response %q: %w", string(resp), err)
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return approvalStatus, fmt.Errorf("API response %q was missing fields: %w", string(resp), err)
+		return approvalStatus, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	authorUUID := *pullResp.Author.UUID
 	for _, participant := range pullResp.Participants {
@@ -242,10 +242,10 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		}
 		var diffStat DiffStat
 		if err := json.Unmarshal(resp, &diffStat); err != nil {
-			return models.MergeableStatus{}, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
+			return models.MergeableStatus{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
 		}
 		if err := validator.New().Struct(diffStat); err != nil {
-			return models.MergeableStatus{}, fmt.Errorf("API response %q was missing fields: %w", string(resp), err)
+			return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 		}
 		for _, v := range diffStat.Values {
 			// These values are undocumented, found via manual testing.

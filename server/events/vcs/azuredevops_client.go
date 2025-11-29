@@ -337,7 +337,7 @@ func (g *AzureDevopsClient) MergePull(logger logging.SimpleLogging, pull models.
 
 	userID, err := g.Client.UserEntitlements.GetUserID(g.ctx, g.UserName, owner)
 	if err != nil {
-		return fmt.Errorf("Getting user id failed. User name: %s Organization %s : %w", g.UserName, owner, err)
+		return fmt.Errorf("getting user id, User name: %s Organization %s : %w", g.UserName, owner, err)
 	}
 	if userID == nil {
 		return fmt.Errorf("the user %s is not found in the organization %s", g.UserName, owner)

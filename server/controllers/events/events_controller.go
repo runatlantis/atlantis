@@ -414,7 +414,7 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 	baseRepo, user, pullNum, err := e.Parser.ParseGithubIssueCommentEvent(logger, event)
 
 	if err != nil {
-		wrapped := fmt.Errorf("Failed parsing event: %s: %w", githubReqID, err)
+		wrapped := fmt.Errorf("parsing event: %s: %w", githubReqID, err)
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{
@@ -539,7 +539,7 @@ func (e *VCSEventsController) handleBitbucketServerPullRequestEvent(logger loggi
 func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.SimpleLogging, pullEvent *github.PullRequestEvent, githubReqID string) HTTPResponse {
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGithubPullEvent(logger, pullEvent)
 	if err != nil {
-		wrapped := fmt.Errorf("Error parsing pull data: %s %s: %w", err, githubReqID, err)
+		wrapped := fmt.Errorf("parsing pull data: %s %s: %w", err, githubReqID, err)
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{
@@ -570,7 +570,7 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 			e.commentNotAllowlisted(baseRepo, pull.Num)
 		}
 
-		err := fmt.Errorf("Pull request event from non-allowlisted repo '%s/%s'", baseRepo.VCSHost.Hostname, baseRepo.FullName)
+		err := fmt.Errorf("pull request event from non-allowlisted repo '%s/%s'", baseRepo.VCSHost.Hostname, baseRepo.FullName)
 
 		return HTTPResponse{
 			body: err.Error(),
@@ -697,7 +697,7 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 	if !e.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
 		e.commentNotAllowlisted(baseRepo, pullNum)
 
-		err := errors.New("Repo not allowlisted")
+		err := errors.New("repo not allowlisted")
 
 		return HTTPResponse{
 			body: err.Error(),
