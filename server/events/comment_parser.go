@@ -292,6 +292,11 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run state command in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run state command for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+	case command.Reset.String():
+		name = command.Reset
+		flagSet = pflag.NewFlagSet(command.Reset.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	default:
 		return CommentParseResult{CommentResponse: fmt.Sprintf("Error: unknown command %q – this is a bug", cmd)}
 	}
@@ -517,6 +522,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowApprovePolicies bool
 		AllowImport          bool
 		AllowState           bool
+		AllowReset           bool
 	}{
 		ExecutableName:       e.ExecutableName,
 		AllowVersion:         e.isAllowedCommand(command.Version.String()),
@@ -526,6 +532,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowApprovePolicies: e.isAllowedCommand(command.ApprovePolicies.String()),
 		AllowImport:          e.isAllowedCommand(command.Import.String()),
 		AllowState:           e.isAllowedCommand(command.State.String()),
+		AllowReset:           e.isAllowedCommand(command.Reset.String()),
 	}); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
 	}
@@ -585,6 +592,10 @@ Commands:
   state rm ADDRESS...
            Runs 'terraform state rm' for the passed address resource.
            To remove a specific project resource, use the -d, -w and -p flags.
+{{- end }}
+{{- if .AllowReset }}
+  reset    Resets PR state by clearing all locks and triggering replan.
+           Useful when PR structure changes and Atlantis gets confused about projects.
 {{- end }}
   help     View help.
 

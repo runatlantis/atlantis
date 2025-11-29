@@ -849,6 +849,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		instrumentedProjectCmdRunner,
 	)
 
+	resetCommandRunner := events.NewResetCommandRunner(
+		pullClosedExecutor,
+		vcsClient,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
@@ -857,6 +862,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
 		command.State:           stateCommandRunner,
+		command.Reset:           resetCommandRunner,
 	}
 
 	var teamAllowlistChecker command.TeamAllowlistChecker
@@ -910,6 +916,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}
+	// Set the command runner on the reset command runner to avoid circular dependency
+	resetCommandRunner.SetCommandRunner(commandRunner)
+
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
 		return nil, err

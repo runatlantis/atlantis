@@ -219,6 +219,22 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.SilenceNoProjects,
 	)
 
+	// Create a PullClosedExecutor for the reset command
+	var pullCleaner events.PullCleaner = &events.PullClosedExecutor{
+		Locker:                   lockingLocker,
+		VCSClient:                vcsClient,
+		WorkingDir:               workingDir,
+		Database:                 testConfig.database,
+		PullClosedTemplate:       &events.PullClosedEventTemplate{},
+		LogStreamResourceCleaner: mocks.NewMockResourceCleaner(),
+	}
+
+	resetCommandRunner := events.NewResetCommandRunner(
+		pullCleaner,
+		vcsClient,
+	)
+	resetCommandRunner.SetCommandRunner(&ch)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
@@ -226,6 +242,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
+		command.Reset:           resetCommandRunner,
 	}
 
 	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()

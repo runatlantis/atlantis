@@ -925,6 +925,8 @@ Commands:
   state rm ADDRESS...
            Runs 'terraform state rm' for the passed address resource.
            To remove a specific project resource, use the -d, -w and -p flags.
+  reset    Resets PR state by clearing all locks and triggering replan.
+           Useful when PR structure changes and Atlantis gets confused about projects.
   help     View help.
 
 Flags:

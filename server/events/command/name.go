@@ -30,6 +30,8 @@ const (
 	Import
 	// State is a command to run terraform state rm
 	State
+	// Reset is a command to reset PR state by clearing locks and triggering replan
+	Reset
 	// Adding more? Don't forget to update String() below
 )
 
@@ -47,6 +49,7 @@ var AllCommentCommands = []Name{
 	ApprovePolicies,
 	Import,
 	State,
+	Reset,
 }
 
 // TitleString returns the string representation in title form.
@@ -74,6 +77,8 @@ func (c Name) String() string {
 		return "import"
 	case State:
 		return "state"
+	case Reset:
+		return "reset"
 	}
 	return ""
 }
@@ -149,6 +154,8 @@ func ParseCommandName(name string) (Name, error) {
 		return Import, nil
 	case "state":
 		return State, nil
+	case "reset":
+		return Reset, nil
 	}
 	return -1, fmt.Errorf("unknown command name: %s", name)
 }
