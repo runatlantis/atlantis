@@ -64,10 +64,10 @@ func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 		}
 		var diffStat DiffStat
 		if err := json.Unmarshal(resp, &diffStat); err != nil {
-			return nil, fmt.Errorf("Could not parse response %q: %w", string(resp), err)
+			return nil, fmt.Errorf("parsing response %q: %w", string(resp), err)
 		}
 		if err := validator.New().Struct(diffStat); err != nil {
-			return nil, fmt.Errorf("API response %q was missing fields: %w", string(resp), err)
+			return nil, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 		}
 		for _, v := range diffStat.Values {
 			if v.Old != nil {
@@ -121,7 +121,7 @@ func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 	// there is no way to hide comment, so delete them instead
 	me, err := b.GetMyUUID()
 	if err != nil {
-		return fmt.Errorf("Cannot get my uuid! Please check required scope of the auth token!: %w", err)
+		return fmt.Errorf("getting my uuid, check required scope of the auth token: %w", err)
 	}
 	logger.Debug("My bitbucket user UUID is: %s", me)
 

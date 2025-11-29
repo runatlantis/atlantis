@@ -2,6 +2,7 @@ package vcs
 
 import (
 	"fmt"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
