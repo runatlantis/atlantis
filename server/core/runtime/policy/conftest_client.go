@@ -220,7 +220,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		}
 
 		passed := true
-		if hasFailures(cmdOutput) {
+		if cmdErr != nil || hasFailures(cmdOutput) {
 			passed = false
 		}
 

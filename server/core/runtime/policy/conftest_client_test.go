@@ -319,4 +319,32 @@ func TestRun(t *testing.T) {
 		Assert(t, err != nil, "error is expected")
 
 	})
+
+	t.Run("parse error should fail policy", func(t *testing.T) {
+		var extraArgs []string
+
+		// Simulate a Rego parse error output
+		parseErrorOutput := "Error: running test: load: loading policies: load: 2 errors occurred during loading:"
+		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"Error: running test: load: loading policies: load: 2 errors occurred during loading:","Passed":false,"ReqApprovals":0,"CurApprovals":0}]`
+
+		expectedArgsPolicy := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
+
+		When(mockResolver.Resolve(policySet1)).ThenReturn(localPolicySetPath1, nil)
+		When(mockExec.CombinedOutput(expectedArgsPolicy, envs, workdir)).ThenReturn(parseErrorOutput, errors.New("exit status code 1"))
+
+		ctxSinglePolicy := command.ProjectContext{
+			PolicySets: valid.PolicySets{
+				PolicySets: []valid.PolicySet{policySet1},
+			},
+			ProjectName: "testproj",
+			Workspace:   "default",
+			Log:         log,
+		}
+
+		result, err := subject.Run(ctxSinglePolicy, executablePath, envs, workdir, extraArgs)
+
+		Equals(t, result, expectedResult)
+		Assert(t, err != nil, "error is expected")
+
+	})
 }
