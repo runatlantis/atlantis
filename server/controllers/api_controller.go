@@ -68,6 +68,14 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.
 		})
 	}
 
+	// If no Projects or Paths specified, create an empty CommentCommand
+	// This triggers auto-discovery of all projects, matching the behavior
+	// of comment flow when user runs "atlantis plan" without arguments
+	if len(cc) == 0 {
+		ctx.Log.Debug("no projects or paths specified, will auto-discover all projects")
+		cc = append(cc, &events.CommentCommand{})
+	}
+
 	cmds := make([]command.ProjectContext, 0)
 	for _, commentCommand := range cc {
 		projectCmds, err := cmdBuilder(ctx, commentCommand)
@@ -233,6 +241,21 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) err
 }
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
+	// Run pre-workflow hooks BEFORE building commands to allow dynamic config generation
+	// This matches the behavior of the comment flow (RunCommentCommand)
+	ctx.Log.Debug("running pre-workflow hooks before building commands")
+	err := a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, &events.CommentCommand{
+		Name: command.Plan,
+	})
+	if err != nil {
+		if a.FailOnPreWorkflowHookError {
+			ctx.Log.Err("pre-workflow hook failed and fail-on-pre-workflow-hook-error is set")
+			return nil, fmt.Errorf("pre-workflow hook error: %w", err)
+		}
+		ctx.Log.Warn("pre-workflow hook failed but continuing: %s", err)
+	}
+
+	// Now build commands - any dynamically generated atlantis.yaml should exist
 	cmds, cc, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildPlanCommands)
 	if err != nil {
 		return nil, err
@@ -265,6 +288,8 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 
 	var projectResults []command.ProjectResult
 	for i, cmd := range cmds {
+		// Pre-workflow hooks already ran globally, but run again per-project for consistency
+		// with comment flow which may have project-specific hooks
 		err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
 		if err != nil {
 			if a.FailOnPreWorkflowHookError {
@@ -281,6 +306,21 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 }
 
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
+	// Run pre-workflow hooks BEFORE building commands to allow dynamic config generation
+	// This matches the behavior of the comment flow (RunCommentCommand)
+	ctx.Log.Debug("running pre-workflow hooks before building commands")
+	err := a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, &events.CommentCommand{
+		Name: command.Apply,
+	})
+	if err != nil {
+		if a.FailOnPreWorkflowHookError {
+			ctx.Log.Err("pre-workflow hook failed and fail-on-pre-workflow-hook-error is set")
+			return nil, fmt.Errorf("pre-workflow hook error: %w", err)
+		}
+		ctx.Log.Warn("pre-workflow hook failed but continuing: %s", err)
+	}
+
+	// Now build commands - any dynamically generated atlantis.yaml should exist
 	cmds, cc, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildApplyCommands)
 	if err != nil {
 		return nil, err
@@ -313,6 +353,8 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 
 	var projectResults []command.ProjectResult
 	for i, cmd := range cmds {
+		// Pre-workflow hooks already ran globally, but run again per-project for consistency
+		// with comment flow which may have project-specific hooks
 		err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
 		if err != nil {
 			if a.FailOnPreWorkflowHookError {
