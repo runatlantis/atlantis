@@ -30,7 +30,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	"github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
+	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -618,7 +619,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		{
 			"just github app key set",
 			map[string]interface{}{
-				GHAppKeyFlag: testdata.GithubPrivateKey,
+				GHAppKeyFlag: githubtestdata.GithubPrivateKey,
 			},
 			true,
 		},
@@ -728,7 +729,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"github app and key set and should be successful",
 			map[string]interface{}{
 				GHAppIDFlag:  "1",
-				GHAppKeyFlag: testdata.GithubPrivateKey,
+				GHAppKeyFlag: githubtestdata.GithubPrivateKey,
 			},
 			false,
 		},

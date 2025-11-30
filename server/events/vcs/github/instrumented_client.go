@@ -3,6 +3,8 @@ package github
 import (
 	"github.com/google/go-github/v71/github"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/uber-go/tally/v4"
@@ -12,7 +14,7 @@ import (
 func NewInstrumentedGithubClient(client *GithubClient, statsScope tally.Scope, logger logging.SimpleLogging) IGithubClient {
 	scope := statsScope.SubScope("github")
 
-	instrumentedGHClient := &InstrumentedClient{
+	instrumentedGHClient := &common.InstrumentedClient{
 		Client:     client,
 		StatsScope: scope,
 		Logger:     logger,
@@ -35,14 +37,14 @@ type GithubPullRequestGetter interface {
 // IGithubClient exists to bridge the gap between GithubPullRequestGetter and Client interface to allow
 // for a single instrumented client
 type IGithubClient interface {
-	Client
+	vcs.Client
 	GithubPullRequestGetter
 }
 
 // InstrumentedGithubClient should delegate to the underlying InstrumentedClient for vcs provider-agnostic
 // methods and implement solely any github specific interfaces.
 type InstrumentedGithubClient struct {
-	*InstrumentedClient
+	*common.InstrumentedClient
 	PullRequestGetter GithubPullRequestGetter
 	StatsScope        tally.Scope
 	Logger            logging.SimpleLogging
@@ -50,7 +52,7 @@ type InstrumentedGithubClient struct {
 
 func (c *InstrumentedGithubClient) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error) {
 	scope := c.StatsScope.SubScope("get_pull_request")
-	scope = SetGitScopeTags(scope, repo.FullName, pullNum)
+	scope = common.SetGitScopeTags(scope, repo.FullName, pullNum)
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()

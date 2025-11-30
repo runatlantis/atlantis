@@ -14,8 +14,8 @@ import (
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/models"
 	azuredevopsclient "github.com/runatlantis/atlantis/server/events/vcs/azuredevops"
+	"github.com/runatlantis/atlantis/server/events/vcs/azuredevops/testdata"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
-	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -272,7 +272,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 			switch r.RequestURI {
 			// The first request should hit this URL.
 			case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
-				w.Write([]byte(testdata.ADPullJSON)) // nolint: errcheck
+				w.Write([]byte(testdata.PullJSON)) // nolint: errcheck
 			// The second should hit this URL.
 			case "/owner/project/_apis/git/repositories/repo/diffs/commits?%24top=100&api-version=5.1&baseVersion=new_feature&targetVersion=npaulk%2Fmy_work":
 				// We write a header that means there's an additional page.

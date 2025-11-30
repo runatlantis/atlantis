@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
+	"github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -19,13 +19,13 @@ func Test_githubTokenRotator_GenerateJob(t *testing.T) {
 	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
 
-	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	anonCreds := &github.GithubAnonymousCredentials{}
+	anonClient, err := github.NewGithubClient(testServer, anonCreds, github.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
 	type fields struct {
-		githubCredentials vcs.GithubCredentials
+		githubCredentials github.GithubCredentials
 	}
 	tests := []struct {
 		name             string
@@ -35,7 +35,7 @@ func Test_githubTokenRotator_GenerateJob(t *testing.T) {
 	}{
 		{
 			name: "Should write .git-credentials file on start",
-			fields: fields{&vcs.GithubAppCredentials{
+			fields: fields{&github.GithubAppCredentials{
 				AppID:    tempSecrets.ID,
 				Key:      []byte(testdata.GithubPrivateKey),
 				Hostname: testServer,
@@ -45,7 +45,7 @@ func Test_githubTokenRotator_GenerateJob(t *testing.T) {
 		},
 		{
 			name: "Should return an error if pem data is missing or wrong",
-			fields: fields{&vcs.GithubAppCredentials{
+			fields: fields{&github.GithubAppCredentials{
 				AppID:    tempSecrets.ID,
 				Key:      []byte("some bad formatted pem key"),
 				Hostname: testServer,
@@ -55,7 +55,7 @@ func Test_githubTokenRotator_GenerateJob(t *testing.T) {
 		},
 		{
 			name: "Should return an error if app id is missing or wrong",
-			fields: fields{&vcs.GithubAppCredentials{
+			fields: fields{&github.GithubAppCredentials{
 				AppID:    3819,
 				Key:      []byte(testdata.GithubPrivateKey),
 				Hostname: testServer,
@@ -68,7 +68,7 @@ func Test_githubTokenRotator_GenerateJob(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			t.Setenv("HOME", tmpDir)
-			r := vcs.NewGithubTokenRotator(logging.NewNoopLogger(t), tt.fields.githubCredentials, testServer, "x-access-token", tmpDir)
+			r := github.NewGithubTokenRotator(logging.NewNoopLogger(t), tt.fields.githubCredentials, testServer, "x-access-token", tmpDir)
 			got, err := r.GenerateJob()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("githubTokenRotator.GenerateJob() error = %v, wantErr %v", err, tt.wantErr)

@@ -8,9 +8,9 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
+	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	vcsMocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -32,13 +32,13 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 	}
 
 	defer disableSSLVerification()()
-	testServer, err := testdata.GithubAppTestServer(t)
+	testServer, err := githubtestdata.GithubAppTestServer(t)
 	Ok(t, err)
 
 	gwd := &events.GithubAppWorkingDir{
 		WorkingDir: wd,
-		Credentials: &vcs.GithubAppCredentials{
-			Key:      []byte(testdata.GithubPrivateKey),
+		Credentials: &github.GithubAppCredentials{
+			Key:      []byte(githubtestdata.GithubPrivateKey),
 			AppID:    1,
 			Hostname: testServer,
 		},
