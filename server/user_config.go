@@ -81,6 +81,7 @@ type UserConfig struct {
 	LockingDBType                   string `mapstructure:"locking-db-type"`
 	LogLevel                        string `mapstructure:"log-level"`
 	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
+	MarkdownTemplateLiveReload      bool   `mapstructure:"markdown-template-live-reload"`
 	MaxCommentsPerCommand           int    `mapstructure:"max-comments-per-command"`
 	IgnoreVCSStatusNames            string `mapstructure:"ignore-vcs-status-names"`
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
