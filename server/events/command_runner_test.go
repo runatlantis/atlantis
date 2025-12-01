@@ -78,6 +78,7 @@ type TestConfig struct {
 	discardApprovalOnPlan      bool
 	database                   db.Database
 	DisableUnlockLabel         string
+	PendingApplyStatus         bool
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -166,6 +167,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		lockingLocker,
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
+		testConfig.PendingApplyStatus,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
