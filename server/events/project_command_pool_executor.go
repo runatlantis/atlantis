@@ -52,10 +52,27 @@ func runProjectCmds(
 	return command.Result{ProjectResults: results}
 }
 
+// assignEffectiveExecutionGroups assigns the EffectiveExecutionOrderGroup for each project.
+// For non-destroy commands, EffectiveExecutionOrderGroup remains 0.
+// For destroy commands, it uses DestroyExecutionOrderGroup if defined, otherwise ExecutionOrderGroup.
+func assignEffectiveExecutionGroups(cmds []command.ProjectContext, isDestroy bool) {
+	for i := range cmds {
+		if isDestroy && cmds[i].DestroyExecutionOrderGroup != nil {
+			cmds[i].EffectiveExecutionOrderGroup = *cmds[i].DestroyExecutionOrderGroup
+		} else {
+			cmds[i].EffectiveExecutionOrderGroup = cmds[i].ExecutionOrderGroup
+		}
+	}
+}
+
 func splitByExecutionOrderGroup(cmds []command.ProjectContext) [][]command.ProjectContext {
 	groups := make(map[int][]command.ProjectContext)
 	for _, cmd := range cmds {
-		groups[cmd.ExecutionOrderGroup] = append(groups[cmd.ExecutionOrderGroup], cmd)
+		// After assignEffectiveExecutionGroups has been called, EffectiveExecutionOrderGroup
+		// will contain the correct group (either from DestroyExecutionOrderGroup for destroy
+		// commands, or from ExecutionOrderGroup for normal commands)
+		groupKey := cmd.EffectiveExecutionOrderGroup
+		groups[groupKey] = append(groups[groupKey], cmd)
 	}
 
 	var groupKeys []int
@@ -78,12 +95,20 @@ func runProjectCmdsParallelGroups(
 	poolSize int,
 ) command.Result {
 	var results []command.ProjectResult
+	isDestroy := false
+	for _, c := range cmds {
+		if c.IsDestroy {
+			isDestroy = true
+			break
+		}
+	}
+	assignEffectiveExecutionGroups(cmds, isDestroy)
+
 	groups := splitByExecutionOrderGroup(cmds)
 	for _, group := range groups {
 		res := runProjectCmdsParallel(group, runnerFunc, poolSize)
 		results = append(results, res.ProjectResults...)
 		if res.HasErrors() && group[0].AbortOnExecutionOrderFail {
-			ctx.Log.Info("abort on execution order when failed")
 			break
 		}
 	}

@@ -126,13 +126,20 @@ This feature works for any workspace name. If you have a custom workspace called
 
 ### Using the -destroy Flag
 
-#### Example
+To perform destructive operations (both plan and apply), you can use the `-destroy` flag as shown below.
 
-To perform a destructive plan that will destroy resources you can use the `-destroy` flag like this:
+#### plan
 
 ```bash
 atlantis plan -- -destroy
 atlantis plan -d dir -- -destroy
+```
+
+#### apply
+
+```bash
+atlantis apply -- -destroy
+atlantis apply -d dir -- -destroy
 ```
 
 ::: warning NOTE

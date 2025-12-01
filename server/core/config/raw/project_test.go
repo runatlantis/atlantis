@@ -33,7 +33,7 @@ func TestProject_UnmarshalYAML(t *testing.T) {
 			},
 		},
 		{
-			description: "all fields set including mergeable apply requirement",
+			description: "all fields set including destroy_execution_order_group",
 			input: `
 name: myname
 branch: mybranch
@@ -50,7 +50,8 @@ apply_requirements:
 - mergeable
 import_requirements:
 - mergeable
-execution_order_group: 10`,
+execution_order_group: 10
+destroy_execution_order_group: 12`,
 			exp: raw.Project{
 				Name:             String("myname"),
 				Branch:           String("mybranch"),
@@ -62,10 +63,11 @@ execution_order_group: 10`,
 					WhenModified: []string{},
 					Enabled:      Bool(false),
 				},
-				PlanRequirements:    []string{"mergeable"},
-				ApplyRequirements:   []string{"mergeable"},
-				ImportRequirements:  []string{"mergeable"},
-				ExecutionOrderGroup: Int(10),
+				PlanRequirements:           []string{"mergeable"},
+				ApplyRequirements:          []string{"mergeable"},
+				ImportRequirements:         []string{"mergeable"},
+				ExecutionOrderGroup:        Int(10),
+				DestroyExecutionOrderGroup: Int(12),
 			},
 		},
 	}

@@ -375,6 +375,123 @@ If there's one or more projects in the dependency list which is not in applied s
 `Can't apply your project unless you apply its dependencies`
 :::
 
+### Order of destroying
+
+```yaml
+version: 3
+abort_on_execution_order_fail: true
+projects:
+  - dir: project1
+    destroy_execution_order_group: 2
+  - dir: project2
+    destroy_execution_order_group: 1
+  - dir: project3
+    destroy_execution_order_group: 0
+---
+version: 3
+abort_on_execution_order_fail: true
+projects:
+  - dir: project1
+    execution_order_group: 0
+    destroy_execution_order_group: 2
+  - dir: project2
+    execution_order_group: 1
+    destroy_execution_order_group: 1
+  - dir: project3
+    execution_order_group: 2
+    destroy_execution_order_group: 0
+```
+
+Notes:
+
+- It’s necessary to configure a workflow to handle the destructive commands.
+- To orchestrate multiple modules within a single root module, use a Terraform-based or OpenTofu-based workflow.
+- To orchestrate multiple modules distributed across separate paths, use a Terragrunt-based workflow.
+
+::: tip
+
+#### `terraform`
+
+```yaml
+# repos.yaml
+workflows:
+  terraform:
+    plan:
+      steps:
+      # Use the -destroy flag in plan. e.g. atlantis plan -- -destroy
+      - run:
+          command: terraform plan $(printf '%s' $COMMENT_ARGS | sed 's/,/ /g' | tr -d '\\') -out=$PLANFILE
+          output: strip_refreshing
+    apply:
+      steps:
+      # Use the -destroy flag in apply. e.g. atlantis apply -- -destroy
+      - run:
+          command: terraform apply $(printf '%s' $COMMENT_ARGS | sed 's/,/ /g' | tr -d '\\') -auto-approve $PLANFILE
+          output: strip_refreshing
+```
+
+#### `opentofu`
+
+```yaml
+# repos.yaml
+workflows:
+  opentofu:
+    plan:
+      steps:
+      # Use the -destroy flag in plan. e.g. atlantis plan -- -destroy
+      - run:
+          command: tofu plan $(printf '%s' $COMMENT_ARGS | sed 's/,/ /g' | tr -d '\\') -out=$PLANFILE
+          output: strip_refreshing
+    apply:
+      steps:
+      # Use the -destroy flag in apply. e.g. atlantis apply -- -destroy
+      - run:
+          command: tofu apply $(printf '%s' $COMMENT_ARGS | sed 's/,/ /g' | tr -d '\\') -auto-approve $PLANFILE
+          output: strip_refreshing
+```
+
+#### `terragrunt`
+
+```yaml
+# repos.yaml
+workflows:
+  terragrunt:
+    plan:
+      steps:
+      # Use the -destroy flag in plan. e.g. atlantis plan -- -destroy
+      - run:
+          command: terragrunt plan $(printf '%s' $COMMENT_ARGS | sed 's/,/ /g' | tr -d '\\') -out=$PLANFILE
+          output: strip_refreshing
+    apply:
+      steps:
+      # Use the -destroy flag in apply. e.g. atlantis apply -- -destroy
+      - run:
+          command: terragrunt apply $(printf '%s' $COMMENT_ARGS | sed 's/,/ /g' | tr -d '\\') -auto-approve
+          output: strip_refreshing
+```
+
+- The use of the native environment variable `COMMENT_ARGS` is required using `-destroy` flag.
+  This variable contains any additional flags passed in the pull-request comment.
+
+- The use of the native environment variable `PLANFILE` isn’t required when Terragrunt modules have dependencies.
+  This variable can be used to override the built-in `plan`/`apply` commands.
+:::
+
+After use `atlantis plan -- -destroy` and `atlantis apply -- -destroy`, Atlantis will execute destroy operations for project3 first, then project2, and finally project1. Multiple projects can share the same `destroy_execution_order_group`, but the order within a single group is not guaranteed. Both `parallel_plan` and `parallel_apply` respect these order groups, so parallel destroying operations will run group by group.
+
+If any destructive plan/apply fails and `abort_on_execution_order_fail` is set to true at the repo level, all subsequent groups will be aborted. In this example, if project3 fails, then project2 and project1 will not run. At any time, it is possible to switch between destructive and non-destructive `plan`/`apply` operations within the same PR.
+
+Rules:
+
+- If all projects define `destroy_execution_order_group`, use only those values.
+- If no project defines `destroy_execution_order_group`, use `execution_order_group`.
+- If some projects define `destroy_execution_order_group`, they will use that; the others will use `execution_order_group`.
+- Non-destructive plan/apply always use `execution_order_group`.
+
+::: warning
+The default use of `execution_order_group` for destructive plan/apply operations is applied when `destroy_execution_order_group` is not specified. However, defining it explicitly is required, as demonstrated in the destroying order.
+:::
+
 ### Autodiscovery Config
 
 ```yaml
@@ -473,6 +590,7 @@ workflow: myworkflow
 | dir                                     | string                  | none            | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                      |
 | workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                  |
 | execution_order_group                   | int                     | `0`             | no       | Index of execution order group. Projects will be sort by this field before planning/applying.                                                                                                                                           |
+| destroy_execution_order_group           | int                     | none            | no       | Index of destroy execution order group. Projects will be sort by this field before destroying.                                                                                                                                          |
 | delete_source_branch_on_merge           | bool                    | `false`         | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                       |
 | repo_locking                            | bool                    | `true`          | no       | (deprecated) Get a repository lock in this project when plan.                                                                                                                                                                           |
 | repo_locks                              | [RepoLocks](#repolocks) | `mode: on_plan` | no       | Get a repository lock in this project on plan or apply. See [RepoLocks](#repolocks) for more details.                                                                                                                                   |

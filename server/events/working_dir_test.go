@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -542,8 +543,23 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 	Ok(t, err)
 	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
 
-	// Use rev-parse to verify at correct commit.
-	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2"))
+	// Sanitize output in case git outputs more than just the sha
+	raw := runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2")
+	lines := strings.Split(strings.TrimSpace(raw), "\n")
+	shaRegex := regexp.MustCompile(`^[0-9a-f]{7,40}$`)
+	var actCommit string
+	for i := len(lines) - 1; i >= 0; i-- {
+		l := strings.TrimSpace(lines[i])
+		if shaRegex.MatchString(l) {
+			actCommit = l
+			break
+		}
+	}
+
+	// fallback to old behavior if parsing failed
+	if actCommit == "" {
+		actCommit = strings.TrimSpace(raw)
+	}
 	Equals(t, expCommit, actCommit)
 }
 

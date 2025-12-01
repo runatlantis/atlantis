@@ -87,9 +87,88 @@ type PlanCommandRunner struct {
 	SilencePRComments     []string
 }
 
+// resetPolicyStatus clears any pending policy check status for the pull request.
+// This prevents stale policy status from blocking new plans.
+func (p *PlanCommandRunner) resetPolicyStatus(ctx *command.Context) {
+	pullStatus, err := p.pullStatusFetcher.GetPullStatus(ctx.Pull)
+	if err != nil {
+		ctx.Log.Warn("unable to fetch pull status to reset policy: %s", err)
+		return
+	}
+	if pullStatus == nil {
+		return
+	}
+
+	// Check if any project has policy status to reset
+	hasPolicyStatus := false
+	for _, proj := range pullStatus.Projects {
+		if len(proj.PolicyStatus) > 0 {
+			hasPolicyStatus = true
+			break
+		}
+	}
+
+	if !hasPolicyStatus {
+		// Nothing to reset
+		return
+	}
+
+	ctx.Log.Debug("resetting policy status for all projects")
+
+	// Delete and recreate pull status to clear policy status
+	if err := p.dbUpdater.Database.DeletePullStatus(ctx.Pull); err != nil {
+		ctx.Log.Warn("unable to delete pull status: %s", err)
+		return
+	}
+
+	// Recreate projects without policy status
+	var results []command.ProjectResult
+	for _, proj := range pullStatus.Projects {
+		result := command.ProjectResult{
+			Command:     command.Plan,
+			RepoRelDir:  proj.RepoRelDir,
+			Workspace:   proj.Workspace,
+			ProjectName: proj.ProjectName,
+		}
+
+		// Preserve existing plan status
+		switch proj.Status {
+		case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredPolicyCheckStatus:
+			// These statuses indicate a plan was successfully generated
+			result.PlanSuccess = &models.PlanSuccess{TerraformOutput: ""}
+		case models.PlannedNoChangesPlanStatus:
+			result.PlanSuccess = &models.PlanSuccess{TerraformOutput: "No changes. Infrastructure is up-to-date"}
+		case models.ErroredPlanStatus, models.ErroredApplyStatus:
+			result.Error = DirNotExistErr{RepoRelDir: proj.RepoRelDir}
+		case models.AppliedPlanStatus:
+			result.ApplySuccess = ""
+		case models.DiscardedPlanStatus:
+			// Discarded plans should be treated as if they never existed
+			result.PlanSuccess = &models.PlanSuccess{TerraformOutput: ""}
+		}
+
+		results = append(results, result)
+	}
+
+	if _, err := p.dbUpdater.Database.UpdatePullWithResults(ctx.Pull, results); err != nil {
+		ctx.Log.Warn("unable to recreate pull status: %s", err)
+	}
+}
+
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+
+	// Reset policy status to prevent stale policy checks from blocking plans
+	p.resetPolicyStatus(ctx)
+
+	// Reload PullStatus after reset to ensure PolicyStatus is cleared in context
+	reloadedStatus, err := p.pullStatusFetcher.GetPullStatus(ctx.Pull)
+	if err != nil {
+		ctx.Log.Warn("unable to reload pull status after policy reset: %s", err)
+	} else {
+		ctx.PullStatus = reloadedStatus
+	}
 
 	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
@@ -196,6 +275,17 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		if err = p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
 			ctx.Log.Err("failed to remove approvals: %s", err)
 		}
+	}
+
+	// Reset policy status to prevent stale policy checks from blocking plans
+	p.resetPolicyStatus(ctx)
+
+	// Reload PullStatus after reset to ensure PolicyStatus is cleared in context
+	reloadedStatus, err := p.pullStatusFetcher.GetPullStatus(ctx.Pull)
+	if err != nil {
+		ctx.Log.Warn("unable to reload pull status after policy reset: %s", err)
+	} else {
+		ctx.PullStatus = reloadedStatus
 	}
 
 	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)

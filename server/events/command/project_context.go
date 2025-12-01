@@ -125,6 +125,12 @@ type ProjectContext struct {
 	JobID string
 	// The index of order group. Before planning/applying it will use to sort projects. Default is 0.
 	ExecutionOrderGroup int
+	// Optional destroy-specific execution order group. If nil, fallback rules apply.
+	DestroyExecutionOrderGroup *int
+	// EffectiveExecutionOrderGroup is the computed group considering destroy logic.
+	EffectiveExecutionOrderGroup int
+	// IsDestroy indicates whether this context is for a destroy plan/apply (contains -destroy flag).
+	IsDestroy bool
 	// If plans/applies should be aborted if any prior plan/apply fails
 	AbortOnExecutionOrderFail bool
 	// Allows custom policy check tools outside of Conftest to run in checks
