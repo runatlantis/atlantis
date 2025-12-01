@@ -9,8 +9,8 @@ import (
 	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/github"
+	githubMocks "github.com/runatlantis/atlantis/server/events/vcs/github/mocks"
 	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
-	vcsMocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -63,7 +63,7 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	workingDir := eventMocks.NewMockWorkingDir()
 
-	credentials := vcsMocks.NewMockGithubCredentials()
+	credentials := githubMocks.NewMockGithubCredentials()
 
 	ghAppWorkingDir := events.GithubAppWorkingDir{
 		WorkingDir:     workingDir,
@@ -108,7 +108,7 @@ func TestMergeAgain_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	workingDir := eventMocks.NewMockWorkingDir()
 
-	credentials := vcsMocks.NewMockGithubCredentials()
+	credentials := githubMocks.NewMockGithubCredentials()
 
 	ghAppWorkingDir := events.GithubAppWorkingDir{
 		WorkingDir:     workingDir,
