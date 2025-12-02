@@ -52,6 +52,21 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "pass with previously failed policy checks",
+			ctx: command.ProjectContext{
+				PlanRequirements: fullRequirements, // valid.PoliciesPassedCommandReq is ignored
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
+				},
+				ProjectPlanStatus: models.ErroredPolicyCheckStatus,
+			},
+			setup: func(workingDir *mocks.MockWorkingDir) {
+				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(false)
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "fail by no approved",
 			ctx: command.ProjectContext{
 				PlanRequirements: []string{raw.ApprovedRequirement},

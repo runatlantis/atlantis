@@ -36,7 +36,17 @@ func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx comma
 }
 
 func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
-	return a.validateCommandRequirement(repoDir, ctx, command.Plan, ctx.PlanRequirements)
+	// Policy checks are only run after a plan.
+	// If they previously failed, we ignore the status to re-run the plan.
+	var planRequirements []string
+	for _, req := range ctx.PlanRequirements {
+		if req == valid.PoliciesPassedCommandReq {
+			continue
+		}
+		planRequirements = append(planRequirements, req)
+	}
+
+	return a.validateCommandRequirement(repoDir, ctx, command.Plan, planRequirements)
 }
 
 func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
