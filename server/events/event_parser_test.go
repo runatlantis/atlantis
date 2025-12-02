@@ -27,7 +27,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	. "github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	azuredevopstestdata "github.com/runatlantis/atlantis/server/events/vcs/azuredevops/testdata"
+	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
@@ -48,7 +49,7 @@ var parser = events.EventParser{
 }
 
 func TestParseGithubRepo(t *testing.T) {
-	r, err := parser.ParseGithubRepo(&Repo)
+	r, err := parser.ParseGithubRepo(&githubtestdata.Repo)
 	Ok(t, err)
 	Equals(t, models.Repo{
 		Owner:             "owner",
@@ -66,7 +67,7 @@ func TestParseGithubRepo(t *testing.T) {
 func TestParseGithubIssueCommentEvent(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	comment := github.IssueCommentEvent{
-		Repo: &Repo,
+		Repo: &githubtestdata.Repo,
 		Issue: &github.Issue{
 			Number:  github.Ptr(1),
 			User:    &github.User{Login: github.Ptr("issue_user")},
@@ -122,22 +123,22 @@ func TestParseGithubPullEvent(t *testing.T) {
 	_, _, _, _, _, err := parser.ParseGithubPullEvent(logger, &github.PullRequestEvent{})
 	ErrEquals(t, "pull_request is null", err)
 
-	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	testEvent := deepcopy.Copy(githubtestdata.PullEvent).(github.PullRequestEvent)
 	testEvent.PullRequest.HTMLURL = nil
 	_, _, _, _, _, err = parser.ParseGithubPullEvent(logger, &testEvent)
 	ErrEquals(t, "html_url is null", err)
 
-	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	testEvent = deepcopy.Copy(githubtestdata.PullEvent).(github.PullRequestEvent)
 	testEvent.Sender = nil
 	_, _, _, _, _, err = parser.ParseGithubPullEvent(logger, &testEvent)
 	ErrEquals(t, "sender is null", err)
 
-	testEvent = deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	testEvent = deepcopy.Copy(githubtestdata.PullEvent).(github.PullRequestEvent)
 	testEvent.Sender.Login = nil
 	_, _, _, _, _, err = parser.ParseGithubPullEvent(logger, &testEvent)
 	ErrEquals(t, "sender.login is null", err)
 
-	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGithubPullEvent(logger, &PullEvent)
+	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGithubPullEvent(logger, &githubtestdata.PullEvent)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		Owner:             "owner",
@@ -153,12 +154,12 @@ func TestParseGithubPullEvent(t *testing.T) {
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, expBaseRepo, actHeadRepo)
 	Equals(t, models.PullRequest{
-		URL:        Pull.GetHTMLURL(),
-		Author:     Pull.User.GetLogin(),
-		HeadBranch: Pull.Head.GetRef(),
-		BaseBranch: Pull.Base.GetRef(),
-		HeadCommit: Pull.Head.GetSHA(),
-		Num:        Pull.GetNumber(),
+		URL:        githubtestdata.Pull.GetHTMLURL(),
+		Author:     githubtestdata.Pull.User.GetLogin(),
+		HeadBranch: githubtestdata.Pull.Head.GetRef(),
+		BaseBranch: githubtestdata.Pull.Base.GetRef(),
+		HeadCommit: githubtestdata.Pull.Head.GetSHA(),
+		Num:        githubtestdata.Pull.GetNumber(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, actPull)
@@ -169,7 +170,7 @@ func TestParseGithubPullEvent(t *testing.T) {
 func TestParseGithubPullEventFromDraft(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	// verify that close event treated as 'close' events by default
-	closeEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	closeEvent := deepcopy.Copy(githubtestdata.PullEvent).(github.PullRequestEvent)
 	closeEvent.Action = github.Ptr("closed")
 	closeEvent.PullRequest.Draft = github.Ptr(true)
 
@@ -178,7 +179,7 @@ func TestParseGithubPullEventFromDraft(t *testing.T) {
 	Equals(t, models.ClosedPullEvent, evType)
 
 	// verify that draft PRs are treated as 'other' events by default
-	testEvent := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+	testEvent := deepcopy.Copy(githubtestdata.PullEvent).(github.PullRequestEvent)
 	testEvent.PullRequest.Draft = github.Ptr(true)
 	_, evType, _, _, _, err = parser.ParseGithubPullEvent(logger, &testEvent)
 	Ok(t, err)
@@ -258,7 +259,7 @@ func TestParseGithubPullEvent_EventType(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.action, func(t *testing.T) {
 			// Test normal parsing
-			event := deepcopy.Copy(PullEvent).(github.PullRequestEvent)
+			event := deepcopy.Copy(githubtestdata.PullEvent).(github.PullRequestEvent)
 			action := c.action
 			event.Action = &action
 			_, actType, _, _, _, err := parser.ParseGithubPullEvent(logger, &event)
@@ -282,37 +283,37 @@ func TestParseGithubPullEvent_EventType(t *testing.T) {
 
 func TestParseGithubPull(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	testPull := deepcopy.Copy(Pull).(github.PullRequest)
+	testPull := deepcopy.Copy(githubtestdata.Pull).(github.PullRequest)
 	testPull.Head.SHA = nil
 	_, _, _, err := parser.ParseGithubPull(logger, &testPull)
 	ErrEquals(t, "head.sha is null", err)
 
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
+	testPull = deepcopy.Copy(githubtestdata.Pull).(github.PullRequest)
 	testPull.HTMLURL = nil
 	_, _, _, err = parser.ParseGithubPull(logger, &testPull)
 	ErrEquals(t, "html_url is null", err)
 
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
+	testPull = deepcopy.Copy(githubtestdata.Pull).(github.PullRequest)
 	testPull.Head.Ref = nil
 	_, _, _, err = parser.ParseGithubPull(logger, &testPull)
 	ErrEquals(t, "head.ref is null", err)
 
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
+	testPull = deepcopy.Copy(githubtestdata.Pull).(github.PullRequest)
 	testPull.Base.Ref = nil
 	_, _, _, err = parser.ParseGithubPull(logger, &testPull)
 	ErrEquals(t, "base.ref is null", err)
 
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
+	testPull = deepcopy.Copy(githubtestdata.Pull).(github.PullRequest)
 	testPull.User.Login = nil
 	_, _, _, err = parser.ParseGithubPull(logger, &testPull)
 	ErrEquals(t, "user.login is null", err)
 
-	testPull = deepcopy.Copy(Pull).(github.PullRequest)
+	testPull = deepcopy.Copy(githubtestdata.Pull).(github.PullRequest)
 	testPull.Number = nil
 	_, _, _, err = parser.ParseGithubPull(logger, &testPull)
 	ErrEquals(t, "number is null", err)
 
-	pullRes, actBaseRepo, actHeadRepo, err := parser.ParseGithubPull(logger, &Pull)
+	pullRes, actBaseRepo, actHeadRepo, err := parser.ParseGithubPull(logger, &githubtestdata.Pull)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		Owner:             "owner",
@@ -326,12 +327,12 @@ func TestParseGithubPull(t *testing.T) {
 		},
 	}
 	Equals(t, models.PullRequest{
-		URL:        Pull.GetHTMLURL(),
-		Author:     Pull.User.GetLogin(),
-		HeadBranch: Pull.Head.GetRef(),
-		BaseBranch: Pull.Base.GetRef(),
-		HeadCommit: Pull.Head.GetSHA(),
-		Num:        Pull.GetNumber(),
+		URL:        githubtestdata.Pull.GetHTMLURL(),
+		Author:     githubtestdata.Pull.User.GetLogin(),
+		HeadBranch: githubtestdata.Pull.Head.GetRef(),
+		BaseBranch: githubtestdata.Pull.Base.GetRef(),
+		HeadCommit: githubtestdata.Pull.Head.GetSHA(),
+		Num:        githubtestdata.Pull.GetNumber(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, pullRes)
@@ -1263,7 +1264,7 @@ func TestGetBitbucketServerEventType(t *testing.T) {
 
 func TestParseAzureDevopsRepo(t *testing.T) {
 	// this should be successful
-	repo := ADRepo
+	repo := azuredevopstestdata.Repo
 	repo.ParentRepository = nil
 	r, err := parser.ParseAzureDevopsRepo(&repo)
 	Ok(t, err)
@@ -1280,7 +1281,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 	}, r)
 
 	// this should be successful
-	repo = ADRepo
+	repo = azuredevopstestdata.Repo
 	repo.WebURL = nil
 	r, err = parser.ParseAzureDevopsRepo(&repo)
 	Ok(t, err)
@@ -1297,7 +1298,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 	}, r)
 
 	// this should be successful
-	repo = ADRepo
+	repo = azuredevopstestdata.Repo
 	repo.WebURL = azuredevops.String("https://owner.visualstudio.com/project/_git/repo")
 	r, err = parser.ParseAzureDevopsRepo(&repo)
 	Ok(t, err)
@@ -1314,7 +1315,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 	}, r)
 
 	// this should be successful
-	repo = ADRepo
+	repo = azuredevopstestdata.Repo
 	repo.WebURL = azuredevops.String("https://dev.azure.com/owner/project/_git/repo")
 	r, err = parser.ParseAzureDevopsRepo(&repo)
 	Ok(t, err)
@@ -1362,33 +1363,33 @@ func TestParseAzureDevopsRepo_LowercasesOwner(t *testing.T) {
 	}
 }
 func TestParseAzureDevopsPullEvent(t *testing.T) {
-	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(ADPullEvent)
+	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(azuredevopstestdata.PullEvent)
 	Ok(t, err)
 
-	testPull := deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull := deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
 	testPull.LastMergeSourceCommit.CommitID = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
 
-	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
 	testPull.URL = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "url is null", err)
-	testEvent := deepcopy.Copy(ADPullEvent).(azuredevops.Event)
+	testEvent := deepcopy.Copy(azuredevopstestdata.PullEvent).(azuredevops.Event)
 	resource := deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
 	resource.CreatedBy = nil
 	testEvent.Resource = resource
 	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
 	ErrEquals(t, "CreatedBy is null", err)
 
-	testEvent = deepcopy.Copy(ADPullEvent).(azuredevops.Event)
+	testEvent = deepcopy.Copy(azuredevopstestdata.PullEvent).(azuredevops.Event)
 	resource = deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
 	resource.CreatedBy.UniqueName = azuredevops.String("")
 	testEvent.Resource = resource
 	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
 	ErrEquals(t, "CreatedBy.UniqueName is null", err)
 
-	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseAzureDevopsPullEvent(ADPullEvent)
+	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseAzureDevopsPullEvent(azuredevopstestdata.PullEvent)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		Owner:             "owner/project",
@@ -1404,12 +1405,12 @@ func TestParseAzureDevopsPullEvent(t *testing.T) {
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, expBaseRepo, actHeadRepo)
 	Equals(t, models.PullRequest{
-		URL:        ADPull.GetURL(),
-		Author:     ADPull.CreatedBy.GetUniqueName(),
+		URL:        azuredevopstestdata.Pull.GetURL(),
+		Author:     azuredevopstestdata.Pull.CreatedBy.GetUniqueName(),
 		HeadBranch: "feature/sourceBranch",
 		BaseBranch: "targetBranch",
-		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
-		Num:        ADPull.GetPullRequestID(),
+		HeadCommit: azuredevopstestdata.Pull.LastMergeSourceCommit.GetCommitID(),
+		Num:        azuredevopstestdata.Pull.GetPullRequestID(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, actPull)
@@ -1442,9 +1443,9 @@ func TestParseAzureDevopsPullEvent_EventType(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.action, func(t *testing.T) {
-			event := deepcopy.Copy(ADPullEvent).(azuredevops.Event)
+			event := deepcopy.Copy(azuredevopstestdata.PullEvent).(azuredevops.Event)
 			if c.exp == models.ClosedPullEvent {
-				event = deepcopy.Copy(ADPullClosedEvent).(azuredevops.Event)
+				event = deepcopy.Copy(azuredevopstestdata.PullClosedEvent).(azuredevops.Event)
 			}
 			event.EventType = c.action
 			_, actType, _, _, _, err := parser.ParseAzureDevopsPullEvent(event)
@@ -1455,42 +1456,42 @@ func TestParseAzureDevopsPullEvent_EventType(t *testing.T) {
 }
 
 func TestParseAzureDevopsPull(t *testing.T) {
-	testPull := deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull := deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
 	testPull.LastMergeSourceCommit.CommitID = nil
 	_, _, _, err := parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
 
-	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
 	testPull.URL = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "url is null", err)
 
-	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
 	testPull.SourceRefName = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "sourceRefName (branch name) is null", err)
 
-	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
 	testPull.TargetRefName = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "targetRefName (branch name) is null", err)
 
-	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
 	testPull.CreatedBy = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "CreatedBy is null", err)
 
-	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
 	testPull.CreatedBy.UniqueName = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "CreatedBy.UniqueName is null", err)
 
-	testPull = deepcopy.Copy(ADPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
 	testPull.PullRequestID = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "pullRequestId is null", err)
 
-	actPull, actBaseRepo, actHeadRepo, err := parser.ParseAzureDevopsPull(&ADPull)
+	actPull, actBaseRepo, actHeadRepo, err := parser.ParseAzureDevopsPull(&azuredevopstestdata.Pull)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		Owner:             "owner/project",
@@ -1504,12 +1505,12 @@ func TestParseAzureDevopsPull(t *testing.T) {
 		},
 	}
 	Equals(t, models.PullRequest{
-		URL:        ADPull.GetURL(),
-		Author:     ADPull.CreatedBy.GetUniqueName(),
+		URL:        azuredevopstestdata.Pull.GetURL(),
+		Author:     azuredevopstestdata.Pull.CreatedBy.GetUniqueName(),
 		HeadBranch: "feature/sourceBranch",
 		BaseBranch: "targetBranch",
-		HeadCommit: ADPull.LastMergeSourceCommit.GetCommitID(),
-		Num:        ADPull.GetPullRequestID(),
+		HeadCommit: azuredevopstestdata.Pull.LastMergeSourceCommit.GetCommitID(),
+		Num:        azuredevopstestdata.Pull.GetPullRequestID(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, actPull)
@@ -1519,7 +1520,7 @@ func TestParseAzureDevopsPull(t *testing.T) {
 
 func TestParseAzureDevopsSelfHostedRepo(t *testing.T) {
 	// this should be successful
-	repo := ADSelfRepo
+	repo := azuredevopstestdata.SelfRepo
 	repo.ParentRepository = nil
 	r, err := parser.ParseAzureDevopsRepo(&repo)
 	Ok(t, err)
@@ -1538,33 +1539,33 @@ func TestParseAzureDevopsSelfHostedRepo(t *testing.T) {
 }
 
 func TestParseAzureDevopsSelfHostedPullEvent(t *testing.T) {
-	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(ADSelfPullEvent)
+	_, _, _, _, _, err := parser.ParseAzureDevopsPullEvent(azuredevopstestdata.SelfPullEvent)
 	Ok(t, err)
 
-	testPull := deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull := deepcopy.Copy(azuredevopstestdata.SelfPull).(azuredevops.GitPullRequest)
 	testPull.LastMergeSourceCommit.CommitID = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
 
-	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.SelfPull).(azuredevops.GitPullRequest)
 	testPull.URL = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "url is null", err)
-	testEvent := deepcopy.Copy(ADSelfPullEvent).(azuredevops.Event)
+	testEvent := deepcopy.Copy(azuredevopstestdata.SelfPullEvent).(azuredevops.Event)
 	resource := deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
 	resource.CreatedBy = nil
 	testEvent.Resource = resource
 	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
 	ErrEquals(t, "CreatedBy is null", err)
 
-	testEvent = deepcopy.Copy(ADSelfPullEvent).(azuredevops.Event)
+	testEvent = deepcopy.Copy(azuredevopstestdata.SelfPullEvent).(azuredevops.Event)
 	resource = deepcopy.Copy(testEvent.Resource).(*azuredevops.GitPullRequest)
 	resource.CreatedBy.UniqueName = azuredevops.String("")
 	testEvent.Resource = resource
 	_, _, _, _, _, err = parser.ParseAzureDevopsPullEvent(testEvent)
 	ErrEquals(t, "CreatedBy.UniqueName is null", err)
 
-	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseAzureDevopsPullEvent(ADSelfPullEvent)
+	actPull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseAzureDevopsPullEvent(azuredevopstestdata.SelfPullEvent)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		Owner:             "owner/project",
@@ -1580,12 +1581,12 @@ func TestParseAzureDevopsSelfHostedPullEvent(t *testing.T) {
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, expBaseRepo, actHeadRepo)
 	Equals(t, models.PullRequest{
-		URL:        ADSelfPull.GetURL(),
-		Author:     ADSelfPull.CreatedBy.GetUniqueName(),
+		URL:        azuredevopstestdata.SelfPull.GetURL(),
+		Author:     azuredevopstestdata.SelfPull.CreatedBy.GetUniqueName(),
 		HeadBranch: "feature/sourceBranch",
 		BaseBranch: "targetBranch",
-		HeadCommit: ADSelfPull.LastMergeSourceCommit.GetCommitID(),
-		Num:        ADSelfPull.GetPullRequestID(),
+		HeadCommit: azuredevopstestdata.SelfPull.LastMergeSourceCommit.GetCommitID(),
+		Num:        azuredevopstestdata.SelfPull.GetPullRequestID(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, actPull)
@@ -1618,9 +1619,9 @@ func TestParseAzureDevopsSelfHostedPullEvent_EventType(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.action, func(t *testing.T) {
-			event := deepcopy.Copy(ADSelfPullEvent).(azuredevops.Event)
+			event := deepcopy.Copy(azuredevopstestdata.SelfPullEvent).(azuredevops.Event)
 			if c.exp == models.ClosedPullEvent {
-				event = deepcopy.Copy(ADSelfPullClosedEvent).(azuredevops.Event)
+				event = deepcopy.Copy(azuredevopstestdata.SelfPullClosedEvent).(azuredevops.Event)
 			}
 			event.EventType = c.action
 			_, actType, _, _, _, err := parser.ParseAzureDevopsPullEvent(event)
@@ -1631,42 +1632,42 @@ func TestParseAzureDevopsSelfHostedPullEvent_EventType(t *testing.T) {
 }
 
 func TestParseAzureSelfHostedDevopsPull(t *testing.T) {
-	testPull := deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull := deepcopy.Copy(azuredevopstestdata.SelfPull).(azuredevops.GitPullRequest)
 	testPull.LastMergeSourceCommit.CommitID = nil
 	_, _, _, err := parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "lastMergeSourceCommit.commitID is null", err)
 
-	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.SelfPull).(azuredevops.GitPullRequest)
 	testPull.URL = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "url is null", err)
 
-	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.SelfPull).(azuredevops.GitPullRequest)
 	testPull.SourceRefName = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "sourceRefName (branch name) is null", err)
 
-	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.SelfPull).(azuredevops.GitPullRequest)
 	testPull.TargetRefName = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "targetRefName (branch name) is null", err)
 
-	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.SelfPull).(azuredevops.GitPullRequest)
 	testPull.CreatedBy = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "CreatedBy is null", err)
 
-	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.SelfPull).(azuredevops.GitPullRequest)
 	testPull.CreatedBy.UniqueName = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "CreatedBy.UniqueName is null", err)
 
-	testPull = deepcopy.Copy(ADSelfPull).(azuredevops.GitPullRequest)
+	testPull = deepcopy.Copy(azuredevopstestdata.SelfPull).(azuredevops.GitPullRequest)
 	testPull.PullRequestID = nil
 	_, _, _, err = parser.ParseAzureDevopsPull(&testPull)
 	ErrEquals(t, "pullRequestId is null", err)
 
-	actPull, actBaseRepo, actHeadRepo, err := parser.ParseAzureDevopsPull(&ADSelfPull)
+	actPull, actBaseRepo, actHeadRepo, err := parser.ParseAzureDevopsPull(&azuredevopstestdata.SelfPull)
 	Ok(t, err)
 	expBaseRepo := models.Repo{
 		Owner:             "owner/project",
@@ -1680,12 +1681,12 @@ func TestParseAzureSelfHostedDevopsPull(t *testing.T) {
 		},
 	}
 	Equals(t, models.PullRequest{
-		URL:        ADSelfPull.GetURL(),
-		Author:     ADSelfPull.CreatedBy.GetUniqueName(),
+		URL:        azuredevopstestdata.SelfPull.GetURL(),
+		Author:     azuredevopstestdata.SelfPull.CreatedBy.GetUniqueName(),
 		HeadBranch: "feature/sourceBranch",
 		BaseBranch: "targetBranch",
-		HeadCommit: ADSelfPull.LastMergeSourceCommit.GetCommitID(),
-		Num:        ADSelfPull.GetPullRequestID(),
+		HeadCommit: azuredevopstestdata.SelfPull.LastMergeSourceCommit.GetCommitID(),
+		Num:        azuredevopstestdata.SelfPull.GetPullRequestID(),
 		State:      models.OpenPullState,
 		BaseRepo:   expBaseRepo,
 	}, actPull)

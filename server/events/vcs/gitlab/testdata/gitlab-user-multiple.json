@@ -1,0 +1,20 @@
+[
+  {
+    "id": 123,
+    "username": "multiuser",
+    "name": "Multiple User 1",
+    "state": "active",
+    "locked": false,
+    "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/123/avatar.png",
+    "web_url": "https://gitlab.com/multiuser"
+  },
+  {
+    "id": 124,
+    "username": "multiuser",
+    "name": "Multiple User 2",
+    "state": "active",
+    "locked": false,
+    "avatar_url": "https://gitlab.com/uploads/-/system/user/avatar/124/avatar.png",
+    "web_url": "https://gitlab.com/multiuser"
+  }
+]
