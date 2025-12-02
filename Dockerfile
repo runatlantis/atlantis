@@ -237,6 +237,9 @@ COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
+
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
