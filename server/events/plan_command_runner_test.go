@@ -859,3 +859,177 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 		)
 	})
 }
+func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		Description            string
+		VCSType                models.VCSHostType
+		PendingApplyFlag       bool
+		ProjectResults         []command.ProjectResult
+		ExpApplyStatus         models.CommitStatus
+		ExpVCSApplyStatusTotal int
+		ExpVCSApplyStatusSucc  int
+		ExpShouldUpdateStatus  bool
+	}{
+		{
+			Description:      "GitLab with flag enabled and unapplied plans should set pending status",
+			VCSType:          models.Gitlab,
+			PendingApplyFlag: true,
+			ProjectResults: []command.ProjectResult{
+				{
+					Command:    command.Plan,
+					RepoRelDir: "mydir",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
+					},
+				},
+			},
+			ExpApplyStatus:         models.PendingCommitStatus,
+			ExpVCSApplyStatusTotal: 1,
+			ExpVCSApplyStatusSucc:  0,
+			ExpShouldUpdateStatus:  true,
+		},
+		{
+			Description:      "GitLab with flag disabled and unapplied plans should NOT update apply status",
+			VCSType:          models.Gitlab,
+			PendingApplyFlag: false,
+			ProjectResults: []command.ProjectResult{
+				{
+					Command:    command.Plan,
+					RepoRelDir: "mydir",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
+					},
+				},
+			},
+			ExpShouldUpdateStatus: false,
+		},
+		{
+			Description:      "GitHub with flag enabled should NOT update apply status (default behavior)",
+			VCSType:          models.Github,
+			PendingApplyFlag: true,
+			ProjectResults: []command.ProjectResult{
+				{
+					Command:    command.Plan,
+					RepoRelDir: "mydir",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
+					},
+				},
+			},
+			ExpShouldUpdateStatus: false,
+		},
+		{
+			Description:      "GitLab with all plans applied should set success status",
+			VCSType:          models.Gitlab,
+			PendingApplyFlag: true,
+			ProjectResults: []command.ProjectResult{
+				{
+					Command:    command.Plan,
+					RepoRelDir: "mydir",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					},
+				},
+			},
+			ExpApplyStatus:         models.SuccessCommitStatus,
+			ExpVCSApplyStatusTotal: 1,
+			ExpVCSApplyStatusSucc:  1,
+			ExpShouldUpdateStatus:  true,
+		},
+		{
+			Description:      "Bitbucket with flag enabled should NOT update apply status",
+			VCSType:          models.BitbucketCloud,
+			PendingApplyFlag: true,
+			ProjectResults: []command.ProjectResult{
+				{
+					Command:    command.Plan,
+					RepoRelDir: "mydir",
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
+					},
+				},
+			},
+			ExpShouldUpdateStatus: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			tmp := t.TempDir()
+			db, err := boltdb.New(tmp)
+			t.Cleanup(func() {
+				db.Close()
+			})
+			Ok(t, err)
+
+			_ = setup(t, func(tc *TestConfig) {
+				tc.database = db
+				tc.PendingApplyStatus = c.PendingApplyFlag
+			})
+
+			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+
+			// Create repo with the appropriate VCS type
+			repo := testdata.GithubRepo
+			repo.VCSHost = models.VCSHost{
+				Type: c.VCSType,
+			}
+
+			modelPull := models.PullRequest{
+				BaseRepo: repo,
+				State:    models.OpenPullState,
+				Num:      testdata.Pull.Num,
+			}
+
+			cmd := &events.CommentCommand{Name: command.Plan}
+
+			ctx := &command.Context{
+				User:     testdata.User,
+				Log:      logging.NewNoopLogger(t),
+				Scope:    scopeNull,
+				Pull:     modelPull,
+				HeadRepo: repo,
+				Trigger:  command.CommentTrigger,
+			}
+
+			projectContexts := []command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "mydir",
+				},
+			}
+
+			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(projectContexts, nil)
+			When(projectCommandRunner.Plan(projectContexts[0])).ThenReturn(c.ProjectResults[0])
+
+			planCommandRunner.Run(ctx, cmd)
+
+			// Verify based on whether we expect a status update
+			if c.ExpShouldUpdateStatus {
+				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Eq[models.CommitStatus](c.ExpApplyStatus),
+					Eq[command.Name](command.Apply),
+					Eq(c.ExpVCSApplyStatusSucc),
+					Eq(c.ExpVCSApplyStatusTotal),
+				)
+			} else {
+				// Verify that UpdateCombinedCount was NOT called for Apply command
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Any[models.CommitStatus](),
+					Eq[command.Name](command.Apply),
+					Any[int](),
+					Any[int](),
+				)
+			}
+		})
+	}
+}

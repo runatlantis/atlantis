@@ -123,6 +123,7 @@ const (
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
+	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
 	PortFlag                         = "port"
@@ -569,6 +570,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	ParallelApplyFlag: {
 		description:  "Run apply operations in parallel.",
+		defaultValue: false,
+	},
+	PendingApplyStatusFlag: {
+		description:  "Set apply job status as pending when there are planned changes that haven't been applied yet. Currently only supported for GitLab.",
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {
