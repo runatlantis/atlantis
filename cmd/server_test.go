@@ -124,6 +124,7 @@ var testFlags = map[string]interface{}{
 	ParallelPoolSize:                 100,
 	ParallelPlanFlag:                 true,
 	ParallelApplyFlag:                true,
+	PendingApplyStatusFlag:           false,
 	QuietPolicyChecks:                false,
 	RedisHost:                        "",
 	RedisInsecureSkipVerify:          false,

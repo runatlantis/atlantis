@@ -34,6 +34,8 @@ func NewPlanCommandRunner(
 	lockingLocker locking.Locker,
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
+	PendingApplyStatus bool,
+
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -54,6 +56,7 @@ func NewPlanCommandRunner(
 		lockingLocker:              lockingLocker,
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
+		PendingApplyStatus:         PendingApplyStatus,
 	}
 }
 
@@ -85,6 +88,7 @@ type PlanCommandRunner struct {
 	DiscardApprovalOnPlan bool
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	SilencePRComments     []string
+	PendingApplyStatus    bool
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -345,8 +349,21 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
 		} else if numSuccess < len(pullStatus.Projects) {
-			// If there are plans that haven't been applied yet, no need to update the status
-			return
+			// When there are planned changes that haven't been applied yet:
+			// - GitLab: Set status to pending if PendingApplyStatus is enabled
+			//           This prevents MR merging until all applies complete
+			// - Other VCS: Leave status unchanged (existing behavior)
+			if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab && p.PendingApplyStatus {
+				ctx.Log.Debug("Pending Apply Status is set. Pipeline status will be marked as pending since there are changes to apply")
+				status = models.PendingCommitStatus
+			} else {
+				if p.PendingApplyStatus {
+					// If a VCS uses this flag other than Gitlab, we log the warning to the user
+					ctx.Log.Warn("Flag --pending-apply-status is not yet supported by your VCS. Pipeline status will not be marked as pending")
+				}
+				// Otherwise, status remains SuccessCommitStatus (no update needed)
+				return
+			}
 		}
 	}
 
