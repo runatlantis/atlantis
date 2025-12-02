@@ -867,7 +867,7 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 		Description            string
 		VCSType                models.VCSHostType
 		PendingApplyFlag       bool
-		ProjectResults         []command.ProjectResult
+		ProjectResults         []command.ProjectCommandOutput
 		ExpApplyStatus         models.CommitStatus
 		ExpVCSApplyStatusTotal int
 		ExpVCSApplyStatusSucc  int
@@ -877,10 +877,8 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			Description:      "GitLab with flag enabled and unapplied plans should set pending status",
 			VCSType:          models.Gitlab,
 			PendingApplyFlag: true,
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command:    command.Plan,
-					RepoRelDir: "mydir",
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
 					},
@@ -895,10 +893,8 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			Description:      "GitLab with flag disabled and unapplied plans should NOT update apply status",
 			VCSType:          models.Gitlab,
 			PendingApplyFlag: false,
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command:    command.Plan,
-					RepoRelDir: "mydir",
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
 					},
@@ -910,10 +906,8 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			Description:      "GitHub with flag enabled should NOT update apply status (default behavior)",
 			VCSType:          models.Github,
 			PendingApplyFlag: true,
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command:    command.Plan,
-					RepoRelDir: "mydir",
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
 					},
@@ -925,10 +919,8 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			Description:      "GitLab with all plans applied should set success status",
 			VCSType:          models.Gitlab,
 			PendingApplyFlag: true,
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command:    command.Plan,
-					RepoRelDir: "mydir",
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "No changes. Infrastructure is up-to-date.",
 					},
@@ -943,10 +935,8 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			Description:      "Bitbucket with flag enabled should NOT update apply status",
 			VCSType:          models.BitbucketCloud,
 			PendingApplyFlag: true,
-			ProjectResults: []command.ProjectResult{
+			ProjectResults: []command.ProjectCommandOutput{
 				{
-					Command:    command.Plan,
-					RepoRelDir: "mydir",
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
 					},
