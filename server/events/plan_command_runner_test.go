@@ -1001,7 +1001,7 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 				tc.PendingApplyStatus = c.PendingApplyFlag
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			// Create repo with the appropriate VCS type
 			repo := testdata.GithubRepo
