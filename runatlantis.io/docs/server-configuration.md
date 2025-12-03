@@ -891,7 +891,7 @@ ATLANTIS_GITLAB_STATUS_RETRY_ENABLED=true
 
 Enable enhanced retry logic for GitLab pipeline status updates with exponential backoff.
 
-* Defaults to `false`.
+Defaults to `false`.
 
 ### `--gitlab-token` <Badge text="v0.2.0+" type="info"/>
 
