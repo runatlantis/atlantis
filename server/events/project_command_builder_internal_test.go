@@ -17,14 +17,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+	statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -736,7 +736,7 @@ projects:
 }
 
 func TestBuildProjectCmdCtx_WithRegExpCmdEnabled(t *testing.T) {
-	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+	statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -866,7 +866,7 @@ projects:
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 
@@ -955,7 +955,7 @@ projects:
 
 func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+	statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -1113,7 +1113,7 @@ workflows:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 
@@ -1265,7 +1265,7 @@ projects:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 
@@ -1487,7 +1487,7 @@ autodiscover:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 

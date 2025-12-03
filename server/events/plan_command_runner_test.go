@@ -15,7 +15,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/require"
 )
@@ -93,7 +93,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				tc.database = db
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
 			cmd := &events.CommentCommand{Name: command.Plan}
@@ -521,7 +521,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				tc.database = db
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			pull := &github.PullRequest{
 				State: github.Ptr("open"),
@@ -763,7 +763,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				tc.database = db
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
 			cmd := &events.CommentCommand{Name: command.Plan}
@@ -852,7 +852,7 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 		})
 
 		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-		scopeNull, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+		scopeNull := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 		ctx := &command.Context{
 			User:     testdata.User,
@@ -1004,7 +1004,7 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 				tc.PendingApplyStatus = c.PendingApplyFlag
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			// Create repo with the appropriate VCS type
 			repo := testdata.GithubRepo

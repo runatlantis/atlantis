@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -22,7 +23,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -233,7 +233,7 @@ terraform {
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	terraformClient := tfclientmocks.NewMockClient()
@@ -591,7 +591,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	for _, c := range cases {
@@ -782,7 +782,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 	userConfig.RestrictFileList = true
 
@@ -1148,7 +1148,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	for name, c := range cases {
@@ -1268,7 +1268,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	userConfig := defaultUserConfig
 
 	globalCfgArgs := valid.GlobalCfgArgs{}
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 	terraformClient := tfclientmocks.NewMockClient()
 
@@ -1353,7 +1353,7 @@ projects:
 		AllowAllRepoSettings: true,
 	}
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	terraformClient := tfclientmocks.NewMockClient()
@@ -1422,7 +1422,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	for _, c := range cases {
@@ -1576,7 +1576,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	for name, testCase := range testCases {
@@ -1746,7 +1746,7 @@ projects:
 		globalCfgArgs := valid.GlobalCfgArgs{
 			AllowAllRepoSettings: true,
 		}
-		scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+		scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 		terraformClient := tfclientmocks.NewMockClient()
 
 		builder := events.NewProjectCommandBuilder(
@@ -1815,7 +1815,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	})
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	workingDir := mocks.NewMockWorkingDir()
@@ -1913,7 +1913,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		ThenReturn(tmpDir, nil)
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	globalCfgArgs := valid.GlobalCfgArgs{
@@ -2025,7 +2025,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 	userConfig.RestrictFileList = true
 	userConfig.IncludeGitUntrackedFiles = true
@@ -2136,7 +2136,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 	userConfig.IncludeGitUntrackedFiles = true
 	userConfig.AutoplanFileList = "**/cdk.tf.json"

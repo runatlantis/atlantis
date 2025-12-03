@@ -21,7 +21,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -265,7 +265,7 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 	logger := logging.NewNoopLogger(t)
 	parser := NewMockEventParsing()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope := metricstest.NewLoggingScope(t, logger, "null")
 	vcsClient := NewMockClient()
 	workingDir := NewMockWorkingDir()
 	Ok(t, err)
