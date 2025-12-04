@@ -13,6 +13,7 @@ import (
 )
 
 var httpApplyResult = webhooks.EventResult{
+	Event:     "apply",
 	Workspace: "production",
 	Repo: models.Repo{
 		FullName: "runatlantis/atlantis",
