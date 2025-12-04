@@ -241,6 +241,13 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
+	// If we originally cloned using `--single-branch` and later changed the base branch of the PR,
+	// `git fetch --all` will not fetch the base branch from the original remote, so we update the config
+	// to ensure the current base branch is fetched.
+	if err := w.wrappedGit(logger, c, "config", "--local", "remote.origin.fetch", fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", c.pr.BaseBranch, c.pr.BaseBranch)); err != nil {
+		return err
+	}
+
 	// We use both `head` and `origin` remotes, update them both
 	if err := w.wrappedGit(logger, c, "fetch", "--all"); err != nil {
 		return err
