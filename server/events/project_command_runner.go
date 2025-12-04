@@ -610,7 +610,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 
-	p.Webhooks.Send(ctx.Log, webhooks.EventResult{ // nolint: errcheck
+	webhookSendErr := p.Webhooks.Send(ctx.Log, webhooks.EventResult{ // nolint: errcheck
 		Event:       webhooks.PlanEvent,
 		Workspace:   ctx.Workspace,
 		User:        ctx.User,
@@ -620,6 +620,10 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		Directory:   ctx.RepoRelDir,
 		ProjectName: ctx.ProjectName,
 	})
+
+	if webhookSendErr != nil {
+		ctx.Log.Err("error sending plan webhook; %v", webhookSendErr)
+	}
 
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
@@ -679,7 +683,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 
-	p.Webhooks.Send(ctx.Log, webhooks.EventResult{ // nolint: errcheck
+	webhookSendErr := p.Webhooks.Send(ctx.Log, webhooks.EventResult{ // nolint: errcheck
 		Event:       webhooks.ApplyEvent,
 		Workspace:   ctx.Workspace,
 		User:        ctx.User,
@@ -689,6 +693,10 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		Directory:   ctx.RepoRelDir,
 		ProjectName: ctx.ProjectName,
 	})
+
+	if webhookSendErr != nil {
+		ctx.Log.Err("error sending apply webhook; %v", webhookSendErr)
+	}
 
 	if err != nil {
 		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
