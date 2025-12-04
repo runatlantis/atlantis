@@ -73,6 +73,7 @@
                         "conclusion": "SUCCESS",
                         "isRequired": true,
                         "checkSuite": {
+                          "conclusion": "SUCCESS",
                           "workflowRun": {
                             "file": {
                               "path": ".github/workflows/my-required-workflow.yaml",

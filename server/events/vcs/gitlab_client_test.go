@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package vcs
 
 import (
@@ -47,7 +50,7 @@ type GetCommitResponseLastPipeline struct {
 
 /* GetCommit response JSON object */
 type GetCommitResponse struct {
-	LastPipeline GetCommitResponseLastPipeline `json:"last_pipeline"`
+	LastPipeline *GetCommitResponseLastPipeline `json:"last_pipeline"`
 }
 
 /* Empty struct for JSON marshalling */
@@ -351,7 +354,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 						w.WriteHeader(http.StatusOK)
 
 						getCommitResponse := GetCommitResponse{
-							LastPipeline: GetCommitResponseLastPipeline{
+							LastPipeline: &GetCommitResponseLastPipeline{
 								ID: gitlabPipelineSuccessMrID,
 							},
 						}
@@ -482,7 +485,7 @@ func TestGitlabClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 							Ok(t, err)
 						} else {
 							getCommitResponse := GetCommitResponse{
-								LastPipeline: GetCommitResponseLastPipeline{
+								LastPipeline: &GetCommitResponseLastPipeline{
 									ID: gitlabPipelineSuccessMrID,
 								},
 							}
@@ -609,7 +612,7 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 						w.WriteHeader(http.StatusOK)
 
 						getCommitResponse := GetCommitResponse{
-							LastPipeline: GetCommitResponseLastPipeline{
+							LastPipeline: &GetCommitResponseLastPipeline{
 								ID: gitlabPipelineSuccessMrID,
 							},
 						}
@@ -666,6 +669,121 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 
 			Assert(t, c.expNumberOfRequests == handledNumberOfRequests,
 				fmt.Sprintf("expected %d number of requests, but processed %d", c.expNumberOfRequests, handledNumberOfRequests))
+		})
+	}
+}
+
+func TestGitlabClient_UpdateStatusWithRetryEnabled(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
+	cases := []struct {
+		name                  string
+		nullPipelineResponses int
+		expGetCommitRequests  int
+		expPipelineIdSet      bool
+	}{
+		{
+			name:                  "waits up to 3 attempts for pipeline",
+			nullPipelineResponses: 1,
+			expGetCommitRequests:  2,
+			expPipelineIdSet:      true,
+		},
+		{
+			name:                  "gives up after 3 attempts and uses ref",
+			nullPipelineResponses: 10,
+			expGetCommitRequests:  5,
+			expPipelineIdSet:      false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			getCommitRequests := 0
+
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha":
+						getCommitRequests++
+						w.WriteHeader(http.StatusOK)
+
+						var getCommitResponse GetCommitResponse
+						if getCommitRequests > c.nullPipelineResponses {
+							getCommitResponse = GetCommitResponse{
+								LastPipeline: &GetCommitResponseLastPipeline{
+									ID: gitlabPipelineSuccessMrID,
+								},
+							}
+						}
+
+						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
+						Ok(t, err)
+						_, err = w.Write(getCommitJsonResponse)
+						Ok(t, err)
+
+					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+						var updateStatusJsonBody UpdateStatusJsonBody
+						err := json.NewDecoder(r.Body).Decode(&updateStatusJsonBody)
+						Ok(t, err)
+						defer r.Body.Close()
+
+						if c.expPipelineIdSet {
+							Equals(t, gitlabPipelineSuccessMrID, updateStatusJsonBody.PipelineId)
+							Equals(t, "", updateStatusJsonBody.Ref)
+						} else {
+							Equals(t, 0, updateStatusJsonBody.PipelineId)
+							Equals(t, updateStatusHeadBranch, updateStatusJsonBody.Ref)
+						}
+
+						w.WriteHeader(http.StatusOK)
+						setStatusJsonResponse, err := json.Marshal(EmptyStruct{})
+						Ok(t, err)
+						_, err = w.Write(setStatusJsonResponse)
+						Ok(t, err)
+
+					case "/api/v4/":
+						w.WriteHeader(http.StatusOK)
+
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+			defer testServer.Close()
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+
+			client := &GitlabClient{
+				Client:             internalClient,
+				Version:            nil,
+				StatusRetryEnabled: true,
+				PollingInterval:    10 * time.Millisecond,
+			}
+
+			repo := models.Repo{
+				FullName: "runatlantis/atlantis",
+				Owner:    "runatlantis",
+				Name:     "atlantis",
+			}
+
+			err = client.UpdateStatus(
+				logger,
+				repo,
+				models.PullRequest{
+					Num:        1,
+					BaseRepo:   repo,
+					HeadCommit: "sha",
+					HeadBranch: updateStatusHeadBranch,
+				},
+				models.PendingCommitStatus,
+				updateStatusSrc,
+				updateStatusDescription,
+				updateStatusTargetUrl,
+			)
+			Ok(t, err)
+
+			Equals(t, c.expGetCommitRequests, getCommitRequests)
 		})
 	}
 }
@@ -1529,7 +1647,7 @@ func TestGitlabClient_UpdateStatusTransitionAlreadyComplete(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 
 				getCommitResponse := GetCommitResponse{
-					LastPipeline: GetCommitResponseLastPipeline{
+					LastPipeline: &GetCommitResponseLastPipeline{
 						ID: gitlabPipelineSuccessMrID,
 					},
 				}
