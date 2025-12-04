@@ -27,7 +27,7 @@ import (
 
 var underlying *mocks.MockUnderlyingSlackClient
 var client webhooks.DefaultSlackClient
-var result webhooks.ApplyResult
+var result webhooks.EventResult
 
 func TestAuthTest_Success(t *testing.T) {
 	t.Log("When the underlying client succeeds, function should succeed")
@@ -157,7 +157,7 @@ func setup(t *testing.T) {
 		Slack: underlying,
 		Token: "sometoken",
 	}
-	result = webhooks.ApplyResult{
+	result = webhooks.EventResult{
 		Workspace: "production",
 		Repo: models.Repo{
 			FullName: "runatlantis/atlantis",
