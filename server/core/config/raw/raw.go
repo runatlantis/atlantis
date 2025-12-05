@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package raw contains the golang representations of the YAML elements
 // supported in atlantis.yaml. The structs here represent the exact data that
 // comes from the file before it is parsed/validated further.
