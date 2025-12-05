@@ -114,6 +114,7 @@ const (
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	GitlabStatusRetryEnabledFlag     = "gitlab-status-retry-enabled"
 	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
@@ -549,6 +550,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	GHAllowMergeableBypassApply: {
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
+		defaultValue: false,
+	},
+	GitlabStatusRetryEnabledFlag: {
+		description:  "Enable enhanced retry logic for GitLab pipeline status updates with exponential backoff.",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {
