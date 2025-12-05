@@ -57,8 +57,8 @@ func NewClient(database db.Database) *Client {
 	}
 }
 
-// keyRegex matches and captures {repoFullName}/{path}/{workspace} where path can have multiple /'s in it.
-var keyRegex = regexp.MustCompile(`^(.*?\/.*?)\/(.*)\/(.*)$`)
+// keyRegex matches and captures {repoFullName}/{path}/{workspace}/{projectName} where path can have multiple /'s in it.
+var keyRegex = regexp.MustCompile(`^(.*?\/.*?)\/(.*)\/(.*)\/(.*)$`)
 
 // TryLock attempts to acquire a lock to a project and workspace.
 func (c *Client) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error) {
@@ -131,11 +131,11 @@ func (c *Client) key(p models.Project, workspace string) string {
 
 func (c *Client) lockKeyToProjectWorkspace(key string) (models.Project, string, error) {
 	matches := keyRegex.FindStringSubmatch(key)
-	if len(matches) != 4 {
+	if len(matches) != 5 {
 		return models.Project{}, "", errors.New("invalid key format")
 	}
 
-	return models.Project{RepoFullName: matches[1], Path: matches[2]}, matches[3], nil
+	return models.Project{RepoFullName: matches[1], Path: matches[2], ProjectName: matches[4]}, matches[3], nil
 }
 
 type NoOpLocker struct{}
