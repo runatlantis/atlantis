@@ -108,6 +108,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
+	Equals(t, command.Plan, res.Command)
 	t.Logf("output is %s", res.PlanSuccess.TerraformOutput)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
 	expSteps := []string{"run", "apply", "plan", "init", "env"}
@@ -466,6 +467,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			res := runner.Apply(ctx)
 			Equals(t, c.expOut, res.ApplySuccess)
 			Equals(t, c.expFailure, res.Failure)
+			Equals(t, command.Apply, res.Command)
 
 			for _, step := range c.expSteps {
 				switch step {
@@ -728,6 +730,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			res := runner.Import(ctx)
 			Equals(t, c.expOut, res.ImportSuccess)
 			Equals(t, c.expFailure, res.Failure)
+			Equals(t, command.Import, res.Command)
 
 			for _, step := range c.expSteps {
 				switch step {
@@ -1299,6 +1302,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			res := runner.ApprovePolicies(ctx)
 			Equals(t, c.expOut, res.PolicyCheckResults.PolicySetResults)
 			Equals(t, c.expFailure, res.Failure)
+			Equals(t, command.ApprovePolicies, res.Command)
 			if c.hasErr == true {
 				Assert(t, res.Error != nil, "expecting error.")
 			} else {
