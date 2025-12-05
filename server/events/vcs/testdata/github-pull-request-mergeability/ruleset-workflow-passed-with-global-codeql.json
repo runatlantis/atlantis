@@ -60,6 +60,7 @@
                         "conclusion": "SUCCESS",
                         "name": "Analyze (actions)",
                         "checkSuite": {
+                          "conclusion": "SUCCESS",
                           "workflowRun": {
                             "runNumber": 208,
                             "file": null
@@ -84,6 +85,7 @@
                         "conclusion": "SUCCESS",
                         "isRequired": true,
                         "checkSuite": {
+                          "conclusion": "SUCCESS",
                           "workflowRun": {
                             "file": {
                               "path": ".github/workflows/my-required-workflow.yaml",
