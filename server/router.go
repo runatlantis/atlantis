@@ -8,7 +8,6 @@ import (
 	"net/url"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
@@ -50,7 +49,7 @@ func (r *Router) GenerateProjectJobURL(ctx command.ProjectContext) (string, erro
 		"job-id", ctx.JobID,
 	)
 	if err != nil {
-		return "", errors.Wrapf(err, "creating job url for %s", ctx.JobID)
+		return "", fmt.Errorf("creating job url for %s: %w", ctx.JobID, err)
 	}
 
 	return r.AtlantisURL.String() + jobURL.String(), nil
@@ -61,7 +60,7 @@ func (r *Router) GenerateProjectWorkflowHookURL(hookID string) (string, error) {
 		"job-id", hookID,
 	)
 	if err != nil {
-		return "", errors.Wrapf(err, "creating workflow hook url for %s", hookID)
+		return "", fmt.Errorf("creating workflow hook url for %s: %w", hookID, err)
 	}
 
 	return r.AtlantisURL.String() + jobURL.String(), nil

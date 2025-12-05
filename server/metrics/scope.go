@@ -4,12 +4,12 @@
 package metrics
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"time"
 
 	"github.com/cactus/go-statsd-client/v5/statsd"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
@@ -26,7 +26,7 @@ func NewScope(cfg valid.Metrics, logger logging.SimpleLogging, statsNamespace st
 	reporter, err := newReporter(cfg, logger)
 
 	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "initializing stats reporter")
+		return nil, nil, nil, fmt.Errorf("initializing stats reporter: %w", err)
 	}
 
 	scopeOpts := tally.ScopeOptions{
@@ -71,7 +71,7 @@ func newStatsReporter(cfg valid.Metrics) (tally.StatsReporter, error) {
 	})
 
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing statsd client")
+		return nil, fmt.Errorf("initializing statsd client: %w", err)
 	}
 
 	return tallystatsd.NewReporter(client, tallystatsd.Options{}), nil

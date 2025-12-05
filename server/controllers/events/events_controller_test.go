@@ -193,7 +193,7 @@ func TestPost_GithubInvalidComment(t *testing.T) {
 	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(models.Repo{}, models.User{}, 1, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	ResponseContains(t, w, http.StatusBadRequest, "Failed parsing event")
+	ResponseContains(t, w, http.StatusBadRequest, "parsing event")
 }
 
 func TestPost_GitlabCommentInvalidCommand(t *testing.T) {
@@ -250,7 +250,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	defer resp.Body.Close()
 	Equals(t, http.StatusForbidden, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
-	exp := "Repo not allowlisted"
+	exp := "repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	expRepo, _ := models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "")
 	vcsClient.VerifyWasCalledOnce().CreateComment(
@@ -285,7 +285,7 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	defer resp.Body.Close()
 	Equals(t, http.StatusForbidden, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
-	exp := "Repo not allowlisted"
+	exp := "repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 
@@ -319,7 +319,7 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	defer resp.Body.Close()
 	Equals(t, http.StatusForbidden, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
-	exp := "Repo not allowlisted"
+	exp := "repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	expRepo, _ := models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "")
 	vcsClient.VerifyWasCalledOnce().CreateComment(
@@ -355,7 +355,7 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	defer resp.Body.Close()
 	Equals(t, http.StatusForbidden, resp.StatusCode)
 	body, _ := io.ReadAll(resp.Body)
-	exp := "Repo not allowlisted"
+	exp := "repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
 	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
@@ -470,7 +470,7 @@ func TestPost_GithubPullRequestInvalid(t *testing.T) {
 	When(p.ParseGithubPullEvent(Any[logging.SimpleLogging](), Any[*github.PullRequestEvent]())).ThenReturn(models.PullRequest{}, models.OpenedPullEvent, models.Repo{}, models.Repo{}, models.User{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	ResponseContains(t, w, http.StatusBadRequest, "Error parsing pull data: err")
+	ResponseContains(t, w, http.StatusBadRequest, "parsing pull data: err")
 }
 
 func TestPost_GitlabMergeRequestInvalid(t *testing.T) {
@@ -500,7 +500,7 @@ func TestPost_GithubPullRequestNotAllowlisted(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	ResponseContains(t, w, http.StatusForbidden, "Pull request event from non-allowlisted repo")
+	ResponseContains(t, w, http.StatusForbidden, "pull request event from non-allowlisted repo")
 }
 
 func TestPost_GitlabMergeRequestNotAllowlisted(t *testing.T) {
@@ -519,7 +519,7 @@ func TestPost_GitlabMergeRequestNotAllowlisted(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	e.Post(w, req)
-	ResponseContains(t, w, http.StatusForbidden, "Pull request event from non-allowlisted repo")
+	ResponseContains(t, w, http.StatusForbidden, "pull request event from non-allowlisted repo")
 }
 
 func TestPost_GithubPullRequestUnsupportedAction(t *testing.T) {
