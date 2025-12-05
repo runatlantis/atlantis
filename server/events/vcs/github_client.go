@@ -493,6 +493,17 @@ type WorkflowRun struct {
 	RunNumber githubv4.Int
 }
 
+func (original WorkflowRun) Copy() WorkflowRun {
+	copy := WorkflowRun{
+		RunNumber: original.RunNumber,
+	}
+	if original.File != nil {
+		fileCopy := *original.File
+		copy.File = &fileCopy
+	}
+	return copy
+}
+
 type CheckSuite struct {
 	Conclusion  githubv4.String
 	WorkflowRun *WorkflowRun
@@ -502,10 +513,9 @@ func (original CheckSuite) Copy() CheckSuite {
 	copy := CheckSuite{
 		Conclusion: original.Conclusion,
 	}
-
 	if original.WorkflowRun != nil {
-		copy.WorkflowRun = new(WorkflowRun)
-		*copy.WorkflowRun = *original.WorkflowRun
+		workflowRunCopy := original.WorkflowRun.Copy()
+		copy.WorkflowRun = &workflowRunCopy
 	}
 
 	return copy
@@ -525,14 +535,6 @@ func (original CheckRun) Copy() CheckRun {
 		Conclusion: original.Conclusion,
 		IsRequired: original.IsRequired,
 		CheckSuite: original.CheckSuite.Copy(),
-	}
-	if original.CheckSuite.WorkflowRun != nil {
-		copy.CheckSuite.WorkflowRun = new(WorkflowRun)
-		*copy.CheckSuite.WorkflowRun = *original.CheckSuite.WorkflowRun
-		if original.CheckSuite.WorkflowRun.File != nil {
-			copy.CheckSuite.WorkflowRun.File = new(WorkflowRunFile)
-			*copy.CheckSuite.WorkflowRun.File = *original.CheckSuite.WorkflowRun.File
-		}
 	}
 
 	return copy
