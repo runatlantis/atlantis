@@ -303,6 +303,103 @@ func TestGitlabClient_MergePull(t *testing.T) {
 	}
 }
 
+func TestGitlabClient_MergePullSquash(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	mergeSuccess, err := os.ReadFile("testdata/github-pull-request.json")
+	Ok(t, err)
+
+	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
+	Ok(t, err)
+
+	projectSuccess, err := os.ReadFile("testdata/gitlab-project-success.json")
+	Ok(t, err)
+
+	cases := []struct {
+		description string
+		mergeMethod string
+		expSquash   bool
+	}{
+		{
+			"squash merge method",
+			"squash",
+			true,
+		},
+		{
+			"merge method (default)",
+			"merge", 
+			false,
+		},
+		{
+			"empty merge method",
+			"",
+			false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			var mergeRequestBody map[string]interface{}
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					// The first request should hit this URL.
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1/merge":
+						// Capture the request body to verify squash parameter
+						json.NewDecoder(r.Body).Decode(&mergeRequestBody) // nolint: errcheck
+						w.WriteHeader(http.StatusOK)
+						w.Write(mergeSuccess) // nolint: errcheck
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
+						w.WriteHeader(http.StatusOK)
+						w.Write(pipelineSuccess) // nolint: errcheck
+					case "/api/v4/projects/4580910":
+						w.WriteHeader(http.StatusOK)
+						w.Write(projectSuccess) // nolint: errcheck
+					case "/api/v4/":
+						// Rate limiter requests.
+						w.WriteHeader(http.StatusOK)
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &GitlabClient{
+				Client:  internalClient,
+				Version: nil,
+			}
+
+			err = client.MergePull(
+				logger,
+				models.PullRequest{
+					Num: 1,
+					BaseRepo: models.Repo{
+						FullName: "runatlantis/atlantis",
+						Owner:    "runatlantis",
+						Name:     "atlantis",
+					},
+				}, models.PullRequestOptions{
+					DeleteSourceBranchOnMerge: false,
+					MergeMethod:               c.mergeMethod,
+				})
+			Ok(t, err)
+
+			// Verify that the squash parameter was sent correctly
+			if c.expSquash {
+				squashValue, exists := mergeRequestBody["squash"]
+				Assert(t, exists, "Expected squash parameter in request body")
+				Assert(t, squashValue == true, "Expected squash:true in request body, got: %v", squashValue)
+			} else {
+				// When not squashing, the squash parameter should be false or not present
+				if squashValue, exists := mergeRequestBody["squash"]; exists {
+					Assert(t, squashValue == false, "Expected squash:false in request body, got: %v", squashValue)
+				}
+			}
+		})
+	}
+}
+
 func TestGitlabClient_UpdateStatus(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
