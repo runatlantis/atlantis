@@ -44,6 +44,11 @@ Where Atlantis is using its local commit `C6`.
 Atlantis doesn't actually commit this merge anywhere. It just uses it locally.
 :::
 
+:::tip NOTE
+In the case of transient errors when updating the merged branch, Atlantis will
+error for safety to avoid using a stale branch.
+:::
+
 :::warning
 Atlantis only performs this merge during the `terraform plan` phase. If another
 commit is pushed to `main` **after** Atlantis runs `plan`, nothing will happen.
