@@ -151,26 +151,82 @@ func TestGithubClient_GetModifiedFilesMovedFile(t *testing.T) {
 func TestGithubClient_PaginatesComments(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	calls := 0
-	issueResps := []string{
-		`[
-	{"node_id": "1", "body": "asd\nplan\nasd", "user": {"login": "someone-else"}},
-	{"node_id": "2", "body": "asd plan\nasd", "user": {"login": "user"}}
-]`,
-		`[
-	{"node_id": "3", "body": "asd", "user": {"login": "someone-else"}},
-	{"node_id": "4", "body": "asdasd", "user": {"login": "someone-else"}}
-]`,
-		`[
-	{"node_id": "5", "body": "asd plan", "user": {"login": "someone-else"}},
-	{"node_id": "6", "body": "asd\nplan", "user": {"login": "user"}}
-]`,
-		`[
-	{"node_id": "7", "body": "asd", "user": {"login": "user"}},
-	{"node_id": "8", "body": "asd plan \n asd", "user": {"login": "user"}}
-]`,
+	issueResps := []string{`{
+	  "data": {
+	    "repository": {
+	      "pullRequest": {
+	        "comments": {
+	          "nodes": [
+	            {"id": "1", "bodyText": "asd\nplan\nasd", "isMinimized": false, "author": {"login": "someone-else"}},
+	            {"id": "2", "bodyText": "asd plan\nasd", "isMinimized": false, "author": {"login": "user"}}
+	          ],
+	          "pageInfo": {
+	            "hasNextPage": true,
+	            "endCursor": "0"
+	          }
+	        }
+	      }
+	    }
+	  }
+	}`,
+		`{
+	  "data": {
+	    "repository": {
+	      "pullRequest": {
+	        "comments": {
+	          "nodes": [
+	            {"id": "3", "bodyText": "asd", "isMinimized": false, "author": {"login": "someone-else"}},
+	            {"id": "4", "bodyText": "asdasd", "isMinimized": false, "author": {"login": "someone-else"}}
+	          ],
+	          "pageInfo": {
+	            "hasNextPage": true,
+	            "endCursor": "1"
+	          }
+	        }
+	      }
+	    }
+	  }
+	}`,
+		`{
+	  "data": {
+	    "repository": {
+	      "pullRequest": {
+	        "comments": {
+	          "nodes": [
+	            {"id": "5", "bodyText": "asd plan", "isMinimized": false, "author": {"login": "someone-else"}},
+	            {"id": "6", "bodyText": "asd\nplan", "isMinimized": false, "author": {"login": "user"}}
+	          ],
+	          "pageInfo": {
+	            "hasNextPage": true,
+	            "endCursor": "2"
+	          }
+	        }
+	      }
+	    }
+	  }
+	}`,
+		`{
+	  "data": {
+	    "repository": {
+	      "pullRequest": {
+	        "comments": {
+	          "nodes": [
+	            {"id": "7", "bodyText": "asd", "isMinimized": false, "author": {"login": "user"}},
+	            {"id": "8", "bodyText": "asd plan \n asd", "isMinimized": false, "author": {"login": "user"}}
+	          ],
+	          "pageInfo": {
+	            "hasNextPage": false,
+	            "endCursor": "3"
+	          }
+	        }
+	      }
+	    }
+	  }
+	}`,
 	}
 	minimizeResp := "{}"
 	type graphQLCall struct {
+		Query     string `json:"query"`
 		Variables struct {
 			Input githubv4.MinimizeCommentInput `json:"input"`
 		} `json:"variables"`
@@ -178,43 +234,36 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	gotMinimizeCalls := make([]graphQLCall, 0, 2)
 	testServer := httptest.NewTLSServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch r.Method + " " + r.RequestURI {
-			case "POST /api/graphql":
-				defer r.Body.Close() // nolint: errcheck
-				body, err := io.ReadAll(r.Body)
-				if err != nil {
-					t.Errorf("read body error: %v", err)
-					http.Error(w, "server error", http.StatusInternalServerError)
-					return
-				}
-				call := graphQLCall{}
-				err = json.Unmarshal(body, &call)
-				if err != nil {
-					t.Errorf("parse body error: %v", err)
-					http.Error(w, "server error", http.StatusInternalServerError)
-					return
-				}
-				gotMinimizeCalls = append(gotMinimizeCalls, call)
+			var gqlRequest graphQLCall
+			if err := json.NewDecoder(r.Body).Decode(&gqlRequest); err != nil {
+				t.Errorf("parse body error: %v", err)
+				http.Error(w, "server error", http.StatusInternalServerError)
+				return
+			}
+
+			operationType := ""
+			if strings.HasPrefix(strings.TrimSpace(gqlRequest.Query), "query") {
+				operationType = "query"
+			} else if strings.HasPrefix(strings.TrimSpace(gqlRequest.Query), "mutation") {
+				operationType = "mutation"
+			} else {
+				t.Errorf("unexpected query: %q", gqlRequest.Query)
+				http.Error(w, "server error", http.StatusInternalServerError)
+				return
+			}
+
+			switch operationType {
+			case "mutation":
+				gotMinimizeCalls = append(gotMinimizeCalls, gqlRequest)
 				w.Write([]byte(minimizeResp)) // nolint: errcheck
 				return
-			default:
-				if r.Method != "GET" || !strings.HasPrefix(r.RequestURI, "/api/v3/repos/owner/repo/issues/123/comments") {
-					t.Errorf("got unexpected request at %q", r.RequestURI)
-					http.Error(w, "not found", http.StatusNotFound)
-					return
-				}
-				if (calls + 1) < len(issueResps) {
-					w.Header().Add(
-						"Link",
-						fmt.Sprintf(
-							`<http://%s/api/v3/repos/owner/repo/issues/123/comments?page=%d&per_page=100>; rel="next"`,
-							r.Host,
-							calls+1,
-						),
-					)
-				}
+			case "query":
 				w.Write([]byte(issueResps[calls])) // nolint: errcheck
 				calls++
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
 			}
 		}),
 	)
@@ -222,7 +271,7 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 
-	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user", "pass", ""}, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	client, err := vcs.NewGithubClient(testServerURL.Host, &vcs.GithubUserCredentials{"user[bot]", "pass", ""}, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	defer disableSSLVerification()()
 
@@ -253,26 +302,37 @@ func TestGithubClient_PaginatesComments(t *testing.T) {
 
 func TestGithubClient_HideOldComments(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	atlantisUser := "AtlantisUser"
+	atlantisUser := "AtlantisUser[bot]"
 	pullRequestNum := 123
-	issueResp := strings.ReplaceAll(`[
-	{"node_id": "1", "body": "asd\nplan\nasd", "user": {"login": "someone-else"}},
-	{"node_id": "2", "body": "asd plan\nasd", "user": {"login": "someone-else"}},
-	{"node_id": "3", "body": "asdasdasd\nasdasdasd", "user": {"login": "someone-else"}},
-	{"node_id": "4", "body": "asdasdasd\nasdasdasd", "user": {"login": "AtlantisUser"}},
-	{"node_id": "5", "body": "asd\nplan\nasd", "user": {"login": "AtlantisUser"}},
-	{"node_id": "6", "body": "Ran Plan for 2 projects:", "user": {"login": "AtlantisUser"}},
-	{"node_id": "7", "body": "Ran Apply for 2 projects:", "user": {"login": "AtlantisUser"}},
-	{"node_id": "8", "body": "Ran Plan for dir: 'stack1' workspace: 'default'", "user": {"login": "AtlantisUser"}},
-	{"node_id": "9", "body": "Ran Plan for dir: 'stack2' workspace: 'default'", "user": {"login": "AtlantisUser"}},
-	{"node_id": "10", "body": "Continued Plan from previous comment\nasd", "user": {"login": "AtlantisUser"}}
-]`, "'", "`")
-	minimizeResp := "{}"
+	issueResp := strings.ReplaceAll(`{
+    "data": {
+ 	  "repository": {
+	    "pullRequest": {
+		  "comments": {
+		    "nodes": [
+              {"id": "1", "bodyText": "asd\nplan\nasd", "isMinimized": false, "author": {"login": "someone-else"}},
+			  {"id": "2", "bodyText": "asd plan\nasd", "isMinimized": false, "author": {"login": "someone-else"}},
+			  {"id": "3", "bodyText": "asdasdasd\nasdasdasd", "isMinimized": false, "author": {"login": "someone-else"}},
+			  {"id": "4", "bodyText": "asdasdasd\nasdasdasd", "isMinimized": false, "author": {"login": "AtlantisUser"}},
+			  {"id": "5", "bodyText": "asd\nplan\nasd", "isMinimized": false, "author": {"login": "AtlantisUser"}},
+			  {"id": "6", "bodyText": "Ran Plan for 2 projects:", "isMinimized": true, "author": {"login": "AtlantisUser"}},
+			  {"id": "7", "bodyText": "Ran Apply for 2 projects:", "isMinimized": false, "author": {"login": "AtlantisUser"}},
+			  {"id": "8", "bodyText": "Ran Plan for dir: 'stack1' workspace: 'default'", "isMinimized": false, "author": {"login": "AtlantisUser"}},
+			  {"id": "9", "bodyText": "Ran Plan for dir: 'stack2' workspace: 'default'", "isMinimized": false, "author": {"login": "AtlantisUser"}},
+			  {"id": "10", "bodyText": "Continued Plan from previous comment\nasd", "isMinimized": false, "author": {"login": "AtlantisUser"}}
+		    ]
+		  }
+	    }
+	  }
+    }
+}`, "'", "`")
 	type graphQLCall struct {
+		Query     string `json:"query"`
 		Variables struct {
 			Input githubv4.MinimizeCommentInput `json:"input"`
 		} `json:"variables"`
 	}
+	minimizeResp := "{}"
 
 	cases := []struct {
 		dir                 string
@@ -280,10 +340,11 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 		processedCommentIds []string
 	}{
 		{
-			// With no dir specified, comments 6, 8, 9 and 10 should be minimized.
+			// With no dir specified, comments 8, 9 and 10 should be minimized.
+			// Comment 6 should not be minimized, because it's already minimized.
 			"",
-			4,
-			[]string{"6", "8", "9", "10"},
+			3,
+			[]string{"8", "9", "10"},
 		},
 		{
 			// With a dir of "stack1", comment 8 should be minimized.
@@ -304,28 +365,31 @@ func TestGithubClient_HideOldComments(t *testing.T) {
 			gotMinimizeCalls := make([]graphQLCall, 0, 1)
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					switch r.Method + " " + r.RequestURI {
-					// This gets the pull request's comments.
-					case fmt.Sprintf("GET /api/v3/repos/owner/repo/issues/%v/comments?direction=asc&sort=created", pullRequestNum):
-						w.Write([]byte(issueResp)) // nolint: errcheck
+					var gqlRequest graphQLCall
+					if err := json.NewDecoder(r.Body).Decode(&gqlRequest); err != nil {
+						t.Errorf("parse body error: %v", err)
+						http.Error(w, "server error", http.StatusInternalServerError)
 						return
-					case "POST /api/graphql":
-						defer r.Body.Close() // nolint: errcheck
-						body, err := io.ReadAll(r.Body)
-						if err != nil {
-							t.Errorf("read body error: %v", err)
-							http.Error(w, "server error", http.StatusInternalServerError)
-							return
-						}
-						call := graphQLCall{}
-						err = json.Unmarshal(body, &call)
-						if err != nil {
-							t.Errorf("parse body error: %v", err)
-							http.Error(w, "server error", http.StatusInternalServerError)
-							return
-						}
-						gotMinimizeCalls = append(gotMinimizeCalls, call)
+					}
+
+					operationType := ""
+					if strings.HasPrefix(strings.TrimSpace(gqlRequest.Query), "query") {
+						operationType = "query"
+					} else if strings.HasPrefix(strings.TrimSpace(gqlRequest.Query), "mutation") {
+						operationType = "mutation"
+					} else {
+						t.Errorf("unexpected query: %q", gqlRequest.Query)
+						http.Error(w, "server error", http.StatusInternalServerError)
+						return
+					}
+
+					switch operationType {
+					case "mutation":
+						gotMinimizeCalls = append(gotMinimizeCalls, gqlRequest)
 						w.Write([]byte(minimizeResp)) // nolint: errcheck
+						return
+					case "query":
+						w.Write([]byte(issueResp)) // nolint: errcheck
 						return
 					default:
 						t.Errorf("got unexpected request at %q", r.RequestURI)
