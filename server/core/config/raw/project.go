@@ -96,6 +96,11 @@ func (p Project) Validate() error {
 		return nil
 	}
 
+	// Validate that name doesn't contain glob patterns - glob expansion only works for 'dir'
+	if p.Name != nil && ContainsGlobPattern(*p.Name) {
+		return errors.New("name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field")
+	}
+
 	// Cross-field validation: name cannot be used with glob patterns in dir
 	// because glob patterns expand to multiple projects which can't share the same name
 	if p.Name != nil && p.Dir != nil && ContainsGlobPattern(*p.Dir) {

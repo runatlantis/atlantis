@@ -363,6 +363,38 @@ func TestProject_Validate(t *testing.T) {
 		},
 		// Name with glob pattern tests
 		{
+			description: "name containing * glob pattern should fail",
+			input: raw.Project{
+				Dir:  String("modules/networking"),
+				Name: String("my-project*"),
+			},
+			expErr: "name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field",
+		},
+		{
+			description: "name containing ** glob pattern should fail",
+			input: raw.Project{
+				Dir:  String("modules/networking"),
+				Name: String("my-project**"),
+			},
+			expErr: "name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field",
+		},
+		{
+			description: "name containing ? glob pattern should fail",
+			input: raw.Project{
+				Dir:  String("modules/networking"),
+				Name: String("project?"),
+			},
+			expErr: "name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field",
+		},
+		{
+			description: "name containing [ glob pattern should fail",
+			input: raw.Project{
+				Dir:  String("modules/networking"),
+				Name: String("project[1]"),
+			},
+			expErr: "name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field",
+		},
+		{
 			description: "name with glob pattern in dir should fail",
 			input: raw.Project{
 				Dir:  String("modules/*"),
