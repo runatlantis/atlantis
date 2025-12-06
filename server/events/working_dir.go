@@ -117,6 +117,10 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 			logger.Info("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 			return cloneDir, nil
 		}
+		if !w.remoteHasBranch(logger, c, p.BaseBranch) {
+			logger.Info("repo appears to have changed base branch, must reclone")
+			return cloneDir, w.forceClone(logger, c)
+		}
 		logger.Info("repo was already cloned but branch is not at correct commit, updating to %q", p.HeadCommit)
 		return cloneDir, w.updateToRef(logger, c, p.HeadCommit)
 	}
@@ -237,6 +241,18 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
 	return hasDiverged
+}
+
+func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {
+	ref := "refs/remotes/origin/" + branch
+
+	err := w.wrappedGit(logger, c, "show-ref", "--verify", ref)
+	if err != nil {
+		logger.Warn("remote-tracking branch %s not found locally", ref)
+		return false
+	}
+
+	return true
 }
 
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
