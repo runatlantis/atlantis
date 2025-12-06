@@ -96,6 +96,12 @@ func (p Project) Validate() error {
 		return nil
 	}
 
+	// Cross-field validation: name cannot be used with glob patterns in dir
+	// because glob patterns expand to multiple projects which can't share the same name
+	if p.Name != nil && p.Dir != nil && ContainsGlobPattern(*p.Dir) {
+		return errors.New("name: cannot be used with glob patterns in 'dir'; glob patterns expand to multiple projects which cannot share the same name")
+	}
+
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Dir, validation.Required, validation.By(validDir)),
 		validation.Field(&p.PlanRequirements, validation.By(validPlanReq)),

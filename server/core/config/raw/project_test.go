@@ -361,6 +361,31 @@ func TestProject_Validate(t *testing.T) {
 			},
 			expErr: `dir: invalid glob pattern "[abc".`,
 		},
+		// Name with glob pattern tests
+		{
+			description: "name with glob pattern in dir should fail",
+			input: raw.Project{
+				Dir:  String("modules/*"),
+				Name: String("my-project"),
+			},
+			expErr: "name: cannot be used with glob patterns in 'dir'; glob patterns expand to multiple projects which cannot share the same name",
+		},
+		{
+			description: "name with ** glob pattern in dir should fail",
+			input: raw.Project{
+				Dir:  String("environments/**"),
+				Name: String("my-env"),
+			},
+			expErr: "name: cannot be used with glob patterns in 'dir'; glob patterns expand to multiple projects which cannot share the same name",
+		},
+		{
+			description: "name without glob pattern in dir should pass",
+			input: raw.Project{
+				Dir:  String("modules/networking"),
+				Name: String("networking"),
+			},
+			expErr: "",
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {
