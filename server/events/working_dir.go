@@ -31,6 +31,8 @@ import (
 
 const workingDirPrefix = "repos"
 
+const prSourceRemote = "source"
+
 var cloneLocks sync.Map
 var recheckRequiredMap sync.Map
 
@@ -79,7 +81,7 @@ type FileWorkspace struct {
 	TestingOverrideBaseCloneURL string
 	// GithubAppEnabled is true and a PR number is supplied, we should fetch
 	// the ref "pull/PR_NUMBER/head" from the "origin" remote. If this is false,
-	// we fetch "+refs/heads/$HEAD_BRANCH" from the "head" remote.
+	// we fetch "+refs/heads/$HEAD_BRANCH" from the "<prSourceRemote>" remote.
 	GithubAppEnabled bool
 	// use the global setting without overriding
 	GpgNoSigningEnabled bool
@@ -195,7 +197,7 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 			"git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
 		},
 		{
-			"git", "remote", "set-url", "head", headRepo.CloneURL,
+			"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL,
 		},
 		{
 			"git", "remote", "update",
@@ -257,7 +259,7 @@ func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedG
 
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
-	// We use both `head` and `origin` remotes, update them both
+	// We use both `<prSourceRemote>` and `origin` remotes, update them both
 	if err := w.wrappedGit(logger, c, "fetch", "--all"); err != nil {
 		return err
 	}
@@ -359,7 +361,7 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 		}
 	}
 
-	if err := w.wrappedGit(logger, c, "remote", "add", "head", headCloneURL); err != nil {
+	if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
 		return err
 	}
 	if w.GpgNoSigningEnabled {
@@ -415,7 +417,7 @@ func (w *FileWorkspace) wrappedGit(logger logging.SimpleLogging, c wrappedGitCon
 // Merge the PR into the base branch.
 func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappedGitContext) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", c.pr.HeadBranch)
-	fetchRemote := "head"
+	fetchRemote := prSourceRemote
 	if w.GithubAppEnabled && c.pr.Num > 0 {
 		fetchRef = fmt.Sprintf("pull/%d/head:", c.pr.Num)
 		fetchRemote = "origin"
