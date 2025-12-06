@@ -318,6 +318,49 @@ func TestProject_Validate(t *testing.T) {
 			},
 			expErr: `name: "namewith\\" is not allowed: must contain only URL safe characters.`,
 		},
+		// Glob pattern tests
+		{
+			description: "dir with valid glob pattern *",
+			input: raw.Project{
+				Dir: String("modules/*"),
+			},
+			expErr: "",
+		},
+		{
+			description: "dir with valid glob pattern **",
+			input: raw.Project{
+				Dir: String("environments/**"),
+			},
+			expErr: "",
+		},
+		{
+			description: "dir with valid glob pattern ?",
+			input: raw.Project{
+				Dir: String("module?"),
+			},
+			expErr: "",
+		},
+		{
+			description: "dir with valid glob pattern [abc]",
+			input: raw.Project{
+				Dir: String("[abc]"),
+			},
+			expErr: "",
+		},
+		{
+			description: "dir with complex glob pattern",
+			input: raw.Project{
+				Dir: String("modules/*/terraform"),
+			},
+			expErr: "",
+		},
+		{
+			description: "dir with invalid glob pattern - unclosed bracket",
+			input: raw.Project{
+				Dir: String("[abc"),
+			},
+			expErr: `dir: invalid glob pattern "[abc".`,
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {

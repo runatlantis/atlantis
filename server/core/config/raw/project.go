@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	validation "github.com/go-ozzo/ozzo-validation"
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -46,9 +47,16 @@ type Project struct {
 }
 
 func (p Project) Validate() error {
-	hasDotDot := func(value interface{}) error {
-		if strings.Contains(*value.(*string), "..") {
+	validDir := func(value interface{}) error {
+		dir := *value.(*string)
+		if strings.Contains(dir, "..") {
 			return errors.New("cannot contain '..'")
+		}
+		// If the dir contains glob pattern characters, validate the pattern
+		if ContainsGlobPattern(dir) {
+			if err := ValidateGlobPattern(dir); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -89,7 +97,7 @@ func (p Project) Validate() error {
 	}
 
 	return validation.ValidateStruct(&p,
-		validation.Field(&p.Dir, validation.Required, validation.By(hasDotDot)),
+		validation.Field(&p.Dir, validation.Required, validation.By(validDir)),
 		validation.Field(&p.PlanRequirements, validation.By(validPlanReq)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&p.ImportRequirements, validation.By(validImportReq)),
@@ -218,6 +226,22 @@ func validDistribution(value interface{}) error {
 	distribution := value.(*string)
 	if distribution != nil && *distribution != "terraform" && *distribution != "opentofu" {
 		return fmt.Errorf("'%s' is not a valid terraform_distribution, only '%s' and '%s' are supported", *distribution, "terraform", "opentofu")
+	}
+	return nil
+}
+
+// ContainsGlobPattern returns true if the string contains glob pattern characters.
+// This is used to detect if a dir field should be treated as a glob pattern
+// for expansion into multiple projects.
+func ContainsGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
+}
+
+// ValidateGlobPattern validates that a glob pattern is syntactically correct
+// using the doublestar library.
+func ValidateGlobPattern(pattern string) error {
+	if !doublestar.ValidatePattern(pattern) {
+		return fmt.Errorf("invalid glob pattern %q", pattern)
 	}
 	return nil
 }
