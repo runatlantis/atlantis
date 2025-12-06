@@ -2007,3 +2007,301 @@ func defaultWorkflow(name string) valid.Workflow {
 		StateRm:     valid.DefaultStateRmStage,
 	}
 }
+
+// Test that ContainsGlobPattern correctly identifies glob patterns.
+func TestContainsGlobPattern(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected bool
+	}{
+		{".", false},
+		{"dir/subdir", false},
+		{"dir-name", false},
+		{"dir_name", false},
+		{"*", true},
+		{"**", true},
+		{"dir/*", true},
+		{"dir/**", true},
+		{"**/subdir", true},
+		{"dir/*/subdir", true},
+		{"dir/**/subdir", true},
+		{"?", true},
+		{"dir/?", true},
+		{"[abc]", true},
+		{"dir/[abc]", true},
+		{"modules/*/", true},
+		{"environments/**/terraform", true},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			result := raw.ContainsGlobPattern(c.input)
+			Equals(t, c.expected, result)
+		})
+	}
+}
+
+// Test that ValidateGlobPattern correctly validates glob patterns.
+func TestValidateGlobPattern(t *testing.T) {
+	cases := []struct {
+		input  string
+		expErr bool
+	}{
+		{"*", false},
+		{"**", false},
+		{"dir/*", false},
+		{"dir/**", false},
+		{"**/subdir", false},
+		{"dir/*/subdir", false},
+		{"dir/**/subdir", false},
+		{"?", false},
+		{"[abc]", false},
+		{"[a-z]", false},
+		{"modules/*/", false},
+		{"environments/**/terraform", false},
+		// Invalid patterns
+		{"[", true},
+		{"[abc", true},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			err := raw.ValidateGlobPattern(c.input)
+			if c.expErr {
+				Assert(t, err != nil, "expected error for pattern %q", c.input)
+			} else {
+				Ok(t, err)
+			}
+		})
+	}
+}
+
+// Test glob pattern expansion in ParseRepoCfg.
+func TestParseRepoCfg_GlobExpansion(t *testing.T) {
+	// Create a temp directory with the following structure:
+	// repo/
+	//   atlantis.yaml
+	//   modules/
+	//     module-a/
+	//       main.tf
+	//     module-b/
+	//       main.tf
+	//     module-c/          (no .tf files - should be excluded)
+	//       readme.md
+	//   environments/
+	//     dev/
+	//       main.tf
+	//     prod/
+	//       main.tf
+
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	dirs := []string{
+		"modules/module-a",
+		"modules/module-b",
+		"modules/module-c",
+		"environments/dev",
+		"environments/prod",
+	}
+	for _, dir := range dirs {
+		err := os.MkdirAll(filepath.Join(tmpDir, dir), 0755)
+		Ok(t, err)
+	}
+
+	// Create .tf files in terraform directories
+	tfDirs := []string{
+		"modules/module-a",
+		"modules/module-b",
+		"environments/dev",
+		"environments/prod",
+	}
+	for _, dir := range tfDirs {
+		err := os.WriteFile(filepath.Join(tmpDir, dir, "main.tf"), []byte("# terraform"), 0600)
+		Ok(t, err)
+	}
+
+	// Create non-tf file in module-c
+	err := os.WriteFile(filepath.Join(tmpDir, "modules/module-c/readme.md"), []byte("# readme"), 0600)
+	Ok(t, err)
+
+	cases := []struct {
+		description string
+		input       string
+		expDirs     []string // Expected project directories after expansion
+		expErr      string
+	}{
+		{
+			description: "single glob pattern",
+			input: `
+version: 3
+projects:
+- dir: "modules/*"
+`,
+			expDirs: []string{"modules/module-a", "modules/module-b"},
+		},
+		{
+			description: "double star glob pattern",
+			input: `
+version: 3
+projects:
+- dir: "environments/**"
+`,
+			expDirs: []string{"environments/dev", "environments/prod"},
+		},
+		{
+			description: "mixed glob and non-glob projects",
+			input: `
+version: 3
+projects:
+- dir: "."
+- dir: "modules/*"
+`,
+			expDirs: []string{".", "modules/module-a", "modules/module-b"},
+		},
+		{
+			description: "glob with workflow preserved",
+			input: `
+version: 3
+projects:
+- dir: "modules/*"
+  workspace: staging
+  apply_requirements: [approved]
+workflows:
+  default: ~
+`,
+			expDirs: []string{"modules/module-a", "modules/module-b"},
+		},
+		{
+			description: "no glob - backward compatibility",
+			input: `
+version: 3
+projects:
+- dir: "modules/module-a"
+`,
+			expDirs: []string{"modules/module-a"},
+		},
+		{
+			description: "invalid glob pattern",
+			input: `
+version: 3
+projects:
+- dir: "[invalid"
+`,
+			expErr: "syntax error in pattern",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
+			Ok(t, err)
+
+			r := config.ParserValidator{}
+			cfg, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
+			if c.expErr != "" {
+				Assert(t, err != nil, "expected error")
+				Assert(t, strings.Contains(err.Error(), c.expErr), "error %q should contain %q", err.Error(), c.expErr)
+				return
+			}
+			Ok(t, err)
+
+			// Extract directories from the parsed config
+			var actualDirs []string
+			for _, p := range cfg.Projects {
+				actualDirs = append(actualDirs, p.Dir)
+			}
+
+			// Sort both slices for comparison
+			Equals(t, len(c.expDirs), len(actualDirs))
+			for _, expDir := range c.expDirs {
+				found := false
+				for _, actDir := range actualDirs {
+					if expDir == actDir {
+						found = true
+						break
+					}
+				}
+				Assert(t, found, "expected dir %q not found in actual dirs %v", expDir, actualDirs)
+			}
+		})
+	}
+}
+
+// Test that glob expansion preserves project settings.
+func TestParseRepoCfg_GlobExpansionPreservesSettings(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	dirs := []string{"modules/mod-a", "modules/mod-b"}
+	for _, dir := range dirs {
+		err := os.MkdirAll(filepath.Join(tmpDir, dir), 0755)
+		Ok(t, err)
+		err = os.WriteFile(filepath.Join(tmpDir, dir, "main.tf"), []byte("# tf"), 0600)
+		Ok(t, err)
+	}
+
+	input := `
+version: 3
+projects:
+- dir: "modules/*"
+  workspace: staging
+  terraform_version: v1.0.0
+  apply_requirements: [approved, mergeable]
+  autoplan:
+    enabled: false
+    when_modified: ["*.tf"]
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(input), 0600)
+	Ok(t, err)
+
+	r := config.ParserValidator{}
+	cfg, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
+	Ok(t, err)
+
+	// Verify we got 2 projects
+	Equals(t, 2, len(cfg.Projects))
+
+	// Verify each project has the correct settings
+	for _, p := range cfg.Projects {
+		Equals(t, "staging", p.Workspace)
+		Assert(t, p.TerraformVersion != nil, "TerraformVersion should not be nil")
+		Equals(t, "1.0.0", p.TerraformVersion.String())
+		Equals(t, []string{"approved", "mergeable"}, p.ApplyRequirements)
+		Equals(t, false, p.Autoplan.Enabled)
+		Equals(t, []string{"*.tf"}, p.Autoplan.WhenModified)
+	}
+}
+
+// Test that glob expansion does not copy project names.
+func TestParseRepoCfg_GlobExpansionNoNameCopy(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	dirs := []string{"modules/mod-a", "modules/mod-b"}
+	for _, dir := range dirs {
+		err := os.MkdirAll(filepath.Join(tmpDir, dir), 0755)
+		Ok(t, err)
+		err = os.WriteFile(filepath.Join(tmpDir, dir, "main.tf"), []byte("# tf"), 0600)
+		Ok(t, err)
+	}
+
+	input := `
+version: 3
+projects:
+- name: my-project
+  dir: "modules/*"
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(input), 0600)
+	Ok(t, err)
+
+	r := config.ParserValidator{}
+	cfg, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
+	Ok(t, err)
+
+	// Verify we got 2 projects and none have names (since name is not copied for expanded projects)
+	Equals(t, 2, len(cfg.Projects))
+	for _, p := range cfg.Projects {
+		Assert(t, p.Name == nil, "expanded projects should not have names")
+	}
+}

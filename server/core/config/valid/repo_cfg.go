@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	version "github.com/hashicorp/go-version"
 )
 
@@ -54,6 +55,35 @@ func (r RepoCfg) FindProjectsByDir(dir string) []Project {
 		}
 	}
 	return ps
+}
+
+// FindProjectsByDirPattern returns all projects whose dir matches the glob pattern.
+// Supports patterns like "modules/*", "environments/**", etc.
+func (r RepoCfg) FindProjectsByDirPattern(pattern string) []Project {
+	var ps []Project
+	for _, p := range r.Projects {
+		if matched, _ := doublestar.Match(pattern, p.Dir); matched {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
+// FindProjectsByDirPatternWorkspace returns all projects whose dir matches the
+// glob pattern and workspace matches exactly.
+func (r RepoCfg) FindProjectsByDirPatternWorkspace(pattern string, workspace string) []Project {
+	var ps []Project
+	for _, p := range r.Projects {
+		if matched, _ := doublestar.Match(pattern, p.Dir); matched && p.Workspace == workspace {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
+// ContainsDirGlobPattern returns true if the string contains glob pattern characters.
+func ContainsDirGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
 }
 
 func (r RepoCfg) FindProjectByName(name string) *Project {
