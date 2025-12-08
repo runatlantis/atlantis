@@ -804,6 +804,72 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
 			policyOutputs:     []string{"Policy check passed"},
 			expectedNames:     []string{"Custom"},
 		},
+		{
+			description:       "More outputs than policy sets - excess use 'Custom'",
+			customPolicyCheck: true,
+			policySets: []valid.PolicySet{
+				{
+					Name:         "security_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"security-team"},
+					},
+				},
+			},
+			policyOutputs: []string{"Security check passed", "Extra check passed"},
+			expectedNames: []string{"security_policy", "Custom"},
+		},
+		{
+			description:       "More policy sets than outputs - only received outputs processed",
+			customPolicyCheck: true,
+			policySets: []valid.PolicySet{
+				{
+					Name:         "security_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"security-team"},
+					},
+				},
+				{
+					Name:         "compliance_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"compliance-team"},
+					},
+				},
+				{
+					Name:         "audit_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"audit-team"},
+					},
+				},
+			},
+			policyOutputs: []string{"Security check passed"},
+			expectedNames: []string{"security_policy"},
+		},
+		{
+			description:       "Empty output is preserved and marked as failed",
+			customPolicyCheck: true,
+			policySets: []valid.PolicySet{
+				{
+					Name:         "security_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"security-team"},
+					},
+				},
+				{
+					Name:         "compliance_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"compliance-team"},
+					},
+				},
+			},
+			policyOutputs: []string{"Security check passed", ""},
+			expectedNames: []string{"security_policy", "compliance_policy"},
+		},
 	}
 
 	for _, c := range cases {

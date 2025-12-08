@@ -57,6 +57,8 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
+    # Use latest testing environment for automatic updates
+    # Previous: ghcr.io/runatlantis/testing-env:latest@sha256:725981e9090c977f8055f5ec5ba7a63430a8f0337ab955978e6b8cc2cd0236c3
     container: ghcr.io/runatlantis/testing-env:latest
     steps:
       - name: Harden Runner
