@@ -292,6 +292,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
+		gitlabClient.StatusRetryEnabled = userConfig.GitlabStatusRetryEnabled
 	}
 	if userConfig.BitbucketUser != "" {
 		if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
@@ -723,8 +724,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RunStepRunner: runStepRunner,
 		},
 		VersionStepRunner: &runtime.VersionStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTfVersion,
+			TerraformExecutor:     terraformClient,
+			DefaultTFDistribution: defaultTfDistribution,
+			DefaultTFVersion:      defaultTfVersion,
 		},
 		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
 		StateRmStepRunner:         runtime.NewStateRmStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
@@ -789,6 +791,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
+		userConfig.PendingApplyStatus,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(

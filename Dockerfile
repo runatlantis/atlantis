@@ -8,7 +8,7 @@ ARG GOLANG_TAG=1.25.4-alpine@sha256:d3f0cf7723f3429e3f9ed846243970b20a2de7bae6a5
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.13.5
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.10.6
+ARG DEFAULT_OPENTOFU_VERSION=1.10.7
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.63.0
 
@@ -208,6 +208,9 @@ RUN apk add --no-cache \
         gcompat=${GCOMPAT_VERSION} \
         coreutils-env=${COREUTILS_ENV_VERSION}
 
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
+
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
@@ -236,6 +239,9 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
