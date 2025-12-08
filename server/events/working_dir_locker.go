@@ -16,6 +16,8 @@ package events
 import (
 	"fmt"
 	"sync"
+
+	"github.com/runatlantis/atlantis/server/events/command"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_working_dir_locker.go WorkingDirLocker
@@ -30,7 +32,7 @@ type WorkingDirLocker interface {
 	// It returns a function that should be used to unlock the workspace and
 	// an error if the workspace is already locked. The error is expected to
 	// be printed to the pull request.
-	TryLock(repoFullName string, pullNum int, workspace string, path string) (func(), error)
+	TryLock(repoFullName string, pullNum int, workspace string, path string, cmdName command.Name) (func(), error)
 }
 
 // DefaultWorkingDirLocker implements WorkingDirLocker.
@@ -38,26 +40,25 @@ type DefaultWorkingDirLocker struct {
 	// mutex prevents against multiple threads calling functions on this struct
 	// concurrently. It's only used for entry/exit to each function.
 	mutex sync.Mutex
-	// locks is a set of the keys that are locked.
-	locks map[string]struct{}
+	// locks is a map of workspaces showing the name of the command locking it
+	locks map[string]command.Name
 }
 
 // NewDefaultWorkingDirLocker is a constructor.
 func NewDefaultWorkingDirLocker() *DefaultWorkingDirLocker {
-	return &DefaultWorkingDirLocker{locks: make(map[string]struct{})}
+	return &DefaultWorkingDirLocker{locks: make(map[string]command.Name)}
 }
 
-func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string) (func(), error) {
+func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, cmdName command.Name) (func(), error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path)
-	if _, exists := d.locks[workspaceKey]; exists {
-		return func() {}, fmt.Errorf("the %s workspace at path %s is currently locked by another"+
-			" command that is running for this pull request.\n"+
-			"Wait until the previous command is complete and try again", workspace, path)
+	if currentLock, exists := d.locks[workspaceKey]; exists {
+		return func() {}, fmt.Errorf("cannot run %q: the %s workspace at path %s is currently locked for this pull request by %q.\n"+
+			"Wait until the previous command is complete and try again", cmdName, workspace, path, currentLock)
 	}
-	d.locks[workspaceKey] = struct{}{}
+	d.locks[workspaceKey] = cmdName
 	return func() {
 		d.unlock(repoFullName, pullNum, workspace, path)
 	}, nil

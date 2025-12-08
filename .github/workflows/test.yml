@@ -22,6 +22,10 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  TERRAFORM_VERSION: 1.11.1
+  NGROK_DOWNLOAD_URL: https://bin.equinox.io/a/bNzUz3YQtcB/ngrok-v3-3.33.1-linux-amd64.tar.gz
+
 jobs:
   changes:
     permissions:
@@ -128,7 +132,6 @@ jobs:
     # dont run e2e tests on forked PRs
     if: github.event.pull_request.head.repo.fork == false
     env:
-      TERRAFORM_VERSION: 1.11.1
       ATLANTIS_GH_USER: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
       ATLANTIS_GH_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
@@ -153,7 +156,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/jVjTX7dAozH/ngrok-v3-3.22.1-linux-amd64.tar.gz
+          wget -q -O ngrok.tar.gz ${NGROK_DOWNLOAD_URL}
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
@@ -170,7 +173,6 @@ jobs:
     # dont run e2e tests on forked PRs
     if: github.event.pull_request.head.repo.fork == false
     env:
-      TERRAFORM_VERSION: 1.11.1
       ATLANTIS_GITLAB_USER: ${{ secrets.ATLANTISBOT_GITLAB_USERNAME }}
       ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
@@ -195,7 +197,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/jVjTX7dAozH/ngrok-v3-3.22.1-linux-amd64.tar.gz
+          wget -q -O ngrok.tar.gz ${NGROK_DOWNLOAD_URL}
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version

@@ -304,6 +304,30 @@ ATLANTIS_AZUREDEVOPS_WEBHOOK_USER="username@example.com"
 
 Azure DevOps basic authentication username for inbound webhooks.
 
+### `--bitbucket-api-user` <Badge text="v0.36.0+" type="info"/>
+
+```bash
+atlantis server --bitbucket-api-user="apiuser@example.com"
+# or
+ATLANTIS_BITBUCKET_API_USER="apiuser@example.com"
+```
+
+Bitbucket username (usually an email) used for API authentication with Bitbucket Cloud. This is used for API calls only. If not specified, Atlantis will use the value of `--bitbucket-user` for API authentication to maintain backward compatibility.
+
+**Note:**
+
+- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026(see [here](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
+
+**Config file key:**
+
+```yaml
+bitbucket-api-user: apiuser@example.com
+```
+
+**Environment variable:** `ATLANTIS_BITBUCKET_API_USER`
+
+**Note:** This flag is only relevant for Bitbucket Cloud (bitbucket.org) integrations.
+
 ### `--bitbucket-base-url` <Badge text="v0.36.0+" type="info"/>
 
 ```bash
@@ -334,7 +358,7 @@ atlantis server --bitbucket-user="myuser"
 ATLANTIS_BITBUCKET_USER="myuser"
 ```
 
-Bitbucket username of API user.
+Bitbucket username used for git operations. For Bitbucket Cloud, if `--bitbucket-api-user` is not specified, this value will also be used for API authentication.
 
 ### `--bitbucket-webhook-secret` <Badge text="v0.36.0+" type="info"/>
 
@@ -501,7 +525,7 @@ atlantis server --discard-approval-on-plan
 ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
 ```
 
-If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.  
+If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.
  Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
 
 ### `--emoji-reaction` <Badge text="v0.29.0+" type="info"/>
@@ -857,6 +881,18 @@ ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
 don't set. Defaults to `gitlab.com`.
 
+### `--gitlab-status-retry-enabled`
+
+```bash
+atlantis server --gitlab-status-retry-enabled
+# or
+ATLANTIS_GITLAB_STATUS_RETRY_ENABLED=true
+```
+
+Enable enhanced retry logic for GitLab pipeline status updates with exponential backoff.
+
+Defaults to `false`.
+
 ### `--gitlab-token` <Badge text="v0.2.0+" type="info"/>
 
 ```bash
@@ -1040,6 +1076,24 @@ ATLANTIS_PARALLEL_POOL_SIZE=100
 ```
 
 Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
+
+### `--pending-apply-status` <Badge text="v0.36.0+" type="info"/>
+
+```bash
+atlantis server --pending-apply-status
+# or (recommended)
+ATLANTIS_PENDING_APPLY_STATUS=true
+```
+
+Set the commit status to pending when there are planned changes that haven't been applied.
+This prevents merge requests from being merged until all Terraform applies are completed if you have `Pipelines must succeed` enabled on your repository.
+
+When enabled, after running `atlantis plan`, the MR status will show as pending if there are changes
+to apply. Once all projects are successfully applied (or show no changes), the status will update to success.
+
+Defaults to `false`.
+
+Only supported on GitLab
 
 ### `--port` <Badge text="v0.1.3+" type="info"/>
 

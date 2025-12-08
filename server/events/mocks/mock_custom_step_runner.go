@@ -8,8 +8,8 @@ import (
 	valid "github.com/runatlantis/atlantis/server/core/config/valid"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	"reflect"
+	regexp "regexp"
 	"time"
-	"regexp"
 )
 
 type MockCustomStepRunner struct {

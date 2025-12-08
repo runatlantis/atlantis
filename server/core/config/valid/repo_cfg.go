@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package valid contains the structs representing the atlantis.yaml config
 // after it's been parsed and validated.
 package valid
