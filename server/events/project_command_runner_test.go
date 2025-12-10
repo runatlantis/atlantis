@@ -971,10 +971,10 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *test
 			customPolicyCheck: true,
 			policySets: []valid.PolicySet{
 				{
-					Name:         "multiple_envs_same_pr",
+					Name:         "test_policy",
 					ApproveCount: 1,
 					Owners: valid.PolicyOwners{
-						Users: []string{"platform-team"},
+						Users: []string{"test-user"},
 					},
 				},
 			},
