@@ -518,7 +518,9 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	var index int
 	var preConftestOutput []string
 	var postConftestOutput []string
-	var policySetResults []models.PolicySetResult
+	// Initialize policySetResults as empty slice instead of nil to prevent
+	// "unable to unmarshal conftest output" error when outputs array is empty
+	policySetResults := []models.PolicySetResult{}
 
 	inputPolicySets := ctx.PolicySets.PolicySets
 	for index, output := range outputs {
@@ -568,9 +570,13 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		}
 	}
 
-	if policySetResults == nil {
+	// For non-custom policy checks (conftest), we expect valid JSON output.
+	// If policySetResults is empty after processing outputs, it means conftest
+	// didn't produce parseable output.
+	if !ctx.CustomPolicyCheck && len(policySetResults) == 0 {
 		return nil, "", errors.New("unable to unmarshal conftest output")
 	}
+
 	if len(outputs) > 0 {
 		postConftestOutput = outputs[(index + 1):]
 	}

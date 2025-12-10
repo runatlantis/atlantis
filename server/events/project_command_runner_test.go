@@ -951,6 +951,109 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
 	}
 }
 
+// Test that when custom policy check has configured policy sets but no outputs are generated,
+// it does NOT trigger "unable to unmarshal conftest output" error.
+// This test reproduces the bug where policySetResults remains nil when the outputs
+// array is empty, which would incorrectly trigger the nil check error.
+func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		description       string
+		customPolicyCheck bool
+		policySets        []valid.PolicySet
+		steps             []valid.Step
+		expectError       bool
+		expectedErrorMsg  string
+	}{
+		{
+			description:       "Custom policy check with configured policy set but no steps (empty outputs array)",
+			customPolicyCheck: true,
+			policySets: []valid.PolicySet{
+				{
+					Name:         "multiple_envs_same_pr",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"platform-team"},
+					},
+				},
+			},
+			steps:            []valid.Step{}, // No steps - outputs array will be empty
+			expectError:      false,          // With the fix, this should NOT error
+			expectedErrorMsg: "",
+		},
+		{
+			description:       "Non-custom (conftest) policy check with no steps",
+			customPolicyCheck: false,
+			policySets:        []valid.PolicySet{},
+			steps:             []valid.Step{},
+			expectError:       true,
+			expectedErrorMsg:  "unable to unmarshal conftest output",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			mockPolicyCheck := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                mockLocker,
+				LockURLGenerator:      mockURLGenerator{},
+				PolicyCheckStepRunner: mockPolicyCheck,
+				WorkingDir:            mockWorkingDir,
+				WorkingDirLocker:      events.NewDefaultWorkingDirLocker(),
+			}
+
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[string](),
+			)).ThenReturn(repoDir, nil)
+
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+				UnlockFn:     func() error { return nil },
+			}, nil)
+
+			ctx := command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				Workspace:         "default",
+				RepoRelDir:        ".",
+				CustomPolicyCheck: c.customPolicyCheck,
+				PolicySets: valid.PolicySets{
+					PolicySets: c.policySets,
+				},
+				Steps: c.steps,
+			}
+
+			res := runner.PolicyCheck(ctx)
+
+			if c.expectError {
+				Assert(t, res.Error != nil, "expecting error but got nil")
+				if c.expectedErrorMsg != "" {
+					Assert(t, res.Error.Error() == c.expectedErrorMsg,
+						"expected error message '%s' but got '%s'",
+						c.expectedErrorMsg, res.Error.Error())
+				}
+			} else {
+				Assert(t, res.Error == nil, "not expecting error but got: %v", res.Error)
+				Assert(t, res.PolicyCheckResults != nil, "expecting policy check results")
+			}
+		})
+	}
+}
+
 // Test approve policies logic.
 func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 	cases := []struct {
