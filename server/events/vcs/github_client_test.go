@@ -933,6 +933,14 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
 			},
 		},
+		{
+			"blocked",
+			"ruleset-workflow-passed-with-global-codeql.json",
+			`"APPROVED"`,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
 	}
 
 	// Use a real GitHub json response and edit the mergeable_state field.
