@@ -570,11 +570,18 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		}
 	}
 
-	// For non-custom policy checks (conftest), we expect valid JSON output.
-	// If policySetResults is empty after processing outputs, it means conftest
-	// didn't produce parseable output.
-	if !ctx.CustomPolicyCheck && len(policySetResults) == 0 {
-		return nil, "", errors.New("unable to unmarshal conftest output")
+	// Check if we have any policy check results
+	// For non-custom policy checks (conftest), empty results means JSON parsing failed
+	// For custom policy checks, empty results when policy sets are configured means the check failed
+	if len(policySetResults) == 0 {
+		if !ctx.CustomPolicyCheck {
+			// Conftest should have produced JSON output
+			return nil, "", errors.New("unable to unmarshal conftest output")
+		} else if len(inputPolicySets) > 0 {
+			// Custom policy check with configured policy sets but no results - this is a failure
+			return nil, "", errors.New("custom policy check produced no results despite configured policy sets")
+		}
+		// Custom policy check with no configured policy sets and no results - this is OK
 	}
 
 	if len(outputs) > 0 {

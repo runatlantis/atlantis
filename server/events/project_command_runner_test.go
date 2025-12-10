@@ -979,8 +979,16 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *test
 				},
 			},
 			steps:            []valid.Step{}, // No steps - outputs array will be empty
-			expectError:      false,          // With the fix, this should NOT error
-			expectedErrorMsg: "",
+			expectError:      true,           // Should error when policy sets configured but no results
+			expectedErrorMsg: "custom policy check produced no results despite configured policy sets",
+		},
+		{
+			description:       "Custom policy check with no configured policy sets and no steps",
+			customPolicyCheck: true,
+			policySets:        []valid.PolicySet{}, // No policy sets configured
+			steps:             []valid.Step{},      // No steps
+			expectError:       false,               // Should NOT error when no policy sets configured
+			expectedErrorMsg:  "",
 		},
 		{
 			description:       "Non-custom (conftest) policy check with no steps",
