@@ -402,7 +402,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		DeleteSourceBranchOnMergeKey, deleteSourceBranchOnMerge,
 		RepoLockingKey, repoLocks.Mode,
 		PolicyCheckKey, policyCheck,
-		CustomPolicyCheckKey, policyCheck,
+		CustomPolicyCheckKey, customPolicyCheck,
 		SilencePRCommentsKey, strings.Join(silencePRComments, ","),
 	)
 
