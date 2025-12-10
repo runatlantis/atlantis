@@ -520,8 +520,8 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	var postConftestOutput []string
 	var policySetResults []models.PolicySetResult
 
-	for i, output := range outputs {
-		index = i
+	inputPolicySets := ctx.PolicySets.PolicySets
+	for index, output := range outputs {
 		if !ctx.CustomPolicyCheck {
 			err = json.Unmarshal([]byte(strings.Join([]string{output}, "\n")), &policySetResults)
 			if err == nil {
@@ -530,9 +530,41 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			preConftestOutput = append(preConftestOutput, output)
 		} else {
 			// Using a policy tool other than Conftest, manually building result struct
-			passed := !strings.Contains(strings.ToLower(output), "fail")
-			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: "Custom", PolicyOutput: output, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
+			policySetName := "Custom"
+			if index < len(inputPolicySets) {
+				policySetName = inputPolicySets[index].Name
+			}
+
+			// Handle empty output: treat as failure since it likely indicates misconfiguration
+			// Non-empty output: check for "fail" string to determine pass/fail
+			var passed bool
+			var policyOutput string
+			if output == "" {
+				passed = false
+				policyOutput = "WARNING: Policy check produced no output. This may indicate a misconfiguration."
+			} else {
+				passed = !strings.Contains(strings.ToLower(output), "fail")
+				policyOutput = output
+			}
+
+			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: policySetName, PolicyOutput: policyOutput, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
 			preConftestOutput = append(preConftestOutput, "")
+		}
+	}
+
+	// Warn if custom policy check has mismatch between configured policy sets and outputs.
+	// Note: With empty output preservation, this warning now only triggers when workflow steps
+	// are completely missing, not when a step returns empty output.
+	if ctx.CustomPolicyCheck {
+		if len(policySetResults) < len(inputPolicySets) {
+			ctx.Log.Warn("Configured %d policy sets but only received %d outputs. Policy sets without outputs: %v. Check your workflow configuration.",
+				len(inputPolicySets),
+				len(policySetResults),
+				getMissingPolicySetNames(inputPolicySets, len(policySetResults)))
+		} else if len(policySetResults) > len(inputPolicySets) {
+			ctx.Log.Warn("Received %d outputs but only %d policy sets configured. Excess outputs will use 'Custom' as name.",
+				len(policySetResults),
+				len(inputPolicySets))
 		}
 	}
 
@@ -836,7 +868,9 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, step.Output)
 		}
 
-		if out != "" {
+		// Keep all policy_check outputs for custom policy checks to maintain positional alignment with policy sets
+		// Empty outputs are still appended to prevent index mismatches
+		if out != "" || (step.StepName == "policy_check" && ctx.CustomPolicyCheck) {
 			outputs = append(outputs, out)
 		}
 		if err != nil {
@@ -844,4 +878,13 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		}
 	}
 	return outputs, nil
+}
+
+// getMissingPolicySetNames returns the names of policy sets that don't have corresponding outputs
+func getMissingPolicySetNames(policySets []valid.PolicySet, receivedCount int) []string {
+	var missing []string
+	for i := receivedCount; i < len(policySets); i++ {
+		missing = append(missing, policySets[i].Name)
+	}
+	return missing
 }
