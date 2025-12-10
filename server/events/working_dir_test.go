@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
@@ -433,21 +436,21 @@ func TestClone_NoReclone(t *testing.T) {
 }
 
 // Test that if the repo is already cloned but is at the wrong commit, we
-// reclone.
-func TestClone_RecloneWrongCommit(t *testing.T) {
+// fetch and reset
+func TestClone_ResetOnWrongCommit(t *testing.T) {
 	repoDir := initRepo(t)
 	dataDir := t.TempDir()
 
 	// Copy the repo to our data dir.
 	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
-	runCmd(t, dataDir, "cp", "-R", repoDir, "repos/0/default")
+	runCmd(t, dataDir, "git", "clone", repoDir, "repos/0/default")
 
 	// Now add a commit to the repo, so the one in the data dir is out of date.
 	runCmd(t, repoDir, "git", "checkout", "branch")
 	runCmd(t, repoDir, "touch", "newfile")
 	runCmd(t, repoDir, "git", "add", "newfile")
 	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
-	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
 	// Pretend that terraform has created a plan file, we'll check for it later
 	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
@@ -468,12 +471,129 @@ func TestClone_RecloneWrongCommit(t *testing.T) {
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
 		HeadCommit: expCommit,
+		BaseBranch: "main",
 	}, "default")
 	Ok(t, err)
-	assert.NoFileExists(t, planFile, "Plan file should have been wiped out by Clone")
+	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
 
 	// Use rev-parse to verify at correct commit.
-	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
+	Equals(t, expCommit, actCommit)
+}
+
+// Test that if the repo is already cloned but is at the wrong commit, but the base has changed
+// we need to reclone
+func TestClone_ReCloneOnBaseChange(t *testing.T) {
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+
+	// Copy the repo to our data dir.
+	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, dataDir, "git", "clone", repoDir, "repos/0/default")
+
+	// Now add a commit to the repo, so the one in the data dir is out of date.
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "newfile")
+	runCmd(t, repoDir, "git", "add", "newfile")
+	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
+	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Pretend that terraform has created a plan file, we'll check for it later
+	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
+	assert.NoFileExists(t, planFile)
+	_, err := os.Create(planFile)
+	Assert(t, err == nil, "creating plan file: %v", err)
+	assert.FileExists(t, planFile)
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		HeadCommit: expCommit,
+		BaseBranch: "some-other-base-branch",
+	}, "default")
+	Ok(t, err)
+	assert.NoFileExists(t, planFile, "Plan file should been wiped out by the reclone")
+
+	// Use rev-parse to verify at correct commit.
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
+	Equals(t, expCommit, actCommit)
+}
+
+func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+
+	// In the repo, make sure there's a commit on the branch and main so we have something to merge
+	runCmd(t, repoDir, "touch", "newfile")
+	runCmd(t, repoDir, "git", "add", "newfile")
+	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
+
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branchfile")
+	runCmd(t, repoDir, "git", "add", "branchfile")
+	runCmd(t, repoDir, "git", "commit", "-m", "branchfile")
+
+	// Copy the repo to our data dir.
+	checkoutDir := filepath.Join(dataDir, "repos/1/default")
+
+	// "clone" the repoDir, instead of just copying it, because we're going to track it
+	runCmd(t, dataDir, "mkdir", "-p", "repos/1/")
+	runCmd(t, dataDir, "git", "clone", repoDir, checkoutDir)
+	runCmd(t, checkoutDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, checkoutDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, checkoutDir, "git", "config", "--local", "commit.gpgsign", "false")
+
+	runCmd(t, checkoutDir, "git", "checkout", "main")
+	runCmd(t, checkoutDir, "git", "remote", "add", "source", repoDir)
+
+	// Simulate the merge strategy
+	runCmd(t, checkoutDir, "git", "checkout", "branch")
+	runCmd(t, checkoutDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, checkoutDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, checkoutDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "origin/main")
+
+	// Now add a commit to the repo, so the one in the data dir is out of date.
+	runCmd(t, repoDir, "touch", "anotherfile")
+	runCmd(t, repoDir, "git", "add", "anotherfile")
+	runCmd(t, repoDir, "git", "commit", "-m", "anotherfile")
+	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Pretend that terraform has created a plan file, we'll check for it later
+	planFile := filepath.Join(dataDir, "repos/1/default/default.tfplan")
+	assert.NoFileExists(t, planFile)
+	_, err := os.Create(planFile)
+	Assert(t, err == nil, "creating plan file: %v", err)
+	assert.FileExists(t, planFile)
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+	fmt.Println(repoDir)
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		HeadCommit: expCommit,
+		BaseBranch: "main",
+		Num:        1,
+	}, "default")
+	Ok(t, err)
+	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
+
+	// Use rev-parse to verify at correct commit.
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2"))
 	Equals(t, expCommit, actCommit)
 }
 
@@ -494,8 +614,8 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	firstPRDir := repoDir + "/first-pr"
 	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
 	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
-	runCmd(t, firstPRDir, "git", "remote", "add", "head", repoDir)
-	runCmd(t, firstPRDir, "git", "fetch", "head", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
 	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
@@ -512,8 +632,8 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	secondPRDir := repoDir + "/second-pr"
 	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
 	runCmd(t, secondPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
-	runCmd(t, secondPRDir, "git", "remote", "add", "head", repoDir)
-	runCmd(t, secondPRDir, "git", "fetch", "head", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "source", "+refs/heads/second-pr")
 	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")
@@ -598,8 +718,8 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	firstPRDir := repoDir + "/first-pr"
 	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
 	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
-	runCmd(t, firstPRDir, "git", "remote", "add", "head", repoDir)
-	runCmd(t, firstPRDir, "git", "fetch", "head", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
 	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
@@ -616,8 +736,8 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	secondPRDir := repoDir + "/second-pr"
 	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
 	runCmd(t, secondPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
-	runCmd(t, secondPRDir, "git", "remote", "add", "head", repoDir)
-	runCmd(t, secondPRDir, "git", "fetch", "head", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "source", "+refs/heads/second-pr")
 	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")

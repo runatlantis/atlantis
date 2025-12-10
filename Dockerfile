@@ -1,16 +1,16 @@
-# syntax=docker/dockerfile:1@sha256:dabfc0969b935b2080555ace70ee69a5261af8a8f1b4df97b9e7fbcf6722eddf
+# syntax=docker/dockerfile:1@sha256:b6afd42430b15f2d2a4c5a02b919e98a525b785b1aaff16747d2f623364e39b6
 # what distro is the image being built for
 ARG ALPINE_TAG=3.21.3@sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c
-ARG DEBIAN_TAG=12.12-slim@sha256:df52e55e3361a81ac1bead266f3373ee55d29aa50cf0975d440c2be3483d8ed3
+ARG DEBIAN_TAG=12.12-slim@sha256:936abff852736f951dab72d91a1b6337cf04217b2a77a5eaadc7c0f2f1ec1758
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.24.4-alpine@sha256:68932fa6d4d4059845c8f40ad7e654e626f3ebd3706eef7846f319293ab5cb7a
+ARG GOLANG_TAG=1.25.4-alpine@sha256:d3f0cf7723f3429e3f9ed846243970b20a2de7bae6a5b66fc5914e228d831bbb
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.11.4
+ARG DEFAULT_TERRAFORM_VERSION=1.13.5
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.10.6
+ARG DEFAULT_OPENTOFU_VERSION=1.10.7
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.59.0
+ARG DEFAULT_CONFTEST_VERSION=0.63.0
 
 # Stage 1: build artifact and download deps
 
@@ -116,7 +116,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.6.1
+ENV GIT_LFS_VERSION=3.7.1
 
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
@@ -177,9 +177,9 @@ COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # renovate: datasource=repology depName=alpine_3_21/ca-certificates versioning=loose
-ENV CA_CERTIFICATES_VERSION="20250619-r0"
+ENV CA_CERTIFICATES_VERSION="20250911-r0"
 # renovate: datasource=repology depName=alpine_3_21/curl versioning=loose
-ENV CURL_VERSION="8.12.1-r1"
+ENV CURL_VERSION="8.14.1-r2"
 # renovate: datasource=repology depName=alpine_3_21/git versioning=loose
 ENV GIT_VERSION="2.47.3-r0"
 # renovate: datasource=repology depName=alpine_3_21/unzip versioning=loose
@@ -207,6 +207,9 @@ RUN apk add --no-cache \
         dumb-init=${DUMB_INIT_VERSION} \
         gcompat=${GCOMPAT_VERSION} \
         coreutils-env=${COREUTILS_ENV_VERSION}
+
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
@@ -236,6 +239,9 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis

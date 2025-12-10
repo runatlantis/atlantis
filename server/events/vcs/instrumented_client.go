@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package vcs
 
 import (
@@ -183,7 +186,7 @@ func (c *InstrumentedClient) PullIsApproved(logger logging.SimpleLogging, repo m
 	return approved, err
 }
 
-func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
+func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	scope := c.StatsScope.SubScope("pull_is_mergeable")
 	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
 

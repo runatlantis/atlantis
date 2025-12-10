@@ -1,6 +1,10 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -17,7 +21,7 @@ func NewApplyCommandRunner(
 	autoMerger *AutoMerger,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
-	backend locking.Backend,
+	database db.Database,
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
@@ -33,7 +37,7 @@ func NewApplyCommandRunner(
 		autoMerger:                 autoMerger,
 		pullUpdater:                pullUpdater,
 		dbUpdater:                  dbUpdater,
-		Backend:                    backend,
+		Database:                   database,
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
@@ -43,7 +47,7 @@ func NewApplyCommandRunner(
 
 type ApplyCommandRunner struct {
 	DisableApplyAll      bool
-	Backend              locking.Backend
+	Database             db.Database
 	locker               locking.ApplyLockChecker
 	vcsClient            vcs.Client
 	commitStatusUpdater  CommitStatusUpdater
@@ -125,7 +129,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		if !a.silenceVCSStatusNoProjects {
 			if cmd.IsForSpecificProject() {
 				// With a specific apply, just reset the status so it's not stuck in pending state
-				pullStatus, err := a.Backend.GetPullStatus(pull)
+				pullStatus, err := a.Database.GetPullStatus(pull)
 				if err != nil {
 					ctx.Log.Warn("unable to fetch pull status: %s", err)
 					return

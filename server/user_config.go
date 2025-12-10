@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package server
 
 import (
@@ -27,6 +30,7 @@ type UserConfig struct {
 	AzureDevopsWebhookPassword  string `mapstructure:"azuredevops-webhook-password"`
 	AzureDevopsWebhookUser      string `mapstructure:"azuredevops-webhook-user"`
 	AzureDevOpsHostname         string `mapstructure:"azuredevops-hostname"`
+	BitbucketApiUser            string `mapstructure:"bitbucket-api-user"`
 	BitbucketBaseURL            string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken              string `mapstructure:"bitbucket-token"`
 	BitbucketUser               string `mapstructure:"bitbucket-user"`
@@ -76,6 +80,7 @@ type UserConfig struct {
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
+	GitlabStatusRetryEnabled        bool   `mapstructure:"gitlab-status-retry-enabled"`
 	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
@@ -87,6 +92,7 @@ type UserConfig struct {
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`
+	PendingApplyStatus              bool   `mapstructure:"pending-apply-status"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
 	Port                            int    `mapstructure:"port"`

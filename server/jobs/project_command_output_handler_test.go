@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package jobs_test
 
 import (
@@ -129,7 +132,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		close(ch)
 
 		expectedMsgs := []string{Msg, Msg}
-		assert.Equal(t, len(expectedMsgs), len(receivedMsgs))
+		assert.Len(t, receivedMsgs, len(expectedMsgs))
 		for i := range expectedMsgs {
 			assert.Equal(t, expectedMsgs[i], receivedMsgs[i])
 		}

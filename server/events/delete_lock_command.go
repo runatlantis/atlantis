@@ -1,6 +1,10 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -19,7 +23,7 @@ type DefaultDeleteLockCommand struct {
 	Locker           locking.Locker
 	WorkingDir       WorkingDir
 	WorkingDirLocker WorkingDirLocker
-	Backend          locking.Backend
+	Database         db.Database
 }
 
 // DeleteLock handles deleting the lock at id

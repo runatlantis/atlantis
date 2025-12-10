@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
@@ -6,14 +9,14 @@ import (
 
 	"github.com/google/go-github/v71/github"
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +55,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			vcsClient := setup(t)
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			pull := &github.PullRequest{
 				State: github.Ptr("open"),
@@ -88,7 +91,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 		Matched           bool
 		Targeted          bool
 		VCSStatusSilence  bool
-		PrevApplyStored   bool // stores a 1/1 passing apply in the backend
+		PrevApplyStored   bool // stores a 1/1 passing apply in the database
 		ExpVCSStatusSet   bool
 		ExpVCSStatusTotal int
 		ExpVCSStatusSucc  int
@@ -140,7 +143,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
@@ -149,10 +152,10 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 			vcsClient := setup(t, func(tc *TestConfig) {
 				tc.SilenceNoProjects = true
 				tc.silenceVCSStatusNoProjects = c.VCSStatusSilence
-				tc.backend = db
+				tc.database = db
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
 			cmd := &events.CommentCommand{Name: command.Apply}
@@ -514,7 +517,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			vcsClient := setup(t)
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			pull := &github.PullRequest{
 				State: github.Ptr("open"),

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
@@ -5,7 +8,7 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -59,14 +62,14 @@ func TestDeleteLock_Success(t *testing.T) {
 		},
 	}, nil)
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
 	Ok(t, err)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:           l,
-		Backend:          db,
+		Database:         db,
 		WorkingDirLocker: workingDirLocker,
 		WorkingDir:       workingDir,
 	}

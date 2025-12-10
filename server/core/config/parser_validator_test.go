@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package config_test
 
 import (
@@ -1692,7 +1695,7 @@ workflows:
 			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 
 			if c.expErr != "" {
-				expErr := strings.Replace(c.expErr, "<tmp>", path, -1)
+				expErr := strings.ReplaceAll(c.expErr, "<tmp>", path)
 				ErrEquals(t, expErr, err)
 				return
 			}

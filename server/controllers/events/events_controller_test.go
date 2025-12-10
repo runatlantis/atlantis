@@ -36,7 +36,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -228,7 +228,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope := metricstest.NewLoggingScope(t, logger, "null")
 	e := events_controllers.VCSEventsController{
 		Logger:                       logger,
 		Scope:                        scope,
@@ -262,7 +262,7 @@ func TestPost_GitlabCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope := metricstest.NewLoggingScope(t, logger, "null")
 	e := events_controllers.VCSEventsController{
 		Logger:                       logger,
 		Scope:                        scope,
@@ -296,7 +296,7 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope := metricstest.NewLoggingScope(t, logger, "null")
 	e := events_controllers.VCSEventsController{
 		Logger:                 logger,
 		Scope:                  scope,
@@ -331,7 +331,7 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope := metricstest.NewLoggingScope(t, logger, "null")
 	e := events_controllers.VCSEventsController{
 		Logger:                 logger,
 		Scope:                  scope,
@@ -868,7 +868,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			allowlist, err := events.NewRepoAllowlistChecker("*")
 			Ok(t, err)
 			logger := logging.NewNoopLogger(t)
-			scope, _, _ := metrics.NewLoggingScope(logger, "null")
+			scope := metricstest.NewLoggingScope(t, logger, "null")
 			ec := &events_controllers.VCSEventsController{
 				PullCleaner: pullCleaner,
 				Parser: &events.EventParser{
@@ -886,7 +886,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			// Build HTTP request.
 			requestBytes, err := os.ReadFile(filepath.Join("testdata", "bb-server-pull-deleted-event.json"))
 			// Replace the eventKey field with our event type.
-			requestJSON := strings.Replace(string(requestBytes), `"eventKey":"pr:deleted",`, fmt.Sprintf(`"eventKey":"%s",`, c.header), -1)
+			requestJSON := strings.ReplaceAll(string(requestBytes), `"eventKey":"pr:deleted",`, fmt.Sprintf(`"eventKey":"%s",`, c.header))
 			Ok(t, err)
 			req, err := http.NewRequest("POST", "/events", bytes.NewBuffer([]byte(requestJSON)))
 			Ok(t, err)
@@ -1002,7 +1002,7 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope := metricstest.NewLoggingScope(t, logger, "null")
 	e := events_controllers.VCSEventsController{
 		ExecutableName:                  "atlantis",
 		EmojiReaction:                   "eyes",

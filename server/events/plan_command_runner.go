@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -34,6 +37,8 @@ func NewPlanCommandRunner(
 	lockingLocker locking.Locker,
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
+	PendingApplyStatus bool,
+
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -54,6 +59,7 @@ func NewPlanCommandRunner(
 		lockingLocker:              lockingLocker,
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
+		PendingApplyStatus:         PendingApplyStatus,
 	}
 }
 
@@ -85,6 +91,7 @@ type PlanCommandRunner struct {
 	DiscardApprovalOnPlan bool
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	SilencePRComments     []string
+	PendingApplyStatus    bool
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -104,7 +111,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
-		if !(p.silenceVCSStatusNoPlans || p.silenceVCSStatusNoProjects) {
+		if !p.silenceVCSStatusNoPlans && !p.silenceVCSStatusNoProjects {
 			// If there were no projects modified, we set successful commit statuses
 			// with 0/0 projects planned/policy_checked/applied successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
@@ -164,7 +171,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
 	if len(policyCheckCmds) > 0 &&
-		!(result.HasErrors() || result.PlansDeleted) {
+		(!result.HasErrors() && !result.PlansDeleted) {
 		// Run policy_check command
 		ctx.Log.Info("Running policy_checks for all plans")
 
@@ -300,7 +307,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
 	if len(result.ProjectResults) > 0 &&
-		!(result.HasErrors() || result.PlansDeleted) {
+		(!result.HasErrors() && !result.PlansDeleted) {
 		ctx.Log.Info("Running policy check for '%s'", cmd.CommandName())
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
@@ -327,7 +334,8 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 	var numErrored int
 	status := models.SuccessCommitStatus
 
-	if commandName == command.Plan {
+	switch commandName {
+	case command.Plan:
 		numErrored = pullStatus.StatusCount(models.ErroredPlanStatus)
 		// We consider anything that isn't a plan error as a plan success.
 		// For example, if there is an apply error, that means that at least a
@@ -337,15 +345,28 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
 		}
-	} else if commandName == command.Apply {
+	case command.Apply:
 		numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
 		numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
 		} else if numSuccess < len(pullStatus.Projects) {
-			// If there are plans that haven't been applied yet, no need to update the status
-			return
+			// When there are planned changes that haven't been applied yet:
+			// - GitLab: Set status to pending if PendingApplyStatus is enabled
+			//           This prevents MR merging until all applies complete
+			// - Other VCS: Leave status unchanged (existing behavior)
+			if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab && p.PendingApplyStatus {
+				ctx.Log.Debug("Pending Apply Status is set. Pipeline status will be marked as pending since there are changes to apply")
+				status = models.PendingCommitStatus
+			} else {
+				if p.PendingApplyStatus {
+					// If a VCS uses this flag other than Gitlab, we log the warning to the user
+					ctx.Log.Warn("Flag --pending-apply-status is not yet supported by your VCS. Pipeline status will not be marked as pending")
+				}
+				// Otherwise, status remains SuccessCommitStatus (no update needed)
+				return
+			}
 		}
 	}
 

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package policy
 
 import (
@@ -220,7 +223,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		}
 
 		passed := true
-		if hasFailures(cmdOutput) {
+		if cmdErr != nil || hasFailures(cmdOutput) {
 			passed = false
 		}
 
@@ -257,7 +260,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 }
 
 func (c *ConfTestExecutorWorkflow) sanitizeOutput(inputFile string, output string) string {
-	return strings.Replace(output, inputFile, "<redacted plan file>", -1)
+	return strings.ReplaceAll(output, inputFile, "<redacted plan file>")
 }
 
 func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log logging.SimpleLogging, v *version.Version) (string, error) {

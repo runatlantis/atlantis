@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
@@ -216,7 +219,7 @@ func (a *ApplyStepRunner) remotePlanChanged(planfileContents string, applyOut st
 	// Strip plan output after the prompt to execute the plan.
 	planEndIdx := strings.Index(output, "Do you want to perform these actions in workspace \"")
 	if planEndIdx < 0 {
-		return fmt.Errorf("Couldn't find plan end when parsing apply output:\n%q", applyOut)
+		return fmt.Errorf("couldn't find plan end when parsing apply output:\n%q", applyOut)
 	}
 	currPlan := strings.TrimSpace(output[:planEndIdx])
 

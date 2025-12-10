@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -71,7 +72,8 @@ type CustomStepRunner interface {
 		path string,
 		envs map[string]string,
 		streamOutput bool,
-		postProcessOutput valid.PostProcessRunOutputOption,
+		postProcessOutput []valid.PostProcessRunOutputOption,
+		postProcessFilterRegexes []*regexp.Regexp,
 	) (string, error)
 }
 
@@ -98,7 +100,7 @@ type MultiEnvStepRunner interface {
 		cmd string,
 		path string,
 		envs map[string]string,
-		postProcessOutput valid.PostProcessRunOutputOption,
+		postProcessOutput []valid.PostProcessRunOutputOption,
 	) (string, error)
 }
 
@@ -354,7 +356,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.ApprovePolicies)
 	if err != nil {
 		return nil, "", err
 	}
@@ -458,7 +460,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
 	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.PolicyCheck)
 	if err != nil {
 		return nil, "", err
 	}
@@ -518,8 +520,8 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	var postConftestOutput []string
 	var policySetResults []models.PolicySetResult
 
-	for i, output := range outputs {
-		index = i
+	inputPolicySets := ctx.PolicySets.PolicySets
+	for index, output := range outputs {
 		if !ctx.CustomPolicyCheck {
 			err = json.Unmarshal([]byte(strings.Join([]string{output}, "\n")), &policySetResults)
 			if err == nil {
@@ -528,9 +530,41 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			preConftestOutput = append(preConftestOutput, output)
 		} else {
 			// Using a policy tool other than Conftest, manually building result struct
-			passed := !strings.Contains(strings.ToLower(output), "fail")
-			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: "Custom", PolicyOutput: output, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
+			policySetName := "Custom"
+			if index < len(inputPolicySets) {
+				policySetName = inputPolicySets[index].Name
+			}
+
+			// Handle empty output: treat as failure since it likely indicates misconfiguration
+			// Non-empty output: check for "fail" string to determine pass/fail
+			var passed bool
+			var policyOutput string
+			if output == "" {
+				passed = false
+				policyOutput = "WARNING: Policy check produced no output. This may indicate a misconfiguration."
+			} else {
+				passed = !strings.Contains(strings.ToLower(output), "fail")
+				policyOutput = output
+			}
+
+			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: policySetName, PolicyOutput: policyOutput, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
 			preConftestOutput = append(preConftestOutput, "")
+		}
+	}
+
+	// Warn if custom policy check has mismatch between configured policy sets and outputs.
+	// Note: With empty output preservation, this warning now only triggers when workflow steps
+	// are completely missing, not when a step returns empty output.
+	if ctx.CustomPolicyCheck {
+		if len(policySetResults) < len(inputPolicySets) {
+			ctx.Log.Warn("Configured %d policy sets but only received %d outputs. Policy sets without outputs: %v. Check your workflow configuration.",
+				len(inputPolicySets),
+				len(policySetResults),
+				getMissingPolicySetNames(inputPolicySets, len(policySetResults)))
+		} else if len(policySetResults) > len(inputPolicySets) {
+			ctx.Log.Warn("Received %d outputs but only %d policy sets configured. Excess outputs will use 'Custom' as name.",
+				len(policySetResults),
+				len(inputPolicySets))
 		}
 	}
 
@@ -574,7 +608,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Plan)
 	if err != nil {
 		return nil, "", err
 	}
@@ -658,7 +692,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Apply)
 	if err != nil {
 		return "", "", err
 	}
@@ -697,7 +731,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Version)
 	if err != nil {
 		return "", "", err
 	}
@@ -738,7 +772,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Import)
 	if err != nil {
 		return nil, "", err
 	}
@@ -779,7 +813,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.State)
 	if err != nil {
 		return nil, "", err
 	}
@@ -823,7 +857,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, true, step.Output)
+			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, true, step.Output, step.FilterRegexes)
 		case "env":
 			out, err = p.EnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out
@@ -834,7 +868,9 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, step.Output)
 		}
 
-		if out != "" {
+		// Keep all policy_check outputs for custom policy checks to maintain positional alignment with policy sets
+		// Empty outputs are still appended to prevent index mismatches
+		if out != "" || (step.StepName == "policy_check" && ctx.CustomPolicyCheck) {
 			outputs = append(outputs, out)
 		}
 		if err != nil {
@@ -842,4 +878,13 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		}
 	}
 	return outputs, nil
+}
+
+// getMissingPolicySetNames returns the names of policy sets that don't have corresponding outputs
+func getMissingPolicySetNames(policySets []valid.PolicySet, receivedCount int) []string {
+	var missing []string
+	for i := receivedCount; i < len(policySets); i++ {
+		missing = append(missing, policySets[i].Name)
+	}
+	return missing
 }

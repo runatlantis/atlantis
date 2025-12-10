@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package vcs
 
 import (
@@ -38,7 +41,7 @@ func (f *pullReqStatusFetcher) FetchPullStatus(logger logging.SimpleLogging, pul
 	}
 
 	return models.PullReqStatus{
-		ApprovalStatus: approvalStatus,
-		Mergeable:      mergeable,
+		ApprovalStatus:  approvalStatus,
+		MergeableStatus: mergeable,
 	}, err
 }

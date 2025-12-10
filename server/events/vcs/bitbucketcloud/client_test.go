@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package bitbucketcloud_test
 
 import (
@@ -75,7 +78,7 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	defer testServer.Close()
 
 	serverURL = testServer.URL
-	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 	client.BaseURL = testServer.URL
 
 	files, err := client.GetModifiedFiles(
@@ -139,7 +142,7 @@ func TestClient_GetModifiedFilesOldNil(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 	client.BaseURL = testServer.URL
 
 	files, err := client.GetModifiedFiles(
@@ -208,7 +211,7 @@ func TestClient_PullIsApproved(t *testing.T) {
 			}))
 			defer testServer.Close()
 
-			client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+			client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 			client.BaseURL = testServer.URL
 
 			repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "https://bitbucket.org/owner/repo.git", "user", "token")
@@ -231,7 +234,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	cases := map[string]struct {
 		DiffStat     string
-		ExpMergeable bool
+		ExpMergeable models.MergeableStatus
 	}{
 		"mergeable": {
 			DiffStat: `{
@@ -257,7 +260,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				"page": 1,
 				"size": 1
 			}`,
-			ExpMergeable: true,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
 		},
 		"merge conflict": {
 			DiffStat: `{
@@ -291,7 +296,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			  "page": 1,
 			  "size": 1
 			}`,
-			ExpMergeable: false,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 		"merge conflict due to file deleted": {
 			DiffStat: `{
@@ -317,7 +324,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			  "page": 1,
 			  "size": 1
 			}`,
-			ExpMergeable: false,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+			},
 		},
 	}
 
@@ -336,7 +345,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			}))
 			defer testServer.Close()
 
-			client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+			client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 			client.BaseURL = testServer.URL
 
 			actMergeable, err := client.PullIsMergeable(
@@ -362,7 +371,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 }
 
 func TestClient_MarkdownPullLink(t *testing.T) {
-	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
 	exp := "#1"
@@ -386,7 +395,7 @@ func TestClient_GetMyUUID(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 	client.BaseURL = testServer.URL
 	v, _ := client.GetMyUUID()
 	Equals(t, v, "{00000000-0000-0000-0000-000000000001}")
@@ -409,7 +418,7 @@ func TestClient_GetComment(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 	client.BaseURL = testServer.URL
 	v, _ := client.GetPullRequestComments(
 		models.Repo{
@@ -445,7 +454,7 @@ func TestClient_DeleteComment(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 	client.BaseURL = testServer.URL
 	err := client.DeletePullRequestComment(
 		models.Repo{
@@ -507,7 +516,7 @@ func TestClient_HidePRComments(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "runatlantis.io")
+	client := bitbucketcloud.NewClient(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 	client.BaseURL = testServer.URL
 	err = client.HidePrevCommandComments(logger,
 		models.Repo{

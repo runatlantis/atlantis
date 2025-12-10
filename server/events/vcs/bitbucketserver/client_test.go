@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package bitbucketserver_test
 
 import (
@@ -103,8 +106,8 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 		switch r.RequestURI {
 		// The first request should hit this URL.
 		case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1/changes?start=0":
-			resp := strings.Replace(firstResp, `"isLastPage": true`, `"isLastPage": false`, -1)
-			resp = strings.Replace(resp, `"nextPageStart": null`, `"nextPageStart": 3`, -1)
+			resp := strings.ReplaceAll(firstResp, `"isLastPage": true`, `"isLastPage": false`)
+			resp = strings.ReplaceAll(resp, `"nextPageStart": null`, `"nextPageStart": 3`)
 			w.Write([]byte(resp)) // nolint: errcheck
 			return
 			// The second should hit this URL.

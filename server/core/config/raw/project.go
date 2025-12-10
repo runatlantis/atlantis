@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw
 
 import (
@@ -177,7 +180,7 @@ func (p Project) ToValid() valid.Project {
 // support any characters that must be url escaped *except* for '/' because
 // users like to name their projects to match the directory it's in.
 func validProjectName(name string) bool {
-	nameWithoutSlashes := strings.Replace(name, "/", "-", -1)
+	nameWithoutSlashes := strings.ReplaceAll(name, "/", "-")
 	return nameWithoutSlashes == url.QueryEscape(nameWithoutSlashes)
 }
 
