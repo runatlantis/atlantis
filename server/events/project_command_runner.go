@@ -613,7 +613,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		ctx.Log.Err(strings.Join(outputs, "\n"))
 		failure = "Some policy sets did not pass."
 	} else {
-		ctx.Log.Debug("Policy check outputs: %s", strings.Join(outputs, "\n"))
+		ctx.Log.Debug("policy check outputs %s", strings.Join(outputs, "\n"))
 	}
 
 	return result, failure, nil
