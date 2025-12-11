@@ -34,8 +34,8 @@ type WorkingDirLocker interface {
 	// an error if the workspace is already locked. The error is expected to
 	// be printed to the pull request.
 	TryLock(repoFullName string, pullNum int, workspace string, path string, cmdName command.Name) (func(), error)
-  // UnlockByPull unlocks all workspaces for a specific pull request
-  UnlockByPull(repoFullName string, pullNum int)
+	// UnlockByPull unlocks all workspaces for a specific pull request
+	UnlockByPull(repoFullName string, pullNum int)
 }
 
 // DefaultWorkingDirLocker implements WorkingDirLocker.
