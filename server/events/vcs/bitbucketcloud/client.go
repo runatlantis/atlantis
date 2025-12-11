@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package bitbucketcloud
 
 import (
@@ -17,7 +20,8 @@ import (
 
 type Client struct {
 	HTTPClient  *http.Client
-	Username    string
+	Username    string // Used for git operations
+	ApiUser     string // Used for API calls (Basic Auth)
 	Password    string
 	BaseURL     string
 	AtlantisURL string
@@ -27,13 +31,20 @@ type Client struct {
 // URL for Atlantis that will be linked to from the build status icons. This
 // linking is annoying because we don't have anywhere good to link but a URL is
 // required.
-func NewClient(httpClient *http.Client, username string, password string, atlantisURL string) *Client {
+// username is used for git operations, apiUser is used for API authentication (Basic Auth).
+// If apiUser is empty, it will default to username for backward compatibility.
+func NewClient(httpClient *http.Client, username string, password string, apiUser string, atlantisURL string) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
+	}
+	// Use apiUser for API calls if provided, otherwise fall back to username for backward compatibility
+	if apiUser == "" {
+		apiUser = username
 	}
 	return &Client{
 		HTTPClient:  httpClient,
 		Username:    username,
+		ApiUser:     apiUser,
 		Password:    password,
 		BaseURL:     BaseURL,
 		AtlantisURL: atlantisURL,
@@ -316,7 +327,8 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	if err != nil {
 		return nil, err
 	}
-	req.SetBasicAuth(b.Username, b.Password)
+	// Use ApiUser for API authentication, Username is for git operations
+	req.SetBasicAuth(b.ApiUser, b.Password)
 	if body != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
@@ -366,7 +378,7 @@ func (b *Client) SupportsSingleFileDownload(models.Repo) bool {
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (b *Client) GetFileContent(_ logging.SimpleLogging, _ models.PullRequest, _ string) (bool, []byte, error) {
+func (b *Client) GetFileContent(_ logging.SimpleLogging, _ models.Repo, _ string, _ string) (bool, []byte, error) {
 	return false, []byte{}, fmt.Errorf("not implemented")
 }
 

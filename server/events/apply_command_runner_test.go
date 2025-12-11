@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
@@ -13,7 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +55,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			vcsClient := setup(t)
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			pull := &github.PullRequest{
 				State: github.Ptr("open"),
@@ -152,7 +155,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				tc.database = db
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
 			cmd := &events.CommentCommand{Name: command.Apply}
@@ -514,7 +517,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			vcsClient := setup(t)
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			pull := &github.PullRequest{
 				State: github.Ptr("open"),

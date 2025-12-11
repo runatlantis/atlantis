@@ -23,6 +23,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/google/shlex"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -473,6 +474,31 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 	if dir == "" {
 		return dir, nil
 	}
+
+	// Check if dir contains glob pattern characters
+	if containsGlobPattern(dir) {
+		// For glob patterns, we validate but don't clean (cleaning mangles glob chars)
+		// Security check: prevent directory traversal even in glob patterns
+		if strings.Contains(dir, "..") {
+			return "", fmt.Errorf("using '..' in glob pattern %q with -%s/--%s is not allowed", dir, dirFlagShort, dirFlagLong)
+		}
+
+		// Validate the glob pattern syntax
+		if !doublestar.ValidatePattern(dir) {
+			return "", fmt.Errorf("invalid glob pattern %q with -%s/--%s", dir, dirFlagShort, dirFlagLong)
+		}
+
+		// Clean leading ./ or / for consistency with non-glob paths
+		dir = strings.TrimPrefix(dir, "./")
+		dir = strings.TrimPrefix(dir, "/")
+		if dir == "" {
+			dir = "."
+		}
+
+		return dir, nil
+	}
+
+	// For non-glob patterns, use standard path cleaning
 	validatedDir := filepath.Clean(dir)
 	// Join with . so the path is relative. This helps us if they use '/',
 	// and is safe to do if their path is relative since it's a no-op.
@@ -485,6 +511,11 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 	}
 
 	return validatedDir, nil
+}
+
+// containsGlobPattern returns true if the string contains glob pattern characters.
+func containsGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
 }
 
 func (e *CommentParser) stringInSlice(a string, list []string) bool {

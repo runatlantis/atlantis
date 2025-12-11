@@ -747,6 +747,321 @@ func (m mockURLGenerator) GenerateLockURL(lockID string) string {
 	return "https://" + lockID
 }
 
+// Test that custom policy checks use configured policy set names instead of defaulting to "Custom".
+// This is a regression test for https://github.com/runatlantis/atlantis/pull/5331
+// where custom policy sets defaulting to "Custom" allowed any user to approve policies.
+func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		description       string
+		customPolicyCheck bool
+		policySets        []valid.PolicySet
+		policyOutputs     []string
+		expectedNames     []string
+	}{
+		{
+			description:       "Custom policy check with single named policy set",
+			customPolicyCheck: true,
+			policySets: []valid.PolicySet{
+				{
+					Name:         "security_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"security-team"},
+					},
+				},
+			},
+			policyOutputs: []string{"Policy check passed"},
+			expectedNames: []string{"security_policy"},
+		},
+		{
+			description:       "Custom policy check with multiple named policy sets",
+			customPolicyCheck: true,
+			policySets: []valid.PolicySet{
+				{
+					Name:         "security_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"security-team"},
+					},
+				},
+				{
+					Name:         "compliance_policy",
+					ApproveCount: 2,
+					Owners: valid.PolicyOwners{
+						Users: []string{"compliance-team"},
+					},
+				},
+			},
+			policyOutputs: []string{"Security check passed", "Compliance check FAIL"},
+			expectedNames: []string{"security_policy", "compliance_policy"},
+		},
+		{
+			description:       "Custom policy check defaults to 'Custom' when no policy set configured",
+			customPolicyCheck: true,
+			policySets:        []valid.PolicySet{},
+			policyOutputs:     []string{"Policy check passed"},
+			expectedNames:     []string{"Custom"},
+		},
+		{
+			description:       "More outputs than policy sets - excess use 'Custom'",
+			customPolicyCheck: true,
+			policySets: []valid.PolicySet{
+				{
+					Name:         "security_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"security-team"},
+					},
+				},
+			},
+			policyOutputs: []string{"Security check passed", "Extra check passed"},
+			expectedNames: []string{"security_policy", "Custom"},
+		},
+		{
+			description:       "More policy sets than outputs - only received outputs processed",
+			customPolicyCheck: true,
+			policySets: []valid.PolicySet{
+				{
+					Name:         "security_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"security-team"},
+					},
+				},
+				{
+					Name:         "compliance_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"compliance-team"},
+					},
+				},
+				{
+					Name:         "audit_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"audit-team"},
+					},
+				},
+			},
+			policyOutputs: []string{"Security check passed"},
+			expectedNames: []string{"security_policy"},
+		},
+		{
+			description:       "Empty output is preserved and marked as failed",
+			customPolicyCheck: true,
+			policySets: []valid.PolicySet{
+				{
+					Name:         "security_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"security-team"},
+					},
+				},
+				{
+					Name:         "compliance_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"compliance-team"},
+					},
+				},
+			},
+			policyOutputs: []string{"Security check passed", ""},
+			expectedNames: []string{"security_policy", "compliance_policy"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			mockPolicyCheck := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                mockLocker,
+				LockURLGenerator:      mockURLGenerator{},
+				PolicyCheckStepRunner: mockPolicyCheck,
+				WorkingDir:            mockWorkingDir,
+				WorkingDirLocker:      events.NewDefaultWorkingDirLocker(),
+			}
+
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[string](),
+			)).ThenReturn(repoDir, nil)
+
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
+
+			// Setup policy check steps - one step per policy output
+			var steps []valid.Step
+			for range c.policyOutputs {
+				steps = append(steps, valid.Step{
+					StepName: "policy_check",
+				})
+			}
+
+			// Setup mock to return outputs in sequence
+			// Note: pegomock will return these in order for successive calls
+			for _, output := range c.policyOutputs {
+				When(mockPolicyCheck.Run(
+					Any[command.ProjectContext](),
+					Any[[]string](),
+					Any[string](),
+					Any[map[string]string](),
+				)).ThenReturn(output, nil)
+			}
+
+			ctx := command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				Workspace:         "default",
+				RepoRelDir:        ".",
+				CustomPolicyCheck: c.customPolicyCheck,
+				PolicySets: valid.PolicySets{
+					PolicySets: c.policySets,
+				},
+				Steps: steps,
+			}
+
+			res := runner.PolicyCheck(ctx)
+
+			Assert(t, res.Error == nil, "not expecting error: %v", res.Error)
+			Assert(t, res.PolicyCheckResults != nil, "expecting policy check results")
+
+			// Verify that the policy set names match the configured names
+			policyResults := res.PolicyCheckResults.PolicySetResults
+			Equals(t, len(c.expectedNames), len(policyResults))
+
+			for i, expectedName := range c.expectedNames {
+				Equals(t, expectedName, policyResults[i].PolicySetName)
+			}
+		})
+	}
+}
+
+// Test that when custom policy check has configured policy sets but no outputs are generated,
+// it does NOT trigger "unable to unmarshal conftest output" error.
+// This test reproduces the bug where policySetResults remains nil when the outputs
+// array is empty, which would incorrectly trigger the nil check error.
+func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		description       string
+		customPolicyCheck bool
+		policySets        []valid.PolicySet
+		steps             []valid.Step
+		expectError       bool
+		expectedErrorMsg  string
+	}{
+		{
+			description:       "Custom policy check with configured policy set but no steps (empty outputs array)",
+			customPolicyCheck: true,
+			policySets: []valid.PolicySet{
+				{
+					Name:         "test_policy",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Users: []string{"test-user"},
+					},
+				},
+			},
+			steps:            []valid.Step{}, // No steps - outputs array will be empty
+			expectError:      true,           // Should error when policy sets configured but no results
+			expectedErrorMsg: "custom policy check produced no results despite configured policy sets",
+		},
+		{
+			description:       "Custom policy check with no configured policy sets and no steps",
+			customPolicyCheck: true,
+			policySets:        []valid.PolicySet{}, // No policy sets configured
+			steps:             []valid.Step{},      // No steps
+			expectError:       false,               // Should NOT error when no policy sets configured
+			expectedErrorMsg:  "",
+		},
+		{
+			description:       "Non-custom (conftest) policy check with no steps",
+			customPolicyCheck: false,
+			policySets:        []valid.PolicySet{},
+			steps:             []valid.Step{},
+			expectError:       true,
+			expectedErrorMsg:  "unable to unmarshal conftest output",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			mockPolicyCheck := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                mockLocker,
+				LockURLGenerator:      mockURLGenerator{},
+				PolicyCheckStepRunner: mockPolicyCheck,
+				WorkingDir:            mockWorkingDir,
+				WorkingDirLocker:      events.NewDefaultWorkingDirLocker(),
+			}
+
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[string](),
+			)).ThenReturn(repoDir, nil)
+
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+				UnlockFn:     func() error { return nil },
+			}, nil)
+
+			ctx := command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				Workspace:         "default",
+				RepoRelDir:        ".",
+				CustomPolicyCheck: c.customPolicyCheck,
+				PolicySets: valid.PolicySets{
+					PolicySets: c.policySets,
+				},
+				Steps: c.steps,
+			}
+
+			res := runner.PolicyCheck(ctx)
+
+			if c.expectError {
+				Assert(t, res.Error != nil, "expecting error but got nil")
+				if c.expectedErrorMsg != "" {
+					Assert(t, res.Error.Error() == c.expectedErrorMsg,
+						"expected error message '%s' but got '%s'",
+						c.expectedErrorMsg, res.Error.Error())
+				}
+			} else {
+				Assert(t, res.Error == nil, "not expecting error but got: %v", res.Error)
+				Assert(t, res.PolicyCheckResults != nil, "expecting policy check results")
+			}
+		})
+	}
+}
+
 // Test approve policies logic.
 func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 	cases := []struct {

@@ -34,7 +34,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -71,7 +71,7 @@ jobs:
       with:
         egress-policy: audit
 
-    - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
     # Lint the Dockerfile first before setting anything up
     - name: Lint Dockerfile
@@ -85,7 +85,7 @@ jobs:
         go-version-file: "go.mod"
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+      uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       with:
         image: tonistiigi/binfmt:latest
         platforms: arm64,arm
@@ -105,7 +105,7 @@ jobs:
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5
+      uses: docker/metadata-action@318604b99e75e41977312d83839a89be02ca4893 # v5
       env:
         SUFFIX: ${{ format('-{0}', matrix.image_type) }}
       with:
@@ -210,7 +210,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
@@ -229,7 +229,7 @@ jobs:
           target: ${{ matrix.image_type }}
 
       - name: "Setup Goss"
-        uses: e1himself/goss-installation-action@fbb6fb55d3e59c96045b2500eeb8ce0995d99ac1 # v1.2.1
+        uses: e1himself/goss-installation-action@3b8340a7c772f8064444f48b0df4c2a80d2e50fc # v1.3.0
         with:
           version: "v0.4.7"
 

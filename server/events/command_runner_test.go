@@ -25,7 +25,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 
 	"github.com/google/go-github/v71/github"
 	. "github.com/petergtz/pegomock/v4"
@@ -79,6 +79,7 @@ type TestConfig struct {
 	discardApprovalOnPlan      bool
 	database                   db.Database
 	DisableUnlockLabel         string
+	PendingApplyStatus         bool
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -169,6 +170,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		lockingLocker,
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
+		testConfig.PendingApplyStatus,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -241,7 +243,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
 
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 	ch = events.DefaultCommandRunner{
 		VCSClient:                      vcsClient,
@@ -1070,114 +1072,6 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 
 	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
-}
-
-func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
-	t.Log("if \"atlantis approve_policies\" is run by non policy owner policy check status fails.")
-	setup(t)
-	tmp := t.TempDir()
-	boltDB, err := boltdb.New(tmp)
-	t.Cleanup(func() {
-		boltDB.Close()
-	})
-	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
-
-	pull := &github.PullRequest{
-		State: github.Ptr("open"),
-	}
-
-	modelPull := models.PullRequest{
-		BaseRepo: testdata.GithubRepo,
-		State:    models.OpenPullState,
-		Num:      testdata.Pull.Num,
-	}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-
-	When(projectCommandBuilder.BuildApprovePoliciesCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{
-		{
-			CommandName: command.ApprovePolicies,
-		},
-		{
-			CommandName: command.ApprovePolicies,
-		},
-	}, nil)
-
-	When(workingDir.GetPullDir(testdata.GithubRepo, testdata.Pull)).ThenReturn(tmp, nil)
-
-	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &testdata.Pull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		Any[logging.SimpleLogging](),
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Eq[models.CommitStatus](models.SuccessCommitStatus),
-		Eq[command.Name](command.PolicyCheck),
-		Eq(0),
-		Eq(2),
-	)
-}
-
-func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
-	t.Log("if \"atlantis approve_policies\" is run by policy owner all policy checks are approved.")
-	setup(t)
-	tmp := t.TempDir()
-	boltDB, err := boltdb.New(tmp)
-	t.Cleanup(func() {
-		boltDB.Close()
-	})
-	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
-
-	pull := &github.PullRequest{
-		State: github.Ptr("open"),
-	}
-
-	modelPull := models.PullRequest{
-		BaseRepo: testdata.GithubRepo,
-		State:    models.OpenPullState,
-		Num:      testdata.Pull.Num,
-	}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-
-	When(projectCommandBuilder.BuildApprovePoliciesCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{
-		{
-			CommandName: command.ApprovePolicies,
-			PolicySets: valid.PolicySets{
-				Owners: valid.PolicyOwners{
-					Users: []string{testdata.User.Username},
-				},
-			},
-		},
-	}, nil)
-
-	When(workingDir.GetPullDir(testdata.GithubRepo, testdata.Pull)).ThenReturn(tmp, nil)
-	When(projectCommandRunner.ApprovePolicies(Any[command.ProjectContext]())).Then(func(_ []Param) ReturnValues {
-		return ReturnValues{
-			command.ProjectResult{
-				Command:            command.PolicyCheck,
-				PolicyCheckResults: &models.PolicyCheckResults{},
-			},
-		}
-	})
-
-	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &testdata.Pull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		Any[logging.SimpleLogging](),
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Eq[models.CommitStatus](models.SuccessCommitStatus),
-		Eq[command.Name](command.PolicyCheck),
-		Eq(1),
-		Eq(1),
-	)
 }
 
 func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {

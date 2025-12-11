@@ -47,6 +47,8 @@ type GitlabClient struct {
 	PollingInterval time.Duration
 	// PollingInterval is the total duration for which to poll, where applicable.
 	PollingTimeout time.Duration
+	// StatusRetryEnabled enables enhanced retry logic for pipeline status updates.
+	StatusRetryEnabled bool
 }
 
 // commonMarkSupported is a version constraint that is true when this version of
@@ -465,14 +467,28 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 		TargetURL:   &url,
 	}
 
-	retries := 1
-	delay := 2 * time.Second
+	pipelineMaxAttempts := 2
+	pipelineRetryer := &backoff.Backoff{
+		Min: 2 * time.Second,
+		Max: 2 * time.Second,
+	}
+
+	if g.StatusRetryEnabled {
+		pipelineMaxAttempts = 5
+		pipelineRetryer = &backoff.Backoff{
+			Min:    2 * time.Second,
+			Max:    5 * time.Second,
+			Jitter: true,
+		}
+	}
+
 	var commit *gitlab.Commit
 	var resp *gitlab.Response
 	var err error
 
 	// Try a couple of times to get the pipeline ID for the commit
-	for i := 0; i <= retries; i++ {
+	for {
+		attempt := int(pipelineRetryer.Attempt()) + 1
 		commit, resp, err = g.Client.Commits.GetCommit(repo.FullName, pull.HeadCommit, nil)
 		if resp != nil {
 			logger.Debug("GET /projects/%s/repository/commits/%d: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
@@ -486,14 +502,15 @@ func (g *GitlabClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 			setCommitStatusOptions.PipelineID = gitlab.Ptr(commit.LastPipeline.ID)
 			break
 		}
-		if i != retries {
-			logger.Info("No pipeline found for commit %s, retrying in %s", pull.HeadCommit, delay)
-			time.Sleep(delay)
-		} else {
+		if attempt == pipelineMaxAttempts {
 			// If we've exhausted all retries, set the Ref to the branch name
 			logger.Info("No pipeline found for commit %s, setting Ref to %s", pull.HeadCommit, pull.HeadBranch)
 			setCommitStatusOptions.Ref = gitlab.Ptr(pull.HeadBranch)
+			break
 		}
+		sleep := pipelineRetryer.Duration()
+		logger.Info("No pipeline found for commit %s, retrying in %s", pull.HeadCommit, sleep)
+		time.Sleep(sleep)
 	}
 
 	var (
@@ -729,13 +746,13 @@ func (g *GitlabClient) GetTeamNamesForUser(logger logging.SimpleLogging, _ model
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (g *GitlabClient) GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) {
+func (g *GitlabClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
 	logger.Debug("Getting GitLab file content for file '%s'", fileName)
-	opt := gitlab.GetRawFileOptions{Ref: gitlab.Ptr(pull.HeadBranch)}
+	opt := gitlab.GetRawFileOptions{Ref: gitlab.Ptr(branch)}
 
-	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(pull.BaseRepo.FullName, fileName, &opt)
+	bytes, resp, err := g.Client.RepositoryFiles.GetRawFile(repo.FullName, fileName, &opt)
 	if resp != nil {
-		logger.Debug("GET /projects/%s/repository/files/%s/raw returned: %d", pull.BaseRepo.FullName, fileName, resp.StatusCode)
+		logger.Debug("GET /projects/%s/repository/files/%s/raw returned: %d", repo.FullName, fileName, resp.StatusCode)
 	}
 	if resp != nil && resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil

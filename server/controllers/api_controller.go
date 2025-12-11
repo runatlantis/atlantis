@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers
 
 import (
@@ -96,7 +99,7 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.apiSetup(ctx)
+	err = a.apiSetup(ctx, command.Plan)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
@@ -130,7 +133,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.apiSetup(ctx)
+	err = a.apiSetup(ctx, command.Apply)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
@@ -211,12 +214,12 @@ func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 	a.respond(w, logging.Warn, http.StatusOK, "%s", string(response))
 }
 
-func (a *APIController) apiSetup(ctx *command.Context) error {
+func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) error {
 	pull := ctx.Pull
 	baseRepo := ctx.Pull.BaseRepo
 	headRepo := ctx.HeadRepo
 
-	unlockFn, err := a.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir)
+	unlockFn, err := a.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, cmdName)
 	if err != nil {
 		return err
 	}

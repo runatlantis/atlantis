@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
@@ -5,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -75,6 +79,11 @@ func (r *RunStepRunner) Run(
 		"REPO_REL_DIR":                    ctx.RepoRelDir,
 		"USER_NAME":                       ctx.User.Username,
 		"WORKSPACE":                       ctx.Workspace,
+	}
+	// Add PR metadata environment variables for plan and apply steps
+	if ctx.CommandName.String() == "plan" || ctx.CommandName.String() == "apply" {
+		customEnvVars["ATLANTIS_PR_APPROVED"] = strconv.FormatBool(ctx.PullReqStatus.ApprovalStatus.IsApproved)
+		customEnvVars["ATLANTIS_PR_MERGEABLE"] = strconv.FormatBool(ctx.PullReqStatus.MergeableStatus.IsMergeable)
 	}
 
 	finalEnvVars := baseEnvVars

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package vcs
 
 import (
@@ -426,7 +429,7 @@ func (g *AzureDevopsClient) SupportsSingleFileDownload(repo models.Repo) bool { 
 	return false
 }
 
-func (g *AzureDevopsClient) GetFileContent(_ logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error) { //nolint: revive
+func (g *AzureDevopsClient) GetFileContent(_ logging.SimpleLogging, _ models.Repo, _ string, _ string) (bool, []byte, error) { //nolint: revive
 	return false, []byte{}, fmt.Errorf("not implemented")
 }
 
