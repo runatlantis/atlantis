@@ -38,7 +38,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
 	tally "github.com/uber-go/tally/v4"
-	prometheus "github.com/uber-go/tally/v4/prometheus"
+	"github.com/uber-go/tally/v4/prometheus"
 	"github.com/urfave/negroni/v3"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
@@ -112,6 +112,7 @@ type Server struct {
 	StatusController               *controllers.StatusController
 	JobsController                 *controllers.JobsController
 	APIController                  *controllers.APIController
+	ConfigController               *controllers.ConfigController
 	IndexTemplate                  web_templates.TemplateWriter
 	LockDetailTemplate             web_templates.TemplateWriter
 	ProjectJobsTemplate            web_templates.TemplateWriter
@@ -1001,6 +1002,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
+	configController := &controllers.ConfigController{
+		APISecret:       []byte(userConfig.APISecret),
+		Logger:          logger,
+		CommandRunner:   commandRunner,
+		RepoConfig:      userConfig.RepoConfig,
+		RepoConfigJSON:  userConfig.RepoConfigJSON,
+		ParserValidator: parserValidator,
+		Scope:           statsScope,
+		GlobalCfgArgs: valid.GlobalCfgArgs{
+			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
+		},
+	}
+
 	server := &Server{
 		AtlantisVersion:                config.AtlantisVersion,
 		AtlantisURL:                    parsedURL,
@@ -1021,6 +1035,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		JobsController:                 jobsController,
 		StatusController:               statusController,
 		APIController:                  apiController,
+		ConfigController:               configController,
 		IndexTemplate:                  web_templates.IndexTemplate,
 		LockDetailTemplate:             web_templates.LockTemplate,
 		ProjectJobsTemplate:            web_templates.ProjectJobsTemplate,
@@ -1060,6 +1075,7 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
 	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
+	s.Router.HandleFunc("/api/config/reload", s.ConfigController.ReloadConfig).Methods("POST")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
