@@ -1062,6 +1062,190 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *test
 	}
 }
 
+// Test custom policy check failure detection logic (regex and FAIL prefix).
+func TestDefaultProjectCommandRunner_CustomPolicyCheckFailureDetection(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		description    string
+		policyOutput   string
+		expectedPassed bool
+		expectedOutput string
+	}{
+		{
+			description:    "Output with '1 failure' pattern should fail",
+			policyOutput:   "Policy check found 1 failure in the code",
+			expectedPassed: false,
+			expectedOutput: "Policy check found 1 failure in the code",
+		},
+		{
+			description:    "Output with '2 failures' pattern should fail",
+			policyOutput:   "Found 2 failures in security scan",
+			expectedPassed: false,
+			expectedOutput: "Found 2 failures in security scan",
+		},
+		{
+			description:    "Output with '10 failures' pattern should fail",
+			policyOutput:   "Total: 10 failures detected",
+			expectedPassed: false,
+			expectedOutput: "Total: 10 failures detected",
+		},
+		{
+			description:    "Output with JSON 'failures': [...] pattern should fail",
+			policyOutput:   `{"result": "failures": [{"rule": "test"}]}`,
+			expectedPassed: false,
+			expectedOutput: `{"result": "failures": [{"rule": "test"}]}`,
+		},
+		{
+			description:    "Output starting with 'FAIL' prefix should fail",
+			policyOutput:   "FAIL: Policy validation failed",
+			expectedPassed: false,
+			expectedOutput: "FAIL: Policy validation failed",
+		},
+		{
+			description:    "Output starting with 'FAIL' after whitespace should fail",
+			policyOutput:   "  FAIL: Something went wrong",
+			expectedPassed: false,
+			expectedOutput: "  FAIL: Something went wrong",
+		},
+		{
+			description:    "Output with 'FAIL' in middle should pass",
+			policyOutput:   "The check did not FAIL completely",
+			expectedPassed: true,
+			expectedOutput: "The check did not FAIL completely",
+		},
+		{
+			description:    "Output with '0 failure' should pass (regex only matches 1-9)",
+			policyOutput:   "Found 0 failure in the scan",
+			expectedPassed: true,
+			expectedOutput: "Found 0 failure in the scan",
+		},
+		{
+			description:    "Output with word 'failure' but not pattern should pass",
+			policyOutput:   "This is a failure message but not a failure count",
+			expectedPassed: true,
+			expectedOutput: "This is a failure message but not a failure count",
+		},
+		{
+			description:    "Output with 'fail' word should pass (not matching pattern)",
+			policyOutput:   "The test might fail if conditions are not met",
+			expectedPassed: true,
+			expectedOutput: "The test might fail if conditions are not met",
+		},
+		{
+			description:    "Output with 'failures' word but not JSON pattern should pass",
+			policyOutput:   "Checking for potential failures in the system",
+			expectedPassed: true,
+			expectedOutput: "Checking for potential failures in the system",
+		},
+		{
+			description:    "Output with '99 failures' should fail",
+			policyOutput:   "Detected 99 failures in compliance check",
+			expectedPassed: false,
+			expectedOutput: "Detected 99 failures in compliance check",
+		},
+		{
+			description:    "Output with '100 failures' should fail",
+			policyOutput:   "Total: 100 failures found",
+			expectedPassed: false,
+			expectedOutput: "Total: 100 failures found",
+		},
+		{
+			description:    "Normal success output should pass",
+			policyOutput:   "Policy check passed successfully",
+			expectedPassed: true,
+			expectedOutput: "Policy check passed successfully",
+		},
+		{
+			description:    "Empty output should fail (handled separately but included for completeness)",
+			policyOutput:   "",
+			expectedPassed: false,
+			expectedOutput: "WARNING: Policy check produced no output. This may indicate a misconfiguration.",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			mockPolicyCheck := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                mockLocker,
+				LockURLGenerator:      mockURLGenerator{},
+				PolicyCheckStepRunner: mockPolicyCheck,
+				WorkingDir:            mockWorkingDir,
+				WorkingDirLocker:      events.NewDefaultWorkingDirLocker(),
+			}
+
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[string](),
+			)).ThenReturn(repoDir, nil)
+
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
+
+			// Setup policy check step
+			steps := []valid.Step{
+				{
+					StepName: "policy_check",
+				},
+			}
+
+			// Setup mock to return the test output
+			When(mockPolicyCheck.Run(
+				Any[command.ProjectContext](),
+				Any[[]string](),
+				Any[string](),
+				Any[map[string]string](),
+			)).ThenReturn(c.policyOutput, nil)
+
+			ctx := command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				Workspace:         "default",
+				RepoRelDir:        ".",
+				CustomPolicyCheck: true,
+				PolicySets: valid.PolicySets{
+					PolicySets: []valid.PolicySet{
+						{
+							Name:         "test_policy",
+							ApproveCount: 1,
+							Owners: valid.PolicyOwners{
+								Users: []string{"test-user"},
+							},
+						},
+					},
+				},
+				Steps: steps,
+			}
+
+			res := runner.PolicyCheck(ctx)
+
+			Assert(t, res.Error == nil, "not expecting error: %v", res.Error)
+			Assert(t, res.PolicyCheckResults != nil, "expecting policy check results")
+
+			// Verify the result
+			policyResults := res.PolicyCheckResults.PolicySetResults
+			Equals(t, 1, len(policyResults))
+			Equals(t, c.expectedPassed, policyResults[0].Passed)
+			Equals(t, c.expectedOutput, policyResults[0].PolicyOutput)
+			Equals(t, "test_policy", policyResults[0].PolicySetName)
+		})
+	}
+}
+
 // Test approve policies logic.
 func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 	cases := []struct {
