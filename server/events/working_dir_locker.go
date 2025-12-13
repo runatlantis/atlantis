@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -33,6 +34,8 @@ type WorkingDirLocker interface {
 	// an error if the workspace is already locked. The error is expected to
 	// be printed to the pull request.
 	TryLock(repoFullName string, pullNum int, workspace string, path string, cmdName command.Name) (func(), error)
+	// UnlockByPull unlocks all workspaces for a specific pull request
+	UnlockByPull(repoFullName string, pullNum int)
 }
 
 // DefaultWorkingDirLocker implements WorkingDirLocker.
@@ -62,6 +65,20 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 	return func() {
 		d.unlock(repoFullName, pullNum, workspace, path)
 	}, nil
+}
+
+// UnlockByPull unlocks all workspaces for a specific pull request
+func (d *DefaultWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	// Find and remove all locks for this pull request
+	prefix := fmt.Sprintf("%s/%d/", repoFullName, pullNum)
+	for key := range d.locks {
+		if strings.HasPrefix(key, prefix) {
+			delete(d.locks, key)
+		}
+	}
 }
 
 // Unlock unlocks the workspace for this pull.

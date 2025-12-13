@@ -270,6 +270,10 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		name = command.Unlock
 		flagSet = pflag.NewFlagSet(command.Unlock.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
+	case command.Cancel.String():
+		name = command.Cancel
+		flagSet = pflag.NewFlagSet(command.Cancel.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
 	case command.Version.String():
 		name = command.Version
 		flagSet = pflag.NewFlagSet(command.Version.String(), pflag.ContinueOnError)
