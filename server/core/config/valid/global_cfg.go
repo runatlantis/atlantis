@@ -235,7 +235,7 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 				IDRegex:                   regexp.MustCompile(".*"),
 				BranchRegex:               regexp.MustCompile(".*"),
 				RepoConfigFile:            args.RepoConfigFile,
-				PlanRequirements:          commandReqs,
+				PlanRequirements:          []string{},
 				ApplyRequirements:         commandReqs,
 				ImportRequirements:        commandReqs,
 				PreWorkflowHooks:          args.PreWorkflowHooks,
