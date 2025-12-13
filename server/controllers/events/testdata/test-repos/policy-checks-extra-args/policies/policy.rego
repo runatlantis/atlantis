@@ -2,14 +2,14 @@ package null_resource_policy
 
 import input as tfplan
 
-deny[reason] {
+deny contains reason if {
 	num_deletes.null_resource > 0
 	reason := "WARNING: Null Resource creation is prohibited."
 }
 
 resource_types = {"null_resource"}
 
-resources[resource_type] = all {
+resources[resource_type] = all if {
 	some resource_type
 	resource_types[resource_type]
 	all := [name |
@@ -19,7 +19,7 @@ resources[resource_type] = all {
 }
 
 # number of deletions of resources of a given type
-num_deletes[resource_type] = num {
+num_deletes[resource_type] = num if {
 	some resource_type
 	resource_types[resource_type]
 	all := resources[resource_type]

@@ -292,6 +292,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
+		gitlabClient.StatusRetryEnabled = userConfig.GitlabStatusRetryEnabled
 	}
 	if userConfig.BitbucketUser != "" {
 		if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
@@ -790,6 +791,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
+		userConfig.PendingApplyStatus,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(

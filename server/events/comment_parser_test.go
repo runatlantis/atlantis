@@ -412,6 +412,67 @@ func TestParse_RelativeDirPath(t *testing.T) {
 	}
 }
 
+func TestParse_GlobPatternDir(t *testing.T) {
+	t.Log("if -d is used with a glob pattern, it should be preserved correctly")
+	cases := []struct {
+		comment     string
+		expectedDir string
+	}{
+		{"atlantis plan -d modules/*", "modules/*"},
+		{"atlantis plan -d modules/**", "modules/**"},
+		{"atlantis plan -d environments/*/apps", "environments/*/apps"},
+		{"atlantis plan -d 'env[0-9]/*'", "env[0-9]/*"},
+		{"atlantis plan -d stacks/prod-?-*", "stacks/prod-?-*"},
+		{"atlantis apply -d modules/**", "modules/**"},
+		{"atlantis import -d modules/* address id", "modules/*"},
+		{"atlantis state -d modules/* rm address", "modules/*"},
+	}
+	for _, c := range cases {
+		t.Run(c.comment, func(t *testing.T) {
+			r := commentParser.Parse(c.comment, models.Github)
+			assert.Empty(t, r.CommentResponse, "Expected no error for comment %q", c.comment)
+			assert.NotNil(t, r.Command, "Expected command to be parsed for comment %q", c.comment)
+			assert.Equal(t, c.expectedDir, r.Command.RepoRelDir, "Expected dir %q but got %q for comment %q", c.expectedDir, r.Command.RepoRelDir, c.comment)
+		})
+	}
+}
+
+func TestParse_GlobPatternDirWithRelativePath(t *testing.T) {
+	t.Log("if -d is used with a glob pattern containing '..', should return an error")
+	comments := []string{
+		"atlantis plan -d '../*'",
+		"atlantis plan -d 'modules/../*'",
+		"atlantis plan -d '../**'",
+		"atlantis apply -d '../apps/*'",
+		"atlantis import -d '../*' address id",
+		"atlantis state -d '../*' rm address",
+	}
+	for _, c := range comments {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			exp := "using '..' in glob pattern"
+			assert.Contains(t, r.CommentResponse, exp,
+				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		})
+	}
+}
+
+func TestParse_InvalidGlobPattern(t *testing.T) {
+	t.Log("if -d is used with an invalid glob pattern, should return an error")
+	comments := []string{
+		"atlantis plan -d 'modules/[invalid'",
+		"atlantis apply -d 'apps/[unclosed'",
+	}
+	for _, c := range comments {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			exp := "invalid glob pattern"
+			assert.Contains(t, r.CommentResponse, exp,
+				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		})
+	}
+}
+
 func TestParse_ValidCommand(t *testing.T) {
 	comments := []string{
 		"atlantis plan\n",

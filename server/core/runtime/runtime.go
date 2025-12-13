@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package runtime holds code for actually running commands vs. preparing
 // and constructing.
 package runtime

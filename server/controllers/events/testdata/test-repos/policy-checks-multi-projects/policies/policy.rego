@@ -2,14 +2,14 @@ package main
 
 import input as tfplan
 
-deny[reason] {
+deny contains reason if {
 	num_creates[_] > 0
 	reason := "WARNING: Forbidden Resource creation is prohibited."
 }
 
 resource_names = {"forbidden"}
 
-resources[resource_name] = all {
+resources[resource_name] = all if {
 	some resource_name
 	resource_names[resource_name]
 	all := [res |
@@ -19,7 +19,7 @@ resources[resource_name] = all {
 }
 
 # number of creations of resources of a given name
-num_creates[resource_name] = num {
+num_creates[resource_name] = num if {
 	some resource_name
 	resource_names[resource_name]
 	all := resources[resource_name]

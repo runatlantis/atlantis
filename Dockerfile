@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1@sha256:b6afd42430b15f2d2a4c5a02b919e98a525b785b1aaff16747d2f623364e39b6
 # what distro is the image being built for
 ARG ALPINE_TAG=3.21.3@sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c
-ARG DEBIAN_TAG=12.12-slim@sha256:936abff852736f951dab72d91a1b6337cf04217b2a77a5eaadc7c0f2f1ec1758
+ARG DEBIAN_TAG=12.12-slim@sha256:e899040a73d36e2b36fa33216943539d9957cba8172b858097c2cabcdb20a3e2
 # renovate: datasource=docker depName=golang versioning=docker
 ARG GOLANG_TAG=1.25.4-alpine@sha256:d3f0cf7723f3429e3f9ed846243970b20a2de7bae6a5b66fc5914e228d831bbb
 
@@ -208,6 +208,9 @@ RUN apk add --no-cache \
         gcompat=${GCOMPAT_VERSION} \
         coreutils-env=${COREUTILS_ENV_VERSION}
 
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
+
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
@@ -236,6 +239,9 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package valid
 
 import (
@@ -399,7 +402,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		DeleteSourceBranchOnMergeKey, deleteSourceBranchOnMerge,
 		RepoLockingKey, repoLocks.Mode,
 		PolicyCheckKey, policyCheck,
-		CustomPolicyCheckKey, policyCheck,
+		CustomPolicyCheckKey, customPolicyCheck,
 		SilencePRCommentsKey, strings.Join(silencePRComments, ","),
 	)
 

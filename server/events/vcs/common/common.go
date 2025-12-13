@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package common is used to share common code between all VCS clients without
 // running into circular dependency issues.
 package common
