@@ -39,7 +39,7 @@ func TestSend_PostMessage(t *testing.T) {
 		BranchRegex:    regex,
 		Channel:        channel,
 	}
-	result := webhooks.ApplyResult{
+	result := webhooks.EventResult{
 		Workspace: "production",
 		Pull: models.PullRequest{
 			BaseBranch: "main",
@@ -65,7 +65,7 @@ func TestSend_NoopSuccess(t *testing.T) {
 		BranchRegex:    regex,
 		Channel:        channel,
 	}
-	result := webhooks.ApplyResult{
+	result := webhooks.EventResult{
 		Workspace: "production",
 		Pull: models.PullRequest{
 			BaseBranch: "main",
