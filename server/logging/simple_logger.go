@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
@@ -97,7 +96,7 @@ func newStructuredLogger(cfg zap.Config) (*StructuredLogger, error) {
 		With(zap.Namespace("json"))
 
 	if err != nil {
-		return nil, errors.Wrap(err, " initializing structured logger")
+		return nil, fmt.Errorf(" initializing structured logger: %w", err)
 	}
 
 	return &StructuredLogger{

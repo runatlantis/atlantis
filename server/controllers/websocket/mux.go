@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -63,7 +62,7 @@ func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 	key, err := m.keyGenerator.Generate(r)
 
 	if err != nil {
-		return errors.Wrapf(err, "generating partition key")
+		return fmt.Errorf("generating partition key: %w", err)
 	}
 
 	// check if the job ID exists before registering receiver
@@ -81,7 +80,7 @@ func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 
 	err = m.writer.Write(w, r, buffer)
 	if err != nil {
-		return errors.Wrapf(err, "writing to ws %s", key)
+		return fmt.Errorf("writing to ws %s: %w", key, err)
 	}
 	return nil
 }

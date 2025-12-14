@@ -22,7 +22,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -324,13 +323,13 @@ func (w *FileWorkspace) isBranchAtTargetRef(logger logging.SimpleLogging, c wrap
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
 	err := os.RemoveAll(c.dir)
 	if err != nil {
-		return errors.Wrapf(err, "deleting dir '%s' before cloning", c.dir)
+		return fmt.Errorf("deleting dir '%s' before cloning: %w", c.dir, err)
 	}
 
 	// Create the directory and parents if necessary.
 	logger.Info("creating dir '%s'", c.dir)
 	if err := os.MkdirAll(c.dir, 0700); err != nil {
-		return errors.Wrap(err, "creating new workspace")
+		return fmt.Errorf("creating new workspace: %w", err)
 	}
 
 	// During testing, we mock some of this out.
@@ -461,7 +460,7 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
 	repoDir := w.cloneDir(r, p, workspace)
 	if _, err := os.Stat(repoDir); err != nil {
-		return "", errors.Wrap(err, "checking if workspace exists")
+		return "", fmt.Errorf("checking if workspace exists: %w", err)
 	}
 	return repoDir, nil
 }

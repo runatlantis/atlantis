@@ -4,9 +4,8 @@
 package server_test
 
 import (
+	"errors"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/command"

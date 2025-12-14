@@ -5,9 +5,8 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -182,14 +181,14 @@ func (u UserConfig) ToWebhookHttpHeaders() (map[string][]string, error) {
 			for _, v := range val {
 				s, ok := v.(string)
 				if !ok {
-					return nil, errors.Errorf("expected string array element, got %T", v)
+					return nil, fmt.Errorf("expected string array element, got %T", v)
 				}
 				headers[name] = append(headers[name], s)
 			}
 		case string:
 			headers[name] = []string{val}
 		default:
-			return nil, errors.Errorf("expected string or array, got %T", val)
+			return nil, fmt.Errorf("expected string or array, got %T", val)
 		}
 	}
 	return headers, nil

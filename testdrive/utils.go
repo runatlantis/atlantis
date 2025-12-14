@@ -30,7 +30,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/term"
 )
 
@@ -140,10 +139,10 @@ func getTunnelAddr() (string, error) {
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", errors.Wrap(err, "reading ngrok api")
+		return "", fmt.Errorf("reading ngrok api: %w", err)
 	}
 	if err = json.Unmarshal(body, &t); err != nil {
-		return "", errors.Wrapf(err, "parsing ngrok api: %s", string(body))
+		return "", fmt.Errorf("parsing ngrok api: %s: %w", string(body), err)
 	}
 
 	// Find the tunnel we just created.
@@ -192,7 +191,7 @@ func execAndWaitForStderr(wg *sync.WaitGroup, stderrMatch *regexp.Regexp, timeou
 	command := exec.CommandContext(ctx, name, args...) // #nosec
 	stderr, err := command.StderrPipe()
 	if err != nil {
-		return cancel, errChan, errors.Wrap(err, "creating stderr pipe")
+		return cancel, errChan, fmt.Errorf("creating stderr pipe: %w", err)
 	}
 
 	// Start the command in the background. This will only return error if the
