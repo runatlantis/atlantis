@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofri/go-github-ratelimit/github_ratelimit"
+	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
 	"github.com/google/go-github/v71/github"
 	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
