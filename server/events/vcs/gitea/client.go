@@ -324,6 +324,7 @@ func (c *GiteaClient) UpdateStatus(logger logging.SimpleLogging, repo models.Rep
 		State:       giteaState,
 		TargetURL:   url,
 		Description: description,
+		Context:     src,
 	}
 
 	_, resp, err := c.giteaClient.CreateStatus(repo.Owner, repo.Name, pull.HeadCommit, newStatusOption)
