@@ -53,6 +53,27 @@ type GitHubRepoIdCache struct {
 	cache map[githubv4.String]GithubRepoIdCacheEntry
 }
 
+type pullRequestCommentsQuery struct {
+	Repository struct {
+		PullRequest struct {
+			Comments struct {
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   githubv4.String
+				}
+				Nodes []struct {
+					ID          githubv4.String
+					BodyText    githubv4.String
+					IsMinimized githubv4.Boolean
+					Author      struct {
+						Login githubv4.String
+					}
+				}
+			} `graphql:"comments(first: $pageSize, after: $after)"`
+		} `graphql:"pullRequest(number: $number)"`
+	} `graphql:"repository(owner: $owner, name: $name)"`
+}
+
 func NewGitHubRepoIdCache() GitHubRepoIdCache {
 	return GitHubRepoIdCache{
 		cache: make(map[githubv4.String]GithubRepoIdCacheEntry),
@@ -270,52 +291,69 @@ func (g *GithubClient) ReactToComment(logger logging.SimpleLogging, repo models.
 
 func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
 	logger.Debug("Hiding previous command comments on GitHub pull request %d", pullNum)
-	var allComments []*github.IssueComment
-	nextPage := 0
+
+	var (
+		query                 pullRequestCommentsQuery
+		allMatchingCommentIDs []string
+		after                 *githubv4.String // for pagination
+	)
+
+	commentsQueryVariables := map[string]interface{}{
+		"owner": githubv4.String(repo.Owner),
+		"name":  githubv4.String(repo.Name),
+		// TODO: This is a potential integer overflow. We should fix this.
+		"number":   githubv4.Int(pullNum), // #nosec G115: integer overflow conversion int -> int32
+		"pageSize": githubv4.Int(100),
+		"after":    (*githubv4.String)(nil),
+	}
+
 	for {
-		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
-			Sort:        github.Ptr("created"),
-			Direction:   github.Ptr("asc"),
-			ListOptions: github.ListOptions{Page: nextPage},
-		})
-		if resp != nil {
-			logger.Debug("GET /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
-		}
+		err := g.v4Client.Query(g.ctx, &query, commentsQueryVariables)
 		if err != nil {
 			return errors.Wrap(err, "listing comments")
 		}
-		allComments = append(allComments, comments...)
-		if resp.NextPage == 0 {
+
+		for _, comment := range query.Repository.PullRequest.Comments.Nodes {
+			logger.Debug("Processing comment user: %s, commentID: %s", comment.Author.Login, comment.ID)
+			if comment.IsMinimized {
+				logger.Debug("Skipping already minimized comment user: %s, commentID: %s", comment.Author.Login, comment.ID)
+				continue
+			}
+
+			// Using a case insensitive compare here because usernames aren't case
+			// sensitive and users may enter their atlantis users with different
+			// cases.
+			if comment.Author.Login != "" && !strings.EqualFold(string(comment.Author.Login+"[bot]"), g.user) {
+				continue
+			}
+
+			body := strings.Split(string(comment.BodyText), "\n")
+			if len(body) == 0 {
+				continue
+			}
+			firstLine := strings.ToLower(body[0])
+			if !strings.Contains(firstLine, strings.ToLower(command)) {
+				continue
+			}
+
+			// If dir was specified, skip processing comments that don't contain the dir in the first line
+			if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
+				continue
+			}
+
+			allMatchingCommentIDs = append(allMatchingCommentIDs, string(comment.ID))
+		}
+
+		pageInfo := query.Repository.PullRequest.Comments.PageInfo
+		if !pageInfo.HasNextPage {
 			break
 		}
-		nextPage = resp.NextPage
+
+		after = &pageInfo.EndCursor
+		commentsQueryVariables["after"] = after
 	}
 
-	for _, comment := range allComments {
-		// Using a case insensitive compare here because usernames aren't case
-		// sensitive and users may enter their atlantis users with different
-		// cases.
-		if comment.User != nil && !strings.EqualFold(comment.User.GetLogin(), g.user) {
-			continue
-		}
-		// Crude filtering: The comment templates typically include the command name
-		// somewhere in the first line. It's a bit of an assumption, but seems like
-		// a reasonable one, given we've already filtered the comments by the
-		// configured Atlantis user.
-		body := strings.Split(comment.GetBody(), "\n")
-		if len(body) == 0 {
-			continue
-		}
-		firstLine := strings.ToLower(body[0])
-		if !strings.Contains(firstLine, strings.ToLower(command)) {
-			continue
-		}
-
-		// If dir was specified, skip processing comments that don't contain the dir in the first line
-		if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
-			continue
-		}
-
+	for _, commentID := range allMatchingCommentIDs {
 		var m struct {
 			MinimizeComment struct {
 				MinimizedComment struct {
@@ -327,11 +365,11 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 		}
 		input := githubv4.MinimizeCommentInput{
 			Classifier: githubv4.ReportedContentClassifiersOutdated,
-			SubjectID:  comment.GetNodeID(),
+			SubjectID:  commentID,
 		}
-		logger.Debug("Hiding comment %s", comment.GetNodeID())
+		logger.Debug("Hiding comment %s", commentID)
 		if err := g.v4Client.Mutate(g.ctx, &m, input, nil); err != nil {
-			return errors.Wrapf(err, "minimize comment %s", comment.GetNodeID())
+			return errors.Wrapf(err, "minimize comment %s", commentID)
 		}
 	}
 
