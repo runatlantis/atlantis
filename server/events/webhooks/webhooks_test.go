@@ -26,14 +26,23 @@ import (
 )
 
 const (
-	validEvent   = webhooks.ApplyEvent
-	validRegex   = ".*"
-	validKind    = webhooks.SlackKind
-	validChannel = "validchannel"
+	validApplyEvent = string(webhooks.ApplyEvent)
+	validPlanEvent  = string(webhooks.PlanEvent)
+	validRegex      = ".*"
+	validKind       = webhooks.SlackKind
+	validChannel    = "validchannel"
 )
 
-var validConfig = webhooks.Config{
-	Event:          validEvent,
+var validApplyEventConfig = webhooks.Config{
+	Event:          validApplyEvent,
+	WorkspaceRegex: validRegex,
+	BranchRegex:    validRegex,
+	Kind:           validKind,
+	Channel:        validChannel,
+}
+
+var validPlanEventConfig = webhooks.Config{
+	Event:          validPlanEvent,
 	WorkspaceRegex: validRegex,
 	BranchRegex:    validRegex,
 	Kind:           validKind,
@@ -41,7 +50,7 @@ var validConfig = webhooks.Config{
 }
 
 func validConfigs() []webhooks.Config {
-	return []webhooks.Config{validConfig}
+	return []webhooks.Config{validApplyEventConfig}
 }
 
 func validClients() webhooks.Clients {
@@ -112,7 +121,7 @@ func TestNewWebhooksManager_UnsupportedEvent(t *testing.T) {
 	configs[0].Event = unsupportedEvent
 	_, err := webhooks.NewMultiWebhookSender(configs, clients)
 	Assert(t, err != nil, "expected error")
-	Equals(t, "\"event: badevent\" not supported. Only \"event: apply\" is supported right now", err.Error())
+	Equals(t, "\"event: badevent\" not supported. Only \"events: apply, plan\" are supported right now", err.Error())
 }
 
 func TestNewWebhooksManager_NoKind(t *testing.T) {
@@ -169,6 +178,18 @@ func TestNewWebhooksManager_SingleConfigSuccess(t *testing.T) {
 	Equals(t, 1, len(m.Webhooks)) // nolint: staticcheck
 }
 
+func TestNewWebhooksManager_PlanConfigSuccess(t *testing.T) {
+	t.Log("When there is one valid plan config, function should succeed")
+	RegisterMockTestingT(t)
+	clients := validClients()
+	When(clients.Slack.TokenIsSet()).ThenReturn(true)
+
+	configs := []webhooks.Config{validPlanEventConfig}
+	m, err := webhooks.NewMultiWebhookSender(configs, clients)
+	Ok(t, err)
+	Equals(t, 1, len(m.Webhooks)) // nolint: staticcheck
+}
+
 func TestNewWebhooksManager_MultipleConfigSuccess(t *testing.T) {
 	t.Log("When there are multiple valid configs, function should succeed")
 	RegisterMockTestingT(t)
@@ -178,7 +199,7 @@ func TestNewWebhooksManager_MultipleConfigSuccess(t *testing.T) {
 	var configs []webhooks.Config
 	nConfigs := 5
 	for i := 0; i < nConfigs; i++ {
-		configs = append(configs, validConfig)
+		configs = append(configs, validApplyEventConfig)
 	}
 	m, err := webhooks.NewMultiWebhookSender(configs, clients)
 	Ok(t, err)
@@ -190,10 +211,12 @@ func TestSend_SingleSuccess(t *testing.T) {
 	RegisterMockTestingT(t)
 	sender := mocks.NewMockSender()
 	manager := webhooks.MultiWebhookSender{
-		Webhooks: []webhooks.Sender{sender},
+		Webhooks: []webhooks.ConfiguredSender{
+			{Event: webhooks.ApplyEvent, Sender: sender},
+		},
 	}
 	logger := logging.NewNoopLogger(t)
-	result := webhooks.ApplyResult{}
+	result := webhooks.EventResult{Event: webhooks.ApplyEvent}
 	manager.Send(logger, result) // nolint: errcheck
 	sender.VerifyWasCalledOnce().Send(logger, result)
 }
@@ -207,13 +230,36 @@ func TestSend_MultipleSuccess(t *testing.T) {
 		mocks.NewMockSender(),
 	}
 	manager := webhooks.MultiWebhookSender{
-		Webhooks: []webhooks.Sender{senders[0], senders[1], senders[2]},
+		Webhooks: []webhooks.ConfiguredSender{
+			{Event: webhooks.ApplyEvent, Sender: senders[0]},
+			{Event: webhooks.ApplyEvent, Sender: senders[1]},
+			{Event: webhooks.ApplyEvent, Sender: senders[2]},
+		},
 	}
 	logger := logging.NewNoopLogger(t)
-	result := webhooks.ApplyResult{}
+	result := webhooks.EventResult{Event: webhooks.ApplyEvent}
 	err := manager.Send(logger, result)
 	Ok(t, err)
 	for _, s := range senders {
 		s.VerifyWasCalledOnce().Send(logger, result)
 	}
+}
+
+func TestSend_FiltersByEvent(t *testing.T) {
+	t.Log("Only matching event webhook should be invoked")
+	RegisterMockTestingT(t)
+	applySender := mocks.NewMockSender()
+	planSender := mocks.NewMockSender()
+	manager := webhooks.MultiWebhookSender{
+		Webhooks: []webhooks.ConfiguredSender{
+			{Event: webhooks.ApplyEvent, Sender: applySender},
+			{Event: webhooks.PlanEvent, Sender: planSender},
+		},
+	}
+	logger := logging.NewNoopLogger(t)
+	planResult := webhooks.EventResult{Event: webhooks.PlanEvent}
+	err := manager.Send(logger, planResult)
+	Ok(t, err)
+	planSender.VerifyWasCalledOnce().Send(logger, planResult)
+	applySender.VerifyWasCalled(Never()).Send(Any[logging.SimpleLogging](), Any[webhooks.EventResult]())
 }
