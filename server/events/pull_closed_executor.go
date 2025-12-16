@@ -23,7 +23,6 @@ import (
 
 	"github.com/runatlantis/atlantis/server/logging"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -101,7 +100,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	}
 
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
-		return errors.Wrap(err, "cleaning workspace")
+		return fmt.Errorf("cleaning workspace: %w", err)
 	}
 
 	// Finally, delete locks. We do this last because when someone
@@ -109,7 +108,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// so we might have plans laying around but no locks.
 	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
-		return errors.Wrap(err, "cleaning up locks")
+		return fmt.Errorf("cleaning up locks: %w", err)
 	}
 
 	// Delete pull from DB.
@@ -130,7 +129,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	templateData := p.buildTemplateData(locks)
 	var buf bytes.Buffer
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
-		return errors.Wrap(err, "rendering template for comment")
+		return fmt.Errorf("rendering template for comment: %w", err)
 	}
 	return p.VCSClient.CreateComment(logger, repo, pull.Num, buf.String(), "")
 }

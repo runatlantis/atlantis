@@ -1,10 +1,11 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package vcs
+package azuredevops
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -43,7 +43,7 @@ func NewAzureDevopsClient(hostname string, userName string, token string) (*Azur
 		baseURL := fmt.Sprintf("https://%s/", hostname)
 		base, err := url.Parse(baseURL)
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid azure devops hostname trying to parse %s", baseURL)
+			return nil, fmt.Errorf("invalid azure devops hostname trying to parse %s: %w", baseURL, err)
 		}
 		adClient.BaseURL = *base
 	}
@@ -80,10 +80,10 @@ func (g *AzureDevopsClient) GetModifiedFiles(logger logging.SimpleLogging, repo 
 			Skip: skip,
 		})
 		if err != nil {
-			return nil, errors.Wrap(err, "getting pull request")
+			return nil, fmt.Errorf("getting pull request: %w", err)
 		}
 		if resp.StatusCode != http.StatusOK {
-			return nil, errors.Wrapf(err, "http response code %d getting diff %s to %s", resp.StatusCode, sourceRefName, targetRefName)
+			return nil, fmt.Errorf("http response code %d getting diff %s to %s: %w", resp.StatusCode, sourceRefName, targetRefName, err)
 		}
 
 		for _, change := range r.Changes {
@@ -167,7 +167,7 @@ func (g *AzureDevopsClient) PullIsApproved(logger logging.SimpleLogging, repo mo
 	}
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
-		return approvalStatus, errors.Wrap(err, "getting pull request")
+		return approvalStatus, fmt.Errorf("getting pull request: %w", err)
 	}
 
 	for _, review := range adPull.Reviewers {
@@ -201,7 +201,7 @@ func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo m
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
 	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
 	if err != nil {
-		return models.MergeableStatus{}, errors.Wrap(err, "getting pull request")
+		return models.MergeableStatus{}, fmt.Errorf("getting pull request: %w", err)
 	}
 
 	if *adPull.MergeStatus != azuredevops.MergeSucceeded.String() {
@@ -226,7 +226,7 @@ func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo m
 	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, pull.Num)
 	policyEvaluations, _, err := g.Client.PolicyEvaluations.List(g.ctx, owner, project, artifactID, &azuredevops.PolicyEvaluationsListOptions{})
 	if err != nil {
-		return models.MergeableStatus{}, errors.Wrap(err, "getting policy evaluations")
+		return models.MergeableStatus{}, fmt.Errorf("getting policy evaluations: %w", err)
 	}
 
 	for _, policyEvaluation := range policyEvaluations {
@@ -292,19 +292,19 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 	opts := azuredevops.PullRequestListOptions{}
 	source, resp, err := g.Client.PullRequests.Get(g.ctx, owner, project, pull.Num, &opts)
 	if err != nil {
-		return errors.Wrap(err, "getting pull request")
+		return fmt.Errorf("getting pull request: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.Errorf("http response code %d getting pull request", resp.StatusCode)
+		return fmt.Errorf("http response code %d getting pull request", resp.StatusCode)
 	}
 	if source.GetSupportsIterations() {
 		opts := azuredevops.PullRequestIterationsListOptions{}
 		iterations, resp, err := g.Client.PullRequests.ListIterations(g.ctx, owner, project, repoName, pull.Num, &opts)
 		if err != nil {
-			return errors.Wrap(err, "listing pull request iterations")
+			return fmt.Errorf("listing pull request iterations: %w", err)
 		}
 		if resp.StatusCode != http.StatusOK {
-			return errors.Errorf("http response code %d listing pull request iterations", resp.StatusCode)
+			return fmt.Errorf("http response code %d listing pull request iterations", resp.StatusCode)
 		}
 		for _, iteration := range iterations {
 			if sourceRef := iteration.GetSourceRefCommit(); sourceRef != nil {
@@ -322,10 +322,10 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 	}
 	_, resp, err = g.Client.PullRequests.CreateStatus(g.ctx, owner, project, repoName, pull.Num, &status)
 	if err != nil {
-		return errors.Wrap(err, "creating pull request status")
+		return fmt.Errorf("creating pull request status: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.Errorf("http response code %d creating pull request status", resp.StatusCode)
+		return fmt.Errorf("http response code %d creating pull request status", resp.StatusCode)
 	}
 	return err
 }
@@ -340,7 +340,7 @@ func (g *AzureDevopsClient) MergePull(logger logging.SimpleLogging, pull models.
 
 	userID, err := g.Client.UserEntitlements.GetUserID(g.ctx, g.UserName, owner)
 	if err != nil {
-		return errors.Wrapf(err, "Getting user id failed. User name: %s Organization %s ", g.UserName, owner)
+		return fmt.Errorf("getting user id, User name: %s Organization %s : %w", g.UserName, owner, err)
 	}
 	if userID == nil {
 		return fmt.Errorf("the user %s is not found in the organization %s", g.UserName, owner)
@@ -383,7 +383,7 @@ func (g *AzureDevopsClient) MergePull(logger logging.SimpleLogging, pull models.
 		id,
 	)
 	if err != nil {
-		return errors.Wrap(err, "merging pull request")
+		return fmt.Errorf("merging pull request: %w", err)
 	}
 	if *mergeResult.MergeStatus != azuredevops.MergeSucceeded.String() {
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMergeFailureMessage())
