@@ -3,7 +3,7 @@ As the Atlantis Community grows, we'd like to keep track of our users and adopte
 
 ## Updating this list
 
-1. Open a PR to directly update this list, or edit this file directly in Github
+1. Open a PR to directly update this list, or edit this file directly in GitHub
 
 ## Atlantis Adopters
 
