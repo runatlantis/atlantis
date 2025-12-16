@@ -552,7 +552,7 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 	runCmd(t, checkoutDir, "git", "config", "--local", "commit.gpgsign", "false")
 
 	runCmd(t, checkoutDir, "git", "checkout", "main")
-	runCmd(t, checkoutDir, "git", "remote", "add", "head", repoDir)
+	runCmd(t, checkoutDir, "git", "remote", "add", "source", repoDir)
 
 	// Simulate the merge strategy
 	runCmd(t, checkoutDir, "git", "checkout", "branch")
@@ -614,8 +614,8 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	firstPRDir := repoDir + "/first-pr"
 	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
 	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
-	runCmd(t, firstPRDir, "git", "remote", "add", "head", repoDir)
-	runCmd(t, firstPRDir, "git", "fetch", "head", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
 	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
@@ -632,8 +632,8 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	secondPRDir := repoDir + "/second-pr"
 	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
 	runCmd(t, secondPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
-	runCmd(t, secondPRDir, "git", "remote", "add", "head", repoDir)
-	runCmd(t, secondPRDir, "git", "fetch", "head", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "source", "+refs/heads/second-pr")
 	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")
@@ -718,8 +718,8 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	firstPRDir := repoDir + "/first-pr"
 	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
 	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
-	runCmd(t, firstPRDir, "git", "remote", "add", "head", repoDir)
-	runCmd(t, firstPRDir, "git", "fetch", "head", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
 	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
@@ -736,8 +736,8 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	secondPRDir := repoDir + "/second-pr"
 	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
 	runCmd(t, secondPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
-	runCmd(t, secondPRDir, "git", "remote", "add", "head", repoDir)
-	runCmd(t, secondPRDir, "git", "fetch", "head", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "source", "+refs/heads/second-pr")
 	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
 	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
 	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")

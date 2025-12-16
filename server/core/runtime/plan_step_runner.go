@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -108,7 +107,7 @@ func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 	// know this is a remote apply.
 	err = os.WriteFile(planFile, []byte(remoteOpsHeader+planOutput), 0600)
 	if err != nil {
-		return output, errors.Wrap(err, "unable to create planfile for remote ops")
+		return output, fmt.Errorf("unable to create planfile for remote ops: %w", err)
 	}
 
 	return p.fmtPlanOutput(output, tfVersion), nil

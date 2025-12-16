@@ -17,7 +17,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 
 	validator "github.com/go-playground/validator/v10"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -52,7 +51,7 @@ func NewClient(httpClient *http.Client, username string, password string, baseUR
 	}
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, errors.Wrapf(err, "parsing %s", baseURL)
+		return nil, fmt.Errorf("parsing %s: %w", baseURL, err)
 	}
 	if parsedURL.Scheme == "" {
 		return nil, fmt.Errorf("must have 'http://' or 'https://' in base url %q", baseURL)
@@ -87,10 +86,10 @@ func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 		}
 		var changes Changes
 		if err := json.Unmarshal(resp, &changes); err != nil {
-			return nil, errors.Wrapf(err, "Could not parse response %q", string(resp))
+			return nil, fmt.Errorf("parsing response %q: %w", string(resp), err)
 		}
 		if err := validator.New().Struct(changes); err != nil {
-			return nil, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+			return nil, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 		}
 		for _, v := range changes.Values {
 			files = append(files, *v.Path.ToString)
@@ -126,11 +125,11 @@ func (b *Client) GetProjectKey(repoName string, cloneURL string) (string, error)
 	expr := fmt.Sprintf(".*/(.*?)/%s\\.git", repoName)
 	capture, err := regexp.Compile(expr)
 	if err != nil {
-		return "", errors.Wrapf(err, "constructing regex from %q", expr)
+		return "", fmt.Errorf("constructing regex from %q: %w", expr, err)
 	}
 	matches := capture.FindStringSubmatch(cloneURL)
 	if len(matches) != 2 {
-		return "", fmt.Errorf("could not extract project key from %q, regex returned %q", cloneURL, strings.Join(matches, ","))
+		return "", fmt.Errorf("extracting project key from %q, regex returned %q", cloneURL, strings.Join(matches, ","))
 	}
 	return matches[1], nil
 }
@@ -161,7 +160,7 @@ func (b *Client) HidePrevCommandComments(_ logging.SimpleLogging, _ models.Repo,
 func (b *Client) postComment(repo models.Repo, pullNum int, comment string) error {
 	bodyBytes, err := json.Marshal(map[string]string{"text": comment})
 	if err != nil {
-		return errors.Wrap(err, "json encoding")
+		return fmt.Errorf("json encoding: %w", err)
 	}
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
@@ -185,10 +184,10 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return approvalStatus, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		return approvalStatus, fmt.Errorf("parsing response %q: %w", string(resp), err)
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return approvalStatus, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		return approvalStatus, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	for _, reviewer := range pullResp.Reviewers {
 		if *reviewer.Approved {
@@ -218,10 +217,10 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 	var mergeStatus MergeStatus
 	if err := json.Unmarshal(resp, &mergeStatus); err != nil {
-		return models.MergeableStatus{}, errors.Wrapf(err, "Could not parse response %q", string(resp))
+		return models.MergeableStatus{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
 	}
 	if err := validator.New().Struct(mergeStatus); err != nil {
-		return models.MergeableStatus{}, errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	if *mergeStatus.CanMerge && !*mergeStatus.Conflicted {
 		return models.MergeableStatus{
@@ -262,7 +261,7 @@ func (b *Client) UpdateStatus(logger logging.SimpleLogging, _ models.Repo, pull 
 
 	path := fmt.Sprintf("%s/rest/build-status/1.0/commits/%s", b.BaseURL, pull.HeadCommit)
 	if err != nil {
-		return errors.Wrap(err, "json encoding")
+		return fmt.Errorf("json encoding: %w", err)
 	}
 	_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
 	return err
@@ -283,10 +282,10 @@ func (b *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 	}
 	var pullResp PullRequest
 	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return errors.Wrapf(err, "Could not parse response %q", string(resp))
+		return fmt.Errorf("parsing response %q: %w", string(resp), err)
 	}
 	if err := validator.New().Struct(pullResp); err != nil {
-		return errors.Wrapf(err, "API response %q was missing fields", string(resp))
+		return fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
 	_, err = b.makeRequest("POST", path, nil)
@@ -296,7 +295,7 @@ func (b *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 	if pullOptions.DeleteSourceBranchOnMerge {
 		bodyBytes, err := json.Marshal(DeleteSourceBranch{Name: "refs/heads/" + pull.HeadBranch, DryRun: false})
 		if err != nil {
-			return errors.Wrap(err, "json encoding")
+			return fmt.Errorf("json encoding: %w", err)
 		}
 
 		path = fmt.Sprintf("%s/rest/branch-utils/1.0/projects/%s/repos/%s/branches", b.BaseURL, projectKey, pull.BaseRepo.Name)
@@ -336,7 +335,7 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]byte, error) {
 	req, err := b.prepRequest(method, path, reqBody)
 	if err != nil {
-		return nil, errors.Wrap(err, "constructing request")
+		return nil, fmt.Errorf("constructing request: %w", err)
 	}
 	resp, err := b.HTTPClient.Do(req)
 	if err != nil {
@@ -351,7 +350,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	}
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, errors.Wrapf(err, "reading response from request %q", requestStr)
+		return nil, fmt.Errorf("reading response from request %q: %w", requestStr, err)
 	}
 	return respBody, nil
 }

@@ -33,7 +33,6 @@ import (
 	"github.com/briandowns/spinner"
 	"github.com/google/go-github/v71/github"
 	"github.com/mitchellh/colorstring"
-	"github.com/pkg/errors"
 )
 
 var terraformExampleRepoOwner = "runatlantis"
@@ -117,7 +116,7 @@ Follow these instructions to create a token (we don't store any tokens):
 	colorstring.Println("\n=> forking repo ")
 	s.Start()
 	if err := githubClient.CreateFork(terraformExampleRepoOwner, terraformExampleRepo); err != nil {
-		return errors.Wrapf(err, "forking repo %s/%s", terraformExampleRepoOwner, terraformExampleRepo)
+		return fmt.Errorf("forking repo %s/%s: %w", terraformExampleRepoOwner, terraformExampleRepo, err)
 	}
 	if !githubClient.CheckForkSuccess(terraformExampleRepoOwner, terraformExampleRepo) {
 		return fmt.Errorf("didn't find forked repo %s/%s. fork unsuccessful", terraformExampleRepoOwner, terraformExampleRepo)
@@ -133,14 +132,14 @@ Follow these instructions to create a token (we don't store any tokens):
 		s.Start()
 		terraformDownloadURL := fmt.Sprintf("%s/terraform/%s/terraform_%s_%s_%s.zip", hashicorpReleasesURL, terraformVersion, terraformVersion, runtime.GOOS, runtime.GOARCH)
 		if err = downloadAndUnzip(terraformDownloadURL, "/tmp/terraform.zip", "/tmp"); err != nil {
-			return errors.Wrapf(err, "downloading and unzipping terraform")
+			return fmt.Errorf("downloading and unzipping terraform: %w", err)
 		}
 		colorstring.Println("[green]=> downloaded terraform successfully![reset]")
 		s.Stop()
 
 		err = executeCmd("mv", "/tmp/terraform", "/usr/local/bin/")
 		if err != nil {
-			return errors.Wrapf(err, "moving terraform binary into /usr/local/bin")
+			return fmt.Errorf("moving terraform binary into /usr/local/bin: %w", err)
 		}
 		colorstring.Println("[green]=> installed terraform successfully at /usr/local/bin[reset]")
 	} else {
@@ -155,7 +154,7 @@ Follow these instructions to create a token (we don't store any tokens):
 		s.Start()
 		ngrokURL := fmt.Sprintf("%s/ngrok-stable-%s-%s.zip", ngrokDownloadURL, runtime.GOOS, runtime.GOARCH)
 		if err = downloadAndUnzip(ngrokURL, "/tmp/ngrok.zip", "/tmp"); err != nil {
-			return errors.Wrapf(err, "downloading and unzipping ngrok")
+			return fmt.Errorf("downloading and unzipping ngrok: %w", err)
 		}
 		s.Stop()
 		colorstring.Println("[green]=> downloaded ngrok successfully![reset]")
@@ -184,11 +183,11 @@ tunnels:
 
 	ngrokConfigFile, err := os.CreateTemp("", "atlantis-testdrive-ngrok-config")
 	if err != nil {
-		return errors.Wrap(err, "creating ngrok config file")
+		return fmt.Errorf("creating ngrok config file: %w", err)
 	}
 	err = os.WriteFile(ngrokConfigFile.Name(), []byte(ngrokConfig), 0600)
 	if err != nil {
-		return errors.Wrap(err, "writing ngrok config file")
+		return fmt.Errorf("writing ngrok config file: %w", err)
 	}
 
 	// Used to ensure proper termination of all background commands.
@@ -202,7 +201,7 @@ tunnels:
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	if err != nil {
 		s.Stop()
-		return errors.Wrap(err, "creating ngrok tunnel")
+		return fmt.Errorf("creating ngrok tunnel: %w", err)
 	}
 	// When this function returns, ngrok tunnel should be stopped.
 	defer cancelNgrok()
@@ -214,7 +213,7 @@ tunnels:
 	time.Sleep(1 * time.Second)
 	tunnelURL, err := getTunnelAddr()
 	if err != nil {
-		return errors.Wrapf(err, "getting tunnel url")
+		return fmt.Errorf("getting tunnel url: %w", err)
 	}
 
 	// Start atlantis server.
@@ -222,7 +221,7 @@ tunnels:
 	s.Start()
 	tmpDir, err := os.MkdirTemp("", "")
 	if err != nil {
-		return errors.Wrap(err, "creating a temporary data directory for Atlantis")
+		return fmt.Errorf("creating a temporary data directory for Atlantis: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
 	serverReadyLog := regexp.MustCompile("Atlantis started - listening on port 4141")
@@ -231,7 +230,7 @@ tunnels:
 		os.Args[0], "server", "--gh-user", githubUsername, "--gh-token", githubToken, "--data-dir", tmpDir, "--atlantis-url", tunnelURL, "--repo-allowlist", fmt.Sprintf("github.com/%s/%s", githubUsername, terraformExampleRepo))
 	// Check if we got a fast error. Move on if we haven't (the command is still running).
 	if err != nil {
-		return errors.Wrap(err, "creating atlantis server")
+		return fmt.Errorf("creating atlantis server: %w", err)
 	}
 	// When this function returns atlantis server should be stopped.
 	defer cancelAtlantis()
@@ -244,7 +243,7 @@ tunnels:
 	s.Start()
 	err = githubClient.CreateWebhook(githubUsername, terraformExampleRepo, fmt.Sprintf("%s/events", tunnelURL))
 	if err != nil {
-		return errors.Wrapf(err, "creating atlantis webhook")
+		return fmt.Errorf("creating atlantis webhook: %w", err)
 	}
 	s.Stop()
 	colorstring.Println("[green]=> atlantis webhook created![reset]")
@@ -254,7 +253,7 @@ tunnels:
 	s.Start()
 	pullRequestURL, err := githubClient.CreatePullRequest(githubUsername, terraformExampleRepo, "example", "main")
 	if err != nil {
-		return errors.Wrapf(err, "creating new pull request for repo %s/%s", githubUsername, terraformExampleRepo)
+		return fmt.Errorf("creating new pull request for repo %s/%s: %w", githubUsername, terraformExampleRepo, err)
 	}
 	s.Stop()
 	colorstring.Println("[green]=> pull request created![reset]")
@@ -287,12 +286,12 @@ tunnels:
 		return nil
 	case err := <-ngrokErrors:
 		if err != nil {
-			err = errors.Wrap(err, "ngrok tunnel")
+			err = fmt.Errorf("ngrok tunnel: %w", err)
 		}
 		return err
 	case err := <-atlantisErrors:
 		if err != nil {
-			err = errors.Wrap(err, "atlantis server")
+			err = fmt.Errorf("atlantis server: %w", err)
 		}
 		return err
 	}

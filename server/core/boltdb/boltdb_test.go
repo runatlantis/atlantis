@@ -14,13 +14,14 @@
 package boltdb_test
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
@@ -928,7 +929,7 @@ func newTestDB() (*bolt.DB, *boltdb.BoltDB) {
 	// Retrieve a temporary path.
 	f, err := os.CreateTemp("", "")
 	if err != nil {
-		panic(errors.Wrap(err, "failed to create temp file"))
+		panic(fmt.Errorf("failed to create temp file: %w", err))
 	}
 	path := f.Name()
 	f.Close() // nolint: errcheck
@@ -936,18 +937,18 @@ func newTestDB() (*bolt.DB, *boltdb.BoltDB) {
 	// Open the database.
 	boltDB, err := bolt.Open(path, 0600, nil)
 	if err != nil {
-		panic(errors.Wrap(err, "could not start bolt DB"))
+		panic(fmt.Errorf("could not start bolt DB: %w", err))
 	}
 	if err := boltDB.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte(lockBucket)); err != nil {
-			return errors.Wrap(err, "failed to create bucket")
+			return fmt.Errorf("failed to create bucket: %w", err)
 		}
 		if _, err := tx.CreateBucketIfNotExists([]byte(configBucket)); err != nil {
-			return errors.Wrap(err, "failed to create bucket")
+			return fmt.Errorf("failed to create bucket: %w", err)
 		}
 		return nil
 	}); err != nil {
-		panic(errors.Wrap(err, "could not create bucket"))
+		panic(fmt.Errorf("could not create bucket: %w", err))
 	}
 	b, _ := boltdb.NewWithDB(boltDB, lockBucket, configBucket)
 	return boltDB, b

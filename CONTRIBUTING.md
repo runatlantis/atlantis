@@ -136,8 +136,8 @@ ngrok http 4141
 
 ### Errors
 - **ALWAYS** use lowercase unless the word requires it
-- **ALWAYS** use `errors.Wrap(err, "additional context...")"` instead of `fmt.Errorf("additional context: %s", err)`
-because it is less likely to result in mistakes and gives us the ability to trace call stacks
+- **ALWAYS** use `fmt.Errorf("additional context: %w", err)"` instead of `fmt.Errorf("additional context: %s", err)`
+because it is less likely to result in mistakes and gives us the ability to trace calls
 - **NEVER** use the words "error occurred when...", or "failed to..." or "unable to...", etc. Instead, describe what was occurring at
 time of the error, ex. "cloning repository", "creating AWS session". This will prevent errors from looking like
 ```
