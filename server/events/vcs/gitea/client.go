@@ -110,7 +110,7 @@ func (c *GiteaClient) GetModifiedFiles(logger logging.SimpleLogging, repo models
 	}
 
 	for page < nextPage {
-		page = +1
+		page++
 		listOptions.Page = page
 		files, resp, err := c.giteaClient.ListPullRequestFiles(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 		if err != nil {
@@ -252,7 +252,7 @@ func (c *GiteaClient) PullIsApproved(logger logging.SimpleLogging, repo models.R
 	}
 
 	for page < nextPage {
-		page = +1
+		page++
 		listOptions.Page = page
 		pullReviews, resp, err := c.giteaClient.ListPullReviews(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 
@@ -355,7 +355,7 @@ func (c *GiteaClient) DiscardReviews(_ logging.SimpleLogging, repo models.Repo, 
 	}
 
 	for page < nextPage {
-		page = +1
+		page++
 		listOptions.Page = page
 		pullReviews, resp, err := c.giteaClient.ListPullReviews(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 
@@ -480,7 +480,7 @@ func (c *GiteaClient) GetPullLabels(logger logging.SimpleLogging, repo models.Re
 	}
 
 	for page < nextPage {
-		page = +1
+		page++
 		opts.Page = page
 
 		labels, resp, err := c.giteaClient.GetIssueLabels(repo.Owner, repo.Name, int64(pull.Num), opts)
