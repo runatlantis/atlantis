@@ -36,7 +36,7 @@
                     {
                       "path": ".github/workflows/my-required-workflow.yaml",
                       "repositoryId": 120519269,
-                      "sha": null
+                      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                     }
                   ]
                 }
@@ -73,7 +73,6 @@
                         "conclusion": "SUCCESS",
                         "isRequired": true,
                         "checkSuite": {
-                          "conclusion": "SUCCESS",
                           "workflowRun": {
                             "file": {
                               "path": ".github/workflows/my-required-workflow.yaml",

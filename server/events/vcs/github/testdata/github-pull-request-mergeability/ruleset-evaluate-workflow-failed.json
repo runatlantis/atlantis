@@ -29,7 +29,7 @@
               {
                 "type": "WORKFLOWS",
                 "repositoryRuleset": {
-                  "enforcement": "ACTIVE"
+                  "enforcement": "EVALUATE"
                 },
                 "parameters": {
                   "workflows": [
@@ -69,11 +69,10 @@
                       },
                       {
                         "__typename": "CheckRun",
-                        "name": "my required check",
+                        "name": "my required (evaluate-enforcement) check",
                         "conclusion": "FAILURE",
                         "isRequired": true,
                         "checkSuite": {
-                          "conclusion": "FAILURE",
                           "workflowRun": {
                             "file": {
                               "path": ".github/workflows/my-required-workflow.yaml",
@@ -81,23 +80,6 @@
                               "repositoryName": "runatlantis/atlantis"
                             },
                             "runNumber": 1
-                          }
-                        }
-                      },
-                      {
-                        "__typename": "CheckRun",
-                        "name": "my required check",
-                        "conclusion": "SUCCESS",
-                        "isRequired": true,
-                        "checkSuite": {
-                          "conclusion": "SUCCESS",
-                          "workflowRun": {
-                            "file": {
-                              "path": ".github/workflows/my-required-workflow.yaml",
-                              "repositoryFileUrl": "https://github.com/runatlantis/atlantis/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/.github/workflows/my-required-workflow.yaml",
-                              "repositoryName": "runatlantis/atlantis"
-                            },
-                            "runNumber": 2
                           }
                         }
                       }
