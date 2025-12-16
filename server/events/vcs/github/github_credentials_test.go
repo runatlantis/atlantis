@@ -1,13 +1,13 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package vcs_test
+package github_test
 
 import (
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
+	"github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -18,13 +18,13 @@ func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
 
-	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	anonCreds := &github.GithubAnonymousCredentials{}
+	anonClient, err := github.NewGithubClient(testServer, anonCreds, github.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
 
-	appCreds := &vcs.GithubAppCredentials{
+	appCreds := &github.GithubAppCredentials{
 		AppID:    tempSecrets.ID,
 		Key:      []byte(testdata.GithubPrivateKey),
 		Hostname: testServer,
@@ -43,18 +43,18 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
 
-	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	anonCreds := &github.GithubAnonymousCredentials{}
+	anonClient, err := github.NewGithubClient(testServer, anonCreds, github.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
 
-	appCreds := &vcs.GithubAppCredentials{
+	appCreds := &github.GithubAppCredentials{
 		AppID:    tempSecrets.ID,
 		Key:      []byte(testdata.GithubPrivateKey),
 		Hostname: testServer,
 	}
-	_, err = vcs.NewGithubClient(testServer, appCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	_, err = github.NewGithubClient(testServer, appCreds, github.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 
 	token, err := appCreds.GetToken()
@@ -79,19 +79,19 @@ func TestGithubClient_MultipleAppAuthentication(t *testing.T) {
 	testServer, err := testdata.GithubMultipleAppTestServer(t)
 	Ok(t, err)
 
-	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	anonCreds := &github.GithubAnonymousCredentials{}
+	anonClient, err := github.NewGithubClient(testServer, anonCreds, github.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
 
-	appCreds := &vcs.GithubAppCredentials{
+	appCreds := &github.GithubAppCredentials{
 		AppID:          tempSecrets.ID,
 		InstallationID: 1,
 		Key:            []byte(testdata.GithubPrivateKey),
 		Hostname:       testServer,
 	}
-	_, err = vcs.NewGithubClient(testServer, appCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	_, err = github.NewGithubClient(testServer, appCreds, github.GithubConfig{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 
 	token, err := appCreds.GetToken()

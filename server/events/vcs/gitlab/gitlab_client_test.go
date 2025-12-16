@@ -1,7 +1,7 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package vcs
+package gitlab
 
 import (
 	"encoding/json"
@@ -215,7 +215,7 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 
 func TestGitlabClient_MergePull(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	mergeSuccess, err := os.ReadFile("testdata/github-pull-request.json")
+	mergeSuccess, err := os.ReadFile("testdata/gitlab-pull-request.json")
 	Ok(t, err)
 
 	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
