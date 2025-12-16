@@ -138,9 +138,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "repo_locks", "policy_check", "silence_pr_comments"}
 			}
 			if c.policyCheckEnabled {
-				exp.Repos[0].PlanRequirements = append(exp.Repos[0].PlanRequirements, "policies_passed")
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "policies_passed")
-				exp.Repos[0].ImportRequirements = append(exp.Repos[0].ImportRequirements, "policies_passed")
 				exp.Repos[0].PolicyCheck = Bool(true)
 			}
 
@@ -1240,9 +1238,9 @@ repos:
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				PlanRequirements:   []string{"approved", "mergeable", "policies_passed"},
+				PlanRequirements:   []string{"approved", "mergeable"},
 				ApplyRequirements:  []string{"approved", "mergeable", "policies_passed"},
-				ImportRequirements: []string{"approved", "mergeable", "policies_passed"},
+				ImportRequirements: []string{"approved", "mergeable"},
 				Workflow:           defaultWorkflow,
 				RepoRelDir:         "mydir",
 				Workspace:          "myworkspace",
