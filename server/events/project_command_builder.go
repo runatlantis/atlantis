@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -764,6 +767,19 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 		return
 	}
 
+	// Check if dir contains glob pattern characters for pattern matching
+	if valid.ContainsDirGlobPattern(dir) {
+		// Use glob pattern matching
+		projCfgs := repoCfg.FindProjectsByDirPatternWorkspace(dir, workspace)
+		if len(projCfgs) == 0 {
+			return
+		}
+		// For glob patterns, multiple matches are expected and allowed
+		projectsCfg = projCfgs
+		return
+	}
+
+	// Exact directory matching
 	projCfgs := repoCfg.FindProjectsByDirWorkspace(dir, workspace)
 	if len(projCfgs) == 0 {
 		return

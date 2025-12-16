@@ -482,13 +482,43 @@ func (original WorkflowFileReference) Copy() WorkflowFileReference {
 	return copy
 }
 
+type WorkflowRunFile struct {
+	Path              githubv4.String
+	RepositoryFileUrl githubv4.String
+	RepositoryName    githubv4.String
+}
+
 type WorkflowRun struct {
-	File struct {
-		Path              githubv4.String
-		RepositoryFileUrl githubv4.String
-		RepositoryName    githubv4.String
-	}
+	File      *WorkflowRunFile
 	RunNumber githubv4.Int
+}
+
+func (original WorkflowRun) Copy() WorkflowRun {
+	copy := WorkflowRun{
+		RunNumber: original.RunNumber,
+	}
+	if original.File != nil {
+		fileCopy := *original.File
+		copy.File = &fileCopy
+	}
+	return copy
+}
+
+type CheckSuite struct {
+	Conclusion  githubv4.String
+	WorkflowRun *WorkflowRun
+}
+
+func (original CheckSuite) Copy() CheckSuite {
+	copy := CheckSuite{
+		Conclusion: original.Conclusion,
+	}
+	if original.WorkflowRun != nil {
+		workflowRunCopy := original.WorkflowRun.Copy()
+		copy.WorkflowRun = &workflowRunCopy
+	}
+
+	return copy
 }
 
 type CheckRun struct {
@@ -496,9 +526,7 @@ type CheckRun struct {
 	Conclusion githubv4.String
 	// Not currently used: GitHub API classifies as required if coming from ruleset, even when the ruleset is not enforced!
 	IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
-	CheckSuite struct {
-		WorkflowRun *WorkflowRun
-	}
+	CheckSuite CheckSuite
 }
 
 func (original CheckRun) Copy() CheckRun {
@@ -506,12 +534,9 @@ func (original CheckRun) Copy() CheckRun {
 		Name:       original.Name,
 		Conclusion: original.Conclusion,
 		IsRequired: original.IsRequired,
-		CheckSuite: original.CheckSuite,
+		CheckSuite: original.CheckSuite.Copy(),
 	}
-	if original.CheckSuite.WorkflowRun != nil {
-		copy.CheckSuite.WorkflowRun = new(WorkflowRun)
-		*copy.CheckSuite.WorkflowRun = *original.CheckSuite.WorkflowRun
-	}
+
 	return copy
 }
 
@@ -555,19 +580,19 @@ func (g *GithubClient) LookupRepoId(repo githubv4.String) (githubv4.Int, error) 
 	return query.Repository.DatabaseId, nil
 }
 
-func (g *GithubClient) WorkflowRunMatchesWorkflowFileReference(workflowRun WorkflowRun, workflowFileReference WorkflowFileReference) (bool, error) {
+func (g *GithubClient) WorkflowRunMatchesWorkflowFileReference(workflowRunFile WorkflowRunFile, workflowFileReference WorkflowFileReference) (bool, error) {
 	// Unfortunately, the GitHub API doesn't expose the repositoryId for the WorkflowRunFile from the statusCheckRollup.
 	// Conversely, it doesn't expose the repository name for the WorkflowFileReference from the RepositoryRuleConnection.
 	// Therefore, a second query is required to lookup the association between repositoryId and repositoryName.
-	repoId, err := g.LookupRepoId(workflowRun.File.RepositoryName)
+	repoId, err := g.LookupRepoId(workflowRunFile.RepositoryName)
 	if err != nil {
 		return false, err
 	}
 
-	if repoId != workflowFileReference.RepositoryId || workflowRun.File.Path != workflowFileReference.Path {
+	if repoId != workflowFileReference.RepositoryId || workflowRunFile.Path != workflowFileReference.Path {
 		return false, nil
 	} else if workflowFileReference.Sha != nil {
-		return strings.Contains(string(workflowRun.File.RepositoryFileUrl), string(*workflowFileReference.Sha)), nil
+		return strings.Contains(string(workflowRunFile.RepositoryFileUrl), string(*workflowFileReference.Sha)), nil
 	} else {
 		return true, nil
 	}
@@ -717,6 +742,10 @@ pagination:
 	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, nil
 }
 
+func CheckSuitePassed(checkSuite CheckSuite) bool {
+	return checkSuite.Conclusion == "SUCCESS" || checkSuite.Conclusion == "SKIPPED" || checkSuite.Conclusion == "NEUTRAL"
+}
+
 func CheckRunPassed(checkRun CheckRun) bool {
 	return checkRun.Conclusion == "SUCCESS" || checkRun.Conclusion == "SKIPPED" || checkRun.Conclusion == "NEUTRAL"
 }
@@ -759,29 +788,29 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 }
 
 func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
-	// If there's no WorkflowRun, we just skip evaluation for given CheckRun.
-	// If there is WorkflowRun, we assume there can be multiple checkRuns with the given name,
-	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckRun.
-	latestCheckRunNumber := githubv4.Int(-1)
-	var latestCheckRun *CheckRun
+	// If there's no WorkflowRun, we just skip evaluation for given CheckSuite.
+	// If there is WorkflowRun, we assume there can be multiple checkSuites with the given name,
+	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckSuite.
+	latestCheckSuiteNumber := githubv4.Int(-1)
+	var latestCheckSuite *CheckSuite
 	for _, checkRun := range checkRuns {
-		if checkRun.CheckSuite.WorkflowRun == nil {
+		if checkRun.CheckSuite.WorkflowRun == nil || checkRun.CheckSuite.WorkflowRun.File == nil {
 			continue
 		}
-		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun, expectedWorkflow)
+		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun.File, expectedWorkflow)
 		if err != nil {
 			return false, err
 		}
 		if match {
-			if checkRun.CheckSuite.WorkflowRun.RunNumber > latestCheckRunNumber {
-				latestCheckRunNumber = checkRun.CheckSuite.WorkflowRun.RunNumber
-				latestCheckRun = &checkRun
+			if checkRun.CheckSuite.WorkflowRun.RunNumber > latestCheckSuiteNumber {
+				latestCheckSuiteNumber = checkRun.CheckSuite.WorkflowRun.RunNumber
+				latestCheckSuite = &checkRun.CheckSuite
 			}
 		}
 	}
 
-	if latestCheckRun != nil {
-		return CheckRunPassed(*latestCheckRun), nil
+	if latestCheckSuite != nil {
+		return CheckSuitePassed(*latestCheckSuite), nil
 	}
 
 	return false, nil

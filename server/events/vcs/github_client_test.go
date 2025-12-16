@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package vcs_test
 
 import (
@@ -881,6 +884,15 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 		},
 		{
 			"blocked",
+			"ruleset-workflow-failed-first-check-successful.json",
+			`"APPROVED"`,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
+		},
+		{
+			"blocked",
 			"ruleset-workflow-failed.json",
 			`"APPROVED"`,
 			models.MergeableStatus{
@@ -919,6 +931,14 @@ func TestGithubClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T)
 			models.MergeableStatus{
 				IsMergeable: false,
 				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
+		},
+		{
+			"blocked",
+			"ruleset-workflow-passed-with-global-codeql.json",
+			`"APPROVED"`,
+			models.MergeableStatus{
+				IsMergeable: true,
 			},
 		},
 	}
