@@ -1,7 +1,7 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package vcs
+package github
 
 // GithubConfig allows for custom github-specific functionality and behavior
 type GithubConfig struct {
