@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package bitbucketserver
 
 import (
@@ -6,11 +9,10 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // Attribution: This code is taken from https://github.com/google/go-github.

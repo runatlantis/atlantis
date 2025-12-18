@@ -1,16 +1,19 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package boltdb handles our database layer using BoltDB.
 package boltdb
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	bolt "go.etcd.io/bbolt"
@@ -35,31 +38,31 @@ const (
 // since bolt stores its data as a file
 func New(dataDir string) (*BoltDB, error) {
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
-		return nil, errors.Wrap(err, "creating data dir")
+		return nil, fmt.Errorf("creating data dir: %w", err)
 	}
 	db, err := bolt.Open(path.Join(dataDir, "atlantis.db"), 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		if err.Error() == "timeout" {
 			return nil, errors.New("starting BoltDB: timeout (a possible cause is another Atlantis instance already running)")
 		}
-		return nil, errors.Wrap(err, "starting BoltDB")
+		return nil, fmt.Errorf("starting BoltDB: %w", err)
 	}
 
 	// Create the buckets.
 	err = db.Update(func(tx *bolt.Tx) error {
 		if _, err = tx.CreateBucketIfNotExists([]byte(locksBucketName)); err != nil {
-			return errors.Wrapf(err, "creating bucket %q", locksBucketName)
+			return fmt.Errorf("creating bucket %q: %w", locksBucketName, err)
 		}
 		if _, err = tx.CreateBucketIfNotExists([]byte(pullsBucketName)); err != nil {
-			return errors.Wrapf(err, "creating bucket %q", pullsBucketName)
+			return fmt.Errorf("creating bucket %q: %w", pullsBucketName, err)
 		}
 		if _, err = tx.CreateBucketIfNotExists([]byte(globalLocksBucketName)); err != nil {
-			return errors.Wrapf(err, "creating bucket %q", globalLocksBucketName)
+			return fmt.Errorf("creating bucket %q: %w", globalLocksBucketName, err)
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "starting BoltDB")
+		return nil, fmt.Errorf("starting BoltDB: %w", err)
 	}
 	return &BoltDB{
 		db:                    db,
@@ -103,14 +106,14 @@ func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, 
 
 		// otherwise the lock fails, return to caller the run that's holding the lock
 		if err := json.Unmarshal(currLockSerialized, &currLock); err != nil {
-			return errors.Wrap(err, "failed to deserialize current lock")
+			return fmt.Errorf("failed to deserialize current lock: %w", err)
 		}
 		lockAcquired = false
 		return nil
 	})
 
 	if transactionErr != nil {
-		return false, currLock, errors.Wrap(transactionErr, "DB transaction failed")
+		return false, currLock, fmt.Errorf("DB transaction failed: %w", transactionErr)
 	}
 
 	return lockAcquired, currLock, nil
@@ -129,14 +132,14 @@ func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock
 		serialized := bucket.Get([]byte(key))
 		if serialized != nil {
 			if err := json.Unmarshal(serialized, &lock); err != nil {
-				return errors.Wrap(err, "failed to deserialize lock")
+				return fmt.Errorf("failed to deserialize lock: %w", err)
 			}
 			foundLock = true
 		}
 		return bucket.Delete([]byte(key))
 	})
 	if err != nil {
-		err = errors.Wrap(err, "DB transaction failed")
+		err = fmt.Errorf("DB transaction failed: %w", err)
 	}
 	if foundLock {
 		return &lock, err
@@ -157,14 +160,14 @@ func (b *BoltDB) List() ([]models.ProjectLock, error) {
 		return nil
 	})
 	if err != nil {
-		return locks, errors.Wrap(err, "DB transaction failed")
+		return locks, fmt.Errorf("DB transaction failed: %w", err)
 	}
 
 	// deserialize bytes into the proper objects
 	for k, v := range locksBytes {
 		var lock models.ProjectLock
 		if err := json.Unmarshal(v, &lock); err != nil {
-			return locks, errors.Wrap(err, fmt.Sprintf("failed to deserialize lock at key '%d'", k))
+			return locks, fmt.Errorf("failed to deserialize lock at key '%d': %w", k, err)
 		}
 		locks = append(locks, lock)
 	}
@@ -198,7 +201,7 @@ func (b *BoltDB) LockCommand(cmdName command.Name, lockTime time.Time) (*command
 	})
 
 	if transactionErr != nil {
-		return nil, errors.Wrap(transactionErr, "db transaction failed")
+		return nil, fmt.Errorf("db transaction failed: %w", transactionErr)
 	}
 
 	return &lock, nil
@@ -218,7 +221,7 @@ func (b *BoltDB) UnlockCommand(cmdName command.Name) error {
 	})
 
 	if transactionErr != nil {
-		return errors.Wrap(transactionErr, "db transaction failed")
+		return fmt.Errorf("db transaction failed: %w", transactionErr)
 	}
 
 	return nil
@@ -238,7 +241,7 @@ func (b *BoltDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
 
 		if serializedLock != nil {
 			if err := json.Unmarshal(serializedLock, &cmdLock); err != nil {
-				return errors.Wrap(err, "failed to deserialize UserConfig")
+				return fmt.Errorf("failed to deserialize UserConfig: %w", err)
 			}
 			found = true
 		}
@@ -263,7 +266,7 @@ func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.Projec
 		for k, v := c.Seek([]byte(repoFullName)); k != nil && bytes.HasPrefix(k, []byte(repoFullName)); k, v = c.Next() {
 			var lock models.ProjectLock
 			if err := json.Unmarshal(v, &lock); err != nil {
-				return errors.Wrapf(err, "deserializing lock at key %q", string(k))
+				return fmt.Errorf("deserializing lock at key %q: %w", string(k), err)
 			}
 			if lock.Pull.Num == pullNum {
 				locks = append(locks, lock)
@@ -278,7 +281,7 @@ func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.Projec
 	// delete the locks
 	for _, lock := range locks {
 		if _, err = b.Unlock(lock.Project, lock.Workspace); err != nil {
-			return locks, errors.Wrapf(err, "unlocking repo %s, path %s, workspace %s", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace)
+			return locks, fmt.Errorf("unlocking repo %s, path %s, workspace %s: %w", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace, err)
 		}
 	}
 	return locks, nil
@@ -295,7 +298,7 @@ func (b *BoltDB) GetLock(p models.Project, workspace string) (*models.ProjectLoc
 		return nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "getting lock data")
+		return nil, fmt.Errorf("getting lock data: %w", err)
 	}
 	// lockBytes will be nil if there was no data at that key
 	if lockBytes == nil {
@@ -304,7 +307,7 @@ func (b *BoltDB) GetLock(p models.Project, workspace string) (*models.ProjectLoc
 
 	var lock models.ProjectLock
 	if err := json.Unmarshal(lockBytes, &lock); err != nil {
-		return nil, errors.Wrapf(err, "deserializing lock at key %q", key)
+		return nil, fmt.Errorf("deserializing lock at key %q: %w", key, err)
 	}
 
 	// need to set it to Local after deserialization due to https://github.com/golang/go/issues/19486
@@ -409,7 +412,7 @@ func (b *BoltDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, err
 		return txErr
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "DB transaction failed")
+		return nil, fmt.Errorf("DB transaction failed: %w", err)
 	}
 	return s, nil
 }
@@ -425,7 +428,7 @@ func (b *BoltDB) DeletePullStatus(pull models.PullRequest) error {
 		return bucket.Delete(key)
 	})
 	if err != nil {
-		return errors.Wrap(err, "DB transaction failed")
+		return fmt.Errorf("DB transaction failed: %w", err)
 	}
 	return nil
 }
@@ -460,7 +463,7 @@ func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, 
 		return b.writePullToBucket(bucket, key, currStatus)
 	})
 	if err != nil {
-		return errors.Wrap(err, "DB transaction failed")
+		return fmt.Errorf("DB transaction failed: %w", err)
 	}
 	return nil
 }
@@ -495,7 +498,7 @@ func (b *BoltDB) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.Pul
 
 	var p models.PullStatus
 	if err := json.Unmarshal(serialized, &p); err != nil {
-		return nil, errors.Wrapf(err, "deserializing pull at %q with contents %q", key, serialized)
+		return nil, fmt.Errorf("deserializing pull at %q with contents %q: %w", key, serialized, err)
 	}
 	return &p, nil
 }
@@ -503,7 +506,7 @@ func (b *BoltDB) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.Pul
 func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.PullStatus) error {
 	serialized, err := json.Marshal(pull)
 	if err != nil {
-		return errors.Wrap(err, "serializing")
+		return fmt.Errorf("serializing: %w", err)
 	}
 	return bucket.Put(key, serialized)
 }

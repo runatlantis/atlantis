@@ -19,6 +19,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	paths "path"
@@ -28,8 +29,6 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/logging"
-
-	"github.com/pkg/errors"
 )
 
 type PullReqStatus struct {
@@ -88,7 +87,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 
 	cloneURLParsed, err := url.Parse(cloneURL)
 	if err != nil {
-		return Repo{}, errors.Wrap(err, "invalid clone url")
+		return Repo{}, fmt.Errorf("invalid clone url: %w", err)
 	}
 
 	// Ensure the Clone URL is for the same repo to avoid something malicious.

@@ -22,7 +22,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -30,6 +29,8 @@ import (
 )
 
 const workingDirPrefix = "repos"
+
+const prSourceRemote = "source"
 
 var cloneLocks sync.Map
 var recheckRequiredMap sync.Map
@@ -79,7 +80,7 @@ type FileWorkspace struct {
 	TestingOverrideBaseCloneURL string
 	// GithubAppEnabled is true and a PR number is supplied, we should fetch
 	// the ref "pull/PR_NUMBER/head" from the "origin" remote. If this is false,
-	// we fetch "+refs/heads/$HEAD_BRANCH" from the "head" remote.
+	// we fetch "+refs/heads/$HEAD_BRANCH" from the "<prSourceRemote>" remote.
 	GithubAppEnabled bool
 	// use the global setting without overriding
 	GpgNoSigningEnabled bool
@@ -116,6 +117,10 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 		if isUpToDate {
 			logger.Info("repo is at correct commit %q so will not re-clone", p.HeadCommit)
 			return cloneDir, nil
+		}
+		if !w.remoteHasBranch(logger, c, p.BaseBranch) {
+			logger.Info("repo appears to have changed base branch, must reclone")
+			return cloneDir, w.forceClone(logger, c)
 		}
 		logger.Info("repo was already cloned but branch is not at correct commit, updating to %q", p.HeadCommit)
 		return cloneDir, w.updateToRef(logger, c, p.HeadCommit)
@@ -191,7 +196,7 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 			"git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
 		},
 		{
-			"git", "remote", "set-url", "head", headRepo.CloneURL,
+			"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL,
 		},
 		{
 			"git", "remote", "update",
@@ -239,9 +244,21 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	return hasDiverged
 }
 
+func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {
+	ref := "refs/remotes/origin/" + branch
+
+	err := w.wrappedGit(logger, c, "show-ref", "--verify", ref)
+	if err != nil {
+		logger.Warn("remote-tracking branch %s not found locally", ref)
+		return false
+	}
+
+	return true
+}
+
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
-	// We use both `head` and `origin` remotes, update them both
+	// We use both `<prSourceRemote>` and `origin` remotes, update them both
 	if err := w.wrappedGit(logger, c, "fetch", "--all"); err != nil {
 		return err
 	}
@@ -306,13 +323,13 @@ func (w *FileWorkspace) isBranchAtTargetRef(logger logging.SimpleLogging, c wrap
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
 	err := os.RemoveAll(c.dir)
 	if err != nil {
-		return errors.Wrapf(err, "deleting dir '%s' before cloning", c.dir)
+		return fmt.Errorf("deleting dir '%s' before cloning: %w", c.dir, err)
 	}
 
 	// Create the directory and parents if necessary.
 	logger.Info("creating dir '%s'", c.dir)
 	if err := os.MkdirAll(c.dir, 0700); err != nil {
-		return errors.Wrap(err, "creating new workspace")
+		return fmt.Errorf("creating new workspace: %w", err)
 	}
 
 	// During testing, we mock some of this out.
@@ -343,7 +360,7 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 		}
 	}
 
-	if err := w.wrappedGit(logger, c, "remote", "add", "head", headCloneURL); err != nil {
+	if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
 		return err
 	}
 	if w.GpgNoSigningEnabled {
@@ -399,7 +416,7 @@ func (w *FileWorkspace) wrappedGit(logger logging.SimpleLogging, c wrappedGitCon
 // Merge the PR into the base branch.
 func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappedGitContext) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", c.pr.HeadBranch)
-	fetchRemote := "head"
+	fetchRemote := prSourceRemote
 	if w.GithubAppEnabled && c.pr.Num > 0 {
 		fetchRef = fmt.Sprintf("pull/%d/head:", c.pr.Num)
 		fetchRemote = "origin"
@@ -443,7 +460,7 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
 	repoDir := w.cloneDir(r, p, workspace)
 	if _, err := os.Stat(repoDir); err != nil {
-		return "", errors.Wrap(err, "checking if workspace exists")
+		return "", fmt.Errorf("checking if workspace exists: %w", err)
 	}
 	return repoDir, nil
 }

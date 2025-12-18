@@ -1,13 +1,15 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -36,7 +38,7 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelDir, ctx.Workspace)
 	}
 	if err != nil {
-		return "", errors.Wrap(err, "unable to read planfile")
+		return "", fmt.Errorf("unable to read planfile: %w", err)
 	}
 
 	ctx.Log.Info("starting apply")
@@ -132,7 +134,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 	// between plan and apply phases.
 	planfileBytes, err := os.ReadFile(absPlanPath)
 	if err != nil {
-		return "", errors.Wrap(err, "reading planfile")
+		return "", fmt.Errorf("reading planfile: %w", err)
 	}
 
 	// updateStatusF will update the commit status and log any error.

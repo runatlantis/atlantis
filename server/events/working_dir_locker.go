@@ -55,8 +55,7 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 
 	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path)
 	if currentLock, exists := d.locks[workspaceKey]; exists {
-		return func() {}, fmt.Errorf("cannot run %q: the %s workspace at path %s is currently locked by %q"+
-			"that is running for this pull request.\n"+
+		return func() {}, fmt.Errorf("cannot run %q: the %s workspace at path %s is currently locked for this pull request by %q.\n"+
 			"Wait until the previous command is complete and try again", cmdName, workspace, path, currentLock)
 	}
 	d.locks[workspaceKey] = cmdName
