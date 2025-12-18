@@ -35,7 +35,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -66,132 +66,130 @@ jobs:
       ECR_REPO: ${{ github.event_name == 'pull_request' && 'atlantis-staging' || 'atlantis-prod' }}
 
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
-        with:
-          egress-policy: audit
+    - name: Harden Runner
+      uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+      with:
+        egress-policy: audit
 
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      # Lint the Dockerfile first before setting anything up
-      - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
-        with:
-          dockerfile: "Dockerfile"
+    # Lint the Dockerfile first before setting anything up
+    - name: Lint Dockerfile
+      uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+      with:
+        dockerfile: "Dockerfile"
 
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version-file: "go.mod"
+    - name: Set up Go
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      with:
+        go-version-file: "go.mod"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
-        with:
-          image: tonistiigi/binfmt:latest
-          platforms: arm64,arm
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      with:
+        image: tonistiigi/binfmt:latest
+        platforms: arm64,arm
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
-      - name: Generate image metadata
-        id: meta
-        run: |
-          # Generate labels for the image
-          echo "labels<<EOF" >> $GITHUB_OUTPUT
-          echo "org.opencontainers.image.authors=@runatlantis Github Org" >> $GITHUB_OUTPUT
-          echo "org.opencontainers.image.licenses=Apache-2.0" >> $GITHUB_OUTPUT
-          echo "org.opencontainers.image.revision=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+    - name: "Install cosign"
+      uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3.8.1
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
 
-      - name: Configure AWS credentials
-        if: env.PUSH_ECR == 'true'
-        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
+    # release version is the name of the tag i.e. v0.10.0
+    # release version also has the image type appended i.e. v0.10.0-alpine
+    # release tag is either pre-release or latest i.e. latest
+    # release tag also has the image type appended i.e. latest-alpine
+    # if it's v0.10.0 and alpine, it will do v0.10.0, v0.10.0-alpine, latest, latest-alpine
+    # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+      env:
+        SUFFIX: ${{ format('-{0}', matrix.image_type) }}
+      with:
+        images: |
+          ${{ env.DOCKER_REPO }}
+        labels: |
+          org.opencontainers.image.authors="@runatlantis Github Org"
+          org.opencontainers.image.licenses=Apache-2.0
+        tags: |
+          # semver
+          type=semver,pattern={{version}},prefix=v,suffix=${{ env.SUFFIX }}
+          type=semver,pattern={{version}},prefix=v,enable=${{ matrix.image_type == 'alpine' }}
+          type=semver,pattern={{major}}.{{minor}},prefix=v,suffix=${{ env.SUFFIX }}
+          # dev
+          type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}
+          type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}-{{ sha }}
+          type=raw,event=push,value=dev,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }},suffix=
+          # prerelease
+          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') && matrix.image_type == 'alpine' }},suffix=
+          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') }},suffix=${{ env.SUFFIX }}
+          # latest
+          type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') && matrix.image_type == 'alpine' }},suffix=
+          type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') }},suffix=${{ env.SUFFIX }}
+          # pr
+          type=ref,event=pr,suffix=${{ env.SUFFIX }}
+        flavor: |
+          # This is disabled here so we can use the raw form above
+          latest=false
+          # Suffix is not used here since there's no way to disable it above
 
-      - name: Login to Amazon ECR
-        if: env.PUSH_ECR == 'true'
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+    - name: Login to Packages Container registry
+      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Read version from VERSION file
-        id: version
-        run: |
-          VERSION=$(cat VERSION)
-          echo "version=v${VERSION}" >> $GITHUB_OUTPUT
-          echo "Version: v${VERSION}"
+    # Publish release to container registry
+    - name: Populate release version
+      if: contains(fromJson('["push", "pull_request"]'), github.event_name)
+      run: echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
 
-      - name: Populate release version
-        run: echo "RELEASE_VERSION=${{ steps.version.outputs.version }}" >> $GITHUB_ENV
+    - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
+      id: build
+      if: contains(fromJson('["push", "pull_request"]'), github.event_name)
+      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+      with:
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        context: .
+        build-args: |
+          ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+          ATLANTIS_VERSION=${{ env.RELEASE_VERSION }}
+          ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+          ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+        platforms: linux/arm64/v8, linux/amd64, linux/arm/v7
+        push: ${{ env.PUSH }}
+        tags: ${{ steps.meta.outputs.tags }}
+        target: ${{ matrix.image_type }}
+        labels: ${{ steps.meta.outputs.labels }}
+        outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}
 
-      - name: Generate ECR tags
-        if: env.PUSH_ECR == 'true'
-        id: ecr-tags
-        run: |
-          ECR_REGISTRY="${{ steps.login-ecr.outputs.registry }}"
-          ECR_REPO="${{ env.ECR_REPO }}"
-          IMAGE_TYPE="${{ matrix.image_type }}"
-          VERSION="${{ steps.version.outputs.version }}"
-          TAGS=""
+    - name: "Create Image Attestation"
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
+      uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+      with:
+        subject-digest: ${{ steps.build.outputs.digest }}
+        subject-name: ghcr.io/${{ github.repository }}
+        push-to-registry: true
 
-          add_tag() {
-            local tag=$1
-            if [ -n "$TAGS" ]; then
-              TAGS="${TAGS},"
-            fi
-            TAGS="${TAGS}${ECR_REGISTRY}/${ECR_REPO}:${tag}-${IMAGE_TYPE}"
-            # Add tag without suffix for alpine (default)
-            if [ "$IMAGE_TYPE" == "alpine" ]; then
-              TAGS="${TAGS},${ECR_REGISTRY}/${ECR_REPO}:${tag}"
-            fi
-          }
-
-          # Always add version and sha tags
-          add_tag "$VERSION"
-          add_tag "${GITHUB_SHA:0:7}"
-
-          # PR -> also add pr-number tag
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            add_tag "pr-${PR_NUMBER}"
-          fi
-
-          # Main branch -> also add latest tag
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            add_tag "latest"
-          fi
-
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-          echo "ECR Tags: ${TAGS}"
-
-      - name: "Build and push to ECR"
-        id: build-ecr
-        if: env.PUSH_ECR == 'true'
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
-        with:
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          context: .
-          build-args: |
-            ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
-            ATLANTIS_VERSION=${{ env.RELEASE_VERSION }}
-            ATLANTIS_COMMIT=${{ github.sha }}
-            ATLANTIS_DATE=${{ steps.meta.outputs.created }}
-          platforms: linux/arm64/v8, linux/amd64, linux/arm/v7
-          push: true
-          tags: ${{ steps.ecr-tags.outputs.tags }}
-          target: ${{ matrix.image_type }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Output ECR image details
-        if: env.PUSH_ECR == 'true'
-        run: |
-          echo "✅ Successfully pushed to ECR repository: ${{ env.ECR_REPO }}"
-          echo "Version: ${{ steps.version.outputs.version }}"
-          echo "Image tags: ${{ steps.ecr-tags.outputs.tags }}"
-          echo "Image digest: ${{ steps.build-ecr.outputs.digest }}"
+    - name: "Sign images with environment annotations"
+      # no key needed, we're using the GitHub OIDC flow
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
+      run: |
+        # Sign dev tags, version tags, and latest tags
+        echo "${TAGS}" | xargs -I {} cosign sign \
+          --yes \
+          -a actor=${{ github.actor}} \
+          -a ref_name=${{ github.ref_name}} \
+          -a ref=${{ github.sha }} \
+          {}@${DIGEST}
+      env:
+        TAGS: ${{ steps.meta.outputs.tags }}
+        DIGEST: ${{ steps.build.outputs.digest }}
 
   test:
     needs: [changes]
@@ -208,7 +206,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 

@@ -15,6 +15,7 @@ package events
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -27,7 +28,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/go-github/v71/github"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
@@ -418,11 +418,11 @@ func (e *EventParser) GetBitbucketCloudPullEventType(eventTypeHeader string, sha
 func (e *EventParser) ParseBitbucketCloudPullCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error) {
 	var event bitbucketcloud.CommentEvent
 	if err = json.Unmarshal(body, &event); err != nil {
-		err = errors.Wrap(err, "parsing json")
+		err = fmt.Errorf("parsing json: %w", err)
 		return
 	}
 	if err = validator.New().Struct(event); err != nil {
-		err = errors.Wrapf(err, "API response %q was missing fields", string(body))
+		err = fmt.Errorf("API response %q was missing fields: %w", string(body), err)
 		return
 	}
 	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketCloudEventData(event.CommonEventData)
@@ -487,11 +487,11 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 func (e *EventParser) ParseBitbucketCloudPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	var event bitbucketcloud.PullRequestEvent
 	if err = json.Unmarshal(body, &event); err != nil {
-		err = errors.Wrap(err, "parsing json")
+		err = fmt.Errorf("parsing json: %w", err)
 		return
 	}
 	if err = validator.New().Struct(event); err != nil {
-		err = errors.Wrapf(err, "API response %q was missing fields", string(body))
+		err = fmt.Errorf("API response %q was missing fields: %w", string(body), err)
 		return
 	}
 	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketCloudEventData(event.CommonEventData)
@@ -812,11 +812,11 @@ func (e *EventParser) GetBitbucketServerPullEventType(eventTypeHeader string) mo
 func (e *EventParser) ParseBitbucketServerPullCommentEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, comment string, err error) {
 	var event bitbucketserver.CommentEvent
 	if err = json.Unmarshal(body, &event); err != nil {
-		err = errors.Wrap(err, "parsing json")
+		err = fmt.Errorf("parsing json: %w", err)
 		return
 	}
 	if err = validator.New().Struct(event); err != nil {
-		err = errors.Wrapf(err, "API response %q was missing fields", string(body))
+		err = fmt.Errorf("API response %q was missing fields: %w", string(body), err)
 		return
 	}
 	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketServerEventData(event.CommonEventData)
@@ -886,11 +886,11 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 func (e *EventParser) ParseBitbucketServerPullEvent(body []byte) (pull models.PullRequest, baseRepo models.Repo, headRepo models.Repo, user models.User, err error) {
 	var event bitbucketserver.PullRequestEvent
 	if err = json.Unmarshal(body, &event); err != nil {
-		err = errors.Wrap(err, "parsing json")
+		err = fmt.Errorf("parsing json: %w", err)
 		return
 	}
 	if err = validator.New().Struct(event); err != nil {
-		err = errors.Wrapf(err, "API response %q was missing fields", string(body))
+		err = fmt.Errorf("API response %q was missing fields: %w", string(body), err)
 		return
 	}
 	pull, baseRepo, headRepo, user, err = e.parseCommonBitbucketServerEventData(event.CommonEventData)

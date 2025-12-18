@@ -17,12 +17,12 @@ package gitea
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"code.gitea.io/sdk/gitea"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -69,7 +69,7 @@ func NewClient(baseURL string, username string, token string, pagesize int, logg
 	)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "creating gitea client")
+		return nil, fmt.Errorf("creating gitea client: %w", err)
 	}
 
 	return &GiteaClient{
