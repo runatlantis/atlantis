@@ -66,7 +66,7 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	workingDir := eventMocks.NewMockWorkingDir()
 
-	credentials := githubMocks.NewMockGithubCredentials()
+	credentials := githubMocks.NewMockCredentials()
 
 	ghAppWorkingDir := events.GithubAppWorkingDir{
 		WorkingDir:     workingDir,
@@ -111,7 +111,7 @@ func TestMergeAgain_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	workingDir := eventMocks.NewMockWorkingDir()
 
-	credentials := githubMocks.NewMockGithubCredentials()
+	credentials := githubMocks.NewMockCredentials()
 
 	ghAppWorkingDir := events.GithubAppWorkingDir{
 		WorkingDir:     workingDir,
