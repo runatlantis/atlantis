@@ -77,6 +77,7 @@ atlantis plan -w staging
   * Ex. `atlantis plan -d child/dir`
 * `-p project` Which project to run plan for. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.md). Cannot be used at same time as `-d` or `-w` because the project defines this already.
 * `-w workspace` Switch to this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) before planning. Defaults to `default`. Ignore this if Terraform workspaces are unused.
+* `--parallelism number` Override the server's parallel pool size for this command. Use `1` to run projects sequentially. Value of `0` (default) uses the server's `--parallel-pool-size` setting. Cannot exceed the server's maximum.
 * `--verbose` Append Atlantis log to comment.
 
 ::: warning NOTE
@@ -180,6 +181,7 @@ atlantis apply -w staging
 * `-w workspace` Apply the plan for this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
 * `--auto-merge-disabled` Disable [automerge](automerging.md) for this apply command.
 * `--auto-merge-method method` Specify which [merge method](automerging.md#how-to-set-the-merge-method-for-automerge) use for the apply command if [automerge](automerging.md) is enabled. Implemented only for GitHub.
+* `--parallelism number` Override the server's parallel pool size for this command. Use `1` to run projects sequentially. Value of `0` (default) uses the server's `--parallel-pool-size` setting. Cannot exceed the server's maximum.
 * `--verbose` Append Atlantis log to comment.
 
 ### Additional Terraform flags

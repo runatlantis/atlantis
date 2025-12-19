@@ -62,8 +62,9 @@ func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.Proj
 
 	var result command.Result
 	if p.isParallelEnabled(cmds) {
-		ctx.Log.Info("Running policy_checks in parallel")
-		result = runProjectCmdsParallel(cmds, p.prjCmdRunner.PolicyCheck, p.parallelPoolSize)
+		poolSize := p.getEffectivePoolSize(ctx, cmds)
+		ctx.Log.Info("Running policy_checks in parallel with pool size %d", poolSize)
+		result = runProjectCmdsParallel(cmds, p.prjCmdRunner.PolicyCheck, poolSize)
 	} else {
 		result = runProjectCmds(cmds, p.prjCmdRunner.PolicyCheck)
 	}
@@ -100,4 +101,20 @@ func (p *PolicyCheckCommandRunner) updateCommitStatus(ctx *command.Context, pull
 
 func (p *PolicyCheckCommandRunner) isParallelEnabled(cmds []command.ProjectContext) bool {
 	return len(cmds) > 0 && cmds[0].ParallelPolicyCheckEnabled
+}
+
+func (p *PolicyCheckCommandRunner) getEffectivePoolSize(ctx *command.Context, cmds []command.ProjectContext) int {
+	if len(cmds) == 0 {
+		return p.parallelPoolSize
+	}
+	// If user specified parallelism in command, use it (but cap at server max)
+	if cmds[0].Parallelism > 0 {
+		if cmds[0].Parallelism > p.parallelPoolSize {
+			ctx.Log.Warn("requested parallelism %d exceeds server maximum %d, using %d",
+				cmds[0].Parallelism, p.parallelPoolSize, p.parallelPoolSize)
+			return p.parallelPoolSize
+		}
+		return cmds[0].Parallelism
+	}
+	return p.parallelPoolSize
 }

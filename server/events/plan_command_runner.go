@@ -143,8 +143,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	// Only run commands in parallel if enabled
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
+		poolSize := p.getEffectivePoolSize(ctx, projectCmds)
+		ctx.Log.Info("Running plans in parallel with pool size %d", poolSize)
+		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, poolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
@@ -273,8 +274,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	// Only run commands in parallel if enabled
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
+		poolSize := p.getEffectivePoolSize(ctx, projectCmds)
+		ctx.Log.Info("Running plans in parallel with pool size %d", poolSize)
+		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, poolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
@@ -416,4 +418,20 @@ func (p *PlanCommandRunner) partitionProjectCmds(
 
 func (p *PlanCommandRunner) isParallelEnabled(projectCmds []command.ProjectContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
+}
+
+func (p *PlanCommandRunner) getEffectivePoolSize(ctx *command.Context, projectCmds []command.ProjectContext) int {
+	if len(projectCmds) == 0 {
+		return p.parallelPoolSize
+	}
+	// If user specified parallelism in command, use it (but cap at server max)
+	if projectCmds[0].Parallelism > 0 {
+		if projectCmds[0].Parallelism > p.parallelPoolSize {
+			ctx.Log.Warn("requested parallelism %d exceeds server maximum %d, using %d",
+				projectCmds[0].Parallelism, p.parallelPoolSize, p.parallelPoolSize)
+			return p.parallelPoolSize
+		}
+		return projectCmds[0].Parallelism
+	}
+	return p.parallelPoolSize
 }

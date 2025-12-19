@@ -1111,6 +1111,8 @@ func TestParse_VCSUsername(t *testing.T) {
 var PlanUsage = `Usage of plan:
   -d, --dir string         Which directory to run plan in relative to root of repo,
                            ex. 'child/dir'.
+      --parallelism int    Max number of projects to run in parallel (0 uses server
+                           default).
   -p, --project string     Which project to run plan for. Refers to the name of the
                            project configured in a repo config file. Cannot be used
                            at same time as workspace or dir flags.
@@ -1125,6 +1127,8 @@ var ApplyUsage = `Usage of apply:
                                    for GitHub)
   -d, --dir string                 Apply the plan for this directory, relative to
                                    root of repo, ex. 'child/dir'.
+      --parallelism int            Max number of projects to run in parallel (0 uses
+                                   server default).
   -p, --project string             Apply the plan for this project. Refers to the
                                    name of the project configured in a repo config
                                    file. Cannot be used at same time as workspace or
@@ -1166,3 +1170,68 @@ var ImportUsage = `Usage of import ADDRESS ID:
       --verbose            Append Atlantis log to comment.
   -w, --workspace string   Switch to this Terraform workspace before importing.
 `
+
+func TestParse_Parallelism(t *testing.T) {
+	cases := []struct {
+		name        string
+		comment     string
+		expParallel int
+		expErr      bool
+	}{
+		{
+			name:        "plan with parallelism flag",
+			comment:     "atlantis plan --parallelism 5",
+			expParallel: 5,
+			expErr:      false,
+		},
+		{
+			name:        "apply with parallelism flag",
+			comment:     "atlantis apply --parallelism 1",
+			expParallel: 1,
+			expErr:      false,
+		},
+		{
+			name:        "parallelism with short flag returns error",
+			comment:     "atlantis plan -n 3",
+			expParallel: 0,
+			expErr:      true,
+		},
+		{
+			name:        "parallelism zero (use server default)",
+			comment:     "atlantis plan --parallelism 0",
+			expParallel: 0,
+			expErr:      false,
+		},
+		{
+			name:        "parallelism negative value",
+			comment:     "atlantis plan --parallelism -1",
+			expParallel: 0,
+			expErr:      true,
+		},
+		{
+			name:        "parallelism with other flags",
+			comment:     "atlantis plan -d mydir --parallelism 2 -w myworkspace",
+			expParallel: 2,
+			expErr:      false,
+		},
+		{
+			name:        "no parallelism flag defaults to 0",
+			comment:     "atlantis plan",
+			expParallel: 0,
+			expErr:      false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := commentParser.Parse(c.comment, models.Github)
+			if c.expErr {
+				Assert(t, r.CommentResponse != "", "expected error response for comment %q", c.comment)
+			} else {
+				Equals(t, "", r.CommentResponse)
+				Assert(t, r.Command != nil, "expected command to be parsed")
+				Equals(t, c.expParallel, r.Command.Parallelism)
+			}
+		})
+	}
+}
