@@ -40,8 +40,8 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 
 	gwd := &events.GithubAppWorkingDir{
 		WorkingDir: wd,
-		Credentials: &github.GithubAppCredentials{
-			Key:      []byte(githubtestdata.GithubPrivateKey),
+		Credentials: &github.AppCredentials{
+			Key:      []byte(githubtestdata.PrivateKey),
 			AppID:    1,
 			Hostname: testServer,
 		},
