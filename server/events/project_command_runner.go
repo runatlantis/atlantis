@@ -260,7 +260,9 @@ func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.P
 		ProjectName:       ctx.ProjectName,
 		SilencePRComments: ctx.SilencePRComments,
 	}
-} // PolicyCheck evaluates policies defined with Rego for the project described by ctx.
+}
+
+// PolicyCheck evaluates policies defined with Rego for the project described by ctx.
 func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
 	return command.ProjectResult{
