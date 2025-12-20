@@ -60,7 +60,7 @@ var Repo = github.Repository{
 	CloneURL: github.Ptr("https://github.com/owner/repo.git"),
 }
 
-const GithubPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
+const PrivateKey = `-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAuEPzOUE+kiEH1WLiMeBytTEF856j0hOVcSUSUkZxKvqczkWM
 9vo1gDyC7ZXhdH9fKh32aapba3RSsp4ke+giSmYTk2mGR538ShSDxh0OgpJmjiKP
 X0Bj4j5sFqfXuCtl9SkH4iueivv4R53ktqM+n6hk98l6hRwC39GVIblAh2lEM4L/
@@ -90,7 +90,7 @@ ZM372Ac6zc1EqSrid2IjET1YqyIW2KGLI1R2xbQc98UGlt48OdWu
 `
 
 // https://developer.github.com/v3/apps/#response-9
-var githubConversionJSON = `{
+var conversionJSON = `{
 	"id":      1,
 	"node_id": "MDM6QXBwNTk=",
 	"owner": {
@@ -125,7 +125,7 @@ var githubConversionJSON = `{
 	"pem":            "%s"
 }`
 
-var githubAppInstallationJSON = `[
+var appInstallationJSON = `[
 	{
 		"id": 1,
 		"account": {
@@ -163,7 +163,7 @@ var githubAppInstallationJSON = `[
 	}
 ]`
 
-var githubAppMultipleInstallationJSON = `[
+var appMultipleInstallationJSON = `[
 	{
 		"id": 1,
 		"account": {
@@ -237,7 +237,7 @@ var githubAppMultipleInstallationJSON = `[
 ]`
 
 // nolint: gosec
-var githubAppTokenJSON = `{
+var appTokenJSON = `{
 	"token":      "some-token",
 	"expires_at": "2050-01-01T00:00:00Z",
 	"permissions": {
@@ -358,7 +358,7 @@ var githubAppTokenJSON = `{
 	]
 }`
 
-var githubAppJSON = `{
+var appJSON = `{
 	"id": 1,
 	"slug": "octoapp",
 	"node_id": "MDExOkludGVncmF0aW9uMQ==",
@@ -400,8 +400,8 @@ var githubAppJSON = `{
 	]
   }`
 
-func validateGithubToken(tokenString string) error {
-	key, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(GithubPrivateKey))
+func validateToken(tokenString string) error {
+	key, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(PrivateKey))
 	if err != nil {
 		return fmt.Errorf("could not parse private key: %s", err)
 	}
@@ -433,40 +433,40 @@ func GithubAppTestServer(t *testing.T) (string, error) {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
 			case "/api/v3/app-manifests/good-code/conversions":
-				encodedKey := strings.Join(strings.Split(GithubPrivateKey, "\n"), "\\n")
-				appInfo := fmt.Sprintf(githubConversionJSON, encodedKey)
+				encodedKey := strings.Join(strings.Split(PrivateKey, "\n"), "\\n")
+				appInfo := fmt.Sprintf(conversionJSON, encodedKey)
 				w.Write([]byte(appInfo)) // nolint: errcheck
 			// https://developer.github.com/v3/apps/#list-installations
 			case "/api/v3/app/installations":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
-				if err := validateGithubToken(token); err != nil {
+				if err := validateToken(token); err != nil {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid token")) // nolint: errcheck
 					return
 				}
 
-				w.Write([]byte(githubAppInstallationJSON)) // nolint: errcheck
+				w.Write([]byte(appInstallationJSON)) // nolint: errcheck
 				return
 			case "/api/v3/apps/some-app":
 				token := strings.Replace(r.Header.Get("Authorization"), "token ", "", 1)
 
-				// token is taken from githubAppTokenJSON
+				// token is taken from appTokenJSON
 				if token != "some-token" {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid installation token")) // nolint: errcheck
 					return
 				}
-				w.Write([]byte(githubAppJSON)) // nolint: errcheck
+				w.Write([]byte(appJSON)) // nolint: errcheck
 				return
 			case "/api/v3/app/installations/1/access_tokens":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
-				if err := validateGithubToken(token); err != nil {
+				if err := validateToken(token); err != nil {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid token")) // nolint: errcheck
 					return
 				}
 
-				appToken := fmt.Sprintf(githubAppTokenJSON, counter)
+				appToken := fmt.Sprintf(appTokenJSON, counter)
 				counter++
 				w.Write([]byte(appToken)) // nolint: errcheck
 				return
@@ -488,40 +488,40 @@ func GithubMultipleAppTestServer(t *testing.T) (string, error) {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
 			case "/api/v3/app-manifests/good-code/conversions":
-				encodedKey := strings.Join(strings.Split(GithubPrivateKey, "\n"), "\\n")
-				appInfo := fmt.Sprintf(githubConversionJSON, encodedKey)
+				encodedKey := strings.Join(strings.Split(PrivateKey, "\n"), "\\n")
+				appInfo := fmt.Sprintf(conversionJSON, encodedKey)
 				w.Write([]byte(appInfo)) // nolint: errcheck
 			// https://developer.github.com/v3/apps/#list-installations
 			case "/api/v3/app/installations":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
-				if err := validateGithubToken(token); err != nil {
+				if err := validateToken(token); err != nil {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid token")) // nolint: errcheck
 					return
 				}
 
-				w.Write([]byte(githubAppMultipleInstallationJSON)) // nolint: errcheck
+				w.Write([]byte(appMultipleInstallationJSON)) // nolint: errcheck
 				return
 			case "/api/v3/apps/some-app":
 				token := strings.Replace(r.Header.Get("Authorization"), "token ", "", 1)
 
-				// token is taken from githubAppTokenJSON
+				// token is taken from appTokenJSON
 				if token != "some-token" {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid installation token")) // nolint: errcheck
 					return
 				}
-				w.Write([]byte(githubAppJSON)) // nolint: errcheck
+				w.Write([]byte(appJSON)) // nolint: errcheck
 				return
 			case "/api/v3/app/installations/1/access_tokens":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
-				if err := validateGithubToken(token); err != nil {
+				if err := validateToken(token); err != nil {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid token")) // nolint: errcheck
 					return
 				}
 
-				appToken := fmt.Sprintf(githubAppTokenJSON, counter)
+				appToken := fmt.Sprintf(appTokenJSON, counter)
 				counter++
 				w.Write([]byte(appToken)) // nolint: errcheck
 				return
