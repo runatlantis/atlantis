@@ -25,11 +25,11 @@ import (
 const maxCommentLength = 32768
 
 type Client struct {
-	HTTPClient  *http.Client
-	Username    string
-	Password    string
+	httpClient  *http.Client
+	username    string
+	password    string
 	BaseURL     string
-	AtlantisURL string
+	atlantisURL string
 }
 
 type DeleteSourceBranch struct {
@@ -57,11 +57,11 @@ func NewClient(httpClient *http.Client, username string, password string, baseUR
 		return nil, fmt.Errorf("must have 'http://' or 'https://' in base url %q", baseURL)
 	}
 	return &Client{
-		HTTPClient:  httpClient,
-		Username:    username,
-		Password:    password,
+		httpClient:  httpClient,
+		username:    username,
+		password:    password,
 		BaseURL:     strings.TrimRight(parsedURL.String(), "/"),
-		AtlantisURL: atlantisURL,
+		atlantisURL: atlantisURL,
 	}, nil
 }
 
@@ -249,7 +249,7 @@ func (b *Client) UpdateStatus(logger logging.SimpleLogging, _ models.Repo, pull 
 	// URL is a required field for bitbucket statuses. We default to the
 	// Atlantis server's URL.
 	if url == "" {
-		url = b.AtlantisURL
+		url = b.atlantisURL
 	}
 
 	bodyBytes, err := json.Marshal(map[string]string{
@@ -320,7 +320,7 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	}
 
 	// Personal access tokens can be sent as basic auth or bearer
-	bearer := "Bearer " + b.Password
+	bearer := "Bearer " + b.password
 	req.Header.Add("Authorization", bearer)
 
 	if body != nil {
@@ -337,7 +337,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	if err != nil {
 		return nil, fmt.Errorf("constructing request: %w", err)
 	}
-	resp, err := b.HTTPClient.Do(req)
+	resp, err := b.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

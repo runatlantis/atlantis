@@ -19,15 +19,15 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-// AzureDevopsClient represents an Azure DevOps VCS client
-type AzureDevopsClient struct {
+// Client represents an Azure DevOps VCS client
+type Client struct {
 	Client   *azuredevops.Client
 	ctx      context.Context
 	UserName string
 }
 
-// NewAzureDevopsClient returns a valid Azure DevOps client.
-func NewAzureDevopsClient(hostname string, userName string, token string) (*AzureDevopsClient, error) {
+// NewClient returns a valid Azure DevOps client.
+func New(hostname string, userName string, token string) (*Client, error) {
 	tp := azuredevops.BasicAuthTransport{
 		Username: "",
 		Password: strings.TrimSpace(token),
@@ -48,7 +48,7 @@ func NewAzureDevopsClient(hostname string, userName string, token string) (*Azur
 		adClient.BaseURL = *base
 	}
 
-	client := &AzureDevopsClient{
+	client := &Client{
 		Client:   adClient,
 		UserName: userName,
 		ctx:      context.Background(),
@@ -59,7 +59,7 @@ func NewAzureDevopsClient(hostname string, userName string, token string) (*Azur
 
 // GetModifiedFiles returns the names of files that were modified in the merge request
 // relative to the repo root, e.g. parent/child/file.txt.
-func (g *AzureDevopsClient) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (g *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	var files []string
 
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
@@ -114,7 +114,7 @@ func (g *AzureDevopsClient) GetModifiedFiles(logger logging.SimpleLogging, repo 
 //
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-func (g *AzureDevopsClient) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error { //nolint: revive
+func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error { //nolint: revive
 	sepEnd := "\n```\n</details>" +
 		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
 	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
@@ -149,17 +149,17 @@ func (g *AzureDevopsClient) CreateComment(logger logging.SimpleLogging, repo mod
 	return nil
 }
 
-func (g *AzureDevopsClient) ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error { //nolint: revive
+func (g *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error { //nolint: revive
 	return nil
 }
 
-func (g *AzureDevopsClient) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error { //nolint: revive
+func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error { //nolint: revive
 	return nil
 }
 
 // PullIsApproved returns true if the merge request was approved by another reviewer.
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
-func (g *AzureDevopsClient) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
+func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{
@@ -189,13 +189,13 @@ func (g *AzureDevopsClient) PullIsApproved(logger logging.SimpleLogging, repo mo
 	return approvalStatus, nil
 }
 
-func (g *AzureDevopsClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error { //nolint: revive
+func (g *Client) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error { //nolint: revive
 	// TODO implement
 	return nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) { //nolint: revive
+func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) { //nolint: revive
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
@@ -256,7 +256,7 @@ func (g *AzureDevopsClient) PullIsMergeable(logger logging.SimpleLogging, repo m
 }
 
 // GetPullRequest returns the pull request.
-func (g *AzureDevopsClient) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, num int) (*azuredevops.GitPullRequest, error) {
+func (g *Client) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, num int) (*azuredevops.GitPullRequest, error) {
 	opts := azuredevops.PullRequestGetOptions{
 		IncludeWorkItemRefs: true,
 	}
@@ -266,7 +266,7 @@ func (g *AzureDevopsClient) GetPullRequest(logger logging.SimpleLogging, repo mo
 }
 
 // UpdateStatus updates the build status of a commit.
-func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	adState := azuredevops.GitError.String()
 	switch state {
 	case models.PendingCommitStatus:
@@ -280,7 +280,7 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 	logger.Info("Updating Azure DevOps commit status for '%s' to '%s'", src, adState)
 
 	status := azuredevops.GitPullRequestStatus{}
-	status.Context = GitStatusContextFromSrc(src)
+	status.Context = gitStatusContextFromSrc(src)
 	status.Description = &description
 	status.State = &adState
 	if url != "" {
@@ -334,7 +334,7 @@ func (g *AzureDevopsClient) UpdateStatus(logger logging.SimpleLogging, repo mode
 // If the user has set a branch policy that disallows no fast-forward, the merge will fail
 // until we handle branch policies
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops
-func (g *AzureDevopsClient) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 	descriptor := "Atlantis Terraform Pull Request Automation"
 
@@ -392,7 +392,7 @@ func (g *AzureDevopsClient) MergePull(logger logging.SimpleLogging, pull models.
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
-func (g *AzureDevopsClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+func (g *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("!%d", pull.Num), nil
 }
 
@@ -421,15 +421,15 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *AzureDevopsClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) { //nolint: revive
+func (g *Client) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) { //nolint: revive
 	return nil, nil
 }
 
-func (g *AzureDevopsClient) SupportsSingleFileDownload(repo models.Repo) bool { //nolint: revive
+func (g *Client) SupportsSingleFileDownload(repo models.Repo) bool { //nolint: revive
 	return false
 }
 
-func (g *AzureDevopsClient) GetFileContent(_ logging.SimpleLogging, _ models.Repo, _ string, _ string) (bool, []byte, error) { //nolint: revive
+func (g *Client) GetFileContent(_ logging.SimpleLogging, _ models.Repo, _ string, _ string) (bool, []byte, error) { //nolint: revive
 	return false, []byte{}, fmt.Errorf("not implemented")
 }
 
@@ -437,7 +437,7 @@ func (g *AzureDevopsClient) GetFileContent(_ logging.SimpleLogging, _ models.Rep
 // for the status update API. In the AzureDevops branch policy UI there is a single string
 // field used to drive these contexts where all text preceding the final '/' character is
 // treated as the 'genre'.
-func GitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
+func gitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
 	lastSlashIdx := strings.LastIndex(src, "/")
 	genre := "Atlantis Bot"
 	name := src
@@ -452,10 +452,10 @@ func GitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
 	}
 }
 
-func (g *AzureDevopsClient) GetCloneURL(_ logging.SimpleLogging, VCSHostType models.VCSHostType, repo string) (string, error) { //nolint: revive
+func (g *Client) GetCloneURL(_ logging.SimpleLogging, VCSHostType models.VCSHostType, repo string) (string, error) { //nolint: revive
 	return "", fmt.Errorf("not yet implemented")
 }
 
-func (g *AzureDevopsClient) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
+func (g *Client) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }
