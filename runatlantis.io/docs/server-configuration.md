@@ -876,6 +876,18 @@ ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
 don't set. Defaults to `gitlab.com`.
 
+### `--gitlab-status-retry-enabled`
+
+```bash
+atlantis server --gitlab-status-retry-enabled
+# or
+ATLANTIS_GITLAB_STATUS_RETRY_ENABLED=true
+```
+
+Enable enhanced retry logic for GitLab pipeline status updates with exponential backoff.
+
+Defaults to `false`.
+
 ### `--gitlab-token` <Badge text="v0.2.0+" type="info"/>
 
 ```bash
@@ -1054,6 +1066,24 @@ ATLANTIS_PARALLEL_POOL_SIZE=100
 ```
 
 Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
+
+### `--pending-apply-status` <Badge text="v0.36.0+" type="info"/>
+
+```bash
+atlantis server --pending-apply-status
+# or (recommended)
+ATLANTIS_PENDING_APPLY_STATUS=true
+```
+
+Set the commit status to pending when there are planned changes that haven't been applied.
+This prevents merge requests from being merged until all Terraform applies are completed if you have `Pipelines must succeed` enabled on your repository.
+
+When enabled, after running `atlantis plan`, the MR status will show as pending if there are changes
+to apply. Once all projects are successfully applied (or show no changes), the status will update to success.
+
+Defaults to `false`.
+
+Only supported on GitLab
 
 ### `--port` <Badge text="v0.1.3+" type="info"/>
 

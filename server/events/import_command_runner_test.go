@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
@@ -9,7 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -60,7 +63,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 				tc.SilenceNoProjects = tt.silenced
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			ctx := &command.Context{
 				User:     testdata.User,

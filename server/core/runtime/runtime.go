@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package runtime holds code for actually running commands vs. preparing
 // and constructing.
 package runtime
@@ -9,7 +12,6 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -112,7 +114,7 @@ func IsRemotePlan(planContents []byte) bool {
 func ProjectNameFromPlanfile(workspace string, filename string) (string, error) {
 	r, err := regexp.Compile(fmt.Sprintf(`(.*?)-%s\.tfplan`, workspace))
 	if err != nil {
-		return "", errors.Wrap(err, "compiling project name regex, this is a bug")
+		return "", fmt.Errorf("compiling project name regex, this is a bug: %w", err)
 	}
 	projMatch := r.FindAllStringSubmatch(filename, 1)
 	if projMatch == nil {

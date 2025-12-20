@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package cache
 
 import (
@@ -5,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 )
 
@@ -43,7 +45,7 @@ func (v *ExecutionVersionDiskLayer) Get(key *version.Version) (string, error) {
 	binaryVersion, err := v.keySerializer.Serialize(key)
 
 	if err != nil {
-		return "", errors.Wrapf(err, "serializing key for disk lookup")
+		return "", fmt.Errorf("serializing key for disk lookup: %w", err)
 	}
 
 	// first check for the binary in our path
@@ -65,13 +67,13 @@ func (v *ExecutionVersionDiskLayer) Get(key *version.Version) (string, error) {
 		loadedBinary, err := v.loader(key, loaderPath.Resolve())
 
 		if err != nil {
-			return "", errors.Wrapf(err, "loading %s", loaderPath)
+			return "", fmt.Errorf("loading %s: %w", loaderPath, err)
 		}
 
 		binaryPath, err = loadedBinary.Symlink(binaryPath.Resolve())
 
 		if err != nil {
-			return "", errors.Wrapf(err, "linking %s to %s", loaderPath, loadedBinary)
+			return "", fmt.Errorf("linking %s to %s: %w", loaderPath, loadedBinary, err)
 		}
 	}
 
@@ -104,7 +106,7 @@ func (v *ExecutionVersionMemoryLayer) Get(key *version.Version) (string, error) 
 		value, err := v.diskLayer.Get(key)
 
 		if err != nil {
-			return "", errors.Wrapf(err, "fetching %s from cache", serializedKey)
+			return "", fmt.Errorf("fetching %s from cache: %w", serializedKey, err)
 		}
 		v.cache[serializedKey] = value
 	}
