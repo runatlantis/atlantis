@@ -13,27 +13,27 @@ import (
 )
 
 // GithubTokenRotator continuously tries to rotate the github app access token every 30 seconds and writes the ~/.git-credentials file
-type GithubTokenRotator interface {
+type TokenRotator interface {
 	Run()
 	GenerateJob() (scheduled.JobDefinition, error)
 }
 
-type githubTokenRotator struct {
+type tokenRotator struct {
 	log               logging.SimpleLogging
-	githubCredentials GithubCredentials
+	githubCredentials Credentials
 	githubHostname    string
 	gitUser           string
 	homeDirPath       string
 }
 
-func NewGithubTokenRotator(
+func NewTokenRotator(
 	log logging.SimpleLogging,
-	githubCredentials GithubCredentials,
+	githubCredentials Credentials,
 	githubHostname string,
 	gitUser string,
-	homeDirPath string) GithubTokenRotator {
+	homeDirPath string) TokenRotator {
 
-	return &githubTokenRotator{
+	return &tokenRotator{
 		log:               log,
 		githubCredentials: githubCredentials,
 		githubHostname:    githubHostname,
@@ -43,9 +43,9 @@ func NewGithubTokenRotator(
 }
 
 // make sure interface is implemented correctly
-var _ GithubTokenRotator = (*githubTokenRotator)(nil)
+var _ TokenRotator = (*tokenRotator)(nil)
 
-func (r *githubTokenRotator) GenerateJob() (scheduled.JobDefinition, error) {
+func (r *tokenRotator) GenerateJob() (scheduled.JobDefinition, error) {
 
 	return scheduled.JobDefinition{
 		Job:    r,
@@ -53,7 +53,7 @@ func (r *githubTokenRotator) GenerateJob() (scheduled.JobDefinition, error) {
 	}, r.rotate()
 }
 
-func (r *githubTokenRotator) Run() {
+func (r *tokenRotator) Run() {
 	err := r.rotate()
 	if err != nil {
 		// at least log the error message here, as we want to notify the that user that the key rotation wasn't successful
@@ -61,7 +61,7 @@ func (r *githubTokenRotator) Run() {
 	}
 }
 
-func (r *githubTokenRotator) rotate() error {
+func (r *tokenRotator) rotate() error {
 	r.log.Debug("Refreshing Github tokens for .git-credentials")
 
 	token, err := r.githubCredentials.GetToken()
