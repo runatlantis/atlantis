@@ -721,6 +721,15 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 	defer unlockFn()
 
+	// Skip apply if the plan had no changes. This prevents errors when using
+	// Terraform Cloud/Enterprise which fails with "Error: Saved plan has no changes"
+	// when applying a plan with no changes.
+	// See: https://github.com/runatlantis/atlantis/issues/4369
+	if ctx.ProjectPlanStatus == models.PlannedNoChangesPlanStatus {
+		ctx.Log.Info("plan had no changes, skipping apply")
+		return "No changes to apply. Infrastructure matches the plan.", "", nil
+	}
+
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck

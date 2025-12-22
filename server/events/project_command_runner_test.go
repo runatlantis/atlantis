@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -541,6 +542,69 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	Assert(t, res.ApplySuccess == "", "exp apply failure")
 
 	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+}
+
+// Test that apply is skipped when plan had no changes
+func TestDefaultProjectCommandRunner_ApplySkipsNoChanges(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	applyReqHandler := &events.DefaultCommandRequirementHandler{
+		WorkingDir: mockWorkingDir,
+	}
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: applyReqHandler,
+		Webhooks:                  mockSender,
+	}
+	repoDir := t.TempDir()
+	When(mockWorkingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string](),
+	)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+	}, nil)
+
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		Steps: []valid.Step{
+			{
+				StepName: "apply",
+			},
+		},
+		Workspace:         "default",
+		ApplyRequirements: []string{},
+		RepoRelDir:        ".",
+		// This is the key: plan had no changes
+		ProjectPlanStatus: models.PlannedNoChangesPlanStatus,
+	}
+
+	res := runner.Apply(ctx)
+
+	// Should succeed with the skip message
+	Assert(t, res.ApplySuccess != "", "expected apply success message")
+	Assert(t, strings.Contains(res.ApplySuccess, "No changes to apply"), "expected no changes message")
+	Assert(t, res.Failure == "", "expected no failure")
+
+	// ApplyStepRunner should NOT have been called since we skipped it
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
 // Test run and env steps. We don't use mocks for this test since we're

@@ -66,6 +66,23 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, tfDistribution, tfVersion, ctx.Workspace)
 	}
 
+	// Handle the case where Terraform Cloud/Enterprise returns an error when
+	// applying a plan with no changes. This is a known issue where TFE returns
+	// exit code 1 with "Error: Saved plan has no changes" error. We treat this as success.
+	// See: https://github.com/runatlantis/atlantis/issues/4369
+	if err != nil && isNoChangesApplyError(out) {
+		ctx.Log.Info("terraform apply returned 'no changes' error, treating as success")
+		err = nil
+		// Update output to indicate successful no-op apply if not already present
+		if !strings.Contains(strings.ToLower(out), "apply complete") {
+			if out != "" {
+				out = out + "\n\nApply complete! Resources: 0 added, 0 changed, 0 destroyed.\n"
+			} else {
+				out = "Apply complete! Resources: 0 added, 0 changed, 0 destroyed.\n"
+			}
+		}
+	}
+
 	// If the apply was successful, delete the plan.
 	if err == nil {
 		ctx.Log.Info("apply successful, deleting planfile")
@@ -74,6 +91,14 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 		}
 	}
 	return out, err
+}
+
+// isNoChangesApplyError checks if the error from terraform apply is due to
+// a plan having no changes. This is particularly relevant for Terraform
+// Cloud/Enterprise which returns an error when applying a plan with no changes.
+func isNoChangesApplyError(output string) bool {
+	// Check for the exact Terraform Cloud/Enterprise error message
+	return strings.Contains(strings.ToLower(output), "error: saved plan has no changes")
 }
 
 func (a *ApplyStepRunner) hasTargetFlag(ctx command.ProjectContext, extraArgs []string) bool {

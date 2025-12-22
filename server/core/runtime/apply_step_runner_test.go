@@ -492,3 +492,110 @@ var noConfirmationOut = `
 
 Error: Apply discarded.
 `
+
+// Test that apply succeeds when TFE returns "Error: Saved plan has no changes"
+func TestRun_NoChanges_TFE_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	err := os.WriteFile(planPath, nil, 0600)
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		EscapedCommentArgs: []string{"comment", "args"},
+	}
+	Ok(t, err)
+
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+	}
+
+	// Simulate TFE returning the exact error for no changes
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("Error: Saved plan has no changes", errors.New("exit status 1"))
+	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	// Should NOT return an error, even though terraform returned one
+	Ok(t, err)
+	// Output should indicate successful apply with 0 changes
+	Assert(t, strings.Contains(output, "Apply complete! Resources: 0 added, 0 changed, 0 destroyed"), "output should indicate successful apply")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "workspace")
+	// Planfile should be deleted since apply was "successful"
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}
+
+// Test that other errors are NOT treated as "no changes"
+func TestRun_OtherNoChangesError_StillFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	err := os.WriteFile(planPath, nil, 0600)
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		EscapedCommentArgs: []string{"comment", "args"},
+	}
+	Ok(t, err)
+
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+	}
+
+	// Simulate a different error message that's not the exact TFE error
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("Error: Plan has no changes to apply", errors.New("exit status 1"))
+	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	// Should still return an error since it's not the exact message
+	Assert(t, err != nil, "other error messages should still fail")
+	Equals(t, "Error: Plan has no changes to apply", output)
+	// Planfile should NOT be deleted since apply failed
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
+// Test that actual errors are still treated as errors
+func TestRun_RealError_StillFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	err := os.WriteFile(planPath, nil, 0600)
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Log:                logger,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		EscapedCommentArgs: []string{"comment", "args"},
+	}
+	Ok(t, err)
+
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+	}
+
+	// Simulate a real error (not "no changes")
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("Error: Failed to create resource", errors.New("exit status 1"))
+	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	// Should still return an error
+	Assert(t, err != nil, "real errors should still fail")
+	Equals(t, "Error: Failed to create resource", output)
+	// Planfile should NOT be deleted since apply failed
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
