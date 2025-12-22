@@ -646,6 +646,26 @@ func TestRunCommentCommand_UnmatchedBranch(t *testing.T) {
 	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
+func TestRunCommentCommand_UnmatchedBranch_CommentError(t *testing.T) {
+	t.Log("if a command is run on a pull request which doesn't match base branches, a comment with error message should be created")
+	vcsClient := setup(t)
+
+	ch.GlobalCfg.Repos = append(ch.GlobalCfg.Repos, valid.Repo{
+		IDRegex:     regexp.MustCompile(".*"),
+		BranchRegex: regexp.MustCompile("^main$"),
+	})
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "develop"}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+
+	expectedMsg := "Commands are not enabled for branch `develop`. Destination branch does not match the required pattern: `^main$`"
+	vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(expectedMsg), Eq(""))
+}
+
 func TestRunUnlockCommand_VCSComment(t *testing.T) {
 	testCases := []struct {
 		name    string
