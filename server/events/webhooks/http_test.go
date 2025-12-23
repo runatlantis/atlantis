@@ -28,7 +28,9 @@ var httpApplyResult = webhooks.ApplyResult{
 	User: models.User{
 		Username: "lkysow",
 	},
-	Success: true,
+	ProjectName: "test-project",
+	Directory:   "testing/prod/directory",
+	Success:     true,
 }
 
 func TestHttpWebhookWithHeaders(t *testing.T) {
@@ -51,6 +53,8 @@ func TestHttpWebhookWithHeaders(t *testing.T) {
 		URL:            server.URL,
 		WorkspaceRegex: regexp.MustCompile(".*"),
 		BranchRegex:    regexp.MustCompile(".*"),
+		ProjectRegex:   regexp.MustCompile(".*"),
+		DirectoryRegex: regexp.MustCompile(".*"),
 	}
 
 	err := webhook.Send(logging.NewNoopLogger(t), httpApplyResult)
@@ -69,6 +73,8 @@ func TestHttpWebhookNoHeaders(t *testing.T) {
 		URL:            server.URL,
 		WorkspaceRegex: regexp.MustCompile(".*"),
 		BranchRegex:    regexp.MustCompile(".*"),
+		ProjectRegex:   regexp.MustCompile(".*"),
+		DirectoryRegex: regexp.MustCompile(".*"),
 	}
 
 	err := webhook.Send(logging.NewNoopLogger(t), httpApplyResult)
@@ -86,6 +92,8 @@ func TestHttpWebhook500(t *testing.T) {
 		URL:            server.URL,
 		WorkspaceRegex: regexp.MustCompile(".*"),
 		BranchRegex:    regexp.MustCompile(".*"),
+		ProjectRegex:   regexp.MustCompile(".*"),
+		DirectoryRegex: regexp.MustCompile(".*"),
 	}
 
 	err := webhook.Send(logging.NewNoopLogger(t), httpApplyResult)
@@ -102,16 +110,36 @@ func TestHttpNoRegexMatch(t *testing.T) {
 		name string
 		wr   *regexp.Regexp
 		br   *regexp.Regexp
+		pr   *regexp.Regexp
+		dr   *regexp.Regexp
 	}{
 		{
 			name: "no workspace match",
 			wr:   regexp.MustCompile("other"),
 			br:   regexp.MustCompile(".*"),
+			pr:   regexp.MustCompile(".*"),
+			dr:   regexp.MustCompile(".*"),
 		},
 		{
 			name: "no branch match",
 			wr:   regexp.MustCompile(".*"),
 			br:   regexp.MustCompile("other"),
+			pr:   regexp.MustCompile(".*"),
+			dr:   regexp.MustCompile(".*"),
+		},
+		{
+			name: "no project match",
+			wr:   regexp.MustCompile(".*"),
+			br:   regexp.MustCompile(".*"),
+			pr:   regexp.MustCompile("other"),
+			dr:   regexp.MustCompile(".*"),
+		},
+		{
+			name: "no directory match",
+			wr:   regexp.MustCompile(".*"),
+			br:   regexp.MustCompile(".*"),
+			pr:   regexp.MustCompile(".*"),
+			dr:   regexp.MustCompile("other"),
 		},
 	}
 
@@ -122,9 +150,82 @@ func TestHttpNoRegexMatch(t *testing.T) {
 				URL:            server.URL,
 				WorkspaceRegex: tc.wr,
 				BranchRegex:    tc.br,
+				ProjectRegex:   tc.pr,
+				DirectoryRegex: tc.dr,
 			}
 			err := webhook.Send(logging.NewNoopLogger(t), httpApplyResult)
 			Ok(t, err)
+		})
+	}
+}
+
+func TestHttpMultipleRegexMatch(t *testing.T) {
+	tt := []struct {
+		name         string
+		wr           *regexp.Regexp
+		br           *regexp.Regexp
+		pr           *regexp.Regexp
+		dr           *regexp.Regexp
+		shouldBeSent bool
+	}{
+		{
+			name:         "all regexes match",
+			wr:           regexp.MustCompile("production"),
+			br:           regexp.MustCompile("main"),
+			pr:           regexp.MustCompile("test-project"),
+			dr:           regexp.MustCompile("testing/prod/directory"),
+			shouldBeSent: true,
+		},
+		{
+			name:         "no match - workspace regex wrong, others correct",
+			wr:           regexp.MustCompile("notproduction"),
+			br:           regexp.MustCompile("main"),
+			pr:           regexp.MustCompile("test-project"),
+			dr:           regexp.MustCompile("testing/directory"),
+			shouldBeSent: false,
+		},
+		{
+			name:         "no match - directory regex wrong, others correct or allowed",
+			wr:           regexp.MustCompile(".*"),
+			br:           regexp.MustCompile(".*"),
+			pr:           regexp.MustCompile("test-project"),
+			dr:           regexp.MustCompile("wrong/directory"),
+			shouldBeSent: false,
+		},
+		{
+			name:         "match - directory regex allowing, others correct or allowed",
+			wr:           regexp.MustCompile(".*"),
+			br:           regexp.MustCompile(".*"),
+			pr:           regexp.MustCompile(".*"),
+			dr:           regexp.MustCompile("testing/.*/directory"),
+			shouldBeSent: true,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a new server for each test case
+			webhookCalled := false
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				webhookCalled = true
+			}))
+			defer server.Close()
+
+			webhook := webhooks.HttpWebhook{
+				Client:         &webhooks.HttpClient{Client: http.DefaultClient},
+				URL:            server.URL,
+				WorkspaceRegex: tc.wr,
+				BranchRegex:    tc.br,
+				ProjectRegex:   tc.pr,
+				DirectoryRegex: tc.dr,
+			}
+			err := webhook.Send(logging.NewNoopLogger(t), httpApplyResult)
+			Ok(t, err)
+
+			Assert(t, tc.shouldBeSent == webhookCalled,
+				"webhook expected to be called: %v, was: %v",
+				tc.shouldBeSent,
+				webhookCalled)
 		})
 	}
 }
