@@ -9,10 +9,17 @@ import (
 
 // ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {
-	Command            Name
-	SubCommand         string
-	RepoRelDir         string
-	Workspace          string
+	ProjectCommandOutput
+	Command           Name
+	SubCommand        string
+	RepoRelDir        string
+	Workspace         string
+	ProjectName       string
+	SilencePRComments []string
+}
+
+// ProjectCommandOutput is the output of a plan/policy_check/apply for a specific project.
+type ProjectCommandOutput struct {
 	Error              error
 	Failure            string
 	PlanSuccess        *models.PlanSuccess
@@ -21,8 +28,6 @@ type ProjectResult struct {
 	VersionSuccess     string
 	ImportSuccess      *models.ImportSuccess
 	StateRmSuccess     *models.StateRmSuccess
-	ProjectName        string
-	SilencePRComments  []string
 }
 
 // CommitStatus returns the vcs commit status of this project result.
