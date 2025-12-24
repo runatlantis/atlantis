@@ -620,7 +620,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		{
 			"just github app key set",
 			map[string]interface{}{
-				GHAppKeyFlag: githubtestdata.GithubPrivateKey,
+				GHAppKeyFlag: githubtestdata.PrivateKey,
 			},
 			true,
 		},
@@ -730,7 +730,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"github app and key set and should be successful",
 			map[string]interface{}{
 				GHAppIDFlag:  "1",
-				GHAppKeyFlag: githubtestdata.GithubPrivateKey,
+				GHAppKeyFlag: githubtestdata.PrivateKey,
 			},
 			false,
 		},
@@ -867,7 +867,7 @@ func TestExecute_GithubUser(t *testing.T) {
 func TestExecute_GithubApp(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
 	c := setup(map[string]interface{}{
-		GHAppKeyFlag:      githubtestdata.GithubPrivateKey,
+		GHAppKeyFlag:      githubtestdata.PrivateKey,
 		GHAppIDFlag:       "1",
 		RepoAllowlistFlag: "*",
 	}, t)
@@ -880,7 +880,7 @@ func TestExecute_GithubApp(t *testing.T) {
 func TestExecute_GithubAppWithInstallationID(t *testing.T) {
 	t.Log("Should pass the installation ID to the config.")
 	c := setup(map[string]interface{}{
-		GHAppKeyFlag:            githubtestdata.GithubPrivateKey,
+		GHAppKeyFlag:            githubtestdata.PrivateKey,
 		GHAppIDFlag:             "1",
 		GHAppInstallationIDFlag: "2",
 		RepoAllowlistFlag:       "*",
