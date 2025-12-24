@@ -154,7 +154,7 @@ Defaults to `false`. See [Automerging](automerging.md) for more details.
 ### `--automerge-method` <Badge text="v0.35.1" type="info"/>
 
 ```bash
-atlantis server --automerge-method
+atlantis server --automerge-method=squash
 # or
 ATLANTIS_AUTOMERGE_METHOD="squash"
 ```
