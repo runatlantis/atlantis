@@ -620,4 +620,61 @@ func TestRunPostHooks_Clone(t *testing.T) {
 			Eq(testHookWithPlanApplyCommands.RunCommand), Any[string](), Any[string](), Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
+
+	t.Run("Closed MR uses base branch clone instead of merge strategy", func(t *testing.T) {
+		postWorkflowHooksSetup(t)
+
+		var unlockCalled = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		// Create a closed MR
+		closedPull := testdata.Pull
+		closedPull.State = models.ClosedPullState
+		closedPull.BaseRepo = testdata.GithubRepo
+
+		ctx := &command.Context{
+			Pull:     closedPull,
+			HeadRepo: testdata.GithubRepo,
+			User:     testdata.User,
+			Log:      log,
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: testdata.GithubRepo.ID(),
+					PostWorkflowHooks: []*valid.WorkflowHook{
+						&testHook,
+					},
+				},
+			},
+		}
+
+		postWh.GlobalCfg = globalCfg
+
+		// Mock the working directory operations for closed MR
+		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, closedPull.Num, events.DefaultWorkspace,
+			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
+
+		// Mock GetWorkingDir to return an error (directory doesn't exist)
+		When(postWhWorkingDir.GetWorkingDir(Eq(testdata.GithubRepo), Eq(closedPull), Eq(events.DefaultWorkspace))).
+			ThenReturn("", errors.New("directory not found"))
+
+		// Mock GetPullDir to return a valid directory
+		When(postWhWorkingDir.GetPullDir(Eq(testdata.GithubRepo), Eq(closedPull))).
+			ThenReturn("/tmp/test-pull-dir", nil)
+
+		// Mock the post-workflow hook runner
+		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](),
+			Eq(testHook.RunCommand), Any[string](), Any[string](), Any[string]())).ThenReturn(result, runtimeDesc, nil)
+
+		err := postWh.RunPostHooks(ctx, planCmd)
+
+		Ok(t, err)
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
+			Eq(testHook.RunCommand), Any[string](), Any[string](), Any[string]())
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
 }
