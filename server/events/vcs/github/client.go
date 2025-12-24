@@ -11,11 +11,12 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package vcs
+package github
 
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -27,7 +28,6 @@ import (
 
 	"github.com/gofri/go-github-ratelimit/github_ratelimit"
 	"github.com/google/go-github/v71/github"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -78,13 +78,13 @@ func (c *GitHubRepoIdCache) Set(key githubv4.String, value githubv4.Int) {
 	}
 }
 
-// GithubClient is used to perform GitHub actions.
-type GithubClient struct {
+// Client is used to perform GitHub actions.
+type Client struct {
 	user                  string
 	client                *github.Client
 	v4Client              *githubv4.Client
 	ctx                   context.Context
-	config                GithubConfig
+	config                Config
 	maxCommentsPerCommand int
 	repoIdCache           GitHubRepoIdCache
 }
@@ -116,18 +116,18 @@ type GithubPRReviewSummary struct {
 	Reviews        []GithubReview
 }
 
-// NewGithubClient returns a valid GitHub client.
+// NewClient returns a valid GitHub client.
 
-func NewGithubClient(hostname string, credentials GithubCredentials, config GithubConfig, maxCommentsPerCommand int, logger logging.SimpleLogging) (*GithubClient, error) {
+func New(hostname string, credentials Credentials, config Config, maxCommentsPerCommand int, logger logging.SimpleLogging) (*Client, error) {
 	logger.Debug("Creating new GitHub client for host: %s", hostname)
 	transport, err := credentials.Client()
 	if err != nil {
-		return nil, errors.Wrap(err, "error initializing github authentication transport")
+		return nil, fmt.Errorf("error initializing github authentication transport: %w", err)
 	}
 
 	transportWithRateLimit, err := github_ratelimit.NewRateLimitWaiterClient(transport.Transport)
 	if err != nil {
-		return nil, errors.Wrap(err, "error initializing github rate limit transport")
+		return nil, fmt.Errorf("error initializing github rate limit transport: %w", err)
 	}
 
 	var graphqlURL string
@@ -152,10 +152,10 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 	logger.Debug("GH User: %s", user)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "getting user")
+		return nil, fmt.Errorf("getting user: %w", err)
 	}
 
-	return &GithubClient{
+	return &Client{
 		user:                  user,
 		client:                client,
 		v4Client:              v4Client,
@@ -168,7 +168,7 @@ func NewGithubClient(hostname string, credentials GithubCredentials, config Gith
 
 // GetModifiedFiles returns the names of files that were modified in the pull request
 // relative to the repo root, e.g. parent/child/file.txt.
-func (g *GithubClient) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (g *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	logger.Debug("Getting modified files for GitHub pull request %d", pull.Num)
 	var files []string
 	nextPage := 0
@@ -226,7 +226,7 @@ listloop:
 // CreateComment creates a comment on the pull request.
 // If comment length is greater than the max comment length we split into
 // multiple comments.
-func (g *GithubClient) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
+func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	logger.Debug("Creating comment on GitHub pull request %d", pullNum)
 	var sepStart string
 
@@ -259,7 +259,7 @@ func (g *GithubClient) CreateComment(logger logging.SimpleLogging, repo models.R
 }
 
 // ReactToComment adds a reaction to a comment.
-func (g *GithubClient) ReactToComment(logger logging.SimpleLogging, repo models.Repo, _ int, commentID int64, reaction string) error {
+func (g *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, _ int, commentID int64, reaction string) error {
 	logger.Debug("Adding reaction to GitHub pull request comment %d", commentID)
 	_, resp, err := g.client.Reactions.CreateIssueCommentReaction(g.ctx, repo.Owner, repo.Name, commentID, reaction)
 	if resp != nil {
@@ -268,7 +268,7 @@ func (g *GithubClient) ReactToComment(logger logging.SimpleLogging, repo models.
 	return err
 }
 
-func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
+func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
 	logger.Debug("Hiding previous command comments on GitHub pull request %d", pullNum)
 	var allComments []*github.IssueComment
 	nextPage := 0
@@ -282,7 +282,7 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 			logger.Debug("GET /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
 		}
 		if err != nil {
-			return errors.Wrap(err, "listing comments")
+			return fmt.Errorf("listing comments: %w", err)
 		}
 		allComments = append(allComments, comments...)
 		if resp.NextPage == 0 {
@@ -331,7 +331,7 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 		}
 		logger.Debug("Hiding comment %s", comment.GetNodeID())
 		if err := g.v4Client.Mutate(g.ctx, &m, input, nil); err != nil {
-			return errors.Wrapf(err, "minimize comment %s", comment.GetNodeID())
+			return fmt.Errorf("minimize comment %s: %w", comment.GetNodeID(), err)
 		}
 	}
 
@@ -340,7 +340,7 @@ func (g *GithubClient) HidePrevCommandComments(logger logging.SimpleLogging, rep
 
 // getPRReviews Retrieves PR reviews for a pull request on a specific repository.
 // The reviews are being retrieved using pages with the size of 10 reviews.
-func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (GithubPRReviewSummary, error) {
+func (g *Client) getPRReviews(repo models.Repo, pull models.PullRequest) (GithubPRReviewSummary, error) {
 	var query struct {
 		Repository struct {
 			PullRequest struct {
@@ -373,7 +373,7 @@ func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (
 			return GithubPRReviewSummary{
 				query.Repository.PullRequest.ReviewDecision,
 				allReviews,
-			}, errors.Wrap(err, "getting reviewDecision")
+			}, fmt.Errorf("getting reviewDecision: %w", err)
 		}
 
 		allReviews = append(allReviews, query.Repository.PullRequest.Reviews.Nodes...)
@@ -391,7 +391,7 @@ func (g *GithubClient) getPRReviews(repo models.Repo, pull models.PullRequest) (
 }
 
 // PullIsApproved returns true if the pull request was approved.
-func (g *GithubClient) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
+func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	logger.Debug("Checking if GitHub pull request %d is approved", pull.Num)
 	nextPage := 0
 	for {
@@ -406,7 +406,7 @@ func (g *GithubClient) PullIsApproved(logger logging.SimpleLogging, repo models.
 			logger.Debug("GET /repos/%v/%v/pulls/%d/reviews returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
 		}
 		if err != nil {
-			return approvalStatus, errors.Wrap(err, "getting reviews")
+			return approvalStatus, fmt.Errorf("getting reviews: %w", err)
 		}
 		for _, review := range pageReviews {
 			if review != nil && review.GetState() == "APPROVED" {
@@ -426,7 +426,7 @@ func (g *GithubClient) PullIsApproved(logger logging.SimpleLogging, repo models.
 }
 
 // DiscardReviews dismisses all reviews on a pull request
-func (g *GithubClient) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+func (g *Client) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
 	logger.Debug("Discarding all reviews on GitHub pull request %d", pull.Num)
 	reviewStatus, err := g.getPRReviews(repo, pull)
 	if err != nil {
@@ -453,7 +453,7 @@ func (g *GithubClient) DiscardReviews(logger logging.SimpleLogging, repo models.
 		mutationResult := &mutation
 		err := g.v4Client.Mutate(g.ctx, mutationResult, input, nil)
 		if err != nil {
-			return errors.Wrap(err, "dismissing reviewDecision")
+			return fmt.Errorf("dismissing reviewDecision: %w", err)
 		}
 	}
 	return nil
@@ -482,13 +482,26 @@ func (original WorkflowFileReference) Copy() WorkflowFileReference {
 	return copy
 }
 
+type WorkflowRunFile struct {
+	Path              githubv4.String
+	RepositoryFileUrl githubv4.String
+	RepositoryName    githubv4.String
+}
+
 type WorkflowRun struct {
-	File struct {
-		Path              githubv4.String
-		RepositoryFileUrl githubv4.String
-		RepositoryName    githubv4.String
-	}
+	File      *WorkflowRunFile
 	RunNumber githubv4.Int
+}
+
+func (original WorkflowRun) Copy() WorkflowRun {
+	copy := WorkflowRun{
+		RunNumber: original.RunNumber,
+	}
+	if original.File != nil {
+		fileCopy := *original.File
+		copy.File = &fileCopy
+	}
+	return copy
 }
 
 type CheckSuite struct {
@@ -500,10 +513,9 @@ func (original CheckSuite) Copy() CheckSuite {
 	copy := CheckSuite{
 		Conclusion: original.Conclusion,
 	}
-
 	if original.WorkflowRun != nil {
-		copy.WorkflowRun = new(WorkflowRun)
-		*copy.WorkflowRun = *original.WorkflowRun
+		workflowRunCopy := original.WorkflowRun.Copy()
+		copy.WorkflowRun = &workflowRunCopy
 	}
 
 	return copy
@@ -535,7 +547,7 @@ type StatusContext struct {
 	IsRequired githubv4.Boolean `graphql:"isRequired(pullRequestNumber: $number)"`
 }
 
-func (g *GithubClient) LookupRepoId(repo githubv4.String) (githubv4.Int, error) {
+func (g *Client) LookupRepoId(repo githubv4.String) (githubv4.Int, error) {
 	// This function may get many calls for the same repo, and repo names are not often changed
 	// Utilize caching to reduce the number of API calls to GitHub
 	if repoId, ok := g.repoIdCache.Get(repo); ok {
@@ -560,7 +572,7 @@ func (g *GithubClient) LookupRepoId(repo githubv4.String) (githubv4.Int, error) 
 	err := g.v4Client.Query(g.ctx, &query, variables)
 
 	if err != nil {
-		return githubv4.Int(0), errors.Wrap(err, "getting repository id from GraphQL")
+		return githubv4.Int(0), fmt.Errorf("getting repository id from GraphQL: %w", err)
 	}
 
 	g.repoIdCache.Set(repo, query.Repository.DatabaseId)
@@ -568,25 +580,25 @@ func (g *GithubClient) LookupRepoId(repo githubv4.String) (githubv4.Int, error) 
 	return query.Repository.DatabaseId, nil
 }
 
-func (g *GithubClient) WorkflowRunMatchesWorkflowFileReference(workflowRun WorkflowRun, workflowFileReference WorkflowFileReference) (bool, error) {
+func (g *Client) WorkflowRunMatchesWorkflowFileReference(workflowRunFile WorkflowRunFile, workflowFileReference WorkflowFileReference) (bool, error) {
 	// Unfortunately, the GitHub API doesn't expose the repositoryId for the WorkflowRunFile from the statusCheckRollup.
 	// Conversely, it doesn't expose the repository name for the WorkflowFileReference from the RepositoryRuleConnection.
 	// Therefore, a second query is required to lookup the association between repositoryId and repositoryName.
-	repoId, err := g.LookupRepoId(workflowRun.File.RepositoryName)
+	repoId, err := g.LookupRepoId(workflowRunFile.RepositoryName)
 	if err != nil {
 		return false, err
 	}
 
-	if repoId != workflowFileReference.RepositoryId || workflowRun.File.Path != workflowFileReference.Path {
+	if repoId != workflowFileReference.RepositoryId || workflowRunFile.Path != workflowFileReference.Path {
 		return false, nil
 	} else if workflowFileReference.Sha != nil {
-		return strings.Contains(string(workflowRun.File.RepositoryFileUrl), string(*workflowFileReference.Sha)), nil
+		return strings.Contains(string(workflowRunFile.RepositoryFileUrl), string(*workflowFileReference.Sha)), nil
 	} else {
 		return true, nil
 	}
 }
 
-func (g *GithubClient) GetPullRequestMergeabilityInfo(
+func (g *Client) GetPullRequestMergeabilityInfo(
 	repo models.Repo,
 	pull *github.PullRequest,
 ) (
@@ -720,7 +732,7 @@ pagination:
 	}
 
 	if err != nil {
-		return "", nil, nil, nil, nil, errors.Wrap(err, "fetching rulesets, branch protections and status checks from GraphQL")
+		return "", nil, nil, nil, nil, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
 	}
 
 	for context := range requiredChecksSet {
@@ -775,17 +787,17 @@ func ExpectedCheckPassed(expectedContext githubv4.String, checkRuns []CheckRun, 
 	return false
 }
 
-func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
+func (g *Client) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, checkRuns []CheckRun) (bool, error) {
 	// If there's no WorkflowRun, we just skip evaluation for given CheckSuite.
 	// If there is WorkflowRun, we assume there can be multiple checkSuites with the given name,
 	// so we retrieve the latest checkRun and evaluate and return the status of the latest CheckSuite.
 	latestCheckSuiteNumber := githubv4.Int(-1)
 	var latestCheckSuite *CheckSuite
 	for _, checkRun := range checkRuns {
-		if checkRun.CheckSuite.WorkflowRun == nil {
+		if checkRun.CheckSuite.WorkflowRun == nil || checkRun.CheckSuite.WorkflowRun.File == nil {
 			continue
 		}
-		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun, expectedWorkflow)
+		match, err := g.WorkflowRunMatchesWorkflowFileReference(*checkRun.CheckSuite.WorkflowRun.File, expectedWorkflow)
 		if err != nil {
 			return false, err
 		}
@@ -805,7 +817,7 @@ func (g *GithubClient) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileRefer
 }
 
 // IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
-func (g *GithubClient) IsMergeableMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
+func (g *Client) IsMergeableMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
 	if pull.Number == nil {
 		return false, errors.New("pull request number is nil")
 	}
@@ -856,11 +868,11 @@ func GetVCSStatusNameFromRequiredCheck(requiredCheck githubv4.String) string {
 }
 
 // PullIsMergeable returns true if the pull request is mergeable.
-func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
+func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if GitHub pull request %d is mergeable", pull.Num)
 	githubPR, err := g.GetPullRequest(logger, repo, pull.Num)
 	if err != nil {
-		return models.MergeableStatus{}, errors.Wrap(err, "getting pull request")
+		return models.MergeableStatus{}, fmt.Errorf("getting pull request: %w", err)
 	}
 
 	// We map our mergeable check to when the GitHub merge button is clickable.
@@ -886,7 +898,7 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 			logger.Debug("AllowMergeableBypassApply feature flag is enabled - attempting to bypass apply from mergeable requirements")
 			isMergeableMinusApply, err := g.IsMergeableMinusApply(logger, repo, githubPR, vcsstatusname, ignoreVCSStatusNames)
 			if err != nil {
-				return models.MergeableStatus{}, errors.Wrap(err, "getting pull request status")
+				return models.MergeableStatus{}, fmt.Errorf("getting pull request status: %w", err)
 			}
 			if isMergeableMinusApply {
 				return models.MergeableStatus{
@@ -911,7 +923,7 @@ func (g *GithubClient) PullIsMergeable(logger logging.SimpleLogging, repo models
 }
 
 // GetPullRequest returns the pull request.
-func (g *GithubClient) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, num int) (*github.PullRequest, error) {
+func (g *Client) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, num int) (*github.PullRequest, error) {
 	logger.Debug("Getting GitHub pull request %d", num)
 	var err error
 	var pull *github.PullRequest
@@ -943,7 +955,7 @@ func (g *GithubClient) GetPullRequest(logger logging.SimpleLogging, repo models.
 
 // UpdateStatus updates the status badge on the pull request.
 // See https://github.com/blog/1227-commit-status-api.
-func (g *GithubClient) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	ghState := "error"
 	switch state {
 	case models.PendingCommitStatus:
@@ -970,7 +982,7 @@ func (g *GithubClient) UpdateStatus(logger logging.SimpleLogging, repo models.Re
 }
 
 // MergePull merges the pull request.
-func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	logger.Debug("Merging GitHub pull request %d", pull.Num)
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
@@ -979,7 +991,7 @@ func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 		logger.Debug("GET /repos/%v/%v returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, resp.StatusCode)
 	}
 	if err != nil {
-		return errors.Wrap(err, "fetching repo info")
+		return fmt.Errorf("fetching repo info: %w", err)
 	}
 
 	const (
@@ -1038,7 +1050,7 @@ func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 		logger.Debug("POST /repos/%v/%v/pulls/%d/merge returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
 	}
 	if err != nil {
-		return errors.Wrap(err, "merging pull request")
+		return fmt.Errorf("merging pull request: %w", err)
 	}
 	if !mergeResult.GetMerged() {
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMessage())
@@ -1047,13 +1059,13 @@ func (g *GithubClient) MergePull(logger logging.SimpleLogging, pull models.PullR
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
-func (g *GithubClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+func (g *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
 // https://docs.github.com/en/graphql/reference/objects#organization
-func (g *GithubClient) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) {
+func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) {
 	logger.Debug("Getting GitHub team names for user '%s'", user)
 	orgName := repo.Owner
 	variables := map[string]interface{}{
@@ -1096,7 +1108,7 @@ func (g *GithubClient) GetTeamNamesForUser(logger logging.SimpleLogging, repo mo
 }
 
 // ExchangeCode returns a newly created app's info
-func (g *GithubClient) ExchangeCode(logger logging.SimpleLogging, code string) (*GithubAppTemporarySecrets, error) {
+func (g *Client) ExchangeCode(logger logging.SimpleLogging, code string) (*GithubAppTemporarySecrets, error) {
 	logger.Debug("Exchanging code for app secrets")
 	ctx := context.Background()
 	cfg, resp, err := g.client.Apps.CompleteAppManifest(ctx, code)
@@ -1117,7 +1129,7 @@ func (g *GithubClient) ExchangeCode(logger logging.SimpleLogging, code string) (
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (g *GithubClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+func (g *Client) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
 	logger.Debug("Getting GitHub file content for file '%s'", fileName)
 	opt := github.RepositoryContentGetOptions{Ref: branch}
 
@@ -1141,11 +1153,11 @@ func (g *GithubClient) GetFileContent(logger logging.SimpleLogging, repo models.
 	return true, decodedData, nil
 }
 
-func (g *GithubClient) SupportsSingleFileDownload(_ models.Repo) bool {
+func (g *Client) SupportsSingleFileDownload(_ models.Repo) bool {
 	return true
 }
 
-func (g *GithubClient) GetCloneURL(logger logging.SimpleLogging, _ models.VCSHostType, repo string) (string, error) {
+func (g *Client) GetCloneURL(logger logging.SimpleLogging, _ models.VCSHostType, repo string) (string, error) {
 	logger.Debug("Getting clone URL for %s", repo)
 	parts := strings.Split(repo, "/")
 	repository, resp, err := g.client.Repositories.Get(g.ctx, parts[0], parts[1])
@@ -1158,7 +1170,7 @@ func (g *GithubClient) GetCloneURL(logger logging.SimpleLogging, _ models.VCSHos
 	return repository.GetCloneURL(), nil
 }
 
-func (g *GithubClient) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (g *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	logger.Debug("Getting labels for GitHub pull request %d", pull.Num)
 	pullDetails, resp, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, pull.Num)
 	if resp != nil {

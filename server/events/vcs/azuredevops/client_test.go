@@ -1,7 +1,7 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package vcs_test
+package azuredevops_test
 
 import (
 	"context"
@@ -16,8 +16,9 @@ import (
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	azuredevopsclient "github.com/runatlantis/atlantis/server/events/vcs/azuredevops"
+	"github.com/runatlantis/atlantis/server/events/vcs/azuredevops/testdata"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -105,10 +106,10 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 			client.Client.VsaexBaseURL = *testServerURL
 			Ok(t, err)
-			defer disableSSLVerification()()
+			defer common.DisableSSLVerification()()
 
 			merge, _, err := client.Client.PullRequests.Merge(context.Background(),
 				"owner",
@@ -222,9 +223,9 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 			Ok(t, err)
-			defer disableSSLVerification()()
+			defer common.DisableSSLVerification()()
 
 			repo := models.Repo{
 				FullName: "owner/project/repo",
@@ -274,7 +275,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 			switch r.RequestURI {
 			// The first request should hit this URL.
 			case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
-				w.Write([]byte(testdata.ADPullJSON)) // nolint: errcheck
+				w.Write([]byte(testdata.PullJSON)) // nolint: errcheck
 			// The second should hit this URL.
 			case "/owner/project/_apis/git/repositories/repo/diffs/commits?%24top=100&api-version=5.1&baseVersion=new_feature&targetVersion=npaulk%2Fmy_work":
 				// We write a header that means there's an additional page.
@@ -289,9 +290,9 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+	client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 	Ok(t, err)
-	defer disableSSLVerification()()
+	defer common.DisableSSLVerification()()
 
 	files, err := client.GetModifiedFiles(
 		logger,
@@ -385,10 +386,10 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 		},
 	}
 
-	jsonPullRequestBytes, err := os.ReadFile("testdata/azuredevops-pr.json")
+	jsonPullRequestBytes, err := os.ReadFile("testdata/pr.json")
 	Ok(t, err)
 
-	jsonPolicyEvaluationBytes, err := os.ReadFile("testdata/azuredevops-policyevaluations.json")
+	jsonPolicyEvaluationBytes, err := os.ReadFile("testdata/policyevaluations.json")
 	Ok(t, err)
 
 	pullRequestBody := string(jsonPullRequestBytes)
@@ -420,10 +421,10 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 			Ok(t, err)
 
-			defer disableSSLVerification()()
+			defer common.DisableSSLVerification()()
 
 			actMergeable, err := client.PullIsMergeable(
 				logger,
@@ -492,7 +493,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 		},
 	}
 
-	jsBytes, err := os.ReadFile("testdata/azuredevops-pr.json")
+	jsBytes, err := os.ReadFile("testdata/pr.json")
 	Ok(t, err)
 
 	json := string(jsBytes)
@@ -517,10 +518,10 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 			Ok(t, err)
 
-			defer disableSSLVerification()()
+			defer common.DisableSSLVerification()()
 
 			approvalStatus, err := client.PullIsApproved(
 				logger,
@@ -546,7 +547,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	// Use a real Azure DevOps json response and edit the mergeable_state field.
-	jsBytes, err := os.ReadFile("testdata/azuredevops-pr.json")
+	jsBytes, err := os.ReadFile("testdata/pr.json")
 	Ok(t, err)
 	response := string(jsBytes)
 
@@ -565,9 +566,9 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := vcs.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+		client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 		Ok(t, err)
-		defer disableSSLVerification()()
+		defer common.DisableSSLVerification()()
 
 		_, err = client.GetPullRequest(
 			logger,
@@ -587,7 +588,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 }
 
 func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
-	client, err := vcs.NewAzureDevopsClient("hostname", "user", "token")
+	client, err := azuredevopsclient.New("hostname", "user", "token")
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
@@ -618,40 +619,3 @@ var adMergeSuccess = `{
 	}
 }
 `
-
-func TestAzureDevopsClient_GitStatusContextFromSrc(t *testing.T) {
-	cases := []struct {
-		src      string
-		expGenre string
-		expName  string
-	}{
-		{
-			"atlantis/plan",
-			"Atlantis Bot/atlantis",
-			"plan",
-		},
-		{
-			"atlantis/foo/bar/biz/baz",
-			"Atlantis Bot/atlantis/foo/bar/biz",
-			"baz",
-		},
-		{
-			"foo",
-			"Atlantis Bot",
-			"foo",
-		},
-		{
-			"",
-			"Atlantis Bot",
-			"",
-		},
-	}
-
-	for _, c := range cases {
-		result := vcs.GitStatusContextFromSrc(c.src)
-		expName := c.expName
-		expGenre := c.expGenre
-		Equals(t, &expName, result.Name)
-		Equals(t, &expGenre, result.Genre)
-	}
-}

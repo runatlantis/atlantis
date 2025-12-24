@@ -318,6 +318,106 @@ func TestProject_Validate(t *testing.T) {
 			},
 			expErr: `name: "namewith\\" is not allowed: must contain only URL safe characters.`,
 		},
+		// Glob pattern tests
+		{
+			description: "dir with valid glob pattern *",
+			input: raw.Project{
+				Dir: String("modules/*"),
+			},
+			expErr: "",
+		},
+		{
+			description: "dir with valid glob pattern **",
+			input: raw.Project{
+				Dir: String("environments/**"),
+			},
+			expErr: "",
+		},
+		{
+			description: "dir with valid glob pattern ?",
+			input: raw.Project{
+				Dir: String("module?"),
+			},
+			expErr: "",
+		},
+		{
+			description: "dir with valid glob pattern [abc]",
+			input: raw.Project{
+				Dir: String("[abc]"),
+			},
+			expErr: "",
+		},
+		{
+			description: "dir with complex glob pattern",
+			input: raw.Project{
+				Dir: String("modules/*/terraform"),
+			},
+			expErr: "",
+		},
+		{
+			description: "dir with invalid glob pattern - unclosed bracket",
+			input: raw.Project{
+				Dir: String("[abc"),
+			},
+			expErr: `dir: invalid glob pattern "[abc".`,
+		},
+		// Name with glob pattern tests
+		{
+			description: "name containing * glob pattern should fail",
+			input: raw.Project{
+				Dir:  String("modules/networking"),
+				Name: String("my-project*"),
+			},
+			expErr: "name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field",
+		},
+		{
+			description: "name containing ** glob pattern should fail",
+			input: raw.Project{
+				Dir:  String("modules/networking"),
+				Name: String("my-project**"),
+			},
+			expErr: "name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field",
+		},
+		{
+			description: "name containing ? glob pattern should fail",
+			input: raw.Project{
+				Dir:  String("modules/networking"),
+				Name: String("project?"),
+			},
+			expErr: "name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field",
+		},
+		{
+			description: "name containing [ glob pattern should fail",
+			input: raw.Project{
+				Dir:  String("modules/networking"),
+				Name: String("project[1]"),
+			},
+			expErr: "name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field",
+		},
+		{
+			description: "name with glob pattern in dir should fail",
+			input: raw.Project{
+				Dir:  String("modules/*"),
+				Name: String("my-project"),
+			},
+			expErr: "name: cannot be used with glob patterns in 'dir'; glob patterns expand to multiple projects which cannot share the same name",
+		},
+		{
+			description: "name with ** glob pattern in dir should fail",
+			input: raw.Project{
+				Dir:  String("environments/**"),
+				Name: String("my-env"),
+			},
+			expErr: "name: cannot be used with glob patterns in 'dir'; glob patterns expand to multiple projects which cannot share the same name",
+		},
+		{
+			description: "name without glob pattern in dir should pass",
+			input: raw.Project{
+				Dir:  String("modules/networking"),
+				Name: String("networking"),
+			},
+			expErr: "",
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {

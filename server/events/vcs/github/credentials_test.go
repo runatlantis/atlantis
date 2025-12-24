@@ -1,32 +1,32 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package vcs_test
+package github_test
 
 import (
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
+	"github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestGithubClient_GetUser_AppSlug(t *testing.T) {
+func TestClient_GetUser_AppSlug(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	defer disableSSLVerification()()
 	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
 
-	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	anonCreds := &github.AnonymousCredentials{}
+	anonClient, err := github.New(testServer, anonCreds, github.Config{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
 
-	appCreds := &vcs.GithubAppCredentials{
+	appCreds := &github.AppCredentials{
 		AppID:    tempSecrets.ID,
-		Key:      []byte(testdata.GithubPrivateKey),
+		Key:      []byte(testdata.PrivateKey),
 		Hostname: testServer,
 		AppSlug:  "some-app",
 	}
@@ -37,24 +37,24 @@ func TestGithubClient_GetUser_AppSlug(t *testing.T) {
 	Assert(t, user == "octoapp[bot]", "user should not be empty")
 }
 
-func TestGithubClient_AppAuthentication(t *testing.T) {
+func TestClient_AppAuthentication(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	defer disableSSLVerification()()
 	testServer, err := testdata.GithubAppTestServer(t)
 	Ok(t, err)
 
-	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	anonCreds := &github.AnonymousCredentials{}
+	anonClient, err := github.New(testServer, anonCreds, github.Config{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
 
-	appCreds := &vcs.GithubAppCredentials{
+	appCreds := &github.AppCredentials{
 		AppID:    tempSecrets.ID,
-		Key:      []byte(testdata.GithubPrivateKey),
+		Key:      []byte(testdata.PrivateKey),
 		Hostname: testServer,
 	}
-	_, err = vcs.NewGithubClient(testServer, appCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	_, err = github.New(testServer, appCreds, github.Config{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 
 	token, err := appCreds.GetToken()
@@ -73,25 +73,25 @@ func TestGithubClient_AppAuthentication(t *testing.T) {
 	}
 }
 
-func TestGithubClient_MultipleAppAuthentication(t *testing.T) {
+func TestClient_MultipleAppAuthentication(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	defer disableSSLVerification()()
 	testServer, err := testdata.GithubMultipleAppTestServer(t)
 	Ok(t, err)
 
-	anonCreds := &vcs.GithubAnonymousCredentials{}
-	anonClient, err := vcs.NewGithubClient(testServer, anonCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	anonCreds := &github.AnonymousCredentials{}
+	anonClient, err := github.New(testServer, anonCreds, github.Config{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	tempSecrets, err := anonClient.ExchangeCode(logger, "good-code")
 	Ok(t, err)
 
-	appCreds := &vcs.GithubAppCredentials{
+	appCreds := &github.AppCredentials{
 		AppID:          tempSecrets.ID,
 		InstallationID: 1,
-		Key:            []byte(testdata.GithubPrivateKey),
+		Key:            []byte(testdata.PrivateKey),
 		Hostname:       testServer,
 	}
-	_, err = vcs.NewGithubClient(testServer, appCreds, vcs.GithubConfig{}, 0, logging.NewNoopLogger(t))
+	_, err = github.New(testServer, appCreds, github.Config{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 
 	token, err := appCreds.GetToken()

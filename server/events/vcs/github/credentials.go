@@ -1,7 +1,7 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package vcs
+package github
 
 import (
 	"context"
@@ -13,50 +13,49 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v71/github"
-	"github.com/pkg/errors"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_github_credentials.go GithubCredentials
+//go:generate pegomock generate --package mocks -o mocks/mock_credentials.go Credentials
 
 // GithubCredentials handles creating http.Clients that authenticate.
-type GithubCredentials interface {
+type Credentials interface {
 	Client() (*http.Client, error)
 	GetToken() (string, error)
 	GetUser() (string, error)
 }
 
 // GithubAnonymousCredentials expose no credentials.
-type GithubAnonymousCredentials struct{}
+type AnonymousCredentials struct{}
 
 // Client returns a client with no credentials.
-func (c *GithubAnonymousCredentials) Client() (*http.Client, error) {
+func (c *AnonymousCredentials) Client() (*http.Client, error) {
 	tr := http.DefaultTransport
 	return &http.Client{Transport: tr}, nil
 }
 
 // GetUser returns the username for these credentials.
-func (c *GithubAnonymousCredentials) GetUser() (string, error) {
+func (c *AnonymousCredentials) GetUser() (string, error) {
 	return "anonymous", nil
 }
 
 // GetToken returns an empty token.
-func (c *GithubAnonymousCredentials) GetToken() (string, error) {
+func (c *AnonymousCredentials) GetToken() (string, error) {
 	return "", nil
 }
 
 // GithubUserCredentials implements GithubCredentials for the personal auth token flow.
-type GithubUserCredentials struct {
+type UserCredentials struct {
 	User      string
 	Token     string
 	TokenFile string
 }
 
-type GitHubUserTransport struct {
-	Credentials *GithubUserCredentials
+type UserTransport struct {
+	Credentials *UserCredentials
 	Transport   *github.BasicAuthTransport
 }
 
-func (t *GitHubUserTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *UserTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// update token
 	token, err := t.Credentials.GetToken()
 	if err != nil {
@@ -69,14 +68,14 @@ func (t *GitHubUserTransport) RoundTrip(req *http.Request) (*http.Response, erro
 }
 
 // Client returns a client for basic auth user credentials.
-func (c *GithubUserCredentials) Client() (*http.Client, error) {
+func (c *UserCredentials) Client() (*http.Client, error) {
 	password, err := c.GetToken()
 	if err != nil {
 		return nil, err
 	}
 
 	client := &http.Client{
-		Transport: &GitHubUserTransport{
+		Transport: &UserTransport{
 			Credentials: c,
 			Transport: &github.BasicAuthTransport{
 				Username: strings.TrimSpace(c.User),
@@ -88,12 +87,12 @@ func (c *GithubUserCredentials) Client() (*http.Client, error) {
 }
 
 // GetUser returns the username for these credentials.
-func (c *GithubUserCredentials) GetUser() (string, error) {
+func (c *UserCredentials) GetUser() (string, error) {
 	return c.User, nil
 }
 
 // GetToken returns the user token.
-func (c *GithubUserCredentials) GetToken() (string, error) {
+func (c *UserCredentials) GetToken() (string, error) {
 	if c.TokenFile != "" {
 		content, err := os.ReadFile(c.TokenFile)
 		if err != nil {
@@ -107,7 +106,7 @@ func (c *GithubUserCredentials) GetToken() (string, error) {
 }
 
 // GithubAppCredentials implements GithubCredentials for github app installation token flow.
-type GithubAppCredentials struct {
+type AppCredentials struct {
 	AppID          int64
 	Key            []byte
 	Hostname       string
@@ -118,7 +117,7 @@ type GithubAppCredentials struct {
 }
 
 // Client returns a github app installation client.
-func (c *GithubAppCredentials) Client() (*http.Client, error) {
+func (c *AppCredentials) Client() (*http.Client, error) {
 	itr, err := c.transport()
 	if err != nil {
 		return nil, err
@@ -127,7 +126,7 @@ func (c *GithubAppCredentials) Client() (*http.Client, error) {
 }
 
 // GetUser returns the username for these credentials.
-func (c *GithubAppCredentials) GetUser() (string, error) {
+func (c *AppCredentials) GetUser() (string, error) {
 	// Keeping backwards compatibility since this flag is optional
 	if c.AppSlug == "" {
 		return "", nil
@@ -135,7 +134,7 @@ func (c *GithubAppCredentials) GetUser() (string, error) {
 	client, err := c.Client()
 
 	if err != nil {
-		return "", errors.Wrap(err, "initializing client")
+		return "", fmt.Errorf("initializing client: %w", err)
 	}
 
 	ghClient := github.NewClient(client)
@@ -145,7 +144,7 @@ func (c *GithubAppCredentials) GetUser() (string, error) {
 	app, _, err := ghClient.Apps.Get(ctx, c.AppSlug)
 
 	if err != nil {
-		return "", errors.Wrap(err, "getting app details")
+		return "", fmt.Errorf("getting app details: %w", err)
 	}
 	// Currently there is no way to get the bot's login info, so this is a
 	// hack until Github exposes that.
@@ -153,16 +152,16 @@ func (c *GithubAppCredentials) GetUser() (string, error) {
 }
 
 // GetToken returns a fresh installation token.
-func (c *GithubAppCredentials) GetToken() (string, error) {
+func (c *AppCredentials) GetToken() (string, error) {
 	tr, err := c.transport()
 	if err != nil {
-		return "", errors.Wrap(err, "transport failed")
+		return "", fmt.Errorf("transport failed: %w", err)
 	}
 
 	return tr.Token(context.Background())
 }
 
-func (c *GithubAppCredentials) getInstallationID() (int64, error) {
+func (c *AppCredentials) getInstallationID() (int64, error) {
 	if c.InstallationID != 0 {
 		return c.InstallationID, nil
 	}
@@ -193,7 +192,7 @@ func (c *GithubAppCredentials) getInstallationID() (int64, error) {
 	return c.InstallationID, nil
 }
 
-func (c *GithubAppCredentials) transport() (*ghinstallation.Transport, error) {
+func (c *AppCredentials) transport() (*ghinstallation.Transport, error) {
 	if c.tr != nil {
 		return c.tr, nil
 	}
@@ -213,7 +212,7 @@ func (c *GithubAppCredentials) transport() (*ghinstallation.Transport, error) {
 	return itr, err
 }
 
-func (c *GithubAppCredentials) getAPIURL() *url.URL {
+func (c *AppCredentials) getAPIURL() *url.URL {
 	if c.apiURL != nil {
 		return c.apiURL
 	}

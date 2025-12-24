@@ -518,7 +518,9 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	var index int
 	var preConftestOutput []string
 	var postConftestOutput []string
-	var policySetResults []models.PolicySetResult
+	// Initialize policySetResults as empty slice instead of nil to prevent
+	// "unable to unmarshal conftest output" error when outputs array is empty
+	policySetResults := []models.PolicySetResult{}
 
 	inputPolicySets := ctx.PolicySets.PolicySets
 	for index, output := range outputs {
@@ -536,14 +538,21 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			}
 
 			// Handle empty output: treat as failure since it likely indicates misconfiguration
-			// Non-empty output: check for "fail" string to determine pass/fail
+			// Non-empty output: parse conftest-style output to determine pass/fail
+			// Check for actual failures (> 0), not just the word "fail"
 			var passed bool
 			var policyOutput string
 			if output == "" {
 				passed = false
 				policyOutput = "WARNING: Policy check produced no output. This may indicate a misconfiguration."
 			} else {
-				passed = !strings.Contains(strings.ToLower(output), "fail")
+				// Use regex to check for actual failures (> 0), not just the word "fail"
+				// Matches patterns like "1 failure", "2 failures", "10 failures", or JSON "failures": [...]
+				failureRegex := regexp.MustCompile(`([1-9][0-9]* failure|failures": \[)`)
+				hasFailures := failureRegex.MatchString(output)
+				// Also check for FAIL prefix (conftest error output)
+				hasFailPrefix := strings.HasPrefix(strings.TrimSpace(output), "FAIL")
+				passed = !hasFailures && !hasFailPrefix
 				policyOutput = output
 			}
 
@@ -568,9 +577,20 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		}
 	}
 
-	if policySetResults == nil {
-		return nil, "", errors.New("unable to unmarshal conftest output")
+	// Check if we have any policy check results
+	// For non-custom policy checks (conftest), empty results means JSON parsing failed
+	// For custom policy checks, empty results when policy sets are configured means the check failed
+	if len(policySetResults) == 0 {
+		if !ctx.CustomPolicyCheck {
+			// Conftest should have produced JSON output
+			return nil, "", errors.New("unable to unmarshal conftest output")
+		} else if len(inputPolicySets) > 0 {
+			// Custom policy check with configured policy sets but no results - this is a failure
+			return nil, "", errors.New("custom policy check produced no results despite configured policy sets")
+		}
+		// Custom policy check with no configured policy sets and no results - this is OK
 	}
+
 	if len(outputs) > 0 {
 		postConftestOutput = outputs[(index + 1):]
 	}
@@ -588,9 +608,12 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Using this function instead of catching failed policy runs with errors, for cases when '--no-fail' is passed to conftest.
 	// One reason to pass such an arg to conftest would be to prevent workflow termination so custom run scripts
 	// can be run after the conftest step.
-	ctx.Log.Err(strings.Join(outputs, "\n"))
+	// Only log outputs as errors if policies did not pass, otherwise log at debug level
 	if !result.PolicyCleared() {
+		ctx.Log.Err(strings.Join(outputs, "\n"))
 		failure = "Some policy sets did not pass."
+	} else {
+		ctx.Log.Debug("policy check outputs %s", strings.Join(outputs, "\n"))
 	}
 
 	return result, failure, nil
