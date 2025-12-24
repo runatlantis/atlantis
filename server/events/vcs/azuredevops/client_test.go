@@ -106,7 +106,7 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 			client.Client.VsaexBaseURL = *testServerURL
 			Ok(t, err)
 			defer common.DisableSSLVerification()()
@@ -223,7 +223,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 			Ok(t, err)
 			defer common.DisableSSLVerification()()
 
@@ -290,7 +290,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+	client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 	Ok(t, err)
 	defer common.DisableSSLVerification()()
 
@@ -386,10 +386,10 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 		},
 	}
 
-	jsonPullRequestBytes, err := os.ReadFile("testdata/azuredevops-pr.json")
+	jsonPullRequestBytes, err := os.ReadFile("testdata/pr.json")
 	Ok(t, err)
 
-	jsonPolicyEvaluationBytes, err := os.ReadFile("testdata/azuredevops-policyevaluations.json")
+	jsonPolicyEvaluationBytes, err := os.ReadFile("testdata/policyevaluations.json")
 	Ok(t, err)
 
 	pullRequestBody := string(jsonPullRequestBytes)
@@ -421,7 +421,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 			Ok(t, err)
 
 			defer common.DisableSSLVerification()()
@@ -493,7 +493,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 		},
 	}
 
-	jsBytes, err := os.ReadFile("testdata/azuredevops-pr.json")
+	jsBytes, err := os.ReadFile("testdata/pr.json")
 	Ok(t, err)
 
 	json := string(jsBytes)
@@ -518,7 +518,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 			Ok(t, err)
 
 			defer common.DisableSSLVerification()()
@@ -547,7 +547,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	// Use a real Azure DevOps json response and edit the mergeable_state field.
-	jsBytes, err := os.ReadFile("testdata/azuredevops-pr.json")
+	jsBytes, err := os.ReadFile("testdata/pr.json")
 	Ok(t, err)
 	response := string(jsBytes)
 
@@ -566,7 +566,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := azuredevopsclient.NewAzureDevopsClient(testServerURL.Host, "user", "token")
+		client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
 		Ok(t, err)
 		defer common.DisableSSLVerification()()
 
@@ -588,7 +588,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 }
 
 func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
-	client, err := azuredevopsclient.NewAzureDevopsClient("hostname", "user", "token")
+	client, err := azuredevopsclient.New("hostname", "user", "token")
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
@@ -619,40 +619,3 @@ var adMergeSuccess = `{
 	}
 }
 `
-
-func TestAzureDevopsClient_GitStatusContextFromSrc(t *testing.T) {
-	cases := []struct {
-		src      string
-		expGenre string
-		expName  string
-	}{
-		{
-			"atlantis/plan",
-			"Atlantis Bot/atlantis",
-			"plan",
-		},
-		{
-			"atlantis/foo/bar/biz/baz",
-			"Atlantis Bot/atlantis/foo/bar/biz",
-			"baz",
-		},
-		{
-			"foo",
-			"Atlantis Bot",
-			"foo",
-		},
-		{
-			"",
-			"Atlantis Bot",
-			"",
-		},
-	}
-
-	for _, c := range cases {
-		result := azuredevopsclient.GitStatusContextFromSrc(c.src)
-		expName := c.expName
-		expGenre := c.expGenre
-		Equals(t, &expName, result.Name)
-		Equals(t, &expGenre, result.Genre)
-	}
-}
