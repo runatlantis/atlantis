@@ -58,6 +58,7 @@ const (
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
+	AutomergeMethodFlag              = "automerge-method"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
@@ -169,6 +170,7 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultAutomergeMethod              = "merge"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
@@ -237,6 +239,10 @@ var stringFlags = map[string]stringFlag{
 			"means projects will be discovered when no explicit projects are defined in repo config. Also supports 'enabled' (always " +
 			"discover projects) and 'disabled' (never discover projects).",
 		defaultValue: DefaultAutoDiscoverMode,
+	},
+	AutomergeMethodFlag: {
+		description:  "Method to use when automatically merging pull requests. Can be either 'merge' (default), 'squash', or 'rebase'. Only supported for GitHub repositories.",
+		defaultValue: DefaultAutomergeMethod,
 	},
 	AutoplanModulesFromProjects: {
 		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
@@ -906,6 +912,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.CheckoutDepth <= 0 {
 		c.CheckoutDepth = DefaultCheckoutDepth
+	}
+	if c.AutomergeMethod == "" {
+		c.AutomergeMethod = DefaultAutomergeMethod
 	}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands

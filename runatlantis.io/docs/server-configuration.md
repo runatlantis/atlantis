@@ -151,6 +151,17 @@ ATLANTIS_AUTOMERGE=true
 Automatically merge pull requests after all plans have been successfully applied.
 Defaults to `false`. See [Automerging](automerging.md) for more details.
 
+### `--automerge-method` <Badge text="v0.35.1" type="info"/>
+
+```bash
+atlantis server --automerge-method=squash
+# or
+ATLANTIS_AUTOMERGE_METHOD="squash"
+```
+
+Method to use when automatically merging pull requests. Can be set to `merge` (default), `squash` or `rebase`.
+Only supported for GitHub repositories.
+
 ### `--autoplan-file-list` <Badge text="v0.15.0+" type="info"/>
 
 ```bash

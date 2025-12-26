@@ -751,8 +751,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	autoMerger := &events.AutoMerger{
-		VCSClient:       vcsClient,
-		GlobalAutomerge: userConfig.Automerge,
+		VCSClient:             vcsClient,
+		GlobalAutomerge:       userConfig.Automerge,
+		GlobalAutomergeMethod: userConfig.AutomergeMethod,
 	}
 
 	projectOutputWrapper := &events.ProjectOutputWrapper{

@@ -41,6 +41,8 @@ type ProjectContext struct {
 	// AutomergeEnabled is true if automerge is enabled for the repo that this
 	// project is in.
 	AutomergeEnabled bool
+	// AutomergeMethod is the automerge method that will be used for the repo that this project is in.
+	AutomergeMethod string
 	// ParallelApplyEnabled is true if parallel apply is enabled for this project.
 	ParallelApplyEnabled bool
 	// ParallelPlanEnabled is true if parallel plan is enabled for this project.
