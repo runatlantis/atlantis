@@ -47,6 +47,9 @@ type ProjectContext struct {
 	ParallelPlanEnabled bool
 	// ParallelPolicyCheckEnabled is true if parallel policy_check is enabled for this project.
 	ParallelPolicyCheckEnabled bool
+	// Parallelism is the max number of projects to run in parallel for this command.
+	// A value of 0 means use the server-configured default.
+	Parallelism int
 	// AutoplanEnabled is true if autoplanning is enabled for this project.
 	AutoplanEnabled bool
 	// BaseRepo is the repository that the pull request will be merged into.

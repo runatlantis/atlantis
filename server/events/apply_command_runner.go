@@ -161,8 +161,9 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	// Only run commands in parallel if enabled
 	var result command.Result
 	if a.isParallelEnabled(projectCmds) {
-		ctx.Log.Info("Running applies in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, a.prjCmdRunner.Apply, a.parallelPoolSize)
+		poolSize := a.GetEffectivePoolSize(ctx, projectCmds)
+		ctx.Log.Info("Running applies in parallel with pool size %d", poolSize)
+		result = runProjectCmdsParallelGroups(ctx, projectCmds, a.prjCmdRunner.Apply, poolSize)
 	} else {
 		result = runProjectCmds(projectCmds, a.prjCmdRunner.Apply)
 	}
@@ -194,6 +195,25 @@ func (a *ApplyCommandRunner) IsLocked() (bool, error) {
 
 func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []command.ProjectContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelApplyEnabled
+}
+
+// GetEffectivePoolSize returns the parallelism level to use for executing projects.
+// If the user specified a parallelism value via command flag, it uses that (capped at server max).
+// Otherwise it uses the server's configured pool size.
+func (a *ApplyCommandRunner) GetEffectivePoolSize(ctx *command.Context, projectCmds []command.ProjectContext) int {
+	if len(projectCmds) == 0 {
+		return a.parallelPoolSize
+	}
+	// If user specified parallelism in command, use it (but cap at server max)
+	if projectCmds[0].Parallelism > 0 {
+		if projectCmds[0].Parallelism > a.parallelPoolSize {
+			ctx.Log.Warn("requested parallelism %d exceeds server maximum %d, using %d",
+				projectCmds[0].Parallelism, a.parallelPoolSize, a.parallelPoolSize)
+			return a.parallelPoolSize
+		}
+		return projectCmds[0].Parallelism
+	}
+	return a.parallelPoolSize
 }
 
 func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {

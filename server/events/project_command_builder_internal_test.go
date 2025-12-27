@@ -690,7 +690,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true, 0)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -907,7 +907,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true, 0)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -1153,7 +1153,7 @@ workflows:
 					PullRequestStatus: models.PullReqStatus{
 						MergeableStatus: models.MergeableStatus{IsMergeable: true},
 					},
-				}, command.Plan, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+				}, command.Plan, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true, 0)
 
 				if c.expErr != "" {
 					ErrEquals(t, c.expErr, err)
@@ -1305,7 +1305,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true, 0)
 					Equals(t, c.expLen, len(ctxs))
 					Ok(t, err)
 				})

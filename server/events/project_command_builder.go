@@ -719,6 +719,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		repoRelDir,
 		workspace,
 		cmd.Verbose,
+		cmd.Parallelism,
 	)
 }
 
@@ -820,7 +821,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 			return nil, err
 		}
 		defer unlockFn()
-		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), commentCmd.SubName, plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
+		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), commentCmd.SubName, plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose, commentCmd.Parallelism)
 		if err != nil {
 			return nil, fmt.Errorf("building command for dir '%s': %w", plan.RepoRelDir, err)
 		}
@@ -873,6 +874,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		repoRelDir,
 		workspace,
 		cmd.Verbose,
+		cmd.Parallelism,
 	)
 }
 
@@ -886,7 +888,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	repoDir string,
 	repoRelDir string,
 	workspace string,
-	verbose bool) ([]command.ProjectContext, error) {
+	verbose bool,
+	parallelism int) ([]command.ProjectContext, error) {
 
 	matchingProjects, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
 	if err != nil {
@@ -989,6 +992,10 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		}
 		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
 	})
+	// Set the parallelism value from the command on all project contexts
+	for i := range projCtxs {
+		projCtxs[i].Parallelism = parallelism
+	}
 
 	return projCtxs, nil
 }

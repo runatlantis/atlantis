@@ -48,6 +48,8 @@ const (
 	verboseFlagShort             = ""
 	clearPolicyApprovalFlagLong  = "clear-policy-approval"
 	clearPolicyApprovalFlagShort = ""
+	parallelismFlagLong          = "parallelism"
+	parallelismFlagShort         = ""
 )
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -233,6 +235,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var verbose bool
 	var autoMergeDisabled bool
 	var autoMergeMethod string
+	var parallelism int
 	var flagSet *pflag.FlagSet
 	var name command.Name
 
@@ -246,6 +249,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run plan for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+		flagSet.IntVarP(&parallelism, parallelismFlagLong, parallelismFlagShort, 0, "Max number of projects to run in parallel (0 uses server default).")
 	case command.Apply.String():
 		name = command.Apply
 		flagSet = pflag.NewFlagSet(command.Apply.String(), pflag.ContinueOnError)
@@ -256,6 +260,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
 		flagSet.StringVarP(&autoMergeMethod, autoMergeMethodFlagLong, autoMergeMethodFlagShort, "", "Specifies the merge method for the VCS if automerge is enabled. (Currently only implemented for GitHub)")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+		flagSet.IntVarP(&parallelism, parallelismFlagLong, parallelismFlagShort, 0, "Max number of projects to run in parallel (0 uses server default).")
 	case command.ApprovePolicies.String():
 		name = command.ApprovePolicies
 		flagSet = pflag.NewFlagSet(command.ApprovePolicies.String(), pflag.ContinueOnError)
@@ -336,8 +341,14 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		}
 	}
 
+	// Validate parallelism value
+	if parallelism < 0 {
+		err := fmt.Sprintf("invalid value for --%s: %d (must be >= 0)", parallelismFlagLong, parallelism)
+		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
+	}
+
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, autoMergeMethod, workspace, project, policySet, clearPolicyApproval),
+		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, autoMergeMethod, workspace, project, policySet, clearPolicyApproval, parallelism),
 	}
 }
 
