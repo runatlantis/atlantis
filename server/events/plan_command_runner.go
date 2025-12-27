@@ -274,7 +274,11 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	var result command.Result
 	if p.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
+		parallelPoolSize := p.parallelPoolSize
+		if cmd.ParallelPoolSize > 0 {
+			parallelPoolSize = cmd.ParallelPoolSize
+		}
+		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
 	}
