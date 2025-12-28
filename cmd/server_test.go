@@ -30,7 +30,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -110,6 +110,7 @@ var testFlags = map[string]interface{}{
 	GitlabTokenFlag:                  "gitlab-token",
 	GitlabUserFlag:                   "gitlab-user",
 	GitlabWebhookSecretFlag:          "gitlab-secret",
+	GitlabStatusRetryEnabledFlag:     false,
 	HideUnchangedPlanComments:        false,
 	HidePrevPlanComments:             false,
 	IncludeGitUntrackedFiles:         false,
@@ -124,6 +125,7 @@ var testFlags = map[string]interface{}{
 	ParallelPoolSize:                 100,
 	ParallelPlanFlag:                 true,
 	ParallelApplyFlag:                true,
+	PendingApplyStatusFlag:           false,
 	QuietPolicyChecks:                false,
 	RedisHost:                        "",
 	RedisInsecureSkipVerify:          false,
@@ -619,7 +621,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		{
 			"just github app key set",
 			map[string]interface{}{
-				GHAppKeyFlag: testdata.GithubPrivateKey,
+				GHAppKeyFlag: githubtestdata.PrivateKey,
 			},
 			true,
 		},
@@ -729,7 +731,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 			"github app and key set and should be successful",
 			map[string]interface{}{
 				GHAppIDFlag:  "1",
-				GHAppKeyFlag: testdata.GithubPrivateKey,
+				GHAppKeyFlag: githubtestdata.PrivateKey,
 			},
 			false,
 		},
@@ -866,7 +868,7 @@ func TestExecute_GithubUser(t *testing.T) {
 func TestExecute_GithubApp(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
 	c := setup(map[string]interface{}{
-		GHAppKeyFlag:      testdata.GithubPrivateKey,
+		GHAppKeyFlag:      githubtestdata.PrivateKey,
 		GHAppIDFlag:       "1",
 		RepoAllowlistFlag: "*",
 	}, t)
@@ -879,7 +881,7 @@ func TestExecute_GithubApp(t *testing.T) {
 func TestExecute_GithubAppWithInstallationID(t *testing.T) {
 	t.Log("Should pass the installation ID to the config.")
 	c := setup(map[string]interface{}{
-		GHAppKeyFlag:            testdata.GithubPrivateKey,
+		GHAppKeyFlag:            githubtestdata.PrivateKey,
 		GHAppIDFlag:             "1",
 		GHAppInstallationIDFlag: "2",
 		RepoAllowlistFlag:       "*",

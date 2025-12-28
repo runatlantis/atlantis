@@ -35,7 +35,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -58,7 +58,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: markdown-lint
         uses: DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265 # v19
@@ -70,7 +70,13 @@ jobs:
         id: lychee
         uses: lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2 # v2.6.1
         with:
-          args: --verbose --no-progress --max-concurrency 5 --max-retries 0 --accept 200,429 ./runatlantis.io
+          args: >-
+            --verbose
+            --no-progress
+            --max-concurrency 5
+            --max-retries 0
+            --accept 200,429
+            ./runatlantis.io
 
       - name: setup npm
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
