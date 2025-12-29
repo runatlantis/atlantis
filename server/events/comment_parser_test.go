@@ -811,6 +811,78 @@ func TestParse_Parsing(t *testing.T) {
 	}
 }
 
+func TestParse_ParallelPoolSize(t *testing.T) {
+	cases := []struct {
+		command         command.Name
+		flags           string
+		expParallelSize int
+		expError        string
+	}{
+		// Test flag works for plan/apply
+		{
+			command:         command.Plan,
+			flags:           "-P 5",
+			expParallelSize: 5,
+		},
+		{
+			command:         command.Plan,
+			flags:           "--parallel-pool-size 10",
+			expParallelSize: 10,
+		},
+		{
+			command:         command.Apply,
+			flags:           "-P 3",
+			expParallelSize: 3,
+		},
+		{
+			command:         command.Apply,
+			flags:           "--parallel-pool-size 8",
+			expParallelSize: 8,
+		},
+		// Test flag is ignored for other commands
+		{
+			command:  command.ApprovePolicies,
+			flags:    "-P 5",
+			expError: fmt.Sprintf("```\nError: unknown shorthand flag: 'P' in -P.\n%s```", ApprovePolicyUsage),
+		},
+		{
+			command:  command.ApprovePolicies,
+			flags:    "-p project --parallel-pool-size 5",
+			expError: fmt.Sprintf("```\nError: unknown flag: --parallel-pool-size.\n%s```", ApprovePolicyUsage),
+		},
+		// // Test invalid values
+		{
+			command:  command.Plan,
+			flags:    "-P fail",
+			expError: fmt.Sprintf("```\nError: invalid argument \"fail\" for \"-P, --parallel-pool-size\" flag: strconv.ParseInt: parsing \"fail\": invalid syntax.\n%s```", PlanUsage),
+		},
+		{
+			command:  command.Apply,
+			flags:    "--parallel-pool-size -1",
+			expError: fmt.Sprintf("```\nError: invalid value for --parallel-pool-size: -1, must be >= 0.\n%s```", ApplyUsage),
+		},
+	}
+
+	for _, test := range cases {
+		comment := fmt.Sprintf("atlantis %s %s", test.command.String(), test.flags)
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, models.Github)
+
+			if test.expError != "" {
+				Equals(t, test.expError, r.CommentResponse)
+				return
+			}
+
+			Assert(t, r.CommentResponse == "",
+				"expected no error but got %q for comment %q",
+				r.CommentResponse, comment)
+			Assert(t, test.expParallelSize == r.Command.ParallelPoolSize,
+				"exp parallel pool size to equal %v but was %v for comment %q",
+				test.expParallelSize, r.Command.ParallelPoolSize, comment)
+		})
+	}
+}
+
 func TestBuildPlanApplyVersionComment(t *testing.T) {
 	cases := []struct {
 		repoRelDir        string
@@ -1109,13 +1181,14 @@ func TestParse_VCSUsername(t *testing.T) {
 }
 
 var PlanUsage = `Usage of plan:
-  -d, --dir string         Which directory to run plan in relative to root of repo,
-                           ex. 'child/dir'.
-  -p, --project string     Which project to run plan for. Refers to the name of the
-                           project configured in a repo config file. Cannot be used
-                           at same time as workspace or dir flags.
-      --verbose            Append Atlantis log to comment.
-  -w, --workspace string   Switch to this Terraform workspace before planning.
+  -d, --dir string               Which directory to run plan in relative to root of
+                                 repo, ex. 'child/dir'.
+  -P, --parallel-pool-size int   Override default parallel pool size for this command
+  -p, --project string           Which project to run plan for. Refers to the name
+                                 of the project configured in a repo config file.
+                                 Cannot be used at same time as workspace or dir flags.
+      --verbose                  Append Atlantis log to comment.
+  -w, --workspace string         Switch to this Terraform workspace before planning.
 `
 
 var ApplyUsage = `Usage of apply:
@@ -1125,6 +1198,7 @@ var ApplyUsage = `Usage of apply:
                                    for GitHub)
   -d, --dir string                 Apply the plan for this directory, relative to
                                    root of repo, ex. 'child/dir'.
+  -P, --parallel-pool-size int     Override default parallel pool size for this command
   -p, --project string             Apply the plan for this project. Refers to the
                                    name of the project configured in a repo config
                                    file. Cannot be used at same time as workspace or
