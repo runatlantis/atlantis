@@ -59,7 +59,7 @@ jobs:
     runs-on: ubuntu-24.04
     # Use latest testing environment for automatic updates
     # Previous: ghcr.io/runatlantis/testing-env:latest@sha256:725981e9090c977f8055f5ec5ba7a63430a8f0337ab955978e6b8cc2cd0236c3
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:13a736f35b22ac7af146ea3f0e8ac9cd751aa6847e5eafde83681b9fdcdbd245
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:71e8f85eec42089d47f7d34ef1429f206cf9686316d3a723a2c087fd3a94e3d7
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
