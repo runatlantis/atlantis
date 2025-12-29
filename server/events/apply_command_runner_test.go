@@ -557,3 +557,76 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 		})
 	}
 }
+func TestApplyCommandRunner_GetEffectivePoolSize(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	serverPoolSize := 15
+
+	cases := []struct {
+		name             string
+		userParallelism  int
+		expectedPoolSize int
+		numProjects      int
+	}{
+		{
+			name:             "user specifies 0, should use server default",
+			userParallelism:  0,
+			expectedPoolSize: 15,
+			numProjects:      1,
+		},
+		{
+			name:             "user specifies value below server max",
+			userParallelism:  5,
+			expectedPoolSize: 5,
+			numProjects:      1,
+		},
+		{
+			name:             "user specifies value equal to server max",
+			userParallelism:  15,
+			expectedPoolSize: 15,
+			numProjects:      1,
+		},
+		{
+			name:             "user specifies value above server max, should cap at server max",
+			userParallelism:  20,
+			expectedPoolSize: 15,
+			numProjects:      1,
+		},
+		{
+			name:             "user specifies sequential execution",
+			userParallelism:  1,
+			expectedPoolSize: 1,
+			numProjects:      1,
+		},
+		{
+			name:             "empty project list should use server default",
+			userParallelism:  0,
+			expectedPoolSize: 15,
+			numProjects:      0,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			runner := events.NewApplyCommandRunner(
+				nil, false, nil, nil, nil, nil, nil, nil, nil, nil,
+				serverPoolSize, false, false, nil,
+			)
+
+			ctx := &command.Context{
+				Log: logger,
+			}
+
+			projectCmds := make([]command.ProjectContext, c.numProjects)
+			if c.numProjects > 0 {
+				projectCmds[0] = command.ProjectContext{
+					Parallelism: c.userParallelism,
+				}
+			}
+
+			// Use reflection to access private method or just test through public API
+			// For now, let's verify the behavior by checking the method exists
+			effectiveSize := runner.GetEffectivePoolSize(ctx, projectCmds)
+			require.Equal(t, c.expectedPoolSize, effectiveSize, "pool size mismatch")
+		})
+	}
+}

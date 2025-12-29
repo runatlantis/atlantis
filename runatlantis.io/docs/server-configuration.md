@@ -1077,6 +1077,8 @@ ATLANTIS_PARALLEL_POOL_SIZE=100
 
 Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
 
+This setting can be overridden on a per-command basis using the `--parallelism` flag in PR comments (e.g., `atlantis apply --parallelism 1`), but the per-command value cannot exceed this server maximum.
+
 ### `--pending-apply-status` <Badge text="v0.36.0+" type="info"/>
 
 ```bash
