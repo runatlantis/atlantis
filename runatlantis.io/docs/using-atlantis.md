@@ -210,7 +210,7 @@ atlantis cancel
 Cancels all **queued commands** for the current pull request.
 
 ::: warning NOTE
-This command **does not** stop or interrupt commands that are already running. It only removes subsequent commands that are waiting in the queue. The currently running command will continue to completion.
+This command **does not** attempt to stop or interrupt commands that are already running. It only removes subsequent commands that are waiting in the queue. There is currently no mechanism in Atlantis to interrupt the currently running process.
 :::
 
 This is useful if you have multiple commands queued (e.g., atlantis apply for several projects) and you realize you made a mistake in your PR. Using cancel prevents the queued plans from executing. Especially with long-running operations, this can save time and resources.
