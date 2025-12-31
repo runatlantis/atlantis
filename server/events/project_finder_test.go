@@ -308,8 +308,7 @@ func TestDetermineProjects(t *testing.T) {
 				"exp %q but found %q", c.expProjectPaths, paths)
 
 			for _, expPath := range c.expProjectPaths {
-				found := slices.Contains(paths, expPath)
-				if !found {
+				if !slices.Contains(paths, expPath) {
 					t.Fatalf("exp %q but was not in paths %v", expPath, paths)
 				}
 			}
