@@ -16,6 +16,7 @@ package events_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
@@ -307,13 +308,7 @@ func TestDetermineProjects(t *testing.T) {
 				"exp %q but found %q", c.expProjectPaths, paths)
 
 			for _, expPath := range c.expProjectPaths {
-				found := false
-				for _, actPath := range paths {
-					if expPath == actPath {
-						found = true
-						break
-					}
-				}
+				found := slices.Contains(paths, expPath)
 				if !found {
 					t.Fatalf("exp %q but was not in paths %v", expPath, paths)
 				}
@@ -334,18 +329,18 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	// modules/
 	//   module/
 	//	  main.tf
-	tmpDir := DirStructure(t, map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]any{
 		"main.tf": nil,
-		"project1": map[string]interface{}{
+		"project1": map[string]any{
 			"main.tf":               nil,
 			"terraform.tfvars.json": nil,
 		},
-		"project2": map[string]interface{}{
+		"project2": map[string]any{
 			"main.tf":          nil,
 			"terraform.tfvars": nil,
 		},
-		"modules": map[string]interface{}{
-			"module": map[string]interface{}{
+		"modules": map[string]any{
+			"module": map[string]any{
 				"main.tf": nil,
 			},
 		},

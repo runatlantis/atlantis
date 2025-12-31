@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -519,12 +520,7 @@ func containsGlobPattern(s string) bool {
 }
 
 func (e *CommentParser) stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, a)
 }
 
 func (e *CommentParser) isAllowedCommand(cmd string) bool {

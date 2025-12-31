@@ -204,13 +204,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	disableApply := true
-	for _, allowCommand := range allowCommands {
-		if allowCommand == command.Apply {
-			disableApply = false
-			break
-		}
-	}
+	disableApply := !slices.Contains(allowCommands, command.Apply)
 
 	parserValidator := &cfg.ParserValidator{}
 

@@ -6,6 +6,7 @@ package common
 import (
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -85,10 +86,5 @@ func IsFileTracked(cloneDir string, filename string) (bool, error) {
 }
 
 func stringInSlice(stringSlice []string, target string) bool {
-	for _, value := range stringSlice {
-		if value == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(stringSlice, target)
 }

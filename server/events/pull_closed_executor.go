@@ -68,12 +68,12 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
 
 type PullCleanupTemplate interface {
-	Execute(wr io.Writer, data interface{}) error
+	Execute(wr io.Writer, data any) error
 }
 
 type PullClosedEventTemplate struct{}
 
-func (t *PullClosedEventTemplate) Execute(wr io.Writer, data interface{}) error {
+func (t *PullClosedEventTemplate) Execute(wr io.Writer, data any) error {
 	return pullClosedTemplate.Execute(wr, data)
 }
 
