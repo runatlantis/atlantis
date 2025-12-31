@@ -1,7 +1,7 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package vcs
+package gitlab
 
 import (
 	"encoding/json"
@@ -57,7 +57,7 @@ type GetCommitResponse struct {
 type EmptyStruct struct{}
 
 // Test that the base url gets set properly.
-func TestNewGitlabClient_BaseURL(t *testing.T) {
+func TestNewClient_BaseURL(t *testing.T) {
 	gitlabClientUnderTest = true
 	defer func() { gitlabClientUnderTest = false }()
 
@@ -98,21 +98,21 @@ func TestNewGitlabClient_BaseURL(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Hostname, func(t *testing.T) {
 			log := logging.NewNoopLogger(t)
-			client, err := NewGitlabClient(c.Hostname, "token", []string{}, log)
+			client, err := New(c.Hostname, "token", []string{}, log)
 			Ok(t, err)
 			Equals(t, c.ExpBaseURL, client.Client.BaseURL().String())
 		})
 	}
 }
 
-// This function gets called even if GitlabClient is nil
+// This function gets called even if Client is nil
 // so we need to test that.
-func TestGitlabClient_SupportsCommonMarkNil(t *testing.T) {
-	var gl *GitlabClient
+func TestClient_SupportsCommonMarkNil(t *testing.T) {
+	var gl *Client
 	Equals(t, false, gl.SupportsCommonMark())
 }
 
-func TestGitlabClient_SupportsCommonMark(t *testing.T) {
+func TestClient_SupportsCommonMark(t *testing.T) {
 	cases := []struct {
 		version string
 		exp     bool
@@ -139,7 +139,7 @@ func TestGitlabClient_SupportsCommonMark(t *testing.T) {
 		t.Run(c.version, func(t *testing.T) {
 			vers, err := version.NewVersion(c.version)
 			Ok(t, err)
-			gl := GitlabClient{
+			gl := Client{
 				Version: vers,
 			}
 			Equals(t, c.exp, gl.SupportsCommonMark())
@@ -147,7 +147,7 @@ func TestGitlabClient_SupportsCommonMark(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_GetModifiedFiles(t *testing.T) {
+func TestClient_GetModifiedFiles(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	cases := []struct {
 		attempts int
@@ -155,10 +155,10 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 		{1}, {2}, {3},
 	}
 
-	changesPending, err := os.ReadFile("testdata/gitlab-changes-pending.json")
+	changesPending, err := os.ReadFile("testdata/changes-pending.json")
 	Ok(t, err)
 
-	changesAvailable, err := os.ReadFile("testdata/gitlab-changes-available.json")
+	changesAvailable, err := os.ReadFile("testdata/changes-available.json")
 	Ok(t, err)
 
 	for _, c := range cases {
@@ -185,7 +185,7 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 
 			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 			Ok(t, err)
-			client := &GitlabClient{
+			client := &Client{
 				Client:          internalClient,
 				Version:         nil,
 				PollingInterval: time.Second * 0,
@@ -213,15 +213,15 @@ func TestGitlabClient_GetModifiedFiles(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_MergePull(t *testing.T) {
+func TestClient_MergePull(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	mergeSuccess, err := os.ReadFile("testdata/github-pull-request.json")
+	mergeSuccess, err := os.ReadFile("testdata/pull-request.json")
 	Ok(t, err)
 
-	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
+	pipelineSuccess, err := os.ReadFile("testdata/pipeline-success.json")
 	Ok(t, err)
 
-	projectSuccess, err := os.ReadFile("testdata/gitlab-project-success.json")
+	projectSuccess, err := os.ReadFile("testdata/project-success.json")
 	Ok(t, err)
 
 	cases := []struct {
@@ -276,7 +276,7 @@ func TestGitlabClient_MergePull(t *testing.T) {
 
 			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 			Ok(t, err)
-			client := &GitlabClient{
+			client := &Client{
 				Client:  internalClient,
 				Version: nil,
 			}
@@ -303,7 +303,7 @@ func TestGitlabClient_MergePull(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_UpdateStatus(t *testing.T) {
+func TestClient_UpdateStatus(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	cases := []struct {
@@ -376,7 +376,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 
 			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 			Ok(t, err)
-			client := &GitlabClient{
+			client := &Client{
 				Client:  internalClient,
 				Version: nil,
 			}
@@ -406,7 +406,7 @@ func TestGitlabClient_UpdateStatus(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_UpdateStatusGetCommitRetryable(t *testing.T) {
+func TestClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	cases := []struct {
@@ -509,7 +509,7 @@ func TestGitlabClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 			Ok(t, err)
 
-			client := &GitlabClient{
+			client := &Client{
 				Client:          internalClient,
 				Version:         nil,
 				PollingInterval: 10 * time.Millisecond,
@@ -543,7 +543,7 @@ func TestGitlabClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T) {
+func TestClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	cases := []struct {
@@ -634,7 +634,7 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 
 			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 			Ok(t, err)
-			client := &GitlabClient{
+			client := &Client{
 				Client:          internalClient,
 				Version:         nil,
 				PollingInterval: 10 * time.Millisecond,
@@ -673,7 +673,7 @@ func TestGitlabClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T)
 	}
 }
 
-func TestGitlabClient_UpdateStatusWithRetryEnabled(t *testing.T) {
+func TestClient_UpdateStatusWithRetryEnabled(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	cases := []struct {
@@ -754,7 +754,7 @@ func TestGitlabClient_UpdateStatusWithRetryEnabled(t *testing.T) {
 			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 			Ok(t, err)
 
-			client := &GitlabClient{
+			client := &Client{
 				Client:             internalClient,
 				Version:            nil,
 				StatusRetryEnabled: true,
@@ -794,7 +794,7 @@ func mustReadFile(t *testing.T, filename string) []byte {
 	return ret
 }
 
-func TestGitlabClient_PullIsMergeable(t *testing.T) {
+func TestClient_PullIsMergeable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	gitlabClientUnderTest = true
 	gitlabVersionOver15_6 := "15.8.3-ee"
@@ -812,20 +812,20 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	pipelineSkippedMR := 8
 
 	// Any IsMergeable logic that depends on data from the project itself is too difficult to test here.
-	// See TestGitlabClient_gitlabPullIsMergeable
+	// See TestClient_gitlabPullIsMergeable
 
-	projectSuccess, err := os.ReadFile("testdata/gitlab-project-success.json")
+	projectSuccess, err := os.ReadFile("testdata/project-success.json")
 	Ok(t, err)
 
 	mrs := map[int][]byte{
-		defaultMr:                       mustReadFile(t, "testdata/gitlab-pipeline-success.json"),
-		noHeadPipelineMR:                mustReadFile(t, "testdata/gitlab-head-pipeline-not-available.json"),
-		ciMustPassMR:                    mustReadFile(t, "testdata/gitlab-detailed-merge-status-ci-must-pass.json"),
-		needRebaseMR:                    mustReadFile(t, "testdata/gitlab-detailed-merge-status-need-rebase.json"),
-		remainingApprovalsMR:            mustReadFile(t, "testdata/gitlab-pipeline-remaining-approvals.json"),
-		blockingDiscussionsUnresolvedMR: mustReadFile(t, "testdata/gitlab-pipeline-blocking-discussions-unresolved.json"),
-		workInProgressMR:                mustReadFile(t, "testdata/gitlab-pipeline-work-in-progress.json"),
-		pipelineSkippedMR:               mustReadFile(t, "testdata/gitlab-pipeline-with-pipeline-skipped.json"),
+		defaultMr:                       mustReadFile(t, "testdata/pipeline-success.json"),
+		noHeadPipelineMR:                mustReadFile(t, "testdata/head-pipeline-not-available.json"),
+		ciMustPassMR:                    mustReadFile(t, "testdata/detailed-merge-status-ci-must-pass.json"),
+		needRebaseMR:                    mustReadFile(t, "testdata/detailed-merge-status-need-rebase.json"),
+		remainingApprovalsMR:            mustReadFile(t, "testdata/pipeline-remaining-approvals.json"),
+		blockingDiscussionsUnresolvedMR: mustReadFile(t, "testdata/pipeline-blocking-discussions-unresolved.json"),
+		workInProgressMR:                mustReadFile(t, "testdata/pipeline-work-in-progress.json"),
+		pipelineSkippedMR:               mustReadFile(t, "testdata/pipeline-with-pipeline-skipped.json"),
 	}
 
 	cases := []struct {
@@ -1073,7 +1073,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 
 				internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 				Ok(t, err)
-				client := &GitlabClient{
+				client := &Client{
 					Client:  internalClient,
 					Version: nil,
 				}
@@ -1104,7 +1104,7 @@ func TestGitlabClient_PullIsMergeable(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_gitlabIsMergeable(t *testing.T) {
+func TestClient_gitlabIsMergeable(t *testing.T) {
 	// Test the helper gitlabIsMergeable directly
 
 	cases := []struct {
@@ -1251,17 +1251,17 @@ func TestGitlabClient_gitlabIsMergeable(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			actual := gitlabIsMergeable(c.mr, c.project, c.supportsDetailedMergeStatus)
+			actual := isMergeable(c.mr, c.project, c.supportsDetailedMergeStatus)
 			Equals(t, c.expected, actual)
 		})
 	}
 }
 
-func TestGitlabClient_MarkdownPullLink(t *testing.T) {
+func TestClient_MarkdownPullLink(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	gitlabClientUnderTest = true
 	defer func() { gitlabClientUnderTest = false }()
-	client, err := NewGitlabClient("gitlab.com", "token", []string{}, logger)
+	client, err := New("gitlab.com", "token", []string{}, logger)
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
@@ -1269,7 +1269,7 @@ func TestGitlabClient_MarkdownPullLink(t *testing.T) {
 	Equals(t, exp, s)
 }
 
-func TestGitlabClient_HideOldComments(t *testing.T) {
+func TestClient_HideOldComments(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	type notePutCallDetails struct {
 		noteID  string
@@ -1392,7 +1392,7 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 
 			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 			Ok(t, err)
-			client := &GitlabClient{
+			client := &Client{
 				Client:  internalClient,
 				Version: nil,
 			}
@@ -1413,9 +1413,9 @@ func TestGitlabClient_HideOldComments(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_GetPullLabels(t *testing.T) {
+func TestClient_GetPullLabels(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	mergeSuccessWithLabel, err := os.ReadFile("testdata/gitlab-merge-success-with-label.json")
+	mergeSuccessWithLabel, err := os.ReadFile("testdata/merge-success-with-label.json")
 	Ok(t, err)
 
 	testServer := httptest.NewServer(
@@ -1432,7 +1432,7 @@ func TestGitlabClient_GetPullLabels(t *testing.T) {
 
 	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 	Ok(t, err)
-	client := &GitlabClient{
+	client := &Client{
 		Client:  internalClient,
 		Version: nil,
 	}
@@ -1450,9 +1450,9 @@ func TestGitlabClient_GetPullLabels(t *testing.T) {
 	Equals(t, []string{"work in progress"}, labels)
 }
 
-func TestGitlabClient_GetPullLabels_EmptyResponse(t *testing.T) {
+func TestClient_GetPullLabels_EmptyResponse(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	pipelineSuccess, err := os.ReadFile("testdata/gitlab-pipeline-success.json")
+	pipelineSuccess, err := os.ReadFile("testdata/pipeline-success.json")
 	Ok(t, err)
 
 	testServer := httptest.NewServer(
@@ -1469,7 +1469,7 @@ func TestGitlabClient_GetPullLabels_EmptyResponse(t *testing.T) {
 
 	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 	Ok(t, err)
-	client := &GitlabClient{
+	client := &Client{
 		Client:  internalClient,
 		Version: nil,
 	}
@@ -1486,19 +1486,19 @@ func TestGitlabClient_GetPullLabels_EmptyResponse(t *testing.T) {
 }
 
 // GetTeamNamesForUser returns the names of the GitLab groups that the user belongs to.
-func TestGitlabClient_GetTeamNamesForUser(t *testing.T) {
+func TestClient_GetTeamNamesForUser(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
-	groupMembershipSuccess, err := os.ReadFile("testdata/gitlab-group-membership-success.json")
+	groupMembershipSuccess, err := os.ReadFile("testdata/group-membership-success.json")
 	Ok(t, err)
 
-	userSuccess, err := os.ReadFile("testdata/gitlab-user-success.json")
+	userSuccess, err := os.ReadFile("testdata/user-success.json")
 	Ok(t, err)
 
-	userEmpty, err := os.ReadFile("testdata/gitlab-user-none.json")
+	userEmpty, err := os.ReadFile("testdata/user-none.json")
 	Ok(t, err)
 
-	multipleUsers, err := os.ReadFile("testdata/gitlab-user-multiple.json")
+	multipleUsers, err := os.ReadFile("testdata/user-multiple.json")
 	Ok(t, err)
 
 	configuredGroups := []string{"someorg/group1", "someorg/group2", "someorg/group3", "someorg/group4"}
@@ -1550,7 +1550,7 @@ func TestGitlabClient_GetTeamNamesForUser(t *testing.T) {
 				}))
 			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 			Ok(t, err)
-			client := &GitlabClient{
+			client := &Client{
 				Client:           internalClient,
 				Version:          nil,
 				ConfiguredGroups: configuredGroups,
@@ -1612,7 +1612,7 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 				}))
 			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 			Ok(t, err)
-			client := &GitlabClient{
+			client := &Client{
 				Client:  internalClient,
 				Version: nil,
 			}
@@ -1632,7 +1632,7 @@ func TestGithubClient_DiscardReviews(t *testing.T) {
 	}
 }
 
-func TestGitlabClient_UpdateStatusTransitionAlreadyComplete(t *testing.T) {
+func TestClient_UpdateStatusTransitionAlreadyComplete(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	testServer := httptest.NewServer(
@@ -1669,7 +1669,7 @@ func TestGitlabClient_UpdateStatusTransitionAlreadyComplete(t *testing.T) {
 
 	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
 	Ok(t, err)
-	client := &GitlabClient{
+	client := &Client{
 		Client:          internalClient,
 		Version:         nil,
 		PollingInterval: 10 * time.Millisecond,

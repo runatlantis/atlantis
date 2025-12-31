@@ -32,7 +32,7 @@ import (
 // Value chosen purposely high, though randomly.
 const giteaPaginationEBreak = 500
 
-type GiteaClient struct {
+type Client struct {
 	giteaClient *gitea.Client
 	username    string
 	token       string
@@ -56,11 +56,11 @@ type GiteaPullGetter interface {
 	GetPullRequest(repo models.Repo, pullNum int) (*gitea.PullRequest, error)
 }
 
-// NewClient builds a client that makes API calls to Gitea. httpClient is the
+// New builds a client that makes API calls to Gitea. httpClient is the
 // client to use to make the requests, username and password are used as basic
 // auth in the requests, baseURL is the API's baseURL, ex. https://corp.com:7990.
 // Don't include the API version, ex. '/1.0'.
-func NewClient(baseURL string, username string, token string, pagesize int, logger logging.SimpleLogging) (*GiteaClient, error) {
+func New(baseURL string, username string, token string, pagesize int, logger logging.SimpleLogging) (*Client, error) {
 	logger.Debug("Creating new Gitea client for: %s", baseURL)
 
 	giteaClient, err := gitea.NewClient(baseURL,
@@ -72,7 +72,7 @@ func NewClient(baseURL string, username string, token string, pagesize int, logg
 		return nil, fmt.Errorf("creating gitea client: %w", err)
 	}
 
-	return &GiteaClient{
+	return &Client{
 		giteaClient: giteaClient,
 		username:    username,
 		token:       token,
@@ -81,7 +81,7 @@ func NewClient(baseURL string, username string, token string, pagesize int, logg
 	}, nil
 }
 
-func (c *GiteaClient) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*gitea.PullRequest, error) {
+func (c *Client) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*gitea.PullRequest, error) {
 	logger.Debug("Getting Gitea pull request %d", pullNum)
 
 	pr, resp, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pullNum))
@@ -96,7 +96,7 @@ func (c *GiteaClient) GetPullRequest(logger logging.SimpleLogging, repo models.R
 
 // GetModifiedFiles returns the names of files that were modified in the merge request
 // relative to the repo root, e.g. parent/child/file.txt.
-func (c *GiteaClient) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (c *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	logger.Debug("Getting modified files for Gitea pull request %d", pull.Num)
 
 	changedFiles := make([]string, 0)
@@ -134,7 +134,7 @@ func (c *GiteaClient) GetModifiedFiles(logger logging.SimpleLogging, repo models
 }
 
 // CreateComment creates a comment on the merge request. As far as we're aware, Gitea has no built in max comment length right now.
-func (c *GiteaClient) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
+func (c *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	logger.Debug("Creating comment on Gitea pull request %d", pullNum)
 
 	opt := gitea.CreateIssueCommentOption{
@@ -154,7 +154,7 @@ func (c *GiteaClient) CreateComment(logger logging.SimpleLogging, repo models.Re
 }
 
 // ReactToComment adds a reaction to a comment.
-func (c *GiteaClient) ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error {
+func (c *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error {
 	logger.Debug("Adding reaction to Gitea pull request comment %d", commentID)
 
 	_, resp, err := c.giteaClient.PostIssueCommentReaction(repo.Owner, repo.Name, commentID, reaction)
@@ -169,7 +169,7 @@ func (c *GiteaClient) ReactToComment(logger logging.SimpleLogging, repo models.R
 
 // HidePrevCommandComments hides the previous command comments from the pull
 // request.
-func (c *GiteaClient) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
+func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
 	logger.Debug("Hiding previous command comments on Gitea pull request %d", pullNum)
 
 	var allComments []*gitea.Comment
@@ -234,7 +234,7 @@ func (c *GiteaClient) HidePrevCommandComments(logger logging.SimpleLogging, repo
 }
 
 // PullIsApproved returns ApprovalStatus with IsApproved set to true if the pull request has a review that approved the PR.
-func (c *GiteaClient) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
+func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
 	logger.Debug("Checking if Gitea pull request %d is approved", pull.Num)
 
 	page := 0
@@ -283,7 +283,7 @@ func (c *GiteaClient) PullIsApproved(logger logging.SimpleLogging, repo models.R
 }
 
 // PullIsMergeable returns true if the pull request is mergeable
-func (c *GiteaClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
+func (c *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if Gitea pull request %d is mergeable", pull.Num)
 
 	pullRequest, _, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pull.Num))
@@ -306,7 +306,7 @@ func (c *GiteaClient) PullIsMergeable(logger logging.SimpleLogging, repo models.
 // change across runs.
 // url is an optional link that users should click on for more information
 // about this status.
-func (c *GiteaClient) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
+func (c *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	giteaState := gitea.StatusFailure
 
 	switch state {
@@ -339,7 +339,7 @@ func (c *GiteaClient) UpdateStatus(logger logging.SimpleLogging, repo models.Rep
 }
 
 // DiscardReviews discards / dismisses all pull request reviews
-func (c *GiteaClient) DiscardReviews(_ logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+func (c *Client) DiscardReviews(_ logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
 	page := 0
 	nextPage := 1
 
@@ -382,7 +382,7 @@ func (c *GiteaClient) DiscardReviews(_ logging.SimpleLogging, repo models.Repo, 
 	return nil
 }
 
-func (c *GiteaClient) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+func (c *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	logger.Debug("Merging Gitea pull request %d", pull.Num)
 
 	mergeOptions := gitea.MergePullRequestOption{
@@ -410,12 +410,12 @@ func (c *GiteaClient) MergePull(logger logging.SimpleLogging, pull models.PullRe
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
-func (c *GiteaClient) MarkdownPullLink(pull models.PullRequest) (string, error) {
+func (c *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("#%d", pull.Num), nil
 }
 
 // GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (c *GiteaClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) {
+func (c *Client) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) {
 	// TODO: implement
 	return nil, errors.New("GetTeamNamesForUser not (yet) implemented for Gitea client")
 }
@@ -423,7 +423,7 @@ func (c *GiteaClient) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo
 // GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 // The first return value indicates whether the repo contains a file or not
 // if BaseRepo had a file, its content will placed on the second return value
-func (c *GiteaClient) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
+func (c *Client) GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error) {
 	logger.Debug("Getting Gitea file content for file '%s'", fileName)
 	content, resp, err := c.giteaClient.GetContents(repo.Owner, repo.Name, branch, fileName)
 
@@ -444,12 +444,12 @@ func (c *GiteaClient) GetFileContent(logger logging.SimpleLogging, repo models.R
 }
 
 // SupportsSingleFileDownload returns true if the VCS supports downloading a single file
-func (c *GiteaClient) SupportsSingleFileDownload(repo models.Repo) bool {
+func (c *Client) SupportsSingleFileDownload(repo models.Repo) bool {
 	return true
 }
 
 // GetCloneURL returns the clone URL of the repo
-func (c *GiteaClient) GetCloneURL(logger logging.SimpleLogging, _ models.VCSHostType, repo string) (string, error) {
+func (c *Client) GetCloneURL(logger logging.SimpleLogging, _ models.VCSHostType, repo string) (string, error) {
 	logger.Debug("Getting clone URL for %s", repo)
 
 	parts := strings.Split(repo, "/")
@@ -465,7 +465,7 @@ func (c *GiteaClient) GetCloneURL(logger logging.SimpleLogging, _ models.VCSHost
 }
 
 // GetPullLabels returns the labels of a pull request
-func (c *GiteaClient) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
+func (c *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	logger.Debug("Getting labels for Gitea pull request %d", pull.Num)
 
 	page := 0

@@ -31,6 +31,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
@@ -194,11 +195,11 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	case *github.IssueCommentEvent:
 		resp = e.HandleGithubCommentEvent(event, githubReqID, logger)
 		scope = scope.SubScope(fmt.Sprintf("comment_%s", *event.Action))
-		scope = vcs.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetIssue().GetNumber())
+		scope = common.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetIssue().GetNumber())
 	case *github.PullRequestEvent:
 		resp = e.HandleGithubPullRequestEvent(logger, event, githubReqID)
 		scope = scope.SubScope(fmt.Sprintf("pr_%s", *event.Action))
-		scope = vcs.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetNumber())
+		scope = common.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetNumber())
 	default:
 		resp = HTTPResponse{
 			body: fmt.Sprintf("Ignoring unsupported event %s", githubReqID),
@@ -231,7 +232,7 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 		return
 	}
 	if len(e.BitbucketWebhookSecret) > 0 {
-		if err := bitbucketcloud.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
+		if err := common.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
 			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
 			return
 		}
@@ -267,7 +268,7 @@ func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r
 		return
 	}
 	if len(e.BitbucketWebhookSecret) > 0 {
-		if err := bitbucketserver.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
+		if err := common.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
 			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
 			return
 		}

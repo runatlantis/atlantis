@@ -21,7 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/go-github/v71/github"
 )
@@ -61,339 +60,7 @@ var Repo = github.Repository{
 	CloneURL: github.Ptr("https://github.com/owner/repo.git"),
 }
 
-var ADPullEvent = azuredevops.Event{
-	EventType: "git.pullrequest.created",
-	Resource:  &ADPull,
-}
-
-var ADPullUpdatedEvent = azuredevops.Event{
-	EventType: "git.pullrequest.updated",
-	Resource:  &ADPull,
-}
-
-var ADPullClosedEvent = azuredevops.Event{
-	EventType: "git.pullrequest.merged",
-	Resource:  &ADPullCompleted,
-}
-
-var ADPull = azuredevops.GitPullRequest{
-	CreatedBy: &azuredevops.IdentityRef{
-		ID:          azuredevops.String("d6245f20-2af8-44f4-9451-8107cb2767db"),
-		DisplayName: azuredevops.String("User"),
-		UniqueName:  azuredevops.String("user@example.com"),
-	},
-	LastMergeSourceCommit: &azuredevops.GitCommitRef{
-		CommitID: azuredevops.String("b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
-		URL:      azuredevops.String("https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
-	},
-	PullRequestID: azuredevops.Int(1),
-	Repository:    &ADRepo,
-	SourceRefName: azuredevops.String("refs/heads/feature/sourceBranch"),
-	Status:        azuredevops.String("active"),
-	TargetRefName: azuredevops.String("refs/heads/targetBranch"),
-	URL:           azuredevops.String("https://dev.azure.com/fabrikam/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/21"),
-}
-
-var ADPullCompleted = azuredevops.GitPullRequest{
-	CreatedBy: &azuredevops.IdentityRef{
-		ID:          azuredevops.String("d6245f20-2af8-44f4-9451-8107cb2767db"),
-		DisplayName: azuredevops.String("User"),
-		UniqueName:  azuredevops.String("user@example.com"),
-	},
-	LastMergeSourceCommit: &azuredevops.GitCommitRef{
-		CommitID: azuredevops.String("b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
-		URL:      azuredevops.String("https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
-	},
-	PullRequestID: azuredevops.Int(1),
-	Repository:    &ADRepo,
-	SourceRefName: azuredevops.String("refs/heads/owner/sourceBranch"),
-	Status:        azuredevops.String("completed"),
-	TargetRefName: azuredevops.String("refs/heads/targetBranch"),
-	URL:           azuredevops.String("https://dev.azure.com/fabrikam/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/21"),
-}
-
-var ADRepo = azuredevops.GitRepository{
-	DefaultBranch: azuredevops.String("refs/heads/main"),
-	Name:          azuredevops.String("repo"),
-	ParentRepository: &azuredevops.GitRepositoryRef{
-		Name: azuredevops.String("owner"),
-	},
-	Project: &azuredevops.TeamProjectReference{
-		ID:    azuredevops.String("a21f5f20-4a12-aaf4-ab12-9a0927cbbb90"),
-		Name:  azuredevops.String("project"),
-		State: azuredevops.String("unchanged"),
-	},
-	WebURL: azuredevops.String("https://dev.azure.com/owner/project/_git/repo"),
-}
-
-var ADPullJSON = `{
-	"repository": {
-		"id": "3411ebc1-d5aa-464f-9615-0b527bc66719",
-		"name": "repo",
-		"url": "https://dev.azure.com/owner/project/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719",
-		"webUrl": "https://dev.azure.com/owner/project/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719",
-		"project": {
-			"id": "a7573007-bbb3-4341-b726-0c4148a07853",
-			"name": "project",
-			"description": "test project created on Halloween 2016",
-			"url": "https://dev.azure.com/owner/_apis/projects/a7573007-bbb3-4341-b726-0c4148a07853",
-			"state": "wellFormed",
-			"revision": 7
-		},
-		"remoteUrl": "https://dev.azure.com/owner/project/_git/repo"
-	},
-	"pullRequestId": 22,
-	"codeReviewId": 22,
-	"status": "active",
-	"createdBy": {
-		"id": "d6245f20-2af8-44f4-9451-8107cb2767db",
-		"displayName": "Normal Paulk",
-		"uniqueName": "fabrikamfiber16@hotmail.com",
-		"url": "https://dev.azure.com/owner/_apis/Identities/d6245f20-2af8-44f4-9451-8107cb2767db",
-		"imageUrl": "https://dev.azure.com/owner/_api/_common/identityImage?id=d6245f20-2af8-44f4-9451-8107cb2767db"
-	},
-	"creationDate": "2016-11-01T16:30:31.6655471Z",
-	"title": "A new feature",
-	"description": "Adding a new feature",
-	"sourceRefName": "refs/heads/npaulk/my_work",
-	"targetRefName": "refs/heads/new_feature",
-	"mergeStatus": "succeeded",
-	"mergeId": "f5fc8381-3fb2-49fe-8a0d-27dcc2d6ef82",
-	"lastMergeSourceCommit": {
-		"commitId": "b60280bc6e62e2f880f1b63c1e24987664d3bda3",
-		"url": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3"
-	},
-	"lastMergeTargetCommit": {
-		"commitId": "f47bbc106853afe3c1b07a81754bce5f4b8dbf62",
-		"url": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/f47bbc106853afe3c1b07a81754bce5f4b8dbf62"
-	},
-	"lastMergeCommit": {
-		"commitId": "39f52d24533cc712fc845ed9fd1b6c06b3942588",
-		"author": {
-			"name": "Normal Paulk",
-			"email": "fabrikamfiber16@hotmail.com",
-			"date": "2016-11-01T16:30:32Z"
-		},
-		"committer": {
-			"name": "Normal Paulk",
-			"email": "fabrikamfiber16@hotmail.com",
-			"date": "2016-11-01T16:30:32Z"
-		},
-		"comment": "Merge pull request 22 from npaulk/my_work into new_feature",
-		"url": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/39f52d24533cc712fc845ed9fd1b6c06b3942588"
-	},
-	"reviewers": [
-		{
-			"reviewerUrl": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/22/reviewers/d6245f20-2af8-44f4-9451-8107cb2767db",
-			"vote": 0,
-			"id": "d6245f20-2af8-44f4-9451-8107cb2767db",
-			"displayName": "Normal Paulk",
-			"uniqueName": "fabrikamfiber16@hotmail.com",
-			"url": "https://dev.azure.com/owner/_apis/Identities/d6245f20-2af8-44f4-9451-8107cb2767db",
-			"imageUrl": "https://dev.azure.com/owner/_api/_common/identityImage?id=d6245f20-2af8-44f4-9451-8107cb2767db"
-		}
-	],
-	"url": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/22",
-	"_links": {
-		"self": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/22"
-		},
-		"repository": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719"
-		},
-		"workItems": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/22/workitems"
-		},
-		"sourceBranch": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/refs"
-		},
-		"targetBranch": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/refs"
-		},
-		"sourceCommit": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3"
-		},
-		"targetCommit": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/f47bbc106853afe3c1b07a81754bce5f4b8dbf62"
-		},
-		"createdBy": {
-			"href": "https://dev.azure.com/owner/_apis/Identities/d6245f20-2af8-44f4-9451-8107cb2767db"
-		},
-		"iterations": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/22/iterations"
-		}
-	},
-	"supportsIterations": true,
-	"artifactId": "vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2f22"
-}`
-
-var ADSelfPullEvent = azuredevops.Event{
-	EventType: "git.pullrequest.created",
-	Resource:  &ADSelfPull,
-}
-
-var ADSelfPullUpdatedEvent = azuredevops.Event{
-	EventType: "git.pullrequest.updated",
-	Resource:  &ADSelfPull,
-}
-
-var ADSelfPullClosedEvent = azuredevops.Event{
-	EventType: "git.pullrequest.merged",
-	Resource:  &ADSelfPullCompleted,
-}
-
-var ADSelfPull = azuredevops.GitPullRequest{
-	CreatedBy: &azuredevops.IdentityRef{
-		ID:          azuredevops.String("d6245f20-2af8-44f4-9451-8107cb2767db"),
-		DisplayName: azuredevops.String("User"),
-		UniqueName:  azuredevops.String("user@example.com"),
-	},
-	LastMergeSourceCommit: &azuredevops.GitCommitRef{
-		CommitID: azuredevops.String("b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
-		URL:      azuredevops.String("https://devops.abc.com/owner/project/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
-	},
-	PullRequestID: azuredevops.Int(1),
-	Repository:    &ADSelfRepo,
-	SourceRefName: azuredevops.String("refs/heads/feature/sourceBranch"),
-	Status:        azuredevops.String("active"),
-	TargetRefName: azuredevops.String("refs/heads/targetBranch"),
-	URL:           azuredevops.String("https://devops.abc.com/owner/project/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/21"),
-}
-
-var ADSelfPullCompleted = azuredevops.GitPullRequest{
-	CreatedBy: &azuredevops.IdentityRef{
-		ID:          azuredevops.String("d6245f20-2af8-44f4-9451-8107cb2767db"),
-		DisplayName: azuredevops.String("User"),
-		UniqueName:  azuredevops.String("user@example.com"),
-	},
-	LastMergeSourceCommit: &azuredevops.GitCommitRef{
-		CommitID: azuredevops.String("b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
-		URL:      azuredevops.String("https://https://devops.abc.com/owner/project/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
-	},
-	PullRequestID: azuredevops.Int(1),
-	Repository:    &ADSelfRepo,
-	SourceRefName: azuredevops.String("refs/heads/owner/sourceBranch"),
-	Status:        azuredevops.String("completed"),
-	TargetRefName: azuredevops.String("refs/heads/targetBranch"),
-	URL:           azuredevops.String("https://devops.abc.com/owner/project/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/21"),
-}
-
-var ADSelfRepo = azuredevops.GitRepository{
-	DefaultBranch: azuredevops.String("refs/heads/main"),
-	Name:          azuredevops.String("repo"),
-	ParentRepository: &azuredevops.GitRepositoryRef{
-		Name: azuredevops.String("owner"),
-	},
-	Project: &azuredevops.TeamProjectReference{
-		ID:    azuredevops.String("a21f5f20-4a12-aaf4-ab12-9a0927cbbb90"),
-		Name:  azuredevops.String("project"),
-		State: azuredevops.String("unchanged"),
-	},
-	WebURL: azuredevops.String("https://devops.abc.com/owner/project/_git/repo"),
-}
-
-var ADSelfPullJSON = `{
-	"repository": {
-		"id": "3411ebc1-d5aa-464f-9615-0b527bc66719",
-		"name": "repo",
-		"url": "https://devops.abc.com/owner/project/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719",
-		"webUrl": "https://devops.abc.com/owner/project/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719",
-		"project": {
-			"id": "a7573007-bbb3-4341-b726-0c4148a07853",
-			"name": "project",
-			"description": "test project created on Halloween 2016",
-			"url": "https://dev.azure.com/owner/_apis/projects/a7573007-bbb3-4341-b726-0c4148a07853",
-			"state": "wellFormed",
-			"revision": 7
-		},
-		"remoteUrl": "https://devops.abc.com/owner/project/_git/repo"
-	},
-	"pullRequestId": 22,
-	"codeReviewId": 22,
-	"status": "active",
-	"createdBy": {
-		"id": "d6245f20-2af8-44f4-9451-8107cb2767db",
-		"displayName": "Normal Paulk",
-		"uniqueName": "fabrikamfiber16@hotmail.com",
-		"url": "https://dev.azure.com/owner/_apis/Identities/d6245f20-2af8-44f4-9451-8107cb2767db",
-		"imageUrl": "https://dev.azure.com/owner/_api/_common/identityImage?id=d6245f20-2af8-44f4-9451-8107cb2767db"
-	},
-	"creationDate": "2016-11-01T16:30:31.6655471Z",
-	"title": "A new feature",
-	"description": "Adding a new feature",
-	"sourceRefName": "refs/heads/npaulk/my_work",
-	"targetRefName": "refs/heads/new_feature",
-	"mergeStatus": "succeeded",
-	"mergeId": "f5fc8381-3fb2-49fe-8a0d-27dcc2d6ef82",
-	"lastMergeSourceCommit": {
-		"commitId": "b60280bc6e62e2f880f1b63c1e24987664d3bda3",
-		"url": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3"
-	},
-	"lastMergeTargetCommit": {
-		"commitId": "f47bbc106853afe3c1b07a81754bce5f4b8dbf62",
-		"url": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/f47bbc106853afe3c1b07a81754bce5f4b8dbf62"
-	},
-	"lastMergeCommit": {
-		"commitId": "39f52d24533cc712fc845ed9fd1b6c06b3942588",
-		"author": {
-			"name": "Normal Paulk",
-			"email": "fabrikamfiber16@hotmail.com",
-			"date": "2016-11-01T16:30:32Z"
-		},
-		"committer": {
-			"name": "Normal Paulk",
-			"email": "fabrikamfiber16@hotmail.com",
-			"date": "2016-11-01T16:30:32Z"
-		},
-		"comment": "Merge pull request 22 from npaulk/my_work into new_feature",
-		"url": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/39f52d24533cc712fc845ed9fd1b6c06b3942588"
-	},
-	"reviewers": [
-		{
-			"reviewerUrl": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/22/reviewers/d6245f20-2af8-44f4-9451-8107cb2767db",
-			"vote": 0,
-			"id": "d6245f20-2af8-44f4-9451-8107cb2767db",
-			"displayName": "Normal Paulk",
-			"uniqueName": "fabrikamfiber16@hotmail.com",
-			"url": "https://dev.azure.com/owner/_apis/Identities/d6245f20-2af8-44f4-9451-8107cb2767db",
-			"imageUrl": "https://dev.azure.com/owner/_api/_common/identityImage?id=d6245f20-2af8-44f4-9451-8107cb2767db"
-		}
-	],
-	"url": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/22",
-	"_links": {
-		"self": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/22"
-		},
-		"repository": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719"
-		},
-		"workItems": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/22/workitems"
-		},
-		"sourceBranch": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/refs"
-		},
-		"targetBranch": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/refs"
-		},
-		"sourceCommit": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3"
-		},
-		"targetCommit": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/f47bbc106853afe3c1b07a81754bce5f4b8dbf62"
-		},
-		"createdBy": {
-			"href": "https://dev.azure.com/owner/_apis/Identities/d6245f20-2af8-44f4-9451-8107cb2767db"
-		},
-		"iterations": {
-			"href": "https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/pullRequests/22/iterations"
-		}
-	},
-	"supportsIterations": true,
-	"artifactId": "vstfs:///Git/PullRequestId/a7573007-bbb3-4341-b726-0c4148a07853%2f3411ebc1-d5aa-464f-9615-0b527bc66719%2f22"
-}`
-
-const GithubPrivateKey = `-----BEGIN RSA PRIVATE KEY-----
+const PrivateKey = `-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAuEPzOUE+kiEH1WLiMeBytTEF856j0hOVcSUSUkZxKvqczkWM
 9vo1gDyC7ZXhdH9fKh32aapba3RSsp4ke+giSmYTk2mGR538ShSDxh0OgpJmjiKP
 X0Bj4j5sFqfXuCtl9SkH4iueivv4R53ktqM+n6hk98l6hRwC39GVIblAh2lEM4L/
@@ -423,7 +90,7 @@ ZM372Ac6zc1EqSrid2IjET1YqyIW2KGLI1R2xbQc98UGlt48OdWu
 `
 
 // https://developer.github.com/v3/apps/#response-9
-var githubConversionJSON = `{
+var conversionJSON = `{
 	"id":      1,
 	"node_id": "MDM6QXBwNTk=",
 	"owner": {
@@ -458,7 +125,7 @@ var githubConversionJSON = `{
 	"pem":            "%s"
 }`
 
-var githubAppInstallationJSON = `[
+var appInstallationJSON = `[
 	{
 		"id": 1,
 		"account": {
@@ -496,7 +163,7 @@ var githubAppInstallationJSON = `[
 	}
 ]`
 
-var githubAppMultipleInstallationJSON = `[
+var appMultipleInstallationJSON = `[
 	{
 		"id": 1,
 		"account": {
@@ -570,7 +237,7 @@ var githubAppMultipleInstallationJSON = `[
 ]`
 
 // nolint: gosec
-var githubAppTokenJSON = `{
+var appTokenJSON = `{
 	"token":      "some-token",
 	"expires_at": "2050-01-01T00:00:00Z",
 	"permissions": {
@@ -691,7 +358,7 @@ var githubAppTokenJSON = `{
 	]
 }`
 
-var githubAppJSON = `{
+var appJSON = `{
 	"id": 1,
 	"slug": "octoapp",
 	"node_id": "MDExOkludGVncmF0aW9uMQ==",
@@ -733,8 +400,8 @@ var githubAppJSON = `{
 	]
   }`
 
-func validateGithubToken(tokenString string) error {
-	key, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(GithubPrivateKey))
+func validateToken(tokenString string) error {
+	key, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(PrivateKey))
 	if err != nil {
 		return fmt.Errorf("could not parse private key: %s", err)
 	}
@@ -766,40 +433,40 @@ func GithubAppTestServer(t *testing.T) (string, error) {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
 			case "/api/v3/app-manifests/good-code/conversions":
-				encodedKey := strings.Join(strings.Split(GithubPrivateKey, "\n"), "\\n")
-				appInfo := fmt.Sprintf(githubConversionJSON, encodedKey)
+				encodedKey := strings.Join(strings.Split(PrivateKey, "\n"), "\\n")
+				appInfo := fmt.Sprintf(conversionJSON, encodedKey)
 				w.Write([]byte(appInfo)) // nolint: errcheck
 			// https://developer.github.com/v3/apps/#list-installations
 			case "/api/v3/app/installations":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
-				if err := validateGithubToken(token); err != nil {
+				if err := validateToken(token); err != nil {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid token")) // nolint: errcheck
 					return
 				}
 
-				w.Write([]byte(githubAppInstallationJSON)) // nolint: errcheck
+				w.Write([]byte(appInstallationJSON)) // nolint: errcheck
 				return
 			case "/api/v3/apps/some-app":
 				token := strings.Replace(r.Header.Get("Authorization"), "token ", "", 1)
 
-				// token is taken from githubAppTokenJSON
+				// token is taken from appTokenJSON
 				if token != "some-token" {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid installation token")) // nolint: errcheck
 					return
 				}
-				w.Write([]byte(githubAppJSON)) // nolint: errcheck
+				w.Write([]byte(appJSON)) // nolint: errcheck
 				return
 			case "/api/v3/app/installations/1/access_tokens":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
-				if err := validateGithubToken(token); err != nil {
+				if err := validateToken(token); err != nil {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid token")) // nolint: errcheck
 					return
 				}
 
-				appToken := fmt.Sprintf(githubAppTokenJSON, counter)
+				appToken := fmt.Sprintf(appTokenJSON, counter)
 				counter++
 				w.Write([]byte(appToken)) // nolint: errcheck
 				return
@@ -821,40 +488,40 @@ func GithubMultipleAppTestServer(t *testing.T) (string, error) {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
 			case "/api/v3/app-manifests/good-code/conversions":
-				encodedKey := strings.Join(strings.Split(GithubPrivateKey, "\n"), "\\n")
-				appInfo := fmt.Sprintf(githubConversionJSON, encodedKey)
+				encodedKey := strings.Join(strings.Split(PrivateKey, "\n"), "\\n")
+				appInfo := fmt.Sprintf(conversionJSON, encodedKey)
 				w.Write([]byte(appInfo)) // nolint: errcheck
 			// https://developer.github.com/v3/apps/#list-installations
 			case "/api/v3/app/installations":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
-				if err := validateGithubToken(token); err != nil {
+				if err := validateToken(token); err != nil {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid token")) // nolint: errcheck
 					return
 				}
 
-				w.Write([]byte(githubAppMultipleInstallationJSON)) // nolint: errcheck
+				w.Write([]byte(appMultipleInstallationJSON)) // nolint: errcheck
 				return
 			case "/api/v3/apps/some-app":
 				token := strings.Replace(r.Header.Get("Authorization"), "token ", "", 1)
 
-				// token is taken from githubAppTokenJSON
+				// token is taken from appTokenJSON
 				if token != "some-token" {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid installation token")) // nolint: errcheck
 					return
 				}
-				w.Write([]byte(githubAppJSON)) // nolint: errcheck
+				w.Write([]byte(appJSON)) // nolint: errcheck
 				return
 			case "/api/v3/app/installations/1/access_tokens":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
-				if err := validateGithubToken(token); err != nil {
+				if err := validateToken(token); err != nil {
 					w.WriteHeader(403)
 					w.Write([]byte("Invalid token")) // nolint: errcheck
 					return
 				}
 
-				appToken := fmt.Sprintf(githubAppTokenJSON, counter)
+				appToken := fmt.Sprintf(appTokenJSON, counter)
 				counter++
 				w.Write([]byte(appToken)) // nolint: errcheck
 				return

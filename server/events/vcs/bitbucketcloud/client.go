@@ -1,6 +1,9 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
+// Package bitbucketcloud holds code for Bitbucket Cloud aka (bitbucket.org).
+// It is separate from bitbucketserver because Bitbucket Server has different
+// APIs.
 package bitbucketcloud
 
 import (
@@ -17,13 +20,15 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
+const BaseURL = "https://api.bitbucket.org"
+
 type Client struct {
-	HTTPClient  *http.Client
-	Username    string // Used for git operations
-	ApiUser     string // Used for API calls (Basic Auth)
-	Password    string
+	httpClient  *http.Client
+	username    string // Used for git operations
+	apiUser     string // Used for API calls (Basic Auth)
+	password    string
 	BaseURL     string
-	AtlantisURL string
+	atlantisURL string
 }
 
 // NewClient builds a bitbucket cloud client. atlantisURL is the
@@ -32,7 +37,7 @@ type Client struct {
 // required.
 // username is used for git operations, apiUser is used for API authentication (Basic Auth).
 // If apiUser is empty, it will default to username for backward compatibility.
-func NewClient(httpClient *http.Client, username string, password string, apiUser string, atlantisURL string) *Client {
+func New(httpClient *http.Client, username string, password string, apiUser string, atlantisURL string) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -41,12 +46,12 @@ func NewClient(httpClient *http.Client, username string, password string, apiUse
 		apiUser = username
 	}
 	return &Client{
-		HTTPClient:  httpClient,
-		Username:    username,
-		ApiUser:     apiUser,
-		Password:    password,
+		httpClient:  httpClient,
+		username:    username,
+		apiUser:     apiUser,
+		password:    password,
 		BaseURL:     BaseURL,
-		AtlantisURL: atlantisURL,
+		atlantisURL: atlantisURL,
 	}
 }
 
@@ -285,7 +290,7 @@ func (b *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 	// URL is a required field for bitbucket statuses. We default to the
 	// Atlantis server's URL.
 	if url == "" {
-		url = b.AtlantisURL
+		url = b.atlantisURL
 	}
 
 	// Ensure key has at most 40 characters
@@ -327,7 +332,7 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 		return nil, err
 	}
 	// Use ApiUser for API authentication, Username is for git operations
-	req.SetBasicAuth(b.ApiUser, b.Password)
+	req.SetBasicAuth(b.apiUser, b.password)
 	if body != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
@@ -347,7 +352,7 @@ func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]b
 	if err != nil {
 		return nil, fmt.Errorf("constructing request: %w", err)
 	}
-	resp, err := b.HTTPClient.Do(req)
+	resp, err := b.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
