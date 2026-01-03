@@ -231,6 +231,7 @@ type DefaultProjectCommandRunner struct {
 	PlanStepRunner            StepRunner
 	ShowStepRunner            StepRunner
 	ApplyStepRunner           StepRunner
+	CancelStepRunner          StepRunner
 	PolicyCheckStepRunner     StepRunner
 	VersionStepRunner         StepRunner
 	ImportStepRunner          StepRunner
@@ -243,6 +244,7 @@ type DefaultProjectCommandRunner struct {
 	Webhooks                  WebhooksSender
 	WorkingDirLocker          WorkingDirLocker
 	CommandRequirementHandler CommandRequirementHandler
+	CancellationTracker       CancellationTracker
 }
 
 // Plan runs terraform plan for the project described by ctx.
