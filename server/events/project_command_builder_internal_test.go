@@ -621,12 +621,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -836,12 +836,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -1081,12 +1081,12 @@ workflows:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -1235,12 +1235,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -1454,14 +1454,14 @@ autodiscover:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			})

@@ -2,17 +2,17 @@
   "license": "Apache-2.0",
   "type": "module",
   "devDependencies": {
-    "@playwright/test": "1.56.1",
+    "@playwright/test": "1.57.0",
     "@types/node": "22.13.4",
     "@vueuse/core": "12.8.2",
     "markdown-it-footnote": "4.0.0",
-    "markdownlint-cli": "0.46.0",
+    "markdownlint-cli": "0.47.0",
     "mermaid": "11.12.2",
     "sitemap-ts": "1.10.1",
     "vite": "6.4.1",
     "vitepress": "1.6.4",
     "vitepress-plugin-mermaid": "2.0.17",
-    "vue": "3.5.24"
+    "vue": "3.5.26"
   },
   "scripts": {
     "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
