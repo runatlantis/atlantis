@@ -20,6 +20,7 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -888,15 +889,10 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseW
 
 // supportsHost returns true if h is in e.SupportedVCSHosts and false otherwise.
 func (e *VCSEventsController) supportsHost(h models.VCSHostType) bool {
-	for _, supported := range e.SupportedVCSHosts {
-		if h == supported {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(e.SupportedVCSHosts, h)
 }
 
-func (e *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
+func (e *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	e.Logger.Log(lvl, response)
 	w.WriteHeader(code)

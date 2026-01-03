@@ -389,7 +389,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	}, http.StatusOK, nil
 }
 
-func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
+func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	a.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)

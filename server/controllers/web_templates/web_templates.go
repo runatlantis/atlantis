@@ -44,7 +44,7 @@ var templateFileNames = map[string]string{
 type TemplateWriter interface {
 	// Execute applies a parsed template to the specified data object,
 	// writing the output to wr.
-	Execute(wr io.Writer, data interface{}) error
+	Execute(wr io.Writer, data any) error
 }
 
 // LockIndexData holds the fields needed to display the index view for locks.
