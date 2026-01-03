@@ -5,6 +5,7 @@ package events
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -321,11 +322,11 @@ func newProjectCommandContext(ctx *command.Context,
 func escapeArgs(args []string) []string {
 	var escaped []string
 	for _, arg := range args {
-		var escapedArg string
+		var escapedArg strings.Builder
 		for i := range arg {
-			escapedArg += "\\" + string(arg[i])
+			escapedArg.WriteString("\\" + string(arg[i]))
 		}
-		escaped = append(escaped, escapedArg)
+		escaped = append(escaped, escapedArg.String())
 	}
 	return escaped
 }

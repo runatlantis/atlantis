@@ -26,11 +26,11 @@ func TestPendingPlanFinder_FindNoDir(t *testing.T) {
 func TestPendingPlanFinder_FindIncludingNotGitDir(t *testing.T) {
 	gitDirName := ".default"
 	notGitDirName := ".terragrunt-cache"
-	tmpDir := DirStructure(t, map[string]interface{}{
-		gitDirName: map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]any{
+		gitDirName: map[string]any{
 			"default.tfplan": nil,
 		},
-		notGitDirName: map[string]interface{}{
+		notGitDirName: map[string]any{
 			"some_file.tfplan": nil,
 		},
 	})
@@ -48,7 +48,7 @@ func TestPendingPlanFinder_FindIncludingNotGitDir(t *testing.T) {
 func TestPendingPlanFinder_Find(t *testing.T) {
 	cases := []struct {
 		description string
-		files       map[string]interface{}
+		files       map[string]any
 		expPlans    []events.PendingPlan
 	}{
 		{
@@ -58,8 +58,8 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"root directory",
-			map[string]interface{}{
-				"default": map[string]interface{}{
+			map[string]any{
+				"default": map[string]any{
 					"default.tfplan": nil,
 				},
 			},
@@ -73,8 +73,8 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"root dir project plan",
-			map[string]interface{}{
-				"default": map[string]interface{}{
+			map[string]any{
+				"default": map[string]any{
 					"projectname-default.tfplan": nil,
 				},
 			},
@@ -89,8 +89,8 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"root dir project plan with slashes",
-			map[string]interface{}{
-				"default": map[string]interface{}{
+			map[string]any{
+				"default": map[string]any{
 					"project::name-default.tfplan": nil,
 				},
 			},
@@ -105,12 +105,12 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"multiple directories in single workspace",
-			map[string]interface{}{
-				"default": map[string]interface{}{
-					"dir1": map[string]interface{}{
+			map[string]any{
+				"default": map[string]any{
+					"dir1": map[string]any{
 						"default.tfplan": nil,
 					},
-					"dir2": map[string]interface{}{
+					"dir2": map[string]any{
 						"default.tfplan": nil,
 					},
 				},
@@ -130,9 +130,9 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"multiple directories nested within each other",
-			map[string]interface{}{
-				"default": map[string]interface{}{
-					"dir1": map[string]interface{}{
+			map[string]any{
+				"default": map[string]any{
+					"dir1": map[string]any{
 						"default.tfplan": nil,
 					},
 					"default.tfplan": nil,
@@ -153,14 +153,14 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			"multiple workspaces",
-			map[string]interface{}{
-				"default": map[string]interface{}{
+			map[string]any{
+				"default": map[string]any{
 					"default.tfplan": nil,
 				},
-				"staging": map[string]interface{}{
+				"staging": map[string]any{
 					"staging.tfplan": nil,
 				},
-				"production": map[string]interface{}{
+				"production": map[string]any{
 					"production.tfplan": nil,
 				},
 			},
@@ -184,12 +184,12 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 		},
 		{
 			".terragrunt-cache",
-			map[string]interface{}{
-				"default": map[string]interface{}{
-					".terragrunt-cache": map[string]interface{}{
-						"N6lY9xk7PivbOAzdsjDL6VUFVYk": map[string]interface{}{
-							"K4xpUZI6HgUF-ip6E1eib4L8mwQ": map[string]interface{}{
-								"app": map[string]interface{}{
+			map[string]any{
+				"default": map[string]any{
+					".terragrunt-cache": map[string]any{
+						"N6lY9xk7PivbOAzdsjDL6VUFVYk": map[string]any{
+							"K4xpUZI6HgUF-ip6E1eib4L8mwQ": map[string]any{
+								"app": map[string]any{
 									"default.tfplan": nil,
 								},
 							},
@@ -237,8 +237,8 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 
 // If a planfile is checked in to git, we shouldn't use it.
 func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
-	tmpDir := DirStructure(t, map[string]interface{}{
-		"default": map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
 			"default.tfplan": nil,
 		},
 	})
@@ -277,12 +277,12 @@ func runCmdErrCode(t *testing.T, dir string, errCode int, name string, args ...s
 
 // Test that it deletes pending plans.
 func TestPendingPlanFinder_DeletePlans(t *testing.T) {
-	files := map[string]interface{}{
-		"default": map[string]interface{}{
-			"dir1": map[string]interface{}{
+	files := map[string]any{
+		"default": map[string]any{
+			"dir1": map[string]any{
 				"default.tfplan": nil,
 			},
-			"dir2": map[string]interface{}{
+			"dir2": map[string]any{
 				"default.tfplan": nil,
 			},
 		},

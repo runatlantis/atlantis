@@ -143,7 +143,7 @@ type UserConfig struct {
 func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 	var allowCommands []command.Name
 	var hasAll bool
-	for _, input := range strings.Split(u.AllowCommands, ",") {
+	for input := range strings.SplitSeq(u.AllowCommands, ",") {
 		if input == "" {
 			continue
 		}
@@ -169,7 +169,7 @@ func (u UserConfig) ToWebhookHttpHeaders() (map[string][]string, error) {
 		return nil, nil
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	err := json.Unmarshal([]byte(u.WebhookHttpHeaders), &m)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func (u UserConfig) ToWebhookHttpHeaders() (map[string][]string, error) {
 	headers := make(map[string][]string)
 	for name, rawValue := range m {
 		switch val := rawValue.(type) {
-		case []interface{}:
+		case []any:
 			for _, v := range val {
 				s, ok := v.(string)
 				if !ok {
