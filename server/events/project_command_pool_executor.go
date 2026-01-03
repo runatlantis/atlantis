@@ -41,7 +41,6 @@ func runProjectCmdsParallel(
 
 	wg := sizedwaitgroup.New(poolSize)
 	for _, pCmd := range cmds {
-		pCmd := pCmd
 		var execute func()
 		wg.Add()
 

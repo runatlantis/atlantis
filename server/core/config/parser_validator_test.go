@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -2215,13 +2216,7 @@ projects:
 			// Sort both slices for comparison
 			Equals(t, len(c.expDirs), len(actualDirs))
 			for _, expDir := range c.expDirs {
-				found := false
-				for _, actDir := range actualDirs {
-					if expDir == actDir {
-						found = true
-						break
-					}
-				}
+				found := slices.Contains(actualDirs, expDir)
 				Assert(t, found, "expected dir %q not found in actual dirs %v", expDir, actualDirs)
 			}
 		})

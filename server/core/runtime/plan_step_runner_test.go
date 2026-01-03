@@ -684,7 +684,7 @@ func (r *remotePlanMock) RunCommandAsync(_ command.ProjectContext, _ string, arg
 	in := make(chan string)
 	out := make(chan runtimemodels.Line)
 	go func() {
-		for _, line := range strings.Split(r.LinesToSend, "\n") {
+		for line := range strings.SplitSeq(r.LinesToSend, "\n") {
 			out <- runtimemodels.Line{Line: line}
 		}
 		close(out)

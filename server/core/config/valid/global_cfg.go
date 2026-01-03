@@ -591,7 +591,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 // getMatchingCfg returns the key settings for repoID.
 func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (planReqs []string, applyReqs []string, importReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocks RepoLocks, policyCheck bool, customPolicyCheck bool, autoDiscover AutoDiscover, silencePRComments []string) {
 	toLog := make(map[string]string)
-	traceF := func(repoIdx int, repoID string, key string, val interface{}) string {
+	traceF := func(repoIdx int, repoID string, key string, val any) string {
 		from := "default server config"
 		if repoIdx > 0 {
 			from = fmt.Sprintf("repos[%d], id: %s", repoIdx, repoID)

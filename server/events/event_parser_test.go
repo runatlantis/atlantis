@@ -1035,7 +1035,7 @@ func TestBitbucketShaCacheExpires(t *testing.T) {
 	Equals(t, models.OtherPullEvent, act)
 	// But after 300 times, the cache should expire
 	// this is so we don't have ever increasing memory usage
-	for i := 0; i < 302; i++ {
+	for i := range 302 {
 		parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", fmt.Sprintf("https://github.com/fakeorg/fakerepo/pull/%d", i))
 	}
 	// and now SHA will seen as a change again

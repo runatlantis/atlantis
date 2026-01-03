@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -1249,11 +1250,5 @@ func (s *ServerCmd) printErr(err error) {
 }
 
 func isValidLogLevel(level string) bool {
-	for _, logLevel := range ValidLogLevels {
-		if logLevel == level {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(ValidLogLevels, level)
 }
