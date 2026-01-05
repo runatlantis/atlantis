@@ -23,7 +23,7 @@ import (
 
 // Assert fails the test if the condition is false.
 // Taken from https://github.com/benbjohnson/testing.
-func Assert(tb testing.TB, condition bool, msg string, v ...interface{}) {
+func Assert(tb testing.TB, condition bool, msg string, v ...any) {
 	tb.Helper()
 	if !condition {
 		errLog(tb, msg, v...)
@@ -43,7 +43,7 @@ func Ok(tb testing.TB, err error) {
 
 // Equals fails the test if exp is not equal to act.
 // Taken from https://github.com/benbjohnson/testing.
-func Equals(tb testing.TB, exp, act interface{}) {
+func Equals(tb testing.TB, exp, act any) {
 	tb.Helper()
 	if diff := deep.Equal(exp, act); diff != nil {
 		errLog(tb, "%s\n\nexp: %s******\ngot: %s", diff, pretty.Sprint(exp), pretty.Sprint(act))
@@ -79,7 +79,7 @@ func ErrContains(tb testing.TB, substr string, act error) {
 }
 
 // Contains fails the test if the slice doesn't contain the expected element
-func Contains(tb testing.TB, exp interface{}, slice []string) {
+func Contains(tb testing.TB, exp any, slice []string) {
 	tb.Helper()
 	for _, v := range slice {
 		if v == exp {
@@ -90,7 +90,7 @@ func Contains(tb testing.TB, exp interface{}, slice []string) {
 	tb.FailNow()
 }
 
-func errLog(tb testing.TB, fmt string, args ...interface{}) {
+func errLog(tb testing.TB, fmt string, args ...any) {
 	tb.Helper()
 	tb.Logf("\033[31m"+fmt+"\033[39m", args...)
 }

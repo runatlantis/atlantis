@@ -11,7 +11,7 @@ import (
 )
 
 // NewInstrumentedGithubClient creates a client proxy responsible for gathering stats and logging
-func NewInstrumentedGithubClient(client *GithubClient, statsScope tally.Scope, logger logging.SimpleLogging) IGithubClient {
+func NewInstrumentedGithubClient(client *Client, statsScope tally.Scope, logger logging.SimpleLogging) IGithubClient {
 	scope := statsScope.SubScope("github")
 
 	instrumentedGHClient := &common.InstrumentedClient{

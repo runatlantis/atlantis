@@ -231,12 +231,12 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	cases := []struct {
-		Description       string
-		ProjectContexts   []command.ProjectContext
-		ProjectResults    []command.ProjectResult
-		RunnerInvokeMatch []*EqMatcher
-		ExpComment        string
-		ApplyFailed       bool
+		Description           string
+		ProjectContexts       []command.ProjectContext
+		ProjectCommandOutputs []command.ProjectCommandOutput
+		RunnerInvokeMatch     []*EqMatcher
+		ExpComment            string
+		ApplyFailed           bool
 	}{
 		{
 			Description: "When first apply fails, the second don't run",
@@ -254,14 +254,12 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 			},
 			RunnerInvokeMatch: []*EqMatcher{
@@ -270,8 +268,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ApplyFailed: true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
+				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "When first apply fails, the second not will run",
@@ -289,13 +286,11 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -304,7 +299,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Never(),
 			},
 			ApplyFailed: true,
-			ExpComment:  "Ran Apply for dir: `` workspace: ``\n\n**Apply Error**\n```\nshabang\n```",
+			ExpComment:  "Ran Apply for project: `First` dir: `` workspace: ``\n\n**Apply Error**\n```\nshabang\n```",
 		},
 		{
 			Description: "When both in a group of two succeeds, the following two will run",
@@ -331,21 +326,17 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -357,8 +348,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ApplyFailed: true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
+				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "When one out of two fails, the following two will not run",
@@ -385,21 +375,17 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:               "Fourth",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -411,10 +397,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ApplyFailed: true,
 			ExpComment: "Ran Apply for 4 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"3. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
-				"4. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n4 projects, 3 successful, 0 failed, 1 errored",
+				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n1. project: `Third` dir: `` workspace: ``\n1. project: `Fourth` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 3. project: `Third` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### 4. project: `Fourth` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n4 projects, 3 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "Don't block when parallel is not set",
@@ -430,13 +413,11 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -446,8 +427,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ApplyFailed: true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
+				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "Don't block when abortOnExecutionOrderFail is not set",
@@ -461,13 +441,11 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:         "Second",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Apply,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -477,8 +455,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ApplyFailed: true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
+				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
 		{
 			Description: "All project finished successfully",
@@ -492,13 +469,11 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:         "Second",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 				{
-					Command:      command.Apply,
 					ApplySuccess: "Great success!",
 				},
 			},
@@ -508,8 +483,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			},
 			ApplyFailed: false,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
-				"1. dir: `` workspace: ``\n1. dir: `` workspace: ``\n---\n\n### 1. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### " +
-				"2. dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 2 successful, 0 failed, 0 errored",
+				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 2 successful, 0 failed, 0 errored",
 		},
 	}
 
@@ -540,7 +514,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 
 			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Apply(c.ProjectContexts[i])).ThenReturn(c.ProjectResults[i])
+				When(projectCommandRunner.Apply(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutputs[i])
 			}
 
 			applyCommandRunner.Run(ctx, cmd)
