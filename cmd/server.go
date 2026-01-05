@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -169,7 +170,7 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
+	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
@@ -1249,11 +1250,5 @@ func (s *ServerCmd) printErr(err error) {
 }
 
 func isValidLogLevel(level string) bool {
-	for _, logLevel := range ValidLogLevels {
-		if logLevel == level {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(ValidLogLevels, level)
 }

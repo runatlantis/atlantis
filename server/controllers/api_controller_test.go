@@ -285,10 +285,10 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 		}}, nil)
 
 	projectCommandRunner := NewMockProjectCommandRunner()
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
 		PlanSuccess: &models.PlanSuccess{},
 	})
-	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
 		ApplySuccess: "success",
 	})
 

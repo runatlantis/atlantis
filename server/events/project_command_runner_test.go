@@ -179,7 +179,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			var prjResult command.ProjectResult
+			var prjResult command.ProjectCommandOutput
 			var expCommitStatus models.CommitStatus
 
 			mockJobURLSetter := mocks.NewMockJobURLSetter()
@@ -193,18 +193,18 @@ func TestProjectOutputWrapper(t *testing.T) {
 			}
 
 			if c.Success {
-				prjResult = command.ProjectResult{
+				prjResult = command.ProjectCommandOutput{
 					PlanSuccess:  &models.PlanSuccess{},
 					ApplySuccess: "exists",
 				}
 				expCommitStatus = models.SuccessCommitStatus
 			} else if c.Failure {
-				prjResult = command.ProjectResult{
+				prjResult = command.ProjectCommandOutput{
 					Failure: "failure",
 				}
 				expCommitStatus = models.FailedCommitStatus
 			} else if c.Error {
-				prjResult = command.ProjectResult{
+				prjResult = command.ProjectCommandOutput{
 					Error: errors.New("error"),
 				}
 				expCommitStatus = models.FailedCommitStatus

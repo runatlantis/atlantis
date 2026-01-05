@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 
 	version "github.com/hashicorp/go-version"
@@ -85,17 +86,10 @@ func (a *ApplyStepRunner) hasTargetFlag(ctx command.ProjectContext, extraArgs []
 		return split[0] == "-target"
 	}
 
-	for _, arg := range ctx.EscapedCommentArgs {
-		if isTargetFlag(arg) {
-			return true
-		}
+	if slices.ContainsFunc(ctx.EscapedCommentArgs, isTargetFlag) {
+		return true
 	}
-	for _, arg := range extraArgs {
-		if isTargetFlag(arg) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(extraArgs, isTargetFlag)
 }
 
 // cleanRemoteApplyOutput removes unneeded output like the refresh and plan

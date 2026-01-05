@@ -496,7 +496,7 @@ func (p *PolicyCheckResults) CombinedOutput() string {
 	combinedOutput := ""
 	for _, psResult := range p.PolicySetResults {
 		// accounting for json output from conftest.
-		for _, psResultLine := range strings.Split(psResult.PolicyOutput, "\\n") {
+		for psResultLine := range strings.SplitSeq(psResult.PolicyOutput, "\\n") {
 			combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
 		}
 	}
