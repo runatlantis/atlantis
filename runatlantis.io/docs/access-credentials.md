@@ -31,6 +31,11 @@ generate an access token. Read on for the instructions for your specific Git hos
 
 * Create a [Personal Access Token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-fine-grained-personal-access-token)
 * Create the token with **repo** scope
+  * The following repository permissions are the minimum required:
+    * Commit statuses: read and write (to update the PR with indicators of plan/apply/policy job states)
+    * Contents: read only (to fetch the files changed and clone the repository)
+    * Metadata: read only (this will be automatically selected as mandatory when Contents is set to read-only)
+    * Pull requests: read and write (to comment and react on the PR)
 * Record the access token
 ::: warning
 Your Atlantis user must also have "Write permissions" (for repos in an organization) or be a "Collaborator" (for repos in a user account) to be able to set commit statuses:
@@ -58,7 +63,9 @@ Only a single installation per GitHub App is supported at the moment.
 :::
 
 ::: tip NOTE
-GitHub App handles the webhook calls by itself, hence there is no need to create webhooks separately. If webhooks were created manually, those should be removed when using GitHub App. Otherwise, there would be 2 calls to Atlantis resulting in locking errors on path/workspace.
+GitHub App handles the webhook calls by itself, hence there is no need to create webhooks separately. If webhooks were created manually, those can be removed when using GitHub App. Otherwise, there would be 2 calls to Atlantis resulting in locking errors on path/workspace.
+
+Webhooks can either be created manually or managed by the GitHub App for repositories that trigger Atlantis. If manually creating (see the [section below](access-credentials.md#manually-creating-the-github-app)), do not specify webhook details in the GitHub app configuration settings. In both cases it is strongly recommended to protect the webhooks using a secret. See [Webhook Secrets](webhook-secrets.md#webhook-secrets)
 :::
 
 #### Manually Creating the GitHub app
@@ -80,10 +87,6 @@ Repositories must be manually registered with the created GitHub app to allow At
 :::
 
 ::: tip NOTE
-Webhooks must be created manually for repositories that trigger Atlantis.
-:::
-
-::: tip NOTE
 Passing the additional flag `--gh-app-slug` will modify the name of the App when posting comments on a Pull Request.
 :::
 
@@ -96,7 +99,7 @@ Since v0.19.7, a new permission for `Administration` has been added. If you have
 
 Since v0.22.3, a new permission for `Members` has been added, which is required for features that apply permissions to an organizations team members rather than individual users. Like the `Administration` permission above, updating Atlantis will not automatically add this permission, so if you wish to use features that rely on checking team membership you will need to add this manually.
 
-A new permission for `Actions` has been added, which is required for checking if a pull request is mergbeably bypassing the apply check. Updating Atlantis will not automatically add this permission, so you will need to add this manually.
+Since v0.30.0, a new permission for `Actions` has been added, which is required for checking if a pull request is mergable while bypassing the apply check. Updating Atlantis will not automatically add this permission, so you will need to add this manually.
 :::
 
 | Type            | Access              |
@@ -114,7 +117,7 @@ A new permission for `Actions` has been added, which is required for checking if
 
 ### GitLab
 
-* Follow: [GitLab: Create a personal access token](https://docs.gitlab.com/ce/user/profile/personal_access_tokens.html#create-a-personal-access-token)
+* Follow: [GitLab: Create a personal access token](https://docs.gitlab.com/user/profile/personal_access_tokens/#create-a-personal-access-token)
 * Create a token with **api** scope
 * Record the access token
 
@@ -132,7 +135,7 @@ A new permission for `Actions` has been added, which is required for checking if
 
 * Create an App Password by following [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 * Label the password "atlantis"
-* Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them
+* Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them. If you want to enable the [hide-prev-plan-comments](server-configuration.md#hide-prev-plan-comments) feature and thus delete old comments, please add **Account**: **Read** as well.
 * Record the access token
 
 ### Bitbucket Server (aka Stash)

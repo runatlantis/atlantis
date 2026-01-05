@@ -94,6 +94,36 @@ atlantis plan -d dir -- -var foo='bar'
 
 If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.md#adding-extra-arguments-to-terraform-commands).
 
+### Automatic Environment Variable Files
+
+Atlantis automatically includes workspace-specific variable files if they exist in your repository. This feature helps reduce duplication across different environments and workspaces.
+
+#### How it works
+
+When running `atlantis plan`, Atlantis automatically checks for a file at `env/{workspace}.tfvars` relative to the project directory. If this file exists, Atlantis will automatically include it using the `-var-file` flag.
+
+#### Examples
+
+```plain
+my-terraform-project/
+├── main.tf
+├── variables.tf
+└── env/
+    ├── default.tfvars
+    ├── staging.tfvars
+    └── production.tfvars
+```
+
+When you run:
+
+* `atlantis plan` (uses default workspace) automatically includes `env/default.tfvars`
+* `atlantis plan -w staging` automatically includes `env/staging.tfvars`
+* `atlantis plan -w production` automatically includes `env/production.tfvars`
+
+::: tip
+This feature works for any workspace name. If you have a custom workspace called `dev-team-1`, Atlantis will look for `env/dev-team-1.tfvars`.
+:::
+
 ### Using the -destroy Flag
 
 #### Example
@@ -149,6 +179,7 @@ atlantis apply -w staging
 * `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.md). Cannot be used at same time as `-d` or `-w`.
 * `-w workspace` Apply the plan for this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused.
 * `--auto-merge-disabled` Disable [automerge](automerging.md) for this apply command.
+* `--auto-merge-method method` Specify which [merge method](automerging.md#how-to-set-the-merge-method-for-automerge) use for the apply command if [automerge](automerging.md) is enabled. Implemented only for GitHub.
 * `--verbose` Append Atlantis log to comment.
 
 ### Additional Terraform flags
@@ -161,6 +192,36 @@ Because Atlantis under the hood is running `terraform apply plan.tfplan`, any Te
 
 They're ignored because they can't be specified for an already generated planfile.
 If you would like to specify these flags, do it while running `atlantis plan`.
+
+::: tip
+The automatic `env/{workspace}.tfvars` file inclusion happens during the `atlantis plan` phase. Since `atlantis apply` uses the already-generated plan file, any environment-specific variables are already incorporated from when the plan was created.
+:::
+
+---
+
+## Atlantis cancel
+
+```bash
+atlantis cancel
+```
+
+### Explanation
+
+Cancels all **queued commands** for the current pull request.
+
+::: warning NOTE
+This command **does not** attempt to stop or interrupt commands that are already running. It only removes subsequent commands that are waiting in the queue. There is currently no mechanism in Atlantis to interrupt the currently running process.
+:::
+
+This is useful if you have multiple commands queued (e.g., atlantis apply for several projects) and you realize you made a mistake in your PR. Using cancel prevents the queued plans from executing. Especially with long-running operations, this can save time and resources.
+
+### Examples
+
+```bash
+# An apply is currently running, and another is queued.
+# This command will cancel the queued apply but not the running one.
+atlantis cancel
+```
 
 ---
 

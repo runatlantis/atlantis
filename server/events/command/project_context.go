@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package command
 
 import (
@@ -93,6 +96,10 @@ type ProjectContext struct {
 	// Steps are the sequence of commands we need to run for this project and this
 	// stage.
 	Steps []valid.Step
+	// TerraformDistribution is the distribution of terraform we should use when
+	// executing commands for this project. This can be set to nil in which case
+	// we will use the default Atlantis terraform distribution.
+	TerraformDistribution *string
 	// TerraformVersion is the version of terraform we should use when executing
 	// commands for this project. This can be set to nil in which case we will
 	// use the default Atlantis terraform version.
@@ -122,7 +129,7 @@ type ProjectContext struct {
 	// The index of order group. Before planning/applying it will use to sort projects. Default is 0.
 	ExecutionOrderGroup int
 	// If plans/applies should be aborted if any prior plan/apply fails
-	AbortOnExcecutionOrderFail bool
+	AbortOnExecutionOrderFail bool
 	// Allows custom policy check tools outside of Conftest to run in checks
 	CustomPolicyCheck bool
 	SilencePRComments []string
@@ -155,7 +162,7 @@ func (p ProjectContext) GetShowResultFileName() string {
 	if p.ProjectName == "" {
 		return fmt.Sprintf("%s.json", p.Workspace)
 	}
-	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
+	projName := strings.ReplaceAll(p.ProjectName, "/", planfileSlashReplace)
 	return fmt.Sprintf("%s-%s.json", projName, p.Workspace)
 }
 
@@ -164,7 +171,7 @@ func (p ProjectContext) GetPolicyCheckResultFileName() string {
 	if p.ProjectName == "" {
 		return fmt.Sprintf("%s-policyout.json", p.Workspace)
 	}
-	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
+	projName := strings.ReplaceAll(p.ProjectName, "/", planfileSlashReplace)
 	return fmt.Sprintf("%s-%s-policyout.json", projName, p.Workspace)
 }
 

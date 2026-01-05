@@ -20,14 +20,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v71/github"
 	. "github.com/petergtz/pegomock/v4"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -68,6 +68,7 @@ var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
+var cancellationTracker *mocks.MockCancellationTracker
 
 type TestConfig struct {
 	parallelPoolSize           int
@@ -76,8 +77,9 @@ type TestConfig struct {
 	silenceVCSStatusNoProjects bool
 	StatusName                 string
 	discardApprovalOnPlan      bool
-	backend                    locking.Backend
+	database                   db.Database
 	DisableUnlockLabel         string
+	PendingApplyStatus         bool
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -85,7 +87,10 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	// create an empty DB
 	tmp := t.TempDir()
-	defaultBoltDB, err := db.New(tmp)
+	defaultBoltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		defaultBoltDB.Close()
+	})
 	Ok(t, err)
 
 	testConfig := &TestConfig{
@@ -93,7 +98,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		SilenceNoProjects:     false,
 		StatusName:            "atlantis-test",
 		discardApprovalOnPlan: false,
-		backend:               defaultBoltDB,
+		database:              defaultBoltDB,
 		DisableUnlockLabel:    "do-not-unlock",
 	}
 
@@ -113,6 +118,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
 	pullReqStatusFetcher = vcsmocks.NewMockPullReqStatusFetcher()
+	cancellationTracker = mocks.NewMockCancellationTracker()
 
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
@@ -120,13 +126,13 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	lockingLocker = lockingmocks.NewMockLocker()
 
 	dbUpdater = &events.DBUpdater{
-		Backend: testConfig.backend,
+		Database: testConfig.database,
 	}
 
 	pullUpdater = &events.PullUpdater{
 		HidePrevPlanComments: false,
 		VCSClient:            vcsClient,
-		MarkdownRenderer:     events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false),
+		MarkdownRenderer:     events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false),
 	}
 
 	autoMerger = &events.AutoMerger{
@@ -153,16 +159,18 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
-		testConfig.backend,
+		testConfig.database,
 		lockingLocker,
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
+		testConfig.PendingApplyStatus,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -172,10 +180,11 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		testConfig.backend,
+		testConfig.database,
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
 		testConfig.silenceVCSStatusNoProjects,
@@ -234,7 +243,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
 
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 	ch = events.DefaultCommandRunner{
 		VCSClient:                      vcsClient,
@@ -252,7 +261,8 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              testConfig.backend,
+		PullStatusFetcher:              testConfig.database,
+		CommitStatusUpdater:            commitUpdater,
 	}
 
 	return vcsClient
@@ -299,6 +309,20 @@ func TestRunCommentCommand_GithubPullParseErr(t *testing.T) {
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Eq("`Error: extracting required fields from comment data: err`"), Eq(""))
 }
 
+func TestRunCommentCommand_CommentPreWorkflowHookFailure(t *testing.T) {
+	t.Log("if there is a pre-workflowhook failure with failure enabled it is commented back on the pull request")
+	vcsClient := setup(t)
+	ch.FailOnPreWorkflowHookError = true
+
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, 1, &events.CommentCommand{Name: command.Plan})
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+
+	Assert(t, strings.Contains(comment, "Error: Pre-workflow hook failed"), fmt.Sprintf("comment should be about a pre-workflow hook failure but was %q", comment))
+}
+
 func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 	t.Run("nil checker", func(t *testing.T) {
 		vcsClient := setup(t)
@@ -313,7 +337,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(testdata.GithubRepo, testdata.User)
+		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(ch.Logger, testdata.GithubRepo, testdata.User)
 		vcsClient.VerifyWasCalledOnce().CreateComment(
 			Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Ran Plan for 0 projects:"), Eq("plan"))
 	})
@@ -331,7 +355,7 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(testdata.GithubRepo, testdata.User)
+		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(ch.Logger, testdata.GithubRepo, testdata.User)
 		vcsClient.VerifyWasCalledOnce().CreateComment(
 			Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Ran Plan for 0 projects:"), Eq("plan"))
 	})
@@ -440,15 +464,8 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		Any[logging.SimpleLogging](),
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Eq[models.CommitStatus](models.SuccessCommitStatus),
-		Eq[command.Name](command.Apply),
-		Eq(0),
-		Eq(0),
-	)
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.PendingCommitStatus), Eq(command.Apply))
 }
 
 func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) {
@@ -463,15 +480,6 @@ func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		Any[logging.SimpleLogging](),
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Eq[models.CommitStatus](models.SuccessCommitStatus),
-		Eq[command.Name](command.PolicyCheck),
-		Eq(0),
-		Eq(0),
-	)
 }
 
 func TestRunCommentCommandUnlock_NoProjects_SilenceEnabled(t *testing.T) {
@@ -485,6 +493,8 @@ func TestRunCommentCommandUnlock_NoProjects_SilenceEnabled(t *testing.T) {
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Unlock})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.PendingCommitStatus), Any[command.Name]())
 }
 
 func TestRunCommentCommandImport_NoProjects_SilenceEnabled(t *testing.T) {
@@ -506,7 +516,7 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	vcsClient := setup(t)
 	applyCommandRunner.DisableApplyAll = true
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
@@ -535,7 +545,7 @@ func TestRunCommentCommand_DisableAutoplan(t *testing.T) {
 				CommandName: command.Plan,
 			},
 		}, nil)
-
+	When(commitUpdater.UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[int](), Any[int]())).ThenReturn(nil)
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
 }
@@ -594,7 +604,7 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 		" comment saying that this is not allowed")
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("closed"),
+		State: github.Ptr("closed"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.ClosedPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
@@ -647,12 +657,12 @@ func TestRunUnlockCommand_VCSComment(t *testing.T) {
 	}{
 		{
 			name:    "PR open",
-			prState: github.String("open"),
+			prState: github.Ptr("open"),
 		},
 
 		{
 			name:    "PR closed",
-			prState: github.String("closed"),
+			prState: github.Ptr("closed"),
 		},
 	}
 
@@ -689,7 +699,7 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -713,7 +723,7 @@ func TestRunUnlockCommandFail_DisableUnlockLabel(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -737,7 +747,7 @@ func TestRunUnlockCommandFail_GetLabelsFail(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -763,7 +773,7 @@ func TestRunUnlockCommandDoesntRetrieveLabelsIfDisableUnlockLabelNotSet(t *testi
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -785,10 +795,13 @@ func TestRunUnlockCommandDoesntRetrieveLabelsIfDisableUnlockLabelNotSet(t *testi
 func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -812,10 +825,13 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_False(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{
@@ -831,15 +847,22 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Eq(models.PendingCommitStatus), Eq(command.Plan))
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Eq(models.FailedCommitStatus), Any[command.Name]())
 }
 
 func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True(t *testing.T) {
-	setup(t)
+	vcsClient := setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{
@@ -853,19 +876,29 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(Any[string]())
 	lockingLocker.VerifyWasCalled(Never()).UnlockByPull(Any[string](), Any[int]())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Eq(models.PendingCommitStatus), Eq(command.Plan))
+
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+
+	Assert(t, strings.Contains(comment, "Error: Pre-workflow hook failed"), fmt.Sprintf("comment should be about a pre-workflow hook failure but was %q", comment))
 }
 
 func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_False(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	pull := &github.PullRequest{State: github.String("open")}
+	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
@@ -874,16 +907,18 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 }
 
 func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -898,16 +933,34 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True
 func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	projectCtx := command.ProjectContext{
+		CommandName:         command.Plan,
+		ExecutionOrderGroup: 0,
+		ProjectName:         "TestProject",
+		Workspace:           "default",
+		BaseRepo:            testdata.GithubRepo,
+		Pull:                testdata.Pull,
+	}
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectResult{
+		Command: command.Plan,
+		PlanSuccess: &models.PlanSuccess{
+			TerraformOutput: "true",
+		},
+	})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	pull := &github.PullRequest{State: github.String("open")}
+	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
@@ -920,10 +973,13 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -940,10 +996,13 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	vcsClient := setup(t)
 
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
@@ -983,7 +1042,7 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	// gets called twice: the first time before the plan starts, the second time after the plan errors
 	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(tmp)
 
-	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[models.Repo](), Any[models.PullRequest]())
+	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
 func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
@@ -992,142 +1051,45 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	})
 
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	pull := &github.PullRequest{State: github.String("open")}
+	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 
-	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[models.Repo](), Any[models.PullRequest]())
-}
-
-func TestFailedApprovalCreatesFailedStatusUpdate(t *testing.T) {
-	t.Log("if \"atlantis approve_policies\" is run by non policy owner policy check status fails.")
-	setup(t)
-	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
-	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
-
-	pull := &github.PullRequest{
-		State: github.String("open"),
-	}
-
-	modelPull := models.PullRequest{
-		BaseRepo: testdata.GithubRepo,
-		State:    models.OpenPullState,
-		Num:      testdata.Pull.Num,
-	}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-
-	When(projectCommandBuilder.BuildApprovePoliciesCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{
-		{
-			CommandName: command.ApprovePolicies,
-		},
-		{
-			CommandName: command.ApprovePolicies,
-		},
-	}, nil)
-
-	When(workingDir.GetPullDir(testdata.GithubRepo, testdata.Pull)).ThenReturn(tmp, nil)
-
-	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &testdata.Pull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		Any[logging.SimpleLogging](),
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Eq[models.CommitStatus](models.SuccessCommitStatus),
-		Eq[command.Name](command.PolicyCheck),
-		Eq(0),
-		Eq(2),
-	)
-}
-
-func TestApprovedPoliciesUpdateFailedPolicyStatus(t *testing.T) {
-	t.Log("if \"atlantis approve_policies\" is run by policy owner all policy checks are approved.")
-	setup(t)
-	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
-	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
-
-	pull := &github.PullRequest{
-		State: github.String("open"),
-	}
-
-	modelPull := models.PullRequest{
-		BaseRepo: testdata.GithubRepo,
-		State:    models.OpenPullState,
-		Num:      testdata.Pull.Num,
-	}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-
-	When(projectCommandBuilder.BuildApprovePoliciesCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{
-		{
-			CommandName: command.ApprovePolicies,
-			PolicySets: valid.PolicySets{
-				Owners: valid.PolicyOwners{
-					Users: []string{testdata.User.Username},
-				},
-			},
-		},
-	}, nil)
-
-	When(workingDir.GetPullDir(testdata.GithubRepo, testdata.Pull)).ThenReturn(tmp, nil)
-	When(projectCommandRunner.ApprovePolicies(Any[command.ProjectContext]())).Then(func(_ []Param) ReturnValues {
-		return ReturnValues{
-			command.ProjectResult{
-				Command:            command.PolicyCheck,
-				PolicyCheckResults: &models.PolicyCheckResults{},
-			},
-		}
-	})
-
-	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &testdata.Pull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		Any[logging.SimpleLogging](),
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Eq[models.CommitStatus](models.SuccessCommitStatus),
-		Eq[command.Name](command.PolicyCheck),
-		Eq(1),
-		Eq(1),
-	)
+	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
 func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run with failing policy check then apply is not performed")
 	setup(t)
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 
 	modelPull := models.PullRequest{
@@ -1148,7 +1110,9 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 		},
 	})
 
-	When(ch.VCSClient.PullIsMergeable(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq("atlantis-test"))).ThenReturn(true, nil)
+	When(ch.VCSClient.PullIsMergeable(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq("atlantis-test"), Eq([]string{}))).ThenReturn(models.MergeableStatus{
+		IsMergeable: true,
+	}, nil)
 
 	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
 		return ReturnValues{
@@ -1174,7 +1138,7 @@ func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
@@ -1197,10 +1161,13 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 	tmp := t.TempDir()
-	boltDB, err := db.New(tmp)
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
 	Ok(t, err)
-	dbUpdater.Backend = boltDB
-	applyCommandRunner.Backend = boltDB
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
 	pull := testdata.Pull
 	pull.BaseRepo = testdata.GithubRepo
 	_, err = boltDB.UpdatePullWithResults(pull, []command.ProjectResult{
@@ -1217,7 +1184,7 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	Ok(t, err)
 	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus))
 	ghPull := &github.PullRequest{
-		State: github.String("open"),
+		State: github.Ptr("open"),
 	}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(ghPull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(ghPull))).ThenReturn(pull, pull.BaseRepo, testdata.GithubRepo, nil)

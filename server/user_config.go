@@ -1,6 +1,11 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package server
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -24,6 +29,7 @@ type UserConfig struct {
 	AzureDevopsWebhookPassword  string `mapstructure:"azuredevops-webhook-password"`
 	AzureDevopsWebhookUser      string `mapstructure:"azuredevops-webhook-user"`
 	AzureDevOpsHostname         string `mapstructure:"azuredevops-hostname"`
+	BitbucketApiUser            string `mapstructure:"bitbucket-api-user"`
 	BitbucketBaseURL            string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken              string `mapstructure:"bitbucket-token"`
 	BitbucketUser               string `mapstructure:"bitbucket-user"`
@@ -42,6 +48,7 @@ type UserConfig struct {
 	EmojiReaction               string `mapstructure:"emoji-reaction"`
 	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
+	EnableProfilingAPI          bool   `mapstructure:"enable-profiling-api"`
 	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
 	ExecutableName              string `mapstructure:"executable-name"`
 	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
@@ -50,6 +57,7 @@ type UserConfig struct {
 	GithubAllowMergeableBypassApply bool   `mapstructure:"gh-allow-mergeable-bypass-apply"`
 	GithubHostname                  string `mapstructure:"gh-hostname"`
 	GithubToken                     string `mapstructure:"gh-token"`
+	GithubTokenFile                 string `mapstructure:"gh-token-file"`
 	GithubUser                      string `mapstructure:"gh-user"`
 	GithubWebhookSecret             string `mapstructure:"gh-webhook-secret"`
 	GithubOrg                       string `mapstructure:"gh-org"`
@@ -65,9 +73,11 @@ type UserConfig struct {
 	GiteaWebhookSecret              string `mapstructure:"gitea-webhook-secret"`
 	GiteaPageSize                   int    `mapstructure:"gitea-page-size"`
 	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
+	GitlabGroupAllowlist            string `mapstructure:"gitlab-group-allowlist"`
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
+	GitlabStatusRetryEnabled        bool   `mapstructure:"gitlab-status-retry-enabled"`
 	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
@@ -75,9 +85,11 @@ type UserConfig struct {
 	LogLevel                        string `mapstructure:"log-level"`
 	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
 	MaxCommentsPerCommand           int    `mapstructure:"max-comments-per-command"`
+	IgnoreVCSStatusNames            string `mapstructure:"ignore-vcs-status-names"`
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`
+	PendingApplyStatus              bool   `mapstructure:"pending-apply-status"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
 	Port                            int    `mapstructure:"port"`
@@ -107,7 +119,7 @@ type UserConfig struct {
 	SSLCertFile                string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile                 string          `mapstructure:"ssl-key-file"`
 	RestrictFileList           bool            `mapstructure:"restrict-file-list"`
-	TFDistribution             string          `mapstructure:"tf-distribution"`
+	TFDistribution             string          `mapstructure:"tf-distribution"` // deprecated in favor of DefaultTFDistribution
 	TFDownload                 bool            `mapstructure:"tf-download"`
 	TFDownloadURL              string          `mapstructure:"tf-download-url"`
 	TFEHostname                string          `mapstructure:"tfe-hostname"`
@@ -115,8 +127,10 @@ type UserConfig struct {
 	TFEToken                   string          `mapstructure:"tfe-token"`
 	VarFileAllowlist           string          `mapstructure:"var-file-allowlist"`
 	VCSStatusName              string          `mapstructure:"vcs-status-name"`
+	DefaultTFDistribution      string          `mapstructure:"default-tf-distribution"`
 	DefaultTFVersion           string          `mapstructure:"default-tf-version"`
 	Webhooks                   []WebhookConfig `mapstructure:"webhooks" flag:"false"`
+	WebhookHttpHeaders         string          `mapstructure:"webhook-http-headers"`
 	WebBasicAuth               bool            `mapstructure:"web-basic-auth"`
 	WebUsername                string          `mapstructure:"web-username"`
 	WebPassword                string          `mapstructure:"web-password"`
@@ -129,7 +143,7 @@ type UserConfig struct {
 func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 	var allowCommands []command.Name
 	var hasAll bool
-	for _, input := range strings.Split(u.AllowCommands, ",") {
+	for input := range strings.SplitSeq(u.AllowCommands, ",") {
 		if input == "" {
 			continue
 		}
@@ -147,6 +161,37 @@ func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 		return command.AllCommentCommands, nil
 	}
 	return allowCommands, nil
+}
+
+// ToWebhookHttpHeaders parses WebhookHttpHeaders into a map of HTTP headers.
+func (u UserConfig) ToWebhookHttpHeaders() (map[string][]string, error) {
+	if u.WebhookHttpHeaders == "" {
+		return nil, nil
+	}
+
+	var m map[string]any
+	err := json.Unmarshal([]byte(u.WebhookHttpHeaders), &m)
+	if err != nil {
+		return nil, err
+	}
+	headers := make(map[string][]string)
+	for name, rawValue := range m {
+		switch val := rawValue.(type) {
+		case []any:
+			for _, v := range val {
+				s, ok := v.(string)
+				if !ok {
+					return nil, fmt.Errorf("expected string array element, got %T", v)
+				}
+				headers[name] = append(headers[name], s)
+			}
+		case string:
+			headers[name] = []string{val}
+		default:
+			return nil, fmt.Errorf("expected string or array, got %T", val)
+		}
+	}
+	return headers, nil
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed

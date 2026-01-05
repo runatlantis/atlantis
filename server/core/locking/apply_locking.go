@@ -1,9 +1,13 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package locking
 
 import (
 	"errors"
 	"time"
 
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
@@ -40,21 +44,21 @@ type ApplyCommandLock struct {
 }
 
 type ApplyClient struct {
-	backend                Backend
+	database               db.Database
 	disableApply           bool
 	disableGlobalApplyLock bool
 }
 
-func NewApplyClient(backend Backend, disableApply bool, disableGlobalApplyLock bool) ApplyLocker {
+func NewApplyClient(database db.Database, disableApply bool, disableGlobalApplyLock bool) ApplyLocker {
 	return &ApplyClient{
-		backend:                backend,
+		database:               database,
 		disableApply:           disableApply,
 		disableGlobalApplyLock: disableGlobalApplyLock,
 	}
 }
 
 // LockApply acquires global apply lock.
-// DisableApply takes presedence to any existing locks, if it is set to true
+// DisableApply takes precedence to any existing locks, if it is set to true
 // this function returns an error
 func (c *ApplyClient) LockApply() (ApplyCommandLock, error) {
 	response := ApplyCommandLock{}
@@ -63,7 +67,7 @@ func (c *ApplyClient) LockApply() (ApplyCommandLock, error) {
 		return response, errors.New("apply is omitted from AllowCommands; Apply commands are locked globally until flag is updated")
 	}
 
-	applyCmdLock, err := c.backend.LockCommand(command.Apply, time.Now())
+	applyCmdLock, err := c.database.LockCommand(command.Apply, time.Now())
 	if err != nil {
 		return response, err
 	}
@@ -76,14 +80,14 @@ func (c *ApplyClient) LockApply() (ApplyCommandLock, error) {
 }
 
 // UnlockApply releases a global apply lock.
-// DisableApply takes presedence to any existing locks, if it is set to true
+// DisableApply takes precedence to any existing locks, if it is set to true
 // this function returns an error
 func (c *ApplyClient) UnlockApply() error {
 	if c.disableApply {
 		return errors.New("apply commands are disabled until AllowCommands flag is updated")
 	}
 
-	err := c.backend.UnlockCommand(command.Apply)
+	err := c.database.UnlockCommand(command.Apply)
 	if err != nil {
 		return err
 	}
@@ -104,7 +108,7 @@ func (c *ApplyClient) CheckApplyLock() (ApplyCommandLock, error) {
 		}, nil
 	}
 
-	applyCmdLock, err := c.backend.CheckCommandLock(command.Apply)
+	applyCmdLock, err := c.database.CheckCommandLock(command.Apply)
 	if err != nil {
 		return response, err
 	}

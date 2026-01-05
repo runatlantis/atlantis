@@ -57,7 +57,7 @@ The `approved` requirement by:
 Each VCS provider has different rules around who can approve:
 
 * **GitHub** – **Any user with read permissions** to the repo can approve a pull request
-* **GitLab** – The user who can approve can be set in the [repo settings](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
+* **GitLab** – The user who can approve can be set in the [repo settings](https://docs.gitlab.com/user/project/merge_requests/approvals/)
 * **Bitbucket Cloud (bitbucket.org)** – A user can approve their own pull request but
   Atlantis does not count that as an approval and requires an approval from at least one user that
   is not the author of the pull request
@@ -142,7 +142,12 @@ If you set `atlantis/apply` to the mergeable requirement, use the `--gh-allow-me
 
 #### GitLab
 
-For GitLab, a merge request will be merged if there are no conflicts, no unresolved discussions if it is a project requirement and if all necessary approvers have approved the pull request.
+For GitLab, a merge request will be merged if all the following are true:
+
+* There are no conflicts
+* No unresolved discussions, if it is a project requirement
+* All necessary approvers have approved the pull request
+* Is not behind the branch it's merging into, if the project's [Merge Methods](https://docs.gitlab.com/user/project/merge_requests/methods/) are "Fast-forward merge" or "Merge commit with semi-linear history"
 
 For pipelines, if the project requires that pipelines must succeed, all builds except the apply command status will be checked.
 
@@ -303,6 +308,6 @@ request can run the actual `atlantis apply` command.
 ## Next Steps
 
 * For more information on GitHub pull request reviews and approvals see: [GitHub: About pull request reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/about-pull-request-reviews)
-* For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: [GitLab: Merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/).
+* For more information on GitLab merge request reviews and approvals (only supported on GitLab Enterprise) see: [GitLab: Merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/).
 * For more information on Bitbucket pull request reviews and approvals see: [BitBucket: Use pull requests for code review](https://confluence.atlassian.com/bitbucket/pull-requests-and-code-review-223220593.html)
 * For more information on Azure DevOps pull request reviews and approvals see: [Azure DevOps: Create pull requests](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops&tabs=browser)

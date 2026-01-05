@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw_test
 
 import (
@@ -130,6 +133,8 @@ version: 3
 automerge: true
 autodiscover:
   mode: enabled
+  ignore_paths:
+  - foo/*
 parallel_apply: true
 parallel_plan: false
 repo_locks:
@@ -157,8 +162,11 @@ allowed_regexp_prefixes:
 - dev/
 - staging/`,
 			exp: raw.RepoCfg{
-				Version:       Int(3),
-				AutoDiscover:  &raw.AutoDiscover{Mode: &autoDiscoverEnabled},
+				Version: Int(3),
+				AutoDiscover: &raw.AutoDiscover{
+					Mode:        &autoDiscoverEnabled,
+					IgnorePaths: []string{"foo/*"},
+				},
 				Automerge:     Bool(true),
 				ParallelApply: Bool(true),
 				ParallelPlan:  Bool(false),
@@ -281,43 +289,43 @@ func TestConfig_ToValid(t *testing.T) {
 				Version: Int(2),
 			},
 			exp: valid.RepoCfg{
-				Version:                    2,
-				Automerge:                  nil,
-				ParallelApply:              nil,
-				AbortOnExcecutionOrderFail: false,
-				Workflows:                  map[string]valid.Workflow{},
+				Version:                   2,
+				Automerge:                 nil,
+				ParallelApply:             nil,
+				AbortOnExecutionOrderFail: false,
+				Workflows:                 map[string]valid.Workflow{},
 			},
 		},
 		{
 			description: "automerge, parallel_apply, abort_on_execution_order_fail true",
 			input: raw.RepoCfg{
-				Version:                    Int(2),
-				Automerge:                  Bool(true),
-				ParallelApply:              Bool(true),
-				AbortOnExcecutionOrderFail: Bool(true),
+				Version:                   Int(2),
+				Automerge:                 Bool(true),
+				ParallelApply:             Bool(true),
+				AbortOnExecutionOrderFail: Bool(true),
 			},
 			exp: valid.RepoCfg{
-				Version:                    2,
-				Automerge:                  Bool(true),
-				ParallelApply:              Bool(true),
-				AbortOnExcecutionOrderFail: true,
-				Workflows:                  map[string]valid.Workflow{},
+				Version:                   2,
+				Automerge:                 Bool(true),
+				ParallelApply:             Bool(true),
+				AbortOnExecutionOrderFail: true,
+				Workflows:                 map[string]valid.Workflow{},
 			},
 		},
 		{
 			description: "automerge, parallel_apply, abort_on_execution_order_fail false",
 			input: raw.RepoCfg{
-				Version:                    Int(2),
-				Automerge:                  Bool(false),
-				ParallelApply:              Bool(false),
-				AbortOnExcecutionOrderFail: Bool(false),
+				Version:                   Int(2),
+				Automerge:                 Bool(false),
+				ParallelApply:             Bool(false),
+				AbortOnExecutionOrderFail: Bool(false),
 			},
 			exp: valid.RepoCfg{
-				Version:                    2,
-				Automerge:                  Bool(false),
-				ParallelApply:              Bool(false),
-				AbortOnExcecutionOrderFail: false,
-				Workflows:                  map[string]valid.Workflow{},
+				Version:                   2,
+				Automerge:                 Bool(false),
+				ParallelApply:             Bool(false),
+				AbortOnExecutionOrderFail: false,
+				Workflows:                 map[string]valid.Workflow{},
 			},
 		},
 		{

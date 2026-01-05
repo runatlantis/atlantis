@@ -1,32 +1,38 @@
-linters-settings:
-  misspell:
-    # Correct spellings using locale preferences for US or UK.
-    # Default is to use a neutral variety of English.
-    # Setting locale to US will correct the British spelling of 'colour' to 'color'.
-    # locale: US
-    ignore-words:
-      # for gitlab notes api
-      - noteable
-  revive:
-    rules:
-      - name: dot-imports
-        disabled: true
-
+version: "2"
 linters:
   enable:
-    - errcheck
+    - modernize
     - gochecknoinits
-    - gofmt
     - gosec
-    - gosimple
-    - govet
-    - ineffassign
     - misspell
     - revive
-    - staticcheck
     - testifylint
-    - typecheck
     - unconvert
-    - unused
-run:
-  timeout: 10m
+  settings:
+    misspell:
+      ignore-rules:
+        - noteable
+    revive:
+      rules:
+        - name: dot-imports
+          disabled: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

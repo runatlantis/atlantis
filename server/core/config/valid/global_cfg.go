@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package valid
 
 import (
@@ -34,12 +37,12 @@ var AllowedSilencePRComments = []string{"plan", "apply"}
 // DefaultAtlantisFile is the default name of the config file for each repo.
 const DefaultAtlantisFile = "atlantis.yaml"
 
-// NonOverrideableApplyReqs will get applied across all "repos" in the server side config.
+// NonOverridableApplyReqs will get applied across all "repos" in the server side config.
 // If repo config is allowed overrides, they can override this.
 // TODO: Make this more customizable, not everyone wants this rigid workflow
-// maybe something along the lines of defining overridable/non-overrideable apply
+// maybe something along the lines of defining overridable/non-overridable apply
 // requirements in the config and removing the flag to enable policy checking.
-var NonOverrideableApplyReqs = []string{PoliciesPassedCommandReq}
+var NonOverridableApplyReqs = []string{PoliciesPassedCommandReq}
 
 // GlobalCfg is the final parsed version of server-side repo config.
 type GlobalCfg struct {
@@ -104,6 +107,8 @@ type MergedProjectCfg struct {
 	Name                      string
 	AutoplanEnabled           bool
 	AutoMergeDisabled         bool
+	AutoMergeMethod           string
+	TerraformDistribution     *string
 	TerraformVersion          *version.Version
 	RepoCfgVersion            int
 	PolicySets                PolicySets
@@ -397,7 +402,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		DeleteSourceBranchOnMergeKey, deleteSourceBranchOnMerge,
 		RepoLockingKey, repoLocks.Mode,
 		PolicyCheckKey, policyCheck,
-		CustomPolicyCheckKey, policyCheck,
+		CustomPolicyCheckKey, customPolicyCheck,
 		SilencePRCommentsKey, strings.Join(silencePRComments, ","),
 	)
 
@@ -411,6 +416,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		DependsOn:                 proj.DependsOn,
 		Name:                      proj.GetName(),
 		AutoplanEnabled:           proj.Autoplan.Enabled,
+		TerraformDistribution:     proj.TerraformDistribution,
 		TerraformVersion:          proj.TerraformVersion,
 		RepoCfgVersion:            rCfg.Version,
 		PolicySets:                g.PolicySets,
@@ -437,6 +443,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		Workspace:                 workspace,
 		Name:                      "",
 		AutoplanEnabled:           DefaultAutoPlanEnabled,
+		TerraformDistribution:     nil,
 		TerraformVersion:          nil,
 		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
@@ -584,7 +591,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 // getMatchingCfg returns the key settings for repoID.
 func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (planReqs []string, applyReqs []string, importReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocks RepoLocks, policyCheck bool, customPolicyCheck bool, autoDiscover AutoDiscover, silencePRComments []string) {
 	toLog := make(map[string]string)
-	traceF := func(repoIdx int, repoID string, key string, val interface{}) string {
+	traceF := func(repoIdx int, repoID string, key string, val any) string {
 		from := "default server config"
 		if repoIdx > 0 {
 			from = fmt.Sprintf("repos[%d], id: %s", repoIdx, repoID)

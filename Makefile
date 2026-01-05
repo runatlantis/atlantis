@@ -7,7 +7,7 @@ IMAGE_NAME := runatlantis/atlantis
 .DEFAULT_GOAL := help
 
 # renovate: datasource=github-releases depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION := v1.59.1
+GOLANGCI_LINT_VERSION := v1.64.4
 
 .PHONY: help
 help: ## List targets & descriptions
@@ -60,7 +60,7 @@ docker/test: ## Run tests in docker
 
 .PHONY: test-all
 test-all: ## Run tests including integration
-	@go test  $(PKG)
+	@go test -timeout=300s $(PKG)
 
 .PHONY: docker/test-all
 docker/test-all: ## Run all tests in docker
@@ -113,4 +113,4 @@ end-to-end-tests: ## Run e2e tests
 
 .PHONY: website-dev
 website-dev: ## Run runatlantic.io on localhost:8080
-	npm website:dev
+	npm run website:dev

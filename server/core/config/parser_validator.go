@@ -1,17 +1,22 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package config
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	validation "github.com/go-ozzo/ozzo-validation"
 	shlex "github.com/google/shlex"
-	"github.com/pkg/errors"
+
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	yaml "gopkg.in/yaml.v3"
@@ -29,11 +34,11 @@ func (p *ParserValidator) HasRepoCfg(absRepoDir, repoConfigFile string) (bool, e
 	const invalidExtensionFilename = "atlantis.yml"
 	_, err := os.Stat(p.repoCfgPath(absRepoDir, invalidExtensionFilename))
 	if err == nil {
-		return false, errors.Errorf("found %q as config file; rename using the .yaml extension", invalidExtensionFilename)
+		return false, fmt.Errorf("found %q as config file; rename using the .yaml extension", invalidExtensionFilename)
 	}
 
 	_, err = os.Stat(p.repoCfgPath(absRepoDir, repoConfigFile))
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
 	return err == nil, err
@@ -48,16 +53,31 @@ func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.Global
 	configData, err := os.ReadFile(configFile) // nolint: gosec
 
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return valid.RepoCfg{}, errors.Wrapf(err, "unable to read %s file", repoConfigFile)
-		}
-		// Don't wrap os.IsNotExist errors because we want our callers to be
-		// able to detect if it's a NotExist err.
+		return valid.RepoCfg{}, fmt.Errorf("unable to read %s file: %w", repoConfigFile, err)
+	}
+
+	// Parse YAML first to expand glob patterns before validation
+	var rawConfig raw.RepoCfg
+	decoder := yaml.NewDecoder(bytes.NewReader(configData))
+	decoder.KnownFields(true)
+	err = decoder.Decode(&rawConfig)
+	if err != nil && !errors.Is(err, io.EOF) {
 		return valid.RepoCfg{}, err
 	}
-	return p.ParseRepoCfgData(configData, globalCfg, repoID, branch)
+
+	// Expand glob patterns in project dirs
+	expandedProjects, err := p.expandProjectGlobs(absRepoDir, rawConfig.Projects)
+	if err != nil {
+		return valid.RepoCfg{}, err
+	}
+	rawConfig.Projects = expandedProjects
+
+	return p.parseRawRepoCfg(rawConfig, globalCfg, repoID, branch)
 }
 
+// ParseRepoCfgData parses repo config from raw YAML bytes. Note that glob patterns
+// in project dirs are NOT expanded here because we don't have access to the repo
+// directory. This method is primarily used for skip-clone scenarios.
 func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.GlobalCfg, repoID string, branch string) (valid.RepoCfg, error) {
 	var rawConfig raw.RepoCfg
 
@@ -69,6 +89,12 @@ func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.G
 		return valid.RepoCfg{}, err
 	}
 
+	return p.parseRawRepoCfg(rawConfig, globalCfg, repoID, branch)
+}
+
+// parseRawRepoCfg validates and processes a raw config into a valid config.
+// This is the shared logic between ParseRepoCfg and ParseRepoCfgData.
+func (p *ParserValidator) parseRawRepoCfg(rawConfig raw.RepoCfg, globalCfg valid.GlobalCfg, repoID string, branch string) (valid.RepoCfg, error) {
 	// Set ErrorTag to yaml so it uses the YAML field names in error messages.
 	validation.ErrorTag = "yaml"
 	if err := rawConfig.Validate(); err != nil {
@@ -105,7 +131,7 @@ func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.G
 		}
 	}
 
-	err = globalCfg.ValidateRepoCfg(validConfig, repoID)
+	err := globalCfg.ValidateRepoCfg(validConfig, repoID)
 	return validConfig, err
 }
 
@@ -115,7 +141,7 @@ func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.G
 func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.GlobalCfg) (valid.GlobalCfg, error) {
 	configData, err := os.ReadFile(configFile) // nolint: gosec
 	if err != nil {
-		return valid.GlobalCfg{}, errors.Wrapf(err, "unable to read %s file", configFile)
+		return valid.GlobalCfg{}, fmt.Errorf("unable to read %s file: %w", configFile, err)
 	}
 	if len(configData) == 0 {
 		return valid.GlobalCfg{}, fmt.Errorf("file %s was empty", configFile)
@@ -204,7 +230,7 @@ func (p *ParserValidator) applyLegacyShellParsing(cfg *valid.RepoCfg) error {
 		if s.StepName == "run" {
 			split, err := shlex.Split(s.RunCommand)
 			if err != nil {
-				return errors.Wrapf(err, "unable to parse %q", s.RunCommand)
+				return fmt.Errorf("unable to parse %q: %w", s.RunCommand, err)
 			}
 			s.RunCommand = strings.Join(split, " ")
 		}
@@ -228,4 +254,104 @@ func (p *ParserValidator) applyLegacyShellParsing(cfg *valid.RepoCfg) error {
 		cfg.Workflows[k] = w
 	}
 	return nil
+}
+
+// expandProjectGlobs expands projects with glob patterns in their dir field
+// into multiple projects, one for each matching directory that contains
+// Terraform files (.tf).
+func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.Project) ([]raw.Project, error) {
+	var expandedProjects []raw.Project
+
+	for _, project := range projects {
+		// If dir is nil or doesn't contain glob patterns, keep the project as-is
+		if project.Dir == nil || !raw.ContainsGlobPattern(*project.Dir) {
+			expandedProjects = append(expandedProjects, project)
+			continue
+		}
+
+		// Expand the glob pattern
+		pattern := filepath.Join(absRepoDir, *project.Dir)
+		matches, err := doublestar.FilepathGlob(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("error expanding glob pattern %q: %w", *project.Dir, err)
+		}
+
+		// Filter matches to only include directories with Terraform files
+		for _, match := range matches {
+			// Check if it's a directory
+			info, err := os.Stat(match)
+			if err != nil || !info.IsDir() {
+				continue
+			}
+
+			// Check if the directory contains any .tf files
+			hasTerraformFiles, err := p.dirContainsTerraformFiles(match)
+			if err != nil {
+				return nil, fmt.Errorf("error checking for Terraform files in %q: %w", match, err)
+			}
+			if !hasTerraformFiles {
+				continue
+			}
+
+			// Create a new project for this matched directory
+			// Calculate the relative path from the repo root
+			relDir, err := filepath.Rel(absRepoDir, match)
+			if err != nil {
+				return nil, fmt.Errorf("error getting relative path for %q: %w", match, err)
+			}
+
+			// Copy the project and set the expanded directory
+			expandedProject := p.copyProjectWithDir(project, relDir)
+			expandedProjects = append(expandedProjects, expandedProject)
+		}
+	}
+
+	return expandedProjects, nil
+}
+
+// dirContainsTerraformFiles returns true if the directory contains at least one .tf file.
+func (p *ParserValidator) dirContainsTerraformFiles(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".tf") {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// copyProjectWithDir creates a copy of a project with a new directory value.
+// All other fields are copied from the original project.
+func (p *ParserValidator) copyProjectWithDir(original raw.Project, newDir string) raw.Project {
+	// Create a new project with the expanded directory
+	dirCopy := newDir
+	newProject := raw.Project{
+		Dir:                       &dirCopy,
+		Branch:                    original.Branch,
+		Workspace:                 original.Workspace,
+		Workflow:                  original.Workflow,
+		TerraformDistribution:     original.TerraformDistribution,
+		TerraformVersion:          original.TerraformVersion,
+		Autoplan:                  original.Autoplan,
+		PlanRequirements:          original.PlanRequirements,
+		ApplyRequirements:         original.ApplyRequirements,
+		ImportRequirements:        original.ImportRequirements,
+		DependsOn:                 original.DependsOn,
+		DeleteSourceBranchOnMerge: original.DeleteSourceBranchOnMerge,
+		RepoLocking:               original.RepoLocking,
+		RepoLocks:                 original.RepoLocks,
+		ExecutionOrderGroup:       original.ExecutionOrderGroup,
+		PolicyCheck:               original.PolicyCheck,
+		CustomPolicyCheck:         original.CustomPolicyCheck,
+		SilencePRComments:         original.SilencePRComments,
+	}
+
+	// Note: We intentionally do NOT copy the Name field.
+	// Each expanded project should be identified by its dir+workspace combination.
+	// If users need unique names, they should not use glob patterns for that project.
+
+	return newProject
 }

@@ -1,12 +1,15 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/utils"
 )
@@ -126,8 +129,8 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	applyReqs := defaultCfg.Repos[0].ApplyRequirements
 	var globalApplyReqs []string
 	for _, req := range applyReqs {
-		for _, nonOverrideableReq := range valid.NonOverrideableApplyReqs {
-			if req == nonOverrideableReq {
+		for _, nonOverridableReq := range valid.NonOverridableApplyReqs {
+			if req == nonOverridableReq {
 				globalApplyReqs = append(globalApplyReqs, req)
 			}
 		}
@@ -178,16 +181,19 @@ func (r Repo) HasRegexBranch() bool {
 }
 
 func (r Repo) Validate() error {
-	idValid := func(value interface{}) error {
+	idValid := func(value any) error {
 		id := value.(string)
 		if !r.HasRegexID() {
 			return nil
 		}
 		_, err := regexp.Compile(id[1 : len(id)-1])
-		return errors.Wrapf(err, "parsing: %s", id)
+		if err != nil {
+			return fmt.Errorf("parsing: %s: %w", id, err)
+		}
+		return nil
 	}
 
-	branchValid := func(value interface{}) error {
+	branchValid := func(value any) error {
 		branch := value.(string)
 		if branch == "" {
 			return nil
@@ -197,10 +203,13 @@ func (r Repo) Validate() error {
 		}
 		withoutSlashes := branch[1 : len(branch)-1]
 		_, err := regexp.Compile(withoutSlashes)
-		return errors.Wrapf(err, "parsing: %s", branch)
+		if err != nil {
+			return fmt.Errorf("parsing: %s: %w", branch, err)
+		}
+		return nil
 	}
 
-	repoConfigFileValid := func(value interface{}) error {
+	repoConfigFileValid := func(value any) error {
 		repoConfigFile := value.(string)
 		if repoConfigFile == "" {
 			return nil
@@ -214,7 +223,7 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
-	overridesValid := func(value interface{}) error {
+	overridesValid := func(value any) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
 			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey && o != valid.RepoLocksKey && o != valid.PolicyCheckKey && o != valid.CustomPolicyCheckKey && o != valid.SilencePRCommentsKey {
@@ -224,18 +233,18 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
-	workflowExists := func(value interface{}) error {
+	workflowExists := func(value any) error {
 		// We validate workflows in ParserValidator.validateRepoWorkflows
 		// because we need the list of workflows to validate.
 		return nil
 	}
 
-	deleteSourceBranchOnMergeValid := func(value interface{}) error {
+	deleteSourceBranchOnMergeValid := func(value any) error {
 		//TOBE IMPLEMENTED
 		return nil
 	}
 
-	autoDiscoverValid := func(value interface{}) error {
+	autoDiscoverValid := func(value any) error {
 		autoDiscover := value.(*AutoDiscover)
 		if autoDiscover != nil {
 			return autoDiscover.Validate()
@@ -243,7 +252,7 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
-	repoLocksValid := func(value interface{}) error {
+	repoLocksValid := func(value any) error {
 		repoLocks := value.(*RepoLocks)
 		if repoLocks != nil {
 			return repoLocks.Validate()

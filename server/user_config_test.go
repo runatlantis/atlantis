@@ -1,6 +1,10 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package server_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server"
@@ -20,23 +24,23 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 	}{
 		{
 			name:          "full commands can be parsed by comma",
-			allowCommands: "apply,plan,unlock,policy_check,approve_policies,version,import,state",
+			allowCommands: "apply,plan,cancel,unlock,policy_check,approve_policies,version,import,state",
 			want: []command.Name{
-				command.Apply, command.Plan, command.Unlock, command.PolicyCheck, command.ApprovePolicies, command.Version, command.Import, command.State,
+				command.Apply, command.Plan, command.Cancel, command.Unlock, command.PolicyCheck, command.ApprovePolicies, command.Version, command.Import, command.State,
 			},
 		},
 		{
 			name:          "all",
 			allowCommands: "all",
 			want: []command.Name{
-				command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import, command.State,
+				command.Version, command.Plan, command.Apply, command.Cancel, command.Unlock, command.ApprovePolicies, command.Import, command.State,
 			},
 		},
 		{
 			name:          "all with others returns same with all result",
 			allowCommands: "all,plan",
 			want: []command.Name{
-				command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import, command.State,
+				command.Version, command.Plan, command.Apply, command.Cancel, command.Unlock, command.ApprovePolicies, command.Import, command.State,
 			},
 		},
 		{
@@ -65,6 +69,49 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 				require.ErrorContains(t, err, tt.wantErr, "ToAllowCommandNames()")
 			}
 			assert.Equalf(t, tt.want, got, "ToAllowCommandNames()")
+		})
+	}
+}
+
+func TestUserConfig_ToWebhookHttpHeaders(t *testing.T) {
+	tcs := []struct {
+		name  string
+		given string
+		want  map[string][]string
+		err   error
+	}{
+		{
+			name:  "empty",
+			given: "",
+			want:  nil,
+		},
+		{
+			name:  "happy path",
+			given: `{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}`,
+			want: map[string][]string{
+				"Authorization":   {"Bearer some-token"},
+				"X-Custom-Header": {"value1", "value2"},
+			},
+		},
+		{
+			name:  "invalid json",
+			given: `{"X-Custom-Header":true}`,
+			err:   errors.New("expected string or array, got bool"),
+		},
+		{
+			name:  "invalid json array element",
+			given: `{"X-Custom-Header":[1, 2]}`,
+			err:   errors.New("expected string array element, got float64"),
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			u := server.UserConfig{
+				WebhookHttpHeaders: tc.given,
+			}
+			got, err := u.ToWebhookHttpHeaders()
+			Equals(t, tc.want, got)
+			Equals(t, tc.err, err)
 		})
 	}
 }

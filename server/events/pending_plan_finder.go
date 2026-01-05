@@ -1,12 +1,15 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/utils"
 )
@@ -59,10 +62,9 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 		lsCmd.Dir = repoDir
 		lsOut, err := lsCmd.CombinedOutput()
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "running 'git ls-files . --others' in '%s' directory: %s",
-				repoDir, string(lsOut))
+			return nil, nil, fmt.Errorf("running 'git ls-files . --others' in '%s' directory: %s: %w", repoDir, string(lsOut), err)
 		}
-		for _, file := range strings.Split(string(lsOut), "\n") {
+		for file := range strings.SplitSeq(string(lsOut), "\n") {
 			if filepath.Ext(file) == ".tfplan" {
 				// Ignore .terragrunt-cache dirs (#487)
 				if strings.Contains(file, ".terragrunt-cache/") {
@@ -94,7 +96,7 @@ func (p *DefaultPendingPlanFinder) DeletePlans(pullDir string) error {
 	}
 	for _, path := range absPaths {
 		if err := utils.RemoveIgnoreNonExistent(path); err != nil {
-			return errors.Wrapf(err, "delete plan at %s", path)
+			return fmt.Errorf("delete plan at %s: %w", path, err)
 		}
 	}
 	return nil

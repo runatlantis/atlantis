@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package models_test
 
 import (
@@ -37,7 +40,7 @@ func TestShellCommandRunner_Run(t *testing.T) {
 		t.Run(c.Command, func(t *testing.T) {
 			RegisterMockTestingT(t)
 			log := logmocks.NewMockSimpleLogging()
-			When(log.With(Any[string](), Any[interface{}]())).ThenReturn(log)
+			When(log.With(Any[string](), Any[any]())).ThenReturn(log)
 			ctx := command.ProjectContext{
 				Log:        log,
 				Workspace:  "default",
@@ -54,7 +57,7 @@ func TestShellCommandRunner_Run(t *testing.T) {
 			expectedOutput := fmt.Sprintf("%s\n", strings.Join(c.ExpLines, "\n"))
 
 			// Run once with streaming enabled
-			runner := models.NewShellCommandRunner(c.Command, environ, cwd, true, projectCmdOutputHandler)
+			runner := models.NewShellCommandRunner(nil, c.Command, environ, cwd, true, projectCmdOutputHandler)
 			output, err := runner.Run(ctx)
 			Ok(t, err)
 			Equals(t, expectedOutput, output)
@@ -62,19 +65,19 @@ func TestShellCommandRunner_Run(t *testing.T) {
 				projectCmdOutputHandler.VerifyWasCalledOnce().Send(ctx, line, false)
 			}
 
-			log.VerifyWasCalledOnce().With(Eq("duration"), Any[interface{}]())
+			log.VerifyWasCalledOnce().With(Eq("duration"), Any[any]())
 
 			// And again with streaming disabled. Everything should be the same except the
 			// command output handler should not have received anything
 
 			projectCmdOutputHandler = mocks.NewMockProjectCommandOutputHandler()
-			runner = models.NewShellCommandRunner(c.Command, environ, cwd, false, projectCmdOutputHandler)
+			runner = models.NewShellCommandRunner(nil, c.Command, environ, cwd, false, projectCmdOutputHandler)
 			output, err = runner.Run(ctx)
 			Ok(t, err)
 			Equals(t, expectedOutput, output)
 			projectCmdOutputHandler.VerifyWasCalled(Never()).Send(Any[command.ProjectContext](), Any[string](), Eq(false))
 
-			log.VerifyWasCalled(Twice()).With(Eq("duration"), Any[interface{}]())
+			log.VerifyWasCalled(Twice()).With(Eq("duration"), Any[any]())
 		})
 	}
 }

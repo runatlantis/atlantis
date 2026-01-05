@@ -97,8 +97,12 @@ repos:
   policy_check: false
 
   # autodiscover defines how atlantis should automatically discover projects in this repository.
+  # If any part of this setting is set here, it overrides the entire setting in the repo config.
   autodiscover:
     mode: auto
+    # Optionally ignore some paths for autodiscovery by a glob path
+    ignore_paths:
+      - foo/*
 
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo

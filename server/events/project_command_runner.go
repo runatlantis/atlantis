@@ -15,13 +15,13 @@ package events
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -65,20 +65,43 @@ type StepRunner interface {
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, streamOutput bool, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
+	Run(
+		ctx command.ProjectContext,
+		shell *valid.CommandShell,
+		cmd string,
+		path string,
+		envs map[string]string,
+		streamOutput bool,
+		postProcessOutput []valid.PostProcessRunOutputOption,
+		postProcessFilterRegexes []*regexp.Regexp,
+	) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
 
 // EnvStepRunner runs env steps.
 type EnvStepRunner interface {
-	Run(ctx command.ProjectContext, cmd string, value string, path string, envs map[string]string) (string, error)
+	Run(
+		ctx command.ProjectContext,
+		shell *valid.CommandShell,
+		cmd string,
+		value string,
+		path string,
+		envs map[string]string,
+	) (string, error)
 }
 
 // MultiEnvStepRunner runs multienv steps.
 type MultiEnvStepRunner interface {
 	// Run cmd in path.
-	Run(ctx command.ProjectContext, cmd string, path string, envs map[string]string, postProcessOutput valid.PostProcessRunOutputOption) (string, error)
+	Run(
+		ctx command.ProjectContext,
+		shell *valid.CommandShell,
+		cmd string,
+		path string,
+		envs map[string]string,
+		postProcessOutput []valid.PostProcessRunOutputOption,
+	) (string, error)
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
@@ -102,7 +125,7 @@ type ProjectApplyCommandRunner interface {
 }
 
 type ProjectPolicyCheckCommandRunner interface {
-	// PolicyCheck runs OPA defined policies for the project desribed by ctx.
+	// PolicyCheck runs OPA defined policies for the project described by ctx.
 	PolicyCheck(ctx command.ProjectContext) command.ProjectResult
 }
 
@@ -203,10 +226,12 @@ type DefaultProjectCommandRunner struct {
 	VcsClient                 vcs.Client
 	Locker                    ProjectLocker
 	LockURLGenerator          LockURLGenerator
+	Logger                    logging.SimpleLogging
 	InitStepRunner            StepRunner
 	PlanStepRunner            StepRunner
 	ShowStepRunner            StepRunner
 	ApplyStepRunner           StepRunner
+	CancelStepRunner          StepRunner
 	PolicyCheckStepRunner     StepRunner
 	VersionStepRunner         StepRunner
 	ImportStepRunner          StepRunner
@@ -219,6 +244,7 @@ type DefaultProjectCommandRunner struct {
 	Webhooks                  WebhooksSender
 	WorkingDirLocker          WorkingDirLocker
 	CommandRequirementHandler CommandRequirementHandler
+	CancellationTracker       CancellationTracker
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -324,7 +350,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+		return nil, "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
@@ -332,7 +358,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.ApprovePolicies)
 	if err != nil {
 		return nil, "", err
 	}
@@ -345,7 +371,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	// Only query the users team membership if any teams have been configured as owners on any policy set(s).
 	if policySetCfg.HasTeamOwners() {
 		// A convenient way to access vcsClient. Not sure if best way.
-		userTeams, err := p.VcsClient.GetTeamNamesForUser(ctx.Pull.BaseRepo, ctx.User)
+		userTeams, err := p.VcsClient.GetTeamNamesForUser(p.Logger, ctx.Pull.BaseRepo, ctx.User)
 		if err != nil {
 			ctx.Log.Err("unable to get team membership for user: %s", err)
 			return nil, "", err
@@ -383,9 +409,12 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					} else {
 						prjPolicyStatus[i].Approvals = 0
 					}
+					// User matches the author and prevent self approve is set to true
+				} else if isOwner && !ignorePolicy && ctx.User.Username == ctx.Pull.Author && policySet.PreventSelfApprove {
+					prjErr = errors.Join(prjErr, fmt.Errorf("policy set: %s the author of pr %s matches the command commenter user %s - please contact another policy owners to approve failing policies", policySet.Name, ctx.Pull.Author, ctx.User.Username))
 					// User is not authorized to approve policy set.
 				} else if !ignorePolicy {
-					prjErr = multierror.Append(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
+					prjErr = errors.Join(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
 				}
 				// Still bubble up this failure, even if policy set is not targeted.
 				if !policyStatus.Passed && (prjPolicyStatus[i].Approvals != policySet.ApproveCount) {
@@ -423,7 +452,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
 
 	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+		return nil, "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
@@ -433,7 +462,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
 	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.PolicyCheck)
 	if err != nil {
 		return nil, "", err
 	}
@@ -476,7 +505,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			}
 			// Exclude errors for failed policies
 			if !strings.Contains(err.Error(), "some policies failed") {
-				errs = multierror.Append(errs, err)
+				errs = errors.Join(errs, err)
 			}
 		}
 
@@ -491,10 +520,12 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	var index int
 	var preConftestOutput []string
 	var postConftestOutput []string
-	var policySetResults []models.PolicySetResult
+	// Initialize policySetResults as empty slice instead of nil to prevent
+	// "unable to unmarshal conftest output" error when outputs array is empty
+	policySetResults := []models.PolicySetResult{}
 
-	for i, output := range outputs {
-		index = i
+	inputPolicySets := ctx.PolicySets.PolicySets
+	for index, output := range outputs {
 		if !ctx.CustomPolicyCheck {
 			err = json.Unmarshal([]byte(strings.Join([]string{output}, "\n")), &policySetResults)
 			if err == nil {
@@ -503,15 +534,65 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			preConftestOutput = append(preConftestOutput, output)
 		} else {
 			// Using a policy tool other than Conftest, manually building result struct
-			passed := !strings.Contains(strings.ToLower(output), "fail")
-			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: "Custom", PolicyOutput: output, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
+			policySetName := "Custom"
+			if index < len(inputPolicySets) {
+				policySetName = inputPolicySets[index].Name
+			}
+
+			// Handle empty output: treat as failure since it likely indicates misconfiguration
+			// Non-empty output: parse conftest-style output to determine pass/fail
+			// Check for actual failures (> 0), not just the word "fail"
+			var passed bool
+			var policyOutput string
+			if output == "" {
+				passed = false
+				policyOutput = "WARNING: Policy check produced no output. This may indicate a misconfiguration."
+			} else {
+				// Use regex to check for actual failures (> 0), not just the word "fail"
+				// Matches patterns like "1 failure", "2 failures", "10 failures", or JSON "failures": [...]
+				failureRegex := regexp.MustCompile(`([1-9][0-9]* failure|failures": \[)`)
+				hasFailures := failureRegex.MatchString(output)
+				// Also check for FAIL prefix (conftest error output)
+				hasFailPrefix := strings.HasPrefix(strings.TrimSpace(output), "FAIL")
+				passed = !hasFailures && !hasFailPrefix
+				policyOutput = output
+			}
+
+			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: policySetName, PolicyOutput: policyOutput, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
 			preConftestOutput = append(preConftestOutput, "")
 		}
 	}
 
-	if policySetResults == nil {
-		return nil, "", errors.New("unable to unmarshal conftest output")
+	// Warn if custom policy check has mismatch between configured policy sets and outputs.
+	// Note: With empty output preservation, this warning now only triggers when workflow steps
+	// are completely missing, not when a step returns empty output.
+	if ctx.CustomPolicyCheck {
+		if len(policySetResults) < len(inputPolicySets) {
+			ctx.Log.Warn("Configured %d policy sets but only received %d outputs. Policy sets without outputs: %v. Check your workflow configuration.",
+				len(inputPolicySets),
+				len(policySetResults),
+				getMissingPolicySetNames(inputPolicySets, len(policySetResults)))
+		} else if len(policySetResults) > len(inputPolicySets) {
+			ctx.Log.Warn("Received %d outputs but only %d policy sets configured. Excess outputs will use 'Custom' as name.",
+				len(policySetResults),
+				len(inputPolicySets))
+		}
 	}
+
+	// Check if we have any policy check results
+	// For non-custom policy checks (conftest), empty results means JSON parsing failed
+	// For custom policy checks, empty results when policy sets are configured means the check failed
+	if len(policySetResults) == 0 {
+		if !ctx.CustomPolicyCheck {
+			// Conftest should have produced JSON output
+			return nil, "", errors.New("unable to unmarshal conftest output")
+		} else if len(inputPolicySets) > 0 {
+			// Custom policy check with configured policy sets but no results - this is a failure
+			return nil, "", errors.New("custom policy check produced no results despite configured policy sets")
+		}
+		// Custom policy check with no configured policy sets and no results - this is OK
+	}
+
 	if len(outputs) > 0 {
 		postConftestOutput = outputs[(index + 1):]
 	}
@@ -529,9 +610,12 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Using this function instead of catching failed policy runs with errors, for cases when '--no-fail' is passed to conftest.
 	// One reason to pass such an arg to conftest would be to prevent workflow termination so custom run scripts
 	// can be run after the conftest step.
-	ctx.Log.Err(strings.Join(outputs, "\n"))
+	// Only log outputs as errors if policies did not pass, otherwise log at debug level
 	if !result.PolicyCleared() {
+		ctx.Log.Err(strings.Join(outputs, "\n"))
 		failure = "Some policy sets did not pass."
+	} else {
+		ctx.Log.Debug("policy check outputs %s", strings.Join(outputs, "\n"))
 	}
 
 	return result, failure, nil
@@ -541,7 +625,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnPlanMode)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+		return nil, "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
@@ -549,21 +633,28 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Plan)
 	if err != nil {
 		return nil, "", err
 	}
 	defer unlockFn()
 
-	p.WorkingDir.SetCheckForUpstreamChanges()
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, mergedAgain, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
-	if cloneErr != nil {
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		return nil, "", cloneErr
+		return nil, "", err
 	}
+	mergedAgain, err := p.WorkingDir.MergeAgain(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
+		return nil, "", err
+	}
+
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
@@ -618,7 +709,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnApplyMode)
 	if err != nil {
-		return "", "", errors.Wrap(err, "acquiring lock")
+		return "", "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return "", lockAttempt.LockFailureReason, nil
@@ -626,7 +717,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Apply)
 	if err != nil {
 		return "", "", err
 	}
@@ -635,12 +726,13 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 
 	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
-		Workspace: ctx.Workspace,
-		User:      ctx.User,
-		Repo:      ctx.Pull.BaseRepo,
-		Pull:      ctx.Pull,
-		Success:   err == nil,
-		Directory: ctx.RepoRelDir,
+		Workspace:   ctx.Workspace,
+		User:        ctx.User,
+		Repo:        ctx.Pull.BaseRepo,
+		Pull:        ctx.Pull,
+		Success:     err == nil,
+		Directory:   ctx.RepoRelDir,
+		ProjectName: ctx.ProjectName,
 	})
 
 	if err != nil {
@@ -664,7 +756,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Version)
 	if err != nil {
 		return "", "", err
 	}
@@ -680,7 +772,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 
 func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out *models.ImportSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}
@@ -697,7 +789,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+		return nil, "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
@@ -705,7 +797,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Import)
 	if err != nil {
 		return nil, "", err
 	}
@@ -726,7 +818,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 
 func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out *models.StateRmSuccess, failure string, err error) {
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
 		return nil, "", cloneErr
 	}
@@ -738,7 +830,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "acquiring lock")
+		return nil, "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
 		return nil, lockAttempt.LockFailureReason, nil
@@ -746,7 +838,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.State)
 	if err != nil {
 		return nil, "", err
 	}
@@ -790,18 +882,20 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunCommand, absPath, envs, true, step.Output)
+			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, true, step.Output, step.FilterRegexes)
 		case "env":
-			out, err = p.EnvStepRunner.Run(ctx, step.RunCommand, step.EnvVarValue, absPath, envs)
+			out, err = p.EnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out
 			// We reset out to the empty string because we don't want it to
 			// be printed to the PR, it's solely to set the environment variable.
 			out = ""
 		case "multienv":
-			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunCommand, absPath, envs, step.Output)
+			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, step.Output)
 		}
 
-		if out != "" {
+		// Keep all policy_check outputs for custom policy checks to maintain positional alignment with policy sets
+		// Empty outputs are still appended to prevent index mismatches
+		if out != "" || (step.StepName == "policy_check" && ctx.CustomPolicyCheck) {
 			outputs = append(outputs, out)
 		}
 		if err != nil {
@@ -809,4 +903,13 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		}
 	}
 	return outputs, nil
+}
+
+// getMissingPolicySetNames returns the names of policy sets that don't have corresponding outputs
+func getMissingPolicySetNames(policySets []valid.PolicySet, receivedCount int) []string {
+	var missing []string
+	for i := receivedCount; i < len(policySets); i++ {
+		missing = append(missing, policySets[i].Name)
+	}
+	return missing
 }

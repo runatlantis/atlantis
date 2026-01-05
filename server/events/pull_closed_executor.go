@@ -23,7 +23,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/logging"
 
-	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -51,9 +51,10 @@ type PullClosedExecutor struct {
 	Locker                   locking.Locker
 	VCSClient                vcs.Client
 	WorkingDir               WorkingDir
-	Backend                  locking.Backend
+	Database                 db.Database
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
+	CancellationTracker      CancellationTracker
 }
 
 type templatedProject struct {
@@ -67,18 +68,18 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
 
 type PullCleanupTemplate interface {
-	Execute(wr io.Writer, data interface{}) error
+	Execute(wr io.Writer, data any) error
 }
 
 type PullClosedEventTemplate struct{}
 
-func (t *PullClosedEventTemplate) Execute(wr io.Writer, data interface{}) error {
+func (t *PullClosedEventTemplate) Execute(wr io.Writer, data any) error {
 	return pullClosedTemplate.Execute(wr, data)
 }
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
-	pullStatus, err := p.Backend.GetPullStatus(pull)
+	pullStatus, err := p.Database.GetPullStatus(pull)
 	if err != nil {
 		// Log and continue to clean up other resources.
 		logger.Err("retrieving pull status: %s", err)
@@ -87,17 +88,19 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	if pullStatus != nil {
 		for _, project := range pullStatus.Projects {
 			jobContext := jobs.PullInfo{
-				PullNum:     pull.Num,
-				Repo:        pull.BaseRepo.Name,
-				Workspace:   project.Workspace,
-				ProjectName: project.ProjectName,
+				PullNum:      pull.Num,
+				Repo:         pull.BaseRepo.Name,
+				RepoFullName: pull.BaseRepo.FullName,
+				ProjectName:  project.ProjectName,
+				Path:         project.RepoRelDir,
+				Workspace:    project.Workspace,
 			}
 			p.LogStreamResourceCleaner.CleanUp(jobContext)
 		}
 	}
 
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
-		return errors.Wrap(err, "cleaning workspace")
+		return fmt.Errorf("cleaning workspace: %w", err)
 	}
 
 	// Finally, delete locks. We do this last because when someone
@@ -105,12 +108,17 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// so we might have plans laying around but no locks.
 	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
-		return errors.Wrap(err, "cleaning up locks")
+		return fmt.Errorf("cleaning up locks: %w", err)
 	}
 
 	// Delete pull from DB.
-	if err := p.Backend.DeletePullStatus(pull); err != nil {
+	if err := p.Database.DeletePullStatus(pull); err != nil {
 		logger.Err("deleting pull from db: %s", err)
+	}
+
+	// Clear any operations to avoid unbounded growth.
+	if p.CancellationTracker != nil {
+		p.CancellationTracker.Clear(pull)
 	}
 
 	// If there are no locks then there's no need to comment.
@@ -121,7 +129,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	templateData := p.buildTemplateData(locks)
 	var buf bytes.Buffer
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
-		return errors.Wrap(err, "rendering template for comment")
+		return fmt.Errorf("rendering template for comment: %w", err)
 	}
 	return p.VCSClient.CreateComment(logger, repo, pull.Num, buf.String(), "")
 }

@@ -20,9 +20,11 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"text/template"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/google/shlex"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -41,6 +43,8 @@ const (
 	policySetFlagShort           = ""
 	autoMergeDisabledFlagLong    = "auto-merge-disabled"
 	autoMergeDisabledFlagShort   = ""
+	autoMergeMethodFlagLong      = "auto-merge-method"
+	autoMergeMethodFlagShort     = ""
 	verboseFlagLong              = "verbose"
 	verboseFlagShort             = ""
 	clearPolicyApprovalFlagLong  = "clear-policy-approval"
@@ -70,7 +74,7 @@ type CommentBuilder interface {
 	// BuildPlanComment builds a plan comment for the specified args.
 	BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string
 	// BuildApplyComment builds an apply comment for the specified args.
-	BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string
+	BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool, autoMergeMethod string) string
 	// BuildApprovePoliciesComment builds an approve_policies comment for the specified args.
 	BuildApprovePoliciesComment(repoRelDir string, workspace string, project string) string
 }
@@ -143,6 +147,7 @@ type CommentParseResult struct {
 // - atlantis import ADDRESS ID
 func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) CommentParseResult {
 	comment := strings.TrimSpace(rawComment)
+	comment = strings.Trim(comment, "`")
 
 	if multiLineRegex.MatchString(comment) {
 		return CommentParseResult{Ignore: true}
@@ -184,7 +189,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		vcsUser = e.AzureDevopsUser
 	}
 	executableNames := []string{"run", e.ExecutableName, "@" + vcsUser}
-	if !e.stringInSlice(executableName, executableNames) {
+	if !slices.Contains(executableNames, executableName) {
 		return CommentParseResult{Ignore: true}
 	}
 
@@ -208,7 +213,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	cmd := strings.ToLower(args[1])
 
 	// Help output.
-	if e.stringInSlice(cmd, []string{"help", "-h", "--help"}) {
+	if slices.Contains([]string{"help", "-h", "--help"}, cmd) {
 		return CommentParseResult{CommentResponse: e.HelpComment()}
 	}
 
@@ -226,7 +231,9 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var project string
 	var policySet string
 	var clearPolicyApproval bool
-	var verbose, autoMergeDisabled bool
+	var verbose bool
+	var autoMergeDisabled bool
+	var autoMergeMethod string
 	var flagSet *pflag.FlagSet
 	var name command.Name
 
@@ -248,6 +255,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Apply the plan for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
+		flagSet.StringVarP(&autoMergeMethod, autoMergeMethodFlagLong, autoMergeMethodFlagShort, "", "Specifies the merge method for the VCS if automerge is enabled. (Currently only implemented for GitHub)")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.ApprovePolicies.String():
 		name = command.ApprovePolicies
@@ -262,6 +270,10 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	case command.Unlock.String():
 		name = command.Unlock
 		flagSet = pflag.NewFlagSet(command.Unlock.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
+	case command.Cancel.String():
+		name = command.Cancel
+		flagSet = pflag.NewFlagSet(command.Cancel.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
 	case command.Version.String():
 		name = command.Version
@@ -317,8 +329,20 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 	}
 
+	if autoMergeMethod != "" {
+		if autoMergeDisabled {
+			err := fmt.Sprintf("cannot use --%s at the same time as --%s", autoMergeMethodFlagLong, autoMergeDisabledFlagLong)
+			return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
+		}
+
+		if vcsHost != models.Github {
+			err := fmt.Sprintf("--%s is not currently implemented for %s", autoMergeMethodFlagLong, vcsHost.String())
+			return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
+		}
+	}
+
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, workspace, project, policySet, clearPolicyApproval),
+		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, autoMergeMethod, workspace, project, policySet, clearPolicyApproval),
 	}
 }
 
@@ -387,7 +411,7 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 
 // BuildPlanComment builds a plan comment for the specified args.
 func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, project string, commentArgs []string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, false)
+	flags := e.buildFlags(repoRelDir, workspace, project, false, "")
 	commentFlags := ""
 	if len(commentArgs) > 0 {
 		var flagsWithoutQuotes []string
@@ -402,18 +426,18 @@ func (e *CommentParser) BuildPlanComment(repoRelDir string, workspace string, pr
 }
 
 // BuildApplyComment builds an apply comment for the specified args.
-func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled)
+func (e *CommentParser) BuildApplyComment(repoRelDir string, workspace string, project string, autoMergeDisabled bool, autoMergeMethod string) string {
+	flags := e.buildFlags(repoRelDir, workspace, project, autoMergeDisabled, autoMergeMethod)
 	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.Apply.String(), flags)
 }
 
 // BuildApprovePoliciesComment builds an apply comment for the specified args.
 func (e *CommentParser) BuildApprovePoliciesComment(repoRelDir string, workspace string, project string) string {
-	flags := e.buildFlags(repoRelDir, workspace, project, false)
+	flags := e.buildFlags(repoRelDir, workspace, project, false, "")
 	return fmt.Sprintf("%s %s%s", e.ExecutableName, command.ApprovePolicies.String(), flags)
 }
 
-func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool) string {
+func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project string, autoMergeDisabled bool, autoMergeMethod string) string {
 	// Add quotes if dir has spaces.
 	if strings.Contains(repoRelDir, " ") {
 		repoRelDir = fmt.Sprintf("%q", repoRelDir)
@@ -441,6 +465,9 @@ func (e *CommentParser) buildFlags(repoRelDir string, workspace string, project 
 	if autoMergeDisabled {
 		flags = fmt.Sprintf("%s --%s", flags, autoMergeDisabledFlagLong)
 	}
+	if autoMergeMethod != "" {
+		flags = fmt.Sprintf("%s --%s %s", flags, autoMergeMethodFlagLong, autoMergeMethod)
+	}
 	return flags
 }
 
@@ -448,6 +475,31 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 	if dir == "" {
 		return dir, nil
 	}
+
+	// Check if dir contains glob pattern characters
+	if containsGlobPattern(dir) {
+		// For glob patterns, we validate but don't clean (cleaning mangles glob chars)
+		// Security check: prevent directory traversal even in glob patterns
+		if strings.Contains(dir, "..") {
+			return "", fmt.Errorf("using '..' in glob pattern %q with -%s/--%s is not allowed", dir, dirFlagShort, dirFlagLong)
+		}
+
+		// Validate the glob pattern syntax
+		if !doublestar.ValidatePattern(dir) {
+			return "", fmt.Errorf("invalid glob pattern %q with -%s/--%s", dir, dirFlagShort, dirFlagLong)
+		}
+
+		// Clean leading ./ or / for consistency with non-glob paths
+		dir = strings.TrimPrefix(dir, "./")
+		dir = strings.TrimPrefix(dir, "/")
+		if dir == "" {
+			dir = "."
+		}
+
+		return dir, nil
+	}
+
+	// For non-glob patterns, use standard path cleaning
 	validatedDir := filepath.Clean(dir)
 	// Join with . so the path is relative. This helps us if they use '/',
 	// and is safe to do if their path is relative since it's a no-op.
@@ -462,13 +514,9 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 	return validatedDir, nil
 }
 
-func (e *CommentParser) stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
+// containsGlobPattern returns true if the string contains glob pattern characters.
+func containsGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
 }
 
 func (e *CommentParser) isAllowedCommand(cmd string) bool {

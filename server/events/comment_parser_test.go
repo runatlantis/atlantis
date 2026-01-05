@@ -144,6 +144,33 @@ func TestParse_HelpResponse(t *testing.T) {
 	}
 }
 
+func TestParse_TrimCommandString(t *testing.T) {
+	t.Log("commands should be trimmed of whitespace and backtick (helps with Gitlab copy/paste issues)")
+	allowCommandsCases := [][]command.Name{
+		command.AllCommentCommands,
+		{}, // empty case
+	}
+	helpComments := []string{
+		"`atlantis help`",
+		"`  atlantis help  `",
+		"`atlantis help`  ",
+		"  `atlantis help",
+	}
+	for _, allowCommandCase := range allowCommandsCases {
+		for _, c := range helpComments {
+			t.Run(fmt.Sprintf("%s with allow commands %v", c, allowCommandCase), func(t *testing.T) {
+				commentParser := events.CommentParser{
+					GithubUser:     "github-user",
+					ExecutableName: "atlantis",
+					AllowCommands:  allowCommandCase,
+				}
+				r := commentParser.Parse(c, models.Github)
+				Equals(t, commentParser.HelpComment(), r.CommentResponse)
+			})
+		}
+	}
+}
+
 func TestParse_UnusedArguments(t *testing.T) {
 	t.Log("if there are unused flags we return an error")
 	cases := []struct {
@@ -382,6 +409,67 @@ func TestParse_RelativeDirPath(t *testing.T) {
 		exp := "Error: using a relative path"
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+	}
+}
+
+func TestParse_GlobPatternDir(t *testing.T) {
+	t.Log("if -d is used with a glob pattern, it should be preserved correctly")
+	cases := []struct {
+		comment     string
+		expectedDir string
+	}{
+		{"atlantis plan -d modules/*", "modules/*"},
+		{"atlantis plan -d modules/**", "modules/**"},
+		{"atlantis plan -d environments/*/apps", "environments/*/apps"},
+		{"atlantis plan -d 'env[0-9]/*'", "env[0-9]/*"},
+		{"atlantis plan -d stacks/prod-?-*", "stacks/prod-?-*"},
+		{"atlantis apply -d modules/**", "modules/**"},
+		{"atlantis import -d modules/* address id", "modules/*"},
+		{"atlantis state -d modules/* rm address", "modules/*"},
+	}
+	for _, c := range cases {
+		t.Run(c.comment, func(t *testing.T) {
+			r := commentParser.Parse(c.comment, models.Github)
+			assert.Empty(t, r.CommentResponse, "Expected no error for comment %q", c.comment)
+			assert.NotNil(t, r.Command, "Expected command to be parsed for comment %q", c.comment)
+			assert.Equal(t, c.expectedDir, r.Command.RepoRelDir, "Expected dir %q but got %q for comment %q", c.expectedDir, r.Command.RepoRelDir, c.comment)
+		})
+	}
+}
+
+func TestParse_GlobPatternDirWithRelativePath(t *testing.T) {
+	t.Log("if -d is used with a glob pattern containing '..', should return an error")
+	comments := []string{
+		"atlantis plan -d '../*'",
+		"atlantis plan -d 'modules/../*'",
+		"atlantis plan -d '../**'",
+		"atlantis apply -d '../apps/*'",
+		"atlantis import -d '../*' address id",
+		"atlantis state -d '../*' rm address",
+	}
+	for _, c := range comments {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			exp := "using '..' in glob pattern"
+			assert.Contains(t, r.CommentResponse, exp,
+				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		})
+	}
+}
+
+func TestParse_InvalidGlobPattern(t *testing.T) {
+	t.Log("if -d is used with an invalid glob pattern, should return an error")
+	comments := []string{
+		"atlantis plan -d 'modules/[invalid'",
+		"atlantis apply -d 'apps/[unclosed'",
+	}
+	for _, c := range comments {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			exp := "invalid glob pattern"
+			assert.Contains(t, r.CommentResponse, exp,
+				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		})
 	}
 }
 
@@ -729,6 +817,7 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 		workspace         string
 		project           string
 		autoMergeDisabled bool
+		autoMergeMethod   string
 		commentArgs       []string
 		expPlanFlags      string
 		expApplyFlags     string
@@ -824,6 +913,16 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 			expApplyFlags:     "-d dir -w workspace --auto-merge-disabled",
 			expVersionFlags:   "-d dir -w workspace",
 		},
+		{
+			repoRelDir:      "dir",
+			workspace:       "workspace",
+			project:         "",
+			autoMergeMethod: "squash",
+			commentArgs:     []string{`"arg1"`, `"arg2"`, `arg3`},
+			expPlanFlags:    "-d dir -w workspace -- arg1 arg2 arg3",
+			expApplyFlags:   "-d dir -w workspace --auto-merge-method squash",
+			expVersionFlags: "-d dir -w workspace",
+		},
 	}
 
 	for _, c := range cases {
@@ -834,7 +933,7 @@ func TestBuildPlanApplyVersionComment(t *testing.T) {
 					actComment := commentParser.BuildPlanComment(c.repoRelDir, c.workspace, c.project, c.commentArgs)
 					Equals(t, fmt.Sprintf("atlantis plan %s", c.expPlanFlags), actComment)
 				case command.Apply:
-					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled)
+					actComment := commentParser.BuildApplyComment(c.repoRelDir, c.workspace, c.project, c.autoMergeDisabled, c.autoMergeMethod)
 					Equals(t, fmt.Sprintf("atlantis apply %s", c.expApplyFlags), actComment)
 				}
 			}
@@ -1020,14 +1119,18 @@ var PlanUsage = `Usage of plan:
 `
 
 var ApplyUsage = `Usage of apply:
-      --auto-merge-disabled   Disable automerge after apply.
-  -d, --dir string            Apply the plan for this directory, relative to root of
-                              repo, ex. 'child/dir'.
-  -p, --project string        Apply the plan for this project. Refers to the name of
-                              the project configured in a repo config file. Cannot
-                              be used at same time as workspace or dir flags.
-      --verbose               Append Atlantis log to comment.
-  -w, --workspace string      Apply the plan for this Terraform workspace.
+      --auto-merge-disabled        Disable automerge after apply.
+      --auto-merge-method string   Specifies the merge method for the VCS if
+                                   automerge is enabled. (Currently only implemented
+                                   for GitHub)
+  -d, --dir string                 Apply the plan for this directory, relative to
+                                   root of repo, ex. 'child/dir'.
+  -p, --project string             Apply the plan for this project. Refers to the
+                                   name of the project configured in a repo config
+                                   file. Cannot be used at same time as workspace or
+                                   dir flags.
+      --verbose                    Append Atlantis log to comment.
+  -w, --workspace string           Apply the plan for this Terraform workspace.
 `
 
 var ApprovePolicyUsage = `Usage of approve_policies:

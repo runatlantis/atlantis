@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime_test
 
 import (
@@ -8,7 +11,8 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tf "github.com/runatlantis/atlantis/server/core/terraform"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -19,7 +23,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 
 	defaultShell := "sh"
 	defaultShellArgs := "-c"
-	defautShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell)
+	defaultShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell)
 	defaultUnterminatedStringError := unterminatedStringError(defaultShell, defaultShellArgs)
 
 	cases := []struct {
@@ -67,7 +71,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         defaultUnterminatedStringError,
-			ExpErr:         "exit status 2: running \"sh -c echo 'a\" in",
+			ExpErr:         "exit status 2: running 'sh -c echo 'a' in",
 			ExpDescription: "",
 		},
 		{
@@ -82,8 +86,8 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Command:        "lkjlkj",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
-			ExpOut:         fmt.Sprintf(defautShellCommandNotFoundErrorFormat, "lkjlkj"),
-			ExpErr:         "exit status 127: running \"sh -c lkjlkj\" in",
+			ExpOut:         fmt.Sprintf(defaultShellCommandNotFoundErrorFormat, "lkjlkj"),
+			ExpErr:         "exit status 127: running 'sh -c lkjlkj' in",
 			ExpDescription: "",
 		},
 		{
@@ -99,6 +103,14 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
 			ExpOut:         "user_name=acme-user\r\n",
+			ExpErr:         "",
+			ExpDescription: "",
+		},
+		{
+			Command:        "echo command_name=$COMMAND_NAME command_has_errors=$COMMAND_HAS_ERRORS",
+			Shell:          defaultShell,
+			ShellArgs:      defaultShellArgs,
+			ExpOut:         "command_name=plan command_has_errors=false\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
@@ -142,15 +154,15 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		Ok(t, err)
 
 		RegisterMockTestingT(t)
-		terraform := mocks.NewMockClient()
-		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[*version.Version]())).
+		terraform := tfclientmocks.NewMockClient()
+		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
 			ThenReturn(nil)
 
 		logger := logging.NewNoopLogger(t)
 		tmpDir := t.TempDir()
 
 		projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
-		r := runtime.DefaultPreWorkflowHookRunner{
+		r := runtime.DefaultPostWorkflowHookRunner{
 			OutputHandler: projectCmdOutputHandler,
 		}
 		t.Run(c.Command, func(t *testing.T) {
@@ -174,8 +186,9 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 				User: models.User{
 					Username: "acme-user",
 				},
-				Log:         logger,
-				CommandName: "plan",
+				Log:              logger,
+				CommandName:      "plan",
+				CommandHasErrors: false,
 			}
 			_, desc, err := r.Run(ctx, c.Command, c.Shell, c.ShellArgs, tmpDir)
 			if c.ExpErr != "" {
@@ -187,7 +200,7 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			// here because when constructing the cases we don't yet know the
 			// temp dir.
 			Equals(t, c.ExpDescription, desc)
-			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
+			expOut := strings.ReplaceAll(c.ExpOut, "$DIR", tmpDir)
 			projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
 				Any[models.WorkflowHookCommandContext](), Eq(expOut), Eq(false))
 		})

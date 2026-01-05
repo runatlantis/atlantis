@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package command
 
 import (
@@ -49,4 +52,7 @@ type Context struct {
 
 	// TeamAllowlistChecker is used to check authorization on a project-level
 	TeamAllowlistChecker TeamAllowlistChecker
+
+	// Set true if there were any errors during the command execution
+	CommandHasErrors bool
 }

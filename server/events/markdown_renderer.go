@@ -57,6 +57,7 @@ type MarkdownRenderer struct {
 	markdownTemplates         *template.Template
 	executableName            string
 	hideUnchangedPlanComments bool
+	quietPolicyChecks         bool
 }
 
 // commonData is data that all responses have.
@@ -72,6 +73,7 @@ type commonData struct {
 	EnableDiffMarkdownFormat  bool
 	ExecutableName            string
 	HideUnchangedPlanComments bool
+	QuietPolicyChecks         bool
 	VcsRequestType            string
 }
 
@@ -131,11 +133,12 @@ type policyCheckResultsData struct {
 }
 
 type projectResultTmplData struct {
-	Workspace   string
-	RepoRelDir  string
-	ProjectName string
-	Rendered    string
-	NoChanges   bool
+	Workspace    string
+	RepoRelDir   string
+	ProjectName  string
+	Rendered     string
+	NoChanges    bool
+	IsSuccessful bool
 }
 
 // Initialize templates
@@ -149,6 +152,7 @@ func NewMarkdownRenderer(
 	markdownTemplateOverridesDir string,
 	executableName string,
 	hideUnchangedPlanComments bool,
+	quietPolicyChecks bool,
 ) *MarkdownRenderer {
 	var templates *template.Template
 	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
@@ -166,13 +170,14 @@ func NewMarkdownRenderer(
 		markdownTemplates:         templates,
 		executableName:            executableName,
 		hideUnchangedPlanComments: hideUnchangedPlanComments,
+		quietPolicyChecks:         quietPolicyChecks,
 	}
 }
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
 func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd PullCommand) string {
-	commandStr := cases.Title(language.English).String(strings.Replace(cmd.CommandName().String(), "_", " ", -1))
+	commandStr := cases.Title(language.English).String(strings.ReplaceAll(cmd.CommandName().String(), "_", " "))
 	var vcsRequestType string
 	if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab {
 		vcsRequestType = "Merge Request"
@@ -192,6 +197,7 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 		EnableDiffMarkdownFormat:  m.enableDiffMarkdownFormat,
 		ExecutableName:            m.executableName,
 		HideUnchangedPlanComments: m.hideUnchangedPlanComments,
+		QuietPolicyChecks:         m.quietPolicyChecks,
 		VcsRequestType:            vcsRequestType,
 	}
 
@@ -224,9 +230,10 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 
 	for _, result := range results {
 		resultData := projectResultTmplData{
-			Workspace:   result.Workspace,
-			RepoRelDir:  result.RepoRelDir,
-			ProjectName: result.ProjectName,
+			Workspace:    result.Workspace,
+			RepoRelDir:   result.RepoRelDir,
+			ProjectName:  result.ProjectName,
+			IsSuccessful: result.IsSuccessful(),
 		}
 		if result.PlanSuccess != nil {
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
@@ -316,8 +323,8 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
 			}
 			// Error out if no template was found, only if there are no errors or failures.
-			// This is because some errors and failures rely on additional context rendered by templtes, but not all errors or failures.
-		} else if !(result.Error != nil || result.Failure != "") {
+			// This is because some errors and failures rely on additional context rendered by templates, but not all errors or failures.
+		} else if result.Error == nil && result.Failure == "" {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
 		// Render error or failure templates. Done outside of previous block so that other context can be rendered for use here.
@@ -395,11 +402,11 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 		return fmt.Sprintf("no template matched–this is a bug: command=%s", common.Command)
 	}
 
-	switch {
-	case common.Command == planCommandTitle:
+	switch common.Command {
+	case planCommandTitle:
 		numPlanFailures := len(results) - numPlanSuccesses
 		return m.renderTemplateTrimSpace(tmpl, planResultData{resultsTmplData, common, numPlansWithChanges, numPlansWithNoChanges, numPlanFailures})
-	case common.Command == applyCommandTitle:
+	case applyCommandTitle:
 		return m.renderTemplateTrimSpace(tmpl, applyResultData{resultsTmplData, common, numApplySuccesses, numApplyFailures, numApplyErrors})
 	}
 	return m.renderTemplateTrimSpace(tmpl, resultData{resultsTmplData, common})
@@ -426,7 +433,7 @@ func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, outp
 	return strings.Count(output, "\n") > maxUnwrappedLines
 }
 
-func (m *MarkdownRenderer) renderTemplateTrimSpace(tmpl *template.Template, data interface{}) string {
+func (m *MarkdownRenderer) renderTemplateTrimSpace(tmpl *template.Template, data any) string {
 	buf := &bytes.Buffer{}
 	if err := tmpl.Execute(buf, data); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)

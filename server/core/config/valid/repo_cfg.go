@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package valid contains the structs representing the atlantis.yaml config
 // after it's been parsed and validated.
 package valid
@@ -8,28 +11,29 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	version "github.com/hashicorp/go-version"
 )
 
 // RepoCfg is the atlantis.yaml config after it's been parsed and validated.
 type RepoCfg struct {
 	// Version is the version of the atlantis YAML file.
-	Version                    int
-	Projects                   []Project
-	Workflows                  map[string]Workflow
-	PolicySets                 PolicySets
-	Automerge                  *bool
-	AutoDiscover               *AutoDiscover
-	ParallelApply              *bool
-	ParallelPlan               *bool
-	ParallelPolicyCheck        *bool
-	DeleteSourceBranchOnMerge  *bool
-	RepoLocks                  *RepoLocks
-	CustomPolicyCheck          *bool
-	EmojiReaction              string
-	AllowedRegexpPrefixes      []string
-	AbortOnExcecutionOrderFail bool
-	SilencePRComments          []string
+	Version                   int
+	Projects                  []Project
+	Workflows                 map[string]Workflow
+	PolicySets                PolicySets
+	Automerge                 *bool
+	AutoDiscover              *AutoDiscover
+	ParallelApply             *bool
+	ParallelPlan              *bool
+	ParallelPolicyCheck       *bool
+	DeleteSourceBranchOnMerge *bool
+	RepoLocks                 *RepoLocks
+	CustomPolicyCheck         *bool
+	EmojiReaction             string
+	AllowedRegexpPrefixes     []string
+	AbortOnExecutionOrderFail bool
+	SilencePRComments         []string
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
@@ -51,6 +55,35 @@ func (r RepoCfg) FindProjectsByDir(dir string) []Project {
 		}
 	}
 	return ps
+}
+
+// FindProjectsByDirPattern returns all projects whose dir matches the glob pattern.
+// Supports patterns like "modules/*", "environments/**", etc.
+func (r RepoCfg) FindProjectsByDirPattern(pattern string) []Project {
+	var ps []Project
+	for _, p := range r.Projects {
+		if matched, _ := doublestar.Match(pattern, p.Dir); matched {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
+// FindProjectsByDirPatternWorkspace returns all projects whose dir matches the
+// glob pattern and workspace matches exactly.
+func (r RepoCfg) FindProjectsByDirPatternWorkspace(pattern string, workspace string) []Project {
+	var ps []Project
+	for _, p := range r.Projects {
+		if matched, _ := doublestar.Match(pattern, p.Dir); matched && p.Workspace == workspace {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
+// ContainsDirGlobPattern returns true if the string contains glob pattern characters.
+func ContainsDirGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
 }
 
 func (r RepoCfg) FindProjectByName(name string) *Project {
@@ -147,6 +180,7 @@ type Project struct {
 	Workspace                 string
 	Name                      *string
 	WorkflowName              *string
+	TerraformDistribution     *string
 	TerraformVersion          *version.Version
 	Autoplan                  Autoplan
 	PlanRequirements          []string
@@ -183,10 +217,21 @@ const (
 	PostProcessRunOutputShow            = "show"
 	PostProcessRunOutputHide            = "hide"
 	PostProcessRunOutputStripRefreshing = "strip_refreshing"
+	PostProcessRunOutputFilterRegexKey  = "filter_regex"
 )
 
 type Stage struct {
 	Steps []Step
+}
+
+// CommandShell sets up the shell for command execution
+type CommandShell struct {
+	Shell     string
+	ShellArgs []string
+}
+
+func (s CommandShell) String() string {
+	return fmt.Sprintf("%s %s", s.Shell, strings.Join(s.ShellArgs, " "))
 }
 
 type Step struct {
@@ -195,13 +240,19 @@ type Step struct {
 	// RunCommand is either a custom run step or the command to run
 	// during an env step to populate the environment variable dynamically.
 	RunCommand string
-	// Output is option for post-processing a RunCommand output
-	Output PostProcessRunOutputOption
+	// Output includes the options for post-processing a RunCommand output
+	// these will be executed in the received order
+	Output []PostProcessRunOutputOption
 	// EnvVarName is the name of the
 	// environment variable that should be set by this step.
 	EnvVarName string
 	// EnvVarValue is the value to set EnvVarName to.
 	EnvVarValue string
+	// The Shell to use for RunCommand execution.
+	RunShell *CommandShell
+	// FilterRegex is a list of regexes for post-processing a RunCommand output
+	// these will be executed in the received order
+	FilterRegexes []*regexp.Regexp
 }
 
 type Workflow struct {

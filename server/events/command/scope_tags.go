@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package command
 
 import (
@@ -7,12 +10,13 @@ import (
 )
 
 type ProjectScopeTags struct {
-	BaseRepo         string
-	PrNumber         string
-	Project          string
-	ProjectPath      string
-	TerraformVersion string
-	Workspace        string
+	BaseRepo              string
+	PrNumber              string
+	Project               string
+	ProjectPath           string
+	TerraformDistribution string
+	TerraformVersion      string
+	Workspace             string
 }
 
 func (s ProjectScopeTags) Loadtags() map[string]string {

@@ -28,7 +28,7 @@ NOTE: 4 months after this writing, I moved the site to [Netlify](https://www.net
 
 There's a surprising number of components required to get all this working so I'm going to start with an overview of what they're all needed for. Here's what the final architecture looks like:
 
-![](/blog/hosting-our-static-site/pic1.webp)
+![](hosting-our-static-site/pic1.webp)
 
 That's what the final product looks like, but lets start with the steps required to get there.
 
@@ -52,7 +52,7 @@ Because I'm going to host the site on AWS services, I need requests to <www.runa
 
 At this point, we've generated an SSL certificate for <www.runatlantis.io> and our website is available on the internet via its S3 url so can't we just CNAME to the S3 bucket and call it a day? Unfortunately not.
 
-Since we generated our own certificate, we would need S3 to sign its responses using our certificiate. S3 doesn't support this and thus we need CloudFront. CloudFront supports using our own SSL cert and will just pull its data from the S3 bucket.
+Since we generated our own certificate, we would need S3 to sign its responses using our certificate. S3 doesn't support this and thus we need CloudFront. CloudFront supports using our own SSL cert and will just pull its data from the S3 bucket.
 
 # Terraform Time
 
@@ -62,13 +62,13 @@ Now that we know what our architecture should look like, it's simply a matter of
 
 Create a new file `main.tf`:
 
-<<< @/public/blog/hosting-our-static-site/code/main.tf
+@include: ./publichosting-our-static-site/code/main.tf
 
 ## S3 Bucket
 
 Assuming we've generated our site content already, we need to create an S3 bucket to host the content.
 
-<<< @/public/blog/hosting-our-static-site/code/s3-bucket.tf
+@include: /publichosting-our-static-site/code/s3-bucket.tf
 
 We should be able to run Terraform now to create the S3 bucket
 
@@ -77,7 +77,7 @@ terraform init
 `terraform apply`
 ```
 
-![](/blog/hosting-our-static-site/pic2.webp)
+![](hosting-our-static-site/pic2.webp)
 
 Now we want to upload our content to the S3 bucket:
 
@@ -103,7 +103,7 @@ You should see your site hosted at that url!
 
 Let's use the AWS Certificate Manager to create our SSL certificate.
 
-<<< @/public/blog/hosting-our-static-site/code/ssl-cert.tf
+@include hosting-our-static-site/code/ssl-cert.tf
 
 Before you run `terraform apply`, ensure you're forwarding any of
 
@@ -119,7 +119,7 @@ To an email address you can access. Then, run `terraform apply` and you should g
 
 Now we're ready for CloudFront to host our website using the S3 bucket for the content and using our SSL certificate. Warning! There's a lot of code ahead but most of it is just defaults.
 
-<<< @/public/blog/hosting-our-static-site/code/cloudfront.tf
+@include: hosting-our-static-site/code/cloudfront.tf
 
 Apply the changes with `terraform apply` and then find the domain name that CloudFront gives us:
 
@@ -134,7 +134,7 @@ You'll probably get an error if you go to that URL right away. You need to wait 
 
 We're almost done! We've got CloudFront hosting our site, now we need to point our DNS at it.
 
-<<< @/public/blog/hosting-our-static-site/code/dns.tf
+@include: hosting-our-static-site/code/dns.tf
 
 If you bought your domain from somewhere else like Namecheap, you'll need to point your DNS at the nameservers listed in the state for the Route53 zone you created. First `terraform apply` (which may take a while), then find out your nameservers.
 
@@ -171,4 +171,4 @@ If you're using Terraform in a team, check out Atlantis: <https://github.com/run
 
 Here's the Terraform needed to redirect your root domain:
 
-<<< @/public/blog/hosting-our-static-site/code/full.tf
+@include: hosting-our-static-site/code/full.tf

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw_test
 
 import (
@@ -100,7 +103,7 @@ func TestGlobalConfigStep_Validate(t *testing.T) {
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should
 			// be no error.
-			description: "unparseable shell command",
+			description: "unparsable shell command",
 			input: raw.WorkflowHook{
 				StringVal: map[string]string{
 					"run": "my 'c",

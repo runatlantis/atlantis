@@ -4,7 +4,7 @@
 [![SuperDopeBadge](./runatlantis.io/public/hightower-super-dope.svg)](https://twitter.com/kelseyhightower/status/893260922222813184)
 [![Go Report Card](https://goreportcard.com/badge/github.com/runatlantis/atlantis)](https://goreportcard.com/report/github.com/runatlantis/atlantis)
 [![Go Reference](https://pkg.go.dev/badge/github.com/runatlantis/atlantis.svg)](https://pkg.go.dev/github.com/runatlantis/atlantis)
-[![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://join.slack.com/t/atlantis-community/shared_invite/zt-9xlxtxtc-CUSKB1ATt_sQy6um~LDPNw)
+[![Slack](https://img.shields.io/badge/Join-Atlantis%20Community%20Slack-red)](https://slack.cncf.io/)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/runatlantis/atlantis/badge)](https://scorecard.dev/viewer/?uri=github.com/runatlantis/atlantis)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9428/badge)](https://www.bestpractices.dev/projects/9428)
 
@@ -23,7 +23,7 @@
 * How to get started: [www.runatlantis.io/guide](https://www.runatlantis.io/guide)
 * Full documentation: [www.runatlantis.io/docs](https://www.runatlantis.io/docs)
 * Download the latest release: [github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest)
-* Get help in our [Slack channel](https://join.slack.com/t/atlantis-community/shared_invite/zt-9xlxtxtc-CUSKB1ATt_sQy6um~LDPNw)
+* Get help in our [Slack channel](https://slack.cncf.io/) in channel #atlantis and development in #atlantis-contributors
 * Start Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## What is Atlantis?

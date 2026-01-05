@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package runtime holds code for actually running commands vs. preparing
 // and constructing.
 package runtime
@@ -9,8 +12,8 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -26,8 +29,8 @@ const (
 // TerraformExec brings the interface from TerraformClient into this package
 // without causing circular imports.
 type TerraformExec interface {
-	RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (string, error)
-	EnsureVersion(log logging.SimpleLogging, v *version.Version) error
+	RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, d terraform.Distribution, v *version.Version, workspace string) (string, error)
+	EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error
 }
 
 // AsyncTFExec brings the interface from TerraformClient into this package
@@ -43,7 +46,7 @@ type AsyncTFExec interface {
 	// Callers can use the input channel to pass stdin input to the command.
 	// If any error is passed on the out channel, there will be no
 	// further output (so callers are free to exit).
-	RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line)
+	RunCommandAsync(ctx command.ProjectContext, path string, args []string, envs map[string]string, d terraform.Distribution, v *version.Version, workspace string) (chan<- string, <-chan runtimemodels.Line)
 }
 
 // StatusUpdater brings the interface from CommitStatusUpdater into this package
@@ -92,7 +95,7 @@ func GetPlanFilename(workspace string, projName string) string {
 	if projName == "" {
 		return fmt.Sprintf("%s.tfplan", workspace)
 	}
-	projName = strings.Replace(projName, "/", planfileSlashReplace, -1)
+	projName = strings.ReplaceAll(projName, "/", planfileSlashReplace)
 	return fmt.Sprintf("%s-%s.tfplan", projName, workspace)
 }
 
@@ -111,12 +114,12 @@ func IsRemotePlan(planContents []byte) bool {
 func ProjectNameFromPlanfile(workspace string, filename string) (string, error) {
 	r, err := regexp.Compile(fmt.Sprintf(`(.*?)-%s\.tfplan`, workspace))
 	if err != nil {
-		return "", errors.Wrap(err, "compiling project name regex, this is a bug")
+		return "", fmt.Errorf("compiling project name regex, this is a bug: %w", err)
 	}
 	projMatch := r.FindAllStringSubmatch(filename, 1)
 	if projMatch == nil {
 		return "", nil
 	}
 	rawProjName := projMatch[0][1]
-	return strings.Replace(rawProjName, planfileSlashReplace, "/", -1), nil
+	return strings.ReplaceAll(rawProjName, planfileSlashReplace, "/"), nil
 }

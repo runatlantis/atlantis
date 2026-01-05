@@ -1,7 +1,11 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package vcs
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -13,30 +17,32 @@ type PullReqStatusFetcher interface {
 }
 
 type pullReqStatusFetcher struct {
-	client        Client
-	vcsStatusName string
+	client               Client
+	vcsStatusName        string
+	ignoreVCSStatusNames []string
 }
 
-func NewPullReqStatusFetcher(client Client, vcsStatusName string) PullReqStatusFetcher {
+func NewPullReqStatusFetcher(client Client, vcsStatusName string, ignoreVCSStatusNames []string) PullReqStatusFetcher {
 	return &pullReqStatusFetcher{
-		client:        client,
-		vcsStatusName: vcsStatusName,
+		client:               client,
+		vcsStatusName:        vcsStatusName,
+		ignoreVCSStatusNames: ignoreVCSStatusNames,
 	}
 }
 
 func (f *pullReqStatusFetcher) FetchPullStatus(logger logging.SimpleLogging, pull models.PullRequest) (pullStatus models.PullReqStatus, err error) {
 	approvalStatus, err := f.client.PullIsApproved(logger, pull.BaseRepo, pull)
 	if err != nil {
-		return pullStatus, errors.Wrapf(err, "fetching pull approval status for repo: %s, and pull number: %d", pull.BaseRepo.FullName, pull.Num)
+		return pullStatus, fmt.Errorf("fetching pull approval status for repo: %s, and pull number: %d: %w", pull.BaseRepo.FullName, pull.Num, err)
 	}
 
-	mergeable, err := f.client.PullIsMergeable(logger, pull.BaseRepo, pull, f.vcsStatusName)
+	mergeable, err := f.client.PullIsMergeable(logger, pull.BaseRepo, pull, f.vcsStatusName, f.ignoreVCSStatusNames)
 	if err != nil {
-		return pullStatus, errors.Wrapf(err, "fetching mergeability status for repo: %s, and pull number: %d", pull.BaseRepo.FullName, pull.Num)
+		return pullStatus, fmt.Errorf("fetching mergeability status for repo: %s, and pull number: %d: %w", pull.BaseRepo.FullName, pull.Num, err)
 	}
 
 	return models.PullReqStatus{
-		ApprovalStatus: approvalStatus,
-		Mergeable:      mergeable,
+		ApprovalStatus:  approvalStatus,
+		MergeableStatus: mergeable,
 	}, err
 }

@@ -1,15 +1,19 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	validation "github.com/go-ozzo/ozzo-validation"
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
@@ -26,6 +30,7 @@ type Project struct {
 	Dir                       *string    `yaml:"dir,omitempty"`
 	Workspace                 *string    `yaml:"workspace,omitempty"`
 	Workflow                  *string    `yaml:"workflow,omitempty"`
+	TerraformDistribution     *string    `yaml:"terraform_distribution,omitempty"`
 	TerraformVersion          *string    `yaml:"terraform_version,omitempty"`
 	Autoplan                  *Autoplan  `yaml:"autoplan,omitempty"`
 	PlanRequirements          []string   `yaml:"plan_requirements,omitempty"`
@@ -42,14 +47,21 @@ type Project struct {
 }
 
 func (p Project) Validate() error {
-	hasDotDot := func(value interface{}) error {
-		if strings.Contains(*value.(*string), "..") {
+	validDir := func(value any) error {
+		dir := *value.(*string)
+		if strings.Contains(dir, "..") {
 			return errors.New("cannot contain '..'")
+		}
+		// If the dir contains glob pattern characters, validate the pattern
+		if ContainsGlobPattern(dir) {
+			if err := ValidateGlobPattern(dir); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
 
-	validName := func(value interface{}) error {
+	validName := func(value any) error {
 		strPtr := value.(*string)
 		if strPtr == nil {
 			return nil
@@ -63,7 +75,7 @@ func (p Project) Validate() error {
 		return nil
 	}
 
-	branchValid := func(value interface{}) error {
+	branchValid := func(value any) error {
 		strPtr := value.(*string)
 		if strPtr == nil {
 			return nil
@@ -74,18 +86,33 @@ func (p Project) Validate() error {
 		}
 		withoutSlashes := branch[1 : len(branch)-1]
 		_, err := regexp.Compile(withoutSlashes)
-		return errors.Wrapf(err, "parsing: %s", branch)
-	}
-
-	DependsOn := func(value interface{}) error {
+		if err != nil {
+			return fmt.Errorf("parsing: %s: %w", branch, err)
+		}
 		return nil
 	}
 
+	DependsOn := func(value any) error {
+		return nil
+	}
+
+	// Validate that name doesn't contain glob patterns - glob expansion only works for 'dir'
+	if p.Name != nil && ContainsGlobPattern(*p.Name) {
+		return errors.New("name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field")
+	}
+
+	// Cross-field validation: name cannot be used with glob patterns in dir
+	// because glob patterns expand to multiple projects which can't share the same name
+	if p.Name != nil && p.Dir != nil && ContainsGlobPattern(*p.Dir) {
+		return errors.New("name: cannot be used with glob patterns in 'dir'; glob patterns expand to multiple projects which cannot share the same name")
+	}
+
 	return validation.ValidateStruct(&p,
-		validation.Field(&p.Dir, validation.Required, validation.By(hasDotDot)),
+		validation.Field(&p.Dir, validation.Required, validation.By(validDir)),
 		validation.Field(&p.PlanRequirements, validation.By(validPlanReq)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&p.ImportRequirements, validation.By(validImportReq)),
+		validation.Field(&p.TerraformDistribution, validation.By(validDistribution)),
 		validation.Field(&p.TerraformVersion, validation.By(VersionValidator)),
 		validation.Field(&p.DependsOn, validation.By(DependsOn)),
 		validation.Field(&p.Name, validation.By(validName)),
@@ -117,6 +144,9 @@ func (p Project) ToValid() valid.Project {
 	v.WorkflowName = p.Workflow
 	if p.TerraformVersion != nil {
 		v.TerraformVersion, _ = version.NewVersion(*p.TerraformVersion)
+	}
+	if p.TerraformDistribution != nil {
+		v.TerraformDistribution = p.TerraformDistribution
 	}
 	if p.Autoplan == nil {
 		v.Autoplan = DefaultAutoPlan()
@@ -169,11 +199,11 @@ func (p Project) ToValid() valid.Project {
 // support any characters that must be url escaped *except* for '/' because
 // users like to name their projects to match the directory it's in.
 func validProjectName(name string) bool {
-	nameWithoutSlashes := strings.Replace(name, "/", "-", -1)
+	nameWithoutSlashes := strings.ReplaceAll(name, "/", "-")
 	return nameWithoutSlashes == url.QueryEscape(nameWithoutSlashes)
 }
 
-func validPlanReq(value interface{}) error {
+func validPlanReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
@@ -183,7 +213,7 @@ func validPlanReq(value interface{}) error {
 	return nil
 }
 
-func validApplyReq(value interface{}) error {
+func validApplyReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
@@ -193,12 +223,36 @@ func validApplyReq(value interface{}) error {
 	return nil
 }
 
-func validImportReq(value interface{}) error {
+func validImportReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
 			return fmt.Errorf("%q is not a valid import_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
 		}
+	}
+	return nil
+}
+
+func validDistribution(value any) error {
+	distribution := value.(*string)
+	if distribution != nil && *distribution != "terraform" && *distribution != "opentofu" {
+		return fmt.Errorf("'%s' is not a valid terraform_distribution, only '%s' and '%s' are supported", *distribution, "terraform", "opentofu")
+	}
+	return nil
+}
+
+// ContainsGlobPattern returns true if the string contains glob pattern characters.
+// This is used to detect if a dir field should be treated as a glob pattern
+// for expansion into multiple projects.
+func ContainsGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
+}
+
+// ValidateGlobPattern validates that a glob pattern is syntactically correct
+// using the doublestar library.
+func ValidateGlobPattern(pattern string) error {
+	if !doublestar.ValidatePattern(pattern) {
+		return fmt.Errorf("invalid glob pattern %q", pattern)
 	}
 	return nil
 }

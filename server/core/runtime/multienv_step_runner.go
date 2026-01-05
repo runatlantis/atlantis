@@ -1,8 +1,12 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -16,8 +20,15 @@ type MultiEnvStepRunner struct {
 
 // Run runs the multienv step command.
 // The command must return a json string containing the array of name-value pairs that are being added as extra environment variables
-func (r *MultiEnvStepRunner) Run(ctx command.ProjectContext, command string, path string, envs map[string]string, postProcessOutput valid.PostProcessRunOutputOption) (string, error) {
-	res, err := r.RunStepRunner.Run(ctx, command, path, envs, false, postProcessOutput)
+func (r *MultiEnvStepRunner) Run(
+	ctx command.ProjectContext,
+	shell *valid.CommandShell,
+	command string,
+	path string,
+	envs map[string]string,
+	postProcessOutput []valid.PostProcessRunOutputOption,
+) (string, error) {
+	res, err := r.RunStepRunner.Run(ctx, shell, command, path, envs, false, []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow}, []*regexp.Regexp{})
 	if err != nil {
 		return "", err
 	}
@@ -30,7 +41,7 @@ func (r *MultiEnvStepRunner) Run(ctx command.ProjectContext, command string, pat
 
 		vars, err := parseMultienvLine(res)
 		if err != nil {
-			return "", fmt.Errorf("Invalid environment variable definition: %s (%w)", res, err)
+			return "", fmt.Errorf("invalid environment variable definition: %s (%w)", res, err)
 		}
 
 		for i := 0; i < len(vars); i += 2 {
@@ -41,14 +52,19 @@ func (r *MultiEnvStepRunner) Run(ctx command.ProjectContext, command string, pat
 		}
 	}
 
-	switch postProcessOutput {
-	case valid.PostProcessRunOutputHide:
-		return "", nil
-	case valid.PostProcessRunOutputShow:
-		return sb.String(), nil
-	default:
-		return sb.String(), nil
+	output := ""
+	for _, processOutput := range postProcessOutput {
+		switch processOutput {
+		case valid.PostProcessRunOutputHide:
+			output = ""
+		case valid.PostProcessRunOutputShow:
+			output = sb.String()
+		default:
+			output = sb.String()
+		}
 	}
+
+	return output, nil
 }
 
 func parseMultienvLine(in string) ([]string, error) {

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -37,6 +40,10 @@ func (checker *ExternalTeamAllowlistChecker) IsCommandAllowedForAnyTeam(ctx mode
 	}
 
 	return checker.checkOutputResults(out)
+}
+
+func (checker *ExternalTeamAllowlistChecker) AllTeams() []string {
+	return []string{}
 }
 
 func (checker *ExternalTeamAllowlistChecker) buildCommandString(ctx models.TeamAllowlistCheckerContext, teams []string, command string) string {
