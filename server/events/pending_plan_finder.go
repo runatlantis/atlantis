@@ -64,7 +64,7 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 		if err != nil {
 			return nil, nil, fmt.Errorf("running 'git ls-files . --others' in '%s' directory: %s: %w", repoDir, string(lsOut), err)
 		}
-		for _, file := range strings.Split(string(lsOut), "\n") {
+		for file := range strings.SplitSeq(string(lsOut), "\n") {
 			if filepath.Ext(file) == ".tfplan" {
 				// Ignore .terragrunt-cache dirs (#487)
 				if strings.Contains(file, ".terragrunt-cache/") {

@@ -32,13 +32,13 @@ import (
 //				},
 //			},
 //		})
-func DirStructure(t *testing.T, structure map[string]interface{}) string {
+func DirStructure(t *testing.T, structure map[string]any) string {
 	tmpDir := t.TempDir()
 	dirStructureGo(t, tmpDir, structure)
 	return tmpDir
 }
 
-func dirStructureGo(t *testing.T, parentDir string, structure map[string]interface{}) {
+func dirStructureGo(t *testing.T, parentDir string, structure map[string]any) {
 	for key, val := range structure {
 		// If val is nil then key is a filename and we just create it
 		if val == nil {
@@ -47,7 +47,7 @@ func dirStructureGo(t *testing.T, parentDir string, structure map[string]interfa
 			continue
 		}
 		// If val is another map then key is a dir
-		if dirContents, ok := val.(map[string]interface{}); ok {
+		if dirContents, ok := val.(map[string]any); ok {
 			subDir := filepath.Join(parentDir, key)
 			Ok(t, os.Mkdir(subDir, 0700))
 			// Recurse and create contents.

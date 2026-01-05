@@ -435,7 +435,7 @@ func (r *remoteApplyMock) RunCommandAsync(_ command.ProjectContext, _ string, ar
 
 	// Asynchronously send the lines we're supposed to.
 	go func() {
-		for _, line := range strings.Split(r.LinesToSend, "\n") {
+		for line := range strings.SplitSeq(r.LinesToSend, "\n") {
 			out <- runtimemodels.Line{Line: line}
 		}
 		if r.Err != nil {

@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1330,11 +1331,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	}
 	disableApply := true
 	disableGlobalApplyLock := false
-	for _, allowCommand := range allowCommands {
-		if allowCommand == command.Apply {
-			disableApply = false
-			break
-		}
+	if slices.Contains(allowCommands, command.Apply) {
+		disableApply = false
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:     "github-user",

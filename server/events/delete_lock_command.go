@@ -57,7 +57,7 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLoggin
 		return numLocks, nil
 	}
 
-	for i := 0; i < numLocks; i++ {
+	for i := range numLocks {
 		lock := locks[i]
 
 		err := l.WorkingDir.DeletePlan(logger, lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, lock.Project.ProjectName)
