@@ -35,7 +35,7 @@ because anyone can open up a pull request from their fork to your repo.
 
 ### `--repo-allowlist`
 
-Atlantis requires you to specify a allowlist of repositories it will accept webhooks from via the `--repo-allowlist` flag.
+Atlantis requires you to specify an allowlist of repositories it will accept webhooks from via the `--repo-allowlist` flag.
 For example:
 
 * Specific repositories: `--repo-allowlist=github.com/runatlantis/atlantis,github.com/runatlantis/atlantis-tests`
