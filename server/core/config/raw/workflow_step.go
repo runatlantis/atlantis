@@ -22,16 +22,16 @@ type WorkflowHook struct {
 	StringVal map[string]string
 }
 
-func (s *WorkflowHook) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (s *WorkflowHook) UnmarshalYAML(unmarshal func(any) error) error {
 	return s.unmarshalGeneric(unmarshal)
 }
 
-func (s WorkflowHook) MarshalYAML() (interface{}, error) {
+func (s WorkflowHook) MarshalYAML() (any, error) {
 	return s.marshalGeneric()
 }
 
 func (s *WorkflowHook) UnmarshalJSON(data []byte) error {
-	return s.unmarshalGeneric(func(i interface{}) error {
+	return s.unmarshalGeneric(func(i any) error {
 		return json.Unmarshal(data, i)
 	})
 }
@@ -45,7 +45,7 @@ func (s *WorkflowHook) MarshalJSON() ([]byte, error) {
 }
 
 func (s WorkflowHook) Validate() error {
-	runStep := func(value interface{}) error {
+	runStep := func(value any) error {
 		elem := value.(map[string]string)
 		var keys []string
 		for k := range elem {
@@ -92,7 +92,7 @@ func (s WorkflowHook) ToValid() *valid.WorkflowHook {
 // a step a custom run step: " - run: my custom command"
 // It takes a parameter unmarshal that is a function that tries to unmarshal
 // the current element into a given object.
-func (s *WorkflowHook) unmarshalGeneric(unmarshal func(interface{}) error) error {
+func (s *WorkflowHook) unmarshalGeneric(unmarshal func(any) error) error {
 	// Try to unmarshal as a custom run step, ex.
 	// repo_config:
 	// - run: my command
@@ -107,7 +107,7 @@ func (s *WorkflowHook) unmarshalGeneric(unmarshal func(interface{}) error) error
 	return err
 }
 
-func (s WorkflowHook) marshalGeneric() (interface{}, error) {
+func (s WorkflowHook) marshalGeneric() (any, error) {
 	if len(s.StringVal) != 0 {
 		return s.StringVal, nil
 	}

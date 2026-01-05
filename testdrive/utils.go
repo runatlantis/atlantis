@@ -34,7 +34,7 @@ import (
 )
 
 const hashicorpReleasesURL = "https://releases.hashicorp.com"
-const terraformVersion = "1.13.5" // renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
+const terraformVersion = "1.14.3" // renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 const ngrokDownloadURL = "https://bin.equinox.io/c/4VmDzA7iaHb"
 const ngrokAPIURL = "localhost:41414" // We hope this isn't used.
 const atlantisPort = 4141
@@ -204,14 +204,14 @@ func execAndWaitForStderr(wg *sync.WaitGroup, stderrMatch *regexp.Regexp, timeou
 	// Wait until we see the desired output or time out.
 	foundLine := make(chan bool, 1)
 	scanner := bufio.NewScanner(stderr)
-	var log string
+	var log strings.Builder
 
 	// This goroutine watches the process stderr and sends true along the
 	// foundLine channel if a line matches.
 	go func() {
 		for scanner.Scan() {
 			text := scanner.Text()
-			log += text + "\n"
+			log.WriteString(text + "\n")
 			if stderrMatch.MatchString(text) {
 				foundLine <- true
 				break
@@ -227,17 +227,15 @@ func execAndWaitForStderr(wg *sync.WaitGroup, stderrMatch *regexp.Regexp, timeou
 		// If it's a timeout we cancel the command ourselves.
 		cancel()
 		// We still need to wait for the command to finish.
-		command.Wait()                                                  // nolint: errcheck
-		return cancel, errChan, fmt.Errorf("timeout, logs:\n%s\n", log) // nolint: staticcheck, revive
+		command.Wait()                                                           // nolint: errcheck
+		return cancel, errChan, fmt.Errorf("timeout, logs:\n%s\n", log.String()) // nolint: staticcheck, revive
 	}
 
 	// Increment the wait group so callers can wait for the command to finish.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err := command.Wait()
 		errChan <- err
-	}()
+	})
 
 	return cancel, errChan, nil
 }

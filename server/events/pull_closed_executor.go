@@ -54,6 +54,7 @@ type PullClosedExecutor struct {
 	Database                 db.Database
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
+	CancellationTracker      CancellationTracker
 }
 
 type templatedProject struct {
@@ -67,12 +68,12 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
 
 type PullCleanupTemplate interface {
-	Execute(wr io.Writer, data interface{}) error
+	Execute(wr io.Writer, data any) error
 }
 
 type PullClosedEventTemplate struct{}
 
-func (t *PullClosedEventTemplate) Execute(wr io.Writer, data interface{}) error {
+func (t *PullClosedEventTemplate) Execute(wr io.Writer, data any) error {
 	return pullClosedTemplate.Execute(wr, data)
 }
 
@@ -113,6 +114,11 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// Delete pull from DB.
 	if err := p.Database.DeletePullStatus(pull); err != nil {
 		logger.Err("deleting pull from db: %s", err)
+	}
+
+	// Clear any operations to avoid unbounded growth.
+	if p.CancellationTracker != nil {
+		p.CancellationTracker.Clear(pull)
 	}
 
 	// If there are no locks then there's no need to comment.
