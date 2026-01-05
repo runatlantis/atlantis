@@ -209,12 +209,14 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	}
 	// Must construct slices here instead of using a `var` declaration because
 	// we treat nil slices differently.
-	commandReqs := []string{}
+	applyReqs := []string{}
+	importReqs := []string{}
+	planReqs := []string{}
 	allowedOverrides := []string{}
 	allowedWorkflows := []string{}
 	policyCheck := false
 	if args.PolicyCheckEnabled {
-		commandReqs = append(commandReqs, PoliciesPassedCommandReq)
+		applyReqs = append(applyReqs, PoliciesPassedCommandReq)
 		policyCheck = true
 	}
 
@@ -235,9 +237,9 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 				IDRegex:                   regexp.MustCompile(".*"),
 				BranchRegex:               regexp.MustCompile(".*"),
 				RepoConfigFile:            args.RepoConfigFile,
-				PlanRequirements:          commandReqs,
-				ApplyRequirements:         commandReqs,
-				ImportRequirements:        commandReqs,
+				PlanRequirements:          planReqs,
+				ApplyRequirements:         applyReqs,
+				ImportRequirements:        importReqs,
 				PreWorkflowHooks:          args.PreWorkflowHooks,
 				Workflow:                  &defaultWorkflow,
 				PostWorkflowHooks:         args.PostWorkflowHooks,
