@@ -114,12 +114,12 @@ func NewAsyncProjectCommandOutputHandler(
 func (p *AsyncProjectCommandOutputHandler) GetPullToJobMapping() []PullInfoWithJobIDs {
 	var pullToJobMappings []PullInfoWithJobIDs
 
-	p.pullToJobMapping.Range(func(key, value interface{}) bool {
+	p.pullToJobMapping.Range(func(key, value any) bool {
 		pullInfo := key.(PullInfo)
 		jobIDSyncMap := value.(*sync.Map)
 
 		var jobIDInfos []JobIDInfo
-		jobIDSyncMap.Range(func(_, v interface{}) bool {
+		jobIDSyncMap.Range(func(_, v any) bool {
 			jobIDInfos = append(jobIDInfos, v.(JobIDInfo))
 			return true
 		})
@@ -306,7 +306,7 @@ func (p *AsyncProjectCommandOutputHandler) GetJobIDMapForPull(pullInfo PullInfo)
 	result := make(map[string]JobIDInfo)
 	if value, ok := p.pullToJobMapping.Load(pullInfo); ok {
 		jobIDSyncMap := value.(*sync.Map)
-		jobIDSyncMap.Range(func(k, v interface{}) bool {
+		jobIDSyncMap.Range(func(k, v any) bool {
 			result[k.(string)] = v.(JobIDInfo)
 			return true
 		})
@@ -318,7 +318,7 @@ func (p *AsyncProjectCommandOutputHandler) GetJobIDMapForPull(pullInfo PullInfo)
 func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 	if value, ok := p.pullToJobMapping.Load(pullInfo); ok {
 		jobIDSyncMap := value.(*sync.Map)
-		jobIDSyncMap.Range(func(k, _ interface{}) bool {
+		jobIDSyncMap.Range(func(k, _ any) bool {
 			jobID := k.(string)
 			p.projectOutputBuffersLock.Lock()
 			delete(p.projectOutputBuffers, jobID)
