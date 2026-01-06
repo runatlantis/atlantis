@@ -181,7 +181,7 @@ func (w *FileWorkspace) MergeAgain(
 
 	c := wrappedGitContext{cloneDir, headRepo, p}
 	if w.recheckDiverged(logger, p, headRepo, cloneDir) {
-		logger.Info("base branch has been updated, using merge strategy and will merge again")
+		logger.Info("base branch may have been updated, using merge strategy and will merge again")
 		return true, w.mergeAgain(logger, c)
 	}
 	return false, nil
@@ -192,8 +192,8 @@ func (w *FileWorkspace) MergeAgain(
 // This matters in the case of the merge checkout strategy because after
 // cloning the repo and doing the merge, it's possible main was updated
 // and we have to perform a new merge.
-// If there are any errors we return false since we prefer things to succeed
-// vs. stopping the plan/apply.
+// If there are any errors we return true since we prefer to assume divergence
+// for safety.
 func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that main has diverged if we're using
@@ -227,7 +227,7 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Warn("getting remote update failed: %s", string(output))
-			return false
+			return true
 		}
 	}
 
@@ -246,7 +246,7 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	outputStatusFetch, err := statusFetchCmd.CombinedOutput()
 	if err != nil {
 		logger.Warn("fetching repo has failed: %s", string(outputStatusFetch))
-		return false
+		return true
 	}
 
 	// Check if remote main branch has diverged.
@@ -255,7 +255,7 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
 	if err != nil {
 		logger.Warn("getting repo status has failed: %s", string(outputStatusUno))
-		return false
+		return true
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
 	return hasDiverged

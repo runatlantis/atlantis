@@ -223,7 +223,7 @@ The `merge` checkout strategy creates a temporary merge commit and runs the `pla
 source and destination branch. The local destination branch can become out of date since changes to the destination branch are not fetched
 if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of main is up to date
 with remote so that the state of the source during the `apply` is identical to that if you were to merge the PR at that
-time.
+time. In the case of a transient error, Atlantis assumes divergence for safety and errors.
 
 ## Setting Command Requirements
 
