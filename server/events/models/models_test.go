@@ -679,7 +679,7 @@ func TestPlanSuccessStats(t *testing.T) {
 		{
 			"with imports",
 			`Terraform used the selected providers to generate the following execution
-			plan. Resource actions are indicated with the following symbols:	
+			plan. Resource actions are indicated with the following symbols:
 			  + create
 			  ~ update in-place
 			  - destroy
@@ -723,6 +723,269 @@ func TestPlanSuccessStats(t *testing.T) {
 			if s != tt.exp {
 				t.Errorf("\nexp: %#v\ngot: %#v", tt.exp, s)
 			}
+		})
+	}
+}
+
+func TestDiffMarkdownFormattedTerraformOutput(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		exp   string
+	}{
+		{
+			"cloudformation stack with heredoc template",
+			`Terraform will perform the following actions:
+
+  # aws_cloudformation_stack.example will be created
+  + resource "aws_cloudformation_stack" "example" {
+      + id            = (known after apply)
+      + name          = "my-stack"
+      + template_body = <<-EOT
+            {
+              "AWSTemplateFormatVersion": "2010-09-09",
+              "Resources": {
+                "MyBucket": {
+                  "Type": "AWS::S3::Bucket"
+                }
+              }
+            }
+        EOT
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.`,
+			`Terraform will perform the following actions:
+
+  # aws_cloudformation_stack.example will be created
+  + resource "aws_cloudformation_stack" "example" {
++       id            = (known after apply)
++       name          = "my-stack"
++       template_body = <<-EOT
+            {
+              "AWSTemplateFormatVersion": "2010-09-09",
+              "Resources": {
+                "MyBucket": {
+                  "Type": "AWS::S3::Bucket"
+                }
+              }
+            }
+        EOT
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.`,
+		},
+		{
+			"cloudformation stack with parameters and tags",
+			`  # aws_cloudformation_stack.example will be updated in-place
+  ~ resource "aws_cloudformation_stack" "example" {
+        id              = "arn:aws:cloudformation:..."
+      ~ name            -> "updated-stack-name"
+      ~ parameters      = {
+          - "OldParam" = "old-value" -> null
+          + "NewParam" = "new-value"
+        }
+      + tags            = {
+          + "Environment" = "production"
+        }
+        template_body   = <<-EOT
+            {
+              "AWSTemplateFormatVersion": "2010-09-09"
+            }
+        EOT
+    }`,
+			`# aws_cloudformation_stack.example will be updated in-place
+  ~ resource "aws_cloudformation_stack" "example" {
+        id              = "arn:aws:cloudformation:..."
+!       name            -> "updated-stack-name"
+!       parameters      = {
+          - "OldParam" = "old-value" -> null
+          + "NewParam" = "new-value"
+        }
++       tags            = {
+          + "Environment" = "production"
+        }
+        template_body   = <<-EOT
+            {
+              "AWSTemplateFormatVersion": "2010-09-09"
+            }
+        EOT
+    }`,
+		},
+		{
+			"cloudformation stack with nested attributes",
+			`  # aws_cloudformation_stack.example will be created
+  + resource "aws_cloudformation_stack" "example" {
+      + capabilities  = ["CAPABILITY_IAM"]
+      + id            = (known after apply)
+      + outputs       = (known after apply)
+      + policy_body   = jsonencode({
+          + Statement = [
+              + {
+                  + Effect = "Allow"
+                },
+            ]
+        })
+      + template_url  = "https://s3.amazonaws.com/bucket/template.json"
+      + timeouts      {
+          + create = "30m"
+        }
+    }`,
+			`# aws_cloudformation_stack.example will be created
+  + resource "aws_cloudformation_stack" "example" {
++       capabilities  = ["CAPABILITY_IAM"]
++       id            = (known after apply)
++       outputs       = (known after apply)
++       policy_body   = jsonencode({
++           Statement = [
+              + {
++                   Effect = "Allow"
+                },
+            ]
+        })
++       template_url  = "https://s3.amazonaws.com/bucket/template.json"
++       timeouts      {
++           create = "30m"
+        }
+    }`,
+		},
+		{
+			"cloudformation stack with complex template body",
+			`  + resource "aws_cloudformation_stack" "vpc" {
+      + arn           = (known after apply)
+      + name          = "vpc-stack"
+      + parameters    = {
+          + "CidrBlock" = "10.0.0.0/16"
+        }
+      + template_body = <<-EOT
+            Resources:
+              VPC:
+                Type: AWS::EC2::VPC
+                Properties:
+                  CidrBlock: !Ref CidrBlock
+                  EnableDnsSupport: true
+              InternetGateway:
+                Type: AWS::EC2::InternetGateway
+        EOT
+    }`,
+			`+ resource "aws_cloudformation_stack" "vpc" {
++       arn           = (known after apply)
++       name          = "vpc-stack"
++       parameters    = {
+          + "CidrBlock" = "10.0.0.0/16"
+        }
++       template_body = <<-EOT
+            Resources:
+              VPC:
+                Type: AWS::EC2::VPC
+                Properties:
+                  CidrBlock: !Ref CidrBlock
+                  EnableDnsSupport: true
+              InternetGateway:
+                Type: AWS::EC2::InternetGateway
+        EOT
+    }`,
+		},
+		{
+			"multiple resource types with various operators",
+			`Terraform will perform the following actions:
+
+  # aws_instance.example will be updated
+  ~ resource "aws_instance" "example" {
+        id                = "i-1234567890"
+      ~ instance_type     -> "t3.medium"
+      + monitoring        = true
+      - user_data         = "old-data" -> null
+        ami                = "ami-12345"
+    }
+
+  # aws_s3_bucket.data will be created
+  + resource "aws_s3_bucket" "data" {
+      + bucket          = "my-bucket"
+      + id              = (known after apply)
+      + versioning      {
+          + enabled = true
+        }
+    }`,
+			`Terraform will perform the following actions:
+
+  # aws_instance.example will be updated
+  ~ resource "aws_instance" "example" {
+        id                = "i-1234567890"
+!       instance_type     -> "t3.medium"
++       monitoring        = true
+-       user_data         = "old-data" -> null
+        ami                = "ami-12345"
+    }
+
+  # aws_s3_bucket.data will be created
+  + resource "aws_s3_bucket" "data" {
++       bucket          = "my-bucket"
++       id              = (known after apply)
++       versioning      {
++           enabled = true
+        }
+    }`,
+		},
+		{
+			"cloudformation stack with yaml template and fn sub intrinsics",
+			`  # aws_cloudformation_stack.iam_role will be created
+  + resource "aws_cloudformation_stack" "iam_role" {
+      + id            = (known after apply)
+      + name          = "audit-role-stack"
+      + template_body = <<-EOT
+            AWSTemplateFormatVersion: '2010-09-09'
+            Description: IAM Role with managed policies
+            Resources:
+              AuditRole:
+                Type: AWS::IAM::Role
+                Properties:
+                  RoleName: AuditRole
+                  AssumeRolePolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Principal:
+                          Service: ec2.amazonaws.com
+                        Action: sts:AssumeRole
+                  ManagedPolicyArns:
+                    - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess
+                    - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/SecurityAudit
+        EOT
+    }`,
+			`# aws_cloudformation_stack.iam_role will be created
+  + resource "aws_cloudformation_stack" "iam_role" {
++       id            = (known after apply)
++       name          = "audit-role-stack"
++       template_body = <<-EOT
+            AWSTemplateFormatVersion: '2010-09-09'
+            Description: IAM Role with managed policies
+            Resources:
+              AuditRole:
+                Type: AWS::IAM::Role
+                Properties:
+                  RoleName: AuditRole
+                  AssumeRolePolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Principal:
+                          Service: ec2.amazonaws.com
+                        Action: sts:AssumeRole
+                  ManagedPolicyArns:
+                    - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess
+                    - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/SecurityAudit
+        EOT
+    }`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ps := models.PlanSuccess{
+				TerraformOutput: tt.input,
+			}
+			result := ps.DiffMarkdownFormattedTerraformOutput()
+			Equals(t, tt.exp, result)
 		})
 	}
 }
