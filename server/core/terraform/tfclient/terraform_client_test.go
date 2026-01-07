@@ -74,7 +74,7 @@ is 0.11.13. You can update by downloading from developer.hashicorp.com/terraform
 
 	// We're testing this by adding our own "fake" terraform binary to path that
 	// outputs what would normally come from terraform version.
-	err := os.WriteFile(filepath.Join(tmp, "terraform"), []byte(fmt.Sprintf("#!/bin/sh\necho '%s'", fakeBinOut)), 0700) // #nosec G306
+	err := os.WriteFile(filepath.Join(tmp, "terraform"), fmt.Appendf(nil, "#!/bin/sh\necho '%s'", fakeBinOut), 0700) // #nosec G306
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
@@ -111,7 +111,7 @@ is 0.11.13. You can update by downloading from developer.hashicorp.com/terraform
 
 	// We're testing this by adding our own "fake" terraform binary to path that
 	// outputs what would normally come from terraform version.
-	err := os.WriteFile(filepath.Join(tmp, "terraform"), []byte(fmt.Sprintf("#!/bin/sh\necho '%s'", fakeBinOut)), 0700) // #nosec G306
+	err := os.WriteFile(filepath.Join(tmp, "terraform"), fmt.Appendf(nil, "#!/bin/sh\necho '%s'", fakeBinOut), 0700) // #nosec G306
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
@@ -161,7 +161,7 @@ func TestNewClient_DefaultTFFlagInPath(t *testing.T) {
 
 	// We're testing this by adding our own "fake" terraform binary to path that
 	// outputs what would normally come from terraform version.
-	err := os.WriteFile(filepath.Join(tmp, "terraform0.11.10"), []byte(fmt.Sprintf("#!/bin/sh\necho '%s'", fakeBinOut)), 0700) // #nosec G306
+	err := os.WriteFile(filepath.Join(tmp, "terraform0.11.10"), fmt.Appendf(nil, "#!/bin/sh\necho '%s'", fakeBinOut), 0700) // #nosec G306
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
@@ -192,7 +192,7 @@ func TestNewClient_DefaultTFFlagInBinDir(t *testing.T) {
 	}
 
 	// Add our fake binary to {datadir}/bin/terraform{version}.
-	err := os.WriteFile(filepath.Join(binDir, "terraform0.11.10"), []byte(fmt.Sprintf("#!/bin/sh\necho '%s'", fakeBinOut)), 0700) // #nosec G306
+	err := os.WriteFile(filepath.Join(binDir, "terraform0.11.10"), fmt.Appendf(nil, "#!/bin/sh\necho '%s'", fakeBinOut), 0700) // #nosec G306
 	Ok(t, err)
 	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
 
@@ -443,7 +443,7 @@ terraform {
 	}
 
 	type testCase struct {
-		DirStructure map[string]interface{}
+		DirStructure map[string]any
 		Exp          map[string]string
 		IsExact      bool
 	}
@@ -451,8 +451,8 @@ terraform {
 	testCases := make(map[string]testCase)
 	for version, expected := range expectedVersions {
 		testCases[fmt.Sprintf("version using \"%s\"", version)] = testCase{
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": fmt.Sprintf(baseVersionConfig, version),
 				},
 			},
@@ -464,8 +464,8 @@ terraform {
 	}
 
 	testCases["no version specified"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
 				"main.tf": nil,
 			},
 		},
@@ -476,11 +476,11 @@ terraform {
 	}
 
 	testCases["projects with different terraform versions"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
 				"main.tf": fmt.Sprintf(baseVersionConfig, "= 0.12.8"),
 			},
-			"project2": map[string]interface{}{
+			"project2": map[string]any{
 				"main.tf": strings.ReplaceAll(fmt.Sprintf(baseVersionConfig, "= 0.12.8"), "0.12.8", "0.12.9"),
 			},
 		},

@@ -18,7 +18,7 @@ const redactedReplacement = "://:<redacted>@"
 // before every clone, given Github App tokens expire quickly
 type GithubAppWorkingDir struct {
 	WorkingDir
-	Credentials    github.GithubCredentials
+	Credentials    github.Credentials
 	GithubHostname string
 }
 

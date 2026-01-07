@@ -29,7 +29,7 @@ import (
 )
 
 func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
-	var githubClient *github.GithubClient
+	var githubClient *github.Client
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
@@ -65,7 +65,7 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 
 func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 	RegisterMockTestingT(t)
-	var githubClient *github.GithubClient
+	var githubClient *github.Client
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
@@ -104,7 +104,7 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 
 func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 	RegisterMockTestingT(t)
-	var githubClient *github.GithubClient
+	var githubClient *github.Client
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
@@ -142,7 +142,7 @@ func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 }
 
 func TestDefaultProjectLocker_RepoLocking(t *testing.T) {
-	var githubClient *github.GithubClient
+	var githubClient *github.Client
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
 	expProject := models.Project{}
 	expWorkspace := "default"

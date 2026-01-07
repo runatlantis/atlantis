@@ -68,6 +68,7 @@ var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
+var cancellationTracker *mocks.MockCancellationTracker
 
 type TestConfig struct {
 	parallelPoolSize           int
@@ -117,6 +118,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
 	pullReqStatusFetcher = vcsmocks.NewMockPullReqStatusFetcher()
+	cancellationTracker = mocks.NewMockCancellationTracker()
 
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
@@ -157,6 +159,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -177,6 +180,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
@@ -830,7 +834,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
@@ -855,7 +859,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
 	testdata.Pull.BaseRepo = testdata.GithubRepo
@@ -912,7 +916,7 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 	dbUpdater.Database = boltDB
 	applyCommandRunner.Database = boltDB
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
@@ -969,8 +973,7 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	}
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		ThenReturn([]command.ProjectContext{projectCtx}, nil)
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectResult{
-		Command: command.Plan,
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{
 		PlanSuccess: &models.PlanSuccess{
 			TerraformOutput: "true",
 		},
@@ -999,7 +1002,7 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "default"})
@@ -1038,14 +1041,14 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 			// The first call, we return a successful result.
 			callCount++
 			return ReturnValues{
-				command.ProjectResult{
+				command.ProjectCommandOutput{
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			}
 		}
 		// The second call, we return a failed result.
 		return ReturnValues{
-			command.ProjectResult{
+			command.ProjectCommandOutput{
 				Error: errors.New("err"),
 			},
 		}
@@ -1077,7 +1080,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
@@ -1118,8 +1121,10 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 
 	_, _ = boltDB.UpdatePullWithResults(modelPull, []command.ProjectResult{
 		{
-			Command:     command.PolicyCheck,
-			Error:       fmt.Errorf("failing policy"),
+			Command: command.PolicyCheck,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: fmt.Errorf("failing policy"),
+			},
 			ProjectName: "default",
 			Workspace:   "default",
 			RepoRelDir:  ".",
@@ -1191,9 +1196,11 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 			Command:    command.Plan,
 			RepoRelDir: ".",
 			Workspace:  "default",
-			PlanSuccess: &models.PlanSuccess{
-				TerraformOutput: "tf-output",
-				LockURL:         "lock-url",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "tf-output",
+					LockURL:         "lock-url",
+				},
 			},
 		},
 	})
