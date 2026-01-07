@@ -573,8 +573,6 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)
 		}
-
-		// just ignore it to allow us to use any git workflows without malicious intentions.
 		return false
 	}
 	return true
