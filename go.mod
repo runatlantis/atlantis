@@ -48,7 +48,7 @@ require (
 	gitlab.com/gitlab-org/api/client-go v0.118.0
 	go.etcd.io/bbolt v1.4.3
 	go.uber.org/zap v1.27.1
-	go.yaml.in/yaml/v3 v3.0.4
+	go.yaml.in/yaml/v4 v4.0.0-rc.3
 	golang.org/x/term v0.37.0
 	golang.org/x/text v0.31.0
 )

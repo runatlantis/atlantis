@@ -9,7 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestWorkflowHook_YAMLMarshalling(t *testing.T) {
