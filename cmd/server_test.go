@@ -24,10 +24,11 @@ import (
 	"strings"
 	"testing"
 
+	"go.yaml.in/yaml/v3"
+
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 
 	"github.com/runatlantis/atlantis/server"
 	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
