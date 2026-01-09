@@ -124,7 +124,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	}
 	// Only GitLab and AzureDevops repos can have /'s in their owners.
 	// This is for GitLab subgroups and Azure DevOps Team Projects.
-	if strings.Contains(owner, "/") && vcsHostType != Gitlab && vcsHostType != AzureDevops {
+	if strings.Contains(owner, "/") && vcsHostType != Gitlab && vcsHostType != AzureDevops && vcsHostType != BitbucketServer {
 		return Repo{}, fmt.Errorf("invalid repo format %q, owner %q should not contain any /'s", repoFullName, owner)
 	}
 	if strings.Contains(repo, "/") {
