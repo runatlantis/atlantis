@@ -2,7 +2,7 @@
 
 It is possible to send notifications to external systems whenever an apply is being done.
 
-You can make requests to any HTTP endpoint or send messages directly to your Slack channel.
+You can make requests to any HTTP endpoint or send messages directly to your Slack channel or Microsoft Teams channel.
 
 ::: tip NOTE
 Currently only `apply` events are supported.
@@ -19,6 +19,15 @@ webhooks:
 - event: apply
   kind: slack
   channel: my-channel-id
+```
+
+Or to send notifications to Microsoft Teams:
+
+```yaml
+webhooks:
+- event: apply
+  kind: msteams
+  url: https://outlook.office.com/webhook/your-webhook-url-here
 ```
 
 If you are deploying Atlantis as a Helm chart, this can be implemented via the `config` parameter available for [chart customizations](https://github.com/runatlantis/helm-charts#customization):
@@ -149,3 +158,51 @@ webhooks:
   kind: slack
   channel: my-channel-id
 ```
+
+## Using Microsoft Teams hooks
+
+You can send notifications to Microsoft Teams channels using Webhooks.
+
+::: danger DEPRECATION NOTICE
+The legacy **Incoming Webhook** connector is deprecated and will be retired. Please use the **Workflows** app to create a new webhook URL.
+:::
+
+### Configuring Microsoft Teams for Atlantis
+
+To receive notifications, you need to create a webhook URL from the Teams **Workflows** app.
+
+1.  In a Teams channel, select **Apps** and search for **Workflows**.
+2.  Choose a template like **Post to a channel when a webhook request is received**.
+3.  Name your workflow and copy the generated URL.
+
+For more detailed instructions, see the [Microsoft Teams documentation](https://support.microsoft.com/en-us/office/create-incoming-webhooks-with-workflows-for-microsoft-teams-8ae491c7-0394-4861-ba59-055e33f75498).
+
+### Configuring Atlantis
+
+In your Atlantis [server-side configuration](server-configuration.md), add the following, using the URL you copied from the Workflow app:
+
+```yaml
+webhooks:
+- event: apply
+  kind: msteams
+  url: <your-workflow-generated-webhook-url>
+```
+
+You can also filter notifications by workspace or branch:
+
+```yaml
+webhooks:
+- event: apply
+  kind: msteams
+  workspace-regex: "production.*"
+  branch-regex: "main|master"
+  url: <your-workflow-generated-webhook-url>
+```
+
+The MS Teams message will include:
+* Apply success/failure status with color coding
+* Repository name
+* Workspace and branch information
+* Username who triggered the apply
+* Directory and project name (if applicable)
+* Pull request link
