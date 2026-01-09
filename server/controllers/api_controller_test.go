@@ -40,6 +40,7 @@ func TestAPIController_Plan(t *testing.T) {
 		paths      []struct {
 			Directory string
 			Workspace string
+			ExtraArgs []string
 		}
 	}{
 		{
@@ -61,14 +62,17 @@ func TestAPIController_Plan(t *testing.T) {
 			paths: []struct {
 				Directory string
 				Workspace string
+				ExtraArgs []string
 			}{
 				{
 					Directory: ".",
 					Workspace: "myworkspace",
+					ExtraArgs: nil,
 				},
 				{
 					Directory: "./myworkspace2",
 					Workspace: "myworkspace2",
+					ExtraArgs: nil,
 				},
 			},
 		},
@@ -81,10 +85,28 @@ func TestAPIController_Plan(t *testing.T) {
 			paths: []struct {
 				Directory string
 				Workspace string
+				ExtraArgs []string
 			}{
 				{
 					Directory: ".",
 					Workspace: "myworkspace",
+					ExtraArgs: nil,
+				},
+			},
+		},
+		{
+			repository: "Repo",
+			ref:        "main",
+			vcsType:    "Gitlab",
+			paths: []struct {
+				Directory string
+				Workspace string
+				ExtraArgs []string
+			}{
+				{
+					Directory: ".",
+					Workspace: "default",
+					ExtraArgs: []string{"-var", "foo=bar"},
 				},
 			},
 		},
@@ -127,6 +149,7 @@ func TestAPIController_Apply(t *testing.T) {
 		paths      []struct {
 			Directory string
 			Workspace string
+			ExtraArgs []string
 		}
 	}{
 		{
@@ -148,14 +171,17 @@ func TestAPIController_Apply(t *testing.T) {
 			paths: []struct {
 				Directory string
 				Workspace string
+				ExtraArgs []string
 			}{
 				{
 					Directory: ".",
 					Workspace: "myworkspace",
+					ExtraArgs: nil,
 				},
 				{
 					Directory: "./myworkspace2",
 					Workspace: "myworkspace2",
+					ExtraArgs: nil,
 				},
 			},
 		},
@@ -168,10 +194,28 @@ func TestAPIController_Apply(t *testing.T) {
 			paths: []struct {
 				Directory string
 				Workspace string
+				ExtraArgs []string
 			}{
 				{
 					Directory: ".",
 					Workspace: "myworkspace",
+					ExtraArgs: nil,
+				},
+			},
+		},
+		{
+			repository: "Repo",
+			ref:        "main",
+			vcsType:    "Gitlab",
+			paths: []struct {
+				Directory string
+				Workspace string
+				ExtraArgs []string
+			}{
+				{
+					Directory: ".",
+					Workspace: "default",
+					ExtraArgs: []string{"-var", "foo=bar"},
 				},
 			},
 		},
@@ -257,6 +301,49 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 	err := json.Unmarshal(response, &result)
 	Ok(t, err)
 	Equals(t, expected, result)
+}
+
+func TestAPIController_ExtraArgs(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+
+	// Capture the CommentCommand for verification
+	var capturedCommand *events.CommentCommand
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			capturedCommand = args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+			}}, nil}
+		})
+
+	// Create a request with ExtraArgs
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Paths: []struct {
+			Directory string
+			Workspace string
+			ExtraArgs []string
+		}{
+			{
+				Directory: "path/to/dir",
+				Workspace: "default",
+				ExtraArgs: []string{"-var", "key=value", "-no-color"},
+			},
+		},
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	// Verify ExtraArgs were correctly passed to the CommentCommand
+	Equals(t, []string{"-var", "key=value", "-no-color"}, capturedCommand.Flags)
+	Equals(t, "path/to/dir", capturedCommand.RepoRelDir)
+	Equals(t, "default", capturedCommand.Workspace)
 }
 
 func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
