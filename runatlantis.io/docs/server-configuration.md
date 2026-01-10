@@ -239,7 +239,7 @@ atlantis server --azuredevops-hostname="dev.azure.com"
 ATLANTIS_AZUREDEVOPS_HOSTNAME="dev.azure.com"
 ```
 
-Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
+Azure DevOps hostname to support cloud and self-hosted instances. Defaults to `dev.azure.com`.
 
 ::: warning COMPATIBILITY WARNING
 If you are affected by this change [docs](https://learn.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#administration)
@@ -600,7 +600,7 @@ This will bypass `--restrict-file-list` if regex is used, normal commands will s
 
 ::: warning SECURITY WARNING
 It's not supposed to be used with `--disable-apply-all`.
-The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects.
+The command `atlantis apply -p .*` will bypass the restriction and run apply on every project.
 :::
 
 ### `--executable-name` <Badge text="v0.42.0+" type="info"/>
@@ -1316,7 +1316,7 @@ ATLANTIS_SILENCE_NO_PROJECTS=true
 `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 This flag ensures an Atlantis server only responds to its explicitly declared projects.
 This has no effect if projects are undefined in the repo level `atlantis.yaml`.
-This also silences targeted commands (eg. `atlantis plan -d mydir` or `atlantis apply -p myproj`) so if the project is not in the repo config `atlantis.yaml`, these commands will not run or report back in a comment.
+This also silences targeted commands (e.g. `atlantis plan -d mydir` or `atlantis apply -p myproj`) so if the project is not in the repo config `atlantis.yaml`, these commands will not run or report back in a comment.
 
 This is useful when running multiple Atlantis servers against a single repository so you can
 delegate work to each Atlantis server. Also useful when used with pre_workflow_hooks to dynamically generate an `atlantis.yaml` file.
