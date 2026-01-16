@@ -487,7 +487,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
 
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmdName)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, "", cmdName)
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
 		return nil, err
@@ -613,7 +613,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	var pcc []command.ProjectContext
 
 	ctx.Log.Debug("building plan command")
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.Name)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
 	if err != nil {
 		return pcc, err
 	}
@@ -815,7 +815,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	var cmds []command.ProjectContext
 	for _, plan := range plans {
 		// Lock all the directories we need to run the command in
-		unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, plan.Workspace, plan.RepoRelDir, commentCmd.Name)
+		unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, plan.Workspace, plan.RepoRelDir, plan.ProjectName, commentCmd.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -843,7 +843,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	}
 
 	var projCtx []command.ProjectContext
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.Name)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
 	if err != nil {
 		return projCtx, err
 	}
