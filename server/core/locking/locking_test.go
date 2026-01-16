@@ -285,3 +285,51 @@ func TestApplyLocker(t *testing.T) {
 		})
 	})
 }
+
+func TestIsCurrentLocking_ValidKey(t *testing.T) {
+	t.Log("IsCurrentLocking should succeed with valid key format")
+	key := "owner/repo/path/workspace/projectName"
+	matches, err := locking.IsCurrentLocking(key)
+	Ok(t, err)
+	Equals(t, 5, len(matches))
+	Equals(t, "owner/repo", matches[1])
+	Equals(t, "path", matches[2])
+	Equals(t, "workspace", matches[3])
+	Equals(t, "projectName", matches[4])
+}
+
+func TestIsCurrentLocking_ValidKeyWithNestedPath(t *testing.T) {
+	t.Log("IsCurrentLocking should succeed with nested path")
+	key := "owner/repo/parent/child/path/workspace/projectName"
+	matches, err := locking.IsCurrentLocking(key)
+	Ok(t, err)
+	Equals(t, 5, len(matches))
+	Equals(t, "owner/repo", matches[1])
+	Equals(t, "parent/child/path", matches[2])
+	Equals(t, "workspace", matches[3])
+	Equals(t, "projectName", matches[4])
+}
+
+func TestIsCurrentLocking_InvalidKeyOldFormat(t *testing.T) {
+	t.Log("IsCurrentLocking should fail with old format key (3 parts)")
+	key := "owner/repo/path/workspace"
+	_, err := locking.IsCurrentLocking(key)
+	Assert(t, err != nil, "expected error for old format")
+	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected invalid key format error")
+}
+
+func TestIsCurrentLocking_InvalidKeySinglePart(t *testing.T) {
+	t.Log("IsCurrentLocking should fail with single part key")
+	key := "invalidkey"
+	_, err := locking.IsCurrentLocking(key)
+	Assert(t, err != nil, "expected error for invalid key")
+	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected invalid key format error")
+}
+
+func TestIsCurrentLocking_EmptyKey(t *testing.T) {
+	t.Log("IsCurrentLocking should fail with empty key")
+	key := ""
+	_, err := locking.IsCurrentLocking(key)
+	Assert(t, err != nil, "expected error for empty key")
+	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected invalid key format error")
+}
