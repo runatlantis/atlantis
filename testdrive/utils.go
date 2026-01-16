@@ -30,12 +30,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
 	"golang.org/x/term"
 )
 
 const hashicorpReleasesURL = "https://releases.hashicorp.com"
-const terraformVersion = "1.11.4" // renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
+const terraformVersion = "1.14.3" // renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 const ngrokDownloadURL = "https://bin.equinox.io/c/4VmDzA7iaHb"
 const ngrokAPIURL = "localhost:41414" // We hope this isn't used.
 const atlantisPort = 4141
@@ -140,10 +139,10 @@ func getTunnelAddr() (string, error) {
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return "", errors.Wrap(err, "reading ngrok api")
+		return "", fmt.Errorf("reading ngrok api: %w", err)
 	}
 	if err = json.Unmarshal(body, &t); err != nil {
-		return "", errors.Wrapf(err, "parsing ngrok api: %s", string(body))
+		return "", fmt.Errorf("parsing ngrok api: %s: %w", string(body), err)
 	}
 
 	// Find the tunnel we just created.
@@ -192,7 +191,7 @@ func execAndWaitForStderr(wg *sync.WaitGroup, stderrMatch *regexp.Regexp, timeou
 	command := exec.CommandContext(ctx, name, args...) // #nosec
 	stderr, err := command.StderrPipe()
 	if err != nil {
-		return cancel, errChan, errors.Wrap(err, "creating stderr pipe")
+		return cancel, errChan, fmt.Errorf("creating stderr pipe: %w", err)
 	}
 
 	// Start the command in the background. This will only return error if the
@@ -205,14 +204,14 @@ func execAndWaitForStderr(wg *sync.WaitGroup, stderrMatch *regexp.Regexp, timeou
 	// Wait until we see the desired output or time out.
 	foundLine := make(chan bool, 1)
 	scanner := bufio.NewScanner(stderr)
-	var log string
+	var log strings.Builder
 
 	// This goroutine watches the process stderr and sends true along the
 	// foundLine channel if a line matches.
 	go func() {
 		for scanner.Scan() {
 			text := scanner.Text()
-			log += text + "\n"
+			log.WriteString(text + "\n")
 			if stderrMatch.MatchString(text) {
 				foundLine <- true
 				break
@@ -228,17 +227,15 @@ func execAndWaitForStderr(wg *sync.WaitGroup, stderrMatch *regexp.Regexp, timeou
 		// If it's a timeout we cancel the command ourselves.
 		cancel()
 		// We still need to wait for the command to finish.
-		command.Wait()                                                  // nolint: errcheck
-		return cancel, errChan, fmt.Errorf("timeout, logs:\n%s\n", log) // nolint: staticcheck, revive
+		command.Wait()                                                           // nolint: errcheck
+		return cancel, errChan, fmt.Errorf("timeout, logs:\n%s\n", log.String()) // nolint: staticcheck, revive
 	}
 
 	// Increment the wait group so callers can wait for the command to finish.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err := command.Wait()
 		errChan <- err
-	}()
+	})
 
 	return cancel, errChan, nil
 }

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers_test
 
 import (
@@ -13,6 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 
@@ -292,19 +296,21 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			RepoFullName: repoName,
 		},
 	}, nil)
-	var backend locking.Backend
+	var database db.Database
 	tmp := t.TempDir()
-	backend, err := db.New(tmp)
+	database, err := boltdb.New(tmp)
 	Ok(t, err)
 	// Seed the DB with a successful plan for that project (that is later discarded).
-	_, err = backend.UpdatePullWithResults(pull, []command.ProjectResult{
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
 			Command:    command.Plan,
 			RepoRelDir: projectPath,
 			Workspace:  workspaceName,
-			PlanSuccess: &models.PlanSuccess{
-				TerraformOutput: "tf-output",
-				LockURL:         "lock-url",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "tf-output",
+					LockURL:         "lock-url",
+				},
 			},
 		},
 	})
@@ -315,14 +321,14 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 		VCSClient:         cp,
 		WorkingDirLocker:  workingDirLocker,
 		WorkingDir:        workingDir,
-		Backend:           backend,
+		Database:          database,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
 	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
-	status, err := backend.GetPullStatus(pull)
+	status, err := database.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, status.Projects != nil, "status projects was nil")
 	Equals(t, []models.ProjectStatus{
@@ -346,9 +352,9 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	var backend locking.Backend
+	var database db.Database
 	tmp := t.TempDir()
-	backend, err := db.New(tmp)
+	database, err := boltdb.New(tmp)
 	Ok(t, err)
 	When(cp.CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())).ThenReturn(errors.New("err"))
 	lc := controllers.LocksController{
@@ -357,7 +363,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 		VCSClient:         cp,
 		WorkingDir:        workingDir,
 		WorkingDirLocker:  workingDirLocker,
-		Backend:           backend,
+		Database:          database,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -373,9 +379,9 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	dlc := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	var backend locking.Backend
+	var database db.Database
 	tmp := t.TempDir()
-	backend, err := db.New(tmp)
+	database, err := boltdb.New(tmp)
 	Ok(t, err)
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
@@ -392,7 +398,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,
-		Backend:           backend,
+		Database:          database,
 		WorkingDir:        workingDir,
 		WorkingDirLocker:  workingDirLocker,
 	}

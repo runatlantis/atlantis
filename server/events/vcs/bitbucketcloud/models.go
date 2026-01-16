@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package bitbucketcloud
 
 const (
@@ -43,7 +46,7 @@ type Actor struct {
 }
 type Repository struct {
 	FullName *string `json:"full_name,omitempty" validate:"required"`
-	Links    Links   `json:"links,omitempty" validate:"required"`
+	Links    Links   `json:"links" validate:"required"`
 }
 
 type User struct {

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers_test
 
 import (
@@ -18,7 +21,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -262,13 +265,13 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 	logger := logging.NewNoopLogger(t)
 	parser := NewMockEventParsing()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
-	scope, _, _ := metrics.NewLoggingScope(logger, "null")
+	scope := metricstest.NewLoggingScope(t, logger, "null")
 	vcsClient := NewMockClient()
 	workingDir := NewMockWorkingDir()
 	Ok(t, err)
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir))).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir), Any[command.Name]())).
 		ThenReturn(func() {}, nil)
 
 	projectCommandBuilder := NewMockProjectCommandBuilder()
@@ -282,10 +285,10 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 		}}, nil)
 
 	projectCommandRunner := NewMockProjectCommandRunner()
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
 		PlanSuccess: &models.PlanSuccess{},
 	})
-	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
 		ApplySuccess: "success",
 	})
 

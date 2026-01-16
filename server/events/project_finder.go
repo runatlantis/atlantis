@@ -14,6 +14,7 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -25,7 +26,6 @@ import (
 	"github.com/runatlantis/atlantis/server/utils"
 
 	"github.com/moby/patternmatcher"
-	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -222,7 +222,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 		}
 		pm, err := patternmatcher.New(whenModifiedRelToRepoRoot)
 		if err != nil {
-			return nil, errors.Wrapf(err, "matching modified files with patterns: %v", project.Autoplan.WhenModified)
+			return nil, fmt.Errorf("matching modified files with patterns: %v: %w", project.Autoplan.WhenModified, err)
 		}
 
 		// If any of the modified files matches the pattern then this project is

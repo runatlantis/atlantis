@@ -1,10 +1,13 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -15,7 +18,7 @@ const redactedReplacement = "://:<redacted>@"
 // before every clone, given Github App tokens expire quickly
 type GithubAppWorkingDir struct {
 	WorkingDir
-	Credentials    vcs.GithubCredentials
+	Credentials    github.Credentials
 	GithubHostname string
 }
 

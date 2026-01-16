@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package valid_test
 
 import (
@@ -135,9 +138,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "repo_locks", "policy_check", "silence_pr_comments"}
 			}
 			if c.policyCheckEnabled {
-				exp.Repos[0].PlanRequirements = append(exp.Repos[0].PlanRequirements, "policies_passed")
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "policies_passed")
-				exp.Repos[0].ImportRequirements = append(exp.Repos[0].ImportRequirements, "policies_passed")
 				exp.Repos[0].PolicyCheck = Bool(true)
 			}
 
@@ -806,6 +807,38 @@ repos:
 				PolicyCheck:        true,
 			},
 		},
+		"repo-side plan reqs should not include non-overridable 'policies_passed', since it's not a default plan requirement": {
+			gCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [plan_requirements]
+  apply_requirements: [approved]
+  policy_check: true
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:                ".",
+				Workspace:          "default",
+				PlanRequirements:   []string{"mergeable"},
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{"mergeable"},
+				ApplyRequirements:  []string{"approved"},
+				ImportRequirements: []string{},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocks:          valid.DefaultRepoLocks,
+				CustomPolicyCheck:  false,
+				PolicyCheck:        true,
+			},
+		},
 		"repo-side apply reqs should not include non-overridable 'policies_passed' req when overridden and policies disabled": {
 			gCfg: `
 repos:
@@ -1237,9 +1270,9 @@ repos:
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				PlanRequirements:   []string{"approved", "mergeable", "policies_passed"},
+				PlanRequirements:   []string{"approved", "mergeable"},
 				ApplyRequirements:  []string{"approved", "mergeable", "policies_passed"},
-				ImportRequirements: []string{"approved", "mergeable", "policies_passed"},
+				ImportRequirements: []string{"approved", "mergeable"},
 				Workflow:           defaultWorkflow,
 				RepoRelDir:         "mydir",
 				Workspace:          "myworkspace",

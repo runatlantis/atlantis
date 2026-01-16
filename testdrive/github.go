@@ -44,7 +44,7 @@ func (g *Client) CreateFork(owner string, repoName string) error {
 // CheckForkSuccess waits for github fork to complete.
 // Forks can take up to 5 minutes to complete according to GitHub.
 func (g *Client) CheckForkSuccess(ownerName string, forkRepoName string) bool {
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if err := g.CreateFork(ownerName, forkRepoName); err == nil {
 			return true
 		}

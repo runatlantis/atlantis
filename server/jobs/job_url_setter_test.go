@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package jobs_test
 
 import (
@@ -22,7 +25,7 @@ func TestJobURLSetter(t *testing.T) {
 		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
 		url := "url-to-project-jobs"
 		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
-		result := &command.ProjectResult{}
+		result := &command.ProjectCommandOutput{}
 
 		When(projectJobURLGenerator.GenerateProjectJobURL(Eq[command.ProjectContext](ctx))).ThenReturn(url, nil)
 		When(projectStatusUpdater.UpdateProject(ctx, command.Plan, models.PendingCommitStatus, url, nil)).ThenReturn(nil)

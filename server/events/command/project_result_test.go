@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package command_test
 
 import (
@@ -16,31 +19,41 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 	}{
 		"plan success": {
 			command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{},
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
 			},
 			true,
 		},
 		"policy_check success": {
 			command.ProjectResult{
-				PolicyCheckResults: &models.PolicyCheckResults{},
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{},
+				},
 			},
 			true,
 		},
 		"apply success": {
 			command.ProjectResult{
-				ApplySuccess: "success",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "success",
+				},
 			},
 			true,
 		},
 		"failure": {
 			command.ProjectResult{
-				Failure: "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			false,
 		},
 		"error": {
 			command.ProjectResult{
-				Error: errors.New("error"),
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New("error"),
+				},
 			},
 			false,
 		},
@@ -61,29 +74,37 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 		{
 			p: command.ProjectResult{
 				Command: command.Plan,
-				Error:   errors.New("err"),
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New("err"),
+				},
 			},
 			expStatus: models.ErroredPlanStatus,
 		},
 		{
 			p: command.ProjectResult{
 				Command: command.Plan,
-				Failure: "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			expStatus: models.ErroredPlanStatus,
 		},
 		{
 			p: command.ProjectResult{
-				Command:     command.Plan,
-				PlanSuccess: &models.PlanSuccess{},
+				Command: command.Plan,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
 			},
 			expStatus: models.PlannedPlanStatus,
 		},
 		{
 			p: command.ProjectResult{
 				Command: command.Plan,
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: "No changes. Infrastructure is up-to-date.",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					},
 				},
 			},
 			expStatus: models.PlannedNoChangesPlanStatus,
@@ -91,49 +112,63 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 		{
 			p: command.ProjectResult{
 				Command: command.Apply,
-				Error:   errors.New("err"),
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New("err"),
+				},
 			},
 			expStatus: models.ErroredApplyStatus,
 		},
 		{
 			p: command.ProjectResult{
 				Command: command.Apply,
-				Failure: "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			expStatus: models.ErroredApplyStatus,
 		},
 		{
 			p: command.ProjectResult{
-				Command:      command.Apply,
-				ApplySuccess: "success",
+				Command: command.Apply,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "success",
+				},
 			},
 			expStatus: models.AppliedPlanStatus,
 		},
 		{
 			p: command.ProjectResult{
-				Command:            command.PolicyCheck,
-				PolicyCheckResults: &models.PolicyCheckResults{},
+				Command: command.PolicyCheck,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{},
+				},
 			},
 			expStatus: models.PassedPolicyCheckStatus,
 		},
 		{
 			p: command.ProjectResult{
 				Command: command.PolicyCheck,
-				Failure: "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			expStatus: models.ErroredPolicyCheckStatus,
 		},
 		{
 			p: command.ProjectResult{
-				Command:            command.ApprovePolicies,
-				PolicyCheckResults: &models.PolicyCheckResults{},
+				Command: command.ApprovePolicies,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{},
+				},
 			},
 			expStatus: models.PassedPolicyCheckStatus,
 		},
 		{
 			p: command.ProjectResult{
 				Command: command.ApprovePolicies,
-				Failure: "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			expStatus: models.ErroredPolicyCheckStatus,
 		},
@@ -153,8 +188,9 @@ func TestPlanSuccess_Summary(t *testing.T) {
 	}{
 		{
 			p: command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: `
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
 					An execution plan has been generated and is shown below.
 					Resource actions are indicated with the following symbols:
 					  - destroy
@@ -165,40 +201,46 @@ func TestPlanSuccess_Summary(t *testing.T) {
 
 
 					Plan: 0 to add, 0 to change, 1 to destroy.`,
+					},
 				},
 			},
 			expResult: "Plan: 0 to add, 0 to change, 1 to destroy.",
 		},
 		{
 			p: command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: `
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
 					An execution plan has been generated and is shown below.
 					Resource actions are indicated with the following symbols:
 
 					No changes. Infrastructure is up-to-date.`,
+					},
 				},
 			},
 			expResult: "No changes. Infrastructure is up-to-date.",
 		},
 		{
 			p: command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: `
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
 					Note: Objects have changed outside of Terraform
 
 					Terraform detected the following changes made outside of Terraform since the
 					last "terraform apply":
 
 					No changes. Your infrastructure matches the configuration.`,
+					},
 				},
 			},
 			expResult: "\n**Note: Objects have changed outside of Terraform**\nNo changes. Your infrastructure matches the configuration.",
 		},
 		{
 			p: command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: `
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
 					Note: Objects have changed outside of Terraform
 
 					Terraform detected the following changes made outside of Terraform since the
@@ -214,14 +256,17 @@ func TestPlanSuccess_Summary(t *testing.T) {
 
 
 					Plan: 0 to add, 0 to change, 1 to destroy.`,
+					},
 				},
 			},
 			expResult: "\n**Note: Objects have changed outside of Terraform**\nPlan: 0 to add, 0 to change, 1 to destroy.",
 		},
 		{
 			p: command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: `No match, expect empty`,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `No match, expect empty`,
+					},
 				},
 			},
 			expResult: "",

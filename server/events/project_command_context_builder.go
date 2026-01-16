@@ -1,7 +1,11 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -130,6 +134,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 	projectCmdContext := newProjectCommandContext(
 		ctx,
 		cmdName,
+		subName,
 		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled, prjCfg.AutoMergeMethod),
 		cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
@@ -203,6 +208,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		projectCmds = append(projectCmds, newProjectCommandContext(
 			ctx,
 			command.PolicyCheck,
+			"",
 			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled, prjCfg.AutoMergeMethod),
 			cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
@@ -229,6 +235,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 // ProjectCommandContext.
 func newProjectCommandContext(ctx *command.Context,
 	cmd command.Name,
+	subCommand string,
 	applyCmd string,
 	approvePoliciesCmd string,
 	planCmd string,
@@ -270,6 +277,7 @@ func newProjectCommandContext(ctx *command.Context,
 
 	return command.ProjectContext{
 		CommandName:                cmd,
+		SubCommand:                 subCommand,
 		ApplyCmd:                   applyCmd,
 		ApprovePoliciesCmd:         approvePoliciesCmd,
 		BaseRepo:                   ctx.Pull.BaseRepo,
@@ -318,11 +326,11 @@ func newProjectCommandContext(ctx *command.Context,
 func escapeArgs(args []string) []string {
 	var escaped []string
 	for _, arg := range args {
-		var escapedArg string
+		var escapedArg strings.Builder
 		for i := range arg {
-			escapedArg += "\\" + string(arg[i])
+			escapedArg.WriteString("\\" + string(arg[i]))
 		}
-		escaped = append(escaped, escapedArg)
+		escaped = append(escaped, escapedArg.String())
 	}
 	return escaped
 }

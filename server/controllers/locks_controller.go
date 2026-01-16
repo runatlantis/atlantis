@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers
 
 import (
@@ -8,6 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 
 	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -26,7 +30,7 @@ type LocksController struct {
 	LockDetailTemplate web_templates.TemplateWriter `validate:"required"`
 	WorkingDir         events.WorkingDir            `validate:"required"`
 	WorkingDirLocker   events.WorkingDirLocker      `validate:"required"`
-	Backend            locking.Backend              `validate:"required"`
+	Database           db.Database                  `validate:"required"`
 	DeleteLockCommand  events.DeleteLockCommand     `validate:"required"`
 }
 
@@ -126,7 +130,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	// installations of Atlantis will have locks in their DB that do not have
 	// this field on PullRequest. We skip commenting in this case.
 	if lock.Pull.BaseRepo != (models.Repo{}) {
-		if err := l.Backend.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
+		if err := l.Database.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
 			l.Logger.Err("unable to update project status: %s", err)
 		}
 
@@ -144,7 +148,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 
 // respond is a helper function to respond and log the response. lvl is the log
 // level to log at, code is the HTTP response code.
-func (l *LocksController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
+func (l *LocksController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	l.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)

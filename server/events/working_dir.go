@@ -22,7 +22,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -30,6 +29,8 @@ import (
 )
 
 const workingDirPrefix = "repos"
+
+const prSourceRemote = "source"
 
 var cloneLocks sync.Map
 var recheckRequiredMap sync.Map
@@ -79,7 +80,7 @@ type FileWorkspace struct {
 	TestingOverrideBaseCloneURL string
 	// GithubAppEnabled is true and a PR number is supplied, we should fetch
 	// the ref "pull/PR_NUMBER/head" from the "origin" remote. If this is false,
-	// we fetch "+refs/heads/$HEAD_BRANCH" from the "head" remote.
+	// we fetch "+refs/heads/$HEAD_BRANCH" from the "<prSourceRemote>" remote.
 	GithubAppEnabled bool
 	// use the global setting without overriding
 	GpgNoSigningEnabled bool
@@ -103,42 +104,47 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 	defer mutex.Unlock()
 
 	c := wrappedGitContext{cloneDir, headRepo, p}
-	// If the directory already exists, check if it's at the right commit.
-	// If so, then we do nothing.
-	if _, err := os.Stat(cloneDir); err == nil {
-		logger.Debug("clone directory '%s' already exists, checking if it's at the right commit", cloneDir)
-
-		// We use git rev-parse to see if our repo is at the right commit.
-		// If just checking out the pull request branch or if there is no
-		// pull request (API triggered with a custom git ref), we can use HEAD.
-		// If doing a merge, then HEAD won't be at the pull request's HEAD
-		// because we'll already have performed a merge. Instead, we'll check
-		// HEAD^2 since that will be the commit before our merge.
-		pullHead := "HEAD"
-		if w.CheckoutMerge && c.pr.Num > 0 {
-			pullHead = "HEAD^2"
-		}
-		revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
-		revParseCmd.Dir = cloneDir
-		outputRevParseCmd, err := revParseCmd.CombinedOutput()
-		if err != nil {
-			logger.Warn("will re-clone repo, could not determine if was at correct commit: %s: %s: %s", strings.Join(revParseCmd.Args, " "), err, string(outputRevParseCmd))
-			return cloneDir, w.forceClone(logger, c)
-		}
-		currCommit := strings.Trim(string(outputRevParseCmd), "\n")
-
-		// We're prefix matching here because BitBucket doesn't give us the full
-		// commit, only a 12 character prefix.
-		if strings.HasPrefix(currCommit, p.HeadCommit) {
-			logger.Debug("repo is at correct commit %q so will not re-clone", p.HeadCommit)
-			return cloneDir, nil
-		}
-		logger.Debug("repo was already cloned but is not at correct commit, wanted %q got %q", p.HeadCommit, currCommit)
-		// We'll fall through to re-clone.
+	ok, err := w.attemptReuseCloneDir(logger, c, cloneDir)
+	if ok && err == nil {
+		return cloneDir, nil
 	}
-
-	// Otherwise we clone the repo.
+	if err != nil {
+		logger.Err("An error occurred attempting to reuse the clone dir, falling back to forced clone. This is likely a bug please report: %v", err)
+	}
 	return cloneDir, w.forceClone(logger, c)
+}
+
+// attemptReuseCloneDir tries to reuse an existing cloneDir.
+//
+// It returns:
+// - (true, nil) → reuse succeeded; caller should use this cloneDir directly
+// - (false, nil) → reuse was not possible for an expected reason; caller should force clone
+// - (false, err) → an unexpected error occurred; caller should log the error and force clone
+func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wrappedGitContext, cloneDir string) (bool, error) {
+	// If the directory doesn't exist yet, surely we can't reuse it
+	if _, err := os.Stat(cloneDir); err != nil {
+		return false, nil
+	}
+	logger.Debug("clone directory '%s' already exists, checking if it's at the right commit", cloneDir)
+
+	isUpToDate, err := w.isBranchAtTargetRef(logger, c, c.pr.HeadCommit)
+	if err != nil {
+		return false, err
+	}
+	if isUpToDate {
+		logger.Info("repo is at correct commit %q so will not re-clone", c.pr.HeadCommit)
+		return true, nil
+	}
+	if !w.remoteHasBranch(logger, c, c.pr.BaseBranch) {
+		logger.Info("repo appears to have changed base branch, must reclone")
+		return false, nil
+	}
+	logger.Info("repo was already cloned but branch is not at correct commit, updating to %q", c.pr.HeadCommit)
+	err = w.updateToRef(logger, c, c.pr.HeadCommit)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // MergeAgain merges again with upstream if we are using the merge checkout strategy,
@@ -175,7 +181,7 @@ func (w *FileWorkspace) MergeAgain(
 
 	c := wrappedGitContext{cloneDir, headRepo, p}
 	if w.recheckDiverged(logger, p, headRepo, cloneDir) {
-		logger.Info("base branch has been updated, using merge strategy and will merge again")
+		logger.Info("base branch may have been updated, using merge strategy and will merge again")
 		return true, w.mergeAgain(logger, c)
 	}
 	return false, nil
@@ -186,8 +192,8 @@ func (w *FileWorkspace) MergeAgain(
 // This matters in the case of the merge checkout strategy because after
 // cloning the repo and doing the merge, it's possible main was updated
 // and we have to perform a new merge.
-// If there are any errors we return false since we prefer things to succeed
-// vs. stopping the plan/apply.
+// If there are any errors we return true since we prefer to assume divergence
+// for safety.
 func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that main has diverged if we're using
@@ -207,7 +213,7 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 			"git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
 		},
 		{
-			"git", "remote", "set-url", "head", headRepo.CloneURL,
+			"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL,
 		},
 		{
 			"git", "remote", "update",
@@ -221,7 +227,7 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Warn("getting remote update failed: %s", string(output))
-			return false
+			return true
 		}
 	}
 
@@ -240,7 +246,7 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	outputStatusFetch, err := statusFetchCmd.CombinedOutput()
 	if err != nil {
 		logger.Warn("fetching repo has failed: %s", string(outputStatusFetch))
-		return false
+		return true
 	}
 
 	// Check if remote main branch has diverged.
@@ -249,22 +255,98 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
 	if err != nil {
 		logger.Warn("getting repo status has failed: %s", string(outputStatusUno))
-		return false
+		return true
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
 	return hasDiverged
 }
 
+func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {
+	ref := "refs/remotes/origin/" + branch
+
+	err := w.wrappedGit(logger, c, "show-ref", "--verify", ref)
+	if err != nil {
+		logger.Warn("remote-tracking branch %s not found locally", ref)
+		return false
+	}
+
+	return true
+}
+
+func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
+
+	// We use both `<prSourceRemote>` and `origin` remotes, update them both
+	if err := w.wrappedGit(logger, c, "fetch", "--all"); err != nil {
+		return err
+	}
+
+	// For branch strategy it's easy: just *go to* the ref we're supposed to be at.
+	if !w.CheckoutMerge {
+		return w.wrappedGit(logger, c, "reset", "--hard", targetRef)
+	}
+
+	// For merge strategy, we have to "redo" the merge
+
+	// First go back to origin/main as if we just checked out
+	if err := w.wrappedGit(logger, c, "reset", "--hard", fmt.Sprintf("origin/%s", c.pr.BaseBranch)); err != nil {
+		return err
+	}
+
+	// Next perform the merge
+	if err := w.mergeToBaseBranch(logger, c); err != nil {
+		return err
+	}
+
+	// Now just as a final check make sure we got ourselves to the right commit
+	isUpToDate, err := w.isBranchAtTargetRef(logger, c, targetRef)
+	if err != nil {
+		return err
+	}
+
+	if !isUpToDate {
+		return fmt.Errorf("post-merge verification failed: HEAD^2 != %s", targetRef)
+	}
+
+	return nil
+}
+
+// isBranchAtTargetRef confirm
+func (w *FileWorkspace) isBranchAtTargetRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) (bool, error) {
+	// We use git rev-parse to see if our repo is at the right commit.
+	// If just checking out the pull request branch or if there is no
+	// pull request (API triggered with a custom git ref), we can use HEAD.
+	// If doing a merge, then HEAD won't be at the pull request's HEAD
+	// because we'll already have performed a merge. Instead, we'll check
+	// HEAD^2 since that will be the commit before our merge.
+	pullHead := "HEAD"
+	if w.CheckoutMerge && c.pr.Num > 0 {
+		pullHead = "HEAD^2"
+	}
+	revParseCmd := exec.Command("git", "rev-parse", pullHead) // #nosec
+	revParseCmd.Dir = c.dir
+	outputRevParseCmd, err := revParseCmd.CombinedOutput()
+	if err != nil {
+		return false, err
+	}
+	currCommit := strings.Trim(string(outputRevParseCmd), "\n")
+
+	logger.Debug("Comparing PR ref %q to local ref %q", targetRef, currCommit)
+
+	// We're prefix matching here because BitBucket doesn't give us the full
+	// commit, only a 12 character prefix.
+	return strings.HasPrefix(currCommit, targetRef), nil
+}
+
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
 	err := os.RemoveAll(c.dir)
 	if err != nil {
-		return errors.Wrapf(err, "deleting dir '%s' before cloning", c.dir)
+		return fmt.Errorf("deleting dir '%s' before cloning: %w", c.dir, err)
 	}
 
 	// Create the directory and parents if necessary.
 	logger.Info("creating dir '%s'", c.dir)
 	if err := os.MkdirAll(c.dir, 0700); err != nil {
-		return errors.Wrap(err, "creating new workspace")
+		return fmt.Errorf("creating new workspace: %w", err)
 	}
 
 	// During testing, we mock some of this out.
@@ -295,7 +377,7 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 		}
 	}
 
-	if err := w.wrappedGit(logger, c, "remote", "add", "head", headCloneURL); err != nil {
+	if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
 		return err
 	}
 	if w.GpgNoSigningEnabled {
@@ -351,7 +433,7 @@ func (w *FileWorkspace) wrappedGit(logger logging.SimpleLogging, c wrappedGitCon
 // Merge the PR into the base branch.
 func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappedGitContext) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", c.pr.HeadBranch)
-	fetchRemote := "head"
+	fetchRemote := prSourceRemote
 	if w.GithubAppEnabled && c.pr.Num > 0 {
 		fetchRef = fmt.Sprintf("pull/%d/head:", c.pr.Num)
 		fetchRemote = "origin"
@@ -395,7 +477,7 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
 	repoDir := w.cloneDir(r, p, workspace)
 	if _, err := os.Stat(repoDir); err != nil {
-		return "", errors.Wrap(err, "checking if workspace exists")
+		return "", fmt.Errorf("checking if workspace exists: %w", err)
 	}
 	return repoDir, nil
 }
@@ -435,8 +517,8 @@ func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace 
 // sanitizeGitCredentials replaces any git clone urls that contain credentials
 // in s with the sanitized versions.
 func (w *FileWorkspace) sanitizeGitCredentials(s string, base models.Repo, head models.Repo) string {
-	baseReplaced := strings.Replace(s, base.CloneURL, base.SanitizedCloneURL, -1)
-	return strings.Replace(baseReplaced, head.CloneURL, head.SanitizedCloneURL, -1)
+	baseReplaced := strings.ReplaceAll(s, base.CloneURL, base.SanitizedCloneURL)
+	return strings.ReplaceAll(baseReplaced, head.CloneURL, head.SanitizedCloneURL)
 }
 
 // Set the flag that indicates we need to check for upstream changes (if using merge checkout strategy)

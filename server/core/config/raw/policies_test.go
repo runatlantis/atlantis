@@ -1,13 +1,16 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw_test
 
 import (
 	"testing"
 
-	yaml "github.com/goccy/go-yaml"
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func TestPolicySetsConfig_YAMLMarshalling(t *testing.T) {

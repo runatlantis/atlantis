@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package scheduled
 
 import (
@@ -75,10 +78,8 @@ func (s *ExecutorService) Run() {
 
 func (s *ExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGroup, jd JobDefinition) {
 	ticker := time.NewTicker(jd.Period)
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer ticker.Stop()
 
 		// Ensure we recover from any panics to keep the jobs isolated.
@@ -98,7 +99,7 @@ func (s *ExecutorService) runScheduledJob(ctx context.Context, wg *sync.WaitGrou
 				jd.Job.Run()
 			}
 		}
-	}()
+	})
 
 }
 

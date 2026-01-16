@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw_test
 
 import (
@@ -45,10 +48,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: `[1:1] unknown field "invalid"
->  1 | invalid: key
-       ^
-`,
+			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.RepoCfg",
 		},
 		{
 			description: "version set to 2",
@@ -94,11 +94,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: `[2:6] mapping was used where sequence is expected
-   1 | projects:
->  2 |   key: value
-            ^
-`,
+			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!map into []raw.Project",
 		},
 		{
 			description: "projects with a scalar",
@@ -108,10 +104,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: `[1:11] string was used where sequence is expected
->  1 | projects: value
-                 ^
-`,
+			expErr: "yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `value` into []raw.Project",
 		},
 		{
 			description: "automerge not a boolean",
@@ -121,11 +114,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: `[2:12] cannot unmarshal string into Go struct field RepoCfg.Automerge of type bool
-   1 | version: 3
->  2 | automerge: notabool
-                  ^
-`,
+			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!str `notabool` into bool",
 		},
 		{
 			description: "parallel apply not a boolean",
@@ -135,11 +124,8 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: `[2:17] cannot unmarshal string into Go struct field RepoCfg.ParallelApply of type bool
-   1 | version: 3
->  2 | parallel_apply: notabool
-                       ^
-`},
+			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!str `notabool` into bool",
+		},
 		{
 			description: "should use values if set",
 			input: `

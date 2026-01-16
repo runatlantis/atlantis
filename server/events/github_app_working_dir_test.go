@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
@@ -8,9 +11,9 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
-	vcsMocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
-	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
+	githubMocks "github.com/runatlantis/atlantis/server/events/vcs/github/mocks"
+	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -32,13 +35,13 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 	}
 
 	defer disableSSLVerification()()
-	testServer, err := testdata.GithubAppTestServer(t)
+	testServer, err := githubtestdata.GithubAppTestServer(t)
 	Ok(t, err)
 
 	gwd := &events.GithubAppWorkingDir{
 		WorkingDir: wd,
-		Credentials: &vcs.GithubAppCredentials{
-			Key:      []byte(testdata.GithubPrivateKey),
+		Credentials: &github.AppCredentials{
+			Key:      []byte(githubtestdata.PrivateKey),
 			AppID:    1,
 			Hostname: testServer,
 		},
@@ -63,7 +66,7 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	workingDir := eventMocks.NewMockWorkingDir()
 
-	credentials := vcsMocks.NewMockGithubCredentials()
+	credentials := githubMocks.NewMockCredentials()
 
 	ghAppWorkingDir := events.GithubAppWorkingDir{
 		WorkingDir:     workingDir,
@@ -108,7 +111,7 @@ func TestMergeAgain_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	workingDir := eventMocks.NewMockWorkingDir()
 
-	credentials := vcsMocks.NewMockGithubCredentials()
+	credentials := githubMocks.NewMockCredentials()
 
 	ghAppWorkingDir := events.GithubAppWorkingDir{
 		WorkingDir:     workingDir,

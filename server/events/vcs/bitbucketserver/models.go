@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package bitbucketserver
 
 const (
@@ -63,7 +66,7 @@ type Changes struct {
 	Values []struct {
 		Path struct {
 			ToString *string `json:"toString,omitempty" validate:"required"`
-		} `json:"path,omitempty" validate:"required"`
+		} `json:"path" validate:"required"`
 		SrcPath *struct {
 			ToString *string `json:"toString,omitempty"`
 		} `json:"srcPath,omitempty"`

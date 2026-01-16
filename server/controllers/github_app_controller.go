@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers
 
 import (
@@ -7,7 +10,7 @@ import (
 	"net/url"
 
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
-	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -54,10 +57,10 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 	}
 
 	g.Logger.Debug("Exchanging GitHub app code for app credentials")
-	creds := &vcs.GithubAnonymousCredentials{}
-	config := vcs.GithubConfig{}
+	creds := &github.AnonymousCredentials{}
+	config := github.Config{}
 	// This client does not post comments, so we don't need to configure it with maxCommentsPerCommand.
-	client, err := vcs.NewGithubClient(g.GithubHostname, creds, config, 0, g.Logger)
+	client, err := github.New(g.GithubHostname, creds, config, 0, g.Logger)
 	if err != nil {
 		g.respond(w, logging.Error, http.StatusInternalServerError, "Failed to exchange code for github app: %s", err)
 		return
@@ -153,7 +156,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func (g *GithubAppController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
+func (g *GithubAppController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	g.Logger.Log(lvl, response)
 	w.WriteHeader(code)

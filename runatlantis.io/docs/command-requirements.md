@@ -142,7 +142,12 @@ If you set `atlantis/apply` to the mergeable requirement, use the `--gh-allow-me
 
 #### GitLab
 
-For GitLab, a merge request will be merged if there are no conflicts, no unresolved discussions if it is a project requirement and if all necessary approvers have approved the pull request.
+For GitLab, a merge request will be merged if all the following are true:
+
+* There are no conflicts
+* No unresolved discussions, if it is a project requirement
+* All necessary approvers have approved the pull request
+* Is not behind the branch it's merging into, if the project's [Merge Methods](https://docs.gitlab.com/user/project/merge_requests/methods/) are "Fast-forward merge" or "Merge commit with semi-linear history"
 
 For pipelines, if the project requires that pipelines must succeed, all builds except the apply command status will be checked.
 
@@ -218,7 +223,7 @@ The `merge` checkout strategy creates a temporary merge commit and runs the `pla
 source and destination branch. The local destination branch can become out of date since changes to the destination branch are not fetched
 if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of main is up to date
 with remote so that the state of the source during the `apply` is identical to that if you were to merge the PR at that
-time.
+time. In the case of a transient error, Atlantis assumes divergence for safety and errors.
 
 ## Setting Command Requirements
 
