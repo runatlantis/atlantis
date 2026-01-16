@@ -185,7 +185,7 @@ Here are the requirements to enable [CDKTF](https://developer.hashicorp.com/terr
 * A custom image with `CDKTF` installed
 * Add `**/cdk.tf.json` to the list of Atlantis autoplan files.
 * Set the `atlantis-include-git-untracked-files` flag so that the Terraform files dynamically generated
-by CDKTF will be add to the Atlantis modified file list.
+by CDKTF will be added to the Atlantis modified file list.
 * Use `pre_workflow_hooks` to run `cdktf synth`
 * Optional: There isn't a requirement to use a repo `atlantis.yaml` but one can be leveraged if needed.
 
@@ -404,7 +404,7 @@ isn't set, Atlantis will use the default plan workflow which is what we want in 
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
-will execute a custom script containing the following code to create a SSH tunnel correctly:
+will execute a custom script containing the following code to create an SSH tunnel correctly:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
 :::
@@ -669,7 +669,7 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
-will execute a custom script containing the following code to create a SSH tunnel correctly:
+will execute a custom script containing the following code to create an SSH tunnel correctly:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
 * If a workflow step returns a non-zero exit code, the workflow will stop.

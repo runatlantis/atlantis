@@ -12,7 +12,24 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
-type prjCmdRunnerFunc func(ctx command.ProjectContext) command.ProjectResult
+type prjCmdRunnerFunc func(ctx command.ProjectContext) command.ProjectCommandOutput
+
+func RunOneProjectCmd(
+	runnerFunc prjCmdRunnerFunc,
+	cmd command.ProjectContext,
+) command.ProjectResult {
+	projectCommandOutput := runnerFunc(cmd)
+
+	return command.ProjectResult{
+		ProjectCommandOutput: projectCommandOutput,
+		Command:              cmd.CommandName,
+		SubCommand:           cmd.SubCommand,
+		RepoRelDir:           cmd.RepoRelDir,
+		Workspace:            cmd.Workspace,
+		ProjectName:          cmd.ProjectName,
+		SilencePRComments:    cmd.SilencePRComments,
+	}
+}
 
 func runProjectCmdsParallel(
 	cmds []command.ProjectContext,
@@ -24,13 +41,12 @@ func runProjectCmdsParallel(
 
 	wg := sizedwaitgroup.New(poolSize)
 	for _, pCmd := range cmds {
-		pCmd := pCmd
 		var execute func()
 		wg.Add()
 
 		execute = func() {
 			defer wg.Done()
-			res := runnerFunc(pCmd)
+			res := RunOneProjectCmd(runnerFunc, pCmd)
 			mux.Lock()
 			results = append(results, res)
 			mux.Unlock()
@@ -49,7 +65,7 @@ func runProjectCmds(
 ) command.Result {
 	var results []command.ProjectResult
 	for _, pCmd := range cmds {
-		res := runnerFunc(pCmd)
+		res := RunOneProjectCmd(runnerFunc, pCmd)
 
 		results = append(results, res)
 	}
@@ -101,7 +117,7 @@ func runProjectCmdsWithCancellationTracker(
 	cancellationTracker CancellationTracker,
 	parallelPoolSize int,
 	isParallel bool,
-	runnerFunc func(command.ProjectContext) command.ProjectResult,
+	runnerFunc prjCmdRunnerFunc,
 ) command.Result {
 	if isParallel {
 		ctx.Log.Info("Running commands in parallel")
@@ -156,8 +172,10 @@ func createCancelledResults(remainingGroups [][]command.ProjectContext) []comman
 	for _, group := range remainingGroups {
 		for _, cmd := range group {
 			cancelledResults = append(cancelledResults, command.ProjectResult{
-				Command:     cmd.CommandName,
-				Error:       fmt.Errorf("operation cancelled"),
+				Command: cmd.CommandName,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: fmt.Errorf("operation cancelled"),
+				},
 				RepoRelDir:  cmd.RepoRelDir,
 				Workspace:   cmd.Workspace,
 				ProjectName: cmd.ProjectName,
@@ -169,7 +187,7 @@ func createCancelledResults(remainingGroups [][]command.ProjectContext) []comman
 
 func runGroup(
 	group []command.ProjectContext,
-	runnerFunc func(command.ProjectContext) command.ProjectResult,
+	runnerFunc prjCmdRunnerFunc,
 	isParallel bool,
 	parallelPoolSize int,
 ) command.Result {

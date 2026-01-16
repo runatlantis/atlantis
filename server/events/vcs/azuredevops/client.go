@@ -236,7 +236,7 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 
 		// Ignore the Atlantis status, even if its set as a blocker.
 		// This status should not be considered when evaluating if the pull request can be applied.
-		settings := (policyEvaluation.Configuration.Settings).(map[string]interface{})
+		settings := (policyEvaluation.Configuration.Settings).(map[string]any)
 		if genre, ok := settings["statusGenre"]; ok && genre == "Atlantis Bot/atlantis" {
 			if name, ok := settings["statusName"]; ok && name == "apply" {
 				continue

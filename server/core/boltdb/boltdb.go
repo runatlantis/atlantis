@@ -478,7 +478,7 @@ func (b *BoltDB) pullKey(pull models.PullRequest) ([]byte, error) {
 		return nil, fmt.Errorf("repo name %q contains illegal string %q", hostname, pullKeySeparator)
 	}
 
-	return []byte(fmt.Sprintf("%s::%s::%d", hostname, repo, pull.Num)),
+	return fmt.Appendf(nil, "%s::%s::%d", hostname, repo, pull.Num),
 		nil
 }
 
