@@ -104,30 +104,47 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 	defer mutex.Unlock()
 
 	c := wrappedGitContext{cloneDir, headRepo, p}
-	// If the directory already exists, check if it's at the right commit.
-	// If so, then we do nothing.
-	if _, err := os.Stat(cloneDir); err == nil {
-		logger.Debug("clone directory '%s' already exists, checking if it's at the right commit", cloneDir)
-
-		isUpToDate, err := w.isBranchAtTargetRef(logger, c, p.HeadCommit)
-		if err != nil {
-			logger.Warn("will re-clone repo, could not determine if was at correct commit: %v", err)
-			return cloneDir, w.forceClone(logger, c)
-		}
-		if isUpToDate {
-			logger.Info("repo is at correct commit %q so will not re-clone", p.HeadCommit)
-			return cloneDir, nil
-		}
-		if !w.remoteHasBranch(logger, c, p.BaseBranch) {
-			logger.Info("repo appears to have changed base branch, must reclone")
-			return cloneDir, w.forceClone(logger, c)
-		}
-		logger.Info("repo was already cloned but branch is not at correct commit, updating to %q", p.HeadCommit)
-		return cloneDir, w.updateToRef(logger, c, p.HeadCommit)
+	ok, err := w.attemptReuseCloneDir(logger, c, cloneDir)
+	if ok && err == nil {
+		return cloneDir, nil
 	}
-
-	// Otherwise we clone the repo.
+	if err != nil {
+		logger.Err("An error occurred attempting to reuse the clone dir, falling back to forced clone. This is likely a bug please report: %v", err)
+	}
 	return cloneDir, w.forceClone(logger, c)
+}
+
+// attemptReuseCloneDir tries to reuse an existing cloneDir.
+//
+// It returns:
+// - (true, nil) → reuse succeeded; caller should use this cloneDir directly
+// - (false, nil) → reuse was not possible for an expected reason; caller should force clone
+// - (false, err) → an unexpected error occurred; caller should log the error and force clone
+func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wrappedGitContext, cloneDir string) (bool, error) {
+	// If the directory doesn't exist yet, surely we can't reuse it
+	if _, err := os.Stat(cloneDir); err != nil {
+		return false, nil
+	}
+	logger.Debug("clone directory '%s' already exists, checking if it's at the right commit", cloneDir)
+
+	isUpToDate, err := w.isBranchAtTargetRef(logger, c, c.pr.HeadCommit)
+	if err != nil {
+		return false, err
+	}
+	if isUpToDate {
+		logger.Info("repo is at correct commit %q so will not re-clone", c.pr.HeadCommit)
+		return true, nil
+	}
+	if !w.remoteHasBranch(logger, c, c.pr.BaseBranch) {
+		logger.Info("repo appears to have changed base branch, must reclone")
+		return false, nil
+	}
+	logger.Info("repo was already cloned but branch is not at correct commit, updating to %q", c.pr.HeadCommit)
+	err = w.updateToRef(logger, c, c.pr.HeadCommit)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // MergeAgain merges again with upstream if we are using the merge checkout strategy,
@@ -164,7 +181,7 @@ func (w *FileWorkspace) MergeAgain(
 
 	c := wrappedGitContext{cloneDir, headRepo, p}
 	if w.recheckDiverged(logger, p, headRepo, cloneDir) {
-		logger.Info("base branch has been updated, using merge strategy and will merge again")
+		logger.Info("base branch may have been updated, using merge strategy and will merge again")
 		return true, w.mergeAgain(logger, c)
 	}
 	return false, nil
@@ -175,8 +192,8 @@ func (w *FileWorkspace) MergeAgain(
 // This matters in the case of the merge checkout strategy because after
 // cloning the repo and doing the merge, it's possible main was updated
 // and we have to perform a new merge.
-// If there are any errors we return false since we prefer things to succeed
-// vs. stopping the plan/apply.
+// If there are any errors we return true since we prefer to assume divergence
+// for safety.
 func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that main has diverged if we're using
@@ -210,7 +227,7 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Warn("getting remote update failed: %s", string(output))
-			return false
+			return true
 		}
 	}
 
@@ -229,7 +246,7 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	outputStatusFetch, err := statusFetchCmd.CombinedOutput()
 	if err != nil {
 		logger.Warn("fetching repo has failed: %s", string(outputStatusFetch))
-		return false
+		return true
 	}
 
 	// Check if remote main branch has diverged.
@@ -238,7 +255,7 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
 	if err != nil {
 		logger.Warn("getting repo status has failed: %s", string(outputStatusUno))
-		return false
+		return true
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
 	return hasDiverged
