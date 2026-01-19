@@ -286,7 +286,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 }
 
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
-	cmds, cc, err := request.getCommands(ctx, command.Plan, a.ProjectCommandBuilder.BuildApplyCommands)
+	cmds, cc, err := request.getCommands(ctx, command.Apply, a.ProjectCommandBuilder.BuildApplyCommands)
 	if err != nil {
 		return nil, err
 	}
