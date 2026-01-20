@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -113,6 +114,10 @@ func New(dataDir string) (*BoltDB, error) {
 
 		return nil
 	})
+
+	if err != nil {
+		log.Printf("warning: failed to migrate BoltDB lock keys: %v", err)
+	}
 
 	return &BoltDB{
 		db:                    db,
