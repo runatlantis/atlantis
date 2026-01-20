@@ -57,8 +57,8 @@ func NewClient(database db.Database) *Client {
 	}
 }
 
-// KeyRegex matches and captures {repoFullName}/{path}/{workspace}/{projectName} where path can have multiple /'s in it.
-var KeyRegex = regexp.MustCompile(`^(.*?\/.*?)\/(.*)\/(.*)\/(.*)$`)
+// keyRegex matches and captures {repoFullName}/{path}/{workspace}/{projectName} where path can have multiple /'s in it.
+var keyRegex = regexp.MustCompile(`^(.*?\/.*?)\/(.*)\/(.*)\/(.*)$`)
 
 // TryLock attempts to acquire a lock to a project and workspace.
 func (c *Client) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error) {
@@ -130,7 +130,7 @@ func (c *Client) key(p models.Project, workspace string) string {
 }
 
 func IsCurrentLocking(key string) ([]string, error) {
-	matches := KeyRegex.FindStringSubmatch(key)
+	matches := keyRegex.FindStringSubmatch(key)
 	if len(matches) != 5 {
 		return []string{}, errors.New("invalid key format")
 	}
