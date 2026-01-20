@@ -4,6 +4,8 @@
 package command
 
 import (
+	"encoding/json"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -92,4 +94,61 @@ func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 // IsSuccessful returns true if this project result had no errors.
 func (p ProjectResult) IsSuccessful() bool {
 	return p.PlanSuccess != nil || (p.PolicyCheckResults != nil && p.Error == nil && p.Failure == "") || p.ApplySuccess != ""
+}
+
+// MarshalJSON implements custom JSON marshaling to properly serialize the Error field.
+func (p ProjectCommandOutput) MarshalJSON() ([]byte, error) {
+	type Alias ProjectCommandOutput
+	var errMsg *string
+	if p.Error != nil {
+		msg := p.Error.Error()
+		errMsg = &msg
+	}
+	return json.Marshal(&struct {
+		Error *string `json:"Error"`
+		*Alias
+	}{
+		Error: errMsg,
+		Alias: (*Alias)(&p),
+	})
+}
+
+// MarshalJSON implements custom JSON marshaling for ProjectResult to properly serialize all fields including Error.
+func (p ProjectResult) MarshalJSON() ([]byte, error) {
+	var errMsg *string
+	if p.Error != nil {
+		msg := p.Error.Error()
+		errMsg = &msg
+	}
+	return json.Marshal(&struct {
+		Error              *string                    `json:"Error"`
+		Failure            string                     `json:"Failure"`
+		PlanSuccess        *models.PlanSuccess        `json:"PlanSuccess"`
+		PolicyCheckResults *models.PolicyCheckResults `json:"PolicyCheckResults"`
+		ApplySuccess       string                     `json:"ApplySuccess"`
+		VersionSuccess     string                     `json:"VersionSuccess"`
+		ImportSuccess      *models.ImportSuccess      `json:"ImportSuccess"`
+		StateRmSuccess     *models.StateRmSuccess     `json:"StateRmSuccess"`
+		Command            Name                       `json:"Command"`
+		SubCommand         string                     `json:"SubCommand"`
+		RepoRelDir         string                     `json:"RepoRelDir"`
+		Workspace          string                     `json:"Workspace"`
+		ProjectName        string                     `json:"ProjectName"`
+		SilencePRComments  []string                   `json:"SilencePRComments"`
+	}{
+		Error:              errMsg,
+		Failure:            p.Failure,
+		PlanSuccess:        p.PlanSuccess,
+		PolicyCheckResults: p.PolicyCheckResults,
+		ApplySuccess:       p.ApplySuccess,
+		VersionSuccess:     p.VersionSuccess,
+		ImportSuccess:      p.ImportSuccess,
+		StateRmSuccess:     p.StateRmSuccess,
+		Command:            p.Command,
+		SubCommand:         p.SubCommand,
+		RepoRelDir:         p.RepoRelDir,
+		Workspace:          p.Workspace,
+		ProjectName:        p.ProjectName,
+		SilencePRComments:  p.SilencePRComments,
+	})
 }
