@@ -54,6 +54,11 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 	for _, req := range requirements {
 		switch req {
 		case raw.ApprovedRequirement:
+			// Skip approval requirement for API calls without a PR number
+			if ctx.API && ctx.Pull.Num == 0 {
+				ctx.Log.Info("skipping approval requirement for API call without PR number")
+				continue
+			}
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
 				return fmt.Sprintf("Pull request must be approved according to the project's approval rules before running %s.", cmd), nil
 			}
@@ -64,6 +69,11 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 				return fmt.Sprintf("All policies must pass for project before running %s.", cmd), nil
 			}
 		case raw.MergeableRequirement:
+			// Skip mergeable requirement for API calls without a PR number
+			if ctx.API && ctx.Pull.Num == 0 {
+				ctx.Log.Info("skipping mergeable requirement for API call without PR number")
+				continue
+			}
 			if !ctx.PullReqStatus.MergeableStatus.IsMergeable {
 				suffix := ""
 				if ctx.PullReqStatus.MergeableStatus.Reason != "" {
