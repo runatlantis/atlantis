@@ -21,13 +21,18 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 
 #### Parameters
 
-| Name       | Type    | Required | Description                              |
-|------------|---------|----------|------------------------------------------|
-| Repository | string  | Yes      | Name of the Terraform repository         |
-| Ref        | string  | Yes      | Git reference, like a branch name        |
-| Type       | string  | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Paths      | Path    | Yes      | Paths to the projects to run the plan    |
-| PR         | int     | No       | Pull Request number                      |
+| Name       | Type     | Required | Description                              |
+|------------|----------|----------|------------------------------------------|
+| Repository | string   | Yes      | Name of the Terraform repository         |
+| Ref        | string   | Yes      | Git reference, like a branch name        |
+| Type       | string   | Yes      | Type of the VCS provider (Github/Gitlab) |
+| Projects   | []string | No       | List of project names to run the plan    |
+| Paths      | []Path   | No       | Paths to the projects to run the plan    |
+| PR         | int      | No       | Pull Request number                      |
+
+::: tip NOTE
+At least one of `Projects` or `Paths` must be specified.
+:::
 
 #### Path
 
@@ -96,13 +101,18 @@ Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repo
 
 #### Parameters
 
-| Name       | Type   | Required | Description                              |
-|------------|--------|----------|------------------------------------------|
-| Repository | string | Yes      | Name of the Terraform repository         |
-| Ref        | string | Yes      | Git reference, like a branch name        |
-| Type       | string | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Paths      | Path   | Yes      | Paths to the projects to run the apply   |
-| PR         | int    | No       | Pull Request number                      |
+| Name       | Type     | Required | Description                              |
+|------------|----------|----------|------------------------------------------|
+| Repository | string   | Yes      | Name of the Terraform repository         |
+| Ref        | string   | Yes      | Git reference, like a branch name        |
+| Type       | string   | Yes      | Type of the VCS provider (Github/Gitlab) |
+| Projects   | []string | No       | List of project names to run the apply   |
+| Paths      | []Path   | No       | Paths to the projects to run the apply   |
+| PR         | int      | No       | Pull Request number                      |
+
+::: tip NOTE
+At least one of `Projects` or `Paths` must be specified.
+:::
 
 #### Path
 
