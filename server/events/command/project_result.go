@@ -4,6 +4,8 @@
 package command
 
 import (
+	"encoding/json"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -92,4 +94,58 @@ func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 // IsSuccessful returns true if this project result had no errors.
 func (p ProjectResult) IsSuccessful() bool {
 	return p.PlanSuccess != nil || (p.PolicyCheckResults != nil && p.Error == nil && p.Failure == "") || p.ApplySuccess != ""
+}
+
+// MarshalJSON implements custom JSON marshaling to properly serialize the Error field.
+// Go's error interface serializes as {} by default since it has no exported fields.
+// This method converts the error to a string pointer for proper JSON output while
+// maintaining backwards compatibility with the existing flat API response structure.
+//
+// IMPORTANT: If fields are added to ProjectCommandOutput or ProjectResult,
+// they must also be added here to ensure proper JSON serialization.
+func (p ProjectResult) MarshalJSON() ([]byte, error) {
+	// Convert error to string pointer for proper serialization
+	var errMsg *string
+	if p.Error != nil {
+		msg := p.Error.Error()
+		errMsg = &msg
+	}
+
+	// Use anonymous struct to control JSON output.
+	// This preserves the flat structure (no ProjectCommandOutput wrapper)
+	// that the embedded struct currently produces.
+	return json.Marshal(&struct {
+		// Fields from ProjectCommandOutput (embedded)
+		Error              *string                    `json:"Error"`
+		Failure            string                     `json:"Failure"`
+		PlanSuccess        *models.PlanSuccess        `json:"PlanSuccess"`
+		PolicyCheckResults *models.PolicyCheckResults `json:"PolicyCheckResults"`
+		ApplySuccess       string                     `json:"ApplySuccess"`
+		VersionSuccess     string                     `json:"VersionSuccess"`
+		ImportSuccess      *models.ImportSuccess      `json:"ImportSuccess"`
+		StateRmSuccess     *models.StateRmSuccess     `json:"StateRmSuccess"`
+
+		// Fields from ProjectResult
+		Command           Name     `json:"Command"`
+		SubCommand        string   `json:"SubCommand"`
+		RepoRelDir        string   `json:"RepoRelDir"`
+		Workspace         string   `json:"Workspace"`
+		ProjectName       string   `json:"ProjectName"`
+		SilencePRComments []string `json:"SilencePRComments"`
+	}{
+		Error:              errMsg,
+		Failure:            p.Failure,
+		PlanSuccess:        p.PlanSuccess,
+		PolicyCheckResults: p.PolicyCheckResults,
+		ApplySuccess:       p.ApplySuccess,
+		VersionSuccess:     p.VersionSuccess,
+		ImportSuccess:      p.ImportSuccess,
+		StateRmSuccess:     p.StateRmSuccess,
+		Command:            p.Command,
+		SubCommand:         p.SubCommand,
+		RepoRelDir:         p.RepoRelDir,
+		Workspace:          p.Workspace,
+		ProjectName:        p.ProjectName,
+		SilencePRComments:  p.SilencePRComments,
+	})
 }
