@@ -28,7 +28,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-var project = models.NewProject("owner/repo", "path", "")
+var project = models.NewProject("owner/repo", "path", "projectName")
 var workspace = "workspace"
 var pull = models.PullRequest{}
 var user = models.User{}
@@ -54,7 +54,7 @@ func TestTryLock_Success(t *testing.T) {
 	l := locking.NewClient(database)
 	r, err := l.TryLock(project, workspace, pull, user)
 	Ok(t, err)
-	Equals(t, locking.TryLockResponse{LockAcquired: true, CurrLock: currLock, LockKey: "owner/repo/path/workspace"}, r)
+	Equals(t, locking.TryLockResponse{LockAcquired: true, CurrLock: currLock, LockKey: "owner/repo/path/workspace/projectName"}, r)
 }
 
 func TestUnlock_InvalidKey(t *testing.T) {
@@ -72,7 +72,7 @@ func TestUnlock_Err(t *testing.T) {
 	database := mocks.NewMockDatabase()
 	When(database.Unlock(Any[models.Project](), Any[string]())).ThenReturn(nil, errExpected)
 	l := locking.NewClient(database)
-	_, err := l.Unlock("owner/repo/path/workspace")
+	_, err := l.Unlock("owner/repo/path/workspace/projectName")
 	Equals(t, err, err)
 	database.VerifyWasCalledOnce().Unlock(project, "workspace")
 }
@@ -82,7 +82,7 @@ func TestUnlock(t *testing.T) {
 	database := mocks.NewMockDatabase()
 	When(database.Unlock(Any[models.Project](), Any[string]())).ThenReturn(&pl, nil)
 	l := locking.NewClient(database)
-	lock, err := l.Unlock("owner/repo/path/workspace")
+	lock, err := l.Unlock("owner/repo/path/workspace/projectName")
 	Ok(t, err)
 	Equals(t, &pl, lock)
 }
@@ -104,7 +104,7 @@ func TestList(t *testing.T) {
 	list, err := l.List()
 	Ok(t, err)
 	Equals(t, map[string]models.ProjectLock{
-		"owner/repo/path/workspace": pl,
+		"owner/repo/path/workspace/projectName": pl,
 	}, list)
 }
 
@@ -131,7 +131,7 @@ func TestGetLock_Err(t *testing.T) {
 	database := mocks.NewMockDatabase()
 	When(database.GetLock(project, workspace)).ThenReturn(nil, errExpected)
 	l := locking.NewClient(database)
-	_, err := l.GetLock("owner/repo/path/workspace")
+	_, err := l.GetLock("owner/repo/path/workspace/projectName")
 	Equals(t, errExpected, err)
 }
 
@@ -140,7 +140,7 @@ func TestGetLock(t *testing.T) {
 	database := mocks.NewMockDatabase()
 	When(database.GetLock(project, workspace)).ThenReturn(&pl, nil)
 	l := locking.NewClient(database)
-	lock, err := l.GetLock("owner/repo/path/workspace")
+	lock, err := l.GetLock("owner/repo/path/workspace/projectName")
 	Ok(t, err)
 	Equals(t, &pl, lock)
 }
@@ -151,12 +151,12 @@ func TestTryLock_NoOpLocker(t *testing.T) {
 	l := locking.NewNoOpLocker()
 	r, err := l.TryLock(project, workspace, pull, user)
 	Ok(t, err)
-	Equals(t, locking.TryLockResponse{LockAcquired: true, CurrLock: currLock, LockKey: "owner/repo/path/workspace"}, r)
+	Equals(t, locking.TryLockResponse{LockAcquired: true, CurrLock: currLock, LockKey: "owner/repo/path/workspace/projectName"}, r)
 }
 
 func TestUnlock_NoOpLocker(t *testing.T) {
 	l := locking.NewNoOpLocker()
-	lock, err := l.Unlock("owner/repo/path/workspace")
+	lock, err := l.Unlock("owner/repo/path/workspace/projectName")
 	Ok(t, err)
 	Equals(t, &models.ProjectLock{}, lock)
 }
@@ -176,7 +176,7 @@ func TestUnlockByPull_NoOpLocker(t *testing.T) {
 
 func TestGetLock_NoOpLocker(t *testing.T) {
 	l := locking.NewNoOpLocker()
-	lock, err := l.GetLock("owner/repo/path/workspace")
+	lock, err := l.GetLock("owner/repo/path/workspace/projectName")
 	Ok(t, err)
 	var expected *models.ProjectLock
 	Equals(t, expected, lock)
@@ -284,4 +284,52 @@ func TestApplyLocker(t *testing.T) {
 			Assert(t, lock.Locked, "exp lock present")
 		})
 	})
+}
+
+func TestIsCurrentLocking_ValidKey(t *testing.T) {
+	t.Log("IsCurrentLocking should succeed with valid key format")
+	key := "owner/repo/path/workspace/projectName"
+	matches, err := locking.IsCurrentLocking(key)
+	Ok(t, err)
+	Equals(t, 5, len(matches))
+	Equals(t, "owner/repo", matches[1])
+	Equals(t, "path", matches[2])
+	Equals(t, "workspace", matches[3])
+	Equals(t, "projectName", matches[4])
+}
+
+func TestIsCurrentLocking_ValidKeyWithNestedPath(t *testing.T) {
+	t.Log("IsCurrentLocking should succeed with nested path")
+	key := "owner/repo/parent/child/path/workspace/projectName"
+	matches, err := locking.IsCurrentLocking(key)
+	Ok(t, err)
+	Equals(t, 5, len(matches))
+	Equals(t, "owner/repo", matches[1])
+	Equals(t, "parent/child/path", matches[2])
+	Equals(t, "workspace", matches[3])
+	Equals(t, "projectName", matches[4])
+}
+
+func TestIsCurrentLocking_InvalidKeyOldFormat(t *testing.T) {
+	t.Log("IsCurrentLocking should fail with old format key (3 parts)")
+	key := "owner/repo/path/workspace"
+	_, err := locking.IsCurrentLocking(key)
+	Assert(t, err != nil, "expected error for old format")
+	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected invalid key format error")
+}
+
+func TestIsCurrentLocking_InvalidKeySinglePart(t *testing.T) {
+	t.Log("IsCurrentLocking should fail with single part key")
+	key := "invalidkey"
+	_, err := locking.IsCurrentLocking(key)
+	Assert(t, err != nil, "expected error for invalid key")
+	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected invalid key format error")
+}
+
+func TestIsCurrentLocking_EmptyKey(t *testing.T) {
+	t.Log("IsCurrentLocking should fail with empty key")
+	key := ""
+	_, err := locking.IsCurrentLocking(key)
+	Assert(t, err != nil, "expected error for empty key")
+	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected invalid key format error")
 }
