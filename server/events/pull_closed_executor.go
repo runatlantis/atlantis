@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -143,14 +144,7 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 	for _, l := range locks {
 		path := l.Project.Path
 		// Check if workspace already exists to avoid duplicates
-		found := false
-		for _, ws := range workspacesByPath[path] {
-			if ws == l.Workspace {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.Contains(workspacesByPath[path], l.Workspace) {
 			workspacesByPath[path] = append(workspacesByPath[path], l.Workspace)
 		}
 	}
