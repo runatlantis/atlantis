@@ -5,6 +5,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
+//go:generate oapi-codegen -generate types,skip-prune -package models -o models/models.gen.go ../../openapi/atlantis.yaml
+
 func BuildPlanResult(result *command.Result) models.PlanResponse {
 	if result == nil {
 		noResponse := "Unexpected no response"
