@@ -26,7 +26,7 @@ const atlantisTokenHeader = "X-Atlantis-Token"
 
 type APIController struct {
 	APISecret                      []byte
-	Locker                         locking.Locker                   `validate:"required"`
+	Locker                         locking.Locker `validate:"required"`
 	DriftStorage                   drift.Storage
 	RemediationService             drift.RemediationService
 	Logger                         logging.SimpleLogging            `validate:"required"`
@@ -723,8 +723,8 @@ func (a *APIController) GetRemediationResult(w http.ResponseWriter, r *http.Requ
 		// Try to extract from path for routers that support path parameters
 		// Path format: /api/drift/remediate/{id}
 		path := r.URL.Path
-		if strings.HasPrefix(path, "/api/drift/remediate/") {
-			id = strings.TrimPrefix(path, "/api/drift/remediate/")
+		if pathID, found := strings.CutPrefix(path, "/api/drift/remediate/"); found {
+			id = pathID
 		}
 	}
 

@@ -42,9 +42,11 @@ At least one of `Projects` or `Paths` must be specified.
 
 ::: tip Non-PR Workflows (Drift Detection)
 When `PR` is omitted or set to `0`, Atlantis operates in non-PR mode. In this mode:
-- PR-specific requirements (`approved`, `mergeable`) are automatically skipped
-- Security requirements (`policies_passed`, `undiverged`) are still enforced
-- This enables drift detection and other automation workflows without an associated pull request
+
+* PR-specific requirements (`approved`, `mergeable`) are automatically skipped
+* Security requirements (`policies_passed`, `undiverged`) are still enforced
+* This enables drift detection and other automation workflows without an associated pull request
+
 :::
 
 #### Path
@@ -152,9 +154,11 @@ When an error occurs, the `Error` field contains the error message as a string:
 ```
 
 ::: tip Error Handling
-- `Error`: Contains the error message as a string when an error occurs, `null` on success
-- `Failure`: Contains a human-readable failure message, empty string on success
-- Both top-level and per-project `Error`/`Failure` fields follow this format
+
+* `Error`: Contains the error message as a string when an error occurs, `null` on success
+* `Failure`: Contains a human-readable failure message, empty string on success
+* Both top-level and per-project `Error`/`Failure` fields follow this format
+
 :::
 
 ### POST /api/apply
@@ -180,9 +184,11 @@ At least one of `Projects` or `Paths` must be specified.
 
 ::: tip Non-PR Workflows (Drift Detection)
 When `PR` is omitted or set to `0`, Atlantis operates in non-PR mode. In this mode:
-- PR-specific requirements (`approved`, `mergeable`) are automatically skipped
-- Security requirements (`policies_passed`, `undiverged`) are still enforced
-- This enables drift detection and other automation workflows without an associated pull request
+
+* PR-specific requirements (`approved`, `mergeable`) are automatically skipped
+* Security requirements (`policies_passed`, `undiverged`) are still enforced
+* This enables drift detection and other automation workflows without an associated pull request
+
 :::
 
 #### Path
@@ -249,8 +255,10 @@ Error responses follow the same format as the plan endpoint. See the [plan error
 Execute drift remediation on the specified repository. This endpoint allows you to run plan-only (to preview remediation) or auto-apply (to automatically fix drift) operations for projects with detected drift.
 
 ::: tip Prerequisites
+
 * Drift detection storage must be enabled on the Atlantis server
 * The repository must be in the allowed repository list (if configured)
+
 :::
 
 #### Parameters
@@ -266,8 +274,10 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 | drift_only | boolean  | No       | If true, only remediate projects with detected drift                     |
 
 ::: tip Actions
-- `plan`: Runs a plan to preview what would change (default, non-destructive)
-- `apply`: Runs both plan and apply to automatically fix drift (destructive)
+
+* `plan`: Runs a plan to preview what would change (default, non-destructive)
+* `apply`: Runs both plan and apply to automatically fix drift (destructive)
+
 :::
 
 #### Sample Request (Plan Only)
@@ -433,13 +443,13 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 
 #### Error Responses
 
-| Status Code | Description                                           |
-|-------------|-------------------------------------------------------|
+| Status Code | Description                                                                |
+|-------------|----------------------------------------------------------------------------|
 | 400         | Invalid request (missing required fields, invalid action, or API disabled) |
-| 401         | Invalid or missing `X-Atlantis-Token` header          |
-| 403         | Repository not in allowed list                        |
-| 503         | Drift remediation is not enabled on the server        |
-| 500         | Internal error during remediation                     |
+| 401         | Invalid or missing `X-Atlantis-Token` header                               |
+| 403         | Repository not in allowed list                                             |
+| 503         | Drift remediation is not enabled on the server                             |
+| 500         | Internal error during remediation                                          |
 
 ### POST /api/drift/detect
 
@@ -448,18 +458,20 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 Trigger drift detection for projects in a repository. This endpoint initiates a plan operation to detect infrastructure drift without requiring a pull request. Results are stored for later retrieval via the drift status endpoints.
 
 ::: tip Prerequisites
+
 * Drift detection storage must be enabled on the Atlantis server
+
 :::
 
 #### Parameters
 
-| Name       | Type                  | Required | Description                                              |
-|------------|-----------------------|----------|----------------------------------------------------------|
-| repository | string                | Yes      | Full repository name (e.g., `owner/repo`)                |
-| ref        | string                | Yes      | Git reference (branch/tag/commit) to check for drift     |
-| type       | string                | Yes      | Type of the VCS provider (`Github`/`Gitlab`)             |
-| projects   | []string              | No       | List of project names to check. If empty, all are checked |
-| paths      | []DriftDetectionPath  | No       | List of paths to check. If empty, project names are used |
+| Name       | Type                 | Required | Description                                                |
+|------------|----------------------|----------|------------------------------------------------------------|
+| repository | string               | Yes      | Full repository name (e.g., `owner/repo`)                  |
+| ref        | string               | Yes      | Git reference (branch/tag/commit) to check for drift       |
+| type       | string               | Yes      | Type of the VCS provider (`Github`/`Gitlab`)               |
+| projects   | []string             | No       | List of project names to check. If empty, all are checked  |
+| paths      | []DriftDetectionPath | No       | List of paths to check. If empty, project names are used   |
 
 #### DriftDetectionPath
 
