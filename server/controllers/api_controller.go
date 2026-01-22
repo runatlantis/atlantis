@@ -45,6 +45,18 @@ type APIController struct {
 	CommitStatusUpdater            events.CommitStatusUpdater            `validate:"required"`
 	// SilenceVCSStatusNoProjects is whether API should set commit status if no projects are found
 	SilenceVCSStatusNoProjects bool
+
+	// apiMiddleware provides common authentication and response utilities.
+	// Initialized lazily via getAPIMiddleware().
+	apiMiddleware *APIMiddleware
+}
+
+// getAPIMiddleware returns the APIMiddleware, initializing it lazily.
+func (a *APIController) getAPIMiddleware() *APIMiddleware {
+	if a.apiMiddleware == nil {
+		a.apiMiddleware = NewAPIMiddleware(a.APISecret, a.Logger)
+	}
+	return a.apiMiddleware
 }
 
 type APIRequest struct {
@@ -86,6 +98,8 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.
 	return cmds, cc, nil
 }
 
+// apiReportError is deprecated - use APIResponder methods instead.
+// Kept for backwards compatibility during migration.
 func (a *APIController) apiReportError(w http.ResponseWriter, code int, err error) {
 	response, _ := json.Marshal(map[string]string{
 		"error": err.Error(),
@@ -93,59 +107,76 @@ func (a *APIController) apiReportError(w http.ResponseWriter, code int, err erro
 	a.respond(w, logging.Warn, code, "%s", string(response))
 }
 
+// apiHandleParseError maps HTTP status codes from apiParseAndValidate to API responses.
+func (a *APIController) apiHandleParseError(w http.ResponseWriter, r *http.Request, responder *APIResponder, code int, err error) {
+	switch code {
+	case http.StatusBadRequest:
+		// Validation or parsing errors
+		responder.ValidationFailed(w, r, err.Error())
+	case http.StatusUnauthorized:
+		responder.Unauthorized(w, r, err.Error())
+	case http.StatusForbidden:
+		responder.Forbidden(w, r, err.Error())
+	default:
+		responder.InternalError(w, r, err)
+	}
+}
+
 func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
 	request, ctx, code, err := a.apiParseAndValidate(r)
 	if err != nil {
-		a.apiReportError(w, code, err)
+		a.apiHandleParseError(w, r, responder, code, err)
 		return
 	}
 
 	err = a.apiSetup(ctx, command.Plan)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 
 	result, err := a.apiPlan(request, ctx)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+
+	// Convert to API response format
+	apiResult := NewCommandResultAPI(result, command.Plan.String())
+
+	// Determine HTTP status based on result
+	httpCode := http.StatusOK
 	if result.HasErrors() {
-		code = http.StatusInternalServerError
+		httpCode = http.StatusInternalServerError
 	}
 
-	// TODO: make a better response
-	response, err := json.Marshal(result)
-	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
-		return
-	}
-	a.respond(w, logging.Warn, code, "%s", string(response))
+	responder.Success(w, r, httpCode, apiResult)
 }
 
 func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
 	request, ctx, code, err := a.apiParseAndValidate(r)
 	if err != nil {
-		a.apiReportError(w, code, err)
+		a.apiHandleParseError(w, r, responder, code, err)
 		return
 	}
 
 	err = a.apiSetup(ctx, command.Apply)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 
 	// We must first make the plan for all projects
 	_, err = a.apiPlan(request, ctx)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
@@ -153,21 +184,24 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	// We can now prepare and run the apply step
 	result, err := a.apiApply(request, ctx)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
-	}
-	if result.HasErrors() {
-		code = http.StatusInternalServerError
 	}
 
-	response, err := json.Marshal(result)
-	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
-		return
+	// Convert to API response format
+	apiResult := NewCommandResultAPI(result, command.Apply.String())
+
+	// Determine HTTP status based on result
+	httpCode := http.StatusOK
+	if result.HasErrors() {
+		httpCode = http.StatusInternalServerError
 	}
-	a.respond(w, logging.Warn, code, "%s", string(response))
+
+	responder.Success(w, r, httpCode, apiResult)
 }
 
+// LockDetail is deprecated - use LockDetailAPI instead.
+// Kept for backwards compatibility during migration.
 type LockDetail struct {
 	Name            string
 	ProjectName     string
@@ -180,41 +214,26 @@ type LockDetail struct {
 	Time            time.Time
 }
 
+// ListLocksResult is deprecated - use ListLocksResultAPI instead.
+// Kept for backwards compatibility during migration.
 type ListLocksResult struct {
 	Locks []LockDetail
 }
 
 func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
 	locks, err := a.Locker.List()
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 
-	result := ListLocksResult{}
-	for name, lock := range locks {
-		lockDetail := LockDetail{
-			name,
-			lock.Project.ProjectName,
-			lock.Project.RepoFullName,
-			lock.Project.Path,
-			lock.Pull.Num,
-			lock.Pull.URL,
-			lock.User.Username,
-			lock.Workspace,
-			lock.Time,
-		}
-		result.Locks = append(result.Locks, lockDetail)
-	}
+	// Convert to API response format
+	apiResult := NewListLocksResultAPI(locks)
 
-	response, err := json.Marshal(result)
-	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
-		return
-	}
-	a.respond(w, logging.Warn, http.StatusOK, "%s", string(response))
+	responder.Success(w, r, http.StatusOK, apiResult)
 }
 
 // DriftStatus returns the drift status for a repository.
@@ -224,18 +243,20 @@ func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 //   - project: optional, filter by project name
 //   - workspace: optional, filter by workspace
 func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
 	// Check if drift storage is configured
 	if a.DriftStorage == nil {
-		a.apiReportError(w, http.StatusServiceUnavailable, fmt.Errorf("drift detection is not enabled"))
+		responder.ServiceUnavailable(w, r, "drift detection is not enabled")
 		return
 	}
 
 	// Get query parameters
 	repository := r.URL.Query().Get("repository")
 	if repository == "" {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("repository parameter is required"))
+		responder.ValidationFailed(w, r, "missing required parameter",
+			ValidationError{Field: "repository", Message: "repository parameter is required"})
 		return
 	}
 
@@ -247,19 +268,15 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 	// Retrieve drift results from storage
 	drifts, err := a.DriftStorage.Get(repository, opts)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 
-	// Build response
-	result := models.NewDriftStatusResponse(repository, drifts)
+	// Build response using API DTO
+	internalResult := models.NewDriftStatusResponse(repository, drifts)
+	apiResult := NewDriftStatusAPI(internalResult)
 
-	response, err := json.Marshal(result)
-	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
-		return
-	}
-	a.respond(w, logging.Info, http.StatusOK, "%s", string(response))
+	responder.Success(w, r, http.StatusOK, apiResult)
 }
 
 func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) error {
@@ -448,74 +465,67 @@ func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, res
 // It executes drift remediation (plan or apply) for the specified projects.
 // This is an authenticated endpoint that requires the API secret.
 func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
-	// Check API is enabled
-	if len(a.APISecret) == 0 {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled"))
-		return
-	}
-
-	// Validate the secret token
-	secret := r.Header.Get(atlantisTokenHeader)
-	if secret != string(a.APISecret) {
-		a.apiReportError(w, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader))
+	// Authenticate
+	if !middleware.RequireAuth(w, r) {
 		return
 	}
 
 	// Check if remediation service is configured
 	if a.RemediationService == nil {
-		a.apiReportError(w, http.StatusServiceUnavailable, fmt.Errorf("drift remediation is not enabled"))
+		responder.ServiceUnavailable(w, r, "drift remediation is not enabled")
 		return
 	}
 
 	// Parse the JSON payload
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to read request: %v", err))
+		responder.ValidationFailed(w, r, "failed to read request body")
 		return
 	}
 
 	var request models.RemediationRequest
 	if err = json.Unmarshal(bytes, &request); err != nil {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to parse request: %v", err))
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse JSON: %v", err))
 		return
 	}
 
-	// Validate required fields
-	if request.Repository == "" {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("repository is required"))
+	// Validate required fields using the model's Validate method
+	if validationErrors := request.Validate(); len(validationErrors) > 0 {
+		fields := make([]ValidationError, 0, len(validationErrors))
+		for _, fe := range validationErrors {
+			fields = append(fields, ValidationError{Field: fe.Field, Message: fe.Message})
+		}
+		responder.ValidationFailed(w, r, "validation failed", fields...)
 		return
 	}
-	if request.Ref == "" {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ref is required"))
-		return
-	}
-	if request.Type == "" {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("type is required"))
-		return
-	}
+
+	// Apply default values
+	request.ApplyDefaults()
 
 	// Check if the repo is allowlisted
 	VCSHostType, err := models.NewVCSHostType(request.Type)
 	if err != nil {
-		a.apiReportError(w, http.StatusBadRequest, err)
+		responder.ValidationFailed(w, r, "invalid VCS type",
+			ValidationError{Field: "type", Message: err.Error()})
 		return
 	}
 	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, request.Repository)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
 		return
 	}
 
 	baseRepo, err := a.Parser.ParseAPIPlanRequest(VCSHostType, request.Repository, cloneURL)
 	if err != nil {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to parse request: %v", err))
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse repository: %v", err))
 		return
 	}
 
 	if !a.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
-		a.apiReportError(w, http.StatusForbidden, fmt.Errorf("repo not allowlisted"))
+		responder.Forbidden(w, r, "repository is not in the allowlist")
 		return
 	}
 
@@ -529,22 +539,20 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 	// Execute remediation
 	result, err := a.RemediationService.Remediate(request, executor)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 
-	// Return result
-	response, err := json.Marshal(result)
-	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
-		return
-	}
+	// Convert to API DTO and return
+	apiResult := NewRemediationResultAPI(result)
 
 	code := http.StatusOK
 	if result.Status == models.RemediationStatusFailed {
 		code = http.StatusInternalServerError
+	} else if result.Status == models.RemediationStatusPartial {
+		code = http.StatusMultiStatus // 207 - some projects succeeded, some failed
 	}
-	a.respond(w, logging.Info, code, "%s", string(response))
+	responder.Success(w, r, code, apiResult)
 }
 
 // apiRemediationExecutor implements drift.RemediationExecutor using the API controller's
@@ -696,24 +704,17 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 // It retrieves a specific remediation result by ID.
 // This is an authenticated endpoint that requires the API secret.
 func (a *APIController) GetRemediationResult(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
-	// Check API is enabled
-	if len(a.APISecret) == 0 {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled"))
-		return
-	}
-
-	// Validate the secret token
-	secret := r.Header.Get(atlantisTokenHeader)
-	if secret != string(a.APISecret) {
-		a.apiReportError(w, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader))
+	// Authenticate
+	if !middleware.RequireAuth(w, r) {
 		return
 	}
 
 	// Check if remediation service is configured
 	if a.RemediationService == nil {
-		a.apiReportError(w, http.StatusServiceUnavailable, fmt.Errorf("drift remediation is not enabled"))
+		responder.ServiceUnavailable(w, r, "drift remediation is not enabled")
 		return
 	}
 
@@ -729,25 +730,21 @@ func (a *APIController) GetRemediationResult(w http.ResponseWriter, r *http.Requ
 	}
 
 	if id == "" {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("id parameter is required"))
+		responder.ValidationFailed(w, r, "missing required parameter",
+			ValidationError{Field: "id", Message: "id parameter is required"})
 		return
 	}
 
 	// Get the result
 	result, err := a.RemediationService.GetResult(id)
 	if err != nil {
-		a.apiReportError(w, http.StatusNotFound, err)
+		responder.NotFound(w, r, fmt.Sprintf("remediation result not found: %v", err))
 		return
 	}
 
-	// Return result
-	response, err := json.Marshal(result)
-	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	a.respond(w, logging.Info, http.StatusOK, "%s", string(response))
+	// Convert to API DTO and return
+	apiResult := NewRemediationResultAPI(result)
+	responder.Success(w, r, http.StatusOK, apiResult)
 }
 
 // ListRemediationResults handles GET /api/drift/remediate requests.
@@ -758,31 +755,25 @@ func (a *APIController) GetRemediationResult(w http.ResponseWriter, r *http.Requ
 //
 // This is an authenticated endpoint that requires the API secret.
 func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
-	// Check API is enabled
-	if len(a.APISecret) == 0 {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled"))
-		return
-	}
-
-	// Validate the secret token
-	secret := r.Header.Get(atlantisTokenHeader)
-	if secret != string(a.APISecret) {
-		a.apiReportError(w, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader))
+	// Authenticate
+	if !middleware.RequireAuth(w, r) {
 		return
 	}
 
 	// Check if remediation service is configured
 	if a.RemediationService == nil {
-		a.apiReportError(w, http.StatusServiceUnavailable, fmt.Errorf("drift remediation is not enabled"))
+		responder.ServiceUnavailable(w, r, "drift remediation is not enabled")
 		return
 	}
 
 	// Get query parameters
 	repository := r.URL.Query().Get("repository")
 	if repository == "" {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("repository parameter is required"))
+		responder.ValidationFailed(w, r, "missing required parameter",
+			ValidationError{Field: "repository", Message: "repository parameter is required"})
 		return
 	}
 
@@ -790,7 +781,8 @@ func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Re
 	limit := 10
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
-			a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("invalid limit parameter: %v", err))
+			responder.ValidationFailed(w, r, "invalid limit parameter",
+				ValidationError{Field: "limit", Message: "must be a positive integer"})
 			return
 		}
 		if limit <= 0 {
@@ -804,102 +796,88 @@ func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Re
 	// Get results
 	results, err := a.RemediationService.ListResults(repository, limit)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 
-	// Return results
-	responseData := struct {
-		Repository string                      `json:"repository"`
-		Count      int                         `json:"count"`
-		Results    []*models.RemediationResult `json:"results"`
-	}{
+	// Convert to API DTOs
+	apiResults := make([]RemediationResultAPI, 0, len(results))
+	for _, r := range results {
+		apiResults = append(apiResults, NewRemediationResultAPI(r))
+	}
+
+	// Build response using DTO
+	response := RemediationListAPI{
 		Repository: repository,
-		Count:      len(results),
-		Results:    results,
+		Count:      len(apiResults),
+		Results:    apiResults,
 	}
 
-	response, err := json.Marshal(responseData)
-	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	a.respond(w, logging.Info, http.StatusOK, "%s", string(response))
+	responder.Success(w, r, http.StatusOK, response)
 }
 
 // DetectDrift handles POST /api/drift/detect requests.
 // It triggers drift detection by running plans for the specified projects.
 // This is an authenticated endpoint that requires the API secret.
 func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
-	// Check API is enabled
-	if len(a.APISecret) == 0 {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled"))
-		return
-	}
-
-	// Validate the secret token
-	secret := r.Header.Get(atlantisTokenHeader)
-	if secret != string(a.APISecret) {
-		a.apiReportError(w, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader))
+	// Authenticate
+	if !middleware.RequireAuth(w, r) {
 		return
 	}
 
 	// Check if drift storage is configured
 	if a.DriftStorage == nil {
-		a.apiReportError(w, http.StatusServiceUnavailable, fmt.Errorf("drift detection is not enabled"))
+		responder.ServiceUnavailable(w, r, "drift detection is not enabled")
 		return
 	}
 
 	// Parse the JSON payload
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to read request: %v", err))
+		responder.ValidationFailed(w, r, "failed to read request body")
 		return
 	}
 
 	var request models.DriftDetectionRequest
 	if err = json.Unmarshal(bytes, &request); err != nil {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to parse request: %v", err))
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse JSON: %v", err))
 		return
 	}
 
-	// Validate required fields
-	if request.Repository == "" {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("repository is required"))
-		return
-	}
-	if request.Ref == "" {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ref is required"))
-		return
-	}
-	if request.Type == "" {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("type is required"))
+	// Validate required fields using the model's Validate method
+	if validationErrors := request.Validate(); len(validationErrors) > 0 {
+		fields := make([]ValidationError, 0, len(validationErrors))
+		for _, fe := range validationErrors {
+			fields = append(fields, ValidationError{Field: fe.Field, Message: fe.Message})
+		}
+		responder.ValidationFailed(w, r, "validation failed", fields...)
 		return
 	}
 
 	// Check if the repo is allowlisted
 	VCSHostType, err := models.NewVCSHostType(request.Type)
 	if err != nil {
-		a.apiReportError(w, http.StatusBadRequest, err)
+		responder.ValidationFailed(w, r, "invalid VCS type",
+			ValidationError{Field: "type", Message: err.Error()})
 		return
 	}
 	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, request.Repository)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
 		return
 	}
 
 	baseRepo, err := a.Parser.ParseAPIPlanRequest(VCSHostType, request.Repository, cloneURL)
 	if err != nil {
-		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to parse request: %v", err))
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse repository: %v", err))
 		return
 	}
 
 	if !a.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
-		a.apiReportError(w, http.StatusForbidden, fmt.Errorf("repo not allowlisted"))
+		responder.Forbidden(w, r, "repository is not in the allowlist")
 		return
 	}
 
@@ -939,13 +917,13 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 
 	// Setup and run plan
 	if err := a.apiSetup(ctx, command.Plan); err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, fmt.Errorf("setup failed: %v", err))
+		responder.InternalError(w, r, fmt.Errorf("setup failed: %w", err))
 		return
 	}
 
 	result, err := a.apiPlan(apiRequest, ctx)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
@@ -963,14 +941,14 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if pr.Error != nil {
+			projectDrift.Error = pr.Error.Error()
 			projectDrift.Drift = models.DriftSummary{
 				HasDrift: false,
-				Summary:  fmt.Sprintf("Error: %v", pr.Error),
 			}
 		} else if pr.Failure != "" {
+			projectDrift.Error = pr.Failure
 			projectDrift.Drift = models.DriftSummary{
 				HasDrift: false,
-				Summary:  fmt.Sprintf("Failure: %s", pr.Failure),
 			}
 		} else if pr.PlanSuccess != nil {
 			projectDrift.Drift = models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
@@ -984,16 +962,12 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		detectionResult.AddProject(projectDrift)
 	}
 
-	// Return detection result
-	response, err := json.Marshal(detectionResult)
-	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
-		return
-	}
+	// Convert to API DTO and return
+	apiResult := NewDriftDetectionResultAPI(detectionResult)
 
 	code := http.StatusOK
 	if result.HasErrors() {
-		code = http.StatusInternalServerError
+		code = http.StatusMultiStatus // 207 - some projects may have failed
 	}
-	a.respond(w, logging.Info, code, "%s", string(response))
+	responder.Success(w, r, code, apiResult)
 }

@@ -24,6 +24,11 @@ type DriftSummary struct {
 	ChangesOutside bool `json:"changes_outside"`
 }
 
+// TotalChanges returns the total number of resource changes.
+func (d DriftSummary) TotalChanges() int {
+	return d.ToAdd + d.ToChange + d.ToDestroy + d.ToImport
+}
+
 // NewDriftSummaryFromPlanStats creates a DriftSummary from PlanSuccessStats.
 // This leverages the existing plan output parsing infrastructure.
 func NewDriftSummaryFromPlanStats(stats PlanSuccessStats, summary string) DriftSummary {
@@ -108,15 +113,34 @@ type DriftDetectionPath struct {
 // DriftDetectionRequest is the API request for POST /api/drift/detect.
 type DriftDetectionRequest struct {
 	// Repository is the full repository name (owner/repo). Required.
-	Repository string `json:"repository" validate:"required"`
+	Repository string `json:"repository"`
 	// Ref is the git reference (branch/tag/commit) to check for drift. Required.
-	Ref string `json:"ref" validate:"required"`
+	Ref string `json:"ref"`
 	// Type is the VCS provider type (Github/Gitlab). Required.
-	Type string `json:"type" validate:"required"`
+	Type string `json:"type"`
 	// Projects is a list of project names to check. If empty, all projects are checked.
 	Projects []string `json:"projects,omitempty"`
 	// Paths is a list of paths to check. If empty, project names are used.
 	Paths []DriftDetectionPath `json:"paths,omitempty"`
+}
+
+// Validate checks the request and returns any validation errors.
+func (r *DriftDetectionRequest) Validate() []FieldError {
+	var errors []FieldError
+
+	if r.Repository == "" {
+		errors = append(errors, FieldError{Field: "repository", Message: "repository is required"})
+	}
+	if r.Ref == "" {
+		errors = append(errors, FieldError{Field: "ref", Message: "ref is required"})
+	}
+	if r.Type == "" {
+		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
+	} else if r.Type != "Github" && r.Type != "Gitlab" && r.Type != "Bitbucket" && r.Type != "AzureDevops" && r.Type != "Gitea" {
+		errors = append(errors, FieldError{Field: "type", Message: "type must be one of: Github, Gitlab, Bitbucket, AzureDevops, Gitea"})
+	}
+
+	return errors
 }
 
 // DriftDetectionResult is the API response for POST /api/drift/detect.

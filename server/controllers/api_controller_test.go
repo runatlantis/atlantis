@@ -208,27 +208,13 @@ func TestAPIController_Apply(t *testing.T) {
 
 func TestAPIController_ListLocks(t *testing.T) {
 	ac, _, _ := setup(t)
-	time := time.Now()
-	expected := controllers.ListLocksResult{[]controllers.LockDetail{
-		{
-			Name:            "lock-id",
-			ProjectName:     "terraform",
-			ProjectRepo:     "owner/repo",
-			ProjectRepoPath: "/path",
-			PullID:          123,
-			PullURL:         "url",
-			User:            "jdoe",
-			Workspace:       "default",
-			Time:            time,
-		},
-	},
-	}
+	lockTime := time.Now()
 	mockLock := models.ProjectLock{
 		Project:   models.Project{ProjectName: "terraform", RepoFullName: "owner/repo", Path: "/path"},
 		Pull:      models.PullRequest{Num: 123, URL: "url", Author: "lkysow"},
 		User:      models.User{Username: "jdoe"},
 		Workspace: "default",
-		Time:      time,
+		Time:      lockTime,
 	}
 	mockLocks := map[string]models.ProjectLock{
 		"lock-id": mockLock,
@@ -238,28 +224,44 @@ func TestAPIController_ListLocks(t *testing.T) {
 	req, _ := http.NewRequest("GET", "", nil)
 	w := httptest.NewRecorder()
 	ac.ListLocks(w, req)
-	response, _ := io.ReadAll(w.Result().Body)
-	var result controllers.ListLocksResult
-	err := json.Unmarshal(response, &result)
-	Ok(t, err)
-	Equals(t, expected, result)
+	Equals(t, http.StatusOK, w.Code)
+
+	responseBody, _ := io.ReadAll(w.Result().Body)
+	var result controllers.ListLocksResultAPI
+	parseAPIResponse(t, responseBody, &result)
+
+	// Verify the lock details
+	Assert(t, len(result.Locks) == 1, "expected 1 lock")
+	Equals(t, 1, result.TotalCount)
+	lock := result.Locks[0]
+	Equals(t, "lock-id", lock.ID)
+	Equals(t, "terraform", lock.ProjectName)
+	Equals(t, "owner/repo", lock.Repository)
+	Equals(t, "/path", lock.Path)
+	Equals(t, "default", lock.Workspace)
+	Equals(t, 123, lock.PullRequestID)
+	Equals(t, "url", lock.PullRequestURL)
+	Equals(t, "jdoe", lock.LockedBy)
 }
 
 func TestAPIController_ListLocksEmpty(t *testing.T) {
 	ac, _, _ := setup(t)
 
-	expected := controllers.ListLocksResult{}
 	mockLocks := map[string]models.ProjectLock{}
 	When(ac.Locker.List()).ThenReturn(mockLocks, nil)
 
 	req, _ := http.NewRequest("GET", "", nil)
 	w := httptest.NewRecorder()
 	ac.ListLocks(w, req)
-	response, _ := io.ReadAll(w.Result().Body)
-	var result controllers.ListLocksResult
-	err := json.Unmarshal(response, &result)
-	Ok(t, err)
-	Equals(t, expected, result)
+	Equals(t, http.StatusOK, w.Code)
+
+	responseBody, _ := io.ReadAll(w.Result().Body)
+	var result controllers.ListLocksResultAPI
+	parseAPIResponse(t, responseBody, &result)
+
+	// Verify empty result
+	Equals(t, 0, len(result.Locks))
+	Equals(t, 0, result.TotalCount)
 }
 
 func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
@@ -327,6 +329,31 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 	return ac, projectCommandBuilder, projectCommandRunner
 }
 
+// parseAPIResponse is a helper to extract data from the API envelope response.
+func parseAPIResponse(t *testing.T, body []byte, target any) {
+	t.Helper()
+	var envelope controllers.APIResponse
+	err := json.Unmarshal(body, &envelope)
+	Ok(t, err)
+	Assert(t, envelope.Success, "expected success response")
+
+	// Re-marshal data to unmarshal into target type
+	dataBytes, err := json.Marshal(envelope.Data)
+	Ok(t, err)
+	err = json.Unmarshal(dataBytes, target)
+	Ok(t, err)
+}
+
+// parseAPIError is a helper to extract error from the API envelope response.
+func parseAPIError(t *testing.T, body []byte) *controllers.APIError {
+	t.Helper()
+	var envelope controllers.APIResponse
+	err := json.Unmarshal(body, &envelope)
+	Ok(t, err)
+	Assert(t, !envelope.Success, "expected error response")
+	return envelope.Error
+}
+
 func TestAPIController_DriftStatus(t *testing.T) {
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
@@ -362,12 +389,11 @@ func TestAPIController_DriftStatus(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	response, _ := io.ReadAll(w.Result().Body)
-	var result models.DriftStatusResponse
-	err := json.Unmarshal(response, &result)
-	Ok(t, err)
+	var result controllers.DriftStatusAPI
+	parseAPIResponse(t, response, &result)
 	Equals(t, "owner/repo", result.Repository)
-	Equals(t, 1, result.TotalProjects)
-	Equals(t, 1, result.ProjectsWithDrift)
+	Equals(t, 1, result.Summary.TotalProjects)
+	Equals(t, 1, result.Summary.ProjectsWithDrift)
 }
 
 func TestAPIController_DriftStatus_NoStorage(t *testing.T) {
@@ -387,6 +413,10 @@ func TestAPIController_DriftStatus_NoStorage(t *testing.T) {
 	ac.DriftStatus(w, req)
 
 	Equals(t, http.StatusServiceUnavailable, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeServiceUnavailable, apiErr.Code)
 }
 
 func TestAPIController_DriftStatus_MissingRepository(t *testing.T) {
@@ -406,6 +436,10 @@ func TestAPIController_DriftStatus_MissingRepository(t *testing.T) {
 	ac.DriftStatus(w, req)
 
 	Equals(t, http.StatusBadRequest, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
 }
 
 func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
@@ -467,12 +501,11 @@ func TestAPIController_DriftStatus_Empty(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	response, _ := io.ReadAll(w.Result().Body)
-	var result models.DriftStatusResponse
-	err := json.Unmarshal(response, &result)
-	Ok(t, err)
+	var result controllers.DriftStatusAPI
+	parseAPIResponse(t, response, &result)
 	Equals(t, "owner/repo", result.Repository)
-	Equals(t, 0, result.TotalProjects)
-	Equals(t, 0, result.ProjectsWithDrift)
+	Equals(t, 0, result.Summary.TotalProjects)
+	Equals(t, 0, result.Summary.ProjectsWithDrift)
 }
 
 func TestAPIController_Remediate(t *testing.T) {
@@ -533,12 +566,11 @@ func TestAPIController_Remediate(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	response, _ := io.ReadAll(w.Result().Body)
-	var result models.RemediationResult
-	err := json.Unmarshal(response, &result)
-	Ok(t, err)
+	var result controllers.RemediationResultAPI
+	parseAPIResponse(t, response, &result)
 	Equals(t, "test-id", result.ID)
-	Equals(t, models.RemediationStatusSuccess, result.Status)
-	Equals(t, 1, result.SuccessCount)
+	Equals(t, "success", result.Status)
+	Equals(t, 1, result.Summary.SuccessCount)
 }
 
 func TestAPIController_Remediate_NoService(t *testing.T) {
@@ -565,6 +597,10 @@ func TestAPIController_Remediate_NoService(t *testing.T) {
 	ac.Remediate(w, req)
 
 	Equals(t, http.StatusServiceUnavailable, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeServiceUnavailable, apiErr.Code)
 }
 
 func TestAPIController_Remediate_Unauthorized(t *testing.T) {
@@ -592,6 +628,10 @@ func TestAPIController_Remediate_Unauthorized(t *testing.T) {
 	ac.Remediate(w, req)
 
 	Equals(t, http.StatusUnauthorized, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeUnauthorized, apiErr.Code)
 }
 
 func TestAPIController_Remediate_MissingRepository(t *testing.T) {
@@ -618,6 +658,10 @@ func TestAPIController_Remediate_MissingRepository(t *testing.T) {
 	ac.Remediate(w, req)
 
 	Equals(t, http.StatusBadRequest, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
 }
 
 func TestAPIController_Remediate_APIDisabled(t *testing.T) {
@@ -643,6 +687,10 @@ func TestAPIController_Remediate_APIDisabled(t *testing.T) {
 	ac.Remediate(w, req)
 
 	Equals(t, http.StatusBadRequest, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeServiceUnavailable, apiErr.Code)
 }
 
 // Phase 5: GetRemediationResult tests
@@ -686,11 +734,10 @@ func TestAPIController_GetRemediationResult(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	response, _ := io.ReadAll(w.Result().Body)
-	var result models.RemediationResult
-	err := json.Unmarshal(response, &result)
-	Ok(t, err)
+	var result controllers.RemediationResultAPI
+	parseAPIResponse(t, response, &result)
 	Equals(t, "test-id-123", result.ID)
-	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, "success", result.Status)
 }
 
 func TestAPIController_GetRemediationResult_NotFound(t *testing.T) {
@@ -714,6 +761,10 @@ func TestAPIController_GetRemediationResult_NotFound(t *testing.T) {
 	ac.GetRemediationResult(w, req)
 
 	Equals(t, http.StatusNotFound, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeNotFound, apiErr.Code)
 }
 
 func TestAPIController_GetRemediationResult_MissingID(t *testing.T) {
@@ -736,6 +787,10 @@ func TestAPIController_GetRemediationResult_MissingID(t *testing.T) {
 	ac.GetRemediationResult(w, req)
 
 	Equals(t, http.StatusBadRequest, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
 }
 
 func TestAPIController_GetRemediationResult_NoService(t *testing.T) {
@@ -756,6 +811,10 @@ func TestAPIController_GetRemediationResult_NoService(t *testing.T) {
 	ac.GetRemediationResult(w, req)
 
 	Equals(t, http.StatusServiceUnavailable, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeServiceUnavailable, apiErr.Code)
 }
 
 // Phase 5: ListRemediationResults tests
@@ -804,13 +863,8 @@ func TestAPIController_ListRemediationResults(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	response, _ := io.ReadAll(w.Result().Body)
-	var listResponse struct {
-		Repository string                      `json:"repository"`
-		Count      int                         `json:"count"`
-		Results    []*models.RemediationResult `json:"results"`
-	}
-	err := json.Unmarshal(response, &listResponse)
-	Ok(t, err)
+	var listResponse controllers.RemediationListAPI
+	parseAPIResponse(t, response, &listResponse)
 	Equals(t, 2, listResponse.Count)
 	Equals(t, "result-1", listResponse.Results[0].ID)
 }
@@ -865,6 +919,10 @@ func TestAPIController_ListRemediationResults_MissingRepository(t *testing.T) {
 	ac.ListRemediationResults(w, req)
 
 	Equals(t, http.StatusBadRequest, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
 }
 
 func TestAPIController_ListRemediationResults_Empty(t *testing.T) {
@@ -890,13 +948,8 @@ func TestAPIController_ListRemediationResults_Empty(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	response, _ := io.ReadAll(w.Result().Body)
-	var listResponse struct {
-		Repository string                      `json:"repository"`
-		Count      int                         `json:"count"`
-		Results    []*models.RemediationResult `json:"results"`
-	}
-	err := json.Unmarshal(response, &listResponse)
-	Ok(t, err)
+	var listResponse controllers.RemediationListAPI
+	parseAPIResponse(t, response, &listResponse)
 	Equals(t, 0, listResponse.Count)
 }
 
@@ -926,9 +979,8 @@ func TestAPIController_DetectDrift(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	response, _ := io.ReadAll(w.Result().Body)
-	var result models.DriftDetectionResult
-	err := json.Unmarshal(response, &result)
-	Ok(t, err)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, response, &result)
 	Equals(t, "Repo", result.Repository)
 }
 
@@ -956,6 +1008,10 @@ func TestAPIController_DetectDrift_NoStorage(t *testing.T) {
 	ac.DetectDrift(w, req)
 
 	Equals(t, http.StatusServiceUnavailable, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeServiceUnavailable, apiErr.Code)
 }
 
 func TestAPIController_DetectDrift_MissingRepository(t *testing.T) {
@@ -983,6 +1039,10 @@ func TestAPIController_DetectDrift_MissingRepository(t *testing.T) {
 	ac.DetectDrift(w, req)
 
 	Equals(t, http.StatusBadRequest, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
 }
 
 func TestAPIController_DetectDrift_Unauthorized(t *testing.T) {
@@ -1010,4 +1070,8 @@ func TestAPIController_DetectDrift_Unauthorized(t *testing.T) {
 	ac.DetectDrift(w, req)
 
 	Equals(t, http.StatusUnauthorized, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeUnauthorized, apiErr.Code)
 }
