@@ -242,6 +242,205 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 Error responses follow the same format as the plan endpoint. See the [plan error response example](#sample-response-error) for details.
 :::
 
+### POST /api/drift/remediate
+
+#### Description
+
+Execute drift remediation on the specified repository. This endpoint allows you to run plan-only (to preview remediation) or auto-apply (to automatically fix drift) operations for projects with detected drift.
+
+::: tip Prerequisites
+* Drift detection storage must be enabled on the Atlantis server
+* The repository must be in the allowed repository list (if configured)
+:::
+
+#### Parameters
+
+| Name       | Type     | Required | Description                                                              |
+|------------|----------|----------|--------------------------------------------------------------------------|
+| repository | string   | Yes      | Full repository name (e.g., `owner/repo`)                                |
+| ref        | string   | Yes      | Git reference (branch/tag/commit) to use for remediation                 |
+| type       | string   | Yes      | Type of the VCS provider (`Github`/`Gitlab`)                             |
+| action     | string   | No       | Remediation action: `plan` (default) or `apply`                          |
+| projects   | []string | No       | List of project names to remediate. If empty, uses drift detection data  |
+| workspaces | []string | No       | Filter remediation to specific workspaces                                |
+| drift_only | boolean  | No       | If true, only remediate projects with detected drift                     |
+
+::: tip Actions
+- `plan`: Runs a plan to preview what would change (default, non-destructive)
+- `apply`: Runs both plan and apply to automatically fix drift (destructive)
+:::
+
+#### Sample Request (Plan Only)
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "repository": "owner/repo",
+    "ref": "main",
+    "type": "Github",
+    "action": "plan",
+    "drift_only": true
+}'
+```
+
+#### Sample Request (Auto-Apply Specific Projects)
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "repository": "owner/repo",
+    "ref": "main",
+    "type": "Github",
+    "action": "apply",
+    "projects": ["vpc", "ec2"],
+    "workspaces": ["production"]
+}'
+```
+
+#### Sample Response (Success)
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "repository": "owner/repo",
+  "ref": "main",
+  "action": "plan",
+  "status": "success",
+  "started_at": "2025-01-21T10:30:00Z",
+  "completed_at": "2025-01-21T10:31:00Z",
+  "total_projects": 2,
+  "success_count": 2,
+  "failure_count": 0,
+  "projects": [
+    {
+      "project_name": "vpc",
+      "path": "modules/vpc",
+      "workspace": "production",
+      "status": "success",
+      "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated...",
+      "drift_before": {
+        "HasDrift": true,
+        "ToAdd": 0,
+        "ToChange": 1,
+        "ToDestroy": 0,
+        "Summary": "Plan: 0 to add, 1 to change, 0 to destroy."
+      },
+      "drift_after": {
+        "HasDrift": true,
+        "ToAdd": 0,
+        "ToChange": 1,
+        "ToDestroy": 0,
+        "Summary": "Plan: 0 to add, 1 to change, 0 to destroy."
+      }
+    },
+    {
+      "project_name": "ec2",
+      "path": "modules/ec2",
+      "workspace": "production",
+      "status": "success",
+      "plan_output": "No changes. Infrastructure is up-to-date.",
+      "drift_before": {
+        "HasDrift": false,
+        "Summary": "No changes. Infrastructure is up-to-date."
+      }
+    }
+  ]
+}
+```
+
+#### Sample Response (Auto-Apply Success)
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "repository": "owner/repo",
+  "ref": "main",
+  "action": "apply",
+  "status": "success",
+  "started_at": "2025-01-21T10:30:00Z",
+  "completed_at": "2025-01-21T10:32:00Z",
+  "total_projects": 1,
+  "success_count": 1,
+  "failure_count": 0,
+  "projects": [
+    {
+      "project_name": "vpc",
+      "path": "modules/vpc",
+      "workspace": "production",
+      "status": "success",
+      "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated...",
+      "apply_output": "Apply complete! Resources: 0 added, 1 changed, 0 destroyed.",
+      "drift_before": {
+        "HasDrift": true,
+        "ToChange": 1,
+        "Summary": "Plan: 0 to add, 1 to change, 0 to destroy."
+      },
+      "drift_after": {
+        "HasDrift": false,
+        "Summary": "Apply completed successfully"
+      }
+    }
+  ]
+}
+```
+
+#### Sample Response (Partial Failure)
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440002",
+  "repository": "owner/repo",
+  "ref": "main",
+  "action": "plan",
+  "status": "partial",
+  "started_at": "2025-01-21T10:30:00Z",
+  "completed_at": "2025-01-21T10:31:00Z",
+  "total_projects": 2,
+  "success_count": 1,
+  "failure_count": 1,
+  "projects": [
+    {
+      "project_name": "vpc",
+      "path": "modules/vpc",
+      "workspace": "production",
+      "status": "success",
+      "plan_output": "No changes. Infrastructure is up-to-date."
+    },
+    {
+      "project_name": "ec2",
+      "path": "modules/ec2",
+      "workspace": "production",
+      "status": "failed",
+      "error": "terraform plan failed: Error acquiring state lock"
+    }
+  ]
+}
+```
+
+#### Status Values
+
+| Status    | Description                                                    |
+|-----------|----------------------------------------------------------------|
+| `pending` | Remediation is queued but not yet started                      |
+| `running` | Remediation is currently in progress                           |
+| `success` | All projects were remediated successfully                      |
+| `failed`  | All projects failed remediation                                |
+| `partial` | Some projects succeeded, some failed                           |
+
+#### Error Responses
+
+| Status Code | Description                                           |
+|-------------|-------------------------------------------------------|
+| 400         | Invalid request (missing required fields, invalid action, or API disabled) |
+| 401         | Invalid or missing `X-Atlantis-Token` header          |
+| 403         | Repository not in allowed list                        |
+| 503         | Drift remediation is not enabled on the server        |
+| 500         | Internal error during remediation                     |
+
 ## Other Endpoints
 
 The endpoints listed in this section are non-destructive and therefore don't require authentication nor special secret token.
@@ -277,6 +476,101 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
   ]
 }
 ```
+
+### GET /api/drift/status
+
+#### Description
+
+Return the drift status for a repository. This endpoint provides cached drift detection results from previous plan executions. Drift detection must be enabled on the server for this endpoint to work.
+
+::: tip Prerequisites
+Drift detection storage must be enabled on the Atlantis server. If not enabled, this endpoint returns a `503 Service Unavailable` error.
+:::
+
+#### Query Parameters
+
+| Name       | Type   | Required | Description                                                  |
+|------------|--------|----------|--------------------------------------------------------------|
+| repository | string | Yes      | Full repository name (e.g., `owner/repo`)                    |
+| project    | string | No       | Filter by project name                                       |
+| workspace  | string | No       | Filter by Terraform workspace                                |
+
+#### Sample Request
+
+```shell
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo'
+```
+
+#### Sample Request (with filters)
+
+```shell
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo&project=vpc&workspace=production'
+```
+
+#### Sample Response (with drift)
+
+```json
+{
+  "Repository": "owner/repo",
+  "TotalProjects": 3,
+  "ProjectsWithDrift": 2,
+  "CheckedAt": "2025-01-21T10:30:00Z",
+  "Projects": [
+    {
+      "ProjectName": "vpc",
+      "Path": "modules/vpc",
+      "Workspace": "production",
+      "Ref": "main",
+      "Drift": {
+        "HasDrift": true,
+        "ToAdd": 2,
+        "ToChange": 1,
+        "ToDestroy": 0,
+        "ToImport": 0,
+        "ChangesOutside": false,
+        "Summary": "Plan: 2 to add, 1 to change, 0 to destroy."
+      },
+      "LastChecked": "2025-01-21T10:30:00Z"
+    },
+    {
+      "ProjectName": "ec2",
+      "Path": "modules/ec2",
+      "Workspace": "production",
+      "Ref": "main",
+      "Drift": {
+        "HasDrift": false,
+        "ToAdd": 0,
+        "ToChange": 0,
+        "ToDestroy": 0,
+        "ToImport": 0,
+        "ChangesOutside": false,
+        "Summary": "No changes. Infrastructure is up-to-date."
+      },
+      "LastChecked": "2025-01-21T10:25:00Z"
+    }
+  ]
+}
+```
+
+#### Sample Response (no drift data)
+
+```json
+{
+  "Repository": "owner/repo",
+  "TotalProjects": 0,
+  "ProjectsWithDrift": 0,
+  "CheckedAt": "2025-01-21T10:30:00Z",
+  "Projects": []
+}
+```
+
+#### Error Responses
+
+| Status Code | Description                                           |
+|-------------|-------------------------------------------------------|
+| 400         | Missing required `repository` parameter               |
+| 503         | Drift detection is not enabled on the server          |
+| 500         | Internal error retrieving drift data                  |
 
 ### GET /status
 
