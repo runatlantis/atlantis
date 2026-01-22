@@ -86,7 +86,7 @@ type RemediationResult struct {
 	// StartedAt is when the remediation started.
 	StartedAt time.Time `json:"started_at"`
 	// CompletedAt is when the remediation completed (zero if still running).
-	CompletedAt time.Time `json:"completed_at,omitempty"`
+	CompletedAt time.Time `json:"completed_at,omitzero"`
 	// TotalProjects is the total number of projects targeted.
 	TotalProjects int `json:"total_projects"`
 	// SuccessCount is the number of projects successfully remediated.
@@ -118,9 +118,10 @@ func (r *RemediationResult) Complete() {
 	r.TotalProjects = len(r.Projects)
 
 	for _, p := range r.Projects {
-		if p.Status == RemediationStatusSuccess {
+		switch p.Status {
+		case RemediationStatusSuccess:
 			r.SuccessCount++
-		} else if p.Status == RemediationStatusFailed {
+		case RemediationStatusFailed:
 			r.FailureCount++
 		}
 	}

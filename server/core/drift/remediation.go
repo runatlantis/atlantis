@@ -7,6 +7,7 @@ package drift
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -155,28 +156,14 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 func (s *InMemoryRemediationService) matchesFilters(proj models.ProjectDrift, req models.RemediationRequest) bool {
 	// Check project name filter
 	if len(req.Projects) > 0 {
-		found := false
-		for _, p := range req.Projects {
-			if p == proj.ProjectName {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.Contains(req.Projects, proj.ProjectName) {
 			return false
 		}
 	}
 
 	// Check workspace filter
 	if len(req.Workspaces) > 0 {
-		found := false
-		for _, w := range req.Workspaces {
-			if w == proj.Workspace {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !slices.Contains(req.Workspaces, proj.Workspace) {
 			return false
 		}
 	}
@@ -265,14 +252,7 @@ func (s *InMemoryRemediationService) storeResult(result *models.RemediationResul
 	}
 
 	// Check if ID already exists in repo results
-	found := false
-	for _, id := range s.repoResults[result.Repository] {
-		if id == result.ID {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(s.repoResults[result.Repository], result.ID) {
 		s.repoResults[result.Repository] = append(s.repoResults[result.Repository], result.ID)
 	}
 }
