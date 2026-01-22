@@ -96,3 +96,61 @@ func NewDriftStatusResponse(repository string, projects []ProjectDrift) DriftSta
 		ProjectsWithDrift: driftCount,
 	}
 }
+
+// DriftDetectionPath represents a project path for drift detection.
+type DriftDetectionPath struct {
+	// Directory is the relative path to the Terraform directory.
+	Directory string `json:"directory"`
+	// Workspace is the Terraform workspace (optional).
+	Workspace string `json:"workspace,omitempty"`
+}
+
+// DriftDetectionRequest is the API request for POST /api/drift/detect.
+type DriftDetectionRequest struct {
+	// Repository is the full repository name (owner/repo). Required.
+	Repository string `json:"repository" validate:"required"`
+	// Ref is the git reference (branch/tag/commit) to check for drift. Required.
+	Ref string `json:"ref" validate:"required"`
+	// Type is the VCS provider type (Github/Gitlab). Required.
+	Type string `json:"type" validate:"required"`
+	// Projects is a list of project names to check. If empty, all projects are checked.
+	Projects []string `json:"projects,omitempty"`
+	// Paths is a list of paths to check. If empty, project names are used.
+	Paths []DriftDetectionPath `json:"paths,omitempty"`
+}
+
+// DriftDetectionResult is the API response for POST /api/drift/detect.
+type DriftDetectionResult struct {
+	// Repository is the full repository name.
+	Repository string `json:"repository"`
+	// Projects contains the drift status for each project checked.
+	Projects []ProjectDrift `json:"projects"`
+	// DetectedAt is when the drift detection was performed.
+	DetectedAt time.Time `json:"detected_at"`
+	// TotalProjects is the total number of projects checked.
+	TotalProjects int `json:"total_projects"`
+	// ProjectsWithDrift is the number of projects that have drift.
+	ProjectsWithDrift int `json:"projects_with_drift"`
+}
+
+// NewDriftDetectionResult creates a new DriftDetectionResult.
+func NewDriftDetectionResult(repository string) *DriftDetectionResult {
+	return &DriftDetectionResult{
+		Repository: repository,
+		Projects:   []ProjectDrift{},
+		DetectedAt: time.Now(),
+	}
+}
+
+// AddProject adds a project drift result and updates counts.
+func (r *DriftDetectionResult) AddProject(project ProjectDrift) {
+	r.Projects = append(r.Projects, project)
+	r.TotalProjects = len(r.Projects)
+	driftCount := 0
+	for _, p := range r.Projects {
+		if p.Drift.HasDrift {
+			driftCount++
+		}
+	}
+	r.ProjectsWithDrift = driftCount
+}
