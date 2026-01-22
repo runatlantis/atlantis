@@ -14,6 +14,8 @@ import (
 
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers"
+	"github.com/runatlantis/atlantis/server/core/drift"
+	driftmocks "github.com/runatlantis/atlantis/server/core/drift/mocks"
 	. "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -322,4 +324,322 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}
 	return ac, projectCommandBuilder, projectCommandRunner
+}
+
+func TestAPIController_DriftStatus(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker()
+
+	driftStorage := driftmocks.NewMockStorage()
+	checkTime := time.Now()
+	mockDrifts := []models.ProjectDrift{
+		{
+			ProjectName: "project1",
+			Path:        "modules/vpc",
+			Workspace:   "default",
+			Ref:         "main",
+			Drift: models.DriftSummary{
+				HasDrift: true,
+				ToAdd:    2,
+			},
+			LastChecked: checkTime,
+		},
+	}
+	When(driftStorage.Get(Eq("owner/repo"), Any[drift.GetOptions]())).ThenReturn(mockDrifts, nil)
+
+	ac := controllers.APIController{
+		Logger:       logger,
+		Locker:       locker,
+		DriftStorage: driftStorage,
+	}
+
+	req, _ := http.NewRequest("GET", "?repository=owner/repo", nil)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	var result models.DriftStatusResponse
+	err := json.Unmarshal(response, &result)
+	Ok(t, err)
+	Equals(t, "owner/repo", result.Repository)
+	Equals(t, 1, result.TotalProjects)
+	Equals(t, 1, result.ProjectsWithDrift)
+}
+
+func TestAPIController_DriftStatus_NoStorage(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker()
+
+	// Controller without drift storage
+	ac := controllers.APIController{
+		Logger:       logger,
+		Locker:       locker,
+		DriftStorage: nil,
+	}
+
+	req, _ := http.NewRequest("GET", "?repository=owner/repo", nil)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusServiceUnavailable, w.Code)
+}
+
+func TestAPIController_DriftStatus_MissingRepository(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker()
+	driftStorage := driftmocks.NewMockStorage()
+
+	ac := controllers.APIController{
+		Logger:       logger,
+		Locker:       locker,
+		DriftStorage: driftStorage,
+	}
+
+	req, _ := http.NewRequest("GET", "", nil)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+}
+
+func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker()
+	driftStorage := driftmocks.NewMockStorage()
+
+	checkTime := time.Now()
+	mockDrifts := []models.ProjectDrift{
+		{
+			ProjectName: "project1",
+			Path:        "modules/vpc",
+			Workspace:   "staging",
+			Ref:         "main",
+			Drift: models.DriftSummary{
+				HasDrift: true,
+				ToChange: 1,
+			},
+			LastChecked: checkTime,
+		},
+	}
+	When(driftStorage.Get(Eq("owner/repo"), Any[drift.GetOptions]())).ThenReturn(mockDrifts, nil)
+
+	ac := controllers.APIController{
+		Logger:       logger,
+		Locker:       locker,
+		DriftStorage: driftStorage,
+	}
+
+	req, _ := http.NewRequest("GET", "?repository=owner/repo&project=project1&workspace=staging", nil)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+
+	// Verify the storage was called with correct options
+	driftStorage.VerifyWasCalledOnce().Get(Eq("owner/repo"), Any[drift.GetOptions]())
+}
+
+func TestAPIController_DriftStatus_Empty(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker()
+	driftStorage := driftmocks.NewMockStorage()
+
+	When(driftStorage.Get(Eq("owner/repo"), Any[drift.GetOptions]())).ThenReturn([]models.ProjectDrift{}, nil)
+
+	ac := controllers.APIController{
+		Logger:       logger,
+		Locker:       locker,
+		DriftStorage: driftStorage,
+	}
+
+	req, _ := http.NewRequest("GET", "?repository=owner/repo", nil)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	var result models.DriftStatusResponse
+	err := json.Unmarshal(response, &result)
+	Ok(t, err)
+	Equals(t, "owner/repo", result.Repository)
+	Equals(t, 0, result.TotalProjects)
+	Equals(t, 0, result.ProjectsWithDrift)
+}
+
+func TestAPIController_Remediate(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker()
+	parser := NewMockEventParsing()
+	vcsClient := NewMockClient()
+	repoAllowlistChecker, _ := events.NewRepoAllowlistChecker("*")
+
+	remediationService := driftmocks.NewMockRemediationService()
+	mockResult := &models.RemediationResult{
+		ID:            "test-id",
+		Repository:    "owner/repo",
+		Ref:           "main",
+		Action:        models.RemediationPlanOnly,
+		Status:        models.RemediationStatusSuccess,
+		TotalProjects: 1,
+		SuccessCount:  1,
+		Projects: []models.ProjectRemediationResult{
+			{
+				ProjectName: "project1",
+				Status:      models.RemediationStatusSuccess,
+				PlanOutput:  "Plan: 0 to add, 0 to change, 0 to destroy",
+			},
+		},
+	}
+	When(remediationService.Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())).ThenReturn(mockResult, nil)
+
+	When(vcsClient.GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Eq("owner/repo"))).ThenReturn("https://github.com/owner/repo.git", nil)
+	When(parser.ParseAPIPlanRequest(Any[models.VCSHostType](), Eq("owner/repo"), Any[string]())).ThenReturn(models.Repo{
+		FullName: "owner/repo",
+		VCSHost:  models.VCSHost{Hostname: "github.com"},
+	}, nil)
+
+	ac := controllers.APIController{
+		APISecret:            []byte(atlantisToken),
+		Logger:               logger,
+		Locker:               locker,
+		Parser:               parser,
+		VCSClient:            vcsClient,
+		RepoAllowlistChecker: repoAllowlistChecker,
+		RemediationService:   remediationService,
+	}
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationPlanOnly,
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	var result models.RemediationResult
+	err := json.Unmarshal(response, &result)
+	Ok(t, err)
+	Equals(t, "test-id", result.ID)
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, result.SuccessCount)
+}
+
+func TestAPIController_Remediate_NoService(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker()
+
+	ac := controllers.APIController{
+		APISecret:          []byte(atlantisToken),
+		Logger:             logger,
+		Locker:             locker,
+		RemediationService: nil, // No remediation service
+	}
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusServiceUnavailable, w.Code)
+}
+
+func TestAPIController_Remediate_Unauthorized(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker()
+	remediationService := driftmocks.NewMockRemediationService()
+
+	ac := controllers.APIController{
+		APISecret:          []byte(atlantisToken),
+		Logger:             logger,
+		Locker:             locker,
+		RemediationService: remediationService,
+	}
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, "wrong-token")
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestAPIController_Remediate_MissingRepository(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker()
+	remediationService := driftmocks.NewMockRemediationService()
+
+	ac := controllers.APIController{
+		APISecret:          []byte(atlantisToken),
+		Logger:             logger,
+		Locker:             locker,
+		RemediationService: remediationService,
+	}
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Ref:  "main",
+		Type: "Github",
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+}
+
+func TestAPIController_Remediate_APIDisabled(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker()
+
+	ac := controllers.APIController{
+		APISecret: nil, // API disabled
+		Logger:    logger,
+		Locker:    locker,
+	}
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
 }

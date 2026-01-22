@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/runatlantis/atlantis/server/core/drift"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -26,6 +27,8 @@ const atlantisTokenHeader = "X-Atlantis-Token"
 type APIController struct {
 	APISecret                      []byte
 	Locker                         locking.Locker                   `validate:"required"`
+	DriftStorage                   drift.Storage
+	RemediationService             drift.RemediationService
 	Logger                         logging.SimpleLogging            `validate:"required"`
 	Parser                         events.EventParsing              `validate:"required"`
 	ProjectCommandBuilder          events.ProjectCommandBuilder     `validate:"required"`
@@ -214,6 +217,51 @@ func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 	a.respond(w, logging.Warn, http.StatusOK, "%s", string(response))
 }
 
+// DriftStatus returns the drift status for a repository.
+// This is a non-authenticated endpoint that returns cached drift detection results.
+// Query parameters:
+//   - repository: required, the full repository name (owner/repo)
+//   - project: optional, filter by project name
+//   - workspace: optional, filter by workspace
+func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Check if drift storage is configured
+	if a.DriftStorage == nil {
+		a.apiReportError(w, http.StatusServiceUnavailable, fmt.Errorf("drift detection is not enabled"))
+		return
+	}
+
+	// Get query parameters
+	repository := r.URL.Query().Get("repository")
+	if repository == "" {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("repository parameter is required"))
+		return
+	}
+
+	opts := drift.GetOptions{
+		ProjectName: r.URL.Query().Get("project"),
+		Workspace:   r.URL.Query().Get("workspace"),
+	}
+
+	// Retrieve drift results from storage
+	drifts, err := a.DriftStorage.Get(repository, opts)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Build response
+	result := models.NewDriftStatusResponse(repository, drifts)
+
+	response, err := json.Marshal(result)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+	a.respond(w, logging.Info, http.StatusOK, "%s", string(response))
+}
+
 func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) error {
 	pull := ctx.Pull
 	baseRepo := ctx.Pull.BaseRepo
@@ -394,4 +442,252 @@ func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, res
 	a.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)
 	fmt.Fprintln(w, response)
+}
+
+// Remediate handles POST /api/drift/remediate requests.
+// It executes drift remediation (plan or apply) for the specified projects.
+// This is an authenticated endpoint that requires the API secret.
+func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Check API is enabled
+	if len(a.APISecret) == 0 {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled"))
+		return
+	}
+
+	// Validate the secret token
+	secret := r.Header.Get(atlantisTokenHeader)
+	if secret != string(a.APISecret) {
+		a.apiReportError(w, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader))
+		return
+	}
+
+	// Check if remediation service is configured
+	if a.RemediationService == nil {
+		a.apiReportError(w, http.StatusServiceUnavailable, fmt.Errorf("drift remediation is not enabled"))
+		return
+	}
+
+	// Parse the JSON payload
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to read request: %v", err))
+		return
+	}
+
+	var request models.RemediationRequest
+	if err = json.Unmarshal(bytes, &request); err != nil {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to parse request: %v", err))
+		return
+	}
+
+	// Validate required fields
+	if request.Repository == "" {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("repository is required"))
+		return
+	}
+	if request.Ref == "" {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ref is required"))
+		return
+	}
+	if request.Type == "" {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("type is required"))
+		return
+	}
+
+	// Check if the repo is allowlisted
+	VCSHostType, err := models.NewVCSHostType(request.Type)
+	if err != nil {
+		a.apiReportError(w, http.StatusBadRequest, err)
+		return
+	}
+	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, request.Repository)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	baseRepo, err := a.Parser.ParseAPIPlanRequest(VCSHostType, request.Repository, cloneURL)
+	if err != nil {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to parse request: %v", err))
+		return
+	}
+
+	if !a.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		a.apiReportError(w, http.StatusForbidden, fmt.Errorf("repo not allowlisted"))
+		return
+	}
+
+	// Create executor that bridges to existing plan/apply infrastructure
+	executor := &apiRemediationExecutor{
+		controller: a,
+		baseRepo:   baseRepo,
+		logger:     a.Logger,
+	}
+
+	// Execute remediation
+	result, err := a.RemediationService.Remediate(request, executor)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Return result
+	response, err := json.Marshal(result)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	code := http.StatusOK
+	if result.Status == models.RemediationStatusFailed {
+		code = http.StatusInternalServerError
+	}
+	a.respond(w, logging.Info, code, "%s", string(response))
+}
+
+// apiRemediationExecutor implements drift.RemediationExecutor using the API controller's
+// existing plan/apply infrastructure.
+type apiRemediationExecutor struct {
+	controller *APIController
+	baseRepo   models.Repo
+	logger     logging.SimpleLogging
+}
+
+// ExecutePlan runs a plan for the given project using the API infrastructure.
+func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectName, path, workspace string) (string, *models.DriftSummary, error) {
+	// Create a minimal API request for the plan
+	request := &APIRequest{
+		Repository: repository,
+		Ref:        ref,
+		Type:       vcsType,
+	}
+
+	if projectName != "" {
+		request.Projects = []string{projectName}
+	} else if path != "" || workspace != "" {
+		request.Paths = []struct {
+			Directory string
+			Workspace string
+		}{{Directory: path, Workspace: workspace}}
+	}
+
+	// Build the command context
+	ctx := &command.Context{
+		HeadRepo: e.baseRepo,
+		Pull: models.PullRequest{
+			Num:        0, // Non-PR workflow
+			BaseBranch: ref,
+			HeadBranch: ref,
+			HeadCommit: ref,
+			BaseRepo:   e.baseRepo,
+		},
+		Scope: e.controller.Scope,
+		Log:   e.logger,
+		API:   true,
+	}
+
+	// Setup working directory
+	if err := e.controller.apiSetup(ctx, command.Plan); err != nil {
+		return "", nil, fmt.Errorf("setup failed: %w", err)
+	}
+
+	// Execute plan
+	result, err := e.controller.apiPlan(request, ctx)
+	if err != nil {
+		return "", nil, err
+	}
+
+	// Extract output and drift summary
+	var output strings.Builder
+	var driftSummary *models.DriftSummary
+
+	for _, pr := range result.ProjectResults {
+		if pr.Error != nil {
+			output.WriteString(fmt.Sprintf("Error: %v\n", pr.Error))
+		} else if pr.Failure != "" {
+			output.WriteString(fmt.Sprintf("Failure: %s\n", pr.Failure))
+		} else if pr.PlanSuccess != nil {
+			output.WriteString(pr.PlanSuccess.TerraformOutput)
+			// Parse drift from plan output
+			summary := models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
+			driftSummary = &summary
+		}
+	}
+
+	if result.HasErrors() {
+		return output.String(), driftSummary, fmt.Errorf("plan had errors")
+	}
+
+	return output.String(), driftSummary, nil
+}
+
+// ExecuteApply runs an apply for the given project using the API infrastructure.
+func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectName, path, workspace string) (string, error) {
+	// Create a minimal API request for the apply
+	request := &APIRequest{
+		Repository: repository,
+		Ref:        ref,
+		Type:       vcsType,
+	}
+
+	if projectName != "" {
+		request.Projects = []string{projectName}
+	} else if path != "" || workspace != "" {
+		request.Paths = []struct {
+			Directory string
+			Workspace string
+		}{{Directory: path, Workspace: workspace}}
+	}
+
+	// Build the command context
+	ctx := &command.Context{
+		HeadRepo: e.baseRepo,
+		Pull: models.PullRequest{
+			Num:        0, // Non-PR workflow
+			BaseBranch: ref,
+			HeadBranch: ref,
+			HeadCommit: ref,
+			BaseRepo:   e.baseRepo,
+		},
+		Scope: e.controller.Scope,
+		Log:   e.logger,
+		API:   true,
+	}
+
+	// Setup working directory
+	if err := e.controller.apiSetup(ctx, command.Apply); err != nil {
+		return "", fmt.Errorf("setup failed: %w", err)
+	}
+
+	// First run plan (required before apply)
+	_, err := e.controller.apiPlan(request, ctx)
+	if err != nil {
+		return "", fmt.Errorf("plan failed: %w", err)
+	}
+
+	// Execute apply
+	result, err := e.controller.apiApply(request, ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Extract output
+	var output strings.Builder
+	for _, pr := range result.ProjectResults {
+		if pr.Error != nil {
+			output.WriteString(fmt.Sprintf("Error: %v\n", pr.Error))
+		} else if pr.Failure != "" {
+			output.WriteString(fmt.Sprintf("Failure: %s\n", pr.Failure))
+		} else if pr.ApplySuccess != "" {
+			output.WriteString(pr.ApplySuccess)
+		}
+	}
+
+	if result.HasErrors() {
+		return output.String(), fmt.Errorf("apply had errors")
+	}
+
+	return output.String(), nil
 }
