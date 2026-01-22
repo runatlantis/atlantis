@@ -15,6 +15,24 @@ const (
 	RemediationAutoApply RemediationAction = "apply"
 )
 
+// IsValid returns true if the action is a recognized value.
+func (a RemediationAction) IsValid() bool {
+	switch a {
+	case RemediationPlanOnly, RemediationAutoApply, "":
+		return true
+	default:
+		return false
+	}
+}
+
+// Default returns the default action if empty.
+func (a RemediationAction) Default() RemediationAction {
+	if a == "" {
+		return RemediationPlanOnly
+	}
+	return a
+}
+
 // RemediationStatus represents the current status of a remediation.
 type RemediationStatus string
 
@@ -31,14 +49,24 @@ const (
 	RemediationStatusPartial RemediationStatus = "partial"
 )
 
+// IsTerminal returns true if the status represents a final state.
+func (s RemediationStatus) IsTerminal() bool {
+	switch s {
+	case RemediationStatusSuccess, RemediationStatusFailed, RemediationStatusPartial:
+		return true
+	default:
+		return false
+	}
+}
+
 // RemediationRequest is the API request for POST /api/drift/remediate.
 type RemediationRequest struct {
 	// Repository is the full repository name (owner/repo). Required.
-	Repository string `json:"repository" validate:"required"`
+	Repository string `json:"repository"`
 	// Ref is the git reference (branch/tag/commit) to remediate. Required.
-	Ref string `json:"ref" validate:"required"`
+	Ref string `json:"ref"`
 	// Type is the VCS provider type (Github/Gitlab). Required.
-	Type string `json:"type" validate:"required"`
+	Type string `json:"type"`
 	// Action specifies plan-only or auto-apply. Defaults to "plan".
 	Action RemediationAction `json:"action"`
 	// Projects is a list of project names to remediate. If empty, all projects with drift are remediated.
@@ -47,6 +75,39 @@ type RemediationRequest struct {
 	Workspaces []string `json:"workspaces,omitempty"`
 	// DriftOnly if true, only remediates projects that have detected drift.
 	DriftOnly bool `json:"drift_only"`
+}
+
+// FieldError represents a validation error for a specific field.
+type FieldError struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+// Validate checks the request and returns any validation errors.
+func (r *RemediationRequest) Validate() []FieldError {
+	var errors []FieldError
+
+	if r.Repository == "" {
+		errors = append(errors, FieldError{Field: "repository", Message: "repository is required"})
+	}
+	if r.Ref == "" {
+		errors = append(errors, FieldError{Field: "ref", Message: "ref is required"})
+	}
+	if r.Type == "" {
+		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
+	} else if r.Type != "Github" && r.Type != "Gitlab" && r.Type != "Bitbucket" && r.Type != "AzureDevops" && r.Type != "Gitea" {
+		errors = append(errors, FieldError{Field: "type", Message: "type must be one of: Github, Gitlab, Bitbucket, AzureDevops, Gitea"})
+	}
+	if !r.Action.IsValid() {
+		errors = append(errors, FieldError{Field: "action", Message: "action must be 'plan' or 'apply'"})
+	}
+
+	return errors
+}
+
+// ApplyDefaults applies default values to optional fields.
+func (r *RemediationRequest) ApplyDefaults() {
+	r.Action = r.Action.Default()
 }
 
 // ProjectRemediationResult represents the remediation result for a single project.
