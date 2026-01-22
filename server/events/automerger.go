@@ -12,7 +12,7 @@ import (
 )
 
 type AutoMerger struct {
-	VCSClient     vcs.Client
+	VCSClient       vcs.Client
 	GlobalAutomerge bool
 	VCSStatusName   string // VCS status name prefix (e.g., "atlantis")
 }

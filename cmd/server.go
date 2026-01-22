@@ -102,10 +102,10 @@ const (
 	GHAppSlugFlag                    = "gh-app-slug"
 	GHAppInstallationIDFlag          = "gh-app-installation-id"
 	GHOrganizationFlag               = "gh-org"
-	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
-	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply"      // nolint: gosec
-	ADAllowMergeableBypassApply      = "azuredevops-allow-mergeable-bypass-apply" // nolint: gosec
-	ADBypassMergeRequirementTeams    = "azuredevops-bypass-merge-requirement-teams"
+	GHWebhookSecretFlag              = "gh-webhook-secret"                          // nolint: gosec
+	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply"            // nolint: gosec
+	ADAllowMergeableBypassApply      = "azuredevops-allow-mergeable-bypass-apply"   // nolint: gosec
+	ADBypassMergeRequirementTeams    = "azuredevops-bypass-merge-requirement-teams" // nolint: gosec
 	GiteaBaseURLFlag                 = "gitea-base-url"
 	GiteaTokenFlag                   = "gitea-token"
 	GiteaUserFlag                    = "gitea-user"

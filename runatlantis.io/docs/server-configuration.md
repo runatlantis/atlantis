@@ -255,40 +255,46 @@ Defaults to `false`.
 ### `--azuredevops-bypass-merge-requirement-teams`
 
 ```bash
-atlantis server --azuredevops-bypass-merge-requirement-teams="DevOps Team,Release Managers"
+atlantis server --azuredevops-bypass-merge-requirement-teams="GL-SGA-DevOps-Team,Release Managers"
 # or
-ATLANTIS_AZUREDEVOPS_BYPASS_MERGE_REQUIREMENT_TEAMS="DevOps Team,Release Managers"
+ATLANTIS_AZUREDEVOPS_BYPASS_MERGE_REQUIREMENT_TEAMS="GL-SGA-DevOps-Team,Release Managers"
 ```
 
-Comma-separated list of Azure DevOps team names that are allowed to merge PRs when the apply
-status check is bypassed (when `--azuredevops-allow-mergeable-bypass-apply` is enabled).
+Comma-separated list of Azure DevOps security group names (including Azure AD groups synced to
+Azure DevOps) that are allowed to merge PRs when the apply status check is bypassed
+(when `--azuredevops-allow-mergeable-bypass-apply` is enabled).
 
 **Behavior:**
 - If this flag is **empty** and bypass is enabled: Any user can merge with bypass
-- If this flag is **set** and bypass is enabled: Only members of the specified teams can merge
+- If this flag is **set** and bypass is enabled: Only members of the specified groups can merge
   with bypass, and an audit comment is added to the PR documenting who performed the merge
 
+**Supported Group Types:**
+- Azure AD security groups synced to Azure DevOps (e.g., `GL-SGA-DevOps-EcomDevopsTeamMembers`)
+- Built-in Azure DevOps project groups (e.g., `[Project Name]\Contributors`)
+- Custom Azure DevOps security groups
+
 **Audit Comment:**
-When a user from an allowed team merges with bypass, Atlantis adds a comment to the PR with:
+When a user from an allowed group merges with bypass, Atlantis adds a comment to the PR with:
 - Username of the person who merged
 - Which status check was bypassed
 - Confirmation that the user was authorized
 
 **Example Use Case:**
 ```bash
-# Only DevOps and Release teams can bypass the apply requirement
+# Only members of the DevOps AAD group can bypass the apply requirement
 atlantis server \
   --azuredevops-allow-mergeable-bypass-apply \
-  --azuredevops-bypass-merge-requirement-teams="DevOps,Release Managers,Platform Team"
+  --azuredevops-bypass-merge-requirement-teams="GL-SGA-DevOps-EcomDevopsTeamMembers"
 ```
 
 ::: tip
-The team names must match exactly as they appear in Azure DevOps. Team membership is checked
-using the Azure DevOps Core API, which requires the configured token to have permissions to
-read teams and team members (vso.project scope).
+The group names must match exactly as they appear in Azure DevOps (the display name).
+Group membership is checked using the Azure DevOps Graph API, which requires the configured
+token to have permissions to read the graph (vso.graph scope).
 :::
 
-Defaults to empty string (no team restriction).
+Defaults to empty string (no group restriction).
 
 ### `--azuredevops-hostname` <Badge text="v0.9.0+" type="info"/>
 

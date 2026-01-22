@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -514,111 +515,219 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 	return repoFullName[:lastSlashIdx], "", repoFullName[lastSlashIdx+1:]
 }
 
-// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to
-// in the Azure DevOps project. This is used for team-based authorization checks.
+// GetTeamNamesForUser returns the names of the security groups (including AAD groups)
+// that the user belongs to in Azure DevOps. This is used for group-based authorization checks.
 //
 // The function works by:
-// 1. Listing all teams in the project
-// 2. For each team, fetching its members via the Azure DevOps Core API
-// 3. Checking if the user is a member of each team
+// 1. Finding the user in Azure DevOps Graph API using their principal name (email)
+// 2. Getting all group memberships for that user
+// 3. Returning the display names of all groups
 //
-// Note: This requires the configured Azure DevOps token to have permissions to read teams
-// and team members (vso.project scope).
+// Note: This requires the configured Azure DevOps token to have permissions to read
+// the Graph API (vso.graph scope). The Graph API is hosted at vssps.dev.azure.com.
 func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) {
-	owner, project, _ := SplitAzureDevopsRepoFullName(repo.FullName)
+	owner, _, _ := SplitAzureDevopsRepoFullName(repo.FullName)
 
-	if project == "" {
-		// If no project is specified, we can't determine teams
-		logger.Debug("No project specified in repo full name, cannot determine team membership")
+	// Step 1: Find the user in the Graph API
+	userDescriptor, err := g.getUserDescriptor(owner, user.Username)
+	if err != nil {
+		return nil, fmt.Errorf("getting user descriptor: %w", err)
+	}
+
+	if userDescriptor == "" {
+		logger.Debug("User %s not found in Azure DevOps Graph", user.Username)
 		return nil, nil
 	}
 
-	// Get all teams in the project
-	teams, _, err := g.Client.Teams.List(g.ctx, owner, project, nil)
+	logger.Debug("Found user %s with descriptor %s", user.Username, userDescriptor)
+
+	// Step 2: Get all group memberships for the user
+	memberships, err := g.getUserGroupMemberships(owner, userDescriptor)
 	if err != nil {
-		return nil, fmt.Errorf("listing teams: %w", err)
+		return nil, fmt.Errorf("getting user memberships: %w", err)
 	}
 
-	var userTeams []string
-	for _, team := range teams {
-		if team == nil || team.ID == nil {
+	// Step 3: Get group details for each membership
+	var groupNames []string
+	for _, membership := range memberships {
+		if membership.ContainerDescriptor == nil {
 			continue
 		}
 
-		// Get members of this team using the Core API
-		members, err := g.getTeamMembers(owner, project, *team.ID)
+		groupName, err := g.getGroupDisplayName(owner, *membership.ContainerDescriptor)
 		if err != nil {
-			logger.Debug("Failed to get members for team %s: %v", team.GetName(), err)
+			logger.Debug("Failed to get group name for descriptor %s: %v", *membership.ContainerDescriptor, err)
 			continue
 		}
 
-		// Check if the user is a member of this team
-		for _, member := range members {
-			// Match by unique name (email) or display name
-			if member.Identity != nil {
-				uniqueName := ""
-				if member.Identity.UniqueName != nil {
-					uniqueName = *member.Identity.UniqueName
-				}
-				displayName := ""
-				if member.Identity.DisplayName != nil {
-					displayName = *member.Identity.DisplayName
-				}
-
-				if uniqueName == user.Username || displayName == user.Username {
-					userTeams = append(userTeams, team.GetName())
-					logger.Debug("User %s is a member of team %s", user.Username, team.GetName())
-					break
-				}
-			}
+		if groupName != "" {
+			groupNames = append(groupNames, groupName)
+			logger.Debug("User %s is a member of group %s", user.Username, groupName)
 		}
 	}
 
-	return userTeams, nil
+	return groupNames, nil
 }
 
-// TeamMember represents a member of an Azure DevOps team.
-type TeamMember struct {
-	IsTeamAdmin *bool               `json:"isTeamAdmin,omitempty"`
-	Identity    *TeamMemberIdentity `json:"identity,omitempty"`
+// GraphUser represents a user in the Azure DevOps Graph API.
+type GraphUser struct {
+	SubjectKind    *string `json:"subjectKind,omitempty"`
+	Domain         *string `json:"domain,omitempty"`
+	PrincipalName  *string `json:"principalName,omitempty"`
+	MailAddress    *string `json:"mailAddress,omitempty"`
+	Origin         *string `json:"origin,omitempty"`
+	OriginID       *string `json:"originId,omitempty"`
+	DisplayName    *string `json:"displayName,omitempty"`
+	Links          any     `json:"_links,omitempty"`
+	URL            *string `json:"url,omitempty"`
+	Descriptor     *string `json:"descriptor,omitempty"`
+	MetaType       *string `json:"metaType,omitempty"`
+	DirectoryAlias *string `json:"directoryAlias,omitempty"`
 }
 
-// TeamMemberIdentity represents the identity of a team member.
-type TeamMemberIdentity struct {
-	ID          *string `json:"id,omitempty"`
-	DisplayName *string `json:"displayName,omitempty"`
-	UniqueName  *string `json:"uniqueName,omitempty"`
-	URL         *string `json:"url,omitempty"`
-	ImageURL    *string `json:"imageUrl,omitempty"`
+// graphUsersResponse represents the response from the Graph users API.
+type graphUsersResponse struct {
+	Count int         `json:"count"`
+	Value []GraphUser `json:"value"`
 }
 
-// teamMembersResponse represents the response from the team members API.
-type teamMembersResponse struct {
-	Value []TeamMember `json:"value"`
-	Count int          `json:"count"`
+// GraphMembership represents a membership relationship in the Azure DevOps Graph API.
+type GraphMembership struct {
+	ContainerDescriptor *string `json:"containerDescriptor,omitempty"`
+	MemberDescriptor    *string `json:"memberDescriptor,omitempty"`
 }
 
-// getTeamMembers fetches the members of a specific team using the Azure DevOps Core API.
-// API: GET https://dev.azure.com/{organization}/_apis/projects/{projectId}/teams/{teamId}/members
-func (g *Client) getTeamMembers(owner, project, teamID string) ([]TeamMember, error) {
-	// Build the URL for the team members API
-	urlStr := fmt.Sprintf("%s_apis/projects/%s/teams/%s/members?api-version=7.1",
-		g.Client.BaseURL.String()+owner+"/",
-		url.PathEscape(project),
-		url.PathEscape(teamID))
+// graphMembershipsResponse represents the response from the Graph memberships API.
+type graphMembershipsResponse struct {
+	Count int               `json:"count"`
+	Value []GraphMembership `json:"value"`
+}
+
+// GraphGroup represents a group in the Azure DevOps Graph API.
+type GraphGroup struct {
+	SubjectKind   *string `json:"subjectKind,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	Domain        *string `json:"domain,omitempty"`
+	PrincipalName *string `json:"principalName,omitempty"`
+	MailAddress   *string `json:"mailAddress,omitempty"`
+	Origin        *string `json:"origin,omitempty"`
+	OriginID      *string `json:"originId,omitempty"`
+	DisplayName   *string `json:"displayName,omitempty"`
+	Links         any     `json:"_links,omitempty"`
+	URL           *string `json:"url,omitempty"`
+	Descriptor    *string `json:"descriptor,omitempty"`
+}
+
+// getUserDescriptor finds a user in Azure DevOps Graph API and returns their descriptor.
+// The Graph API is hosted at vssps.dev.azure.com (different from the main API).
+// API: GET https://vssps.dev.azure.com/{organization}/_apis/graph/users
+func (g *Client) getUserDescriptor(organization, principalName string) (string, error) {
+	// The Graph API uses a different base URL: vssps.dev.azure.com
+	// We need to construct the URL based on the current base URL
+	graphBaseURL := g.getGraphAPIBaseURL()
+
+	urlStr := fmt.Sprintf("%s%s/_apis/graph/users?subjectTypes=aad,msa&api-version=7.1-preview.1",
+		graphBaseURL,
+		url.PathEscape(organization))
+
+	req, err := g.Client.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+
+	var response graphUsersResponse
+	_, err = g.Client.Execute(g.ctx, req, &response)
+	if err != nil {
+		return "", fmt.Errorf("executing request: %w", err)
+	}
+
+	// Search for the user by principal name (email) or mail address
+	for _, user := range response.Value {
+		if user.Descriptor == nil {
+			continue
+		}
+
+		// Match by principal name, mail address, or display name
+		if (user.PrincipalName != nil && strings.EqualFold(*user.PrincipalName, principalName)) ||
+			(user.MailAddress != nil && strings.EqualFold(*user.MailAddress, principalName)) ||
+			(user.DisplayName != nil && strings.EqualFold(*user.DisplayName, principalName)) {
+			return *user.Descriptor, nil
+		}
+	}
+
+	return "", nil
+}
+
+// getUserGroupMemberships returns all group memberships for a user.
+// API: GET https://vssps.dev.azure.com/{organization}/_apis/graph/memberships/{subjectDescriptor}?direction=up
+func (g *Client) getUserGroupMemberships(organization, userDescriptor string) ([]GraphMembership, error) {
+	graphBaseURL := g.getGraphAPIBaseURL()
+
+	urlStr := fmt.Sprintf("%s%s/_apis/graph/memberships/%s?direction=up&api-version=7.1-preview.1",
+		graphBaseURL,
+		url.PathEscape(organization),
+		url.PathEscape(userDescriptor))
 
 	req, err := g.Client.NewRequest("GET", urlStr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	var response teamMembersResponse
+	var response graphMembershipsResponse
 	_, err = g.Client.Execute(g.ctx, req, &response)
 	if err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
 
 	return response.Value, nil
+}
+
+// getGroupDisplayName returns the display name of a group given its descriptor.
+// API: GET https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}
+func (g *Client) getGroupDisplayName(organization, groupDescriptor string) (string, error) {
+	graphBaseURL := g.getGraphAPIBaseURL()
+
+	urlStr := fmt.Sprintf("%s%s/_apis/graph/groups/%s?api-version=7.1-preview.1",
+		graphBaseURL,
+		url.PathEscape(organization),
+		url.PathEscape(groupDescriptor))
+
+	req, err := g.Client.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+
+	var group GraphGroup
+	_, err = g.Client.Execute(g.ctx, req, &group)
+	if err != nil {
+		return "", fmt.Errorf("executing request: %w", err)
+	}
+
+	if group.DisplayName != nil {
+		return *group.DisplayName, nil
+	}
+
+	return "", nil
+}
+
+// getGraphAPIBaseURL returns the base URL for the Azure DevOps Graph API.
+// The Graph API is hosted at vssps.dev.azure.com instead of dev.azure.com.
+func (g *Client) getGraphAPIBaseURL() string {
+	// Default Graph API URL
+	graphBaseURL := "https://vssps.dev.azure.com/"
+
+	// If using a custom hostname (on-premises), adjust accordingly
+	currentBase := g.Client.BaseURL.String()
+	if strings.Contains(currentBase, "dev.azure.com") {
+		graphBaseURL = "https://vssps.dev.azure.com/"
+	} else if strings.Contains(currentBase, "visualstudio.com") {
+		// For legacy visualstudio.com URLs
+		graphBaseURL = "https://vssps.visualstudio.com/"
+	}
+	// For on-premises Azure DevOps Server, the Graph API might be at the same host
+	// This would need to be tested/configured for specific deployments
+
+	return graphBaseURL
 }
 
 // ValidateBypassMerge checks if a user is allowed to perform a bypass merge and
@@ -664,13 +773,8 @@ func (g *Client) ValidateBypassMerge(logger logging.SimpleLogging, repo models.R
 		// Check if user is in any of the allowed teams
 		userAllowed := false
 		for _, allowedTeam := range g.config.BypassMergeRequirementTeams {
-			for _, userTeam := range userTeams {
-				if userTeam == allowedTeam {
-					userAllowed = true
-					break
-				}
-			}
-			if userAllowed {
+			if slices.Contains(userTeams, allowedTeam) {
+				userAllowed = true
 				break
 			}
 		}

@@ -321,7 +321,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		// Parse bypass teams from comma-separated string
 		var bypassTeams []string
 		if userConfig.AzureDevopsBypassMergeRequirementTeams != "" {
-			for _, team := range strings.Split(userConfig.AzureDevopsBypassMergeRequirementTeams, ",") {
+			for team := range strings.SplitSeq(userConfig.AzureDevopsBypassMergeRequirementTeams, ",") {
 				team = strings.TrimSpace(team)
 				if team != "" {
 					bypassTeams = append(bypassTeams, team)

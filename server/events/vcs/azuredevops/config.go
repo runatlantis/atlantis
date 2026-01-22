@@ -11,10 +11,18 @@ type Config struct {
 	// as long as all other branch policy requirements are satisfied.
 	AllowMergeableBypassApply bool
 
-	// BypassMergeRequirementTeams is a list of Azure DevOps team names that are allowed
-	// to merge PRs when the apply status check is bypassed. If empty and
-	// AllowMergeableBypassApply is enabled, any user can merge with bypass.
-	// When set, only members of these teams can merge with bypass, and an audit
+	// BypassMergeRequirementTeams is a list of Azure DevOps security group names
+	// (including Azure AD groups synced to Azure DevOps) that are allowed to merge PRs
+	// when the apply status check is bypassed. If empty and AllowMergeableBypassApply
+	// is enabled, any user can merge with bypass.
+	// When set, only members of these groups can merge with bypass, and an audit
 	// comment will be added to the PR documenting who performed the bypass merge.
+	//
+	// Example group names:
+	//   - "GL-SGA-DevOps-EcomDevopsTeamMembers" (AAD group synced to Azure DevOps)
+	//   - "[Project Name]\\Contributors" (built-in project group)
+	//
+	// Note: This uses the Azure DevOps Graph API to check group membership,
+	// which requires the vso.graph scope for the configured token.
 	BypassMergeRequirementTeams []string
 }
