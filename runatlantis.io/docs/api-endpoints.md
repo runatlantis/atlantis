@@ -40,6 +40,13 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 At least one of `Projects` or `Paths` must be specified.
 :::
 
+::: tip Non-PR Workflows (Drift Detection)
+When `PR` is omitted or set to `0`, Atlantis operates in non-PR mode. In this mode:
+- PR-specific requirements (`approved`, `mergeable`) are automatically skipped
+- Security requirements (`policies_passed`, `undiverged`) are still enforced
+- This enables drift detection and other automation workflows without an associated pull request
+:::
+
 #### Path
 
 Similar to the [Options](using-atlantis.md#options) of `atlantis plan`. Path specifies which directory/workspace
@@ -51,7 +58,7 @@ At least one of `Directory` or `Workspace` should be specified.
 | Directory | string | No       | Which directory to run plan in relative to root of repo                                                                                                   |
 | Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
 
-#### Sample Request
+#### Sample Request (with PR)
 
 ```shell
 curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
@@ -69,7 +76,26 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
 }'
 ```
 
-#### Sample Response
+#### Sample Request (Drift Detection - No PR)
+
+For drift detection workflows, omit the `PR` parameter:
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "Repository": "repo-name",
+    "Ref": "main",
+    "Type": "Github",
+    "Paths": [{
+      "Directory": ".",
+      "Workspace": "default"
+    }]
+}'
+```
+
+#### Sample Response (Success)
 
 ```json
 {
@@ -99,6 +125,38 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
 }
 ```
 
+#### Sample Response (Error)
+
+When an error occurs, the `Error` field contains the error message as a string:
+
+```json
+{
+  "Error": null,
+  "Failure": "",
+  "ProjectResults": [
+    {
+      "Command": 1,
+      "RepoRelDir": "modules/vpc",
+      "Workspace": "production",
+      "Error": "terraform plan failed: resource not found",
+      "Failure": "plan execution error",
+      "PlanSuccess": null,
+      "PolicyCheckSuccess": null,
+      "ApplySuccess": "",
+      "VersionSuccess": "",
+      "ProjectName": "vpc"
+    }
+  ],
+  "PlansDeleted": false
+}
+```
+
+::: tip Error Handling
+- `Error`: Contains the error message as a string when an error occurs, `null` on success
+- `Failure`: Contains a human-readable failure message, empty string on success
+- Both top-level and per-project `Error`/`Failure` fields follow this format
+:::
+
 ### POST /api/apply
 
 #### Description
@@ -118,6 +176,13 @@ Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repo
 
 ::: tip NOTE
 At least one of `Projects` or `Paths` must be specified.
+:::
+
+::: tip Non-PR Workflows (Drift Detection)
+When `PR` is omitted or set to `0`, Atlantis operates in non-PR mode. In this mode:
+- PR-specific requirements (`approved`, `mergeable`) are automatically skipped
+- Security requirements (`policies_passed`, `undiverged`) are still enforced
+- This enables drift detection and other automation workflows without an associated pull request
 :::
 
 #### Path
@@ -149,7 +214,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 }'
 ```
 
-#### Sample Response
+#### Sample Response (Success)
 
 ```json
 {
@@ -172,6 +237,10 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
   "PlansDeleted": false
 }
 ```
+
+::: tip Error Response Format
+Error responses follow the same format as the plan endpoint. See the [plan error response example](#sample-response-error) for details.
+:::
 
 ## Other Endpoints
 
