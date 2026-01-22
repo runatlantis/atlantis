@@ -231,6 +231,65 @@ This flag overrides `--autoplan-modules`. If you wish to disable auto-planning o
 and set `--autoplan-modules` to `false`.
 :::
 
+### `--azuredevops-allow-mergeable-bypass-apply`
+
+```bash
+atlantis server --azuredevops-allow-mergeable-bypass-apply
+# or
+ATLANTIS_AZUREDEVOPS_ALLOW_MERGEABLE_BYPASS_APPLY=true
+```
+
+Feature flag to enable the functionality that allows the Azure DevOps mergeable check to ignore
+the apply required status policy. When enabled, a pull request can be considered mergeable even
+if the Atlantis apply status check is failing, as long as all other branch policy requirements
+are satisfied.
+
+This is useful in scenarios where you want to allow merging PRs that have been planned but not
+yet applied, while still enforcing other branch policies.
+
+The bypass only affects status policies with genre `Atlantis Bot/{vcs-status-name}` and name `apply`.
+Other branch policies (such as required reviewers, build validation, etc.) are not affected.
+
+Defaults to `false`.
+
+### `--azuredevops-bypass-merge-requirement-teams`
+
+```bash
+atlantis server --azuredevops-bypass-merge-requirement-teams="DevOps Team,Release Managers"
+# or
+ATLANTIS_AZUREDEVOPS_BYPASS_MERGE_REQUIREMENT_TEAMS="DevOps Team,Release Managers"
+```
+
+Comma-separated list of Azure DevOps team names that are allowed to merge PRs when the apply
+status check is bypassed (when `--azuredevops-allow-mergeable-bypass-apply` is enabled).
+
+**Behavior:**
+- If this flag is **empty** and bypass is enabled: Any user can merge with bypass
+- If this flag is **set** and bypass is enabled: Only members of the specified teams can merge
+  with bypass, and an audit comment is added to the PR documenting who performed the merge
+
+**Audit Comment:**
+When a user from an allowed team merges with bypass, Atlantis adds a comment to the PR with:
+- Username of the person who merged
+- Which status check was bypassed
+- Confirmation that the user was authorized
+
+**Example Use Case:**
+```bash
+# Only DevOps and Release teams can bypass the apply requirement
+atlantis server \
+  --azuredevops-allow-mergeable-bypass-apply \
+  --azuredevops-bypass-merge-requirement-teams="DevOps,Release Managers,Platform Team"
+```
+
+::: tip
+The team names must match exactly as they appear in Azure DevOps. Team membership is checked
+using the Azure DevOps Core API, which requires the configured token to have permissions to
+read teams and team members (vso.project scope).
+:::
+
+Defaults to empty string (no team restriction).
+
 ### `--azuredevops-hostname` <Badge text="v0.9.0+" type="info"/>
 
 ```bash
@@ -973,11 +1032,11 @@ atlantis server --ignore-vcs-status-names="status1,status2"
 ATLANTIS_IGNORE_VCS_STATUS_NAMES=status1,status2
 ```
 
-Comma separated list of VCS status names from other atlantis services.
-When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks
-(e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
+Comma separated list of VCS status names from other Atlantis services.
+When `gh-allow-mergeable-bypass-apply` or `azuredevops-allow-mergeable-bypass-apply` is true,
+will ignore status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
 from other Atlantis services when checking if the PR is mergeable.
-Currently only implemented for GitHub.
+Implemented for GitHub and Azure DevOps.
 
 ### `--include-git-untracked-files` <Badge text="v0.27.0+" type="info"/>
 

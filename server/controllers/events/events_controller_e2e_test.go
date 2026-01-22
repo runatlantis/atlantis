@@ -1537,6 +1537,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	autoMerger := &events.AutoMerger{
 		VCSClient:       e2eVCSClient,
 		GlobalAutomerge: false,
+		VCSStatusName:   "atlantis",
 	}
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(

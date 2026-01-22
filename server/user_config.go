@@ -28,8 +28,10 @@ type UserConfig struct {
 	AzureDevopsUser             string `mapstructure:"azuredevops-user"`
 	AzureDevopsWebhookPassword  string `mapstructure:"azuredevops-webhook-password"`
 	AzureDevopsWebhookUser      string `mapstructure:"azuredevops-webhook-user"`
-	AzureDevOpsHostname         string `mapstructure:"azuredevops-hostname"`
-	BitbucketApiUser            string `mapstructure:"bitbucket-api-user"`
+	AzureDevOpsHostname                  string `mapstructure:"azuredevops-hostname"`
+	AzureDevopsAllowMergeableBypassApply bool   `mapstructure:"azuredevops-allow-mergeable-bypass-apply"`
+	AzureDevopsBypassMergeRequirementTeams string `mapstructure:"azuredevops-bypass-merge-requirement-teams"`
+	BitbucketApiUser                     string `mapstructure:"bitbucket-api-user"`
 	BitbucketBaseURL            string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken              string `mapstructure:"bitbucket-token"`
 	BitbucketUser               string `mapstructure:"bitbucket-user"`
