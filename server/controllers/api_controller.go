@@ -56,6 +56,50 @@ type APIRequest struct {
 	}
 }
 
+type APIPlanResponse struct {
+	Error          string `json:"omitempty"`
+	ProjectResults []APIPlanProjectResponse
+}
+
+type APIPlanProjectResponse struct {
+	Error           string `json:"omitempty"`
+	Success         bool
+	RepoRelDir      string
+	Workspace       string
+	ProjectName     string
+	TerraformOutput string
+}
+
+func preparePlanResult(result *command.Result) APIPlanResponse {
+	if result == nil {
+		return APIPlanResponse{
+			Error: "Unexpected no response",
+		}
+	}
+	ret := APIPlanResponse{
+		ProjectResults: make([]APIPlanProjectResponse, len(result.ProjectResults)),
+	}
+	if result.Error != nil {
+		ret.Error = result.Error.Error()
+	}
+	for i, projectResult := range result.ProjectResults {
+		entry := APIPlanProjectResponse{}
+		if projectResult.Error != nil {
+			entry.Error = projectResult.Error.Error()
+		}
+		if projectResult.PlanSuccess == nil {
+			entry.Success = true
+		} else {
+			entry.ProjectName = projectResult.ProjectName
+			entry.RepoRelDir = projectResult.RepoRelDir
+			entry.TerraformOutput = projectResult.PlanSuccess.TerraformOutput
+			entry.Workspace = projectResult.ProjectName
+		}
+		ret.ProjectResults[i] = entry
+	}
+	return ret
+}
+
 func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
 	cc := make([]*events.CommentCommand, 0)
 
@@ -115,8 +159,7 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		code = http.StatusInternalServerError
 	}
 
-	// TODO: make a better response
-	response, err := json.Marshal(result)
+	response, err := json.Marshal(preparePlanResult(result))
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
