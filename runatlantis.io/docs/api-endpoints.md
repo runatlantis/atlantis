@@ -8,6 +8,58 @@ The API endpoints documented on this page are currently in **alpha state** and a
 If you build integrations against these endpoints, when upgrading Atlantis you should review the release notes carefully and be prepared to update your code.
 :::
 
+## Response Format
+
+All API responses use a consistent envelope format:
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:30:00Z"
+}
+```
+
+### Response Fields
+
+| Field      | Type    | Description                                                    |
+|------------|---------|----------------------------------------------------------------|
+| success    | boolean | `true` if the request succeeded, `false` otherwise             |
+| data       | object  | The response payload (present on success)                      |
+| error      | object  | Error details (present on failure, `null` on success)          |
+| request_id | string  | Unique identifier for request tracing                          |
+| timestamp  | string  | ISO 8601 timestamp of when the response was generated          |
+
+### Error Response Format
+
+When an error occurs, the response includes structured error information:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "missing required parameter: repository"
+  },
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:30:00Z"
+}
+```
+
+### Error Codes
+
+| Code                 | HTTP Status | Description                                      |
+|----------------------|-------------|--------------------------------------------------|
+| VALIDATION_ERROR     | 400         | Invalid request parameters or body               |
+| UNAUTHORIZED         | 401         | Invalid or missing authentication token          |
+| FORBIDDEN            | 403         | Access denied (e.g., repository not allowed)     |
+| NOT_FOUND            | 404         | Requested resource not found                     |
+| INTERNAL_ERROR       | 500         | Internal server error                            |
+| SERVICE_UNAVAILABLE  | 503         | Feature not enabled or service unavailable       |
+
 ## Main Endpoints
 
 The API endpoints in this section are disabled by default, since these API endpoints could change the infrastructure directly.
@@ -101,63 +153,90 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
 
 ```json
 {
-  "Error": null,
-  "Failure": "",
-  "ProjectResults": [
-    {
-      "Command": 1,
-      "RepoRelDir": ".",
-      "Workspace": "default",
-      "Error": null,
-      "Failure": "",
-      "PlanSuccess": {
-        "TerraformOutput": "<redacted>",
-        "LockURL": "<redacted>",
-        "RePlanCmd": "atlantis plan -d .",
-        "ApplyCmd": "atlantis apply -d .",
-        "HasDiverged": false
-      },
-      "PolicyCheckSuccess": null,
-      "ApplySuccess": "",
-      "VersionSuccess": "",
-      "ProjectName": ""
-    }
-  ],
-  "PlansDeleted": false
+  "success": true,
+  "data": {
+    "command": "plan",
+    "projects": [
+      {
+        "project_name": "",
+        "directory": ".",
+        "workspace": "default",
+        "command": "plan",
+        "status": "success",
+        "output": "<terraform plan output>",
+        "plan": {
+          "has_changes": true,
+          "to_add": 2,
+          "to_change": 1,
+          "to_destroy": 0,
+          "to_import": 0,
+          "summary": "Plan: 2 to add, 1 to change, 0 to destroy."
+        }
+      }
+    ],
+    "total_projects": 1,
+    "success_count": 1,
+    "failure_count": 0,
+    "executed_at": "2025-01-21T10:30:00Z"
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
 
 #### Sample Response (Error)
 
-When an error occurs, the `Error` field contains the error message as a string:
+When an error occurs, the response includes structured error information:
 
 ```json
 {
-  "Error": null,
-  "Failure": "",
-  "ProjectResults": [
-    {
-      "Command": 1,
-      "RepoRelDir": "modules/vpc",
-      "Workspace": "production",
-      "Error": "terraform plan failed: resource not found",
-      "Failure": "plan execution error",
-      "PlanSuccess": null,
-      "PolicyCheckSuccess": null,
-      "ApplySuccess": "",
-      "VersionSuccess": "",
-      "ProjectName": "vpc"
-    }
-  ],
-  "PlansDeleted": false
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "at least one of 'Projects' or 'Paths' must be specified"
+  },
+  "request_id": "550e8400-e29b-41d4-a716-446655440001",
+  "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
 
-::: tip Error Handling
+#### Sample Response (Project Error)
 
-* `Error`: Contains the error message as a string when an error occurs, `null` on success
-* `Failure`: Contains a human-readable failure message, empty string on success
-* Both top-level and per-project `Error`/`Failure` fields follow this format
+When a project-level error occurs:
+
+```json
+{
+  "success": true,
+  "data": {
+    "command": "plan",
+    "projects": [
+      {
+        "project_name": "vpc",
+        "directory": "modules/vpc",
+        "workspace": "production",
+        "command": "plan",
+        "status": "error",
+        "error": "terraform plan failed: resource not found"
+      }
+    ],
+    "total_projects": 1,
+    "success_count": 0,
+    "failure_count": 1,
+    "executed_at": "2025-01-21T10:30:00Z"
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440002",
+  "timestamp": "2025-01-21T10:30:00Z"
+}
+```
+
+::: tip Project Status Values
+
+* `success`: Project command completed successfully
+* `error`: An error occurred (check `error` field)
+* `failed`: A failure occurred (check `failure` field)
 
 :::
 
@@ -224,28 +303,32 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 
 ```json
 {
-  "Error": null,
-  "Failure": "",
-  "ProjectResults": [
-    {
-      "Command": 0,
-      "RepoRelDir": ".",
-      "Workspace": "default",
-      "Error": null,
-      "Failure": "",
-      "PlanSuccess": null,
-      "PolicyCheckSuccess": null,
-      "ApplySuccess": "<redacted>",
-      "VersionSuccess": "",
-      "ProjectName": ""
-    }
-  ],
-  "PlansDeleted": false
+  "success": true,
+  "data": {
+    "command": "apply",
+    "projects": [
+      {
+        "project_name": "",
+        "directory": ".",
+        "workspace": "default",
+        "command": "apply",
+        "status": "success",
+        "output": "Apply complete! Resources: 2 added, 1 changed, 0 destroyed."
+      }
+    ],
+    "total_projects": 1,
+    "success_count": 1,
+    "failure_count": 0,
+    "executed_at": "2025-01-21T10:30:00Z"
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
 
 ::: tip Error Response Format
-Error responses follow the same format as the plan endpoint. See the [plan error response example](#sample-response-error) for details.
+Error responses follow the same envelope format as the plan endpoint. See the [plan error response example](#sample-response-error) for details.
 :::
 
 ### POST /api/drift/remediate
@@ -315,50 +398,58 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "repository": "owner/repo",
-  "ref": "main",
-  "action": "plan",
-  "status": "success",
-  "started_at": "2025-01-21T10:30:00Z",
-  "completed_at": "2025-01-21T10:31:00Z",
-  "total_projects": 2,
-  "success_count": 2,
-  "failure_count": 0,
-  "projects": [
-    {
-      "project_name": "vpc",
-      "path": "modules/vpc",
-      "workspace": "production",
-      "status": "success",
-      "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated...",
-      "drift_before": {
-        "HasDrift": true,
-        "ToAdd": 0,
-        "ToChange": 1,
-        "ToDestroy": 0,
-        "Summary": "Plan: 0 to add, 1 to change, 0 to destroy."
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "repository": "owner/repo",
+    "ref": "main",
+    "action": "plan",
+    "status": "success",
+    "started_at": "2025-01-21T10:30:00Z",
+    "completed_at": "2025-01-21T10:31:00Z",
+    "projects": [
+      {
+        "project_name": "vpc",
+        "directory": "modules/vpc",
+        "workspace": "production",
+        "status": "success",
+        "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated...",
+        "drift_before": {
+          "to_add": 0,
+          "to_change": 1,
+          "to_destroy": 0,
+          "to_import": 0,
+          "total_changes": 1,
+          "summary": "Plan: 0 to add, 1 to change, 0 to destroy.",
+          "changes_outside": false
+        },
+        "drift_after": {
+          "to_add": 0,
+          "to_change": 1,
+          "to_destroy": 0,
+          "to_import": 0,
+          "total_changes": 1,
+          "summary": "Plan: 0 to add, 1 to change, 0 to destroy.",
+          "changes_outside": false
+        }
       },
-      "drift_after": {
-        "HasDrift": true,
-        "ToAdd": 0,
-        "ToChange": 1,
-        "ToDestroy": 0,
-        "Summary": "Plan: 0 to add, 1 to change, 0 to destroy."
+      {
+        "project_name": "ec2",
+        "directory": "modules/ec2",
+        "workspace": "production",
+        "status": "success",
+        "plan_output": "No changes. Infrastructure is up-to-date."
       }
-    },
-    {
-      "project_name": "ec2",
-      "path": "modules/ec2",
-      "workspace": "production",
-      "status": "success",
-      "plan_output": "No changes. Infrastructure is up-to-date.",
-      "drift_before": {
-        "HasDrift": false,
-        "Summary": "No changes. Infrastructure is up-to-date."
-      }
+    ],
+    "summary": {
+      "total_projects": 2,
+      "success_count": 2,
+      "failure_count": 0
     }
-  ]
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
 
@@ -366,35 +457,52 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440001",
-  "repository": "owner/repo",
-  "ref": "main",
-  "action": "apply",
-  "status": "success",
-  "started_at": "2025-01-21T10:30:00Z",
-  "completed_at": "2025-01-21T10:32:00Z",
-  "total_projects": 1,
-  "success_count": 1,
-  "failure_count": 0,
-  "projects": [
-    {
-      "project_name": "vpc",
-      "path": "modules/vpc",
-      "workspace": "production",
-      "status": "success",
-      "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated...",
-      "apply_output": "Apply complete! Resources: 0 added, 1 changed, 0 destroyed.",
-      "drift_before": {
-        "HasDrift": true,
-        "ToChange": 1,
-        "Summary": "Plan: 0 to add, 1 to change, 0 to destroy."
-      },
-      "drift_after": {
-        "HasDrift": false,
-        "Summary": "Apply completed successfully"
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "repository": "owner/repo",
+    "ref": "main",
+    "action": "apply",
+    "status": "success",
+    "started_at": "2025-01-21T10:30:00Z",
+    "completed_at": "2025-01-21T10:32:00Z",
+    "projects": [
+      {
+        "project_name": "vpc",
+        "directory": "modules/vpc",
+        "workspace": "production",
+        "status": "success",
+        "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated...",
+        "apply_output": "Apply complete! Resources: 0 added, 1 changed, 0 destroyed.",
+        "drift_before": {
+          "to_add": 0,
+          "to_change": 1,
+          "to_destroy": 0,
+          "to_import": 0,
+          "total_changes": 1,
+          "summary": "Plan: 0 to add, 1 to change, 0 to destroy.",
+          "changes_outside": false
+        },
+        "drift_after": {
+          "to_add": 0,
+          "to_change": 0,
+          "to_destroy": 0,
+          "to_import": 0,
+          "total_changes": 0,
+          "summary": "Apply completed successfully",
+          "changes_outside": false
+        }
       }
+    ],
+    "summary": {
+      "total_projects": 1,
+      "success_count": 1,
+      "failure_count": 0
     }
-  ]
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440001",
+  "timestamp": "2025-01-21T10:32:00Z"
 }
 ```
 
@@ -402,32 +510,40 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440002",
-  "repository": "owner/repo",
-  "ref": "main",
-  "action": "plan",
-  "status": "partial",
-  "started_at": "2025-01-21T10:30:00Z",
-  "completed_at": "2025-01-21T10:31:00Z",
-  "total_projects": 2,
-  "success_count": 1,
-  "failure_count": 1,
-  "projects": [
-    {
-      "project_name": "vpc",
-      "path": "modules/vpc",
-      "workspace": "production",
-      "status": "success",
-      "plan_output": "No changes. Infrastructure is up-to-date."
-    },
-    {
-      "project_name": "ec2",
-      "path": "modules/ec2",
-      "workspace": "production",
-      "status": "failed",
-      "error": "terraform plan failed: Error acquiring state lock"
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440002",
+    "repository": "owner/repo",
+    "ref": "main",
+    "action": "plan",
+    "status": "partial",
+    "started_at": "2025-01-21T10:30:00Z",
+    "completed_at": "2025-01-21T10:31:00Z",
+    "projects": [
+      {
+        "project_name": "vpc",
+        "directory": "modules/vpc",
+        "workspace": "production",
+        "status": "success",
+        "plan_output": "No changes. Infrastructure is up-to-date."
+      },
+      {
+        "project_name": "ec2",
+        "directory": "modules/ec2",
+        "workspace": "production",
+        "status": "failed",
+        "error": "terraform plan failed: Error acquiring state lock"
+      }
+    ],
+    "summary": {
+      "total_projects": 2,
+      "success_count": 1,
+      "failure_count": 1
     }
-  ]
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440002",
+  "timestamp": "2025-01-21T10:31:00Z"
 }
 ```
 
@@ -519,55 +635,58 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
 
 ```json
 {
-  "repository": "owner/repo",
-  "projects": [
-    {
-      "project_name": "vpc",
-      "path": "modules/vpc",
-      "workspace": "production",
-      "ref": "main",
-      "drift": {
+  "success": true,
+  "data": {
+    "repository": "owner/repo",
+    "projects": [
+      {
+        "project_name": "vpc",
+        "directory": "modules/vpc",
+        "workspace": "production",
+        "ref": "main",
         "has_drift": true,
-        "to_add": 1,
-        "to_change": 2,
-        "to_destroy": 0,
-        "to_import": 0,
-        "summary": "Plan: 1 to add, 2 to change, 0 to destroy.",
-        "changes_outside": false
+        "drift": {
+          "to_add": 1,
+          "to_change": 2,
+          "to_destroy": 0,
+          "to_import": 0,
+          "total_changes": 3,
+          "summary": "Plan: 1 to add, 2 to change, 0 to destroy.",
+          "changes_outside": false
+        },
+        "last_checked": "2025-01-21T10:30:00Z"
       },
-      "last_checked": "2025-01-21T10:30:00Z"
-    },
-    {
-      "project_name": "ec2",
-      "path": "modules/ec2",
-      "workspace": "production",
-      "ref": "main",
-      "drift": {
+      {
+        "project_name": "ec2",
+        "directory": "modules/ec2",
+        "workspace": "production",
+        "ref": "main",
         "has_drift": false,
-        "to_add": 0,
-        "to_change": 0,
-        "to_destroy": 0,
-        "to_import": 0,
-        "summary": "No changes. Infrastructure is up-to-date.",
-        "changes_outside": false
-      },
-      "last_checked": "2025-01-21T10:30:00Z"
+        "last_checked": "2025-01-21T10:30:00Z"
+      }
+    ],
+    "detected_at": "2025-01-21T10:30:00Z",
+    "summary": {
+      "total_projects": 2,
+      "projects_with_drift": 1,
+      "projects_without_drift": 1,
+      "projects_with_errors": 0
     }
-  ],
-  "detected_at": "2025-01-21T10:30:00Z",
-  "total_projects": 2,
-  "projects_with_drift": 1
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
 
 #### Error Responses
 
-| Status Code | Description                                           |
-|-------------|-------------------------------------------------------|
-| 400         | Invalid request (missing required fields)             |
-| 401         | Invalid or missing `X-Atlantis-Token` header          |
-| 503         | Drift detection storage is not enabled on the server  |
-| 500         | Internal error during drift detection                 |
+| Status Code | Error Code          | Description                                          |
+|-------------|---------------------|------------------------------------------------------|
+| 400         | VALIDATION_ERROR    | Invalid request (missing required fields)            |
+| 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header         |
+| 503         | SERVICE_UNAVAILABLE | Drift detection storage is not enabled on the server |
+| 500         | INTERNAL_ERROR      | Internal error during drift detection                |
 
 ## Other Endpoints
 
@@ -589,19 +708,41 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
 
 ```json
 {
-  "Locks": [
-    {
-      "Name": "lock-id",
-      "ProjectName": "terraform",
-      "ProjectRepo": "owner/repo",
-      "ProjectRepoPath": "/path",
-      "PullID": "123",
-      "PullURL": "url",
-      "User": "jdoe",
-      "Workspace": "default",
-      "Time": "2025-02-13T16:47:42.040856-08:00"
-    }
-  ]
+  "success": true,
+  "data": {
+    "locks": [
+      {
+        "id": "owner/repo/./default",
+        "project_name": "terraform",
+        "repository": "owner/repo",
+        "path": ".",
+        "workspace": "default",
+        "pull_request_id": 123,
+        "pull_request_url": "https://github.com/owner/repo/pull/123",
+        "locked_by": "jdoe",
+        "locked_at": "2025-02-13T16:47:42.040856-08:00"
+      }
+    ],
+    "total_count": 1
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:30:00Z"
+}
+```
+
+#### Sample Response (No Locks)
+
+```json
+{
+  "success": true,
+  "data": {
+    "locks": [],
+    "total_count": 0
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440001",
+  "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
 
@@ -639,44 +780,47 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=own
 
 ```json
 {
-  "Repository": "owner/repo",
-  "TotalProjects": 3,
-  "ProjectsWithDrift": 2,
-  "CheckedAt": "2025-01-21T10:30:00Z",
-  "Projects": [
-    {
-      "ProjectName": "vpc",
-      "Path": "modules/vpc",
-      "Workspace": "production",
-      "Ref": "main",
-      "Drift": {
-        "HasDrift": true,
-        "ToAdd": 2,
-        "ToChange": 1,
-        "ToDestroy": 0,
-        "ToImport": 0,
-        "ChangesOutside": false,
-        "Summary": "Plan: 2 to add, 1 to change, 0 to destroy."
+  "success": true,
+  "data": {
+    "repository": "owner/repo",
+    "projects": [
+      {
+        "project_name": "vpc",
+        "directory": "modules/vpc",
+        "workspace": "production",
+        "ref": "main",
+        "has_drift": true,
+        "drift": {
+          "to_add": 2,
+          "to_change": 1,
+          "to_destroy": 0,
+          "to_import": 0,
+          "total_changes": 3,
+          "summary": "Plan: 2 to add, 1 to change, 0 to destroy.",
+          "changes_outside": false
+        },
+        "last_checked": "2025-01-21T10:30:00Z"
       },
-      "LastChecked": "2025-01-21T10:30:00Z"
-    },
-    {
-      "ProjectName": "ec2",
-      "Path": "modules/ec2",
-      "Workspace": "production",
-      "Ref": "main",
-      "Drift": {
-        "HasDrift": false,
-        "ToAdd": 0,
-        "ToChange": 0,
-        "ToDestroy": 0,
-        "ToImport": 0,
-        "ChangesOutside": false,
-        "Summary": "No changes. Infrastructure is up-to-date."
-      },
-      "LastChecked": "2025-01-21T10:25:00Z"
+      {
+        "project_name": "ec2",
+        "directory": "modules/ec2",
+        "workspace": "production",
+        "ref": "main",
+        "has_drift": false,
+        "last_checked": "2025-01-21T10:25:00Z"
+      }
+    ],
+    "checked_at": "2025-01-21T10:30:00Z",
+    "summary": {
+      "total_projects": 2,
+      "projects_with_drift": 1,
+      "projects_without_drift": 1,
+      "projects_with_errors": 0
     }
-  ]
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
 
@@ -684,21 +828,31 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=own
 
 ```json
 {
-  "Repository": "owner/repo",
-  "TotalProjects": 0,
-  "ProjectsWithDrift": 0,
-  "CheckedAt": "2025-01-21T10:30:00Z",
-  "Projects": []
+  "success": true,
+  "data": {
+    "repository": "owner/repo",
+    "projects": [],
+    "checked_at": "2025-01-21T10:30:00Z",
+    "summary": {
+      "total_projects": 0,
+      "projects_with_drift": 0,
+      "projects_without_drift": 0,
+      "projects_with_errors": 0
+    }
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440001",
+  "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
 
 #### Error Responses
 
-| Status Code | Description                                           |
-|-------------|-------------------------------------------------------|
-| 400         | Missing required `repository` parameter               |
-| 503         | Drift detection is not enabled on the server          |
-| 500         | Internal error retrieving drift data                  |
+| Status Code | Error Code          | Description                                  |
+|-------------|---------------------|----------------------------------------------|
+| 400         | VALIDATION_ERROR    | Missing required `repository` parameter      |
+| 503         | SERVICE_UNAVAILABLE | Drift detection is not enabled on the server |
+| 500         | INTERNAL_ERROR      | Internal error retrieving drift data         |
 
 ### GET /api/drift/remediate
 
@@ -733,34 +887,46 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=
 
 ```json
 {
-  "repository": "owner/repo",
-  "count": 2,
-  "results": [
-    {
-      "id": "550e8400-e29b-41d4-a716-446655440000",
-      "repository": "owner/repo",
-      "ref": "main",
-      "action": "plan",
-      "status": "success",
-      "started_at": "2025-01-21T10:30:00Z",
-      "completed_at": "2025-01-21T10:31:00Z",
-      "total_projects": 2,
-      "success_count": 2,
-      "failure_count": 0
-    },
-    {
-      "id": "550e8400-e29b-41d4-a716-446655440001",
-      "repository": "owner/repo",
-      "ref": "main",
-      "action": "apply",
-      "status": "partial",
-      "started_at": "2025-01-21T09:00:00Z",
-      "completed_at": "2025-01-21T09:05:00Z",
-      "total_projects": 3,
-      "success_count": 2,
-      "failure_count": 1
-    }
-  ]
+  "success": true,
+  "data": {
+    "repository": "owner/repo",
+    "count": 2,
+    "results": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "repository": "owner/repo",
+        "ref": "main",
+        "action": "plan",
+        "status": "success",
+        "started_at": "2025-01-21T10:30:00Z",
+        "completed_at": "2025-01-21T10:31:00Z",
+        "projects": [],
+        "summary": {
+          "total_projects": 2,
+          "success_count": 2,
+          "failure_count": 0
+        }
+      },
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "repository": "owner/repo",
+        "ref": "main",
+        "action": "apply",
+        "status": "partial",
+        "started_at": "2025-01-21T09:00:00Z",
+        "completed_at": "2025-01-21T09:05:00Z",
+        "projects": [],
+        "summary": {
+          "total_projects": 3,
+          "success_count": 2,
+          "failure_count": 1
+        }
+      }
+    ]
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
 
@@ -768,19 +934,25 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=
 
 ```json
 {
-  "repository": "owner/repo",
-  "count": 0,
-  "results": []
+  "success": true,
+  "data": {
+    "repository": "owner/repo",
+    "count": 0,
+    "results": []
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440001",
+  "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
 
 #### Error Responses
 
-| Status Code | Description                                           |
-|-------------|-------------------------------------------------------|
-| 400         | Missing required `repository` parameter               |
-| 503         | Drift remediation is not enabled on the server        |
-| 500         | Internal error retrieving remediation data            |
+| Status Code | Error Code          | Description                                    |
+|-------------|---------------------|------------------------------------------------|
+| 400         | VALIDATION_ERROR    | Missing required `repository` parameter        |
+| 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server |
+| 500         | INTERNAL_ERROR      | Internal error retrieving remediation data     |
 
 ### GET /api/drift/remediate/{id}
 
@@ -808,50 +980,60 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e2
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "repository": "owner/repo",
-  "ref": "main",
-  "action": "plan",
-  "status": "success",
-  "started_at": "2025-01-21T10:30:00Z",
-  "completed_at": "2025-01-21T10:31:00Z",
-  "total_projects": 2,
-  "success_count": 2,
-  "failure_count": 0,
-  "projects": [
-    {
-      "project_name": "vpc",
-      "path": "modules/vpc",
-      "workspace": "production",
-      "status": "success",
-      "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated...",
-      "drift_before": {
-        "HasDrift": true,
-        "ToAdd": 0,
-        "ToChange": 1,
-        "ToDestroy": 0,
-        "Summary": "Plan: 0 to add, 1 to change, 0 to destroy."
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "repository": "owner/repo",
+    "ref": "main",
+    "action": "plan",
+    "status": "success",
+    "started_at": "2025-01-21T10:30:00Z",
+    "completed_at": "2025-01-21T10:31:00Z",
+    "projects": [
+      {
+        "project_name": "vpc",
+        "directory": "modules/vpc",
+        "workspace": "production",
+        "status": "success",
+        "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated...",
+        "drift_before": {
+          "to_add": 0,
+          "to_change": 1,
+          "to_destroy": 0,
+          "to_import": 0,
+          "total_changes": 1,
+          "summary": "Plan: 0 to add, 1 to change, 0 to destroy.",
+          "changes_outside": false
+        }
+      },
+      {
+        "project_name": "ec2",
+        "directory": "modules/ec2",
+        "workspace": "production",
+        "status": "success",
+        "plan_output": "No changes. Infrastructure is up-to-date."
       }
-    },
-    {
-      "project_name": "ec2",
-      "path": "modules/ec2",
-      "workspace": "production",
-      "status": "success",
-      "plan_output": "No changes. Infrastructure is up-to-date."
+    ],
+    "summary": {
+      "total_projects": 2,
+      "success_count": 2,
+      "failure_count": 0
     }
-  ]
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:31:00Z"
 }
 ```
 
 #### Error Responses
 
-| Status Code | Description                                           |
-|-------------|-------------------------------------------------------|
-| 400         | Missing required `id` parameter                       |
-| 404         | Remediation result not found                          |
-| 503         | Drift remediation is not enabled on the server        |
-| 500         | Internal error retrieving remediation data            |
+| Status Code | Error Code          | Description                                           |
+|-------------|---------------------|-------------------------------------------------------|
+| 400         | VALIDATION_ERROR    | Missing required `id` parameter                       |
+| 404         | NOT_FOUND           | Remediation result not found                          |
+| 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server        |
+| 500         | INTERNAL_ERROR      | Internal error retrieving remediation data            |
 
 ### GET /status
 
