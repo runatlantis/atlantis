@@ -691,3 +691,309 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 
 	return output.String(), nil
 }
+
+// GetRemediationResult handles GET /api/drift/remediate/{id} requests.
+// It retrieves a specific remediation result by ID.
+// This is an authenticated endpoint that requires the API secret.
+func (a *APIController) GetRemediationResult(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Check API is enabled
+	if len(a.APISecret) == 0 {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled"))
+		return
+	}
+
+	// Validate the secret token
+	secret := r.Header.Get(atlantisTokenHeader)
+	if secret != string(a.APISecret) {
+		a.apiReportError(w, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader))
+		return
+	}
+
+	// Check if remediation service is configured
+	if a.RemediationService == nil {
+		a.apiReportError(w, http.StatusServiceUnavailable, fmt.Errorf("drift remediation is not enabled"))
+		return
+	}
+
+	// Get the ID from query parameter (or path, depending on router)
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		// Try to extract from path for routers that support path parameters
+		// Path format: /api/drift/remediate/{id}
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/api/drift/remediate/") {
+			id = strings.TrimPrefix(path, "/api/drift/remediate/")
+		}
+	}
+
+	if id == "" {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("id parameter is required"))
+		return
+	}
+
+	// Get the result
+	result, err := a.RemediationService.GetResult(id)
+	if err != nil {
+		a.apiReportError(w, http.StatusNotFound, err)
+		return
+	}
+
+	// Return result
+	response, err := json.Marshal(result)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	a.respond(w, logging.Info, http.StatusOK, "%s", string(response))
+}
+
+// ListRemediationResults handles GET /api/drift/remediate requests.
+// It lists remediation results for a repository.
+// Query parameters:
+//   - repository: required, the full repository name (owner/repo)
+//   - limit: optional, maximum number of results to return (default: 10)
+//
+// This is an authenticated endpoint that requires the API secret.
+func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Check API is enabled
+	if len(a.APISecret) == 0 {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled"))
+		return
+	}
+
+	// Validate the secret token
+	secret := r.Header.Get(atlantisTokenHeader)
+	if secret != string(a.APISecret) {
+		a.apiReportError(w, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader))
+		return
+	}
+
+	// Check if remediation service is configured
+	if a.RemediationService == nil {
+		a.apiReportError(w, http.StatusServiceUnavailable, fmt.Errorf("drift remediation is not enabled"))
+		return
+	}
+
+	// Get query parameters
+	repository := r.URL.Query().Get("repository")
+	if repository == "" {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("repository parameter is required"))
+		return
+	}
+
+	// Parse limit (default: 10)
+	limit := 10
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
+			a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("invalid limit parameter: %v", err))
+			return
+		}
+		if limit <= 0 {
+			limit = 10
+		}
+		if limit > 100 {
+			limit = 100
+		}
+	}
+
+	// Get results
+	results, err := a.RemediationService.ListResults(repository, limit)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// Return results
+	responseData := struct {
+		Repository string                      `json:"repository"`
+		Count      int                         `json:"count"`
+		Results    []*models.RemediationResult `json:"results"`
+	}{
+		Repository: repository,
+		Count:      len(results),
+		Results:    results,
+	}
+
+	response, err := json.Marshal(responseData)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	a.respond(w, logging.Info, http.StatusOK, "%s", string(response))
+}
+
+// DetectDrift handles POST /api/drift/detect requests.
+// It triggers drift detection by running plans for the specified projects.
+// This is an authenticated endpoint that requires the API secret.
+func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Check API is enabled
+	if len(a.APISecret) == 0 {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled"))
+		return
+	}
+
+	// Validate the secret token
+	secret := r.Header.Get(atlantisTokenHeader)
+	if secret != string(a.APISecret) {
+		a.apiReportError(w, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader))
+		return
+	}
+
+	// Check if drift storage is configured
+	if a.DriftStorage == nil {
+		a.apiReportError(w, http.StatusServiceUnavailable, fmt.Errorf("drift detection is not enabled"))
+		return
+	}
+
+	// Parse the JSON payload
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to read request: %v", err))
+		return
+	}
+
+	var request models.DriftDetectionRequest
+	if err = json.Unmarshal(bytes, &request); err != nil {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to parse request: %v", err))
+		return
+	}
+
+	// Validate required fields
+	if request.Repository == "" {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("repository is required"))
+		return
+	}
+	if request.Ref == "" {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ref is required"))
+		return
+	}
+	if request.Type == "" {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("type is required"))
+		return
+	}
+
+	// Check if the repo is allowlisted
+	VCSHostType, err := models.NewVCSHostType(request.Type)
+	if err != nil {
+		a.apiReportError(w, http.StatusBadRequest, err)
+		return
+	}
+	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, request.Repository)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	baseRepo, err := a.Parser.ParseAPIPlanRequest(VCSHostType, request.Repository, cloneURL)
+	if err != nil {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to parse request: %v", err))
+		return
+	}
+
+	if !a.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		a.apiReportError(w, http.StatusForbidden, fmt.Errorf("repo not allowlisted"))
+		return
+	}
+
+	// Build API request for plan
+	apiRequest := &APIRequest{
+		Repository: request.Repository,
+		Ref:        request.Ref,
+		Type:       request.Type,
+	}
+
+	if len(request.Projects) > 0 {
+		apiRequest.Projects = request.Projects
+	}
+	if len(request.Paths) > 0 {
+		for _, p := range request.Paths {
+			apiRequest.Paths = append(apiRequest.Paths, struct {
+				Directory string
+				Workspace string
+			}{Directory: p.Directory, Workspace: p.Workspace})
+		}
+	}
+
+	// Build the command context
+	ctx := &command.Context{
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        0, // Non-PR workflow
+			BaseBranch: request.Ref,
+			HeadBranch: request.Ref,
+			HeadCommit: request.Ref,
+			BaseRepo:   baseRepo,
+		},
+		Scope: a.Scope,
+		Log:   a.Logger,
+		API:   true,
+	}
+
+	// Setup and run plan
+	if err := a.apiSetup(ctx, command.Plan); err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, fmt.Errorf("setup failed: %v", err))
+		return
+	}
+
+	result, err := a.apiPlan(apiRequest, ctx)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+
+	// Process results and store drift data
+	detectionResult := models.NewDriftDetectionResult(request.Repository)
+
+	for _, pr := range result.ProjectResults {
+		projectDrift := models.ProjectDrift{
+			ProjectName: pr.ProjectName,
+			Path:        pr.RepoRelDir,
+			Workspace:   pr.Workspace,
+			Ref:         request.Ref,
+			LastChecked: time.Now(),
+		}
+
+		if pr.Error != nil {
+			projectDrift.Drift = models.DriftSummary{
+				HasDrift: false,
+				Summary:  fmt.Sprintf("Error: %v", pr.Error),
+			}
+		} else if pr.Failure != "" {
+			projectDrift.Drift = models.DriftSummary{
+				HasDrift: false,
+				Summary:  fmt.Sprintf("Failure: %s", pr.Failure),
+			}
+		} else if pr.PlanSuccess != nil {
+			projectDrift.Drift = models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
+		}
+
+		// Store drift data
+		if err := a.DriftStorage.Store(request.Repository, projectDrift); err != nil {
+			a.Logger.Warn("failed to store drift data: %v", err)
+		}
+
+		detectionResult.AddProject(projectDrift)
+	}
+
+	// Return detection result
+	response, err := json.Marshal(detectionResult)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	code := http.StatusOK
+	if result.HasErrors() {
+		code = http.StatusInternalServerError
+	}
+	a.respond(w, logging.Info, code, "%s", string(response))
+}
