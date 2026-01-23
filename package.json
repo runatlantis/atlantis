@@ -12,7 +12,7 @@
     "vite": "6.4.1",
     "vitepress": "1.6.4",
     "vitepress-plugin-mermaid": "2.0.17",
-    "vue": "3.5.26"
+    "vue": "3.5.27"
   },
   "scripts": {
     "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
