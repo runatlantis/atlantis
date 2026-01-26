@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -142,7 +143,10 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 	workspacesByPath := make(map[string][]string)
 	for _, l := range locks {
 		path := l.Project.Path
-		workspacesByPath[path] = append(workspacesByPath[path], l.Workspace)
+		// Check if workspace already exists to avoid duplicates
+		if !slices.Contains(workspacesByPath[path], l.Workspace) {
+			workspacesByPath[path] = append(workspacesByPath[path], l.Workspace)
+		}
 	}
 
 	// sort keys so we can write deterministic tests
@@ -155,6 +159,7 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 	var projects []templatedProject
 	for _, p := range sortedPaths {
 		workspace := workspacesByPath[p]
+		sort.Strings(workspace)
 		workspacesStr := fmt.Sprintf("`%s`", strings.Join(workspace, "`, `"))
 		if len(workspace) == 1 {
 			projects = append(projects, templatedProject{
