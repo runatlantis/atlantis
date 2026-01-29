@@ -227,6 +227,60 @@ func TestClone_CheckoutMergeGithubAppNoSourceRemote(t *testing.T) {
 	Assert(t, strings.Contains(remotes, "origin"), "expected \"origin\" remote, got remotes: %q", remotes)
 }
 
+func TestClone_CheckoutMergeGithubAppNonGithubUsesSourceRemote(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Add a commit to branch 'branch' that's not on main.
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
+	branchCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	// Now switch back to main and advance the main branch by another commit.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-file")
+	runCmd(t, repoDir, "git", "add", "main-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "main-commit")
+	mainCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		CheckoutDepth:               50,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+		GithubAppEnabled:            true,
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{
+		VCSHost: models.VCSHost{Type: models.Gitlab},
+	}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+		Num:        1,
+	}, "default")
+	Ok(t, err)
+
+	// Non-GitHub repos do not have GitHub's pull/<n>/head ref, so the merge must
+	// still fetch the head branch from the source remote.
+	actBaseCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD~1")
+	actHeadCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2")
+	Equals(t, mainCommit, actBaseCommit)
+	Equals(t, branchCommit, actHeadCommit)
+
+	remotes := runCmd(t, cloneDir, "git", "remote")
+	Assert(t, strings.Contains(remotes, "source"), "expected \"source\" remote for non-GitHub repo, got remotes: %q", remotes)
+	Assert(t, strings.Contains(remotes, "origin"), "expected \"origin\" remote, got remotes: %q", remotes)
+}
+
 // Test that if we're using the merge method and the repo is already cloned at
 // the right commit, then we don't reclone.
 func TestClone_CheckoutMergeNoReclone(t *testing.T) {
