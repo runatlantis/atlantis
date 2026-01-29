@@ -33,6 +33,11 @@ func TestValidateWebhookURL(t *testing.T) {
 			expectErr: webhooks.ErrPrivateIP,
 		},
 		{
+			name:      "127.0.0.1 with port forbidden",
+			url:       "https://127.0.0.1:8080/webhook",
+			expectErr: webhooks.ErrPrivateIP,
+		},
+		{
 			name:      "private IP 10.0.0.1 forbidden",
 			url:       "https://10.0.0.1/webhook",
 			expectErr: webhooks.ErrPrivateIP,
@@ -56,6 +61,41 @@ func TestValidateWebhookURL(t *testing.T) {
 			name:      "link-local address forbidden",
 			url:       "https://169.254.0.1/webhook",
 			expectErr: webhooks.ErrPrivateIP,
+		},
+		{
+			name:      "IPv6 loopback forbidden",
+			url:       "https://[::1]/webhook",
+			expectErr: webhooks.ErrPrivateIP,
+		},
+		{
+			name:      "IPv6 link-local forbidden",
+			url:       "https://[fe80::1]/webhook",
+			expectErr: webhooks.ErrPrivateIP,
+		},
+		{
+			name:      "IPv6 unique local forbidden",
+			url:       "https://[fc00::1]/webhook",
+			expectErr: webhooks.ErrPrivateIP,
+		},
+		{
+			name:      "IPv4-mapped IPv6 private IP forbidden",
+			url:       "https://[::ffff:192.168.1.1]/webhook",
+			expectErr: webhooks.ErrPrivateIP,
+		},
+		{
+			name:      "IPv4-mapped IPv6 loopback forbidden",
+			url:       "https://[::ffff:127.0.0.1]/webhook",
+			expectErr: webhooks.ErrPrivateIP,
+		},
+		{
+			name:      "IPv6 documentation address forbidden",
+			url:       "https://[2001:db8::1]/webhook",
+			expectErr: webhooks.ErrPrivateIP,
+		},
+		{
+			name:            "URL with credentials forbidden",
+			url:             "https://user:pass@example.com/webhook",
+			expectErrSubstr: "must not contain credentials",
 		},
 		{
 			name:      "malformed URL",
