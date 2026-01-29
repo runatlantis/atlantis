@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
 	tally "github.com/uber-go/tally/v4"
 	prometheus "github.com/uber-go/tally/v4/prometheus"
@@ -610,14 +611,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ExecutableName,
 		allowCommands,
 	)
-	defaultTfDistribution := terraformClient.DefaultDistribution()
-	defaultTfVersion := terraformClient.DefaultVersion()
+	var defaultTfDistribution terraform.Distribution
+	var defaultTfVersion *version.Version
+	var terraformBinDir string
+	if terraformClient != nil {
+		defaultTfDistribution = terraformClient.DefaultDistribution()
+		defaultTfVersion = terraformClient.DefaultVersion()
+		terraformBinDir = terraformClient.TerraformBinDir()
+	}
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
 	runStepRunner := &runtime.RunStepRunner{
 		TerraformExecutor:       terraformClient,
 		DefaultTFDistribution:   defaultTfDistribution,
 		DefaultTFVersion:        defaultTfVersion,
-		TerraformBinDir:         terraformClient.TerraformBinDir(),
+		TerraformBinDir:         terraformBinDir,
 		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	drainer := &events.Drainer{}

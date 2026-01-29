@@ -18,10 +18,11 @@ import (
 )
 
 const (
-	DefaultWorkspace      = "default"
-	ApprovedRequirement   = "approved"
-	MergeableRequirement  = "mergeable"
-	UnDivergedRequirement = "undiverged"
+	DefaultWorkspace                  = "default"
+	ApprovedRequirement               = "approved"
+	MergeableRequirement              = "mergeable"
+	UnDivergedRequirement             = "undiverged"
+	UnDivergedWhenModifiedRequirement = "undiverged_when_modified"
 )
 
 type Project struct {
@@ -206,8 +207,8 @@ func validProjectName(name string) bool {
 func validPlanReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
-		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
-			return fmt.Errorf("%q is not a valid plan_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
+		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement && r != UnDivergedWhenModifiedRequirement {
+			return fmt.Errorf("%q is not a valid plan_requirement, only %q, %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement, UnDivergedWhenModifiedRequirement)
 		}
 	}
 	return nil
@@ -216,8 +217,8 @@ func validPlanReq(value any) error {
 func validApplyReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
-		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
-			return fmt.Errorf("%q is not a valid apply_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
+		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement && r != UnDivergedWhenModifiedRequirement {
+			return fmt.Errorf("%q is not a valid apply_requirement, only %q, %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement, UnDivergedWhenModifiedRequirement)
 		}
 	}
 	return nil
@@ -226,8 +227,8 @@ func validApplyReq(value any) error {
 func validImportReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
-		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
-			return fmt.Errorf("%q is not a valid import_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
+		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement && r != UnDivergedWhenModifiedRequirement {
+			return fmt.Errorf("%q is not a valid import_requirement, only %q, %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement, UnDivergedWhenModifiedRequirement)
 		}
 	}
 	return nil
