@@ -49,7 +49,10 @@ type WorkingDir interface {
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
+	// HasDiverged checks if the branch has diverged
 	HasDiverged(logger logging.SimpleLogging, cloneDir string) bool
+	// HasDivergedWhenModified checks if the branch has diverged for the given autoplanWhenModified patterns
+	HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, autoplanWhenModified []string, pullRequest models.PullRequest) bool
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error
@@ -259,6 +262,63 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	}
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
 	return hasDiverged
+}
+
+func (w *FileWorkspace) HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+	if !w.CheckoutMerge {
+		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
+		// we assume false here for 'branch' strategy.
+		return false
+	}
+
+	// If there are no patterns to check, we assume that we're either checking an
+	// autodiscovered project or a project that doesn't have any when_modified patterns.
+	// Fall back to the regular HasDiverged check.
+	if len(autoplanWhenModified) == 0 {
+		return w.HasDiverged(logger, cloneDir)
+	}
+
+	// Iterate over the patterns and check if the remote ref is in the log for the pattern.
+	// If not, we return true.
+	for _, pattern := range autoplanWhenModified {
+		remoteRef := fmt.Sprintf("origin/%s", pullRequest.BaseBranch)
+		remoteRefCmd := exec.Command("git", "log", "-1", "--format=%H", remoteRef, "--", pattern)
+		remoteRefCmd.Dir = cloneDir
+		outputRemoteRef, err := remoteRefCmd.CombinedOutput()
+		if err != nil {
+			logger.Warn("getting remote ref for pattern %s has failed: %s", pattern, string(outputRemoteRef))
+			return true
+		}
+
+		localRefCmd := exec.Command("git", "log", "--format=%H", pullRequest.HeadCommit, "--", pattern) //nolint:gosec // pullRequest.HeadCommit is a git commit SHA
+		localRefCmd.Dir = cloneDir
+		outputLocalRef, err := localRefCmd.CombinedOutput()
+		if err != nil {
+			logger.Warn("getting local ref for pattern %s has failed: %s", pattern, string(outputLocalRef))
+			return true
+		}
+
+		// Trim whitespace (including newlines) from the remote ref for comparison
+		remoteRefHash := strings.TrimSpace(string(outputRemoteRef))
+
+		// Split and filter out empty strings from the local refs
+		localRefsRaw := strings.Split(string(outputLocalRef), "\n")
+		var localRefs []string
+		for _, ref := range localRefsRaw {
+			trimmed := strings.TrimSpace(ref)
+			if trimmed != "" {
+				localRefs = append(localRefs, trimmed)
+			}
+		}
+
+		// If remote has commits that are not in local history, it has diverged.
+		// If remote has no ref for this pattern, the file is being created; no divergence.
+		if remoteRefHash != "" && !utils.SlicesContains(localRefs, remoteRefHash) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {

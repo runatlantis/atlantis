@@ -509,7 +509,7 @@ terraform {
 				cacheDir,
 				"",
 				"",
-				"",
+				"0.11.10",
 				cmd.DefaultTFVersionFlag,
 				cmd.DefaultTFDownloadURL,
 				downloadsAllowed,
