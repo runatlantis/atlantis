@@ -54,3 +54,25 @@ type Client interface {
 	// GetPullLabels returns the labels of a pull request
 	GetPullLabels(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error)
 }
+
+// BypassMergeChecker is an optional interface that VCS clients can implement
+// to provide bypass merge validation and audit functionality.
+// This is used when merging PRs with certain policy checks bypassed.
+type BypassMergeChecker interface {
+	// ValidateBypassMerge checks if a user is allowed to perform a bypass merge.
+	// This is called before merging a PR when bypass functionality is enabled.
+	//
+	// Parameters:
+	//   - logger: for logging
+	//   - repo: the repository
+	//   - pull: the pull request
+	//   - user: the user attempting to merge
+	//   - vcsstatusname: the VCS status name prefix (e.g., "atlantis")
+	//
+	// Returns:
+	//   - allowed: true if the user can perform the bypass merge
+	//   - auditMessage: a message to be added as a comment for audit purposes
+	//     (empty if no audit comment should be added)
+	//   - err: any error that occurred
+	ValidateBypassMerge(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, user models.User, vcsstatusname string) (allowed bool, auditMessage string, err error)
+}

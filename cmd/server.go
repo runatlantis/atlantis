@@ -102,8 +102,10 @@ const (
 	GHAppSlugFlag                    = "gh-app-slug"
 	GHAppInstallationIDFlag          = "gh-app-installation-id"
 	GHOrganizationFlag               = "gh-org"
-	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
-	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
+	GHWebhookSecretFlag              = "gh-webhook-secret"                          // nolint: gosec
+	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply"            // nolint: gosec
+	ADAllowMergeableBypassApply      = "azuredevops-allow-mergeable-bypass-apply"   // nolint: gosec
+	ADBypassMergeRequirementTeams    = "azuredevops-bypass-merge-requirement-teams" // nolint: gosec
 	GiteaBaseURLFlag                 = "gitea-base-url"
 	GiteaTokenFlag                   = "gitea-token"
 	GiteaUserFlag                    = "gitea-user"
@@ -225,6 +227,13 @@ var stringFlags = map[string]stringFlag{
 	ADHostnameFlag: {
 		description:  "Azure DevOps hostname to support cloud and self hosted instances.",
 		defaultValue: "dev.azure.com",
+	},
+	ADBypassMergeRequirementTeams: {
+		description: "Comma-separated list of Azure DevOps team names that are allowed to merge PRs " +
+			"when the apply status check is bypassed. If empty and --azuredevops-allow-mergeable-bypass-apply is enabled, " +
+			"any user can merge with bypass. When set, only members of these teams can merge with bypass, " +
+			"and an audit comment will be added to the PR.",
+		defaultValue: "",
 	},
 	AllowCommandsFlag: {
 		description:  "Comma separated list of acceptable atlantis commands.",
@@ -550,6 +559,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	GHAllowMergeableBypassApply: {
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
+		defaultValue: false,
+	},
+	ADAllowMergeableBypassApply: {
+		description:  "Feature flag to enable functionality to allow Azure DevOps mergeable check to ignore apply required status policy",
 		defaultValue: false,
 	},
 	GitlabStatusRetryEnabledFlag: {
