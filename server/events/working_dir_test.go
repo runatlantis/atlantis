@@ -822,6 +822,617 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	Equals(t, hasDiverged, false)
 }
 
+func TestHasDivergedWhenModified_CheckoutMergeDisabled(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Simulate first PR with file changes.
+	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "project1")
+	runCmd(t, repoDir, "touch", "project1/main.tf")
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1")
+	headCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout first PR.
+	firstPRDir := repoDir + "/first-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
+	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, firstPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	logger := logging.NewNoopLogger(t)
+
+	// Create the workspace without CheckoutMerge.
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       false,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "first-pr",
+		BaseBranch: "main",
+		HeadCommit: headCommit,
+	}
+
+	// Should return false when CheckoutMerge is disabled.
+	hasDiverged := wd.HasDivergedWhenModified(logger, firstPRDir, []string{"project1/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+}
+
+func TestHasDivergedWhenModified_EmptyPatterns(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Simulate first PR.
+	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
+	runCmd(t, repoDir, "touch", "file1")
+	runCmd(t, repoDir, "git", "add", "file1")
+	runCmd(t, repoDir, "git", "commit", "-m", "file1")
+	headCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout first PR.
+	firstPRDir := repoDir + "/first-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
+	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, firstPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Simulate second PR.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "checkout", "-b", "second-pr")
+	runCmd(t, repoDir, "touch", "file2")
+	runCmd(t, repoDir, "git", "add", "file2")
+	runCmd(t, repoDir, "git", "commit", "-m", "file2")
+
+	// Atlantis checkout second PR.
+	secondPRDir := repoDir + "/second-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
+	runCmd(t, secondPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, secondPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "source", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, secondPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Merge first PR to make main diverge from second PR.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "merge", "first-pr")
+
+	// Copy the second-pr repo to our data dir which has diverged remote main.
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", secondPRDir, "repos/0/default")
+
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "second-pr",
+		BaseBranch: "main",
+		HeadCommit: headCommit,
+	}
+
+	// With empty patterns, should fall back to regular HasDiverged which should return true.
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{}, pullRequest)
+	Equals(t, true, hasDiverged)
+}
+
+func TestHasDivergedWhenModified_PatternHasDiverged(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Simulate first PR with changes to project1.
+	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "project1")
+	runCmd(t, repoDir, "touch", "project1/main.tf")
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1")
+
+	// Atlantis checkout first PR.
+	firstPRDir := repoDir + "/first-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
+	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, firstPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Simulate second PR with changes to project1.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "checkout", "-b", "second-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "project1")
+	runCmd(t, repoDir, "touch", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "add", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add variables to project1")
+	secondHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout second PR.
+	secondPRDir := repoDir + "/second-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
+	runCmd(t, secondPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, secondPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "source", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, secondPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Merge first PR to create divergence.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "merge", "first-pr")
+
+	// Copy the second-pr repo to our data dir which has diverged remote main.
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", secondPRDir, "repos/0/default")
+
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "second-pr",
+		BaseBranch: "main",
+		HeadCommit: secondHeadCommit,
+	}
+
+	// Pattern matches files that have diverged (project1 was modified in first-pr and merged to main).
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**"}, pullRequest)
+	Equals(t, true, hasDiverged)
+}
+
+func TestHasDivergedWhenModified_PatternHasNotDiverged(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Simulate first PR with changes to project1.
+	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "project1")
+	runCmd(t, repoDir, "touch", "project1/main.tf")
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1")
+
+	// Merge first PR to main.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "merge", "first-pr")
+
+	// Simulate second PR with changes to project1 after main already has project1.
+	runCmd(t, repoDir, "git", "checkout", "-b", "second-pr")
+	runCmd(t, repoDir, "touch", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "add", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add variables to project1")
+	secondHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout second PR (which includes main's changes since it branched from main).
+	secondPRDir := repoDir + "/second-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
+	runCmd(t, secondPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, secondPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "source", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, secondPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Copy the second-pr repo to our data dir.
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", secondPRDir, "repos/0/default")
+
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "second-pr",
+		BaseBranch: "main",
+		HeadCommit: secondHeadCommit,
+	}
+
+	// Pattern matches project1 files. Main's last commit for project1 is in second-pr's history (since it branched from main).
+	// So it has not diverged.
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+}
+
+func TestHasDivergedWhenModified_MultiplePatterns(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Add initial files to project2 and project3 on main.
+	runCmd(t, repoDir, "mkdir", "-p", "project2")
+	runCmd(t, repoDir, "mkdir", "-p", "project3")
+	runCmd(t, repoDir, "touch", "project2/main.tf")
+	runCmd(t, repoDir, "touch", "project3/main.tf")
+	runCmd(t, repoDir, "git", "add", "project2/main.tf")
+	runCmd(t, repoDir, "git", "add", "project3/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project2 and project3")
+
+	// Simulate PR with additional changes to project2 and project3.
+	runCmd(t, repoDir, "git", "checkout", "-b", "feature-pr")
+	runCmd(t, repoDir, "touch", "project2/variables.tf")
+	runCmd(t, repoDir, "touch", "project3/variables.tf")
+	runCmd(t, repoDir, "git", "add", "project2/variables.tf")
+	runCmd(t, repoDir, "git", "add", "project3/variables.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add variables to project2 and project3")
+	featureHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout feature PR.
+	featurePRDir := repoDir + "/feature-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "feature-pr")
+	runCmd(t, featurePRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, featurePRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, featurePRDir, "git", "fetch", "source", "+refs/heads/feature-pr")
+	runCmd(t, featurePRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, featurePRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, featurePRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, featurePRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Copy the feature-pr repo to our data dir.
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", featurePRDir, "repos/0/default")
+
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "feature-pr",
+		BaseBranch: "main",
+		HeadCommit: featureHeadCommit,
+	}
+
+	// Both patterns match files. Main's commits for these patterns are in feature-pr's history.
+	// So neither has diverged.
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project2/**", "project3/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+}
+
+func TestHasDivergedWhenModified_PatternMatchesNothing(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Simulate first PR with changes to project1.
+	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "project1")
+	runCmd(t, repoDir, "touch", "project1/main.tf")
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1")
+	headCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout first PR.
+	firstPRDir := repoDir + "/first-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
+	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, firstPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "first-pr",
+		BaseBranch: "main",
+		HeadCommit: headCommit,
+	}
+
+	// Pattern matches no files (project2 doesn't exist), should not be considered diverged.
+	hasDiverged := wd.HasDivergedWhenModified(logger, firstPRDir, []string{"project2/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+}
+
+func TestHasDivergedWhenModified_BrandNewFiles(t *testing.T) {
+	// When a PR adds brand new files matching a pattern that main has never touched,
+	// this should NOT be considered diverged - main hasn't moved, we're just adding new content.
+
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Simulate PR that adds brand new project1 files (main has never had project1).
+	runCmd(t, repoDir, "git", "checkout", "-b", "new-project-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "project1")
+	runCmd(t, repoDir, "touch", "project1/main.tf")
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add brand new project1")
+	headCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout the PR.
+	prDir := repoDir + "/new-project-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "new-project-pr")
+	runCmd(t, prDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, prDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, prDir, "git", "fetch", "source", "+refs/heads/new-project-pr")
+	runCmd(t, prDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, prDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, prDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, prDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "new-project-pr",
+		BaseBranch: "main",
+		HeadCommit: headCommit,
+	}
+
+	// Pattern matches brand new files that main has never touched.
+	// Main hasn't "diverged" - we're just adding new content.
+	hasDiverged := wd.HasDivergedWhenModified(logger, prDir, []string{"project1/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+}
+
+func TestHasDivergedWhenModified_FilesDeletedFromMain(t *testing.T) {
+	// When files are deleted from main after PR was created, this IS divergence.
+	// Even though remoteRefHash == "", this is different from brand new files because
+	// the files existed on main when the PR branched off.
+
+	// Initialize the git repo with project1.
+	repoDir := initRepo(t)
+	runCmd(t, repoDir, "mkdir", "-p", "project1")
+	runCmd(t, repoDir, "touch", "project1/main.tf")
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1 to main")
+
+	// Create PR that modifies project1.
+	runCmd(t, repoDir, "git", "checkout", "-b", "feature-pr")
+	runCmd(t, repoDir, "touch", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "add", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add variables to project1")
+	featureHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout feature PR.
+	featurePRDir := repoDir + "/feature-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "feature-pr")
+	runCmd(t, featurePRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, featurePRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, featurePRDir, "git", "fetch", "source", "+refs/heads/feature-pr")
+	runCmd(t, featurePRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, featurePRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, featurePRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, featurePRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// After PR created, delete project1 from main.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "rm", "-r", "project1")
+	runCmd(t, repoDir, "git", "commit", "-m", "delete project1")
+
+	// Copy feature-pr repo to our data dir.
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", featurePRDir, "repos/0/default")
+
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "feature-pr",
+		BaseBranch: "main",
+		HeadCommit: featureHeadCommit,
+	}
+
+	// Pattern matches project1 which has been deleted from main.
+	// This IS divergence - main has moved forward by deleting the files.
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**"}, pullRequest)
+	Equals(t, true, hasDiverged)
+}
+
+func TestHasDivergedWhenModified_MixedPatternsOneDiverged(t *testing.T) {
+	// Test that when multiple patterns are provided and ONE has diverged,
+	// the function correctly returns true (diverged).
+
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Add project1 and project2 to main.
+	runCmd(t, repoDir, "mkdir", "-p", "project1")
+	runCmd(t, repoDir, "mkdir", "-p", "project2")
+	runCmd(t, repoDir, "touch", "project1/main.tf")
+	runCmd(t, repoDir, "touch", "project2/main.tf")
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "add", "project2/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1 and project2")
+
+	// Create PR that modifies both projects.
+	runCmd(t, repoDir, "git", "checkout", "-b", "feature-pr")
+	runCmd(t, repoDir, "touch", "project1/variables.tf")
+	runCmd(t, repoDir, "touch", "project2/variables.tf")
+	runCmd(t, repoDir, "git", "add", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "add", "project2/variables.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "modify both projects")
+	featureHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout feature PR.
+	featurePRDir := repoDir + "/feature-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "feature-pr")
+	runCmd(t, featurePRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, featurePRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, featurePRDir, "git", "fetch", "source", "+refs/heads/feature-pr")
+	runCmd(t, featurePRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, featurePRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, featurePRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, featurePRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// After PR created, modify ONLY project1 on main (not project2).
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "project1/outputs.tf")
+	runCmd(t, repoDir, "git", "add", "project1/outputs.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "modify project1 on main")
+
+	// Copy feature-pr repo to our data dir.
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", featurePRDir, "repos/0/default")
+
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "feature-pr",
+		BaseBranch: "main",
+		HeadCommit: featureHeadCommit,
+	}
+
+	// Check with both patterns: project1 (diverged) and project2 (not diverged).
+	// Should return true because at least one pattern has diverged.
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**", "project2/**"}, pullRequest)
+	Equals(t, true, hasDiverged)
+
+	// Check with only project2 pattern (not diverged).
+	hasDiverged = wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project2/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+}
+
+func TestHasDivergedWhenModified_PRDidNotTouchPattern(t *testing.T) {
+	// This test shows the intended behavior: even if the PR didn't modify files matching the pattern,
+	// if main did (after PR was created), we consider it diverged. This ensures plans stay current.
+
+	// Initialize the git repo with project1 already existing.
+	repoDir := initRepo(t)
+	runCmd(t, repoDir, "mkdir", "-p", "project1")
+	runCmd(t, repoDir, "touch", "project1/main.tf")
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1 to main")
+
+	// Create first PR that modifies project2 (not project1).
+	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "project2")
+	runCmd(t, repoDir, "touch", "project2/main.tf")
+	runCmd(t, repoDir, "git", "add", "project2/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project2")
+	firstHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout first PR.
+	firstPRDir := repoDir + "/first-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
+	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, firstPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Create second PR that modifies project1.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "checkout", "-b", "second-pr")
+	runCmd(t, repoDir, "touch", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "add", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "modify project1")
+
+	// Merge second PR to main (so main now has new project1 changes).
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "merge", "second-pr")
+
+	// Copy first-pr repo to our data dir.
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", firstPRDir, "repos/0/default")
+
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "first-pr",
+		BaseBranch: "main",
+		HeadCommit: firstHeadCommit,
+	}
+
+	// Check divergence for project1 pattern.
+	// first-pr never touched project1, but main has moved forward on it.
+	// This IS considered diverged - the pattern is in autoplanWhenModified,
+	// and we want to ensure plans stay current with main's changes.
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**"}, pullRequest)
+	Equals(t, true, hasDiverged)
+}
+
 func initRepo(t *testing.T) string {
 	repoDir := t.TempDir()
 	runCmd(t, repoDir, "git", "init", "--initial-branch=main")
