@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package tfclient
 
 import (
@@ -181,7 +184,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	Ok(t, err)
 	tmp := t.TempDir()
 	logger := logmocks.NewMockSimpleLogging()
-	When(logger.With(Any[string](), Any[interface{}]())).ThenReturn(logger)
+	When(logger.With(Any[string](), Any[any]())).ThenReturn(logger)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := command.ProjectContext{
@@ -224,7 +227,7 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	exp := fmt.Sprintf("TF_IN_AUTOMATION=true TF_PLUGIN_CACHE_DIR=%s WORKSPACE=workspace ATLANTIS_TERRAFORM_VERSION=0.11.11 DIR=%s", tmp, tmp)
 	Equals(t, exp, out)
 
-	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[interface{}]())
+	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[any]())
 }
 
 func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
@@ -233,7 +236,7 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	Ok(t, err)
 	tmp := t.TempDir()
 	logger := logmocks.NewMockSimpleLogging()
-	When(logger.With(Any[string](), Any[interface{}]())).ThenReturn(logger)
+	When(logger.With(Any[string](), Any[any]())).ThenReturn(logger)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := command.ProjectContext{
@@ -262,10 +265,10 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	Ok(t, err)
 
-	var exp string
-	for i := 0; i < 1024; i++ {
+	var exp strings.Builder
+	for range 1024 {
 		s := strings.Repeat("0", 10) + "\n"
-		exp += s
+		exp.WriteString(s)
 		_, err = f.WriteString(s)
 		Ok(t, err)
 	}
@@ -275,9 +278,9 @@ func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 
 	out, err := waitCh(outCh)
 	Ok(t, err)
-	Equals(t, strings.TrimRight(exp, "\n"), out)
+	Equals(t, strings.TrimRight(exp.String(), "\n"), out)
 
-	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[interface{}]())
+	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[any]())
 }
 
 func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
@@ -286,7 +289,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	Ok(t, err)
 	tmp := t.TempDir()
 	logger := logmocks.NewMockSimpleLogging()
-	When(logger.With(Any[string](), Any[interface{}]())).ThenReturn(logger)
+	When(logger.With(Any[string](), Any[any]())).ThenReturn(logger)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := command.ProjectContext{
@@ -319,7 +322,7 @@ func TestDefaultClient_RunCommandAsync_StderrOutput(t *testing.T) {
 	Ok(t, err)
 	Equals(t, "stderr", out)
 
-	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[interface{}]())
+	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[any]())
 }
 
 func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
@@ -328,7 +331,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	Ok(t, err)
 	tmp := t.TempDir()
 	logger := logmocks.NewMockSimpleLogging()
-	When(logger.With(Any[string](), Any[interface{}]())).ThenReturn(logger)
+	When(logger.With(Any[string](), Any[any]())).ThenReturn(logger)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := command.ProjectContext{
@@ -362,7 +365,7 @@ func TestDefaultClient_RunCommandAsync_ExitOne(t *testing.T) {
 	// Test that we still get our output.
 	Equals(t, "dying", out)
 
-	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[interface{}]())
+	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[any]())
 }
 
 func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
@@ -371,7 +374,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	Ok(t, err)
 	tmp := t.TempDir()
 	logger := logmocks.NewMockSimpleLogging()
-	When(logger.With(Any[string](), Any[interface{}]())).ThenReturn(logger)
+	When(logger.With(Any[string](), Any[any]())).ThenReturn(logger)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	ctx := command.ProjectContext{
@@ -406,7 +409,7 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	Ok(t, err)
 	Equals(t, "echo me", out)
 
-	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[interface{}]())
+	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[any]())
 }
 
 func waitCh(ch <-chan runtimemodels.Line) (string, error) {

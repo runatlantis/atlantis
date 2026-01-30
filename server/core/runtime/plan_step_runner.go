@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
@@ -8,7 +11,6 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -105,7 +107,7 @@ func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 	// know this is a remote apply.
 	err = os.WriteFile(planFile, []byte(remoteOpsHeader+planOutput), 0600)
 	if err != nil {
-		return output, errors.Wrap(err, "unable to create planfile for remote ops")
+		return output, fmt.Errorf("unable to create planfile for remote ops: %w", err)
 	}
 
 	return p.fmtPlanOutput(output, tfVersion), nil
@@ -271,6 +273,14 @@ func StripRefreshingFromPlanOutput(output string, tfVersion *version.Version) st
 		}
 	}
 	return output
+}
+
+func FilterRegexFromPlanOutput(output string, filterRegex *regexp.Regexp) string {
+	if filterRegex == nil {
+		return output
+	}
+
+	return filterRegex.ReplaceAllString(output, "${1}<redacted>$2")
 }
 
 // remoteOpsErr01114 is the error terraform plan will return if this project is

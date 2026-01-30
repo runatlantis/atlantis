@@ -1,13 +1,16 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 type DBUpdater struct {
-	Backend locking.Backend
+	Database db.Database
 }
 
 func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
@@ -23,5 +26,5 @@ func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, resu
 		filtered = append(filtered, r)
 	}
 	ctx.Log.Debug("updating DB with pull results")
-	return c.Backend.UpdatePullWithResults(pull, filtered)
+	return c.Database.UpdatePullWithResults(pull, filtered)
 }

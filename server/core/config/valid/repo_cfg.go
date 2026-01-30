@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package valid contains the structs representing the atlantis.yaml config
 // after it's been parsed and validated.
 package valid
@@ -52,6 +55,35 @@ func (r RepoCfg) FindProjectsByDir(dir string) []Project {
 		}
 	}
 	return ps
+}
+
+// FindProjectsByDirPattern returns all projects whose dir matches the glob pattern.
+// Supports patterns like "modules/*", "environments/**", etc.
+func (r RepoCfg) FindProjectsByDirPattern(pattern string) []Project {
+	var ps []Project
+	for _, p := range r.Projects {
+		if matched, _ := doublestar.Match(pattern, p.Dir); matched {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
+// FindProjectsByDirPatternWorkspace returns all projects whose dir matches the
+// glob pattern and workspace matches exactly.
+func (r RepoCfg) FindProjectsByDirPatternWorkspace(pattern string, workspace string) []Project {
+	var ps []Project
+	for _, p := range r.Projects {
+		if matched, _ := doublestar.Match(pattern, p.Dir); matched && p.Workspace == workspace {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
+// ContainsDirGlobPattern returns true if the string contains glob pattern characters.
+func ContainsDirGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
 }
 
 func (r RepoCfg) FindProjectByName(name string) *Project {
@@ -110,21 +142,6 @@ func (r RepoCfg) AutoDiscoverEnabled(defaultAutoDiscoverMode AutoDiscoverMode) b
 	}
 
 	return autoDiscoverMode == AutoDiscoverEnabledMode
-}
-
-func (r RepoCfg) IsPathIgnoredForAutoDiscover(path string) bool {
-	if r.AutoDiscover == nil || r.AutoDiscover.IgnorePaths == nil {
-		return false
-	}
-	for i := 0; i < len(r.AutoDiscover.IgnorePaths); i++ {
-		// Per documentation https://pkg.go.dev/github.com/bmatcuk/doublestar, if you run ValidatePattern()
-		// against a pattern, which we do, you can run MatchUnvalidated for a slight performance gain,
-		// and also no need to explicitly check for an error
-		if doublestar.MatchUnvalidated(r.AutoDiscover.IgnorePaths[i], path) {
-			return true
-		}
-	}
-	return false
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in
@@ -200,6 +217,7 @@ const (
 	PostProcessRunOutputShow            = "show"
 	PostProcessRunOutputHide            = "hide"
 	PostProcessRunOutputStripRefreshing = "strip_refreshing"
+	PostProcessRunOutputFilterRegexKey  = "filter_regex"
 )
 
 type Stage struct {
@@ -222,8 +240,9 @@ type Step struct {
 	// RunCommand is either a custom run step or the command to run
 	// during an env step to populate the environment variable dynamically.
 	RunCommand string
-	// Output is option for post-processing a RunCommand output
-	Output PostProcessRunOutputOption
+	// Output includes the options for post-processing a RunCommand output
+	// these will be executed in the received order
+	Output []PostProcessRunOutputOption
 	// EnvVarName is the name of the
 	// environment variable that should be set by this step.
 	EnvVarName string
@@ -231,6 +250,9 @@ type Step struct {
 	EnvVarValue string
 	// The Shell to use for RunCommand execution.
 	RunShell *CommandShell
+	// FilterRegex is a list of regexes for post-processing a RunCommand output
+	// these will be executed in the received order
+	FilterRegexes []*regexp.Regexp
 }
 
 type Workflow struct {

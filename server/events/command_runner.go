@@ -14,12 +14,12 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v68/github"
-	"github.com/pkg/errors"
+	"github.com/google/go-github/v71/github"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -29,7 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
 	"github.com/runatlantis/atlantis/server/utils"
-	tally "github.com/uber-go/tally/v4"
+	"github.com/uber-go/tally/v4"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
@@ -94,20 +94,20 @@ func buildCommentCommandRunner(
 
 // DefaultCommandRunner is the first step when processing a comment command.
 type DefaultCommandRunner struct {
-	VCSClient                vcs.Client
+	VCSClient                vcs.Client `validate:"required"`
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
-	GiteaPullGetter          *gitea.GiteaClient
+	GiteaPullGetter          *gitea.Client
 	// User config option: Disables autoplan when a pull request is opened or updated.
 	DisableAutoplan      bool
 	DisableAutoplanLabel string
 	EventParser          EventParsing
 	// User config option: Fail and do not run the Atlantis command request if any of the pre workflow hooks error
 	FailOnPreWorkflowHookError bool
-	Logger                     logging.SimpleLogging
-	GlobalCfg                  valid.GlobalCfg
-	StatsScope                 tally.Scope
+	Logger                     logging.SimpleLogging `validate:"required"`
+	GlobalCfg                  valid.GlobalCfg       `validate:"required"`
+	StatsScope                 tally.Scope           `validate:"required"`
 	// User config option: controls whether to operate on pull requests from forks.
 	AllowForkPRs bool
 	// ParallelPoolSize controls the size of the wait group used to run
@@ -122,15 +122,17 @@ type DefaultCommandRunner struct {
 	// SilenceForkPRErrorsFlag is the name of the flag that controls fork PR's. We use
 	// this in our error message back to the user on a forked PR so they know
 	// how to disable error comment
-	SilenceForkPRErrorsFlag        string
-	CommentCommandRunnerByCmd      map[command.Name]CommentCommandRunner
-	Drainer                        *Drainer
-	PreWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner
-	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
-	PullStatusFetcher              PullStatusFetcher
-	TeamAllowlistChecker           command.TeamAllowlistChecker
-	VarFileAllowlistChecker        *VarFileAllowlistChecker
-	CommitStatusUpdater            CommitStatusUpdater
+	SilenceForkPRErrorsFlag string
+	// SilenceVCSStatusNoProjects is whether to set commit status if no projects are found
+	SilenceVCSStatusNoProjects     bool
+	CommentCommandRunnerByCmd      map[command.Name]CommentCommandRunner `validate:"required"`
+	Drainer                        *Drainer                              `validate:"required"`
+	PreWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner         `validate:"required"`
+	PostWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner        `validate:"required"`
+	PullStatusFetcher              PullStatusFetcher                     `validate:"required"`
+	TeamAllowlistChecker           command.TeamAllowlistChecker          `validate:"required"`
+	VarFileAllowlistChecker        *VarFileAllowlistChecker              `validate:"required"`
+	CommitStatusUpdater            CommitStatusUpdater                   `validate:"required"`
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -203,16 +205,28 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		Name: command.Autoplan,
 	}
 
-	// Update the combined plan commit status to pending
-	if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-		ctx.Log.Warn("unable to update plan commit status: %s", err)
+	// Only set pending status if silence is not enabled
+	// The PlanCommandRunner will handle the final status decision based on project results
+	if !c.SilenceVCSStatusNoProjects {
+		// Update the combined plan commit status to pending
+		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+			ctx.Log.Warn("unable to update plan commit status: %s", err)
+		}
+	} else {
+		ctx.Log.Debug("silence enabled - not setting pending VCS status")
 	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
-	if err != nil {
+	if preWorkflowHooksErr != nil {
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
+
+			// Create comment on pull request about the pre-workflow hook failure
+			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", preWorkflowHooksErr.Error())
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
+			}
 
 			// Update the plan or apply commit status to failed
 			switch cmd.Name {
@@ -360,23 +374,35 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	// Update the combined plan or apply commit status to pending
-	switch cmd.Name {
-	case command.Plan:
-		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-			ctx.Log.Warn("unable to update plan commit status: %s", err)
+	// Only set pending status if silence is not enabled
+	// The command runners will handle the final status decision based on project results
+	if !c.SilenceVCSStatusNoProjects {
+		// Update the combined plan or apply commit status to pending
+		switch cmd.Name {
+		case command.Plan:
+			if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+				ctx.Log.Warn("unable to update plan commit status: %s", err)
+			}
+		case command.Apply:
+			if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+				ctx.Log.Warn("unable to update apply commit status: %s", err)
+			}
 		}
-	case command.Apply:
-		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
-			ctx.Log.Warn("unable to update apply commit status: %s", err)
-		}
+	} else {
+		ctx.Log.Debug("silence enabled - not setting pending VCS status")
 	}
 
-	err = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
-	if err != nil {
+	if preWorkflowHooksErr != nil {
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
+
+			// Create comment on pull request about the pre-workflow hook failure
+			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", preWorkflowHooksErr.Error())
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
+			}
 
 			// Update the plan or apply commit status to failed
 			switch cmd.Name {
@@ -405,41 +431,41 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GithubPullGetter == nil {
-		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support GitHub")
+		return models.PullRequest{}, models.Repo{}, errors.New("atlantis not configured to support GitHub")
 	}
 	ghPull, err := c.GithubPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to GitHub")
+		return models.PullRequest{}, models.Repo{}, fmt.Errorf("making pull request API call to GitHub: %w", err)
 	}
 	pull, _, headRepo, err := c.EventParser.ParseGithubPull(logger, ghPull)
 	if err != nil {
-		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+		return pull, headRepo, fmt.Errorf("extracting required fields from comment data: %w", err)
 	}
 	return pull, headRepo, nil
 }
 
 func (c *DefaultCommandRunner) getGiteaData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GiteaPullGetter == nil {
-		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support Gitea")
+		return models.PullRequest{}, models.Repo{}, errors.New("atlantis not configured to support Gitea")
 	}
 	giteaPull, err := c.GiteaPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Gitea")
+		return models.PullRequest{}, models.Repo{}, fmt.Errorf("making pull request API call to Gitea: %w", err)
 	}
 	pull, _, headRepo, err := c.EventParser.ParseGiteaPull(giteaPull)
 	if err != nil {
-		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+		return pull, headRepo, fmt.Errorf("extracting required fields from comment data: %w", err)
 	}
 	return pull, headRepo, nil
 }
 
 func (c *DefaultCommandRunner) getGitlabData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, error) {
 	if c.GitlabMergeRequestGetter == nil {
-		return models.PullRequest{}, errors.New("Atlantis not configured to support GitLab")
+		return models.PullRequest{}, errors.New("atlantis not configured to support GitLab")
 	}
 	mr, err := c.GitlabMergeRequestGetter.GetMergeRequest(logger, baseRepo.FullName, pullNum)
 	if err != nil {
-		return models.PullRequest{}, errors.Wrap(err, "making merge request API call to GitLab")
+		return models.PullRequest{}, fmt.Errorf("making merge request API call to GitLab: %w", err)
 	}
 	pull := c.EventParser.ParseGitlabMergeRequest(mr, baseRepo)
 	return pull, nil
@@ -451,11 +477,11 @@ func (c *DefaultCommandRunner) getAzureDevopsData(logger logging.SimpleLogging, 
 	}
 	adPull, err := c.AzureDevopsPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Azure DevOps")
+		return models.PullRequest{}, models.Repo{}, fmt.Errorf("making pull request API call to Azure DevOps: %w", err)
 	}
 	pull, _, headRepo, err := c.EventParser.ParseAzureDevopsPull(adPull)
 	if err != nil {
-		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+		return pull, headRepo, fmt.Errorf("extracting required fields from comment data: %w", err)
 	}
 	return pull, headRepo, nil
 }
@@ -496,7 +522,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	case models.Gitea:
 		pull, headRepo, err = c.getGiteaData(log, baseRepo, pullNum)
 	default:
-		err = errors.New("Unknown VCS type–this is a bug")
+		err = errors.New("unknown VCS type–this is a bug")
 	}
 
 	if err != nil {

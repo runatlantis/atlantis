@@ -19,6 +19,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	paths "path"
@@ -28,13 +29,11 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/logging"
-
-	"github.com/pkg/errors"
 )
 
 type PullReqStatus struct {
-	ApprovalStatus ApprovalStatus
-	Mergeable      bool
+	ApprovalStatus  ApprovalStatus
+	MergeableStatus MergeableStatus
 }
 
 // Repo is a VCS repository.
@@ -88,7 +87,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 
 	cloneURLParsed, err := url.Parse(cloneURL)
 	if err != nil {
-		return Repo{}, errors.Wrap(err, "invalid clone url")
+		return Repo{}, fmt.Errorf("invalid clone url: %w", err)
 	}
 
 	// Ensure the Clone URL is for the same repo to avoid something malicious.
@@ -105,7 +104,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 
 	// We url encode because we're using them in a URL and weird characters can
 	// mess up git.
-	cloneURL = strings.Replace(cloneURL, " ", "%20", -1)
+	cloneURL = strings.ReplaceAll(cloneURL, " ", "%20")
 	escapedVCSUser := url.QueryEscape(vcsUser)
 	escapedVCSToken := url.QueryEscape(vcsToken)
 	auth := fmt.Sprintf("%s:%s@", escapedVCSUser, escapedVCSToken)
@@ -113,10 +112,10 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 
 	// Construct clone urls with http and https auth. Need to do both
 	// because Bitbucket supports http.
-	authedCloneURL := strings.Replace(cloneURL, "https://", "https://"+auth, -1)
-	authedCloneURL = strings.Replace(authedCloneURL, "http://", "http://"+auth, -1)
-	sanitizedCloneURL := strings.Replace(cloneURL, "https://", "https://"+redactedAuth, -1)
-	sanitizedCloneURL = strings.Replace(sanitizedCloneURL, "http://", "http://"+redactedAuth, -1)
+	authedCloneURL := strings.ReplaceAll(cloneURL, "https://", "https://"+auth)
+	authedCloneURL = strings.ReplaceAll(authedCloneURL, "http://", "http://"+auth)
+	sanitizedCloneURL := strings.ReplaceAll(cloneURL, "https://", "https://"+redactedAuth)
+	sanitizedCloneURL = strings.ReplaceAll(sanitizedCloneURL, "http://", "http://"+redactedAuth)
 
 	// Get the owner and repo names from the full name.
 	owner, repo := SplitRepoFullName(repoFullName)
@@ -149,6 +148,12 @@ type ApprovalStatus struct {
 	IsApproved bool
 	ApprovedBy string
 	Date       time.Time
+}
+
+type MergeableStatus struct {
+	IsMergeable bool
+	// Short human readable explanation of why the PR is (or is not) mergeable
+	Reason string
 }
 
 // PullRequest is a VCS pull request.
@@ -274,6 +279,12 @@ type Plan struct {
 	// LocalPath is the absolute path to the plan on disk
 	// (versus the relative path from the repo root).
 	LocalPath string
+}
+
+// GenerateLockKey creates a consistent lock key from a project and workspace.
+// This ensures the same format is used across all locking operations.
+func GenerateLockKey(project Project, workspace string) string {
+	return fmt.Sprintf("%s/%s/%s/%s", project.RepoFullName, project.Path, workspace, project.ProjectName)
 }
 
 // NewProject constructs a Project. Use this constructor because it
@@ -485,7 +496,7 @@ func (p *PolicyCheckResults) CombinedOutput() string {
 	combinedOutput := ""
 	for _, psResult := range p.PolicySetResults {
 		// accounting for json output from conftest.
-		for _, psResultLine := range strings.Split(psResult.PolicyOutput, "\\n") {
+		for psResultLine := range strings.SplitSeq(psResult.PolicyOutput, "\\n") {
 			combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
 		}
 	}

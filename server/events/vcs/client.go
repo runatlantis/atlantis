@@ -30,7 +30,7 @@ type Client interface {
 	ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error
 	HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error
 	PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error)
-	PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error)
+	PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error)
 	// UpdateStatus updates the commit status to state for pull. src is the
 	// source of this status. This should be relatively static across runs,
 	// ex. atlantis/plan or atlantis/apply.
@@ -39,7 +39,7 @@ type Client interface {
 	// url is an optional link that users should click on for more information
 	// about this status.
 	UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error
-	DiscardReviews(repo models.Repo, pull models.PullRequest) error
+	DiscardReviews(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error
 	MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error
 	MarkdownPullLink(pull models.PullRequest) (string, error)
 	GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error)
@@ -47,7 +47,7 @@ type Client interface {
 	// GetFileContent a repository file content from VCS (which support fetch a single file from repository)
 	// The first return value indicates whether the repo contains a file or not
 	// if BaseRepo had a file, its content will placed on the second return value
-	GetFileContent(logger logging.SimpleLogging, pull models.PullRequest, fileName string) (bool, []byte, error)
+	GetFileContent(logger logging.SimpleLogging, repo models.Repo, branch string, fileName string) (bool, []byte, error)
 	SupportsSingleFileDownload(repo models.Repo) bool
 	GetCloneURL(logger logging.SimpleLogging, VCSHostType models.VCSHostType, repo string) (string, error)
 

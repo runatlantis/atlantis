@@ -19,6 +19,10 @@ Custom workflows can be specified in the Server-Side Repo Config or in the Repo-
 
 ### .tfvars files
 
+::: tip
+Before creating custom workflows for `.tfvars` files, consider using Atlantis's automatic `env/{workspace}.tfvars` feature. If you structure your files as `env/staging.tfvars`, `env/production.tfvars`, etc., Atlantis will automatically include them based on the workspace without any configuration. See [Using Atlantis - Automatic Environment Variable Files](using-atlantis.md#automatic-environment-variable-files) for details.
+:::
+
 Given the structure:
 
 ```plain
@@ -181,7 +185,7 @@ Here are the requirements to enable [CDKTF](https://developer.hashicorp.com/terr
 * A custom image with `CDKTF` installed
 * Add `**/cdk.tf.json` to the list of Atlantis autoplan files.
 * Set the `atlantis-include-git-untracked-files` flag so that the Terraform files dynamically generated
-by CDKTF will be add to the Atlantis modified file list.
+by CDKTF will be added to the Atlantis modified file list.
 * Use `pre_workflow_hooks` to run `cdktf synth`
 * Optional: There isn't a requirement to use a repo `atlantis.yaml` but one can be leveraged if needed.
 
@@ -400,7 +404,7 @@ isn't set, Atlantis will use the default plan workflow which is what we want in 
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
-will execute a custom script containing the following code to create a SSH tunnel correctly:
+will execute a custom script containing the following code to create an SSH tunnel correctly:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
 :::
@@ -594,7 +598,7 @@ Compact:
 |-----|--------|---------|----------|----------------------|
 | run | string | none    | no       | Run a custom command |
 
-Full
+Full example:
 
 ```yaml
 - run:
@@ -606,13 +610,27 @@ Full
     output: show
 ```
 
-| Key | Type                                                         | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                             |
-|-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| run | map\[string -> string\] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
+Full example, filtering output and masking matching text (`mySecret: "foo"` -> `mySecret: "<redacted>"`):
+
+```yaml
+- run:
+    command: custom-command arg1 arg2
+    shell: sh
+    shellArgs:
+     - "--debug"
+     - "-c"
+    output:
+      - strip_refreshing
+      - filter_regex: "((?i)secret:\\s\")[^\"]*"
+```
+
+| Key | Type | Default | Required | Description |
+|-----|-----|-----|-----|-----|
+| run | map\[string -> string\] | none | no | Run a custom command |
+| run.command | string | none | yes | Shell command to run |
 | run.shell | string | "sh" | no | Name of the shell to use for command execution |
 | run.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
-| run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
+| run.output | string or []string or []any | "show" | no | How to post-process the output of this command when posted in the PR comment. The options are:<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command <br/> `filter_regex: "<regex_pattern>"` - masks sensitive text in Atlantis comments by replacing regex matches with &lt;redacted&gt;. Can be used multiple times (processed in order). Only filters inline comments - full plan links still show unfiltered results. |
 
 #### Native Environment Variables
 
@@ -645,10 +663,13 @@ Full
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
+  * `ATLANTIS_PR_APPROVED` - "true" if the PR is approved
+  * `ATLANTIS_PR_MERGEABLE` - "true" if the PR is mergeable
+
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
-will execute a custom script containing the following code to create a SSH tunnel correctly:
+will execute a custom script containing the following code to create an SSH tunnel correctly:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
 * If a workflow step returns a non-zero exit code, the workflow will stop.

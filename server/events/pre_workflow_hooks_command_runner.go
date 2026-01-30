@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -27,13 +30,13 @@ type PreWorkflowHooksCommandRunner interface {
 
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
 type DefaultPreWorkflowHooksCommandRunner struct {
-	VCSClient             vcs.Client
-	WorkingDirLocker      WorkingDirLocker
-	WorkingDir            WorkingDir
-	GlobalCfg             valid.GlobalCfg
-	PreWorkflowHookRunner runtime.PreWorkflowHookRunner
-	CommitStatusUpdater   CommitStatusUpdater
-	Router                PreWorkflowHookURLGenerator
+	VCSClient             vcs.Client                    `validate:"required"`
+	WorkingDirLocker      WorkingDirLocker              `validate:"required"`
+	WorkingDir            WorkingDir                    `validate:"required"`
+	GlobalCfg             valid.GlobalCfg               `validate:"required"`
+	PreWorkflowHookRunner runtime.PreWorkflowHookRunner `validate:"required"`
+	CommitStatusUpdater   CommitStatusUpdater           `validate:"required"`
+	Router                PreWorkflowHookURLGenerator   `validate:"required"`
 }
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
@@ -52,14 +55,14 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 
 	ctx.Log.Info("Pre-workflow hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir)
+	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, "", cmd.Name)
 	if err != nil {
 		return err
 	}
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	repoDir, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 	if err != nil {
 		return err
 	}

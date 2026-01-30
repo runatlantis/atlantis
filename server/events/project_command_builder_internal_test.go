@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -14,14 +17,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+	statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -71,7 +74,7 @@ workflows:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -128,7 +131,7 @@ projects:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -189,7 +192,7 @@ projects:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -258,7 +261,7 @@ projects:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -414,7 +417,7 @@ workflows:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -477,7 +480,7 @@ projects:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -543,7 +546,7 @@ workflows:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -595,7 +598,7 @@ projects:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -618,12 +621,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -631,7 +634,7 @@ projects:
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, false, nil)
+				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -685,7 +688,7 @@ projects:
 							BaseRepo: baseRepo,
 						},
 						PullRequestStatus: models.PullReqStatus{
-							Mergeable: true,
+							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
 					}, cmd, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
 
@@ -733,7 +736,7 @@ projects:
 }
 
 func TestBuildProjectCmdCtx_WithRegExpCmdEnabled(t *testing.T) {
-	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+	statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -809,7 +812,7 @@ projects:
 				Log:                logging.NewNoopLogger(t),
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "myproject_1",
@@ -833,12 +836,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -846,7 +849,7 @@ projects:
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, false, nil)
+				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -863,7 +866,7 @@ projects:
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 
@@ -902,7 +905,7 @@ projects:
 						Log:   logging.NewNoopLogger(t),
 						Scope: statsScope,
 						PullRequestStatus: models.PullReqStatus{
-							Mergeable: true,
+							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
 					}, cmd, "", "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true)
 
@@ -952,7 +955,7 @@ projects:
 
 func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+	statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -992,13 +995,13 @@ repos:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
-				PlanRequirements:   []string{"policies_passed"},
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{"policies_passed"},
-				ImportRequirements: []string{"policies_passed"},
+				ImportRequirements: []string{},
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
 				User:               models.User{},
@@ -1054,13 +1057,13 @@ workflows:
 				Log:                logger,
 				Scope:              statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
-				PlanRequirements:   []string{"policies_passed"},
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{"policies_passed"},
-				ImportRequirements: []string{"policies_passed"},
+				ImportRequirements: []string{},
 				RepoConfigVersion:  3,
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
@@ -1078,12 +1081,12 @@ workflows:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -1091,7 +1094,7 @@ workflows:
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, false, nil)
+				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -1110,7 +1113,7 @@ workflows:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 
@@ -1148,7 +1151,7 @@ workflows:
 						BaseRepo: baseRepo,
 					},
 					PullRequestStatus: models.PullReqStatus{
-						Mergeable: true,
+						MergeableStatus: models.MergeableStatus{IsMergeable: true},
 					},
 				}, command.Plan, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
 
@@ -1232,12 +1235,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -1245,7 +1248,7 @@ projects:
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, false, nil)
+				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -1262,7 +1265,7 @@ projects:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 
@@ -1300,7 +1303,7 @@ projects:
 							BaseRepo: baseRepo,
 						},
 						PullRequestStatus: models.PullReqStatus{
-							Mergeable: true,
+							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
 					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true)
 					Equals(t, c.expLen, len(ctxs))
@@ -1367,25 +1370,105 @@ projects:
 			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
 			expLen:        3,
 		},
+		"autodiscover enabled, disabled at repo level": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: disabled
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        1,
+		},
+		"autodiscover respects ignore_paths in repo config": {
+			globalCfg: `
+repos:
+- id: /.*/
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - project3
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        2,
+		},
+		"autodiscover respects ignore_paths in global config": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+    ignore_paths:
+    - project3
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        2,
+		},
+		"autodiscover skips ignore_paths in repo when configured in global": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+    ignore_paths:
+    - project[0-9]
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - project3
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        1,
+		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			})
 
 			workingDir := NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, false, nil)
+				Any[string]())).ThenReturn(tmp, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(c.modifiedFiles, nil)
@@ -1404,7 +1487,7 @@ projects:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 

@@ -22,6 +22,10 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  TERRAFORM_VERSION: 1.11.1
+  NGROK_DOWNLOAD_URL: https://bin.equinox.io/a/bNzUz3YQtcB/ngrok-v3-3.33.1-linux-amd64.tar.gz
+
 jobs:
   changes:
     permissions:
@@ -33,11 +37,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
         id: changes
         with:
@@ -53,17 +57,19 @@ jobs:
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:e6bfa93e7b649feb2f209cb67b24245bcd89a3bb27411ee1402206b14b4358c1
+    # Use latest testing environment for automatic updates
+    # Previous: ghcr.io/runatlantis/testing-env:latest@sha256:725981e9090c977f8055f5ec5ba7a63430a8f0337ab955978e6b8cc2cd0236c3
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:02aaccfc5c1ee9fc321359a66987b8999a1754450da1f90a5d28acee40141a0c
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       # need to setup go toolchain explicitly
-      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
@@ -75,7 +81,7 @@ jobs:
       ###########################################################
       - name: Slack failure notification
         if: ${{ github.ref == 'refs/heads/main' && failure() }}
-        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         with:
           payload: |
             {
@@ -117,7 +123,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
           egress-policy: audit
 
@@ -128,18 +134,17 @@ jobs:
     # dont run e2e tests on forked PRs
     if: github.event.pull_request.head.repo.fork == false
     env:
-      TERRAFORM_VERSION: 1.9.2
       ATLANTIS_GH_USER: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
       ATLANTIS_GH_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
@@ -153,7 +158,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/9VU6NY9RyvK/ngrok-v3-3.19.1-linux-amd64.tar.gz
+          wget -q -O ngrok.tar.gz ${NGROK_DOWNLOAD_URL}
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
@@ -170,18 +175,17 @@ jobs:
     # dont run e2e tests on forked PRs
     if: github.event.pull_request.head.repo.fork == false
     env:
-      TERRAFORM_VERSION: 1.9.2
       ATLANTIS_GITLAB_USER: ${{ secrets.ATLANTISBOT_GITLAB_USERNAME }}
       ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@cb605e52c26070c328afc4562f0b4ada7618a84e # v2.10.4
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
 
@@ -195,7 +199,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/4no1PS1PoRF/ngrok-v3-3.13.0-linux-amd64.tar.gz
+          wget -q -O ngrok.tar.gz ${NGROK_DOWNLOAD_URL}
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version

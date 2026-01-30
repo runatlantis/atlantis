@@ -2,6 +2,12 @@
 
 Aside from interacting via pull request comments, Atlantis could respond to a limited number of API endpoints.
 
+:::warning ALPHA API - SUBJECT TO CHANGE
+The API endpoints documented on this page are currently in **alpha state** and are **not considered stable**. The request and response schemas may change at any time without prior notice or deprecation period.
+
+If you build integrations against these endpoints, when upgrading Atlantis you should review the release notes carefully and be prepared to update your code.
+:::
+
 ## Main Endpoints
 
 The API endpoints in this section are disabled by default, since these API endpoints could change the infrastructure directly.
@@ -21,13 +27,18 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 
 #### Parameters
 
-| Name       | Type    | Required | Description                              |
-|------------|---------|----------|------------------------------------------|
-| Repository | string  | Yes      | Name of the Terraform repository         |
-| Ref        | string  | Yes      | Git reference, like a branch name        |
-| Type       | string  | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Paths      | Path    | Yes      | Paths to the projects to run the plan    |
-| PR         | int     | No       | Pull Request number                      |
+| Name       | Type     | Required | Description                              |
+|------------|----------|----------|------------------------------------------|
+| Repository | string   | Yes      | Name of the Terraform repository         |
+| Ref        | string   | Yes      | Git reference, like a branch name        |
+| Type       | string   | Yes      | Type of the VCS provider (Github/Gitlab) |
+| Projects   | []string | No       | List of project names to run the plan    |
+| Paths      | []Path   | No       | Paths to the projects to run the plan    |
+| PR         | int      | No       | Pull Request number                      |
+
+::: tip NOTE
+At least one of `Projects` or `Paths` must be specified.
+:::
 
 #### Path
 
@@ -96,13 +107,18 @@ Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repo
 
 #### Parameters
 
-| Name       | Type   | Required | Description                              |
-|------------|--------|----------|------------------------------------------|
-| Repository | string | Yes      | Name of the Terraform repository         |
-| Ref        | string | Yes      | Git reference, like a branch name        |
-| Type       | string | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Paths      | Path   | Yes      | Paths to the projects to run the apply   |
-| PR         | int    | No       | Pull Request number                      |
+| Name       | Type     | Required | Description                              |
+|------------|----------|----------|------------------------------------------|
+| Repository | string   | Yes      | Name of the Terraform repository         |
+| Ref        | string   | Yes      | Git reference, like a branch name        |
+| Type       | string   | Yes      | Type of the VCS provider (Github/Gitlab) |
+| Projects   | []string | No       | List of project names to run the apply   |
+| Paths      | []Path   | No       | Paths to the projects to run the apply   |
+| PR         | int      | No       | Pull Request number                      |
+
+::: tip NOTE
+At least one of `Projects` or `Paths` must be specified.
+:::
 
 #### Path
 
@@ -234,3 +250,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/healthz'
   "status": "ok"
 }
 ```
+
+### GET /debug/pprof
+
+If `--enable-profiling-api` is set to true, it adds endpoints under this path to expose server's profiling data. See [profiling Go programs](https://go.dev/blog/pprof) for more information.

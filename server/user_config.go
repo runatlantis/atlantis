@@ -1,10 +1,12 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -27,6 +29,7 @@ type UserConfig struct {
 	AzureDevopsWebhookPassword  string `mapstructure:"azuredevops-webhook-password"`
 	AzureDevopsWebhookUser      string `mapstructure:"azuredevops-webhook-user"`
 	AzureDevOpsHostname         string `mapstructure:"azuredevops-hostname"`
+	BitbucketApiUser            string `mapstructure:"bitbucket-api-user"`
 	BitbucketBaseURL            string `mapstructure:"bitbucket-base-url"`
 	BitbucketToken              string `mapstructure:"bitbucket-token"`
 	BitbucketUser               string `mapstructure:"bitbucket-user"`
@@ -45,6 +48,7 @@ type UserConfig struct {
 	EmojiReaction               string `mapstructure:"emoji-reaction"`
 	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
+	EnableProfilingAPI          bool   `mapstructure:"enable-profiling-api"`
 	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
 	ExecutableName              string `mapstructure:"executable-name"`
 	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
@@ -73,6 +77,7 @@ type UserConfig struct {
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
+	GitlabStatusRetryEnabled        bool   `mapstructure:"gitlab-status-retry-enabled"`
 	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
@@ -84,6 +89,7 @@ type UserConfig struct {
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`
+	PendingApplyStatus              bool   `mapstructure:"pending-apply-status"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
 	Port                            int    `mapstructure:"port"`
@@ -137,7 +143,7 @@ type UserConfig struct {
 func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 	var allowCommands []command.Name
 	var hasAll bool
-	for _, input := range strings.Split(u.AllowCommands, ",") {
+	for input := range strings.SplitSeq(u.AllowCommands, ",") {
 		if input == "" {
 			continue
 		}
@@ -163,7 +169,7 @@ func (u UserConfig) ToWebhookHttpHeaders() (map[string][]string, error) {
 		return nil, nil
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	err := json.Unmarshal([]byte(u.WebhookHttpHeaders), &m)
 	if err != nil {
 		return nil, err
@@ -171,18 +177,18 @@ func (u UserConfig) ToWebhookHttpHeaders() (map[string][]string, error) {
 	headers := make(map[string][]string)
 	for name, rawValue := range m {
 		switch val := rawValue.(type) {
-		case []interface{}:
+		case []any:
 			for _, v := range val {
 				s, ok := v.(string)
 				if !ok {
-					return nil, errors.Errorf("expected string array element, got %T", v)
+					return nil, fmt.Errorf("expected string array element, got %T", v)
 				}
 				headers[name] = append(headers[name], s)
 			}
 		case string:
 			headers[name] = []string{val}
 		default:
-			return nil, errors.Errorf("expected string or array, got %T", val)
+			return nil, fmt.Errorf("expected string or array, got %T", val)
 		}
 	}
 	return headers, nil

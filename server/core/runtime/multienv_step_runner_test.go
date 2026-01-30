@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime_test
 
 import (
@@ -21,29 +24,50 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 	cases := []struct {
 		Command     string
 		ProjectName string
+		Output      []valid.PostProcessRunOutputOption
 		ExpOut      string
 		ExpErr      string
-		Version     string
+		ExpEnv      map[string]string
 	}{
 		{
 			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_ONE=value1'`,
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
 			ExpOut:  "Dynamic environment variables added:\nTF_VAR_REPODEFINEDVARIABLE_ONE\n",
-			Version: "v1.2.3",
+			ExpEnv: map[string]string{
+				"TF_VAR_REPODEFINEDVARIABLE_ONE": "value1",
+			},
 		},
 		{
 			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_TWO=value=1='`,
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
 			ExpOut:  "Dynamic environment variables added:\nTF_VAR_REPODEFINEDVARIABLE_TWO\n",
-			Version: "v1.2.3",
+			ExpEnv: map[string]string{
+				"TF_VAR_REPODEFINEDVARIABLE_TWO": "value=1=",
+			},
 		},
 		{
 			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_NO_VALUE'`,
-			ExpErr:  "Invalid environment variable definition: TF_VAR_REPODEFINEDVARIABLE_NO_VALUE",
-			Version: "v1.2.3",
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
+			ExpErr:  "invalid environment variable definition: TF_VAR_REPODEFINEDVARIABLE_NO_VALUE\n",
+			ExpEnv:  map[string]string{},
 		},
 		{
 			Command: `echo 'TF_VAR1_MULTILINE="foo\\nbar",TF_VAR2_VALUEWITHCOMMA="one,two",TF_VAR3_CONTROL=true'`,
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
 			ExpOut:  "Dynamic environment variables added:\nTF_VAR1_MULTILINE\nTF_VAR2_VALUEWITHCOMMA\nTF_VAR3_CONTROL\n",
-			Version: "v1.2.3",
+			ExpEnv: map[string]string{
+				"TF_VAR1_MULTILINE":      "foo\\nbar",
+				"TF_VAR2_VALUEWITHCOMMA": "one,two",
+				"TF_VAR3_CONTROL":        "true",
+			},
+		},
+		{
+			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_HIDE=value1'`,
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputHide},
+			ExpOut:  "",
+			ExpEnv: map[string]string{
+				"TF_VAR_REPODEFINEDVARIABLE_HIDE": "value1",
+			},
 		},
 	}
 	RegisterMockTestingT(t)
@@ -90,13 +114,14 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 				ProjectName:      c.ProjectName,
 			}
 			envMap := make(map[string]string)
-			value, err := multiEnvStepRunner.Run(ctx, nil, c.Command, tmpDir, envMap, valid.PostProcessRunOutputShow)
+			value, err := multiEnvStepRunner.Run(ctx, nil, c.Command, tmpDir, envMap, c.Output)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return
 			}
 			Ok(t, err)
 			Equals(t, c.ExpOut, value)
+			Equals(t, c.ExpEnv, envMap)
 		})
 	}
 }

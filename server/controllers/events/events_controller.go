@@ -15,22 +15,24 @@ package events
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v71/github"
 	"github.com/microcosm-cc/bluemonday"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
@@ -58,12 +60,12 @@ const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/
 // VCSEventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
 type VCSEventsController struct {
-	CommandRunner  events.CommandRunner
-	PullCleaner    events.PullCleaner
-	Logger         logging.SimpleLogging
-	Scope          tally.Scope
-	Parser         events.EventParsing
-	CommentParser  events.CommentParsing
+	CommandRunner  events.CommandRunner  `validate:"required"`
+	PullCleaner    events.PullCleaner    `validate:"required"`
+	Logger         logging.SimpleLogging `validate:"required"`
+	Scope          tally.Scope           `validate:"required"`
+	Parser         events.EventParsing   `validate:"required"`
+	CommentParser  events.CommentParsing `validate:"required"`
 	ApplyDisabled  bool
 	EmojiReaction  string
 	ExecutableName string
@@ -71,20 +73,20 @@ type VCSEventsController struct {
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
 	GithubWebhookSecret          []byte
-	GithubRequestValidator       GithubRequestValidator
-	GitlabRequestParserValidator GitlabRequestParserValidator
+	GithubRequestValidator       GithubRequestValidator       `validate:"required"`
+	GitlabRequestParserValidator GitlabRequestParserValidator `validate:"required"`
 	// GitlabWebhookSecret is the secret added to this webhook via the GitLab
 	// UI that identifies this call as coming from GitLab. If empty, no
 	// request validation is done.
 	GitlabWebhookSecret  []byte
-	RepoAllowlistChecker *events.RepoAllowlistChecker
+	RepoAllowlistChecker *events.RepoAllowlistChecker `validate:"required"`
 	// SilenceAllowlistErrors controls whether we write an error comment on
 	// pull requests from non-allowlisted repos.
 	SilenceAllowlistErrors bool
 	// SupportedVCSHosts is which VCS hosts Atlantis was configured upon
 	// startup to support.
-	SupportedVCSHosts []models.VCSHostType
-	VCSClient         vcs.Client
+	SupportedVCSHosts []models.VCSHostType `validate:"required"`
+	VCSClient         vcs.Client           `validate:"required"`
 	TestingMode       bool
 	// BitbucketWebhookSecret is the secret added to this webhook via the Bitbucket
 	// UI that identifies this call as coming from Bitbucket. If empty, no
@@ -99,7 +101,7 @@ type VCSEventsController struct {
 	// webhook via the Azure DevOps UI that identifies this call as coming from your
 	// Azure DevOps Team Project. If empty, no request validation is done.
 	AzureDevopsWebhookBasicPassword []byte
-	AzureDevopsRequestValidator     AzureDevopsRequestValidator
+	AzureDevopsRequestValidator     AzureDevopsRequestValidator `validate:"required"`
 	GiteaWebhookSecret              []byte
 }
 
@@ -194,11 +196,11 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	case *github.IssueCommentEvent:
 		resp = e.HandleGithubCommentEvent(event, githubReqID, logger)
 		scope = scope.SubScope(fmt.Sprintf("comment_%s", *event.Action))
-		scope = vcs.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetIssue().GetNumber())
+		scope = common.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetIssue().GetNumber())
 	case *github.PullRequestEvent:
 		resp = e.HandleGithubPullRequestEvent(logger, event, githubReqID)
 		scope = scope.SubScope(fmt.Sprintf("pr_%s", *event.Action))
-		scope = vcs.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetNumber())
+		scope = common.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetNumber())
 	default:
 		resp = HTTPResponse{
 			body: fmt.Sprintf("Ignoring unsupported event %s", githubReqID),
@@ -231,8 +233,8 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 		return
 	}
 	if len(e.BitbucketWebhookSecret) > 0 {
-		if err := bitbucketcloud.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
-			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", errors.Wrap(err, "request did not pass validation").Error())
+		if err := common.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
+			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
 			return
 		}
 	}
@@ -267,8 +269,8 @@ func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r
 		return
 	}
 	if len(e.BitbucketWebhookSecret) > 0 {
-		if err := bitbucketserver.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
-			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", errors.Wrap(err, "request did not pass validation").Error())
+		if err := common.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
+			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
 			return
 		}
 	}
@@ -328,7 +330,7 @@ func (e *VCSEventsController) handleGiteaPost(w http.ResponseWriter, r *http.Req
 
 	if len(e.GiteaWebhookSecret) > 0 {
 		if err := gitea.ValidateSignature(body, signature, e.GiteaWebhookSecret); err != nil {
-			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", errors.Wrap(err, "request did not pass validation").Error())
+			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
 			return
 		}
 	}
@@ -414,7 +416,7 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 	baseRepo, user, pullNum, err := e.Parser.ParseGithubIssueCommentEvent(logger, event)
 
 	if err != nil {
-		wrapped := errors.Wrapf(err, "Failed parsing event: %s", githubReqID)
+		wrapped := fmt.Errorf("parsing event: %s: %w", githubReqID, err)
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{
@@ -539,7 +541,7 @@ func (e *VCSEventsController) handleBitbucketServerPullRequestEvent(logger loggi
 func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.SimpleLogging, pullEvent *github.PullRequestEvent, githubReqID string) HTTPResponse {
 	pull, pullEventType, baseRepo, headRepo, user, err := e.Parser.ParseGithubPullEvent(logger, pullEvent)
 	if err != nil {
-		wrapped := errors.Wrapf(err, "Error parsing pull data: %s %s", err, githubReqID)
+		wrapped := fmt.Errorf("parsing pull data: %s %s: %w", err, githubReqID, err)
 		return HTTPResponse{
 			body: wrapped.Error(),
 			err: HTTPError{
@@ -570,7 +572,7 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 			e.commentNotAllowlisted(baseRepo, pull.Num)
 		}
 
-		err := errors.Errorf("Pull request event from non-allowlisted repo '%s/%s'", baseRepo.VCSHost.Hostname, baseRepo.FullName)
+		err := fmt.Errorf("pull request event from non-allowlisted repo '%s/%s'", baseRepo.VCSHost.Hostname, baseRepo.FullName)
 
 		return HTTPResponse{
 			body: err.Error(),
@@ -697,7 +699,7 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 	if !e.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
 		e.commentNotAllowlisted(baseRepo, pullNum)
 
-		err := errors.New("Repo not allowlisted")
+		err := errors.New("repo not allowlisted")
 
 		return HTTPResponse{
 			body: err.Error(),
@@ -887,15 +889,10 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestEvent(w http.ResponseW
 
 // supportsHost returns true if h is in e.SupportedVCSHosts and false otherwise.
 func (e *VCSEventsController) supportsHost(h models.VCSHostType) bool {
-	for _, supported := range e.SupportedVCSHosts {
-		if h == supported {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(e.SupportedVCSHosts, h)
 }
 
-func (e *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
+func (e *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	e.Logger.Log(lvl, response)
 	w.WriteHeader(code)

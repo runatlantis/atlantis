@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers
 
 import (
@@ -8,7 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	tally "github.com/uber-go/tally/v4"
@@ -26,15 +29,15 @@ func (g JobIDKeyGenerator) Generate(r *http.Request) (string, error) {
 }
 
 type JobsController struct {
-	AtlantisVersion          string
-	AtlantisURL              *url.URL
-	Logger                   logging.SimpleLogging
-	ProjectJobsTemplate      web_templates.TemplateWriter
-	ProjectJobsErrorTemplate web_templates.TemplateWriter
-	Backend                  locking.Backend
-	WsMux                    *websocket.Multiplexor
+	AtlantisVersion          string                       `validate:"required"`
+	AtlantisURL              *url.URL                     `validate:"required"`
+	Logger                   logging.SimpleLogging        `validate:"required"`
+	ProjectJobsTemplate      web_templates.TemplateWriter `validate:"required"`
+	ProjectJobsErrorTemplate web_templates.TemplateWriter `validate:"required"`
+	Database                 db.Database                  `validate:"required"`
+	WsMux                    *websocket.Multiplexor       `validate:"required"`
 	KeyGenerator             JobIDKeyGenerator
-	StatsScope               tally.Scope
+	StatsScope               tally.Scope `validate:"required"`
 }
 
 func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) error {
@@ -87,7 +90,7 @@ func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (j *JobsController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
+func (j *JobsController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	j.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)

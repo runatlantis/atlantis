@@ -26,6 +26,7 @@ import (
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
@@ -36,13 +37,28 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestNewServer(t *testing.T) {
+const (
+	testAtlantisVersion = "1.0.0"
+	testAtlantisUrl     = "http://example.com"
+	testLockingDBType   = cmd.DefaultLockingDBType
+	testGitHubHostName  = cmd.DefaultGHHostname
+	testGitHubUser      = "user"
+)
+
+func TestNewServer_GitHubUser(t *testing.T) {
 	t.Log("Run through NewServer constructor")
 	tmpDir := t.TempDir()
-	_, err := server.NewServer(server.UserConfig{
-		DataDir:     tmpDir,
-		AtlantisURL: "http://example.com",
-	}, server.Config{})
+	_, err := server.NewServer(
+		server.UserConfig{
+			DataDir:        tmpDir,
+			AtlantisURL:    testAtlantisUrl,
+			LockingDBType:  testLockingDBType,
+			GithubHostname: testGitHubHostName,
+			GithubUser:     testGitHubUser,
+		}, server.Config{
+			AtlantisVersion: testAtlantisVersion,
+		},
+	)
 	Ok(t, err)
 }
 
@@ -165,7 +181,7 @@ var s = &server.Server{}
 
 func BenchmarkHealthz(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		s.Healthz(w, nil)
 	}
 }
@@ -272,13 +288,4 @@ func TestParseAtlantisURL(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCommandRunnerVCSClientInitialized(t *testing.T) {
-	s, _ := server.NewServer(server.UserConfig{
-		AtlantisURL: "http://example.com",
-	},
-		server.Config{},
-	)
-	Assert(t, s.CommandRunner.VCSClient != nil, "VCSClient must not be nil.")
 }

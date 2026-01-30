@@ -19,11 +19,13 @@ import (
 	"context"
 	"crypto/tls"
 	"embed"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"net/url"
 	"os"
 	"os/signal"
@@ -34,11 +36,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
 	tally "github.com/uber-go/tally/v4"
 	prometheus "github.com/uber-go/tally/v4/prometheus"
 	"github.com/urfave/negroni/v3"
 
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	cfg "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -49,7 +53,6 @@ import (
 	"github.com/runatlantis/atlantis/server/scheduled"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
@@ -62,9 +65,13 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
+	"github.com/runatlantis/atlantis/server/events/vcs/gitlab"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -125,6 +132,8 @@ type Server struct {
 	ProjectCmdOutputHandler        jobs.ProjectCommandOutputHandler
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
+	EnableProfilingAPI             bool
+	database                       db.Database
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -175,15 +184,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	var supportedVCSHosts []models.VCSHostType
-	var githubClient vcs.IGithubClient
+	var githubClient github.IGithubClient
 	var githubAppEnabled bool
-	var githubConfig vcs.GithubConfig
-	var githubCredentials vcs.GithubCredentials
-	var gitlabClient *vcs.GitlabClient
+	var githubConfig github.Config
+	var githubCredentials github.Credentials
+	var gitlabClient *gitlab.Client
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
-	var azuredevopsClient *vcs.AzureDevopsClient
-	var giteaClient *gitea.GiteaClient
+	var azuredevopsClient *azuredevops.Client
+	var giteaClient *gitea.Client
 
 	policyChecksEnabled := false
 	if userConfig.EnablePolicyChecksFlag {
@@ -195,47 +204,41 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	disableApply := true
-	for _, allowCommand := range allowCommands {
-		if allowCommand == command.Apply {
-			disableApply = false
-			break
-		}
-	}
+	disableApply := !slices.Contains(allowCommands, command.Apply)
 
-	validator := &cfg.ParserValidator{}
+	parserValidator := &cfg.ParserValidator{}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(
 		valid.GlobalCfgArgs{
 			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
 		})
 	if userConfig.RepoConfig != "" {
-		globalCfg, err = validator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
+		globalCfg, err = parserValidator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing %s file", userConfig.RepoConfig)
+			return nil, fmt.Errorf("parsing %s file: %w", userConfig.RepoConfig, err)
 		}
 	} else if userConfig.RepoConfigJSON != "" {
-		globalCfg, err = validator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
+		globalCfg, err = parserValidator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing --%s", config.RepoConfigJSONFlag)
+			return nil, fmt.Errorf("parsing --%s: %w", config.RepoConfigJSONFlag, err)
 		}
 	}
 
 	statsScope, statsReporter, closer, err := metrics.NewScope(globalCfg.Metrics, logger, userConfig.StatsNamespace)
 
 	if err != nil {
-		return nil, errors.Wrapf(err, "instantiating metrics scope")
+		return nil, fmt.Errorf("instantiating metrics scope: %w", err)
 	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
 		if userConfig.GithubAllowMergeableBypassApply {
-			githubConfig = vcs.GithubConfig{
+			githubConfig = github.Config{
 				AllowMergeableBypassApply: true,
 			}
 		}
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
-			githubCredentials = &vcs.GithubUserCredentials{
+			githubCredentials = &github.UserCredentials{
 				User:      userConfig.GithubUser,
 				Token:     userConfig.GithubToken,
 				TokenFile: userConfig.GithubTokenFile,
@@ -245,7 +248,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			if err != nil {
 				return nil, err
 			}
-			githubCredentials = &vcs.GithubAppCredentials{
+			githubCredentials = &github.AppCredentials{
 				AppID:          userConfig.GithubAppID,
 				InstallationID: userConfig.GithubAppInstallationID,
 				Key:            privateKey,
@@ -254,7 +257,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			}
 			githubAppEnabled = true
 		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKey != "" {
-			githubCredentials = &vcs.GithubAppCredentials{
+			githubCredentials = &github.AppCredentials{
 				AppID:          userConfig.GithubAppID,
 				InstallationID: userConfig.GithubAppInstallationID,
 				Key:            []byte(userConfig.GithubAppKey),
@@ -265,12 +268,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
+		rawGithubClient, err := github.New(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
 		if err != nil {
 			return nil, err
 		}
 
-		githubClient = vcs.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
+		githubClient = github.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
 	}
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
@@ -283,18 +286,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 		gitlabGroups := slices.Concat(gitlabGroupAllowlistChecker.AllTeams(), globalCfg.PolicySets.AllTeams())
 		slices.Sort(gitlabGroups)
-		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
+		gitlabClient, err = gitlab.New(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
 		if err != nil {
 			return nil, err
 		}
+		gitlabClient.StatusRetryEnabled = userConfig.GitlabStatusRetryEnabled
 	}
 	if userConfig.BitbucketUser != "" {
 		if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
 			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketCloud)
-			bitbucketCloudClient = bitbucketcloud.NewClient(
+			bitbucketCloudClient = bitbucketcloud.New(
 				http.DefaultClient,
 				userConfig.BitbucketUser,
 				userConfig.BitbucketToken,
+				userConfig.BitbucketApiUser,
 				userConfig.AtlantisURL)
 		} else {
 			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketServer)
@@ -306,7 +311,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				userConfig.BitbucketBaseURL,
 				userConfig.AtlantisURL)
 			if err != nil {
-				return nil, errors.Wrapf(err, "setting up Bitbucket Server client")
+				return nil, fmt.Errorf("setting up Bitbucket Server client: %w", err)
 			}
 		}
 	}
@@ -314,7 +319,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
 
 		var err error
-		azuredevopsClient, err = vcs.NewAzureDevopsClient(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
+		azuredevopsClient, err = azuredevops.New(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
 		if err != nil {
 			return nil, err
 		}
@@ -322,10 +327,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GiteaToken != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitea)
 
-		giteaClient, err = gitea.NewClient(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaPageSize, logger)
+		giteaClient, err = gitea.New(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaPageSize, logger)
 		if err != nil {
 			fmt.Println("error setting up gitea client", "error", err)
-			return nil, errors.Wrapf(err, "setting up Gitea client")
+			return nil, fmt.Errorf("setting up Gitea client: %w", err)
 		} else {
 			logger.Info("gitea client configured successfully")
 		}
@@ -340,17 +345,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	home, err := homedir.Dir()
 	if err != nil {
-		return nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
+		return nil, fmt.Errorf("getting home dir to write ~/.git-credentials file: %w", err)
 	}
 
 	if userConfig.WriteGitCreds {
 		if userConfig.GithubUser != "" {
-			if err := vcs.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger, false); err != nil {
+			if err := common.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.GitlabUser != "" {
-			if err := vcs.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger, false); err != nil {
+			if err := common.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -361,17 +366,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			if bitbucketBaseURL == "https://api.bitbucket.org" {
 				bitbucketBaseURL = "bitbucket.org"
 			}
-			if err := vcs.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger, false); err != nil {
+			if err := common.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.AzureDevopsUser != "" {
-			if err := vcs.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger, false); err != nil {
+			if err := common.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.GiteaUser != "" {
-			if err := vcs.WriteGitCreds(userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaBaseURL, home, logger, false); err != nil {
+			if err := common.WriteGitCreds(userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaBaseURL, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -397,7 +402,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	webhookHeaders, err := userConfig.ToWebhookHttpHeaders()
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing webhook http headers")
+		return nil, fmt.Errorf("parsing webhook http headers: %w", err)
 	}
 	webhooksManager, err := webhooks.NewMultiWebhookSender(
 		webhooksConfig,
@@ -407,7 +412,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		},
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing webhooks")
+		return nil, fmt.Errorf("initializing webhooks: %w", err)
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient, giteaClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
@@ -426,7 +431,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
-		return nil, errors.Wrapf(err, "parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
+		return nil, fmt.Errorf("parsing --%s flag %q: %w", config.AtlantisURLFlag, userConfig.AtlantisURL, err)
 	}
 
 	underlyingRouter := mux.NewRouter()
@@ -470,7 +475,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
 	if err != nil && flag.Lookup("test.v") == nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("initializing %s", userConfig.DefaultTFDistribution))
+		return nil, fmt.Errorf("initializing %s: %w", userConfig.DefaultTFDistribution, err)
 	}
 	markdownRenderer := events.NewMarkdownRenderer(
 		gitlabClient.SupportsCommonMark(),
@@ -487,18 +492,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	var lockingClient locking.Locker
 	var applyLockingClient locking.ApplyLocker
-	var backend locking.Backend
+	var database db.Database
 
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
 		logger.Info("Utilizing Redis DB")
-		backend, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
+		database, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
 		if err != nil {
 			return nil, err
 		}
 	case "boltdb":
 		logger.Info("Utilizing BoltDB")
-		backend, err = db.New(userConfig.DataDir)
+		database, err = boltdb.New(userConfig.DataDir)
 		if err != nil {
 			return nil, err
 		}
@@ -509,14 +514,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		logger.Info("Repo Locking is disabled")
 		lockingClient = noOpLocker
 	} else {
-		lockingClient = locking.NewClient(backend)
+		lockingClient = locking.NewClient(database)
 	}
-	disableGlobalApplyLock := false
-	if userConfig.DisableGlobalApplyLock {
-		disableGlobalApplyLock = true
-	}
+	disableGlobalApplyLock := userConfig.DisableGlobalApplyLock
 
-	applyLockingClient = locking.NewApplyClient(backend, disableApply, disableGlobalApplyLock)
+	applyLockingClient = locking.NewApplyClient(database, disableApply, disableGlobalApplyLock)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
@@ -534,7 +536,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir
 	if githubAppEnabled {
 		if !userConfig.WriteGitCreds {
-			return nil, errors.New("Github App requires --write-git-creds to support cloning")
+			return nil, errors.New("github App requires --write-git-creds to support cloning")
 		}
 		workingDir = &events.GithubAppWorkingDir{
 			WorkingDir:     workingDir,
@@ -542,19 +544,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			GithubHostname: userConfig.GithubHostname,
 		}
 
-		githubAppTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, "x-access-token", home)
+		githubAppTokenRotator := github.NewTokenRotator(logger, githubCredentials, userConfig.GithubHostname, "x-access-token", home)
 		tokenJd, err := githubAppTokenRotator.GenerateJob()
 		if err != nil {
-			return nil, errors.Wrap(err, "could not write credentials")
+			return nil, fmt.Errorf("could not write credentials: %w", err)
 		}
 		scheduledExecutorService.AddJob(tokenJd)
 	}
 
 	if userConfig.GithubUser != "" && userConfig.GithubTokenFile != "" && userConfig.WriteGitCreds {
-		githubTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, userConfig.GithubUser, home)
+		githubTokenRotator := github.NewTokenRotator(logger, githubCredentials, userConfig.GithubHostname, userConfig.GithubUser, home)
 		tokenJd, err := githubTokenRotator.GenerateJob()
 		if err != nil {
-			return nil, errors.Wrap(err, "could not write credentials")
+			return nil, fmt.Errorf("could not write credentials: %w", err)
 		}
 		scheduledExecutorService.AddJob(tokenJd)
 	}
@@ -568,7 +570,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Locker:           lockingClient,
 		WorkingDir:       workingDir,
 		WorkingDirLocker: workingDirLocker,
-		Backend:          backend,
+		Database:         database,
 	}
 
 	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
@@ -577,7 +579,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		&events.PullClosedExecutor{
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
-			Backend:                  backend,
+			Database:                 database,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 			VCSClient:                vcsClient,
@@ -649,7 +651,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
 		policyChecksEnabled,
-		validator,
+		parserValidator,
 		&events.DefaultProjectFinder{},
 		vcsClient,
 		workingDir,
@@ -675,7 +677,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing show step runner")
+		return nil, fmt.Errorf("initializing show step runner: %w", err)
 	}
 
 	policyCheckStepRunner, err := runtime.NewPolicyCheckStepRunner(
@@ -685,12 +687,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing policy check step runner")
+		return nil, fmt.Errorf("initializing policy check step runner: %w", err)
 	}
 
 	applyRequirementHandler := &events.DefaultCommandRequirementHandler{
 		WorkingDir: workingDir,
 	}
+
+	cancellationTracker := events.NewCancellationTracker()
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		VcsClient:        vcsClient,
@@ -720,8 +724,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RunStepRunner: runStepRunner,
 		},
 		VersionStepRunner: &runtime.VersionStepRunner{
-			TerraformExecutor: terraformClient,
-			DefaultTFVersion:  defaultTfVersion,
+			TerraformExecutor:     terraformClient,
+			DefaultTFDistribution: defaultTfDistribution,
+			DefaultTFVersion:      defaultTfVersion,
 		},
 		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
 		StateRmStepRunner:         runtime.NewStateRmStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
@@ -729,10 +734,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,
 		CommandRequirementHandler: applyRequirementHandler,
+		CancellationTracker:       cancellationTracker,
 	}
 
 	dbUpdater := &events.DBUpdater{
-		Backend: backend,
+		Database: database,
 	}
 
 	pullUpdater := &events.PullUpdater{
@@ -776,16 +782,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
+		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
-		backend,
+		database,
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
+		userConfig.PendingApplyStatus,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -795,10 +803,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
+		cancellationTracker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		backend,
+		database,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
@@ -845,6 +854,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		instrumentedProjectCmdRunner,
 	)
 
+	cancelCommandRunner := events.NewCancelCommandRunner(
+		vcsClient,
+		projectOutputWrapper.ProjectCommandRunner,
+		pullUpdater,
+		workingDirLocker,
+		userConfig.SilenceNoProjects,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
@@ -853,6 +870,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
 		command.State:           stateCommandRunner,
+		command.Cancel:          cancelCommandRunner,
 	}
 
 	var teamAllowlistChecker command.TeamAllowlistChecker
@@ -895,12 +913,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRsFlag:               config.AllowForkPRsFlag,
 		SilenceForkPRErrors:            userConfig.SilenceForkPRErrors,
 		SilenceForkPRErrorsFlag:        config.SilenceForkPRErrorsFlag,
+		SilenceVCSStatusNoProjects:     userConfig.SilenceVCSStatusNoProjects,
 		DisableAutoplan:                userConfig.DisableAutoplan,
 		DisableAutoplanLabel:           userConfig.DisableAutoplanLabel,
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              backend,
+		PullStatusFetcher:              database,
 		TeamAllowlistChecker:           teamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
@@ -919,7 +938,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockDetailTemplate: web_templates.LockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
-		Backend:            backend,
+		Database:           database,
 		DeleteLockCommand:  deleteLockCommand,
 	}
 
@@ -936,11 +955,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		ProjectJobsTemplate:      web_templates.ProjectJobsTemplate,
 		ProjectJobsErrorTemplate: web_templates.ProjectJobsErrorTemplate,
-		Backend:                  backend,
+		Database:                 database,
 		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
 	}
+
 	apiController := &controllers.APIController{
 		APISecret:                      []byte(userConfig.APISecret),
 		Locker:                         lockingClient,
@@ -957,6 +977,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:                      vcsClient,
 		WorkingDir:                     workingDir,
 		WorkingDirLocker:               workingDirLocker,
+		CommitStatusUpdater:            commitStatusUpdater,
+		SilenceVCSStatusNoProjects:     userConfig.SilenceVCSStatusNoProjects,
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -991,7 +1013,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
-	return &Server{
+	server := &Server{
 		AtlantisVersion:                config.AtlantisVersion,
 		AtlantisURL:                    parsedURL,
 		Router:                         underlyingRouter,
@@ -1024,7 +1046,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebUsername:                    userConfig.WebUsername,
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
-	}, nil
+		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
+		database:                       database,
+	}
+
+	validate := validator.New(validator.WithRequiredStructEnabled())
+
+	err = validate.Struct(server)
+	if err != nil {
+		return nil, err
+	} else {
+		return server, nil
+	}
 }
 
 // Start creates the routes and starts serving traffic.
@@ -1054,6 +1087,18 @@ func (s *Server) Start() error {
 	if !s.DisableGlobalApplyLock {
 		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
 		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
+	}
+
+	if s.EnableProfilingAPI {
+		for p, h := range map[string]http.HandlerFunc{
+			"/":        pprof.Index,
+			"/cmdline": pprof.Cmdline,
+			"/profile": pprof.Profile,
+			"/symbol":  pprof.Symbol,
+			"/trace":   pprof.Trace,
+		} {
+			s.Router.HandleFunc("/debug/pprof"+p, h).Methods("GET")
+		}
 	}
 
 	n := negroni.New(&negroni.Recovery{
@@ -1104,6 +1149,11 @@ func (s *Server) Start() error {
 		s.Logger.Err(err.Error())
 	}
 
+	// Attempt to close the database
+	if err := s.closeDatabase(1 * time.Second); err != nil {
+		s.Logger.Err("while closing database: %v", err)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
@@ -1128,6 +1178,23 @@ func (s *Server) waitForDrain() {
 		case <-ticker.C:
 			s.Logger.Info("Waiting for in-progress operations to complete, current in-progress ops: %d", s.Drainer.GetStatus().InProgressOps)
 		}
+	}
+}
+
+// closeDatabase attempts to close the database, waiting up to the given timeout.
+func (s *Server) closeDatabase(timeout time.Duration) error {
+	if s.database == nil {
+		return nil
+	}
+	s.Logger.Info("Shutting down database")
+
+	done := make(chan error, 1)
+	go func() { done <- s.database.Close() }()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(timeout):
+		return fmt.Errorf("database close timed out after %s", timeout)
 	}
 }
 
@@ -1223,7 +1290,7 @@ func preparePullToJobMappings(s *Server) []jobs.PullInfoWithJobIDs {
 func mkSubDir(parentDir string, subDir string) (string, error) {
 	fullDir := filepath.Join(parentDir, subDir)
 	if err := os.MkdirAll(fullDir, 0700); err != nil {
-		return "", errors.Wrapf(err, "unable to create dir %q", fullDir)
+		return "", fmt.Errorf("unable to create dir %q: %w", fullDir, err)
 	}
 
 	return fullDir, nil
@@ -1272,7 +1339,7 @@ func ParseAtlantisURL(u string) (*url.URL, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !(parsed.Scheme == "http" || parsed.Scheme == "https") {
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return nil, errors.New("http or https must be specified")
 	}
 	// We want the path to end without a trailing slash so we know how to

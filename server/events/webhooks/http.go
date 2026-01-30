@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package webhooks
 
 import (
@@ -8,7 +11,6 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -26,7 +28,7 @@ func (h *HttpWebhook) Send(_ logging.SimpleLogging, applyResult ApplyResult) err
 		return nil
 	}
 	if err := h.doSend(applyResult); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("sending webhook to %q", h.URL))
+		return fmt.Errorf("sending webhook to %q: %w", h.URL, err)
 	}
 	return nil
 }

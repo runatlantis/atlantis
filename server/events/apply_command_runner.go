@@ -1,6 +1,10 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -14,10 +18,11 @@ func NewApplyCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
 	prjCmdRunner ProjectApplyCommandRunner,
+	cancellationTracker CancellationTracker,
 	autoMerger *AutoMerger,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
-	backend locking.Backend,
+	database db.Database,
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
@@ -30,10 +35,11 @@ func NewApplyCommandRunner(
 		commitStatusUpdater:        commitStatusUpdater,
 		prjCmdBuilder:              prjCommandBuilder,
 		prjCmdRunner:               prjCmdRunner,
+		cancellationTracker:        cancellationTracker,
 		autoMerger:                 autoMerger,
 		pullUpdater:                pullUpdater,
 		dbUpdater:                  dbUpdater,
-		Backend:                    backend,
+		Database:                   database,
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
@@ -43,12 +49,13 @@ func NewApplyCommandRunner(
 
 type ApplyCommandRunner struct {
 	DisableApplyAll      bool
-	Backend              locking.Backend
+	Database             db.Database
 	locker               locking.ApplyLockChecker
 	vcsClient            vcs.Client
 	commitStatusUpdater  CommitStatusUpdater
 	prjCmdBuilder        ProjectApplyCommandBuilder
 	prjCmdRunner         ProjectApplyCommandRunner
+	cancellationTracker  CancellationTracker
 	autoMerger           *AutoMerger
 	pullUpdater          *PullUpdater
 	dbUpdater            *DBUpdater
@@ -110,7 +117,6 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	var projectCmds []command.ProjectContext
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
-
 	if err != nil {
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
@@ -125,7 +131,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		if !a.silenceVCSStatusNoProjects {
 			if cmd.IsForSpecificProject() {
 				// With a specific apply, just reset the status so it's not stuck in pending state
-				pullStatus, err := a.Backend.GetPullStatus(pull)
+				pullStatus, err := a.Database.GetPullStatus(pull)
 				if err != nil {
 					ctx.Log.Warn("unable to fetch pull status: %s", err)
 					return
@@ -154,14 +160,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	// Only run commands in parallel if enabled
-	var result command.Result
-	if a.isParallelEnabled(projectCmds) {
-		ctx.Log.Info("Running applies in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, a.prjCmdRunner.Apply, a.parallelPoolSize)
-	} else {
-		result = runProjectCmds(projectCmds, a.prjCmdRunner.Apply)
-	}
+	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
 	ctx.CommandHasErrors = result.HasErrors()
 
 	a.pullUpdater.updatePull(

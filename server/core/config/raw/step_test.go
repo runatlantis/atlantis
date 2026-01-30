@@ -1,6 +1,10 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw_test
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
@@ -271,7 +275,7 @@ func TestStep_Validate(t *testing.T) {
 						"name":      "test",
 						"command":   "echo 123",
 						"shell":     "bash",
-						"shellArgs": []interface{}{"-c", "--debug"},
+						"shellArgs": []any{"-c", "--debug"},
 					},
 				},
 			},
@@ -463,7 +467,7 @@ func TestStep_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "\"run\" step \"shellArgs\" option must be a string or a list of strings, found [42 42]\n",
+			expErr: "\"run\" step \"shellArgs\" option must be a string or a list of strings, found [42 42]",
 		},
 		{
 			description: "run step with shellArgs contain not strings",
@@ -473,11 +477,11 @@ func TestStep_Validate(t *testing.T) {
 						"name":      "name",
 						"command":   "echo",
 						"shell":     "shell",
-						"shellArgs": []interface{}{"-c", 42},
+						"shellArgs": []any{"-c", 42},
 					},
 				},
 			},
-			expErr: "\"run\" step \"shellArgs\" option must contain only strings, found 42\n",
+			expErr: "\"run\" step \"shellArgs\" option must contain only strings, found 42",
 		},
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should
@@ -503,6 +507,9 @@ func TestStep_Validate(t *testing.T) {
 }
 
 func TestStep_ToValid(t *testing.T) {
+	testRegexDotStar := regexp.MustCompile(".*")
+	testRegexSecret := regexp.MustCompile("((?i)secret:\\s\")[^\"]*")
+
 	cases := []struct {
 		description string
 		input       raw.Step
@@ -652,7 +659,7 @@ func TestStep_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "run step with output",
+			description: "run step with single output",
 			input: raw.Step{
 				CommandMap: RunType{
 					"run": {
@@ -664,7 +671,135 @@ func TestStep_ToValid(t *testing.T) {
 			exp: valid.Step{
 				StepName:   "run",
 				RunCommand: "my 'run command'",
-				Output:     "hide",
+				Output: []valid.PostProcessRunOutputOption{
+					"hide",
+				},
+			},
+		},
+		{
+			description: "run step with duplicated values",
+			input: raw.Step{
+				CommandMap: RunType{
+					"run": {
+						"command": "my 'run command'",
+						"output": []string{
+							"hide",
+							"hide",
+						},
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:   "run",
+				RunCommand: "my 'run command'",
+				Output: []valid.PostProcessRunOutputOption{
+					"hide",
+				},
+			},
+		},
+		{
+			description: "run step with multiple string outputs",
+			input: raw.Step{
+				CommandMap: RunType{
+					"run": {
+						"command": "my 'run command'",
+						"output": []string{
+							"show",
+							"strip_refreshing",
+						},
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:   "run",
+				RunCommand: "my 'run command'",
+				Output: []valid.PostProcessRunOutputOption{
+					"show",
+					"strip_refreshing",
+				},
+			},
+		},
+		{
+			description: "run step with single regex filter",
+			input: raw.Step{
+				CommandMap: RunType{
+					"run": {
+						"command": "my 'run command'",
+						"output": []any{
+							map[string]any{
+								"filter_regex": ".*",
+							},
+						},
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:   "run",
+				RunCommand: "my 'run command'",
+				Output: []valid.PostProcessRunOutputOption{
+					"filter_regex",
+				},
+				FilterRegexes: []*regexp.Regexp{
+					testRegexDotStar,
+				},
+			},
+		},
+		{
+			description: "run step with multiple mixed outputs and single regex",
+			input: raw.Step{
+				CommandMap: RunType{
+					"run": {
+						"command": "my 'run command'",
+						"output": []any{
+							"strip_refreshing",
+							map[string]any{
+								"filter_regex": ".*",
+							},
+						},
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:   "run",
+				RunCommand: "my 'run command'",
+				Output: []valid.PostProcessRunOutputOption{
+					"strip_refreshing",
+					"filter_regex",
+				},
+				FilterRegexes: []*regexp.Regexp{
+					testRegexDotStar,
+				},
+			},
+		},
+		{
+			description: "run step with multiple mixed outputs and multiple regexes",
+			input: raw.Step{
+				CommandMap: RunType{
+					"run": {
+						"command": "my 'run command'",
+						"output": []any{
+							"strip_refreshing",
+							map[string]any{
+								"filter_regex": ".*",
+							},
+							map[string]any{
+								"filter_regex": "((?i)secret:\\s\")[^\"]*",
+							},
+						},
+					},
+				},
+			},
+			exp: valid.Step{
+				StepName:   "run",
+				RunCommand: "my 'run command'",
+				Output: []valid.PostProcessRunOutputOption{
+					"strip_refreshing",
+					"filter_regex",
+				},
+				FilterRegexes: []*regexp.Regexp{
+					testRegexDotStar,
+					testRegexSecret,
+				},
 			},
 		},
 		{
@@ -680,7 +815,7 @@ func TestStep_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "multienv step with output",
+			description: "multienv step with single output",
 			input: raw.Step{
 				CommandMap: MultiEnvType{
 					"multienv": {
@@ -692,7 +827,9 @@ func TestStep_ToValid(t *testing.T) {
 			exp: valid.Step{
 				StepName:   "multienv",
 				RunCommand: "envs.sh",
-				Output:     "hide",
+				Output: []valid.PostProcessRunOutputOption{
+					"hide",
+				},
 			},
 		},
 	}
@@ -704,6 +841,6 @@ func TestStep_ToValid(t *testing.T) {
 }
 
 type MapType map[string]map[string][]string
-type EnvType map[string]map[string]interface{}
-type RunType map[string]map[string]interface{}
-type MultiEnvType map[string]map[string]interface{}
+type EnvType map[string]map[string]any
+type RunType map[string]map[string]any
+type MultiEnvType map[string]map[string]any
