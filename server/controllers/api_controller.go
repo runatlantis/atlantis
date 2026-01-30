@@ -56,16 +56,18 @@ type APIRequest struct {
 	}
 }
 
-func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
+func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
 	cc := make([]*events.CommentCommand, 0)
 
 	for _, project := range a.Projects {
 		cc = append(cc, &events.CommentCommand{
+			Name:        cmdName,
 			ProjectName: project,
 		})
 	}
 	for _, path := range a.Paths {
 		cc = append(cc, &events.CommentCommand{
+			Name:       cmdName,
 			RepoRelDir: strings.TrimRight(path.Directory, "/"),
 			Workspace:  path.Workspace,
 		})
@@ -236,7 +238,7 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) err
 }
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
-	cmds, cc, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildPlanCommands)
+	cmds, cc, err := request.getCommands(ctx, command.Plan, a.ProjectCommandBuilder.BuildPlanCommands)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +286,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 }
 
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
-	cmds, cc, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildApplyCommands)
+	cmds, cc, err := request.getCommands(ctx, command.Apply, a.ProjectCommandBuilder.BuildApplyCommands)
 	if err != nil {
 		return nil, err
 	}
