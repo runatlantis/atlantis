@@ -51,9 +51,18 @@ func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string,
 }
 
 func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir string, ctx command.ProjectContext, cmd command.Name, requirements []string) (failure string, err error) {
+	// Check if this is a non-PR API call (e.g., drift detection)
+	// PR-specific requirements (approved, mergeable) should be skipped for these
+	isNonPRAPICall := ctx.API && ctx.Pull.Num == 0
+
 	for _, req := range requirements {
 		switch req {
 		case raw.ApprovedRequirement:
+			// Skip approval check for non-PR API calls - approval is a PR-specific concept
+			if isNonPRAPICall {
+				ctx.Log.Info("skipping approval requirement for API call without PR number (e.g., drift detection)")
+				continue
+			}
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
 				return fmt.Sprintf("Pull request must be approved according to the project's approval rules before running %s.", cmd), nil
 			}
@@ -64,6 +73,11 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 				return fmt.Sprintf("All policies must pass for project before running %s.", cmd), nil
 			}
 		case raw.MergeableRequirement:
+			// Skip mergeability check for non-PR API calls - mergeability is a PR-specific concept
+			if isNonPRAPICall {
+				ctx.Log.Info("skipping mergeable requirement for API call without PR number (e.g., drift detection)")
+				continue
+			}
 			if !ctx.PullReqStatus.MergeableStatus.IsMergeable {
 				suffix := ""
 				if ctx.PullReqStatus.MergeableStatus.Reason != "" {
