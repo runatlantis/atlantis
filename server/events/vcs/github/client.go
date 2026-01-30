@@ -130,6 +130,8 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		return nil, fmt.Errorf("error initializing github rate limit transport: %w", err)
 	}
 
+	transportWithRateLimit.Timeout = 60 * time.Second
+
 	var graphqlURL string
 	var client *github.Client
 	if hostname == "github.com" {
