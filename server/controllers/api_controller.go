@@ -4,6 +4,7 @@
 package controllers
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -338,9 +339,9 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled")
 	}
 
-	// Validate the secret token
+	// Validate the secret token using constant-time comparison to prevent timing attacks
 	secret := r.Header.Get(atlantisTokenHeader)
-	if secret != string(a.APISecret) {
+	if subtle.ConstantTimeCompare([]byte(secret), a.APISecret) != 1 {
 		return nil, nil, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader)
 	}
 

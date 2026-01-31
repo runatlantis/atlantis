@@ -99,6 +99,10 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 			if c.URL == "" {
 				return nil, errors.New("must specify \"url\" if using a webhook of \"kind: http\"")
 			}
+			// Validate webhook URL to prevent SSRF attacks
+			if err := ValidateWebhookURL(c.URL); err != nil {
+				return nil, fmt.Errorf("invalid webhook URL %q: %w", c.URL, err)
+			}
 			httpWebhook := &HttpWebhook{
 				Client:         clients.Http,
 				WorkspaceRegex: wr,
