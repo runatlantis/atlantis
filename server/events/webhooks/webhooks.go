@@ -65,7 +65,7 @@ type Clients struct {
 	Http  *HttpClient
 }
 
-func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSender, error) {
+func NewMultiWebhookSender(configs []Config, clients Clients, allowInsecure bool) (*MultiWebhookSender, error) {
 	var webhooks []Sender
 	for _, c := range configs {
 		wr, err := regexp.Compile(c.WorkspaceRegex)
@@ -100,7 +100,7 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 				return nil, errors.New("must specify \"url\" if using a webhook of \"kind: http\"")
 			}
 			// Validate webhook URL to prevent SSRF attacks
-			if err := ValidateWebhookURL(c.URL); err != nil {
+			if err := ValidateWebhookURL(c.URL, allowInsecure); err != nil {
 				return nil, fmt.Errorf("invalid webhook URL %q: %w", c.URL, err)
 			}
 			httpWebhook := &HttpWebhook{

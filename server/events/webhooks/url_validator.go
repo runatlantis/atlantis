@@ -65,8 +65,12 @@ func isPrivateIP(ip net.IP) bool {
 // ValidateWebhookURL validates that a webhook URL is safe to use.
 // It checks:
 // 1. The URL is well-formed
-// 2. The URL uses HTTPS scheme
-// 3. The hostname resolves to a public IP address (not private/internal)
+// 2. The URL uses HTTPS scheme (unless allowInsecure is true)
+// 3. The hostname resolves to a public IP address (unless allowInsecure is true)
+//
+// When allowInsecure is true, this function only performs basic URL validation
+// and allows HTTP, localhost, and private IPs. This mode should ONLY be used
+// for local development and testing, never in production.
 //
 // Security Note: This validation is performed at configuration time. There is a
 // Time-of-Check-Time-of-Use (TOCTOU) vulnerability where DNS could change between
@@ -75,16 +79,11 @@ func isPrivateIP(ip net.IP) bool {
 //
 // If ANY resolved IP is private, the entire URL is rejected. DNS resolution may
 // fail or timeout, which will result in validation failure.
-func ValidateWebhookURL(urlStr string) error {
+func ValidateWebhookURL(urlStr string, allowInsecure bool) error {
 	// Parse the URL
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidURL, err)
-	}
-
-	// Ensure HTTPS scheme
-	if parsedURL.Scheme != "https" {
-		return ErrInvalidScheme
 	}
 
 	// Get the hostname
@@ -96,6 +95,20 @@ func ValidateWebhookURL(urlStr string) error {
 	// Check for credentials in URL (potential information leakage)
 	if parsedURL.User != nil {
 		return fmt.Errorf("%w: URL must not contain credentials", ErrInvalidURL)
+	}
+
+	// If insecure mode is enabled, skip security checks
+	if allowInsecure {
+		// Only perform basic scheme validation
+		if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+			return fmt.Errorf("%w: scheme must be http or https", ErrInvalidURL)
+		}
+		return nil
+	}
+
+	// Ensure HTTPS scheme in secure mode
+	if parsedURL.Scheme != "https" {
+		return ErrInvalidScheme
 	}
 
 	// Resolve the hostname to IP addresses
