@@ -12,9 +12,9 @@ import (
 
 func TestValidateWebhookURL(t *testing.T) {
 	tests := []struct {
-		name           string
-		url            string
-		expectErr      error
+		name            string
+		url             string
+		expectErr       error
 		expectErrSubstr string
 	}{
 		{
