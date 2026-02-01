@@ -4,10 +4,11 @@
 package mocks
 
 import (
-	pegomock "github.com/petergtz/pegomock/v4"
-	command "github.com/runatlantis/atlantis/server/events/command"
 	"reflect"
 	"time"
+
+	pegomock "github.com/petergtz/pegomock/v4"
+	command "github.com/runatlantis/atlantis/server/events/command"
 )
 
 type MockWorkingDirLocker struct {
@@ -25,11 +26,11 @@ func NewMockWorkingDirLocker(options ...pegomock.Option) *MockWorkingDirLocker {
 func (mock *MockWorkingDirLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockWorkingDirLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, cmdName command.Name) (func(), error) {
+func (mock *MockWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) (func(), error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
 	}
-	_params := []pegomock.Param{repoFullName, pullNum, workspace, path, cmdName}
+	_params := []pegomock.Param{repoFullName, pullNum, workspace, path, projectName, cmdName}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", _params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 func()
 	var _ret1 error

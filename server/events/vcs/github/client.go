@@ -876,7 +876,7 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 
 	// We map our mergeable check to when the GitHub merge button is clickable.
-	// This corresponds to the following states:
+	// This corresponds to when the PR is not a draft and has one of the following states:
 	// clean: No conflicts, all requirements satisfied.
 	//        Merging is allowed (green box).
 	// unstable: Failing/pending commit status that is not part of the required
@@ -884,6 +884,12 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
+	if githubPR.GetDraft() {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "PR is a draft",
+		}, nil
+	}
 	state := githubPR.GetMergeableState()
 	if state == "" {
 		state = "<unknown>"
