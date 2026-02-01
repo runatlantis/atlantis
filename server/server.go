@@ -415,7 +415,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initializing webhooks: %w", err)
 	}
-	
+
 	// Log warning if insecure webhook mode is enabled
 	if userConfig.AllowLocalWebhooks {
 		logger.Warn("allow-local-webhooks is enabled - webhook URL validation is relaxed. This should ONLY be used for local development and testing, NEVER in production as it exposes the system to SSRF attacks.")
