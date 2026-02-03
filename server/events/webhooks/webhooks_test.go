@@ -198,7 +198,7 @@ func TestNewWebhooksManager_MultipleConfigSuccess(t *testing.T) {
 
 	var configs []webhooks.Config
 	nConfigs := 5
-	for i := 0; i < nConfigs; i++ {
+	for range nConfigs {
 		configs = append(configs, validApplyEventConfig)
 	}
 	m, err := webhooks.NewMultiWebhookSender(configs, clients)

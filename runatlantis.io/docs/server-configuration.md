@@ -239,7 +239,7 @@ atlantis server --azuredevops-hostname="dev.azure.com"
 ATLANTIS_AZUREDEVOPS_HOSTNAME="dev.azure.com"
 ```
 
-Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
+Azure DevOps hostname to support cloud and self-hosted instances. Defaults to `dev.azure.com`.
 
 ::: warning COMPATIBILITY WARNING
 If you are affected by this change [docs](https://learn.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#administration)
@@ -525,7 +525,7 @@ atlantis server --discard-approval-on-plan
 ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
 ```
 
-If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.  
+If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.
  Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
 
 ### `--emoji-reaction` <Badge text="v0.29.0+" type="info"/>
@@ -600,7 +600,7 @@ This will bypass `--restrict-file-list` if regex is used, normal commands will s
 
 ::: warning SECURITY WARNING
 It's not supposed to be used with `--disable-apply-all`.
-The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects.
+The command `atlantis apply -p .*` will bypass the restriction and run apply on every project.
 :::
 
 ### `--executable-name` <Badge text="v0.42.0+" type="info"/>
@@ -881,6 +881,18 @@ ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
 don't set. Defaults to `gitlab.com`.
 
+### `--gitlab-status-retry-enabled`
+
+```bash
+atlantis server --gitlab-status-retry-enabled
+# or
+ATLANTIS_GITLAB_STATUS_RETRY_ENABLED=true
+```
+
+Enable enhanced retry logic for GitLab pipeline status updates with exponential backoff.
+
+Defaults to `false`.
+
 ### `--gitlab-token` <Badge text="v0.2.0+" type="info"/>
 
 ```bash
@@ -1064,6 +1076,24 @@ ATLANTIS_PARALLEL_POOL_SIZE=100
 ```
 
 Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
+
+### `--pending-apply-status` <Badge text="v0.36.0+" type="info"/>
+
+```bash
+atlantis server --pending-apply-status
+# or (recommended)
+ATLANTIS_PENDING_APPLY_STATUS=true
+```
+
+Set the commit status to pending when there are planned changes that haven't been applied.
+This prevents merge requests from being merged until all Terraform applies are completed if you have `Pipelines must succeed` enabled on your repository.
+
+When enabled, after running `atlantis plan`, the MR status will show as pending if there are changes
+to apply. Once all projects are successfully applied (or show no changes), the status will update to success.
+
+Defaults to `false`.
+
+Only supported on GitLab
 
 ### `--port` <Badge text="v0.1.3+" type="info"/>
 
@@ -1286,7 +1316,7 @@ ATLANTIS_SILENCE_NO_PROJECTS=true
 `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 This flag ensures an Atlantis server only responds to its explicitly declared projects.
 This has no effect if projects are undefined in the repo level `atlantis.yaml`.
-This also silences targeted commands (eg. `atlantis plan -d mydir` or `atlantis apply -p myproj`) so if the project is not in the repo config `atlantis.yaml`, these commands will not run or report back in a comment.
+This also silences targeted commands (e.g. `atlantis plan -d mydir` or `atlantis apply -p myproj`) so if the project is not in the repo config `atlantis.yaml`, these commands will not run or report back in a comment.
 
 This is useful when running multiple Atlantis servers against a single repository so you can
 delegate work to each Atlantis server. Also useful when used with pre_workflow_hooks to dynamically generate an `atlantis.yaml` file.

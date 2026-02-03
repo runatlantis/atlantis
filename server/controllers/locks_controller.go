@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers
 
 import (
@@ -145,7 +148,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 
 // respond is a helper function to respond and log the response. lvl is the log
 // level to log at, code is the HTTP response code.
-func (l *LocksController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
+func (l *LocksController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	l.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw
 
 import (
@@ -9,7 +12,7 @@ import (
 // PolicySets is the raw schema for repo-level atlantis.yaml config.
 type PolicySets struct {
 	Version      *string      `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
-	Owners       PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
+	Owners       PolicyOwners `yaml:"owners" json:"owners"`
 	PolicySets   []PolicySet  `yaml:"policy_sets" json:"policy_sets"`
 	ApproveCount int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
 }
@@ -73,7 +76,7 @@ type PolicySet struct {
 	Path               string       `yaml:"path" json:"path"`
 	Source             string       `yaml:"source" json:"source"`
 	Name               string       `yaml:"name" json:"name"`
-	Owners             PolicyOwners `yaml:"owners,omitempty" json:"owners,omitempty"`
+	Owners             PolicyOwners `yaml:"owners" json:"owners"`
 	ApproveCount       int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
 	PreventSelfApprove bool         `yaml:"prevent_self_approve,omitempty" json:"prevent_self_approve,omitempty"`
 }

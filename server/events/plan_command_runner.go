@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -24,6 +27,7 @@ func NewPlanCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	projectCommandBuilder ProjectPlanCommandBuilder,
 	projectCommandRunner ProjectPlanCommandRunner,
+	cancellationTracker CancellationTracker,
 	dbUpdater *DBUpdater,
 	pullUpdater *PullUpdater,
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
@@ -34,6 +38,8 @@ func NewPlanCommandRunner(
 	lockingLocker locking.Locker,
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
+	PendingApplyStatus bool,
+
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -44,6 +50,7 @@ func NewPlanCommandRunner(
 		commitStatusUpdater:        commitStatusUpdater,
 		prjCmdBuilder:              projectCommandBuilder,
 		prjCmdRunner:               projectCommandRunner,
+		cancellationTracker:        cancellationTracker,
 		dbUpdater:                  dbUpdater,
 		pullUpdater:                pullUpdater,
 		policyCheckCommandRunner:   policyCheckCommandRunner,
@@ -54,6 +61,7 @@ func NewPlanCommandRunner(
 		lockingLocker:              lockingLocker,
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
+		PendingApplyStatus:         PendingApplyStatus,
 	}
 }
 
@@ -73,6 +81,7 @@ type PlanCommandRunner struct {
 	workingDir                 WorkingDir
 	prjCmdBuilder              ProjectPlanCommandBuilder
 	prjCmdRunner               ProjectPlanCommandRunner
+	cancellationTracker        CancellationTracker
 	dbUpdater                  *DBUpdater
 	pullUpdater                *PullUpdater
 	policyCheckCommandRunner   *PolicyCheckCommandRunner
@@ -85,6 +94,7 @@ type PlanCommandRunner struct {
 	DiscardApprovalOnPlan bool
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	SilencePRComments     []string
+	PendingApplyStatus    bool
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -133,14 +143,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		ctx.Log.Err("deleting locks: %s", err)
 	}
 
-	// Only run commands in parallel if enabled
-	var result command.Result
-	if p.isParallelEnabled(projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
-	} else {
-		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
-	}
+	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -263,14 +266,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		}
 	}
 
-	// Only run commands in parallel if enabled
-	var result command.Result
-	if p.isParallelEnabled(projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
-	} else {
-		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
-	}
+	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 	ctx.CommandHasErrors = result.HasErrors()
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
@@ -345,8 +341,21 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
 		} else if numSuccess < len(pullStatus.Projects) {
-			// If there are plans that haven't been applied yet, no need to update the status
-			return
+			// When there are planned changes that haven't been applied yet:
+			// - GitLab: Set status to pending if PendingApplyStatus is enabled
+			//           This prevents MR merging until all applies complete
+			// - Other VCS: Leave status unchanged (existing behavior)
+			if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab && p.PendingApplyStatus {
+				ctx.Log.Debug("Pending Apply Status is set. Pipeline status will be marked as pending since there are changes to apply")
+				status = models.PendingCommitStatus
+			} else {
+				if p.PendingApplyStatus {
+					// If a VCS uses this flag other than Gitlab, we log the warning to the user
+					ctx.Log.Warn("Flag --pending-apply-status is not yet supported by your VCS. Pipeline status will not be marked as pending")
+				}
+				// Otherwise, status remains SuccessCommitStatus (no update needed)
+				return
+			}
 		}
 	}
 

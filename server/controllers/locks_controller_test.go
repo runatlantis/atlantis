@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers_test
 
 import (
@@ -303,9 +306,11 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			Command:    command.Plan,
 			RepoRelDir: projectPath,
 			Workspace:  workspaceName,
-			PlanSuccess: &models.PlanSuccess{
-				TerraformOutput: "tf-output",
-				LockURL:         "lock-url",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "tf-output",
+					LockURL:         "lock-url",
+				},
 			},
 		},
 	})

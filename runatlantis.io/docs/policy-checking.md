@@ -6,7 +6,7 @@ for using this step include:
 - Denying usage of a list of modules
 - Asserting attributes of a resource at creation time
 - Catching unintentional resource deletions
-- Preventing security risks (ie. exposing secure ports to the public)
+- Preventing security risks (i.e. exposing secure ports to the public)
 
 ## How it works?
 

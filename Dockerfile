@@ -1,16 +1,16 @@
 # syntax=docker/dockerfile:1@sha256:b6afd42430b15f2d2a4c5a02b919e98a525b785b1aaff16747d2f623364e39b6
 # what distro is the image being built for
-ARG ALPINE_TAG=3.21.3@sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c
-ARG DEBIAN_TAG=12.12-slim@sha256:936abff852736f951dab72d91a1b6337cf04217b2a77a5eaadc7c0f2f1ec1758
+ARG ALPINE_TAG=3.23.2@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62
+ARG DEBIAN_TAG=12.13-slim@sha256:56ff6d36d4eb3db13a741b342ec466f121480b5edded42e4b7ee850ce7a418ee
 # renovate: datasource=docker depName=golang versioning=docker
 ARG GOLANG_TAG=1.25.4-alpine@sha256:d3f0cf7723f3429e3f9ed846243970b20a2de7bae6a5b66fc5914e228d831bbb
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.13.5
+ARG DEFAULT_TERRAFORM_VERSION=1.14.3
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.10.7
+ARG DEFAULT_OPENTOFU_VERSION=1.11.4
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.63.0
+ARG DEFAULT_CONFTEST_VERSION=0.66.0
 
 # Stage 1: build artifact and download deps
 
@@ -37,7 +37,7 @@ WORKDIR /app
 # This is needed to download transitive dependencies instead of compiling them
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
-# renovate: datasource=repology depName=alpine_3_21/bash versioning=loose
+# renovate: datasource=repology depName=alpine_3_22/bash versioning=loose
 ENV BUILDER_BASH_VERSION="5.2.37-r0"
 RUN apk add --no-cache \
         bash=${BUILDER_BASH_VERSION}
@@ -67,7 +67,7 @@ ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u7"
 # renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
 ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
 # renovate: datasource=repology depName=debian_12/gnupg versioning=loose
-ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1+deb12u1"
+ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1+deb12u2"
 # renovate: datasource=repology depName=debian_12/openssl versioning=loose
 ENV DEBIAN_OPENSSL_VERSION="3.0.17-1~deb12u2"
 
@@ -176,24 +176,24 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# renovate: datasource=repology depName=alpine_3_21/ca-certificates versioning=loose
-ENV CA_CERTIFICATES_VERSION="20250911-r0"
-# renovate: datasource=repology depName=alpine_3_21/curl versioning=loose
-ENV CURL_VERSION="8.14.1-r2"
-# renovate: datasource=repology depName=alpine_3_21/git versioning=loose
-ENV GIT_VERSION="2.47.3-r0"
-# renovate: datasource=repology depName=alpine_3_21/unzip versioning=loose
-ENV UNZIP_VERSION="6.0-r15"
-# renovate: datasource=repology depName=alpine_3_21/bash versioning=loose
-ENV BASH_VERSION="5.2.37-r0"
-# renovate: datasource=repology depName=alpine_3_21/openssh versioning=loose
-ENV OPENSSH_VERSION="9.9_p2-r0"
-# renovate: datasource=repology depName=alpine_3_21/dumb-init versioning=loose
+# renovate: datasource=repology depName=alpine_3_23/ca-certificates versioning=loose
+ENV CA_CERTIFICATES_VERSION="20251003-r0"
+# renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
+ENV CURL_VERSION="8.17.0-r1"
+# renovate: datasource=repology depName=alpine_3_23/git versioning=loose
+ENV GIT_VERSION="2.52.0-r0"
+# renovate: datasource=repology depName=alpine_3_23/unzip versioning=loose
+ENV UNZIP_VERSION="6.0-r16"
+# renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
+ENV BASH_VERSION="5.3.3-r1"
+# renovate: datasource=repology depName=alpine_3_23/openssh versioning=loose
+ENV OPENSSH_VERSION="10.2_p1-r0"
+# renovate: datasource=repology depName=alpine_3_23/dumb-init versioning=loose
 ENV DUMB_INIT_VERSION="1.2.5-r3"
-# renovate: datasource=repology depName=alpine_3_21/gcompat versioning=loose
+# renovate: datasource=repology depName=alpine_3_23/gcompat versioning=loose
 ENV GCOMPAT_VERSION="1.1.0-r4"
-# renovate: datasource=repology depName=alpine_3_21/coreutils versioning=loose
-ENV COREUTILS_ENV_VERSION="9.5-r2"
+# renovate: datasource=repology depName=alpine_3_23/coreutils versioning=loose
+ENV COREUTILS_ENV_VERSION="9.8-r1"
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
@@ -207,6 +207,9 @@ RUN apk add --no-cache \
         dumb-init=${DUMB_INIT_VERSION} \
         gcompat=${GCOMPAT_VERSION} \
         coreutils-env=${COREUTILS_ENV_VERSION}
+
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
@@ -236,6 +239,9 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis

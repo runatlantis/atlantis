@@ -1,6 +1,10 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,7 +14,6 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
@@ -432,7 +435,7 @@ func (r *remoteApplyMock) RunCommandAsync(_ command.ProjectContext, _ string, ar
 
 	// Asynchronously send the lines we're supposed to.
 	go func() {
-		for _, line := range strings.Split(r.LinesToSend, "\n") {
+		for line := range strings.SplitSeq(r.LinesToSend, "\n") {
 			out <- runtimemodels.Line{Line: line}
 		}
 		if r.Err != nil {

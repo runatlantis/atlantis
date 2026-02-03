@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package jobs_test
 
 import (
@@ -281,7 +284,7 @@ func TestRaceConditionPrevention(t *testing.T) {
 		// that was fixed by using sync.Map for pullToJobMapping
 
 		// Concurrent writers (Handle() method updates the mapping)
-		for i := 0; i < numGoroutines; i++ {
+		for i := range numGoroutines {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
@@ -291,25 +294,21 @@ func TestRaceConditionPrevention(t *testing.T) {
 		}
 
 		// Concurrent readers (GetPullToJobMapping() method reads the mapping)
-		for i := 0; i < numGoroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range numGoroutines {
+			wg.Go(func() {
 				// This would race with Handle() before the sync.Map fix
 				mappings := handler.GetPullToJobMapping()
 				_ = mappings
-			}()
+			})
 		}
 
 		// Concurrent readers of GetJobIDMapForPull
-		for i := 0; i < numGoroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range numGoroutines {
+			wg.Go(func() {
 				// This would also race with Handle() before the fix
 				jobMap := handler.(*jobs.AsyncProjectCommandOutputHandler).GetJobIDMapForPull(pullInfo)
 				_ = jobMap
-			}()
+			})
 		}
 
 		wg.Wait()
@@ -324,18 +323,16 @@ func TestRaceConditionPrevention(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 
 		// Test the race condition we fixed in GetProjectOutputBuffer
-		for i := 0; i < numGoroutines; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		for range numGoroutines {
+			wg.Go(func() {
 				// This would race with completeJob() before the RLock fix
 				buffer := handler.(*jobs.AsyncProjectCommandOutputHandler).GetProjectOutputBuffer(ctx.JobID)
 				_ = buffer
-			}()
+			})
 		}
 
 		// Concurrent operations that modify the buffer
-		for i := 0; i < numGoroutines; i++ {
+		for i := range numGoroutines {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
@@ -374,7 +371,7 @@ func TestHighConcurrencyStress(t *testing.T) {
 
 	// Multiple workers performing mixed operations
 	wg.Add(numWorkers)
-	for worker := 0; worker < numWorkers; worker++ {
+	for worker := range numWorkers {
 		go func(workerID int) {
 			defer wg.Done()
 
@@ -391,7 +388,7 @@ func TestHighConcurrencyStress(t *testing.T) {
 				Workspace:    ctx.Workspace,
 			}
 
-			for op := 0; op < operationsPerWorker; op++ {
+			for op := range operationsPerWorker {
 				switch op % 6 {
 				case 0:
 					// Send messages

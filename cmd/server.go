@@ -18,11 +18,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -114,6 +114,7 @@ const (
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	GitlabStatusRetryEnabledFlag     = "gitlab-status-retry-enabled"
 	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
@@ -123,6 +124,7 @@ const (
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
+	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
 	PortFlag                         = "port"
@@ -168,7 +170,7 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
+	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
@@ -550,6 +552,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
 		defaultValue: false,
 	},
+	GitlabStatusRetryEnabledFlag: {
+		description:  "Enable enhanced retry logic for GitLab pipeline status updates with exponential backoff.",
+		defaultValue: false,
+	},
 	AllowDraftPRs: {
 		description:  "Enable autoplan for Github Draft Pull Requests",
 		defaultValue: false,
@@ -569,6 +575,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	ParallelApplyFlag: {
 		description:  "Run apply operations in parallel.",
+		defaultValue: false,
+	},
+	PendingApplyStatusFlag: {
+		description:  "Set apply job status as pending when there are planned changes that haven't been applied yet. Currently only supported for GitLab.",
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {
@@ -835,7 +845,7 @@ func (s *ServerCmd) preRun() error {
 	if configFile != "" {
 		s.Viper.SetConfigFile(configFile)
 		if err := s.Viper.ReadInConfig(); err != nil {
-			return errors.Wrapf(err, "invalid config: reading %s", configFile)
+			return fmt.Errorf("invalid config: reading %s: %w", configFile, err)
 		}
 	}
 	return nil
@@ -883,7 +893,7 @@ func (s *ServerCmd) run() error {
 	})
 
 	if err != nil {
-		return errors.Wrap(err, "initializing server")
+		return fmt.Errorf("initializing server: %w", err)
 	}
 	return server.Start()
 }
@@ -1086,15 +1096,15 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	_, patternErr := patternmatcher.New(strings.Split(userConfig.AutoplanFileList, ","))
 	if patternErr != nil {
-		return errors.Wrapf(patternErr, "invalid pattern in --%s, %s", AutoplanFileListFlag, userConfig.AutoplanFileList)
+		return fmt.Errorf("invalid pattern in --%s, %s: %w", AutoplanFileListFlag, userConfig.AutoplanFileList, patternErr)
 	}
 
 	if _, err := userConfig.ToAllowCommandNames(); err != nil {
-		return errors.Wrapf(err, "invalid --%s", AllowCommandsFlag)
+		return fmt.Errorf("invalid --%s: %w", AllowCommandsFlag, err)
 	}
 
 	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {
-		return errors.Wrapf(err, "invalid --%s", WebhookHttpHeaders)
+		return fmt.Errorf("invalid --%s: %w", WebhookHttpHeaders, err)
 	}
 
 	return nil
@@ -1105,7 +1115,7 @@ func (s *ServerCmd) setAtlantisURL(userConfig *server.UserConfig) error {
 	if userConfig.AtlantisURL == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			return errors.Wrap(err, "failed to determine hostname")
+			return fmt.Errorf("failed to determine hostname: %w", err)
 		}
 		userConfig.AtlantisURL = fmt.Sprintf("http://%s:%d", hostname, userConfig.Port)
 	}
@@ -1123,14 +1133,14 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 		var err error
 		finalPath, err = homedir.Expand(finalPath)
 		if err != nil {
-			return errors.Wrap(err, "determining home directory")
+			return fmt.Errorf("determining home directory: %w", err)
 		}
 	}
 
 	// Convert relative paths to absolute.
 	finalPath, err := filepath.Abs(finalPath)
 	if err != nil {
-		return errors.Wrap(err, "making data-dir absolute")
+		return fmt.Errorf("making data-dir absolute: %w", err)
 	}
 	userConfig.DataDir = finalPath
 	return nil
@@ -1147,14 +1157,14 @@ func (s *ServerCmd) setMarkdownTemplateOverridesDir(userConfig *server.UserConfi
 		var err error
 		finalPath, err = homedir.Expand(finalPath)
 		if err != nil {
-			return errors.Wrap(err, "determining home directory")
+			return fmt.Errorf("determining home directory: %w", err)
 		}
 	}
 
 	// Convert relative paths to absolute.
 	finalPath, err := filepath.Abs(finalPath)
 	if err != nil {
-		return errors.Wrap(err, "making markdown-template-overrides-dir absolute")
+		return fmt.Errorf("making markdown-template-overrides-dir absolute: %w", err)
 	}
 	userConfig.MarkdownTemplateOverridesDir = finalPath
 	return nil
@@ -1240,11 +1250,5 @@ func (s *ServerCmd) printErr(err error) {
 }
 
 func isValidLogLevel(level string) bool {
-	for _, logLevel := range ValidLogLevels {
-		if logLevel == level {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(ValidLogLevels, level)
 }

@@ -14,13 +14,15 @@
 package boltdb_test
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
@@ -96,6 +98,132 @@ func TestUnlockCommandDisabled(t *testing.T) {
 	config, err = b.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Assert(t, config == nil, "exp nil object")
+}
+
+func TestMigrationOldLockKeysToNewFormat(t *testing.T) {
+	t.Log("migration should convert old format keys to new format with project name")
+
+	// Create a temporary directory
+	tmpDir := t.TempDir()
+
+	// Create a database file manually with an old format key
+	dbPath := tmpDir + "/atlantis.db"
+	boltDB, err := bolt.Open(dbPath, 0600, nil)
+	Ok(t, err)
+
+	// Create buckets
+	err = boltDB.Update(func(tx *bolt.Tx) error {
+		if _, err := tx.CreateBucketIfNotExists([]byte("runLocks")); err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucketIfNotExists([]byte("pulls")); err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucketIfNotExists([]byte("globalLocks")); err != nil {
+			return err
+		}
+		return nil
+	})
+	Ok(t, err)
+
+	// Create a lock in old format: {repoFullName}/{path}/{workspace}
+	oldKey := "owner/repo/path/default"
+	oldProject := models.NewProject("owner/repo", "path", "myproject")
+	oldLock := models.ProjectLock{
+		Pull:      models.PullRequest{Num: 1},
+		User:      models.User{Username: "testuser"},
+		Workspace: "default",
+		Project:   oldProject,
+		Time:      time.Now(),
+	}
+
+	oldLockSerialized, err := json.Marshal(oldLock)
+	Ok(t, err)
+
+	// Insert old format lock
+	err = boltDB.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("runLocks"))
+		return bucket.Put([]byte(oldKey), oldLockSerialized)
+	})
+	Ok(t, err)
+
+	// Verify old key exists
+	err = boltDB.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("runLocks"))
+		val := bucket.Get([]byte(oldKey))
+		Assert(t, val != nil, "old key should exist before migration")
+		return nil
+	})
+	Ok(t, err)
+
+	// Close the database
+	boltDB.Close()
+
+	// Now open with boltdb.New which should trigger the migration
+	b, err := boltdb.New(tmpDir)
+	Ok(t, err)
+	defer b.Close()
+
+	// List all locks
+	allLocks, err := b.List()
+	Ok(t, err)
+	Assert(t, len(allLocks) == 1, "should have 1 lock after migration")
+
+	// Verify the lock can be retrieved using the GetLock method
+	// which uses the new key format internally
+	projectWithName := models.NewProject("owner/repo", "path", "myproject")
+	retrievedLock, err := b.GetLock(projectWithName, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist with new key format")
+	Equals(t, "owner/repo", retrievedLock.Project.RepoFullName)
+	Equals(t, "path", retrievedLock.Project.Path)
+	Equals(t, "myproject", retrievedLock.Project.ProjectName)
+	Equals(t, "default", retrievedLock.Workspace)
+	Equals(t, "testuser", retrievedLock.User.Username)
+}
+
+func TestNoMigrationNeededForNewFormatKeys(t *testing.T) {
+	t.Log("migration should not affect keys already in new format")
+
+	// Create a temporary directory for the test database
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	Ok(t, err)
+
+	// Create a lock with the new format (includes project name)
+	projectWithName := models.NewProject("owner/repo", "path", "projectName")
+	newLock := models.ProjectLock{
+		Pull:      models.PullRequest{Num: 1},
+		User:      models.User{Username: "testuser"},
+		Workspace: "default",
+		Project:   projectWithName,
+		Time:      time.Now(),
+	}
+
+	// Acquire lock using the new format
+	acquired, _, err := db.TryLock(newLock)
+	Ok(t, err)
+	Assert(t, acquired, "should acquire lock")
+
+	// Verify the lock can be retrieved immediately after creation
+	retrievedLock, err := db.GetLock(projectWithName, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist")
+	Equals(t, "projectName", retrievedLock.Project.ProjectName)
+	Equals(t, "testuser", retrievedLock.User.Username)
+
+	// Close and reopen the database to trigger any migration logic
+	db.Close()
+	db, err = boltdb.New(tmp)
+	Ok(t, err)
+	defer db.Close()
+
+	// Verify lock still exists after reopening (no migration should have changed it)
+	retrievedLock, err = db.GetLock(projectWithName, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist after migration")
+	Equals(t, "projectName", retrievedLock.Project.ProjectName)
+	Equals(t, "testuser", retrievedLock.User.Username)
 }
 
 func TestUnlockCommandFail(t *testing.T) {
@@ -473,7 +601,9 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 				Command:    command.Plan,
 				RepoRelDir: ".",
 				Workspace:  "default",
-				Failure:    "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 		})
 	Ok(t, err)
@@ -523,7 +653,9 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
-				Failure:    "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 		})
 	Ok(t, err)
@@ -569,12 +701,16 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
-				Failure:    "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			{
-				RepoRelDir:   ".",
-				Workspace:    "staging",
-				ApplySuccess: "success!",
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "success!",
+				},
 			},
 		})
 	Ok(t, err)
@@ -633,7 +769,9 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
-				Failure:    "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 		})
 	Ok(t, err)
@@ -642,9 +780,11 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 	status, err := b.UpdatePullWithResults(pull,
 		[]command.ProjectResult{
 			{
-				RepoRelDir:   ".",
-				Workspace:    "staging",
-				ApplySuccess: "success!",
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "success!",
+				},
 			},
 		})
 
@@ -697,24 +837,30 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 				Command:    command.Plan,
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
-				Failure:    "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			{
 				Command:     command.Plan,
 				RepoRelDir:  "projectname",
 				Workspace:   "default",
 				ProjectName: "projectname",
-				Failure:     "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			{
 				Command:    command.Plan,
 				RepoRelDir: "staythesame",
 				Workspace:  "default",
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: "tf out",
-					LockURL:         "lock-url",
-					RePlanCmd:       "plan command",
-					ApplyCmd:        "apply command",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "tf out",
+						LockURL:         "lock-url",
+						RePlanCmd:       "plan command",
+						ApplyCmd:        "apply command",
+					},
 				},
 			},
 		})
@@ -723,23 +869,29 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 	updateStatus, err := b.UpdatePullWithResults(pull,
 		[]command.ProjectResult{
 			{
-				Command:      command.Apply,
-				RepoRelDir:   "mergeme",
-				Workspace:    "default",
-				ApplySuccess: "applied!",
+				Command:    command.Apply,
+				RepoRelDir: "mergeme",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "applied!",
+				},
 			},
 			{
 				Command:     command.Apply,
 				RepoRelDir:  "projectname",
 				Workspace:   "default",
 				ProjectName: "projectname",
-				Error:       errors.New("apply error"),
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New("apply error"),
+				},
 			},
 			{
-				Command:      command.Apply,
-				RepoRelDir:   "newresult",
-				Workspace:    "default",
-				ApplySuccess: "success!",
+				Command:    command.Apply,
+				RepoRelDir: "newresult",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "success!",
+				},
 			},
 		})
 	Ok(t, err)
@@ -810,12 +962,14 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				Command:    command.PolicyCheck,
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
-				Failure:    "policy failure",
-				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
-						{
-							PolicySetName: "policy1",
-							ReqApprovals:  1,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "policy failure",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								ReqApprovals:  1,
+							},
 						},
 					},
 				},
@@ -825,12 +979,14 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				RepoRelDir:  "projectname",
 				Workspace:   "default",
 				ProjectName: "projectname",
-				Failure:     "policy failure",
-				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
-						{
-							PolicySetName: "policy1",
-							ReqApprovals:  1,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "policy failure",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								ReqApprovals:  1,
+							},
 						},
 					},
 				},
@@ -844,12 +1000,14 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				Command:    command.ApprovePolicies,
 				RepoRelDir: "mergeme",
 				Workspace:  "default",
-				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
-						{
-							PolicySetName: "policy1",
-							ReqApprovals:  1,
-							CurApprovals:  1,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								ReqApprovals:  1,
+								CurApprovals:  1,
+							},
 						},
 					},
 				},
@@ -898,7 +1056,7 @@ func newTestDB() (*bolt.DB, *boltdb.BoltDB) {
 	// Retrieve a temporary path.
 	f, err := os.CreateTemp("", "")
 	if err != nil {
-		panic(errors.Wrap(err, "failed to create temp file"))
+		panic(fmt.Errorf("failed to create temp file: %w", err))
 	}
 	path := f.Name()
 	f.Close() // nolint: errcheck
@@ -906,18 +1064,18 @@ func newTestDB() (*bolt.DB, *boltdb.BoltDB) {
 	// Open the database.
 	boltDB, err := bolt.Open(path, 0600, nil)
 	if err != nil {
-		panic(errors.Wrap(err, "could not start bolt DB"))
+		panic(fmt.Errorf("could not start bolt DB: %w", err))
 	}
 	if err := boltDB.Update(func(tx *bolt.Tx) error {
 		if _, err := tx.CreateBucketIfNotExists([]byte(lockBucket)); err != nil {
-			return errors.Wrap(err, "failed to create bucket")
+			return fmt.Errorf("failed to create bucket: %w", err)
 		}
 		if _, err := tx.CreateBucketIfNotExists([]byte(configBucket)); err != nil {
-			return errors.Wrap(err, "failed to create bucket")
+			return fmt.Errorf("failed to create bucket: %w", err)
 		}
 		return nil
 	}); err != nil {
-		panic(errors.Wrap(err, "could not create bucket"))
+		panic(fmt.Errorf("could not create bucket: %w", err))
 	}
 	b, _ := boltdb.NewWithDB(boltDB, lockBucket, configBucket)
 	return boltDB, b

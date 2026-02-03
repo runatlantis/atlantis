@@ -116,37 +116,37 @@ type WebhooksSender interface {
 
 type ProjectPlanCommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
-	Plan(ctx command.ProjectContext) command.ProjectResult
+	Plan(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectApplyCommandRunner interface {
 	// Apply runs terraform apply for the project described by ctx.
-	Apply(ctx command.ProjectContext) command.ProjectResult
+	Apply(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectPolicyCheckCommandRunner interface {
 	// PolicyCheck runs OPA defined policies for the project described by ctx.
-	PolicyCheck(ctx command.ProjectContext) command.ProjectResult
+	PolicyCheck(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectApprovePoliciesCommandRunner interface {
 	// Approves any failing OPA policies.
-	ApprovePolicies(ctx command.ProjectContext) command.ProjectResult
+	ApprovePolicies(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectVersionCommandRunner interface {
 	// Version runs terraform version for the project described by ctx.
-	Version(ctx command.ProjectContext) command.ProjectResult
+	Version(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectImportCommandRunner interface {
 	// Import runs terraform import for the project described by ctx.
-	Import(ctx command.ProjectContext) command.ProjectResult
+	Import(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectStateCommandRunner interface {
 	// StateRm runs terraform state rm for the project described by ctx.
-	StateRm(ctx command.ProjectContext) command.ProjectResult
+	StateRm(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 // ProjectCommandRunner runs project commands. A project command is a command
@@ -166,7 +166,7 @@ type ProjectCommandRunner interface {
 type JobURLSetter interface {
 	// SetJobURLWithStatus sets the commit status for the project represented by
 	// ctx and updates the status with and url to a job.
-	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectResult) error
+	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
@@ -183,19 +183,19 @@ type ProjectOutputWrapper struct {
 	JobURLSetter     JobURLSetter
 }
 
-func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectResult {
+func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectCommandOutput {
 	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
 	p.JobMessageSender.Send(ctx, "", OperationComplete)
 	return result
 }
 
-func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
+func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
 	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
 	p.JobMessageSender.Send(ctx, "", OperationComplete)
 	return result
 }
 
-func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult) command.ProjectResult {
+func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectCommandOutput) command.ProjectCommandOutput {
 	// Create a PR status to track project's plan status. The status will
 	// include a link to view the progress of atlantis plan command in real
 	// time
@@ -231,6 +231,7 @@ type DefaultProjectCommandRunner struct {
 	PlanStepRunner            StepRunner
 	ShowStepRunner            StepRunner
 	ApplyStepRunner           StepRunner
+	CancelStepRunner          StepRunner
 	PolicyCheckStepRunner     StepRunner
 	VersionStepRunner         StepRunner
 	ImportStepRunner          StepRunner
@@ -243,104 +244,74 @@ type DefaultProjectCommandRunner struct {
 	Webhooks                  WebhooksSender
 	WorkingDirLocker          WorkingDirLocker
 	CommandRequirementHandler CommandRequirementHandler
+	CancellationTracker       CancellationTracker
 }
 
 // Plan runs terraform plan for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectCommandOutput {
 	planSuccess, failure, err := p.doPlan(ctx)
-	return command.ProjectResult{
-		Command:           command.Plan,
-		PlanSuccess:       planSuccess,
-		Error:             err,
-		Failure:           failure,
-		RepoRelDir:        ctx.RepoRelDir,
-		Workspace:         ctx.Workspace,
-		ProjectName:       ctx.ProjectName,
-		SilencePRComments: ctx.SilencePRComments,
+	return command.ProjectCommandOutput{
+		PlanSuccess: planSuccess,
+		Error:       err,
+		Failure:     failure,
 	}
 }
 
 // PolicyCheck evaluates policies defined with Rego for the project described by ctx.
-func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectCommandOutput {
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
-	return command.ProjectResult{
-		Command:            command.PolicyCheck,
+	return command.ProjectCommandOutput{
 		PolicyCheckResults: policySuccess,
 		Error:              err,
 		Failure:            failure,
-		RepoRelDir:         ctx.RepoRelDir,
-		Workspace:          ctx.Workspace,
-		ProjectName:        ctx.ProjectName,
 	}
 }
 
 // Apply runs terraform apply for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
 	applyOut, failure, err := p.doApply(ctx)
-	return command.ProjectResult{
-		Command:           command.Apply,
-		Failure:           failure,
-		Error:             err,
-		ApplySuccess:      applyOut,
-		RepoRelDir:        ctx.RepoRelDir,
-		Workspace:         ctx.Workspace,
-		ProjectName:       ctx.ProjectName,
-		SilencePRComments: ctx.SilencePRComments,
+	return command.ProjectCommandOutput{
+		Failure:      failure,
+		Error:        err,
+		ApplySuccess: applyOut,
 	}
 }
 
-func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectCommandOutput {
 	approvedOut, failure, err := p.doApprovePolicies(ctx)
-	return command.ProjectResult{
-		Command:            command.PolicyCheck,
+	return command.ProjectCommandOutput{
 		Failure:            failure,
 		Error:              err,
 		PolicyCheckResults: approvedOut,
-		RepoRelDir:         ctx.RepoRelDir,
-		Workspace:          ctx.Workspace,
-		ProjectName:        ctx.ProjectName,
 	}
 }
 
-func (p *DefaultProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectCommandOutput {
 	versionOut, failure, err := p.doVersion(ctx)
-	return command.ProjectResult{
-		Command:        command.Version,
+	return command.ProjectCommandOutput{
 		Failure:        failure,
 		Error:          err,
 		VersionSuccess: versionOut,
-		RepoRelDir:     ctx.RepoRelDir,
-		Workspace:      ctx.Workspace,
-		ProjectName:    ctx.ProjectName,
 	}
 }
 
 // Import runs terraform import for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Import(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) Import(ctx command.ProjectContext) command.ProjectCommandOutput {
 	importSuccess, failure, err := p.doImport(ctx)
-	return command.ProjectResult{
-		Command:       command.Import,
+	return command.ProjectCommandOutput{
 		ImportSuccess: importSuccess,
 		Error:         err,
 		Failure:       failure,
-		RepoRelDir:    ctx.RepoRelDir,
-		Workspace:     ctx.Workspace,
-		ProjectName:   ctx.ProjectName,
 	}
 }
 
 // StateRm runs terraform state rm for the project described by ctx.
-func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectCommandOutput {
 	stateRmSuccess, failure, err := p.doStateRm(ctx)
-	return command.ProjectResult{
-		Command:        command.State,
-		SubCommand:     "rm",
+	return command.ProjectCommandOutput{
 		StateRmSuccess: stateRmSuccess,
 		Error:          err,
 		Failure:        failure,
-		RepoRelDir:     ctx.RepoRelDir,
-		Workspace:      ctx.Workspace,
-		ProjectName:    ctx.ProjectName,
 	}
 }
 
@@ -356,7 +327,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.ApprovePolicies)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.ApprovePolicies)
 	if err != nil {
 		return nil, "", err
 	}
@@ -460,7 +431,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
 	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.PolicyCheck)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.PolicyCheck)
 	if err != nil {
 		return nil, "", err
 	}
@@ -518,10 +489,12 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	var index int
 	var preConftestOutput []string
 	var postConftestOutput []string
-	var policySetResults []models.PolicySetResult
+	// Initialize policySetResults as empty slice instead of nil to prevent
+	// "unable to unmarshal conftest output" error when outputs array is empty
+	policySetResults := []models.PolicySetResult{}
 
-	for i, output := range outputs {
-		index = i
+	inputPolicySets := ctx.PolicySets.PolicySets
+	for index, output := range outputs {
 		if !ctx.CustomPolicyCheck {
 			err = json.Unmarshal([]byte(strings.Join([]string{output}, "\n")), &policySetResults)
 			if err == nil {
@@ -530,15 +503,65 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			preConftestOutput = append(preConftestOutput, output)
 		} else {
 			// Using a policy tool other than Conftest, manually building result struct
-			passed := !strings.Contains(strings.ToLower(output), "fail")
-			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: "Custom", PolicyOutput: output, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
+			policySetName := "Custom"
+			if index < len(inputPolicySets) {
+				policySetName = inputPolicySets[index].Name
+			}
+
+			// Handle empty output: treat as failure since it likely indicates misconfiguration
+			// Non-empty output: parse conftest-style output to determine pass/fail
+			// Check for actual failures (> 0), not just the word "fail"
+			var passed bool
+			var policyOutput string
+			if output == "" {
+				passed = false
+				policyOutput = "WARNING: Policy check produced no output. This may indicate a misconfiguration."
+			} else {
+				// Use regex to check for actual failures (> 0), not just the word "fail"
+				// Matches patterns like "1 failure", "2 failures", "10 failures", or JSON "failures": [...]
+				failureRegex := regexp.MustCompile(`([1-9][0-9]* failure|failures": \[)`)
+				hasFailures := failureRegex.MatchString(output)
+				// Also check for FAIL prefix (conftest error output)
+				hasFailPrefix := strings.HasPrefix(strings.TrimSpace(output), "FAIL")
+				passed = !hasFailures && !hasFailPrefix
+				policyOutput = output
+			}
+
+			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: policySetName, PolicyOutput: policyOutput, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
 			preConftestOutput = append(preConftestOutput, "")
 		}
 	}
 
-	if policySetResults == nil {
-		return nil, "", errors.New("unable to unmarshal conftest output")
+	// Warn if custom policy check has mismatch between configured policy sets and outputs.
+	// Note: With empty output preservation, this warning now only triggers when workflow steps
+	// are completely missing, not when a step returns empty output.
+	if ctx.CustomPolicyCheck {
+		if len(policySetResults) < len(inputPolicySets) {
+			ctx.Log.Warn("Configured %d policy sets but only received %d outputs. Policy sets without outputs: %v. Check your workflow configuration.",
+				len(inputPolicySets),
+				len(policySetResults),
+				getMissingPolicySetNames(inputPolicySets, len(policySetResults)))
+		} else if len(policySetResults) > len(inputPolicySets) {
+			ctx.Log.Warn("Received %d outputs but only %d policy sets configured. Excess outputs will use 'Custom' as name.",
+				len(policySetResults),
+				len(inputPolicySets))
+		}
 	}
+
+	// Check if we have any policy check results
+	// For non-custom policy checks (conftest), empty results means JSON parsing failed
+	// For custom policy checks, empty results when policy sets are configured means the check failed
+	if len(policySetResults) == 0 {
+		if !ctx.CustomPolicyCheck {
+			// Conftest should have produced JSON output
+			return nil, "", errors.New("unable to unmarshal conftest output")
+		} else if len(inputPolicySets) > 0 {
+			// Custom policy check with configured policy sets but no results - this is a failure
+			return nil, "", errors.New("custom policy check produced no results despite configured policy sets")
+		}
+		// Custom policy check with no configured policy sets and no results - this is OK
+	}
+
 	if len(outputs) > 0 {
 		postConftestOutput = outputs[(index + 1):]
 	}
@@ -556,9 +579,12 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Using this function instead of catching failed policy runs with errors, for cases when '--no-fail' is passed to conftest.
 	// One reason to pass such an arg to conftest would be to prevent workflow termination so custom run scripts
 	// can be run after the conftest step.
-	ctx.Log.Err(strings.Join(outputs, "\n"))
+	// Only log outputs as errors if policies did not pass, otherwise log at debug level
 	if !result.PolicyCleared() {
+		ctx.Log.Err(strings.Join(outputs, "\n"))
 		failure = "Some policy sets did not pass."
+	} else {
+		ctx.Log.Debug("policy check outputs %s", strings.Join(outputs, "\n"))
 	}
 
 	return result, failure, nil
@@ -576,7 +602,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Plan)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Plan)
 	if err != nil {
 		return nil, "", err
 	}
@@ -675,7 +701,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Apply)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Apply)
 	if err != nil {
 		return "", "", err
 	}
@@ -719,7 +745,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Version)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Version)
 	if err != nil {
 		return "", "", err
 	}
@@ -760,7 +786,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Import)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Import)
 	if err != nil {
 		return nil, "", err
 	}
@@ -801,7 +827,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.State)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.State)
 	if err != nil {
 		return nil, "", err
 	}
@@ -856,7 +882,9 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 			out, err = p.MultiEnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, step.Output)
 		}
 
-		if out != "" {
+		// Keep all policy_check outputs for custom policy checks to maintain positional alignment with policy sets
+		// Empty outputs are still appended to prevent index mismatches
+		if out != "" || (step.StepName == "policy_check" && ctx.CustomPolicyCheck) {
 			outputs = append(outputs, out)
 		}
 		if err != nil {
@@ -864,4 +892,13 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		}
 	}
 	return outputs, nil
+}
+
+// getMissingPolicySetNames returns the names of policy sets that don't have corresponding outputs
+func getMissingPolicySetNames(policySets []valid.PolicySet, receivedCount int) []string {
+	var missing []string
+	for i := receivedCount; i < len(policySets); i++ {
+		missing = append(missing, policySets[i].Name)
+	}
+	return missing
 }
