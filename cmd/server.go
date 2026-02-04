@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
@@ -126,6 +127,7 @@ const (
 	ParallelPoolSize                 = "parallel-pool-size"
 	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
+	MetricsInactivePRRetention       = "metrics-inactive-pr-retention"
 	AllowDraftPRs                    = "allow-draft-prs"
 	PortFlag                         = "port"
 	RedisDB                          = "redis-db"
@@ -188,6 +190,7 @@ const (
 	DefaultMaxCommentsPerCommand        = 100
 	DefaultParallelPoolSize             = 15
 	DefaultStatsNamespace               = "atlantis"
+	DefaultMetricsInactivePRRetention   = "24h"
 	DefaultPort                         = 4141
 	DefaultRedisDB                      = 0
 	DefaultRedisPort                    = 6379
@@ -413,6 +416,10 @@ var stringFlags = map[string]stringFlag{
 	StatsNamespace: {
 		description:  "Namespace for aggregating stats.",
 		defaultValue: DefaultStatsNamespace,
+	},
+	MetricsInactivePRRetention: {
+		description:  "Duration to retain metrics for inactive PRs before cleanup (e.g., '24h', '168h', '7d'). Cleanup runs at this same frequency. Set to 0 to disable cleanup.",
+		defaultValue: DefaultMetricsInactivePRRetention,
 	},
 	RedisHost: {
 		description: "The Redis Hostname for when using a Locking DB type of 'redis'.",
@@ -956,6 +963,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.StatsNamespace == "" {
 		c.StatsNamespace = DefaultStatsNamespace
 	}
+	if c.MetricsInactivePRRetention == "" {
+		c.MetricsInactivePRRetention = DefaultMetricsInactivePRRetention
+	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
 	}
@@ -1003,6 +1013,19 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if userConfig.DefaultTFDistribution != TFDistributionTerraform && userConfig.DefaultTFDistribution != TFDistributionOpenTofu {
 		return fmt.Errorf("invalid tf distribution: expected one of %s or %s",
 			TFDistributionTerraform, TFDistributionOpenTofu)
+	}
+
+	if userConfig.MetricsInactivePRRetention != "" && userConfig.MetricsInactivePRRetention != "0" {
+		retention, err := time.ParseDuration(userConfig.MetricsInactivePRRetention)
+		if err != nil {
+			return fmt.Errorf("--%s must be a valid duration (e.g., '24h', '168h', '7d'): %w", MetricsInactivePRRetention, err)
+		}
+		if retention < 0 {
+			return fmt.Errorf("--%s must be positive", MetricsInactivePRRetention)
+		}
+		if retention > 30*24*time.Hour {
+			return fmt.Errorf("--%s must be <= 30 days", MetricsInactivePRRetention)
+		}
 	}
 
 	checkoutStrategy := userConfig.CheckoutStrategy

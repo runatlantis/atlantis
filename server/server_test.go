@@ -38,11 +38,12 @@ import (
 )
 
 const (
-	testAtlantisVersion = "1.0.0"
-	testAtlantisUrl     = "http://example.com"
-	testLockingDBType   = cmd.DefaultLockingDBType
-	testGitHubHostName  = cmd.DefaultGHHostname
-	testGitHubUser      = "user"
+	testAtlantisVersion            = "1.0.0"
+	testAtlantisUrl                = "http://example.com"
+	testLockingDBType              = cmd.DefaultLockingDBType
+	testGitHubHostName             = cmd.DefaultGHHostname
+	testGitHubUser                 = "user"
+	testMetricsInactivePRRetention = "67h"
 )
 
 func TestNewServer_GitHubUser(t *testing.T) {
@@ -50,11 +51,12 @@ func TestNewServer_GitHubUser(t *testing.T) {
 	tmpDir := t.TempDir()
 	_, err := server.NewServer(
 		server.UserConfig{
-			DataDir:        tmpDir,
-			AtlantisURL:    testAtlantisUrl,
-			LockingDBType:  testLockingDBType,
-			GithubHostname: testGitHubHostName,
-			GithubUser:     testGitHubUser,
+			DataDir:                    tmpDir,
+			AtlantisURL:                testAtlantisUrl,
+			LockingDBType:              testLockingDBType,
+			GithubHostname:             testGitHubHostName,
+			GithubUser:                 testGitHubUser,
+			MetricsInactivePRRetention: testMetricsInactivePRRetention,
 		}, server.Config{
 			AtlantisVersion: testAtlantisVersion,
 		},
@@ -67,12 +69,25 @@ func TestNewServer_GitHubUser(t *testing.T) {
 func TestNewServer_InvalidAtlantisURL(t *testing.T) {
 	tmpDir := t.TempDir()
 	_, err := server.NewServer(server.UserConfig{
-		DataDir:     tmpDir,
-		AtlantisURL: "example.com",
+		DataDir:                    tmpDir,
+		AtlantisURL:                "example.com",
+		MetricsInactivePRRetention: testMetricsInactivePRRetention,
 	}, server.Config{
 		AtlantisURLFlag: "atlantis-url",
 	})
 	ErrEquals(t, "parsing --atlantis-url flag \"example.com\": http or https must be specified", err)
+}
+
+func TestNewServer_InvalidMetricsInactivePRRetention(t *testing.T) {
+	tmpDir := t.TempDir()
+	_, err := server.NewServer(server.UserConfig{
+		DataDir:                    tmpDir,
+		AtlantisURL:                testAtlantisUrl,
+		MetricsInactivePRRetention: "invalid",
+	}, server.Config{
+		AtlantisURLFlag: "atlantis-url",
+	})
+	ErrEquals(t, "parsing metrics-inactive-pr-retention: time: invalid duration \"invalid\"", err)
 }
 
 func TestIndex_LockErr(t *testing.T) {

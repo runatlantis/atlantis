@@ -196,11 +196,17 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 	case *github.IssueCommentEvent:
 		resp = e.HandleGithubCommentEvent(event, githubReqID, logger)
 		scope = scope.SubScope(fmt.Sprintf("comment_%s", *event.Action))
-		scope = common.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetIssue().GetNumber())
+		scope = scope.Tagged(map[string]string{
+			"base_repo": event.GetRepo().GetFullName(),
+			"pr_number": strconv.Itoa(event.GetIssue().GetNumber()),
+		})
 	case *github.PullRequestEvent:
 		resp = e.HandleGithubPullRequestEvent(logger, event, githubReqID)
 		scope = scope.SubScope(fmt.Sprintf("pr_%s", *event.Action))
-		scope = common.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetNumber())
+		scope = scope.Tagged(map[string]string{
+			"base_repo": event.GetRepo().GetFullName(),
+			"pr_number": strconv.Itoa(event.GetNumber()),
+		})
 	default:
 		resp = HTTPResponse{
 			body: fmt.Sprintf("Ignoring unsupported event %s", githubReqID),

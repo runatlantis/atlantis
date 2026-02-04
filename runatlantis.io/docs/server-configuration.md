@@ -1047,6 +1047,16 @@ ATLANTIS_MAX_COMMENTS_PER_COMMAND=100
 
 Limit the number of comments published after a command is executed, to prevent spamming your VCS and Atlantis to get throttled as a result. Defaults to `100`. Set this option to `0` to disable log truncation. Note that the truncation will happen on the top of the command output, to preserve the most important parts of the output, often displayed at the end.
 
+### `--metrics-inactive-pr-retention`
+
+```bash
+atlantis server --metrics-inactive-pr-retention=72h
+# or
+ATLANTIS_METRICS_INACTIVE_PR_RETENTION=72h
+```
+
+After the duration specified, Atlantis will stop reporting metrics for inactive pull requests.
+
 ### `--parallel-apply` <Badge text="v0.22.0+" type="info"/>
 
 ```bash
