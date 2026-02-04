@@ -607,16 +607,22 @@ func TestClone_MissingRemoteBranch(t *testing.T) {
 	Ok(t, err)
 	assert.FileExists(t, planFile)
 
-	// 3. Delete 'main' branch from remote
+	// 3. Create a new commit on the head branch and delete 'main' branch from remote.
 	runCmd(t, repoDir, "git", "checkout", "branch")
+	newFile := filepath.Join(repoDir, "new-file.txt")
+	err = os.WriteFile(newFile, []byte("new content"), 0o644)
+	Ok(t, err)
+	runCmd(t, repoDir, "git", "add", "new-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "new commit for head branch")
+	newHeadCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
 	runCmd(t, repoDir, "git", "branch", "-D", "main")
 
 	// 4. Trigger another clone, expecting re-clone because the base branch 'main'
-	// is missing from the remote.
+	// is missing from the remote and the head commit has changed.
 	_, err = wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "branch",
-		HeadCommit: "new-commit-hash", // Needs to be a different commit to trigger update path.
+		HeadCommit: newHeadCommit,
 		BaseBranch: "main",
 	}, "default")
 	Ok(t, err)
