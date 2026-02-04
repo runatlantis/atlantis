@@ -6,6 +6,7 @@ package controllers_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -330,6 +331,88 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 	err := json.Unmarshal(response, &result)
 	Ok(t, err)
 	Equals(t, expected, result)
+}
+
+func TestAPIController_Plan_ErrorSerialization(t *testing.T) {
+	RegisterMockTestingT(t)
+	locker := NewMockLocker()
+	logger := logging.NewNoopLogger(t)
+	parser := NewMockEventParsing()
+	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
+	Ok(t, err)
+	scope := metricstest.NewLoggingScope(t, logger, "null")
+	vcsClient := NewMockClient()
+	workingDir := NewMockWorkingDir()
+
+	workingDirLocker := NewMockWorkingDirLocker()
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir), Eq(""), Any[command.Name]())).
+		ThenReturn(func() {}, nil)
+
+	projectCommandBuilder := NewMockProjectCommandBuilder()
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+		}}, nil)
+
+	// Mock the plan runner to return an error
+	projectCommandRunner := NewMockProjectCommandRunner()
+	expectedError := "Error acquiring the state lock\nLock Info:\n  ID: test-lock-id"
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		Error: fmt.Errorf("%s", expectedError),
+	})
+
+	preWorkflowHooksCommandRunner := NewMockPreWorkflowHooksCommandRunner()
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+
+	postWorkflowHooksCommandRunner := NewMockPostWorkflowHooksCommandRunner()
+	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+
+	commitStatusUpdater := NewMockCommitStatusUpdater()
+	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).ThenReturn(nil)
+
+	ac := controllers.APIController{
+		APISecret:                      []byte(atlantisToken),
+		Locker:                         locker,
+		Logger:                         logger,
+		Scope:                          scope,
+		Parser:                         parser,
+		ProjectCommandBuilder:          projectCommandBuilder,
+		ProjectPlanCommandRunner:       projectCommandRunner,
+		ProjectApplyCommandRunner:      projectCommandRunner,
+		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		VCSClient:                      vcsClient,
+		RepoAllowlistChecker:           repoAllowlistChecker,
+		WorkingDir:                     workingDir,
+		WorkingDirLocker:               workingDirLocker,
+		CommitStatusUpdater:            commitStatusUpdater,
+	}
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	// Verify we get a 500 status code (due to the error)
+	Equals(t, http.StatusInternalServerError, w.Code)
+
+	// Parse the response and verify the error is properly serialized as a string
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.APIResult
+	err = json.Unmarshal(response, &result)
+	Ok(t, err)
+
+	// Verify the error message is present in the response
+	Assert(t, len(result.ProjectResults) == 1, "expected 1 project result")
+	Assert(t, result.ProjectResults[0].Error == expectedError,
+		"expected error %q, got %q", expectedError, result.ProjectResults[0].Error)
 }
 
 func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
