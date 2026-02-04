@@ -610,7 +610,7 @@ func TestClone_MissingRemoteBranch(t *testing.T) {
 	// 3. Create a new commit on the head branch and delete 'main' branch from remote.
 	runCmd(t, repoDir, "git", "checkout", "branch")
 	newFile := filepath.Join(repoDir, "new-file.txt")
-	err = os.WriteFile(newFile, []byte("new content"), 0o644)
+	err = os.WriteFile(newFile, []byte("new content"), 0o600)
 	Ok(t, err)
 	runCmd(t, repoDir, "git", "add", "new-file.txt")
 	runCmd(t, repoDir, "git", "commit", "-m", "new commit for head branch")
