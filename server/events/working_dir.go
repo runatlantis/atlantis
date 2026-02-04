@@ -262,11 +262,12 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 }
 
 func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {
-	ref := "refs/remotes/origin/" + branch
-
-	err := w.wrappedGit(logger, c, "show-ref", "--verify", ref)
+	// We use ls-remote to check if the branch exists on the remote.
+	// We use --exit-code which will return exit code 2 if the branch
+	// doesn't exist and 0 if it does.
+	err := w.wrappedGit(logger, c, "ls-remote", "--exit-code", "--heads", "origin", branch)
 	if err != nil {
-		logger.Warn("remote-tracking branch %s not found locally", ref)
+		logger.Warn("could not find branch '%s' on remote 'origin': %s", branch, err)
 		return false
 	}
 

@@ -576,6 +576,55 @@ func TestClone_ReCloneOnErrorAttemptingReuse(t *testing.T) {
 	Equals(t, expCommit, actCommit)
 }
 
+// Test that if the base branch is missing from the remote, we re-clone.
+func TestClone_MissingRemoteBranch(t *testing.T) {
+	// 1. Initialize remote repo
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	// 2. Initial successful clone
+	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		HeadCommit: expCommit,
+		BaseBranch: "main",
+	}, "default")
+	Ok(t, err)
+
+	// Create a plan file that should be deleted on re-clone.
+	planFile := filepath.Join(cloneDir, "default.tfplan")
+	_, err = os.Create(planFile)
+	Ok(t, err)
+	assert.FileExists(t, planFile)
+
+	// 3. Delete 'main' branch from remote
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "git", "branch", "-D", "main")
+
+	// 4. Trigger another clone, expecting re-clone because the base branch 'main'
+	// is missing from the remote.
+	_, err = wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		HeadCommit: "new-commit-hash", // Needs to be a different commit to trigger update path.
+		BaseBranch: "main",
+	}, "default")
+	Ok(t, err)
+
+	// After re-clone, the plan file should be gone.
+	assert.NoFileExists(t, planFile, "Plan file should have been wiped out by the reclone")
+}
+
 func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 	repoDir := initRepo(t)
 	dataDir := t.TempDir()
