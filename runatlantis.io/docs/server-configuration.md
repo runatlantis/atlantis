@@ -1047,6 +1047,8 @@ ATLANTIS_MAX_COMMENTS_PER_COMMAND=100
 
 Limit the number of comments published after a command is executed, to prevent spamming your VCS and Atlantis to get throttled as a result. Defaults to `100`. Set this option to `0` to disable log truncation. Note that the truncation will happen on the top of the command output, to preserve the most important parts of the output, often displayed at the end.
 
+When command output exceeds the VCS comment size limit (or when this limit applies), Atlantis splits the output into multiple comments using **intelligent comment splitting**. Split points are chosen so that markdown structure is preserved: the splitter detects whether it is inside a code block (`` ``` ``), a `<details>` block, or inline code (`` ` ``), and inserts appropriate closing and continuation markers so that each comment renders correctly. Continuation comments are labeled with the command name (e.g. "Continued plan output from previous comment") when available.
+
 ### `--parallel-apply` <Badge text="v0.22.0+" type="info"/>
 
 ```bash
