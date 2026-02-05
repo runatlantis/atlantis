@@ -234,8 +234,9 @@ Applies to `merge` checkout strategy only which you need to set via `--checkout-
 
 :::tip Tip
 Use `undiverged_when_modified` instead of `undiverged` - not both. Choose based on your needs:
-- **`undiverged`**: Checks all files (more conservative, can have false positives in monorepos)
-- **`undiverged_when_modified`**: Only checks `when_modified` patterns (better for monorepos)
+
+* **`undiverged`**: Checks all files (more conservative, can have false positives in monorepos)
+* **`undiverged_when_modified`**: Only checks `when_modified` patterns (better for monorepos)
 
 :::
 
@@ -288,17 +289,17 @@ and you only want to block applies if the base branch has changes to **files tha
 
 **Example scenario:**
 
-```
+```text
 monorepo/
   project1/        # Has when_modified: ["project1/**"]
   project2/        # Has when_modified: ["project2/**"]
   shared/          # Included in both projects
 ```
 
-- PR modifies `project1/main.tf`
-- After PR created, someone merges changes to `project2/main.tf`
-- With `undiverged`: Would **fail** (base branch changed)
-- With `undiverged_when_modified`: Would **pass** (base branch didn't change project1 files)
+* PR modifies `project1/main.tf`
+* After PR created, someone merges changes to `project2/main.tf`
+* With `undiverged`: Would **fail** (base branch changed)
+* With `undiverged_when_modified`: Would **pass** (base branch didn't change project1 files)
 
 ## Setting Command Requirements
 
@@ -377,8 +378,9 @@ You can set any or all of `approved`, `mergeable`, `undiverged`, and `undiverged
 
 ::: warning
 `undiverged` and `undiverged_when_modified` are **mutually exclusive**. You should use one or the other, not both:
-- Use `undiverged` to check if **any** files on the base branch have changed
-- Use `undiverged_when_modified` to check only files matching your project's `when_modified` patterns
+
+* Use `undiverged` to check if **any** files on the base branch have changed
+* Use `undiverged_when_modified` to check only files matching your project's `when_modified` patterns
 :::
 
 ## Who Can Apply?

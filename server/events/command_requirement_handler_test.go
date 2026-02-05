@@ -104,9 +104,9 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 		{
 			name: "fail by diverged when modified",
 			ctx: command.ProjectContext{
-				PlanRequirements:       []string{raw.UnDivergedWhenModifiedRequirement},
-				AutoplanWhenModified:   []string{"project1/**"},
-				Pull:                   models.PullRequest{BaseBranch: "main", HeadCommit: "abc123"},
+				PlanRequirements:     []string{raw.UnDivergedWhenModifiedRequirement},
+				AutoplanWhenModified: []string{"project1/**"},
+				Pull:                 models.PullRequest{BaseBranch: "main", HeadCommit: "abc123"},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
 				When(workingDir.HasDivergedWhenModified(Any[logging.SimpleLogging](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
@@ -227,9 +227,9 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 		{
 			name: "fail by diverged when modified",
 			ctx: command.ProjectContext{
-				ApplyRequirements:      []string{raw.UnDivergedWhenModifiedRequirement},
-				AutoplanWhenModified:   []string{"project1/**"},
-				Pull:                   models.PullRequest{BaseBranch: "main", HeadCommit: "abc123"},
+				ApplyRequirements:    []string{raw.UnDivergedWhenModifiedRequirement},
+				AutoplanWhenModified: []string{"project1/**"},
+				Pull:                 models.PullRequest{BaseBranch: "main", HeadCommit: "abc123"},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
 				When(workingDir.HasDivergedWhenModified(Any[logging.SimpleLogging](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
@@ -451,9 +451,9 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 		{
 			name: "fail by diverged when modified",
 			ctx: command.ProjectContext{
-				ImportRequirements:     []string{raw.UnDivergedWhenModifiedRequirement},
-				AutoplanWhenModified:   []string{"project1/**"},
-				Pull:                   models.PullRequest{BaseBranch: "main", HeadCommit: "abc123"},
+				ImportRequirements:   []string{raw.UnDivergedWhenModifiedRequirement},
+				AutoplanWhenModified: []string{"project1/**"},
+				Pull:                 models.PullRequest{BaseBranch: "main", HeadCommit: "abc123"},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
 				When(workingDir.HasDivergedWhenModified(Any[logging.SimpleLogging](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
