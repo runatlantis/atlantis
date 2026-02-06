@@ -33,6 +33,8 @@ type JobIDInfo struct {
 	Time           time.Time
 	TimeFormatted  string
 	JobStep        string
+	CompletedAt    time.Time // Zero value if still running
+	TriggeredBy    string    // Username who triggered the job
 }
 
 type PullInfoWithJobIDs struct {
@@ -45,6 +47,7 @@ type JobInfo struct {
 	HeadCommit     string
 	JobDescription string
 	JobStep        string
+	TriggeredBy    string // Username who triggered the job
 }
 
 type ProjectCmdOutputLine struct {
@@ -96,6 +99,9 @@ type ProjectCommandOutputHandler interface {
 
 	// Returns a map from Pull Requests to Jobs
 	GetPullToJobMapping() []PullInfoWithJobIDs
+
+	// GetProjectOutputBuffer returns the output buffer for a job (for persistence)
+	GetProjectOutputBuffer(jobID string) OutputBuffer
 }
 
 func NewAsyncProjectCommandOutputHandler(
@@ -154,7 +160,8 @@ func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg 
 				Path:         ctx.RepoRelDir,
 				Workspace:    ctx.Workspace,
 			},
-			JobStep: ctx.CommandName.String(),
+			JobStep:     ctx.CommandName.String(),
+			TriggeredBy: ctx.User.Username,
 		},
 		Line:              msg,
 		OperationComplete: operationComplete,
@@ -201,6 +208,7 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 			JobDescription: msg.JobInfo.JobDescription,
 			Time:           time.Now(),
 			JobStep:        msg.JobInfo.JobStep,
+			TriggeredBy:    msg.JobInfo.TriggeredBy,
 		})
 
 		// Forward new message to all receiver channels and output buffer
@@ -221,6 +229,9 @@ func (p *AsyncProjectCommandOutputHandler) completeJob(jobID string) {
 		outputBuffer.OperationComplete = true
 		p.projectOutputBuffers[jobID] = outputBuffer
 	}
+
+	// Update completion time in job mapping
+	p.setJobCompletionTime(jobID)
 
 	// Close active receiver channels
 	if openChannels, ok := p.receiverBuffers[jobID]; ok {
@@ -263,8 +274,13 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line strin
 		select {
 		case ch <- line:
 		default:
-			// Delete buffered channel if it's blocking.
+			// Close channel gracefully instead of silent delete
+			// This allows SSE to auto-reconnect
+			close(ch)
 			delete(p.receiverBuffers[jobID], ch)
+			p.logger.Warn("Buffer full, closing connection", map[string]interface{}{
+				"jobID": jobID,
+			})
 		}
 	}
 	p.receiverBuffersLock.Unlock()
@@ -334,6 +350,89 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 	}
 }
 
+// InitTestJob initializes an empty buffer for a test job (for testing)
+func (p *AsyncProjectCommandOutputHandler) InitTestJob(jobID string) {
+	p.projectOutputBuffersLock.Lock()
+	if _, ok := p.projectOutputBuffers[jobID]; !ok {
+		p.projectOutputBuffers[jobID] = OutputBuffer{
+			Buffer: []string{},
+		}
+	}
+	p.projectOutputBuffersLock.Unlock()
+}
+
+// SendTestLine sends a line directly to a job's buffer (for testing)
+func (p *AsyncProjectCommandOutputHandler) SendTestLine(jobID string, line string) {
+	p.InitTestJob(jobID)
+	p.writeLogLine(jobID, line)
+}
+
+// MarkComplete marks a job as complete (for testing)
+func (p *AsyncProjectCommandOutputHandler) MarkComplete(jobID string) {
+	p.projectOutputBuffersLock.Lock()
+	if outputBuffer, ok := p.projectOutputBuffers[jobID]; ok {
+		outputBuffer.OperationComplete = true
+		p.projectOutputBuffers[jobID] = outputBuffer
+	}
+	p.projectOutputBuffersLock.Unlock()
+
+	// Update completion time in job mapping
+	p.setJobCompletionTime(jobID)
+
+	// Close active receiver channels
+	p.receiverBuffersLock.Lock()
+	if openChannels, ok := p.receiverBuffers[jobID]; ok {
+		for ch := range openChannels {
+			close(ch)
+		}
+		delete(p.receiverBuffers, jobID)
+	}
+	p.receiverBuffersLock.Unlock()
+}
+
+// setJobCompletionTime updates the CompletedAt field for a job in the pull mapping
+func (p *AsyncProjectCommandOutputHandler) setJobCompletionTime(jobID string) {
+	completionTime := time.Now()
+	p.pullToJobMapping.Range(func(key, value any) bool {
+		jobIDSyncMap := value.(*sync.Map)
+		if jobInfoValue, ok := jobIDSyncMap.Load(jobID); ok {
+			jobInfo := jobInfoValue.(JobIDInfo)
+			jobInfo.CompletedAt = completionTime
+			jobIDSyncMap.Store(jobID, jobInfo)
+			return false // Found, stop iterating
+		}
+		return true // Continue looking
+	})
+}
+
+// RegisterTestJob initializes a test job with PR association for dev mode testing.
+// This makes the job appear in the jobs list page.
+func (p *AsyncProjectCommandOutputHandler) RegisterTestJob(jobID string, pullInfo PullInfo, jobStep string) {
+	// Initialize output buffer
+	p.projectOutputBuffersLock.Lock()
+	if _, ok := p.projectOutputBuffers[jobID]; !ok {
+		p.projectOutputBuffers[jobID] = OutputBuffer{
+			Buffer: []string{},
+		}
+	}
+	p.projectOutputBuffersLock.Unlock()
+
+	// Register in pullToJobMapping so it appears on jobs list
+	if _, ok := p.pullToJobMapping.Load(pullInfo); !ok {
+		p.pullToJobMapping.Store(pullInfo, &sync.Map{})
+	}
+	value, _ := p.pullToJobMapping.Load(pullInfo)
+	jobMapping := value.(*sync.Map)
+	jobMapping.Store(jobID, JobIDInfo{
+		JobID:          jobID,
+		JobIDUrl:       "/jobs/" + jobID,
+		JobDescription: "Test job",
+		Time:           time.Now(),
+		TimeFormatted:  time.Now().Format("Jan 2, 2006 3:04 PM"),
+		JobStep:        jobStep,
+	})
+}
+
 // NoopProjectOutputHandler is a mock that doesn't do anything
 type NoopProjectOutputHandler struct{}
 
@@ -359,4 +458,8 @@ func (p *NoopProjectOutputHandler) IsKeyExists(_ string) bool {
 
 func (p *NoopProjectOutputHandler) GetPullToJobMapping() []PullInfoWithJobIDs {
 	return []PullInfoWithJobIDs{}
+}
+
+func (p *NoopProjectOutputHandler) GetProjectOutputBuffer(_ string) OutputBuffer {
+	return OutputBuffer{}
 }
