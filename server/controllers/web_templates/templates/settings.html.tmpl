@@ -1,0 +1,123 @@
+{{ define "title" }}Settings - Atlantis{{ end }}
+
+{{ define "content" }}
+<div class="page-container" x-data="settingsPage()">
+  <div class="page-header">
+    <h1>Settings</h1>
+  </div>
+
+  <!-- Apply Commands Section -->
+  {{ if .GlobalApplyLockEnabled }}
+  <div class="settings-section">
+    <h2 class="settings-section-title">Emergency Controls</h2>
+    <div id="apply-commands-card" class="settings-card{{ if .ApplyLockActive }} settings-card--danger{{ end }}">
+      {{ if .ApplyLockActive }}
+      <div class="settings-card-body">
+        <div class="settings-card-header">
+          <i data-lucide="alert-triangle" class="icon-md"></i>
+          <span>Apply commands are currently <strong>disabled</strong></span>
+        </div>
+        {{ if .ApplyLockTime }}
+        <p class="settings-card-meta">Disabled since: {{ .ApplyLockTime }}</p>
+        {{ end }}
+        <p class="settings-card-description">
+          All terraform apply operations are blocked. In-progress applies will complete, but no new applies can start.
+        </p>
+      </div>
+      <div class="settings-card-footer">
+        <button
+          type="button"
+          class="btn btn--success"
+          :disabled="isLoading"
+          @click="enableApplies()"
+        >
+          <span class="btn-spinner" x-show="isLoading"></span>
+          <i data-lucide="unlock" class="icon-sm" x-show="!isLoading"></i>
+          Enable Apply Commands
+        </button>
+      </div>
+      {{ else }}
+      <div class="settings-card-body">
+        <div class="settings-card-header">
+          <i data-lucide="shield-check" class="icon-md"></i>
+          <span>Apply commands are <strong>enabled</strong></span>
+        </div>
+        <p class="settings-card-description">
+          Emergency kill switch: Immediately prevents all terraform apply operations across all repositories. Use during incidents to stop infrastructure changes.
+        </p>
+      </div>
+      <div class="settings-card-footer">
+        <button
+          type="button"
+          class="btn btn--danger"
+          @click="showDisableModal()"
+        >
+          <i data-lucide="lock" class="icon-sm"></i>
+          Disable Apply Commands
+        </button>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script>
+  function settingsPage() {
+    return {
+      isLoading: false,
+      basePath: '{{ .CleanedBasePath }}',
+
+      showDisableModal() {
+        var self = this;
+        showConfirmModal({
+          title: 'Disable Apply Commands',
+          description: 'This will immediately block all terraform apply operations across all repositories.',
+          impactItems: [
+            'All pending applies will be blocked',
+            'In-progress applies will complete normally',
+            'No new applies can start until re-enabled'
+          ],
+          confirmPhrase: 'DISABLE',
+          confirmButtonText: 'Disable Apply Commands',
+          onConfirm: function() { return self.disableApplies(); }
+        });
+      },
+
+      async disableApplies() {
+        const response = await fetch(this.basePath + '/apply/lock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) {
+          throw new Error('Failed to disable applies');
+        }
+        // Reload immediately - the new state is self-evident
+        window.location.reload();
+      },
+
+      async enableApplies() {
+        this.isLoading = true;
+        try {
+          const response = await fetch(this.basePath + '/apply/unlock', {
+            method: 'DELETE'
+          });
+          if (!response.ok) {
+            throw new Error('Failed to enable applies');
+          }
+          // Reload immediately - the new state is self-evident
+          window.location.reload();
+        } catch (error) {
+          // Keep error feedback - user needs to know something went wrong
+          showToast('Failed to enable apply commands. Please try again.', 'error');
+          this.isLoading = false;
+        }
+      }
+    };
+  }
+</script>
+{{ end }}
+
+{{ template "layout" . }}
