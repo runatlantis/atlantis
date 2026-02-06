@@ -4545,7 +4545,9 @@ func TestLiveReload(t *testing.T) {
 						Workspace:   "default",
 						RepoRelDir:  ".",
 						ProjectName: "test",
-						PlanSuccess: planSuccess,
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: planSuccess,
+						},
 					},
 				},
 			}
