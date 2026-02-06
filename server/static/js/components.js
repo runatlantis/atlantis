@@ -192,7 +192,16 @@ function createGroupedTableState(config) {
         groups[key][itemsKey].push(item);
       });
 
-      // Sort groups alphabetically by key
+      // Sort items within each group by PR number (ascending, numeric)
+      Object.values(groups).forEach(group => {
+        group[itemsKey].sort((a, b) => {
+          const pullA = typeof a.pullNum === 'number' ? a.pullNum : 0;
+          const pullB = typeof b.pullNum === 'number' ? b.pullNum : 0;
+          return pullA - pullB;
+        });
+      });
+
+      // Sort groups by repo name (ascending, alphabetical)
       this.groupedItems = Object.values(groups).sort((a, b) =>
         a.key.localeCompare(b.key)
       );
