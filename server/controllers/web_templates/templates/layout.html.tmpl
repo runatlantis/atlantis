@@ -1,0 +1,267 @@
+{{ define "layout" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ block "title" . }}Atlantis{{ end }}</title>
+  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png" sizes="32x32">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
+  <script src="{{ .CleanedBasePath }}/static/js/htmx.min.js" defer></script>
+  <script src="{{ .CleanedBasePath }}/static/js/components.js"></script>
+  <script src="{{ .CleanedBasePath }}/static/js/alpine.min.js" defer></script>
+  <script src="{{ .CleanedBasePath }}/static/js/lucide.min.js" defer></script>
+  {{ block "head" . }}{{ end }}
+</head>
+<body class="app-layout{{ if .ApplyLockActive }} app-layout--emergency{{ end }}">
+  <!-- Sidebar -->
+  <aside class="sidebar{{ if .ApplyLockActive }} sidebar--emergency{{ end }}">
+    {{ if .ApplyLockActive }}
+    <div class="sidebar-emergency-banner">
+      <i data-lucide="alert-triangle"></i>
+      <span>Applies Disabled</span>
+    </div>
+    {{ end }}
+
+    <div class="sidebar-header">
+      <a href="{{ .CleanedBasePath }}/prs" class="sidebar-logo">
+        <img src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png" alt="Atlantis" class="sidebar-logo-img">
+        <span class="sidebar-logo-text">atlantis</span>
+      </a>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="{{ .CleanedBasePath }}/prs" class="sidebar-nav-item{{ if eq .ActiveNav "prs" }} sidebar-nav-item--active{{ end }}">
+        <i data-lucide="git-pull-request"></i>
+        <span>Pull Requests</span>
+      </a>
+      <a href="{{ .CleanedBasePath }}/locks" class="sidebar-nav-item{{ if eq .ActiveNav "locks" }} sidebar-nav-item--active{{ end }}">
+        <i data-lucide="lock"></i>
+        <span>Locks</span>
+      </a>
+      <a href="{{ .CleanedBasePath }}/jobs" class="sidebar-nav-item{{ if eq .ActiveNav "jobs" }} sidebar-nav-item--active{{ end }}">
+        <i data-lucide="terminal"></i>
+        <span>Jobs</span>
+      </a>
+      <a href="{{ .CleanedBasePath }}/settings" class="sidebar-nav-item{{ if eq .ActiveNav "settings" }} sidebar-nav-item--active{{ end }}">
+        <i data-lucide="settings"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <span class="sidebar-version">{{ .AtlantisVersion }}</span>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    {{ block "content" . }}{{ end }}
+  </main>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Confirmation Modal -->
+  <div
+    id="confirm-modal"
+    class="confirm-modal"
+    x-data="confirmModal()"
+    x-show="open"
+    x-cloak
+    @keydown.escape.window="close()"
+    @show-confirm-modal.window="showFromEvent($event.detail)"
+  >
+    <div class="confirm-modal-backdrop" @click="close()"></div>
+    <div class="confirm-modal-content confirm-modal-content--danger" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+      <div class="confirm-modal-header">
+        <i data-lucide="alert-triangle" class="icon-lg text-danger"></i>
+        <h2 id="confirm-modal-title" x-text="title"></h2>
+        <button type="button" class="confirm-modal-close" @click="close()" aria-label="Close">
+          <i data-lucide="x" class="icon-md"></i>
+        </button>
+      </div>
+      <div class="confirm-modal-body">
+        <p class="confirm-modal-description" x-text="description"></p>
+        <div class="confirm-modal-impact" x-show="impactItems.length > 0">
+          <strong>Impact</strong>
+          <ul>
+            <template x-for="item in impactItems" :key="item">
+              <li x-text="item"></li>
+            </template>
+          </ul>
+        </div>
+        <div class="confirm-modal-confirmation">
+          <label for="confirm-input">
+            To confirm, type <code x-text="confirmPhrase"></code> below:
+          </label>
+          <input
+            type="text"
+            id="confirm-input"
+            class="confirm-modal-input"
+            x-model="userInput"
+            @input="validateInput()"
+            @keydown.enter="isValid && !isLoading && confirm()"
+            autocomplete="off"
+            spellcheck="false"
+            x-ref="confirmInput"
+          >
+        </div>
+      </div>
+      <div class="confirm-modal-footer">
+        <button type="button" class="btn btn--secondary" @click="close()" :disabled="isLoading">
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="btn btn--danger"
+          :disabled="!isValid || isLoading"
+          @click="confirm()"
+        >
+          <span class="btn-spinner" x-show="isLoading"></span>
+          <span x-text="confirmButtonText"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      lucide.createIcons();
+    });
+    // Re-initialize icons after htmx swaps
+    document.body.addEventListener('htmx:afterSwap', function() {
+      lucide.createIcons();
+    });
+
+    // Toast notification system
+    function showToast(message, type = 'info', duration = 5000) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast toast--' + type;
+      toast.setAttribute('role', 'alert');
+
+      const icons = {
+        success: 'check-circle',
+        error: 'x-circle',
+        warning: 'alert-triangle',
+        info: 'info'
+      };
+
+      toast.innerHTML =
+        '<i data-lucide="' + icons[type] + '" class="icon-md toast-icon"></i>' +
+        '<div class="toast-content">' +
+        '<p class="toast-message">' + message + '</p>' +
+        '</div>' +
+        '<button type="button" class="toast-close" onclick="this.parentElement.remove()" aria-label="Dismiss">' +
+        '<i data-lucide="x" class="icon-sm"></i>' +
+        '</button>';
+
+      container.appendChild(toast);
+      lucide.createIcons({ nodes: [toast] });
+
+      setTimeout(function() {
+        toast.classList.add('toast--exit');
+        setTimeout(function() { toast.remove(); }, 300);
+      }, duration);
+    }
+
+    // Global htmx error handler
+    document.body.addEventListener('htmx:responseError', function(event) {
+      showToast('Request failed. Please try again.', 'error');
+    });
+
+    // Store for pending confirmation callbacks
+    window._confirmModalCallbacks = {};
+
+    // Confirmation modal component
+    function confirmModal() {
+      return {
+        open: false,
+        title: '',
+        description: '',
+        impactItems: [],
+        confirmPhrase: '',
+        confirmButtonText: '',
+        userInput: '',
+        isValid: false,
+        isLoading: false,
+        callbackId: null,
+
+        showFromEvent(config) {
+          this.title = config.title || 'Confirm Action';
+          this.description = config.description || '';
+          this.impactItems = config.impactItems || [];
+          this.confirmPhrase = config.confirmPhrase || 'CONFIRM';
+          this.confirmButtonText = config.confirmButtonText || 'Confirm';
+          this.callbackId = config.callbackId || null;
+          this.userInput = '';
+          this.isValid = false;
+          this.isLoading = false;
+          this.open = true;
+          // Focus the input after modal opens
+          var self = this;
+          this.$nextTick(function() {
+            if (self.$refs.confirmInput) {
+              self.$refs.confirmInput.focus();
+            }
+            lucide.createIcons();
+          });
+        },
+
+        close() {
+          if (this.isLoading) return;
+          this.open = false;
+          // Clean up callback
+          if (this.callbackId && window._confirmModalCallbacks[this.callbackId]) {
+            delete window._confirmModalCallbacks[this.callbackId];
+          }
+        },
+
+        validateInput() {
+          this.isValid = this.userInput.toUpperCase() === this.confirmPhrase.toUpperCase();
+        },
+
+        async confirm() {
+          if (!this.isValid || this.isLoading) return;
+          this.isLoading = true;
+          try {
+            if (this.callbackId && window._confirmModalCallbacks[this.callbackId]) {
+              await window._confirmModalCallbacks[this.callbackId]();
+              delete window._confirmModalCallbacks[this.callbackId];
+            }
+            this.open = false;
+          } catch (error) {
+            showToast('Action failed. Please try again.', 'error');
+          } finally {
+            this.isLoading = false;
+          }
+        }
+      };
+    }
+
+    // Global function to show confirmation modal
+    function showConfirmModal(config) {
+      // Generate a unique callback ID and store the callback
+      var callbackId = 'cb_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      if (config.onConfirm) {
+        window._confirmModalCallbacks[callbackId] = config.onConfirm;
+      }
+      // Dispatch custom event with config
+      window.dispatchEvent(new CustomEvent('show-confirm-modal', {
+        detail: {
+          title: config.title,
+          description: config.description,
+          impactItems: config.impactItems,
+          confirmPhrase: config.confirmPhrase,
+          confirmButtonText: config.confirmButtonText,
+          callbackId: callbackId
+        }
+      }));
+    }
+  </script>
+  {{ block "scripts" . }}{{ end }}
+</body>
+</html>
+{{ end }}
