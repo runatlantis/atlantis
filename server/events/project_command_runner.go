@@ -116,37 +116,37 @@ type WebhooksSender interface {
 
 type ProjectPlanCommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
-	Plan(ctx command.ProjectContext) command.ProjectResult
+	Plan(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectApplyCommandRunner interface {
 	// Apply runs terraform apply for the project described by ctx.
-	Apply(ctx command.ProjectContext) command.ProjectResult
+	Apply(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectPolicyCheckCommandRunner interface {
 	// PolicyCheck runs OPA defined policies for the project described by ctx.
-	PolicyCheck(ctx command.ProjectContext) command.ProjectResult
+	PolicyCheck(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectApprovePoliciesCommandRunner interface {
 	// Approves any failing OPA policies.
-	ApprovePolicies(ctx command.ProjectContext) command.ProjectResult
+	ApprovePolicies(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectVersionCommandRunner interface {
 	// Version runs terraform version for the project described by ctx.
-	Version(ctx command.ProjectContext) command.ProjectResult
+	Version(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectImportCommandRunner interface {
 	// Import runs terraform import for the project described by ctx.
-	Import(ctx command.ProjectContext) command.ProjectResult
+	Import(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 type ProjectStateCommandRunner interface {
 	// StateRm runs terraform state rm for the project described by ctx.
-	StateRm(ctx command.ProjectContext) command.ProjectResult
+	StateRm(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
 // ProjectCommandRunner runs project commands. A project command is a command
@@ -166,7 +166,7 @@ type ProjectCommandRunner interface {
 type JobURLSetter interface {
 	// SetJobURLWithStatus sets the commit status for the project represented by
 	// ctx and updates the status with and url to a job.
-	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectResult) error
+	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
@@ -183,19 +183,19 @@ type ProjectOutputWrapper struct {
 	JobURLSetter     JobURLSetter
 }
 
-func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectResult {
+func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectCommandOutput {
 	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
 	p.JobMessageSender.Send(ctx, "", OperationComplete)
 	return result
 }
 
-func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectResult {
+func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
 	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
 	p.JobMessageSender.Send(ctx, "", OperationComplete)
 	return result
 }
 
-func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectResult) command.ProjectResult {
+func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectCommandOutput) command.ProjectCommandOutput {
 	// Create a PR status to track project's plan status. The status will
 	// include a link to view the progress of atlantis plan command in real
 	// time
@@ -231,6 +231,7 @@ type DefaultProjectCommandRunner struct {
 	PlanStepRunner            StepRunner
 	ShowStepRunner            StepRunner
 	ApplyStepRunner           StepRunner
+	CancelStepRunner          StepRunner
 	PolicyCheckStepRunner     StepRunner
 	VersionStepRunner         StepRunner
 	ImportStepRunner          StepRunner
@@ -243,104 +244,74 @@ type DefaultProjectCommandRunner struct {
 	Webhooks                  WebhooksSender
 	WorkingDirLocker          WorkingDirLocker
 	CommandRequirementHandler CommandRequirementHandler
+	CancellationTracker       CancellationTracker
 }
 
 // Plan runs terraform plan for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectCommandOutput {
 	planSuccess, failure, err := p.doPlan(ctx)
-	return command.ProjectResult{
-		Command:           command.Plan,
-		PlanSuccess:       planSuccess,
-		Error:             err,
-		Failure:           failure,
-		RepoRelDir:        ctx.RepoRelDir,
-		Workspace:         ctx.Workspace,
-		ProjectName:       ctx.ProjectName,
-		SilencePRComments: ctx.SilencePRComments,
+	return command.ProjectCommandOutput{
+		PlanSuccess: planSuccess,
+		Error:       err,
+		Failure:     failure,
 	}
 }
 
 // PolicyCheck evaluates policies defined with Rego for the project described by ctx.
-func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectCommandOutput {
 	policySuccess, failure, err := p.doPolicyCheck(ctx)
-	return command.ProjectResult{
-		Command:            command.PolicyCheck,
+	return command.ProjectCommandOutput{
 		PolicyCheckResults: policySuccess,
 		Error:              err,
 		Failure:            failure,
-		RepoRelDir:         ctx.RepoRelDir,
-		Workspace:          ctx.Workspace,
-		ProjectName:        ctx.ProjectName,
 	}
 }
 
 // Apply runs terraform apply for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
 	applyOut, failure, err := p.doApply(ctx)
-	return command.ProjectResult{
-		Command:           command.Apply,
-		Failure:           failure,
-		Error:             err,
-		ApplySuccess:      applyOut,
-		RepoRelDir:        ctx.RepoRelDir,
-		Workspace:         ctx.Workspace,
-		ProjectName:       ctx.ProjectName,
-		SilencePRComments: ctx.SilencePRComments,
+	return command.ProjectCommandOutput{
+		Failure:      failure,
+		Error:        err,
+		ApplySuccess: applyOut,
 	}
 }
 
-func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectCommandOutput {
 	approvedOut, failure, err := p.doApprovePolicies(ctx)
-	return command.ProjectResult{
-		Command:            command.PolicyCheck,
+	return command.ProjectCommandOutput{
 		Failure:            failure,
 		Error:              err,
 		PolicyCheckResults: approvedOut,
-		RepoRelDir:         ctx.RepoRelDir,
-		Workspace:          ctx.Workspace,
-		ProjectName:        ctx.ProjectName,
 	}
 }
 
-func (p *DefaultProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectCommandOutput {
 	versionOut, failure, err := p.doVersion(ctx)
-	return command.ProjectResult{
-		Command:        command.Version,
+	return command.ProjectCommandOutput{
 		Failure:        failure,
 		Error:          err,
 		VersionSuccess: versionOut,
-		RepoRelDir:     ctx.RepoRelDir,
-		Workspace:      ctx.Workspace,
-		ProjectName:    ctx.ProjectName,
 	}
 }
 
 // Import runs terraform import for the project described by ctx.
-func (p *DefaultProjectCommandRunner) Import(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) Import(ctx command.ProjectContext) command.ProjectCommandOutput {
 	importSuccess, failure, err := p.doImport(ctx)
-	return command.ProjectResult{
-		Command:       command.Import,
+	return command.ProjectCommandOutput{
 		ImportSuccess: importSuccess,
 		Error:         err,
 		Failure:       failure,
-		RepoRelDir:    ctx.RepoRelDir,
-		Workspace:     ctx.Workspace,
-		ProjectName:   ctx.ProjectName,
 	}
 }
 
 // StateRm runs terraform state rm for the project described by ctx.
-func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectResult {
+func (p *DefaultProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectCommandOutput {
 	stateRmSuccess, failure, err := p.doStateRm(ctx)
-	return command.ProjectResult{
-		Command:        command.State,
-		SubCommand:     "rm",
+	return command.ProjectCommandOutput{
 		StateRmSuccess: stateRmSuccess,
 		Error:          err,
 		Failure:        failure,
-		RepoRelDir:     ctx.RepoRelDir,
-		Workspace:      ctx.Workspace,
-		ProjectName:    ctx.ProjectName,
 	}
 }
 
@@ -356,7 +327,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.ApprovePolicies)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.ApprovePolicies)
 	if err != nil {
 		return nil, "", err
 	}
@@ -460,7 +431,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
 	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.PolicyCheck)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.PolicyCheck)
 	if err != nil {
 		return nil, "", err
 	}
@@ -631,7 +602,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Plan)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Plan)
 	if err != nil {
 		return nil, "", err
 	}
@@ -715,7 +686,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Apply)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Apply)
 	if err != nil {
 		return "", "", err
 	}
@@ -754,7 +725,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Version)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Version)
 	if err != nil {
 		return "", "", err
 	}
@@ -795,7 +766,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.Import)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Import)
 	if err != nil {
 		return nil, "", err
 	}
@@ -836,7 +807,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, command.State)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.State)
 	if err != nil {
 		return nil, "", err
 	}

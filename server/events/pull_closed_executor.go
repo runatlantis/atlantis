@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -54,6 +55,7 @@ type PullClosedExecutor struct {
 	Database                 db.Database
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
+	CancellationTracker      CancellationTracker
 }
 
 type templatedProject struct {
@@ -67,12 +69,12 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
 
 type PullCleanupTemplate interface {
-	Execute(wr io.Writer, data interface{}) error
+	Execute(wr io.Writer, data any) error
 }
 
 type PullClosedEventTemplate struct{}
 
-func (t *PullClosedEventTemplate) Execute(wr io.Writer, data interface{}) error {
+func (t *PullClosedEventTemplate) Execute(wr io.Writer, data any) error {
 	return pullClosedTemplate.Execute(wr, data)
 }
 
@@ -115,6 +117,11 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		logger.Err("deleting pull from db: %s", err)
 	}
 
+	// Clear any operations to avoid unbounded growth.
+	if p.CancellationTracker != nil {
+		p.CancellationTracker.Clear(pull)
+	}
+
 	// If there are no locks then there's no need to comment.
 	if len(locks) == 0 {
 		return nil
@@ -136,7 +143,10 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 	workspacesByPath := make(map[string][]string)
 	for _, l := range locks {
 		path := l.Project.Path
-		workspacesByPath[path] = append(workspacesByPath[path], l.Workspace)
+		// Check if workspace already exists to avoid duplicates
+		if !slices.Contains(workspacesByPath[path], l.Workspace) {
+			workspacesByPath[path] = append(workspacesByPath[path], l.Workspace)
+		}
 	}
 
 	// sort keys so we can write deterministic tests
@@ -149,6 +159,7 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 	var projects []templatedProject
 	for _, p := range sortedPaths {
 		workspace := workspacesByPath[p]
+		sort.Strings(workspace)
 		workspacesStr := fmt.Sprintf("`%s`", strings.Join(workspace, "`, `"))
 		if len(workspace) == 1 {
 			projects = append(projects, templatedProject{

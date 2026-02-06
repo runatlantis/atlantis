@@ -186,7 +186,7 @@ listloop:
 		// up to 5 times for each page with exponential backoff.
 		maxAttempts := 5
 		attemptDelay := 0 * time.Second
-		for i := 0; i < maxAttempts; i++ {
+		for i := range maxAttempts {
 			// First don't sleep, then sleep 1, 3, 7, etc.
 			time.Sleep(attemptDelay)
 			attemptDelay = 2*attemptDelay + 1*time.Second
@@ -357,7 +357,7 @@ func (g *Client) getPRReviews(repo models.Repo, pull models.PullRequest) (Github
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":        githubv4.String(repo.Owner),
 		"name":         githubv4.String(repo.Name),
 		"number":       githubv4.Int(pull.Num), // #nosec G115: integer overflow conversion int -> int32
@@ -564,7 +564,7 @@ func (g *Client) LookupRepoId(repo githubv4.String) (githubv4.Int, error) {
 			DatabaseId githubv4.Int
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner": githubv4.String(repoSplit[0]),
 		"name":  githubv4.String(repoSplit[1]),
 	}
@@ -659,7 +659,7 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":         githubv4.String(repo.Owner),
 		"name":          githubv4.String(repo.Name),
 		"number":        githubv4.Int(*pull.Number), // #nosec G115: integer overflow conversion int -> int32
@@ -876,7 +876,7 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 
 	// We map our mergeable check to when the GitHub merge button is clickable.
-	// This corresponds to the following states:
+	// This corresponds to when the PR is not a draft and has one of the following states:
 	// clean: No conflicts, all requirements satisfied.
 	//        Merging is allowed (green box).
 	// unstable: Failing/pending commit status that is not part of the required
@@ -884,6 +884,12 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
+	if githubPR.GetDraft() {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "PR is a draft",
+		}, nil
+	}
 	state := githubPR.GetMergeableState()
 	if state == "" {
 		state = "<unknown>"
@@ -933,7 +939,7 @@ func (g *Client) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, 
 	// to attempt up to 5 times with exponential backoff.
 	maxAttempts := 5
 	attemptDelay := 0 * time.Second
-	for i := 0; i < maxAttempts; i++ {
+	for range maxAttempts {
 		// First don't sleep, then sleep 1, 3, 7, etc.
 		time.Sleep(attemptDelay)
 		attemptDelay = 2*attemptDelay + 1*time.Second
@@ -1068,7 +1074,7 @@ func (g *Client) MarkdownPullLink(pull models.PullRequest) (string, error) {
 func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) {
 	logger.Debug("Getting GitHub team names for user '%s'", user)
 	orgName := repo.Owner
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"orgName":    githubv4.String(orgName),
 		"userLogins": []githubv4.String{githubv4.String(user.Username)},
 		"teamCursor": (*githubv4.String)(nil),

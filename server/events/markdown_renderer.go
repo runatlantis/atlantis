@@ -460,7 +460,7 @@ func (m *MarkdownRenderer) shouldUseWrappedTmpl(vcsHost models.VCSHostType, outp
 	return strings.Count(output, "\n") > maxUnwrappedLines
 }
 
-func (m *MarkdownRenderer) renderTemplateTrimSpace(tmpl *template.Template, data interface{}) string {
+func (m *MarkdownRenderer) renderTemplateTrimSpace(tmpl *template.Template, data any) string {
 	buf := &bytes.Buffer{}
 	if err := tmpl.Execute(buf, data); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
