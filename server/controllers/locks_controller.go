@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/runatlantis/atlantis/server/controllers/web_templates"
-
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -21,17 +19,16 @@ import (
 
 // LocksController handles all requests relating to Atlantis locks.
 type LocksController struct {
-	AtlantisVersion    string                       `validate:"required"`
-	AtlantisURL        *url.URL                     `validate:"required"`
-	Locker             locking.Locker               `validate:"required"`
-	Logger             logging.SimpleLogging        `validate:"required"`
-	ApplyLocker        locking.ApplyLocker          `validate:"required"`
-	VCSClient          vcs.Client                   `validate:"required"`
-	LockDetailTemplate web_templates.TemplateWriter `validate:"required"`
-	WorkingDir         events.WorkingDir            `validate:"required"`
-	WorkingDirLocker   events.WorkingDirLocker      `validate:"required"`
-	Database           db.Database                  `validate:"required"`
-	DeleteLockCommand  events.DeleteLockCommand     `validate:"required"`
+	AtlantisVersion   string                `validate:"required"`
+	AtlantisURL       *url.URL              `validate:"required"`
+	Locker            locking.Locker        `validate:"required"`
+	Logger            logging.SimpleLogging `validate:"required"`
+	ApplyLocker       locking.ApplyLocker   `validate:"required"`
+	VCSClient         vcs.Client            `validate:"required"`
+	WorkingDir        events.WorkingDir     `validate:"required"`
+	WorkingDirLocker  events.WorkingDirLocker      `validate:"required"`
+	Database          db.Database                  `validate:"required"`
+	DeleteLockCommand events.DeleteLockCommand     `validate:"required"`
 }
 
 // LockApply handles creating a global apply lock.
@@ -56,48 +53,6 @@ func (l *LocksController) UnlockApply(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	l.respond(w, logging.Info, http.StatusOK, "Deleted apply lock")
-}
-
-// GetLock is the GET /locks/{id} route. It renders the lock detail view.
-func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
-	id, ok := mux.Vars(r)["id"]
-	if !ok {
-		l.respond(w, logging.Warn, http.StatusBadRequest, "No lock id in request")
-		return
-	}
-
-	idUnencoded, err := url.QueryUnescape(id)
-	if err != nil {
-		l.respond(w, logging.Warn, http.StatusBadRequest, "Invalid lock id: %s", err)
-		return
-	}
-	lock, err := l.Locker.GetLock(idUnencoded)
-	if err != nil {
-		l.respond(w, logging.Error, http.StatusInternalServerError, "Failed getting lock: %s", err)
-		return
-	}
-	if lock == nil {
-		l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id '%s'", idUnencoded)
-		return
-	}
-
-	owner, repo := models.SplitRepoFullName(lock.Project.RepoFullName)
-	viewData := web_templates.LockDetailData{
-		LockKeyEncoded:  id,
-		LockKey:         idUnencoded,
-		PullRequestLink: lock.Pull.URL,
-		LockedBy:        lock.Pull.Author,
-		Workspace:       lock.Workspace,
-		AtlantisVersion: l.AtlantisVersion,
-		CleanedBasePath: l.AtlantisURL.Path,
-		RepoOwner:       owner,
-		RepoName:        repo,
-	}
-
-	err = l.LockDetailTemplate.Execute(w, viewData)
-	if err != nil {
-		l.Logger.Err(err.Error())
-	}
 }
 
 // DeleteLock handles deleting the lock at id and commenting back on the
