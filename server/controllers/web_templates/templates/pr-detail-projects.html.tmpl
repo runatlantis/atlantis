@@ -1,0 +1,40 @@
+{{ $basePath := .CleanedBasePath }}
+{{ $repo := .RepoFullName }}
+{{ $pullNum := .PullNum }}
+{{ range .Projects }}
+<div
+  class="pr-project-item"
+  data-path="{{ .Path }}"
+  data-workspace="{{ .Workspace }}"
+  data-project="{{ .ProjectName }}"
+  onclick="window.location='{{ $basePath }}/pr/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ .Path }}?workspace={{ .Workspace }}'"
+>
+  <span class="pr-project-status-icon pr-project-status-icon--{{ .Status }}">
+    {{ if eq .Status "success" }}✓{{ end }}
+    {{ if eq .Status "failed" }}✗{{ end }}
+    {{ if eq .Status "pending" }}⏳{{ end }}
+  </span>
+  <div class="pr-project-info">
+    <div class="pr-project-path">{{ .Path }}{{ if .ProjectName }} ({{ .ProjectName }}){{ end }}</div>
+    <div class="pr-project-meta">{{ .Workspace }} • {{ .LastUpdated }}</div>
+  </div>
+  <div class="pr-project-changes">
+    {{ if gt .AddCount 0 }}<span class="pr-resource-add">+{{ .AddCount }}</span>{{ end }}
+    {{ if gt .ChangeCount 0 }}<span class="pr-resource-change">~{{ .ChangeCount }}</span>{{ end }}
+    {{ if gt .DestroyCount 0 }}<span class="pr-resource-destroy">-{{ .DestroyCount }}</span>{{ end }}
+    {{ if and (eq .AddCount 0) (eq .ChangeCount 0) (eq .DestroyCount 0) }}—{{ end }}
+  </div>
+  <div class="pr-project-policy">
+    {{ if .PolicyPassed }}
+    <span class="pr-project-policy-icon--pass" title="Policy passed">✓</span>
+    {{ else }}
+    <span class="pr-project-policy-icon--fail" title="Policy failed">✗</span>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+{{ if eq (len .Projects) 0 }}
+<div class="pr-project-empty">
+  No projects match the current filter.
+</div>
+{{ end }}

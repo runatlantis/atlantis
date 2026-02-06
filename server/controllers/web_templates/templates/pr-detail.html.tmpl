@@ -1,0 +1,271 @@
+{{ define "title" }}{{ .RepoFullName }} #{{ .PullNum }} - Atlantis{{ end }}
+
+{{ define "content" }}
+<div class="page-container" x-data="projectListState()">
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb">
+    <a href="{{ .CleanedBasePath }}/prs">Pull Requests</a>
+    <i data-lucide="chevron-right" class="icon-xs"></i>
+    <span>{{ .RepoFullName }} #{{ .PullNum }}</span>
+  </nav>
+
+  <!-- Header -->
+  <div class="pr-header-card">
+    <div class="pr-header-title">
+      <h1>{{ .RepoFullName }}</h1>
+      <a href="{{ .PullURL }}" target="_blank" rel="noopener" class="pr-number-link">
+        #{{ .PullNum }}
+        <i data-lucide="external-link" class="icon-xs"></i>
+      </a>
+    </div>
+    <div class="pr-stats-row">
+      <div class="pr-stat">
+        <span class="pr-stat-value">{{ .TotalCount }}</span>
+        <span class="pr-stat-label">Projects</span>
+      </div>
+      <div class="pr-stat">
+        <span class="pr-stat-value text-success">{{ .SuccessCount }}</span>
+        <span class="pr-stat-label">Passed</span>
+      </div>
+      <div class="pr-stat">
+        <span class="pr-stat-value text-danger">{{ .FailedCount }}</span>
+        <span class="pr-stat-label">Failed</span>
+      </div>
+      <div class="pr-stat">
+        <span class="pr-stat-value text-warning">{{ .PendingCount }}</span>
+        <span class="pr-stat-label">Pending</span>
+      </div>
+      <div class="pr-stat">
+        <span class="pr-stat-value resource-changes">
+          {{ if gt .AddCount 0 }}<span class="text-success">+{{ .AddCount }}</span>{{ end }}
+          {{ if gt .ChangeCount 0 }}<span class="text-warning">~{{ .ChangeCount }}</span>{{ end }}
+          {{ if gt .DestroyCount 0 }}<span class="text-danger">-{{ .DestroyCount }}</span>{{ end }}
+          {{ if and (eq .AddCount 0) (eq .ChangeCount 0) (eq .DestroyCount 0) }}<span class="text-muted">No changes</span>{{ end }}
+        </span>
+        <span class="pr-stat-label">Changes</span>
+      </div>
+      <div class="pr-stat">
+        <span class="pr-stat-value">{{ .LastActivity }}</span>
+        <span class="pr-stat-label">Last Activity</span>
+      </div>
+    </div>
+  </div>
+
+  {{ if .ErrorMessage }}
+  <!-- Error Alert when we failed to load project data -->
+  <div class="alert alert--warning">
+    <div class="alert-header">
+      <i data-lucide="alert-triangle" class="icon-md"></i>
+      <span>Unable to Load Project Data</span>
+    </div>
+    <div class="alert-content">
+      <p>{{ .ErrorMessage }}</p>
+    </div>
+  </div>
+  {{ else }}
+  <!-- Failures Alert -->
+  {{ if gt .FailedCount 0 }}
+  <div class="alert alert--danger">
+    <div class="alert-header">
+      <i data-lucide="alert-triangle" class="icon-md"></i>
+      <span>{{ .FailedCount }} Failed Project{{ if ne .FailedCount 1 }}s{{ end }}</span>
+    </div>
+    <ul class="alert-list">
+      {{ $basePath := .CleanedBasePath }}
+      {{ $repo := .RepoFullName }}
+      {{ $pullNum := .PullNum }}
+      {{ range .FailedProjects }}
+      <li>
+        <a href="{{ $basePath }}/pr/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ .Path }}?workspace={{ .Workspace }}{{ if .ProjectName }}&project={{ .ProjectName }}{{ end }}">
+          {{ .Path }}{{ if .ProjectName }} ({{ .ProjectName }}){{ end }}
+        </a>
+      </li>
+      {{ end }}
+    </ul>
+  </div>
+  {{ end }}
+
+  <!-- Toolbar: Filters + Search on same row -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button
+        type="button"
+        class="filter-toggle"
+        :class="{ 'filter-toggle--active': statusFilters.failed }"
+        @click="toggleStatusFilter('failed')"
+        :aria-pressed="statusFilters.failed ? 'true' : 'false'"
+      >
+        <i data-lucide="x-circle" class="icon-xs"></i> Failed ({{ .FailedCount }})
+      </button>
+      <button
+        type="button"
+        class="filter-toggle"
+        :class="{ 'filter-toggle--active': statusFilters.policy }"
+        @click="toggleStatusFilter('policy')"
+        :aria-pressed="statusFilters.policy ? 'true' : 'false'"
+      >
+        <i data-lucide="shield-x" class="icon-xs"></i> Policy ({{ .PolicyFailCount }})
+      </button>
+      <button
+        type="button"
+        class="filter-toggle"
+        :class="{ 'filter-toggle--active': statusFilters.passed }"
+        @click="toggleStatusFilter('passed')"
+        :aria-pressed="statusFilters.passed ? 'true' : 'false'"
+      >
+        <i data-lucide="check-circle" class="icon-xs"></i> Passed ({{ .SuccessCount }})
+      </button>
+      <button
+        type="button"
+        class="filter-toggle"
+        :class="{ 'filter-toggle--active': statusFilters.pending }"
+        @click="toggleStatusFilter('pending')"
+        :aria-pressed="statusFilters.pending ? 'true' : 'false'"
+      >
+        <i data-lucide="clock" class="icon-xs"></i> Pending ({{ .PendingCount }})
+      </button>
+    </div>
+    <div class="toolbar-right">
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Search projects by path..."
+        x-model="searchQuery"
+        @input="filterProjects()"
+      >
+    </div>
+  </div>
+
+  <!-- Project List Table -->
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Project Path</th>
+          <th>Workspace</th>
+          <th>Changes</th>
+          <th style="width: 60px;">Policy</th>
+          <th>Updated</th>
+          <th style="width: 32px;"></th>
+        </tr>
+      </thead>
+      <tbody id="project-list">
+        {{ $basePath := .CleanedBasePath }}
+        {{ $repo := .RepoFullName }}
+        {{ $pullNum := .PullNum }}
+        {{ range .Projects }}
+        <tr
+          class="data-table-row"
+          data-path="{{ .Path }}"
+          data-workspace="{{ .Workspace }}"
+          data-project="{{ .ProjectName }}"
+          data-status="{{ .Status }}"
+          data-policy-passed="{{ .PolicyPassed }}"
+          onclick="window.location='{{ $basePath }}/pr/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ .Path }}?workspace={{ .Workspace }}{{ if .ProjectName }}&project={{ .ProjectName }}{{ end }}'"
+        >
+          <td>
+            <span class="status-badge status-badge--{{ .Status }}">
+              {{ if eq .Status "success" }}<i data-lucide="check-circle" class="icon-xs"></i>{{ end }}
+              {{ if eq .Status "applied" }}<i data-lucide="check-check" class="icon-xs"></i>{{ end }}
+              {{ if eq .Status "failed" }}<i data-lucide="x-circle" class="icon-xs"></i>{{ end }}
+              {{ if eq .Status "pending" }}<i data-lucide="loader" class="icon-xs"></i>{{ end }}
+              {{ .StatusLabel }}
+            </span>
+          </td>
+          <td>
+            <span class="mono">{{ .Path }}{{ if .ProjectName }} ({{ .ProjectName }}){{ end }}</span>
+          </td>
+          <td>
+            <span class="badge">{{ .Workspace }}</span>
+          </td>
+          <td class="resource-changes">
+            {{ if gt .AddCount 0 }}<span class="text-success">+{{ .AddCount }}</span>{{ end }}
+            {{ if gt .ChangeCount 0 }}<span class="text-warning">~{{ .ChangeCount }}</span>{{ end }}
+            {{ if gt .DestroyCount 0 }}<span class="text-danger">-{{ .DestroyCount }}</span>{{ end }}
+            {{ if and (eq .AddCount 0) (eq .ChangeCount 0) (eq .DestroyCount 0) }}<span class="text-muted">-</span>{{ end }}
+          </td>
+          <td class="text-center">
+            {{ if .PolicyPassed }}
+            <i data-lucide="shield-check" class="icon-sm text-success" title="Policy passed"></i>
+            {{ else }}
+            <i data-lucide="shield-x" class="icon-sm text-danger" title="Policy failed"></i>
+            {{ end }}
+          </td>
+          <td class="text-muted">{{ .LastUpdated }}</td>
+          <td class="row-action-hint">
+            <i data-lucide="chevron-right" class="icon-sm"></i>
+          </td>
+        </tr>
+        {{ end }}
+        {{ if eq (len .Projects) 0 }}
+        <tr>
+          <td colspan="7" class="text-center text-muted" style="padding: 40px;">
+            No projects found for this pull request.
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script>
+  function projectListState() {
+    return {
+      searchQuery: '',
+      statusFilters: {
+        failed: false,
+        policy: false,
+        passed: false,
+        pending: false
+      },
+
+      toggleStatusFilter(status) {
+        this.statusFilters[status] = !this.statusFilters[status];
+        this.filterProjects();
+      },
+
+      hasActiveStatusFilters() {
+        return this.statusFilters.failed || this.statusFilters.policy ||
+               this.statusFilters.passed || this.statusFilters.pending;
+      },
+
+      filterProjects() {
+        const query = this.searchQuery.toLowerCase().trim();
+        const hasStatusFilter = this.hasActiveStatusFilters();
+
+        document.querySelectorAll('.data-table-row').forEach(row => {
+          const path = (row.dataset.path || '').toLowerCase();
+          const workspace = (row.dataset.workspace || '').toLowerCase();
+          const project = (row.dataset.project || '').toLowerCase();
+          const status = row.dataset.status || '';
+          const policyPassed = row.dataset.policyPassed === 'true';
+
+          // Search filter
+          const matchesSearch = query === '' ||
+            path.includes(query) ||
+            workspace.includes(query) ||
+            project.includes(query);
+
+          // Status filter: if no filters active, show all; otherwise match any active filter
+          let matchesStatus = true;
+          if (hasStatusFilter) {
+            matchesStatus = (this.statusFilters.failed && status === 'failed') ||
+                           (this.statusFilters.passed && status === 'success') ||
+                           (this.statusFilters.pending && status === 'pending') ||
+                           (this.statusFilters.policy && !policyPassed);
+          }
+
+          row.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
+        });
+      }
+    };
+  }
+</script>
+{{ end }}
+
+{{ template "layout" . }}
