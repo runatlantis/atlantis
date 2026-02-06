@@ -8,9 +8,9 @@ package common
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/runatlantis/atlantis/server/logging"
 	"math"
 	"net/http"
-	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // ClosureType represents the type of markdown closure at a given position
