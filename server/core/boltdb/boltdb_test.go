@@ -1092,3 +1092,263 @@ func cleanupDB(db *bolt.DB) {
 	db.Close()           // nolint: errcheck
 	os.Remove(db.Path()) // nolint: errcheck
 }
+
+func TestBoltDB_SaveAndGetProjectOutput(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	now := time.Now()
+	output := models.ProjectOutput{
+		RepoFullName:  "owner/repo",
+		PullNum:       123,
+		ProjectName:   "myproject",
+		Workspace:     "default",
+		Path:          "terraform/staging",
+		CommandName:   "plan",
+		JobID:         "job-123",
+		RunTimestamp:  now.UnixMilli(),
+		Output:        "Plan: 1 to add, 0 to change, 0 to destroy.",
+		Status:        models.SuccessOutputStatus,
+		ResourceStats: models.ResourceStats{Add: 1},
+		TriggeredBy:   "testuser",
+		StartedAt:     now.Add(-time.Minute),
+		CompletedAt:   now,
+	}
+
+	err := db.SaveProjectOutput(output)
+	Ok(t, err)
+
+	// Test GetProjectOutputHistory
+	history, err := db.GetProjectOutputHistory("owner/repo", 123, "terraform/staging", "default", "myproject")
+	Ok(t, err)
+	Assert(t, len(history) == 1, "expected 1 result")
+	Equals(t, output.Output, history[0].Output)
+	Equals(t, output.Status, history[0].Status)
+	Equals(t, output.ResourceStats.Add, history[0].ResourceStats.Add)
+
+	// Test GetProjectOutputRun
+	retrieved, err := db.GetProjectOutputRun("owner/repo", 123, "terraform/staging", "default", "myproject", "plan", now.UnixMilli())
+	Ok(t, err)
+	Assert(t, retrieved != nil, "expected non-nil result")
+	Equals(t, output.Output, retrieved.Output)
+}
+
+func TestBoltDB_GetProjectOutputHistory_NotFound(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	history, err := db.GetProjectOutputHistory("owner/repo", 999, "nonexistent", "default", "")
+	Ok(t, err)
+	Assert(t, len(history) == 0, "expected empty history for non-existent output")
+}
+
+func TestBoltDB_GetProjectOutputsByPull(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	// Save two outputs for the same PR
+	output1 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "project1",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		Status:       models.SuccessOutputStatus,
+	}
+	output2 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "project2",
+		Workspace:    "default",
+		Path:         "terraform/prod",
+		CommandName:  "plan",
+		Status:       models.FailedOutputStatus,
+	}
+
+	err := db.SaveProjectOutput(output1)
+	Ok(t, err)
+	err = db.SaveProjectOutput(output2)
+	Ok(t, err)
+
+	outputs, err := db.GetProjectOutputsByPull("owner/repo", 123)
+	Ok(t, err)
+	Equals(t, 2, len(outputs))
+}
+
+func TestBoltDB_GetProjectOutputsByPull_Empty(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	outputs, err := db.GetProjectOutputsByPull("owner/repo", 999)
+	Ok(t, err)
+	Equals(t, 0, len(outputs))
+}
+
+func TestBoltDB_DeleteProjectOutputsByPull(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	output := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+	}
+	err := db.SaveProjectOutput(output)
+	Ok(t, err)
+
+	err = db.DeleteProjectOutputsByPull("owner/repo", 123)
+	Ok(t, err)
+
+	outputs, err := db.GetProjectOutputsByPull("owner/repo", 123)
+	Ok(t, err)
+	Equals(t, 0, len(outputs))
+}
+
+func TestBoltDB_GetActivePullRequests(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	// Save outputs for two different PRs
+	output1 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "project1",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+	}
+	output2 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      456,
+		ProjectName:  "project2",
+		Workspace:    "default",
+		Path:         "terraform/prod",
+	}
+
+	err := db.SaveProjectOutput(output1)
+	Ok(t, err)
+	err = db.SaveProjectOutput(output2)
+	Ok(t, err)
+
+	pulls, err := db.GetActivePullRequests()
+	Ok(t, err)
+	Equals(t, 2, len(pulls))
+}
+
+func TestBoltDB_GetActivePullRequests_Empty(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	pulls, err := db.GetActivePullRequests()
+	Ok(t, err)
+	Equals(t, 0, len(pulls))
+}
+
+func TestBoltDB_GetProjectOutputHistory_SortsDescending(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	base := time.Now()
+
+	// Save outputs with different timestamps (out of order)
+	timestamps := []int64{
+		base.Add(1 * time.Minute).UnixMilli(),
+		base.Add(3 * time.Minute).UnixMilli(),
+		base.Add(2 * time.Minute).UnixMilli(),
+	}
+
+	for _, ts := range timestamps {
+		output := models.ProjectOutput{
+			RepoFullName: "owner/repo",
+			PullNum:      123,
+			ProjectName:  "project",
+			Workspace:    "default",
+			Path:         "terraform",
+			CommandName:  "plan",
+			RunTimestamp: ts,
+			Status:       models.SuccessOutputStatus,
+		}
+		err := db.SaveProjectOutput(output)
+		Ok(t, err)
+	}
+
+	// Get history and verify it's sorted descending (newest first)
+	history, err := db.GetProjectOutputHistory("owner/repo", 123, "terraform", "default", "project")
+	Ok(t, err)
+	Equals(t, 3, len(history))
+
+	// Verify descending order
+	Assert(t, history[0].RunTimestamp > history[1].RunTimestamp,
+		"expected %d > %d", history[0].RunTimestamp, history[1].RunTimestamp)
+	Assert(t, history[1].RunTimestamp > history[2].RunTimestamp,
+		"expected %d > %d", history[1].RunTimestamp, history[2].RunTimestamp)
+}
+
+func TestBoltDB_GetProjectOutputByJobID(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	now := time.Now()
+	output := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		JobID:        "job-abc-123",
+		RunTimestamp: now.UnixMilli(),
+		Output:       "Plan: 1 to add",
+		Status:       models.SuccessOutputStatus,
+	}
+
+	err := db.SaveProjectOutput(output)
+	Ok(t, err)
+
+	// Test retrieval by job ID (should use index for O(1) lookup)
+	retrieved, err := db.GetProjectOutputByJobID("job-abc-123")
+	Ok(t, err)
+	Assert(t, retrieved != nil, "expected non-nil result")
+	Equals(t, output.JobID, retrieved.JobID)
+	Equals(t, output.Output, retrieved.Output)
+	Equals(t, output.RepoFullName, retrieved.RepoFullName)
+}
+
+func TestBoltDB_GetProjectOutputByJobID_NotFound(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	// Test retrieval of non-existent job ID
+	retrieved, err := db.GetProjectOutputByJobID("nonexistent-job-id")
+	Ok(t, err)
+	Assert(t, retrieved == nil, "expected nil result for non-existent job ID")
+}
+
+func TestBoltDB_GetProjectOutputByJobID_EmptyJobID(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	// Save output with empty job ID - should not be indexed
+	output := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		JobID:        "", // Empty job ID
+		RunTimestamp: time.Now().UnixMilli(),
+	}
+
+	err := db.SaveProjectOutput(output)
+	Ok(t, err)
+
+	// Empty job IDs are not indexed, but the fallback scan will still find them
+	// This verifies backwards compatibility - outputs without job IDs can still be found
+	retrieved, err := db.GetProjectOutputByJobID("")
+	Ok(t, err)
+	// The scan finds outputs with matching (empty) job ID
+	Assert(t, retrieved != nil, "fallback scan should find output with empty job ID")
+}

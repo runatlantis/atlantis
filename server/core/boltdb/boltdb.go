@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,17 +24,21 @@ import (
 
 // BoltDB is a database using BoltDB
 type BoltDB struct {
-	db                    *bolt.DB
-	locksBucketName       []byte
-	pullsBucketName       []byte
-	globalLocksBucketName []byte
+	db                       *bolt.DB
+	locksBucketName          []byte
+	pullsBucketName          []byte
+	globalLocksBucketName    []byte
+	projectOutputsBucketName []byte
+	jobIDIndexBucketName     []byte
 }
 
 const (
-	locksBucketName       = "runLocks"
-	pullsBucketName       = "pulls"
-	globalLocksBucketName = "globalLocks"
-	pullKeySeparator      = "::"
+	locksBucketName          = "runLocks"
+	pullsBucketName          = "pulls"
+	globalLocksBucketName    = "globalLocks"
+	projectOutputsBucketName = "projectOutputs"
+	jobIDIndexBucketName     = "job-id-index"
+	pullKeySeparator         = "::"
 )
 
 // New returns a valid locker. We need to be able to write to dataDir
@@ -60,6 +65,12 @@ func New(dataDir string) (*BoltDB, error) {
 		}
 		if _, err = tx.CreateBucketIfNotExists([]byte(globalLocksBucketName)); err != nil {
 			return fmt.Errorf("creating bucket %q: %w", globalLocksBucketName, err)
+		}
+		if _, err = tx.CreateBucketIfNotExists([]byte(projectOutputsBucketName)); err != nil {
+			return fmt.Errorf("creating bucket %q: %w", projectOutputsBucketName, err)
+		}
+		if _, err = tx.CreateBucketIfNotExists([]byte(jobIDIndexBucketName)); err != nil {
+			return fmt.Errorf("creating bucket %q: %w", jobIDIndexBucketName, err)
 		}
 		return nil
 	})
@@ -120,20 +131,24 @@ func New(dataDir string) (*BoltDB, error) {
 	}
 
 	return &BoltDB{
-		db:                    db,
-		locksBucketName:       []byte(locksBucketName),
-		pullsBucketName:       []byte(pullsBucketName),
-		globalLocksBucketName: []byte(globalLocksBucketName),
+		db:                       db,
+		locksBucketName:          []byte(locksBucketName),
+		pullsBucketName:          []byte(pullsBucketName),
+		globalLocksBucketName:    []byte(globalLocksBucketName),
+		projectOutputsBucketName: []byte(projectOutputsBucketName),
+		jobIDIndexBucketName:     []byte(jobIDIndexBucketName),
 	}, nil
 }
 
 // NewWithDB is used for testing.
 func NewWithDB(db *bolt.DB, bucket string, globalBucket string) (*BoltDB, error) {
 	return &BoltDB{
-		db:                    db,
-		locksBucketName:       []byte(bucket),
-		pullsBucketName:       []byte(pullsBucketName),
-		globalLocksBucketName: []byte(globalBucket),
+		db:                       db,
+		locksBucketName:          []byte(bucket),
+		pullsBucketName:          []byte(pullsBucketName),
+		globalLocksBucketName:    []byte(globalBucket),
+		projectOutputsBucketName: []byte(projectOutputsBucketName),
+		jobIDIndexBucketName:     []byte(jobIDIndexBucketName),
 	}, nil
 }
 
@@ -574,6 +589,244 @@ func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectS
 		PolicyStatus: p.PolicyStatus(),
 		Status:       p.PlanStatus(),
 	}
+}
+
+// SaveProjectOutput saves a project output to the database.
+func (b *BoltDB) SaveProjectOutput(output models.ProjectOutput) error {
+	return b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.projectOutputsBucketName)
+		key := output.Key()
+		bytes, err := json.Marshal(output)
+		if err != nil {
+			return fmt.Errorf("marshaling project output: %w", err)
+		}
+		if err := bucket.Put([]byte(key), bytes); err != nil {
+			return err
+		}
+
+		// Also save the job ID index for O(1) lookups by job ID
+		if output.JobID != "" {
+			indexBucket := tx.Bucket(b.jobIDIndexBucketName)
+			if indexBucket != nil {
+				if err := indexBucket.Put([]byte(output.JobID), []byte(key)); err != nil {
+					return fmt.Errorf("saving job ID index: %w", err)
+				}
+			}
+		}
+		return nil
+	})
+}
+
+// GetProjectOutputRun retrieves a specific project output run.
+func (b *BoltDB) GetProjectOutputRun(repoFullName string, pullNum int, path string, workspace string, projectName string, command string, runTimestamp int64) (*models.ProjectOutput, error) {
+	var output models.ProjectOutput
+	found := false
+
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.projectOutputsBucketName)
+		key := fmt.Sprintf("%s::%d::%s::%s::%s::%s::%d", repoFullName, pullNum, path, workspace, projectName, command, runTimestamp)
+		bytes := bucket.Get([]byte(key))
+		if bytes == nil {
+			return nil
+		}
+		found = true
+		return json.Unmarshal(bytes, &output)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return &output, nil
+}
+
+// GetProjectOutputHistory retrieves all runs for a project, sorted by timestamp descending.
+func (b *BoltDB) GetProjectOutputHistory(repoFullName string, pullNum int, path string, workspace string, projectName string) ([]models.ProjectOutput, error) {
+	var outputs []models.ProjectOutput
+	prefix := fmt.Sprintf("%s::%d::%s::%s::%s::", repoFullName, pullNum, path, workspace, projectName)
+
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.projectOutputsBucketName)
+		c := bucket.Cursor()
+
+		for k, v := c.Seek([]byte(prefix)); k != nil && strings.HasPrefix(string(k), prefix); k, v = c.Next() {
+			var output models.ProjectOutput
+			if err := json.Unmarshal(v, &output); err != nil {
+				return fmt.Errorf("unmarshaling project output: %w", err)
+			}
+			outputs = append(outputs, output)
+		}
+		return nil
+	})
+
+	if outputs == nil {
+		outputs = []models.ProjectOutput{}
+	}
+
+	// Sort by RunTimestamp descending (newest first)
+	sort.Slice(outputs, func(i, j int) bool {
+		return outputs[i].RunTimestamp > outputs[j].RunTimestamp
+	})
+
+	return outputs, err
+}
+
+// GetProjectOutputsByPull retrieves the latest output per project for a pull request.
+func (b *BoltDB) GetProjectOutputsByPull(repoFullName string, pullNum int) ([]models.ProjectOutput, error) {
+	var allOutputs []models.ProjectOutput
+	prefix := fmt.Sprintf("%s::%d::", repoFullName, pullNum)
+
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.projectOutputsBucketName)
+		c := bucket.Cursor()
+
+		for k, v := c.Seek([]byte(prefix)); k != nil && strings.HasPrefix(string(k), prefix); k, v = c.Next() {
+			var output models.ProjectOutput
+			if err := json.Unmarshal(v, &output); err != nil {
+				return fmt.Errorf("unmarshaling project output: %w", err)
+			}
+			allOutputs = append(allOutputs, output)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Group by project key and keep only the latest (highest timestamp) per project
+	latestByProject := make(map[string]models.ProjectOutput)
+	for _, output := range allOutputs {
+		projectKey := output.ProjectKey()
+		if existing, ok := latestByProject[projectKey]; !ok || output.RunTimestamp > existing.RunTimestamp {
+			latestByProject[projectKey] = output
+		}
+	}
+
+	// Convert map to slice
+	outputs := make([]models.ProjectOutput, 0, len(latestByProject))
+	for _, output := range latestByProject {
+		outputs = append(outputs, output)
+	}
+
+	return outputs, nil
+}
+
+// DeleteProjectOutputsByPull deletes all project outputs for a pull request.
+func (b *BoltDB) DeleteProjectOutputsByPull(repoFullName string, pullNum int) error {
+	prefix := fmt.Sprintf("%s::%d::", repoFullName, pullNum)
+
+	return b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.projectOutputsBucketName)
+		if bucket == nil {
+			// No bucket means no outputs to delete
+			return nil
+		}
+		c := bucket.Cursor()
+
+		var keysToDelete [][]byte
+		for k, _ := c.Seek([]byte(prefix)); k != nil && strings.HasPrefix(string(k), prefix); k, _ = c.Next() {
+			keysToDelete = append(keysToDelete, append([]byte{}, k...))
+		}
+
+		for _, key := range keysToDelete {
+			if err := bucket.Delete(key); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// GetProjectOutputByJobID retrieves a project output by its job ID.
+// Uses an index for O(1) lookups, with fallback to full scan for backwards compatibility.
+func (b *BoltDB) GetProjectOutputByJobID(jobID string) (*models.ProjectOutput, error) {
+	var result *models.ProjectOutput
+
+	err := b.db.View(func(tx *bolt.Tx) error {
+		// First, try to use the job ID index for O(1) lookup
+		indexBucket := tx.Bucket(b.jobIDIndexBucketName)
+		if indexBucket != nil {
+			outputKey := indexBucket.Get([]byte(jobID))
+			if outputKey != nil {
+				bucket := tx.Bucket(b.projectOutputsBucketName)
+				outputBytes := bucket.Get(outputKey)
+				if outputBytes != nil {
+					var output models.ProjectOutput
+					if err := json.Unmarshal(outputBytes, &output); err != nil {
+						return fmt.Errorf("unmarshaling project output: %w", err)
+					}
+					result = &output
+					return nil
+				}
+			}
+		}
+
+		// Fallback to full scan for backwards compatibility with existing data
+		// that doesn't have an index entry yet
+		bucket := tx.Bucket(b.projectOutputsBucketName)
+		return bucket.ForEach(func(k, v []byte) error {
+			var output models.ProjectOutput
+			if err := json.Unmarshal(v, &output); err != nil {
+				return nil // Skip malformed entries
+			}
+			if output.JobID == jobID {
+				result = &output
+				return nil // Found it, but ForEach doesn't support early exit
+			}
+			return nil
+		})
+	})
+
+	return result, err
+}
+
+// GetActivePullRequests returns all pull requests that have stored project outputs.
+func (b *BoltDB) GetActivePullRequests() ([]models.PullRequest, error) {
+	pullSet := make(map[string]models.PullRequest)
+
+	err := b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.projectOutputsBucketName)
+		return bucket.ForEach(func(k, v []byte) error {
+			var output models.ProjectOutput
+			if err := json.Unmarshal(v, &output); err != nil {
+				return nil // Skip malformed entries
+			}
+			pullKey := output.PullKey()
+			if existing, ok := pullSet[pullKey]; ok {
+				// Keep existing, but update URL/Title if we have them
+				if output.PullURL != "" {
+					existing.URL = output.PullURL
+				}
+				if output.PullTitle != "" {
+					existing.Title = output.PullTitle
+				}
+				pullSet[pullKey] = existing
+			} else {
+				pullSet[pullKey] = models.PullRequest{
+					Num:   output.PullNum,
+					URL:   output.PullURL,
+					Title: output.PullTitle,
+					BaseRepo: models.Repo{
+						FullName: output.RepoFullName,
+					},
+				}
+			}
+			return nil
+		})
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	pulls := make([]models.PullRequest, 0, len(pullSet))
+	for _, pr := range pullSet {
+		pulls = append(pulls, pr)
+	}
+	return pulls, nil
 }
 
 func (b *BoltDB) Close() error {
