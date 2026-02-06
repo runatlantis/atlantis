@@ -117,6 +117,11 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		logger.Err("deleting pull from db: %s", err)
 	}
 
+	// Delete project outputs for this pull request.
+	if err := p.Database.DeleteProjectOutputsByPull(repo.FullName, pull.Num); err != nil {
+		logger.Warn("failed to delete project outputs for %s #%d: %v", repo.FullName, pull.Num, err)
+	}
+
 	// Clear any operations to avoid unbounded growth.
 	if p.CancellationTracker != nil {
 		p.CancellationTracker.Clear(pull)

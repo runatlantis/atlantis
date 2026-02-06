@@ -353,6 +353,46 @@ func TestRaceConditionPrevention(t *testing.T) {
 }
 
 // TestHighConcurrencyStress performs stress testing with many concurrent operations
+func TestProjectCommandOutputHandler_GracefulClose(t *testing.T) {
+	t.Run("closes channel when buffer full instead of silent delete", func(t *testing.T) {
+		logger := logging.NewNoopLogger(t)
+		prjCmdOutputChan := make(chan *jobs.ProjectCmdOutputLine)
+		prjCmdOutputHandler := jobs.NewAsyncProjectCommandOutputHandler(
+			prjCmdOutputChan,
+			logger,
+		)
+
+		go prjCmdOutputHandler.Handle()
+
+		ctx := createTestProjectCmdContext(t)
+
+		// Register a channel with size 1 that we won't read from
+		slowCh := make(chan string, 1)
+		prjCmdOutputHandler.Register(ctx.JobID, slowCh)
+
+		// Send messages until buffer would overflow
+		// First message fills the channel
+		prjCmdOutputHandler.Send(ctx, "msg1", false)
+		// Second message should trigger close (not silent delete)
+		prjCmdOutputHandler.Send(ctx, "msg2", false)
+
+		// Give time for async processing
+		time.Sleep(100 * time.Millisecond)
+
+		// Channel should be closed, not just deleted
+		select {
+		case _, ok := <-slowCh:
+			if ok {
+				// Read the first message, try again
+				_, ok = <-slowCh
+			}
+			Assert(t, !ok, "channel should be closed after buffer overflow")
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("channel was not closed")
+		}
+	})
+}
+
 func TestHighConcurrencyStress(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping stress test in short mode")

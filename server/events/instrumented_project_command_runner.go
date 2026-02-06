@@ -61,6 +61,10 @@ func (p *InstrumentedProjectCommandRunner) StateRm(ctx command.ProjectContext) c
 	return RunAndEmitStats(ctx, p.projectCommandRunner.StateRm, p.scope)
 }
 
+func (p *InstrumentedProjectCommandRunner) Version(ctx command.ProjectContext) command.ProjectCommandOutput {
+	return RunAndEmitStats(ctx, p.projectCommandRunner.Version, p.scope)
+}
+
 func RunAndEmitStats(ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectCommandOutput, scope tally.Scope) command.ProjectCommandOutput {
 	commandName := ctx.CommandName.String()
 	// ensures we are differentiating between project level command and overall command

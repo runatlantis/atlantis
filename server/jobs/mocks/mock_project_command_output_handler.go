@@ -43,6 +43,21 @@ func (mock *MockProjectCommandOutputHandler) Deregister(jobID string, receiver c
 	pegomock.GetGenericMockFrom(mock).Invoke("Deregister", _params, []reflect.Type{})
 }
 
+func (mock *MockProjectCommandOutputHandler) GetProjectOutputBuffer(jobID string) jobs.OutputBuffer {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
+	}
+	_params := []pegomock.Param{jobID}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetProjectOutputBuffer", _params, []reflect.Type{reflect.TypeOf((*jobs.OutputBuffer)(nil)).Elem()})
+	var _ret0 jobs.OutputBuffer
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(jobs.OutputBuffer)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockProjectCommandOutputHandler) GetPullToJobMapping() []jobs.PullInfoWithJobIDs {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
@@ -200,6 +215,35 @@ func (c *MockProjectCommandOutputHandler_Deregister_OngoingVerification) GetAllC
 			_param1 = make([]chan string, len(c.methodInvocations))
 			for u, param := range _params[1] {
 				_param1[u] = param.(chan string)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockProjectCommandOutputHandler) GetProjectOutputBuffer(jobID string) *MockProjectCommandOutputHandler_GetProjectOutputBuffer_OngoingVerification {
+	_params := []pegomock.Param{jobID}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetProjectOutputBuffer", _params, verifier.timeout)
+	return &MockProjectCommandOutputHandler_GetProjectOutputBuffer_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandOutputHandler_GetProjectOutputBuffer_OngoingVerification struct {
+	mock              *MockProjectCommandOutputHandler
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandOutputHandler_GetProjectOutputBuffer_OngoingVerification) GetCapturedArguments() string {
+	jobID := c.GetAllCapturedArguments()
+	return jobID[len(jobID)-1]
+}
+
+func (c *MockProjectCommandOutputHandler_GetProjectOutputBuffer_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
 			}
 		}
 	}
