@@ -1078,6 +1078,245 @@ func newTestRedisTLS(mr *miniredis.Miniredis) *redis.RedisDB {
 	return r
 }
 
+func TestRedis_SaveAndGetProjectOutput(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	now := time.Now()
+	output := models.ProjectOutput{
+		RepoFullName:  "owner/repo",
+		PullNum:       123,
+		ProjectName:   "myproject",
+		Workspace:     "default",
+		Path:          "terraform/staging",
+		CommandName:   "plan",
+		JobID:         "job-123",
+		RunTimestamp:  now.UnixMilli(),
+		Output:        "Plan: 1 to add, 0 to change, 0 to destroy.",
+		Status:        models.SuccessOutputStatus,
+		ResourceStats: models.ResourceStats{Add: 1},
+		TriggeredBy:   "testuser",
+		StartedAt:     now.Add(-time.Minute),
+		CompletedAt:   now,
+	}
+
+	err := r.SaveProjectOutput(output)
+	Ok(t, err)
+
+	// Test GetProjectOutputHistory
+	history, err := r.GetProjectOutputHistory("owner/repo", 123, "terraform/staging", "default", "myproject")
+	Ok(t, err)
+	Assert(t, len(history) == 1, "expected 1 result")
+	Equals(t, output.Output, history[0].Output)
+	Equals(t, output.Status, history[0].Status)
+
+	// Test GetProjectOutputRun
+	retrieved, err := r.GetProjectOutputRun("owner/repo", 123, "terraform/staging", "default", "myproject", "plan", now.UnixMilli())
+	Ok(t, err)
+	Assert(t, retrieved != nil, "expected non-nil result")
+	Equals(t, output.Output, retrieved.Output)
+}
+
+func TestRedis_GetProjectOutputHistory_NotFound(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	history, err := r.GetProjectOutputHistory("owner/repo", 999, "nonexistent", "default", "")
+	Ok(t, err)
+	Assert(t, len(history) == 0, "expected empty history for non-existent output")
+}
+
+func TestRedis_GetProjectOutputsByPull(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	output1 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "project1",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+	}
+	output2 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "project2",
+		Workspace:    "default",
+		Path:         "terraform/prod",
+	}
+
+	err := r.SaveProjectOutput(output1)
+	Ok(t, err)
+	err = r.SaveProjectOutput(output2)
+	Ok(t, err)
+
+	outputs, err := r.GetProjectOutputsByPull("owner/repo", 123)
+	Ok(t, err)
+	Equals(t, 2, len(outputs))
+}
+
+func TestRedis_GetProjectOutputsByPull_Empty(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	outputs, err := r.GetProjectOutputsByPull("owner/repo", 999)
+	Ok(t, err)
+	Equals(t, 0, len(outputs))
+}
+
+func TestRedis_DeleteProjectOutputsByPull(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	output := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+	}
+	err := r.SaveProjectOutput(output)
+	Ok(t, err)
+
+	err = r.DeleteProjectOutputsByPull("owner/repo", 123)
+	Ok(t, err)
+
+	outputs, err := r.GetProjectOutputsByPull("owner/repo", 123)
+	Ok(t, err)
+	Equals(t, 0, len(outputs))
+}
+
+func TestRedis_GetActivePullRequests(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	output1 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "project1",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+	}
+	output2 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      456,
+		ProjectName:  "project2",
+		Workspace:    "default",
+		Path:         "terraform/prod",
+	}
+
+	err := r.SaveProjectOutput(output1)
+	Ok(t, err)
+	err = r.SaveProjectOutput(output2)
+	Ok(t, err)
+
+	pulls, err := r.GetActivePullRequests()
+	Ok(t, err)
+	Equals(t, 2, len(pulls))
+}
+
+func TestRedis_GetActivePullRequests_Empty(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	pulls, err := r.GetActivePullRequests()
+	Ok(t, err)
+	Equals(t, 0, len(pulls))
+}
+
+func TestRedisDB_SaveProjectOutput_Atomic(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	output := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/app",
+		CommandName:  "plan",
+		RunTimestamp: time.Now().UnixMilli(),
+		Status:       models.SuccessOutputStatus,
+	}
+
+	// Save should succeed
+	err := r.SaveProjectOutput(output)
+	Ok(t, err)
+
+	// Verify both the output and index were saved
+	retrieved, err := r.GetProjectOutputsByPull("owner/repo", 123)
+	Ok(t, err)
+	Equals(t, 1, len(retrieved))
+	Equals(t, output.ProjectName, retrieved[0].ProjectName)
+}
+
+func TestRedis_GetProjectOutputByJobID(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	now := time.Now()
+	output := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		JobID:        "job-abc-123",
+		RunTimestamp: now.UnixMilli(),
+		Output:       "Plan: 1 to add",
+		Status:       models.SuccessOutputStatus,
+	}
+
+	err := r.SaveProjectOutput(output)
+	Ok(t, err)
+
+	// Test retrieval by job ID (should use index for O(1) lookup)
+	retrieved, err := r.GetProjectOutputByJobID("job-abc-123")
+	Ok(t, err)
+	Assert(t, retrieved != nil, "expected non-nil result")
+	Equals(t, output.JobID, retrieved.JobID)
+	Equals(t, output.Output, retrieved.Output)
+	Equals(t, output.RepoFullName, retrieved.RepoFullName)
+}
+
+func TestRedis_GetProjectOutputByJobID_NotFound(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	// Test retrieval of non-existent job ID
+	retrieved, err := r.GetProjectOutputByJobID("nonexistent-job-id")
+	Ok(t, err)
+	Assert(t, retrieved == nil, "expected nil result for non-existent job ID")
+}
+
+func TestRedis_GetProjectOutputByJobID_EmptyJobID(t *testing.T) {
+	mr := miniredis.RunT(t)
+	r := newTestRedis(mr)
+
+	// Save output with empty job ID - should not be indexed
+	output := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		JobID:        "", // Empty job ID
+		RunTimestamp: time.Now().UnixMilli(),
+	}
+
+	err := r.SaveProjectOutput(output)
+	Ok(t, err)
+
+	// Empty job IDs are not indexed, but the fallback scan will still find them
+	// This verifies backwards compatibility - outputs without job IDs can still be found
+	retrieved, err := r.GetProjectOutputByJobID("")
+	Ok(t, err)
+	// The scan finds outputs with matching (empty) job ID
+	Assert(t, retrieved != nil, "fallback scan should find output with empty job ID")
+}
+
 func generateLocalhostCert() ([]byte, []byte, error) {
 	var err error
 
