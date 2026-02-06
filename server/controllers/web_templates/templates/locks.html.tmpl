@@ -1,0 +1,232 @@
+{{ define "title" }}Locks - Atlantis{{ end }}
+
+{{ define "content" }}
+<div class="page-container" x-data="locksState()">
+  <div class="page-header">
+    <h1>Locks</h1>
+    <div class="page-header-actions">
+      <span class="count-badge">{{ .TotalCount }} Lock{{ if ne .TotalCount 1 }}s{{ end }}</span>
+    </div>
+  </div>
+
+  {{ if gt .TotalCount 0 }}
+  <!-- Lock data container for Alpine.js -->
+  <div id="locks-data-container" style="display: none;">
+    <script id="locks-data" type="application/json">
+    [
+      {{ $first := true }}
+      {{ range .Locks }}
+      {{ if not $first }},{{ end }}
+      {{ $first = false }}
+      {
+        "lockId": {{ .LockID | js }},
+        "lockPath": {{ .LockPath | js }},
+        "repo": {{ .RepoFullName | js }},
+        "pullNum": {{ .PullNum }},
+        "groupKey": {{ printf "%s|%d" .RepoFullName .PullNum | js }},
+        "groupDisplayName": {{ printf "%s #%d" .RepoFullName .PullNum | js }},
+        "path": {{ .Path | js }},
+        "workspace": {{ .Workspace | js }},
+        "lockedBy": {{ .LockedBy | js }},
+        "time": {{ .TimeFormatted | js }},
+        "prUrl": {{ printf "%s/pr/%s/pulls/%d" $.CleanedBasePath .RepoFullName .PullNum | js }},
+        "unlockUrl": {{ printf "%s/locks?id=%s" $.CleanedBasePath .LockID | js }}
+      }
+      {{ end }}
+    ]
+    </script>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button type="button" class="group-control-btn" @click="expandAll()" title="Expand all groups">
+        <i data-lucide="chevrons-down" class="icon-xs"></i>
+        <span class="group-control-label">Expand</span>
+      </button>
+      <button type="button" class="group-control-btn" @click="collapseAll()" title="Collapse all groups">
+        <i data-lucide="chevrons-up" class="icon-xs"></i>
+        <span class="group-control-label">Collapse</span>
+      </button>
+    </div>
+    <div class="toolbar-right">
+      {{ if gt (len .Repositories) 1 }}
+      <select class="repo-select" x-model="selectedRepo" @change="applyFilters()">
+        <option value="">All Repositories</option>
+        {{ range .Repositories }}
+        <option value="{{ . }}">{{ . }}</option>
+        {{ end }}
+      </select>
+      {{ end }}
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Search by project path..."
+        x-model="searchQuery"
+        @input="applyFilters()"
+      >
+    </div>
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table data-table--grouped data-table--fixed">
+      <thead>
+        <tr>
+          <th style="width: 32px;"></th>
+          <th>Project Path</th>
+          <th style="width: 100px;">Workspace</th>
+          <th style="width: 120px;">Locked By</th>
+          <th style="width: 120px;">Lock Time</th>
+          <th style="width: 90px;">Actions</th>
+        </tr>
+      </thead>
+
+      <template x-for="group in groupedItems" :key="group.key">
+        <tbody class="repo-group">
+          <!-- Group header with Unlock All button -->
+          <tr class="repo-group-header repo-group-header--hybrid"
+              @click="toggleGroup(group.key)"
+              tabindex="0"
+              :aria-expanded="isExpanded(group.key)">
+            <td class="repo-group-chevron-cell-hybrid">
+              <i :data-lucide="isExpanded(group.key) ? 'chevron-down' : 'chevron-right'" class="icon-sm repo-group-chevron"></i>
+            </td>
+            <td colspan="4" class="repo-group-info-hybrid">
+              <span class="repo-group-name" x-text="group.displayName"></span>
+              <span class="repo-group-count-minimal" x-text="'(' + group.locks.length + ')'"></span>
+            </td>
+            <td class="repo-group-actions">
+              <button
+                type="button"
+                class="btn btn--danger btn--sm"
+                @click.stop="unlockAllInGroup(group)"
+                title="Unlock all locks in this PR"
+              >
+                <i data-lucide="unlock" class="icon-xs"></i>
+                Unlock All
+              </button>
+            </td>
+          </tr>
+
+          <!-- Lock rows (shown when expanded) -->
+          <template x-if="isExpanded(group.key)">
+            <template x-for="lock in group.locks" :key="lock.lockId">
+              <tr class="data-table-row repo-group-row">
+                <td></td>
+                <td>
+                  <span class="mono" x-text="lock.path"></span>
+                </td>
+                <td>
+                  <span class="badge" x-text="lock.workspace"></span>
+                </td>
+                <td x-text="lock.lockedBy"></td>
+                <td class="text-muted" x-text="lock.time"></td>
+                <td>
+                  <button
+                    type="button"
+                    class="btn btn--danger btn--sm"
+                    @click="unlockSingle(lock)"
+                  >
+                    <i data-lucide="unlock" class="icon-xs"></i>
+                    Unlock
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </template>
+        </tbody>
+      </template>
+
+      <!-- Empty state when filters hide all groups -->
+      <template x-if="groupedItems.length === 0 && allItems.length > 0">
+        <tbody>
+          <tr>
+            <td colspan="6" class="text-center text-muted" style="padding: 40px;">
+              No locks match the current filters
+            </td>
+          </tr>
+        </tbody>
+      </template>
+    </table>
+  </div>
+  {{ else }}
+  <div class="empty-state">
+    <i data-lucide="unlock" class="empty-state-icon"></i>
+    <h3>No Active Locks</h3>
+    <p>When Atlantis locks projects during plan/apply, they will appear here.</p>
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script>
+  function locksState() {
+    return {
+      // Inherit shared grouped table behavior
+      ...createGroupedTableState({
+        dataElementId: 'locks-data',
+        itemsKey: 'locks',
+        searchFields: ['repo', 'path', 'workspace'],
+        expandAllOnInit: false,
+        groupKeyField: 'groupKey',
+        groupDisplayField: 'groupDisplayName'
+      }),
+
+      // ========== Locks-specific methods ==========
+
+      // Unlock a single lock
+      unlockSingle(lock) {
+        showConfirmModal({
+          title: 'Unlock Project',
+          description: 'This will release the lock and allow other plans/applies to proceed.',
+          impactItems: [
+            lock.path + ' (' + lock.workspace + ')',
+            'PR #' + lock.pullNum
+          ],
+          confirmPhrase: 'UNLOCK',
+          confirmButtonText: 'Unlock',
+          onConfirm: async () => {
+            const response = await fetch(lock.unlockUrl, { method: 'DELETE' });
+            if (response.ok) {
+              window.location.reload();
+            } else {
+              throw new Error('Failed to unlock');
+            }
+          }
+        });
+      },
+
+      // Unlock all locks in a group
+      unlockAllInGroup(group) {
+        const lockCount = group.locks.length;
+        const paths = group.locks.map(l => l.path + ' (' + l.workspace + ')');
+
+        showConfirmModal({
+          title: 'Unlock All in ' + group.displayName,
+          description: 'This will release ' + lockCount + ' lock' + (lockCount !== 1 ? 's' : '') + ' in this PR.',
+          impactItems: paths.slice(0, 5).concat(paths.length > 5 ? ['... and ' + (paths.length - 5) + ' more'] : []),
+          confirmPhrase: 'UNLOCK ALL',
+          confirmButtonText: 'Unlock All',
+          onConfirm: async () => {
+            const results = await Promise.allSettled(
+              group.locks.map(lock => fetch(lock.unlockUrl, { method: 'DELETE' }))
+            );
+
+            const failures = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
+
+            if (failures.length > 0) {
+              showToast(failures.length + ' lock(s) failed to unlock. Please try again.', 'error');
+            } else {
+              showToast('Successfully unlocked ' + lockCount + ' lock(s).', 'success');
+            }
+
+            setTimeout(() => window.location.reload(), 1000);
+          }
+        });
+      }
+    };
+  }
+</script>
+{{ end }}
+
+{{ template "layout" . }}
