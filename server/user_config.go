@@ -137,6 +137,7 @@ type UserConfig struct {
 	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
 	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
+	DevMode                    bool            `mapstructure:"dev"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName
