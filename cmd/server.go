@@ -163,6 +163,7 @@ const (
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
 	WebsocketCheckOrigin             = "websocket-check-origin"
+	DevModeFlag                      = "dev"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser                  = ""
@@ -644,6 +645,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	WebsocketCheckOrigin: {
 		description:  "Enable websocket origin check",
+		defaultValue: false,
+	},
+	DevModeFlag: {
+		description:  "Enable development mode: serve static files and templates from disk for hot reloading. Do not use in production.",
 		defaultValue: false,
 	},
 	HideUnchangedPlanComments: {

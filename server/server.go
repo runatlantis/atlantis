@@ -31,7 +31,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -115,10 +114,8 @@ type Server struct {
 	LocksController                *controllers.LocksController
 	StatusController               *controllers.StatusController
 	JobsController                 *controllers.JobsController
-	APIController                  *controllers.APIController
-	IndexTemplate                  web_templates.TemplateWriter
-	LockDetailTemplate             web_templates.TemplateWriter
-	ProjectJobsTemplate            web_templates.TemplateWriter
+	APIController            *controllers.APIController
+	ProjectJobsTemplate      web_templates.TemplateWriter
 	ProjectJobsErrorTemplate       web_templates.TemplateWriter
 	SSLCertFile                    string
 	SSLKeyFile                     string
@@ -178,6 +175,20 @@ var staticAssets embed.FS
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	logging.SuppressDefaultLogging()
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
+
+	// Initialize dev mode for templates if enabled
+	if userConfig.DevMode {
+		// Find templates directory relative to working directory
+		templatesDir := "server/controllers/web_templates/templates"
+		if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
+			// Try current directory structure
+			templatesDir = "controllers/web_templates/templates"
+			if _, statErr := os.Stat(templatesDir); os.IsNotExist(statErr) {
+				return nil, fmt.Errorf("dev mode enabled but templates directory not found. Run from project root or set ATLANTIS_DEV=false")
+			}
+		}
+		web_templates.SetDevMode(true, templatesDir)
+	}
 
 	if err != nil {
 		return nil, err
@@ -762,11 +773,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectOutputWrapper,
 	)
 
+	// Wrap the instrumented runner with output persistence to save command results to the database
+	outputPersister := events.NewOutputPersister(database, projectCmdOutputHandler)
+	persistingProjectCmdRunner := events.NewOutputPersistingProjectCommandRunner(
+		instrumentedProjectCmdRunner,
+		outputPersister,
+	)
+
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
 		commitStatusUpdater,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceVCSStatusNoProjects,
 		userConfig.QuietPolicyChecks,
@@ -781,7 +799,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		workingDir,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
@@ -802,7 +820,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		applyLockingClient,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 		cancellationTracker,
 		autoMerger,
 		pullUpdater,
@@ -817,7 +835,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 		pullUpdater,
 		dbUpdater,
 		userConfig.SilenceNoProjects,
@@ -835,7 +853,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	versionCommandRunner := events.NewVersionCommandRunner(
 		pullUpdater,
 		projectCommandBuilder,
-		projectOutputWrapper,
+		persistingProjectCmdRunner,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 	)
@@ -844,14 +862,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullUpdater,
 		pullReqStatusFetcher,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 		userConfig.SilenceNoProjects,
 	)
 
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 	)
 
 	cancelCommandRunner := events.NewCancelCommandRunner(
@@ -935,8 +953,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ApplyLocker:        applyLockingClient,
 		Logger:             logger,
 		VCSClient:          vcsClient,
-		LockDetailTemplate: web_templates.LockTemplate,
-		WorkingDir:         workingDir,
+		WorkingDir: workingDir,
 		WorkingDirLocker:   workingDirLocker,
 		Database:           database,
 		DeleteLockCommand:  deleteLockCommand,
@@ -953,12 +970,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AtlantisVersion:          config.AtlantisVersion,
 		AtlantisURL:              parsedURL,
 		Logger:                   logger,
-		ProjectJobsTemplate:      web_templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate: web_templates.ProjectJobsErrorTemplate,
+		ProjectJobsTemplate:      web_templates.GetTemplate(web_templates.TemplateName_JobDetail),
+		ProjectJobsErrorTemplate: web_templates.GetTemplate(web_templates.TemplateName_ProjectJobsError),
 		Database:                 database,
 		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
+		OutputHandler:            projectCmdOutputHandler,
 	}
 
 	apiController := &controllers.APIController{
@@ -1033,10 +1051,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		JobsController:                 jobsController,
 		StatusController:               statusController,
 		APIController:                  apiController,
-		IndexTemplate:                  web_templates.IndexTemplate,
-		LockDetailTemplate:             web_templates.LockTemplate,
-		ProjectJobsTemplate:            web_templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate:       web_templates.ProjectJobsErrorTemplate,
+		ProjectJobsTemplate: web_templates.GetTemplate(web_templates.TemplateName_JobDetail),
+		ProjectJobsErrorTemplate:       web_templates.GetTemplate(web_templates.TemplateName_ProjectJobsError),
 		SSLKeyFile:                     userConfig.SSLKeyFile,
 		SSLCertFile:                    userConfig.SSLCertFile,
 		DisableGlobalApplyLock:         userConfig.DisableGlobalApplyLock,
@@ -1062,23 +1078,150 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 // Start creates the routes and starts serving traffic.
 func (s *Server) Start() error {
-	s.Router.HandleFunc("/", s.Index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
+	// Redirect index to /prs since PRs is now the primary view
+	s.Router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, s.AtlantisURL.Path+"/prs", http.StatusFound)
+	}).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
-	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
+	// Serve static files - from disk in dev mode, embedded otherwise
+	if web_templates.IsDevMode() && web_templates.StaticDirExists() {
+		staticDir := web_templates.GetStaticDir()
+		s.Logger.Info("Dev mode: serving static files from %s", staticDir)
+		s.Router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+	} else {
+		s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
+	}
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
 	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
+
+	// PR list page controller
+	prController := controllers.NewPRController(
+		s.database,
+		web_templates.GetTemplate(web_templates.TemplateName_PRList),
+		web_templates.GetTemplate(web_templates.TemplateName_PRListRows),
+		s.AtlantisVersion,
+		s.AtlantisURL.Path,
+		func() bool {
+			lock, _ := s.ApplyLocker.CheckApplyLock()
+			return lock.Locked
+		},
+		func(repoFullName string, pullNum int) int {
+			// Count active jobs for this PR from the pull-to-job mapping
+			mapping := s.ProjectCmdOutputHandler.GetPullToJobMapping()
+			for _, pullInfo := range mapping {
+				if pullInfo.Pull.RepoFullName == repoFullName && pullInfo.Pull.PullNum == pullNum {
+					return len(pullInfo.JobIDInfos)
+				}
+			}
+			return 0
+		},
+	)
+
+	// PR list routes
+	s.Router.HandleFunc("/prs", prController.PRList).Methods("GET")
+	s.Router.HandleFunc("/prs/partial", prController.PRListPartial).Methods("GET")
+
+	// PR detail page controller
+	prDetailController := controllers.NewPRDetailController(
+		s.database,
+		web_templates.GetTemplate(web_templates.TemplateName_PRDetail),
+		web_templates.GetTemplate(web_templates.TemplateName_PRDetailProjects),
+		s.AtlantisVersion,
+		s.AtlantisURL.Path,
+		func() bool {
+			lock, _ := s.ApplyLocker.CheckApplyLock()
+			return lock.Locked
+		},
+	)
+
+	// PR detail routes
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}", prDetailController.PRDetail).Methods("GET")
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/projects", prDetailController.PRDetailProjects).Methods("GET")
+
+	// Project output page controller
+	projectOutputController := controllers.NewProjectOutputController(
+		s.database,
+		web_templates.GetTemplate(web_templates.TemplateName_ProjectOutput),
+		web_templates.GetTemplate(web_templates.TemplateName_ProjectOutputPartial),
+		s.AtlantisVersion,
+		s.AtlantisURL.Path,
+		func() bool {
+			lock, _ := s.ApplyLocker.CheckApplyLock()
+			return lock.Locked
+		},
+		s.ProjectCmdOutputHandler,
+	)
+
+	// Project output routes - path uses .+ to allow slashes in project paths
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/project/{path:.+}/output", projectOutputController.ProjectOutputPartial).Methods("GET")
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/project/{path:.+}", projectOutputController.ProjectOutput).Methods("GET")
+
+	// Settings page controller
+	settingsController := controllers.NewSettingsController(
+		web_templates.GetTemplate(web_templates.TemplateName_Settings),
+		!s.DisableGlobalApplyLock,
+		func() bool {
+			lock, _ := s.ApplyLocker.CheckApplyLock()
+			return lock.Locked
+		},
+		s.AtlantisVersion,
+		s.AtlantisURL.Path,
+	)
+	s.Router.HandleFunc("/settings", settingsController.Get).Methods("GET")
+
+	// Locks page controller
+	locksPageController := controllers.NewLocksPageController(
+		web_templates.GetTemplate(web_templates.TemplateName_LocksPage),
+		func() (map[string]models.ProjectLock, error) {
+			return s.Locker.List()
+		},
+		func() bool {
+			lock, _ := s.ApplyLocker.CheckApplyLock()
+			return lock.Locked
+		},
+		s.AtlantisVersion,
+		s.AtlantisURL.Path,
+	)
+	s.Router.HandleFunc("/locks", locksPageController.Get).Methods("GET")
+
+	// Jobs page controller
+	jobsPageController := controllers.NewJobsPageController(
+		web_templates.GetTemplate(web_templates.TemplateName_JobsPage),
+		web_templates.GetTemplate(web_templates.TemplateName_JobsPartial),
+		func() []jobs.PullInfoWithJobIDs {
+			return s.ProjectCmdOutputHandler.GetPullToJobMapping()
+		},
+		func() bool {
+			lock, _ := s.ApplyLocker.CheckApplyLock()
+			return lock.Locked
+		},
+		s.AtlantisVersion,
+		s.AtlantisURL.Path,
+	)
+	s.Router.HandleFunc("/jobs", jobsPageController.Get).Methods("GET")
+	s.Router.HandleFunc("/jobs/partial", jobsPageController.GetPartial).Methods("GET")
+
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
-	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
+	// Redirect old /lock detail page to /locks (the detail page is no longer needed)
+	s.Router.HandleFunc("/lock", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, s.AtlantisURL.Path+"/locks", http.StatusMovedPermanently)
+	}).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
+	// Dev mode test endpoint - must be registered before /jobs/{job-id} to take precedence
+	if web_templates.IsDevMode() {
+		s.Router.HandleFunc("/jobs/test", s.JobsController.CreateTestJob).Methods("GET")
+	}
+
 	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
 	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
+	s.Router.HandleFunc("/jobs/{job-id}/stream", s.JobsController.GetProjectJobsSSE).Methods("GET")
 
 	r, ok := s.StatsReporter.(prometheus.Reporter)
 	if ok {
@@ -1196,95 +1339,6 @@ func (s *Server) closeDatabase(timeout time.Duration) error {
 	case <-time.After(timeout):
 		return fmt.Errorf("database close timed out after %s", timeout)
 	}
-}
-
-// Index is the / route.
-func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
-	locks, err := s.Locker.List()
-	if err != nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Could not retrieve locks: %s", err)
-		return
-	}
-
-	var lockResults []web_templates.LockIndexData
-	for id, v := range locks {
-		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
-		lockResults = append(lockResults, web_templates.LockIndexData{
-			// NOTE: must use .String() instead of .Path because we need the
-			// query params as part of the lock URL.
-			LockPath:      lockURL.String(),
-			RepoFullName:  v.Project.RepoFullName,
-			LockedBy:      v.Pull.Author,
-			PullNum:       v.Pull.Num,
-			Path:          v.Project.Path,
-			Workspace:     v.Workspace,
-			Time:          v.Time,
-			TimeFormatted: v.Time.Format("2006-01-02 15:04:05"),
-		})
-	}
-
-	applyCmdLock, err := s.ApplyLocker.CheckApplyLock()
-	s.Logger.Debug("Apply Lock: %v", applyCmdLock)
-	if err != nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err)
-		return
-	}
-
-	applyLockData := web_templates.ApplyLockData{
-		Time:                   applyCmdLock.Time,
-		Locked:                 applyCmdLock.Locked,
-		GlobalApplyLockEnabled: applyCmdLock.GlobalApplyLockEnabled,
-		TimeFormatted:          applyCmdLock.Time.Format("2006-01-02 15:04:05"),
-	}
-	//Sort by date - newest to oldest.
-	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
-
-	err = s.IndexTemplate.Execute(w, web_templates.IndexData{
-		Locks:            lockResults,
-		PullToJobMapping: preparePullToJobMappings(s),
-		ApplyLock:        applyLockData,
-		AtlantisVersion:  s.AtlantisVersion,
-		CleanedBasePath:  s.AtlantisURL.Path,
-	})
-	if err != nil {
-		s.Logger.Err(err.Error())
-	}
-}
-
-func preparePullToJobMappings(s *Server) []jobs.PullInfoWithJobIDs {
-
-	pullToJobMappings := s.ProjectCmdOutputHandler.GetPullToJobMapping()
-
-	for i := range pullToJobMappings {
-		for j := range pullToJobMappings[i].JobIDInfos {
-			jobUrl, _ := s.Router.Get(ProjectJobsViewRouteName).URL("job-id", pullToJobMappings[i].JobIDInfos[j].JobID)
-			pullToJobMappings[i].JobIDInfos[j].JobIDUrl = jobUrl.String()
-			pullToJobMappings[i].JobIDInfos[j].TimeFormatted = pullToJobMappings[i].JobIDInfos[j].Time.Format("2006-01-02 15:04:05")
-		}
-
-		//Sort by date - newest to oldest.
-		sort.SliceStable(pullToJobMappings[i].JobIDInfos, func(x, y int) bool {
-			return pullToJobMappings[i].JobIDInfos[x].Time.After(pullToJobMappings[i].JobIDInfos[y].Time)
-		})
-	}
-
-	//Sort by repository, project, path, workspace then date.
-	sort.SliceStable(pullToJobMappings, func(x, y int) bool {
-		if pullToJobMappings[x].Pull.RepoFullName != pullToJobMappings[y].Pull.RepoFullName {
-			return pullToJobMappings[x].Pull.RepoFullName < pullToJobMappings[y].Pull.RepoFullName
-		}
-		if pullToJobMappings[x].Pull.ProjectName != pullToJobMappings[y].Pull.ProjectName {
-			return pullToJobMappings[x].Pull.ProjectName < pullToJobMappings[y].Pull.ProjectName
-		}
-		if pullToJobMappings[x].Pull.Path != pullToJobMappings[y].Pull.Path {
-			return pullToJobMappings[x].Pull.Path < pullToJobMappings[y].Pull.Path
-		}
-		return pullToJobMappings[x].Pull.Workspace < pullToJobMappings[y].Pull.Workspace
-	})
-
-	return pullToJobMappings
 }
 
 func mkSubDir(parentDir string, subDir string) (string, error) {
