@@ -33,8 +33,9 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
-		Locker:    mockLocker,
-		VCSClient: mockClient,
+		Locker:         mockLocker,
+		VCSClient:      mockClient,
+		ExecutableName: "atlantis",
 	}
 	expProject := models.Project{}
 	expWorkspace := "default"
@@ -69,8 +70,9 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
-		Locker:    mockLocker,
-		VCSClient: mockClient,
+		Locker:         mockLocker,
+		VCSClient:      mockClient,
+		ExecutableName: "atlantis",
 	}
 	expProject := models.Project{}
 	expWorkspace := "default"
@@ -108,8 +110,9 @@ func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
 	mockLocker := mocks.NewMockLocker()
 	locker := events.DefaultProjectLocker{
-		Locker:    mockLocker,
-		VCSClient: mockClient,
+		Locker:         mockLocker,
+		VCSClient:      mockClient,
+		ExecutableName: "atlantis",
 	}
 	expProject := models.Project{}
 	expWorkspace := "default"
@@ -199,9 +202,10 @@ func TestDefaultProjectLocker_RepoLocking(t *testing.T) {
 			mockLocker := mocks.NewMockLocker()
 			mockNoOpLocker := mocks.NewMockLocker()
 			locker := events.DefaultProjectLocker{
-				Locker:     mockLocker,
-				NoOpLocker: mockNoOpLocker,
-				VCSClient:  mockClient,
+				Locker:         mockLocker,
+				NoOpLocker:     mockNoOpLocker,
+				VCSClient:      mockClient,
+				ExecutableName: "atlantis",
 			}
 			tt.setup(mockLocker, mockNoOpLocker)
 			res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, tt.repoLocking)

@@ -38,9 +38,10 @@ type ProjectLocker interface {
 
 // DefaultProjectLocker implements ProjectLocker.
 type DefaultProjectLocker struct {
-	Locker     locking.Locker
-	NoOpLocker locking.Locker
-	VCSClient  vcs.Client
+	Locker         locking.Locker
+	NoOpLocker     locking.Locker
+	VCSClient      vcs.Client
+	ExecutableName string
 }
 
 // TryLockResponse is the result of trying to lock a project.
@@ -75,9 +76,10 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 			return nil, err
 		}
 		failureMsg := fmt.Sprintf(
-			"This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+			"This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `%s plan` here to re-plan.",
 			link,
-			link)
+			link,
+			p.ExecutableName)
 		return &TryLockResponse{
 			LockAcquired:      false,
 			LockFailureReason: failureMsg,
