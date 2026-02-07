@@ -6,7 +6,8 @@ To test drive Atlantis on an example repo, download the latest release from
 Once you've extracted the archive, run:
 
 ```bash
-./atlantis testdrive
+#you need to signup an ngrok account, and take the NGROK_AUTHTOKEN from the ngrok's dashborad, then run with this commnd to add NGROK_AUTHTOKEN before atlantis!
+NGROK_AUTHTOKEN=XXXXXXXXXXXXXXXXXXXXXXXXXXXXX ./atlantis testdrive
 ```
 
 This mode sets up Atlantis on a test repo so you can try it out. It will
