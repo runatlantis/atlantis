@@ -145,6 +145,21 @@ workflows:
           extra_args: ["--all-namespaces"]
 ```
 
+Please note: It is not possible to use workflow variables like `$PROJECT_NAME` in `extra_args` arguments directly, due to the way variable expansion is implemented. Instead, you have to create a local variable first and use that:
+
+```yaml
+workflows:
+  myworkflow:
+    plan:
+      steps:
+        - env: # Allow PROJECT_NAME to be used in extra_args:
+            name: LOCAL_PROJECT_NAME
+            command: echo ${PROJECT_NAME}
+        - init:
+            extra_args:
+              - "-backend-config=\"address=${MY_GITLAB_PROJECT_URL}/terraform/state/${LOCAL_PROJECT_NAME}\""
+```
+
 ### Custom init/plan/apply Commands
 
 If you want to customize `terraform init`, `plan` or `apply` in ways that
