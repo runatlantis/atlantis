@@ -64,7 +64,8 @@ List of allowed commands to be run on the Atlantis server, Defaults to `version,
 Notes:
 
 - Accepts a comma separated list, ex. `command1,command2`.
-- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state` and `all` are available.
+- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state`, `policy_check` and `all` are available.
+- `policy_check` is an internal command that runs automatically after `plan` when [policy checking](policy-checking.md) is enabled. It must be explicitly allowlisted when using [`--gh-team-allowlist`](#gh-team-allowlist).
 - `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
 
 ### `--allow-draft-prs` <Badge text="v0.13.0" type="info"/>
@@ -748,6 +749,16 @@ In versions v0.20.1 and below, the Github team name required the case sensitive 
 Comma-separated list of GitHub teams and permission pairs.
 
 By default, any team can plan and apply.
+
+::: tip
+If you are using [policy checking](policy-checking.md), you must also allowlist the `policy_check` command for it to work on manual `atlantis plan` commands:
+
+```bash
+atlantis server --gh-team-allowlist="*:plan,*:policy_check,myteam:apply"
+```
+
+See [Policy Checking documentation](policy-checking.md#step-1-enable-the-workflow) for more details.
+:::
 
 ### `--gh-token` <Badge text="v0.1.3+" type="info"/>
 
