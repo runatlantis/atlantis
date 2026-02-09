@@ -73,7 +73,7 @@ func TestPRController_PRList_Success(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	// Verify template was called
-	mockTemplate.VerifyWasCalledOnce().Execute(Any[io.Writer](), Any[interface{}]())
+	mockTemplate.VerifyWasCalledOnce().Execute(Any[io.Writer](), Any[any]())
 }
 
 func TestPRController_PRList_DBError(t *testing.T) {
@@ -110,7 +110,7 @@ func TestPRController_PRList_TemplateError(t *testing.T) {
 	mockTemplate := tMocks.NewMockTemplateWriter()
 
 	When(mockDB.GetActivePullRequests()).ThenReturn([]models.PullRequest{}, nil)
-	When(mockTemplate.Execute(Any[io.Writer](), Any[interface{}]())).ThenReturn(errors.New("template error"))
+	When(mockTemplate.Execute(Any[io.Writer](), Any[any]())).ThenReturn(errors.New("template error"))
 
 	controller := controllers.NewPRController(
 		mockDB,
@@ -161,7 +161,7 @@ func TestPRController_PRListPartial_Success(t *testing.T) {
 	controller.PRListPartial(w, req)
 
 	Equals(t, http.StatusOK, w.Code)
-	mockRowsTemplate.VerifyWasCalledOnce().Execute(Any[io.Writer](), Any[interface{}]())
+	mockRowsTemplate.VerifyWasCalledOnce().Execute(Any[io.Writer](), Any[any]())
 }
 
 func TestPRController_PRListPartial_DBError(t *testing.T) {
@@ -211,7 +211,7 @@ func TestPRController_PRList_ShowsErrorStateForPRsWithOutputErrors(t *testing.T)
 	}, nil)
 
 	var capturedData web_templates.PRListData
-	When(mockTemplate.Execute(Any[io.Writer](), Any[interface{}]())).Then(func(params []Param) ReturnValues {
+	When(mockTemplate.Execute(Any[io.Writer](), Any[any]())).Then(func(params []Param) ReturnValues {
 		if data, ok := params[1].(web_templates.PRListData); ok {
 			capturedData = data
 		}
@@ -283,7 +283,7 @@ func TestPRController_PRList_SortsByLastActivity(t *testing.T) {
 	}, nil)
 
 	var capturedData web_templates.PRListData
-	When(mockTemplate.Execute(Any[io.Writer](), Any[interface{}]())).Then(func(params []Param) ReturnValues {
+	When(mockTemplate.Execute(Any[io.Writer](), Any[any]())).Then(func(params []Param) ReturnValues {
 		if data, ok := params[1].(web_templates.PRListData); ok {
 			capturedData = data
 		}
@@ -395,7 +395,7 @@ func TestPRController_PRList_AggregatesResourceStats(t *testing.T) {
 	}, nil)
 
 	var capturedData web_templates.PRListData
-	When(mockTemplate.Execute(Any[io.Writer](), Any[interface{}]())).Then(func(params []Param) ReturnValues {
+	When(mockTemplate.Execute(Any[io.Writer](), Any[any]())).Then(func(params []Param) ReturnValues {
 		if data, ok := params[1].(web_templates.PRListData); ok {
 			capturedData = data
 		}
@@ -446,7 +446,7 @@ func TestPRController_PRList_MixedStatuses(t *testing.T) {
 	}, nil)
 
 	var capturedData web_templates.PRListData
-	When(mockTemplate.Execute(Any[io.Writer](), Any[interface{}]())).Then(func(params []Param) ReturnValues {
+	When(mockTemplate.Execute(Any[io.Writer](), Any[any]())).Then(func(params []Param) ReturnValues {
 		if data, ok := params[1].(web_templates.PRListData); ok {
 			capturedData = data
 		}

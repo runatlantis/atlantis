@@ -76,7 +76,7 @@ func (m *mockProjectOutputDB) DeleteProjectOutputsByPull(repoFullName string, pu
 	return nil
 }
 func (m *mockProjectOutputDB) GetActivePullRequests() ([]models.PullRequest, error) { return nil, nil }
-func (m *mockProjectOutputDB) Close() error                                          { return nil }
+func (m *mockProjectOutputDB) Close() error                                         { return nil }
 func (m *mockProjectOutputDB) GetProjectOutputByJobID(jobID string) (*models.ProjectOutput, error) {
 	return nil, nil
 }

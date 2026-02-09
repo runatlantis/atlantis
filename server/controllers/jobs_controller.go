@@ -33,16 +33,16 @@ func (g JobIDKeyGenerator) Generate(r *http.Request) (string, error) {
 }
 
 type JobsController struct {
-	AtlantisVersion          string                            `validate:"required"`
-	AtlantisURL              *url.URL                          `validate:"required"`
-	Logger                   logging.SimpleLogging             `validate:"required"`
-	ProjectJobsTemplate      web_templates.TemplateWriter      `validate:"required"`
-	ProjectJobsErrorTemplate web_templates.TemplateWriter      `validate:"required"`
-	Database                 db.Database                       `validate:"required"`
-	WsMux                    *websocket.Multiplexor            `validate:"required"`
+	AtlantisVersion          string                       `validate:"required"`
+	AtlantisURL              *url.URL                     `validate:"required"`
+	Logger                   logging.SimpleLogging        `validate:"required"`
+	ProjectJobsTemplate      web_templates.TemplateWriter `validate:"required"`
+	ProjectJobsErrorTemplate web_templates.TemplateWriter `validate:"required"`
+	Database                 db.Database                  `validate:"required"`
+	WsMux                    *websocket.Multiplexor       `validate:"required"`
 	KeyGenerator             JobIDKeyGenerator
-	StatsScope               tally.Scope                       `validate:"required"`
-	OutputHandler            jobs.ProjectCommandOutputHandler  // For SSE streaming
+	StatsScope               tally.Scope                      `validate:"required"`
+	OutputHandler            jobs.ProjectCommandOutputHandler // For SSE streaming
 }
 
 // computeJobBadge returns badge text, style, and icon based on job step and status

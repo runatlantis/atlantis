@@ -19,16 +19,16 @@ import (
 
 // LocksController handles all requests relating to Atlantis locks.
 type LocksController struct {
-	AtlantisVersion   string                `validate:"required"`
-	AtlantisURL       *url.URL              `validate:"required"`
-	Locker            locking.Locker        `validate:"required"`
-	Logger            logging.SimpleLogging `validate:"required"`
-	ApplyLocker       locking.ApplyLocker   `validate:"required"`
-	VCSClient         vcs.Client            `validate:"required"`
-	WorkingDir        events.WorkingDir     `validate:"required"`
-	WorkingDirLocker  events.WorkingDirLocker      `validate:"required"`
-	Database          db.Database                  `validate:"required"`
-	DeleteLockCommand events.DeleteLockCommand     `validate:"required"`
+	AtlantisVersion   string                   `validate:"required"`
+	AtlantisURL       *url.URL                 `validate:"required"`
+	Locker            locking.Locker           `validate:"required"`
+	Logger            logging.SimpleLogging    `validate:"required"`
+	ApplyLocker       locking.ApplyLocker      `validate:"required"`
+	VCSClient         vcs.Client               `validate:"required"`
+	WorkingDir        events.WorkingDir        `validate:"required"`
+	WorkingDirLocker  events.WorkingDirLocker  `validate:"required"`
+	Database          db.Database              `validate:"required"`
+	DeleteLockCommand events.DeleteLockCommand `validate:"required"`
 }
 
 // LockApply handles creating a global apply lock.

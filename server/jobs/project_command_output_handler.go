@@ -205,6 +205,7 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 		jobMapping := value.(*sync.Map)
 		jobMapping.Store(msg.JobID, JobIDInfo{
 			JobID:          msg.JobID,
+			JobIDUrl:       "/jobs/" + msg.JobID,
 			JobDescription: msg.JobInfo.JobDescription,
 			Time:           time.Now(),
 			JobStep:        msg.JobInfo.JobStep,
@@ -278,7 +279,7 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line strin
 			// This allows SSE to auto-reconnect
 			close(ch)
 			delete(p.receiverBuffers[jobID], ch)
-			p.logger.Warn("Buffer full, closing connection", map[string]interface{}{
+			p.logger.Warn("Buffer full, closing connection", map[string]any{
 				"jobID": jobID,
 			})
 		}

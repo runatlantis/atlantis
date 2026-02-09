@@ -126,6 +126,32 @@ Policy check failed! 1/2 checks failed.`
 		"\033[31m\033[1mError:\033[0m \033[1mCannot upgrade mysql from 5.7 to 8.0 directly.\033[0m\n" +
 		"\n" +
 		"\033[31m\033[1mError:\033[0m \033[1mApply failed.\033[0m"
+
+	// Realistic error output with timestamps and ANSI codes like terragrunt output
+	longErrorOutput = "running 'sh -c 'TERRAGRUNT_STRICT_CONTROL=skip-dependencies-inputs terragrunt plan -out=$PLANFILE' in '/home/atlantis/data/repos/acme/infrastructure/102/terraform_environments_production_us-east-1_web': exit status 1: running \"TERRAGRUNT_STRICT_CONTROL=skip-dependencies-inputs terragrunt plan -out=$PLANFILE\" in \"/home/atlantis/data/repos/acme/infrastructure/102/terraform_environments_production_us-east-1_web\":\n" +
+		"07:59:39.429 WARN   The `TERRAGRUNT_STRICT_CONTROL` environment variable is deprecated and will be removed in a future version of Terragrunt. Use `TG_STRICT_CONTROL=skip-dependencies-inputs,skip-dependencies-inputs` instead.\n" +
+		"07:59:39.429 WARN   The following strict control(s) are already completed: skip-dependencies-inputs. Please remove any completed strict controls, as setting them no longer does anything. For a list of all ongoing strict controls, and the outcomes of previous strict controls, see https://terragrunt.gruntwork.io/docs/reference/strict-mode or get the actual list by running the `terragrunt info strict` command.\n" +
+		"07:59:39.430 WARN   The `TERRAGRUNT_TFPATH` environment variable is deprecated and will be removed in a future version of Terragrunt. Use `TG_TF_PATH=terraform1.13.3` instead.\n" +
+		"07:59:39.547 INFO   terraform1.13.3: Initializing the backend...\n" +
+		"07:59:39.594 INFO   terraform1.13.3: Successfully configured the backend \"gcs\"! Terraform will automatically\n" +
+		"07:59:39.594 INFO   terraform1.13.3: use this backend unless the backend configuration changes.\n" +
+		"07:59:39.669 INFO   terraform1.13.3: Initializing provider plugins...\n" +
+		"07:59:39.669 INFO   terraform1.13.3: - Finding latest version of hashicorp/aws...\n" +
+		"07:59:39.751 INFO   terraform1.13.3: - Using hashicorp/aws v5.31.0 from the shared cache directory\n" +
+		"07:59:39.772 INFO   terraform1.13.3: Terraform has created a lock file .terraform.lock.hcl to record the provider\n" +
+		"07:59:39.772 INFO   terraform1.13.3: selections it made above. Include this file in your version control repository\n" +
+		"07:59:39.772 INFO   terraform1.13.3: so that Terraform can guarantee to make the same selections by default when\n" +
+		"07:59:39.772 INFO   terraform1.13.3: you run \"terraform init\" in the future.\n" +
+		"07:59:39.772 INFO   terraform1.13.3: Terraform has been successfully initialized!\n" +
+		"07:59:40.418 STDOUT terraform1.13.3: aws_instance.web: Refreshing state... [id=i-0abc123def456]\n" +
+		"07:59:40.419 STDOUT terraform1.13.3: aws_security_group.web: Refreshing state... [id=sg-0123456789]\n" +
+		"07:59:40.628 STDOUT terraform1.13.3: Changes to Outputs:\n" +
+		"07:59:40.628 STDOUT terraform1.13.3:   ~ instance_id = \"i-0abc123def456\" -> null\n" +
+		"07:59:40.628 STDOUT terraform1.13.3:   ~ public_ip   = \"10.0.1.100\" -> null\n" +
+		"07:59:40.628 STDOUT terraform1.13.3: You can apply this plan to save these new output values to the Terraform\n" +
+		"07:59:40.628 STDOUT terraform1.13.3: state, without changing any real infrastructure.\n" +
+		"\033[31m07:59:40.628 STDERR terraform1.13.3: Error: error configuring S3 Backend: no valid credential sources for S3 Backend found.\033[0m\n" +
+		"\033[31m07:59:40.628 STDERR terraform1.13.3: Error: Failed to get existing workspaces: S3 bucket \"acme-terraform-state\" does not exist or is not accessible\033[0m"
 )
 
 // GenerateLockKey creates the key for the locks bucket (matches boltdb.go)
@@ -326,7 +352,7 @@ func main() {
 			RunTimestamp:  now.Add(-30 * time.Minute).UnixMilli(),
 			Output:        failedOutput,
 			Status:        models.FailedOutputStatus,
-			Error:         "exit status 1: initialization failed",
+			Error:         longErrorOutput,
 			ResourceStats: models.ResourceStats{},
 			PolicyPassed:  false,
 			TriggeredBy:   "ssmith",

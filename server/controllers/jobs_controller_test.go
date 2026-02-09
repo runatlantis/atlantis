@@ -112,8 +112,8 @@ func TestJobsController_GetProjectJobsSSE(t *testing.T) {
 
 		for scanner.Scan() {
 			line := scanner.Text()
-			if strings.HasPrefix(line, "data: ") {
-				dataLines = append(dataLines, strings.TrimPrefix(line, "data: "))
+			if data, found := strings.CutPrefix(line, "data: "); found {
+				dataLines = append(dataLines, data)
 			}
 			if line == "event: complete" {
 				hasComplete = true

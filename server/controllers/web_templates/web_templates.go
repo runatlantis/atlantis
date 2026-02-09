@@ -149,8 +149,8 @@ func StaticDirExists() bool {
 
 // Template name constants
 const (
-	TemplateName_Layout           = "layout"
-	TemplateName_ProjectJobsError = "project-jobs-error"
+	TemplateName_Layout               = "layout"
+	TemplateName_ProjectJobsError     = "project-jobs-error"
 	TemplateName_GithubApp            = "github-app"
 	TemplateName_PRList               = "pr-list"
 	TemplateName_PRListRows           = "pr-list-rows"
@@ -167,21 +167,21 @@ const (
 
 // layoutTemplates tracks which templates use the layout wrapper
 var layoutTemplates = map[string]bool{
-	TemplateName_PRList:         true,
-	TemplateName_PRDetail:       true,
-	TemplateName_ProjectOutput:  true,
-	TemplateName_Settings:       true,
-	TemplateName_LocksPage:      true,
-	TemplateName_JobsPage:       true,
-	TemplateName_JobDetail:      true,
+	TemplateName_PRList:        true,
+	TemplateName_PRDetail:      true,
+	TemplateName_ProjectOutput: true,
+	TemplateName_Settings:      true,
+	TemplateName_LocksPage:     true,
+	TemplateName_JobsPage:      true,
+	TemplateName_JobDetail:     true,
 }
 
 // cachedTemplates holds pre-parsed templates for production mode
 var cachedTemplates = map[string]TemplateWriter{}
 
 var templateFileNames = map[string]string{
-	"layout":             "layout.html.tmpl",
-	"project-jobs-error": "project-jobs-error.html.tmpl",
+	"layout":                 "layout.html.tmpl",
+	"project-jobs-error":     "project-jobs-error.html.tmpl",
 	"github-app":             "github-app.html.tmpl",
 	"pr-list":                "pr-list.html.tmpl",
 	"pr-list-rows":           "pr-list-rows.html.tmpl",
@@ -223,6 +223,8 @@ func GetTemplate(name string) TemplateWriter {
 }
 
 // init caches all templates at startup for production mode
+//
+//nolint:gochecknoinits // intentional: cache templates at startup for performance
 func init() {
 	for name, fileName := range templateFileNames {
 		if layoutTemplates[name] {
@@ -317,7 +319,7 @@ var GithubAppSetupTemplate = templates.Lookup(templateFileNames["github-app"])
 // PRListData holds data for the PR list page template
 type PRListData struct {
 	LayoutData
-	PullRequests   []PRListItem
+	PullRequests []PRListItem
 	TotalCount   int
 	Repositories []string // For repo filter dropdown
 	ActiveRepo   string   // Selected repo filter
@@ -328,9 +330,9 @@ type PRListData struct {
 type PRListItem struct {
 	RepoFullName   string
 	PullNum        int
-	Title          string    // Future: from VCS
-	Status         string    // "passed", "failed", "pending", "mixed", "error"
-	StatusIcon     string    // Emoji/icon for status
+	Title          string // Future: from VCS
+	Status         string // "passed", "failed", "pending", "mixed", "error"
+	StatusIcon     string // Emoji/icon for status
 	ProjectCount   int
 	SuccessCount   int
 	FailedCount    int

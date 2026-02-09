@@ -72,8 +72,7 @@
       <thead>
         <tr>
           <th style="width: 32px;"></th>
-          <th>Project Path</th>
-          <th style="width: 100px;">Workspace</th>
+          <th>Project / Workspace</th>
           <th style="width: 120px;">Locked By</th>
           <th style="width: 120px;">Lock Time</th>
           <th style="width: 90px;">Actions</th>
@@ -90,7 +89,7 @@
             <td class="repo-group-chevron-cell-hybrid">
               <i :data-lucide="isExpanded(group.key) ? 'chevron-down' : 'chevron-right'" class="icon-sm repo-group-chevron"></i>
             </td>
-            <td colspan="4" class="repo-group-info-hybrid">
+            <td colspan="3" class="repo-group-info-hybrid">
               <span class="repo-group-name" x-text="group.displayName"></span>
               <span class="repo-group-count-minimal" x-text="'(' + group.locks.length + ')'"></span>
             </td>
@@ -113,10 +112,8 @@
               <tr class="data-table-row repo-group-row">
                 <td></td>
                 <td>
-                  <span class="mono" x-text="lock.path"></span>
-                </td>
-                <td>
-                  <span class="badge" x-text="lock.workspace"></span>
+                  <div class="mono" x-text="lock.path"></div>
+                  <div style="margin-top: 4px;"><span class="badge" x-text="lock.workspace"></span></div>
                 </td>
                 <td x-text="lock.lockedBy"></td>
                 <td class="text-muted" x-text="lock.time"></td>
@@ -140,7 +137,7 @@
       <template x-if="groupedItems.length === 0 && allItems.length > 0">
         <tbody>
           <tr>
-            <td colspan="6" class="text-center text-muted" style="padding: 40px;">
+            <td colspan="5" class="text-center text-muted" style="padding: 40px;">
               No locks match the current filters
             </td>
           </tr>

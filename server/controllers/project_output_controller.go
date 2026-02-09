@@ -339,7 +339,7 @@ func (c *ProjectOutputController) buildProjectOutputData(output *models.ProjectO
 		// Policy
 		PolicyPassed:     output.PolicyPassed,
 		PolicyOutput:     output.PolicyOutput,
-		PolicyOutputHTML: template.HTML(html.EscapeString(output.PolicyOutput)),
+		PolicyOutputHTML: template.HTML(html.EscapeString(output.PolicyOutput)), //nolint:gosec // G203: input is escaped
 
 		// Error
 		Error: output.Error,
@@ -434,5 +434,5 @@ func HighlightTerraformOutput(output string) template.HTML {
 		}
 	}
 
-	return template.HTML(strings.Join(highlighted, "\n"))
+	return template.HTML(strings.Join(highlighted, "\n")) //nolint:gosec // G203: content is escaped via html.EscapeString above
 }
