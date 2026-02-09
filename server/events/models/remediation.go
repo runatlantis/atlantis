@@ -95,8 +95,8 @@ func (r *RemediationRequest) Validate() []FieldError {
 	}
 	if r.Type == "" {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
-	} else if r.Type != "Github" && r.Type != "Gitlab" && r.Type != "Bitbucket" && r.Type != "AzureDevops" && r.Type != "Gitea" {
-		errors = append(errors, FieldError{Field: "type", Message: "type must be one of: Github, Gitlab, Bitbucket, AzureDevops, Gitea"})
+	} else if r.Type != "Github" && r.Type != "Gitlab" && r.Type != "BitbucketCloud" && r.Type != "BitbucketServer" && r.Type != "AzureDevops" && r.Type != "Gitea" {
+		errors = append(errors, FieldError{Field: "type", Message: "type must be one of: Github, Gitlab, BitbucketCloud, BitbucketServer, AzureDevops, Gitea"})
 	}
 	if !r.Action.IsValid() {
 		errors = append(errors, FieldError{Field: "action", Message: "action must be 'plan' or 'apply'"})
@@ -147,7 +147,7 @@ type RemediationResult struct {
 	// StartedAt is when the remediation started.
 	StartedAt time.Time `json:"started_at"`
 	// CompletedAt is when the remediation completed (zero if still running).
-	CompletedAt time.Time `json:"completed_at,omitzero"`
+	CompletedAt time.Time `json:"completed_at,omitempty"`
 	// TotalProjects is the total number of projects targeted.
 	TotalProjects int `json:"total_projects"`
 	// SuccessCount is the number of projects successfully remediated.
@@ -177,6 +177,10 @@ func NewRemediationResult(id, repository, ref string, action RemediationAction) 
 func (r *RemediationResult) Complete() {
 	r.CompletedAt = time.Now()
 	r.TotalProjects = len(r.Projects)
+
+	// Reset counts before recomputing to avoid double-counting if Complete() is called multiple times
+	r.SuccessCount = 0
+	r.FailureCount = 0
 
 	for _, p := range r.Projects {
 		switch p.Status {

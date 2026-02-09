@@ -338,7 +338,7 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 	Equals(t, 0, result.TotalCount)
 }
 
-func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
+func setup(t *testing.T) (*controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
 	locker := NewMockLocker(gmockCtrl)
@@ -386,7 +386,7 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 
 	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).ThenReturn(nil)
 
-	ac := controllers.APIController{
+	ac := &controllers.APIController{
 		APISecret:                      []byte(atlantisToken),
 		Locker:                         locker,
 		Logger:                         logger,
@@ -763,7 +763,7 @@ func TestAPIController_Remediate_APIDisabled(t *testing.T) {
 	w := httptest.NewRecorder()
 	ac.Remediate(w, req)
 
-	Equals(t, http.StatusBadRequest, w.Code)
+	Equals(t, http.StatusServiceUnavailable, w.Code)
 
 	response, _ := io.ReadAll(w.Result().Body)
 	apiErr := parseAPIError(t, response)

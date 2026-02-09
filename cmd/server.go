@@ -162,6 +162,7 @@ const (
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
+	EnableDriftDetectionFlag          = "enable-drift-detection"
 	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
@@ -644,6 +645,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	WebsocketCheckOrigin: {
 		description:  "Enable websocket origin check",
+		defaultValue: false,
+	},
+	EnableDriftDetectionFlag: {
+		description:  "Enable drift detection and remediation API endpoints.",
 		defaultValue: false,
 	},
 	HideUnchangedPlanComments: {
