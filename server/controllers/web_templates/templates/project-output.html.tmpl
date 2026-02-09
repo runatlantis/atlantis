@@ -43,7 +43,7 @@
         <span class="history-viewing-past" id="viewing-past-indicator" {{ if not .IsHistorical }}style="display: none;"{{ end }}>Viewing past run</span>
       </button>
 
-      <div class="history-list" x-show="expanded" x-collapse>
+      <div class="history-list" x-show="expanded" x-collapse x-cloak>
         {{ $basePath := .CleanedBasePath }}
         {{ $owner := .RepoOwner }}
         {{ $repo := .RepoName }}
@@ -149,30 +149,8 @@
     </div>
   </div>
 
-  <!-- Error Section (if any) -->
-  <div id="output-error">
-  {{ if .Error }}
-  <div class="output-section output-section--error" x-data="{ expanded: true }">
-    <button
-      class="output-section-header output-section-header--clickable"
-      @click="expanded = !expanded"
-      :aria-expanded="expanded"
-    >
-      <span class="output-section-title">
-        <i data-lucide="chevron-right" class="icon-sm collapse-chevron" :class="{ 'collapse-chevron--open': expanded }"></i>
-        <i data-lucide="alert-triangle" class="icon-sm text-danger"></i>
-        <span>Error</span>
-      </span>
-    </button>
-    <div class="output-section-content" x-show="expanded" x-collapse>
-      <pre class="alert-pre">{{ .Error }}</pre>
-    </div>
-  </div>
-  {{ end }}
-  </div>
-
   <!-- Terraform Output Section -->
-  <div class="output-section output-section--expand output-section--terminal" :class="{ 'output-section--collapsed': !outputExpanded }">
+  <div class="output-section output-section--expand output-section--terminal{{ if .Error }} output-section--error{{ end }}" :class="{ 'output-section--collapsed': !outputExpanded }">
     <button
       class="output-section-header output-section-header--clickable"
       @click="outputExpanded = !outputExpanded"
@@ -180,7 +158,7 @@
     >
       <span class="output-section-title">
         <i data-lucide="chevron-right" class="icon-sm collapse-chevron" :class="{ 'collapse-chevron--open': outputExpanded }"></i>
-        <i data-lucide="file-text" class="icon-sm"></i>
+        {{ if .Error }}<i data-lucide="alert-triangle" class="icon-sm text-danger"></i>{{ else }}<i data-lucide="file-text" class="icon-sm"></i>{{ end }}
         <span>Terraform {{ .CommandName | title }} Output</span>
       </span>
       <span
@@ -193,8 +171,8 @@
       </span>
     </button>
     <div class="output-section-content" id="output-content" x-show="outputExpanded" x-collapse>
-      {{ if or .Output .ActiveJob }}
-      <div id="output-terminal" class="output-terminal" data-output="{{ .Output }}" data-is-live="{{ if .ActiveJob }}true{{ else }}false{{ end }}" data-stream-url="{{ if .ActiveJob }}{{ .ActiveJob.StreamURL }}{{ end }}"></div>
+      {{ if or .Output .Error .ActiveJob }}
+      <div id="output-terminal" class="output-terminal" data-output="{{ .Output }}" data-error="{{ .Error }}" data-is-live="{{ if .ActiveJob }}true{{ else }}false{{ end }}" data-stream-url="{{ if .ActiveJob }}{{ .ActiveJob.StreamURL }}{{ end }}"></div>
       {{ else if eq .Status "pending" }}
       <div class="output-pending-state">
         <i data-lucide="loader-2" class="output-pending-spinner"></i>
@@ -263,20 +241,33 @@ document.addEventListener('DOMContentLoaded', function() {
   term.open(container);
   fitAddon.fit();
 
+  // Write output and/or error to terminal
+  function writeContent(output, error) {
+    if (error) {
+      term.write(error.replace(/\n/g, '\r\n'));
+      if (output) {
+        term.write('\r\n\r\n');
+      }
+    }
+    if (output) {
+      term.write(output.replace(/\n/g, '\r\n'));
+    }
+  }
+
   const isLive = container.dataset.isLive === 'true';
   const staticOutput = container.dataset.output;
+  const staticError = container.dataset.error;
 
   if (isLive) {
     // SSE streaming
     const source = new EventSource(container.dataset.streamUrl);
     source.onmessage = (e) => term.write(e.data + '\r\n');
     source.addEventListener('complete', () => source.close());
-  } else if (staticOutput) {
-    // Static output
-    term.write(staticOutput.replace(/\n/g, '\r\n'));
+  } else {
+    writeContent(staticOutput, staticError);
   }
 
-  // Handle resize - use ResizeObserver for reliable container resize detection
+  // Handle resize
   if (window.ResizeObserver) {
     const resizeObserver = new ResizeObserver(() => {
       if (container.offsetWidth > 0 && container.offsetHeight > 0) {
@@ -285,33 +276,40 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     resizeObserver.observe(container);
   }
-  // Fallback for older browsers
   window.addEventListener('resize', () => fitAddon.fit());
 
-  // Refit terminal when section is expanded (x-collapse visibility change)
+  // Refit terminal when output section is expanded/collapsed
   const outputSection = document.querySelector('.output-section--terminal');
   if (outputSection) {
     const observer = new MutationObserver(() => {
       if (container.offsetHeight > 0) {
         fitAddon.fit();
-        // Delayed fit for layout stabilization
         setTimeout(() => fitAddon.fit(), 50);
       }
     });
     observer.observe(outputSection, { attributes: true, attributeFilter: ['class'] });
   }
 
-  // Initial delayed fit to ensure container has stabilized
+  // Refit terminal when history section expands/collapses (changes available space)
+  const historyList = document.querySelector('.history-list');
+  if (historyList) {
+    const historyObserver = new MutationObserver(() => {
+      // Delay to let x-collapse animation complete
+      setTimeout(() => fitAddon.fit(), 300);
+    });
+    historyObserver.observe(historyList, { attributes: true, attributeFilter: ['style'] });
+  }
+
+  // Initial delayed fit
   setTimeout(() => fitAddon.fit(), 100);
 
   // Handle history item clicks for switching output
   window.addEventListener('htmx:afterSwap', function(e) {
     if (e.detail.target.id === 'output-content') {
-      // Re-init terminal with new content
       const newContainer = document.getElementById('output-terminal');
-      if (newContainer && newContainer.dataset.output) {
+      if (newContainer) {
         term.clear();
-        term.write(newContainer.dataset.output.replace(/\n/g, '\r\n'));
+        writeContent(newContainer.dataset.output, newContainer.dataset.error);
       }
     }
   });

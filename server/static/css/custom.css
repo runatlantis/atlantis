@@ -68,6 +68,8 @@
 .sidebar-emergency-banner i {
   width: 16px;
   height: 16px;
+  min-width: 16px;
+  min-height: 16px;
 }
 
 .sidebar-header {
@@ -141,6 +143,7 @@
 .sidebar-nav-item i {
   width: 18px;
   height: 18px;
+  flex-shrink: 0;
 }
 
 .sidebar-footer {
@@ -1177,7 +1180,6 @@
   border: 1px solid #f5c2c7;
   border-radius: 8px;
   margin-bottom: 16px;
-  overflow: hidden;
 }
 
 .output-section--error .output-section-header {
@@ -1970,7 +1972,6 @@
   border: 1px solid #e9ecef;
   border-top: none;
   border-radius: 0 0 8px 8px;
-  overflow: hidden;
 }
 
 .history-item {
@@ -2043,7 +2044,6 @@
   border-radius: 8px;
   min-height: var(--run-info-card-height);
   margin-bottom: var(--section-gap);
-  overflow: hidden;
 }
 
 .run-info-card .history-section {

@@ -108,7 +108,7 @@
         <tr>
           <th style="width: 32px;"></th>
           <th>PR</th>
-          <th style="width: 100px;">Status</th>
+          <th style="width: 150px;">Status</th>
           <th style="width: 70px;">Projects</th>
           <th style="width: 100px;">Changes</th>
           <th style="width: 120px;">Last Activity</th>
@@ -149,19 +149,21 @@
                   </span>
                 </td>
                 <td>
-                  <span class="status-badge" :class="'status-badge--' + pr.status">
-                    <template x-if="pr.status === 'passed'"><span><i data-lucide="check-circle" class="icon-xs"></i> Passed</span></template>
-                    <template x-if="pr.status === 'failed'"><span><i data-lucide="x-circle" class="icon-xs"></i> Failed</span></template>
-                    <template x-if="pr.status === 'pending'"><span><i data-lucide="clock" class="icon-xs"></i> Pending</span></template>
-                    <template x-if="pr.status === 'mixed'"><span><i data-lucide="minus-circle" class="icon-xs"></i> <span x-text="pr.successCount + '/' + pr.projectCount"></span></span></template>
-                    <template x-if="pr.status === 'error'"><span><i data-lucide="alert-circle" class="icon-xs"></i> Error</span></template>
-                  </span>
-                  <template x-if="pr.activeJobCount > 0">
-                    <a :href="pr.jobsUrl" class="job-indicator" :title="pr.activeJobCount + ' active job' + (pr.activeJobCount !== 1 ? 's' : '')" @click.stop>
-                      <i data-lucide="terminal" class="icon-xs"></i>
-                      <span x-text="pr.activeJobCount"></span>
-                    </a>
-                  </template>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="status-badge" :class="'status-badge--' + pr.status">
+                      <template x-if="pr.status === 'passed'"><span><i data-lucide="check-circle" class="icon-xs"></i> Passed</span></template>
+                      <template x-if="pr.status === 'failed'"><span><i data-lucide="x-circle" class="icon-xs"></i> Failed</span></template>
+                      <template x-if="pr.status === 'pending'"><span><i data-lucide="clock" class="icon-xs"></i> Pending</span></template>
+                      <template x-if="pr.status === 'mixed'"><span><i data-lucide="minus-circle" class="icon-xs"></i> <span x-text="pr.successCount + '/' + pr.projectCount"></span></span></template>
+                      <template x-if="pr.status === 'error'"><span><i data-lucide="alert-circle" class="icon-xs"></i> Error</span></template>
+                    </span>
+                    <template x-if="pr.activeJobCount > 0">
+                      <a :href="pr.jobsUrl" class="job-indicator" :title="pr.activeJobCount + ' active job' + (pr.activeJobCount !== 1 ? 's' : '')" @click.stop>
+                        <i data-lucide="terminal" class="icon-xs"></i>
+                        <span x-text="pr.activeJobCount"></span>
+                      </a>
+                    </template>
+                  </div>
                 </td>
                 <td x-text="pr.projectCount"></td>
                 <td class="resource-changes">

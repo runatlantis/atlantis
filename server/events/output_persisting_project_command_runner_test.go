@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/petergtz/pegomock/v4"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -365,6 +364,6 @@ func TestOutputPersistingProjectCommandRunner_DatabaseError(t *testing.T) {
 
 // AnyProjectContext returns a pegomock matcher for command.ProjectContext
 func AnyProjectContext() command.ProjectContext {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf(command.ProjectContext{})))
+	RegisterMatcher(NewAnyMatcher(reflect.TypeFor[command.ProjectContext]()))
 	return command.ProjectContext{}
 }

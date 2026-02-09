@@ -17,11 +17,11 @@ import (
 )
 
 type mockJobsTemplate struct {
-	data    interface{}
+	data    any
 	execErr error
 }
 
-func (m *mockJobsTemplate) Execute(w io.Writer, data interface{}) error {
+func (m *mockJobsTemplate) Execute(w io.Writer, data any) error {
 	m.data = data
 	if m.execErr != nil {
 		return m.execErr

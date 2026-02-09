@@ -100,6 +100,16 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		}
 	}
 
+	// Clean up pre/post workflow hook jobs which use PullInfo without project-specific fields
+	if p.LogStreamResourceCleaner != nil {
+		hookJobContext := jobs.PullInfo{
+			PullNum:      pull.Num,
+			Repo:         pull.BaseRepo.Name,
+			RepoFullName: pull.BaseRepo.FullName,
+		}
+		p.LogStreamResourceCleaner.CleanUp(hookJobContext)
+	}
+
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
 		return fmt.Errorf("cleaning workspace: %w", err)
 	}

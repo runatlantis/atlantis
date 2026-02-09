@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/petergtz/pegomock/v4"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -257,9 +256,9 @@ func TestOutputPersister_PersistsPullURLAndTitle(t *testing.T) {
 
 	// Capture the output that gets passed to SaveProjectOutput
 	var capturedOutput models.ProjectOutput
-	When(mockDB.SaveProjectOutput(AnyProjectOutput())).Then(func(params []pegomock.Param) pegomock.ReturnValues {
+	When(mockDB.SaveProjectOutput(AnyProjectOutput())).Then(func(params []Param) ReturnValues {
 		capturedOutput = params[0].(models.ProjectOutput)
-		return []pegomock.ReturnValue{nil}
+		return []ReturnValue{nil}
 	})
 
 	err := persister.PersistResult(ctx, result)
@@ -274,6 +273,6 @@ func TestOutputPersister_PersistsPullURLAndTitle(t *testing.T) {
 
 // AnyProjectOutput returns a pegomock matcher for models.ProjectOutput
 func AnyProjectOutput() models.ProjectOutput {
-	pegomock.RegisterMatcher(pegomock.NewAnyMatcher(reflect.TypeOf(models.ProjectOutput{})))
+	RegisterMatcher(NewAnyMatcher(reflect.TypeFor[models.ProjectOutput]()))
 	return models.ProjectOutput{}
 }

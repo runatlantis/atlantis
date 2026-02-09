@@ -71,7 +71,7 @@ func generateSlowOutput(output chan<- string) {
 }
 
 func generateBurstOutput(output chan<- string) {
-	for i := 0; i < 500; i++ {
+	for i := range 500 {
 		output <- fmt.Sprintf("Burst line %d: This is a longer line to increase data volume and test buffer handling properly", i)
 	}
 	output <- "\033[32mBurst complete!\033[0m"
@@ -112,7 +112,7 @@ func generateErrorOutput(output chan<- string) {
 func generateLongOutput(output chan<- string) {
 	output <- "\033[1mStarting long-running operation (5 minutes)...\033[0m"
 
-	for i := 0; i < 300; i++ {
+	for i := range 300 {
 		output <- fmt.Sprintf("[%02d:%02d] Processing batch %d...", i/60, i%60, i+1)
 		time.Sleep(1 * time.Second)
 	}

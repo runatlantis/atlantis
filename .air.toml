@@ -1,0 +1,37 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  # Build command - compiles the binary
+  cmd = "go build -o ./tmp/atlantis ."
+  # Binary path
+  bin = "./tmp/atlantis"
+  # Full command with arguments
+  full_bin = "./tmp/atlantis server --atlantis-url=http://localhost:4141 --gh-user=test --gh-token=test --gh-webhook-secret=test --repo-allowlist=* --data-dir=data --dev"
+  delay = 1000
+  exclude_dir = ["assets", "tmp", "vendor", "node_modules", "data"]
+  exclude_file = []
+  exclude_regex = ["_test.go"]
+  exclude_unchanged = false
+  follow_symlink = false
+  include_dir = []
+  include_ext = ["go", "tpl", "tmpl", "html", "css", "js"]
+  # Give process time to shutdown gracefully
+  kill_delay = "2s"
+  log = "build-errors.log"
+  # Send SIGINT first, then SIGKILL after kill_delay
+  send_interrupt = true
+  stop_on_error = true
+
+[color]
+  app = ""
+  build = "yellow"
+  main = "magenta"
+  runner = "green"
+  watcher = "cyan"
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true

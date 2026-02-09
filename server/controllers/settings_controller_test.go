@@ -16,7 +16,7 @@ func TestSettingsController_Get(t *testing.T) {
 		tmpl := web_templates.SettingsTemplate
 		controller := controllers.NewSettingsController(
 			tmpl,
-			false, // globalApplyLockEnabled
+			false,                        // globalApplyLockEnabled
 			func() bool { return false }, // isLocked
 			"v0.1.0",
 			"",
@@ -37,8 +37,8 @@ func TestSettingsController_Get(t *testing.T) {
 		tmpl := web_templates.SettingsTemplate
 		controller := controllers.NewSettingsController(
 			tmpl,
-			true,                         // globalApplyLockEnabled
-			func() bool { return true },  // isLocked
+			true,                        // globalApplyLockEnabled
+			func() bool { return true }, // isLocked
 			"v0.1.0",
 			"",
 		)

@@ -40,12 +40,12 @@ func TestPRDetailController_PRDetail_Success(t *testing.T) {
 				CompletedAt:   time.Now().Add(-5 * time.Minute),
 			},
 			{
-				Path:          "terraform/prod",
-				Workspace:     "default",
-				Status:        models.FailedOutputStatus,
-				PolicyPassed:  false,
-				Error:         "plan failed",
-				CompletedAt:   time.Now().Add(-10 * time.Minute),
+				Path:         "terraform/prod",
+				Workspace:    "default",
+				Status:       models.FailedOutputStatus,
+				PolicyPassed: false,
+				Error:        "plan failed",
+				CompletedAt:  time.Now().Add(-10 * time.Minute),
 			},
 		},
 	}
