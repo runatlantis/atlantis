@@ -136,8 +136,8 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 	}
 	if r.Type == "" {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
-	} else if r.Type != "Github" && r.Type != "Gitlab" && r.Type != "Bitbucket" && r.Type != "AzureDevops" && r.Type != "Gitea" {
-		errors = append(errors, FieldError{Field: "type", Message: "type must be one of: Github, Gitlab, Bitbucket, AzureDevops, Gitea"})
+	} else if r.Type != "Github" && r.Type != "Gitlab" && r.Type != "BitbucketCloud" && r.Type != "BitbucketServer" && r.Type != "AzureDevops" && r.Type != "Gitea" {
+		errors = append(errors, FieldError{Field: "type", Message: "type must be one of: Github, Gitlab, BitbucketCloud, BitbucketServer, AzureDevops, Gitea"})
 	}
 
 	return errors

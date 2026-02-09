@@ -613,7 +613,7 @@ type apiControllerTestConfig struct {
 	allowUnlockByPull bool
 }
 
-func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
+func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (*controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
 	RegisterMockTestingT(t)
 	config := &apiControllerTestConfig{
 		allowUnlockByPull: true,
@@ -670,7 +670,7 @@ func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (controllers
 
 	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).ThenReturn(nil)
 
-	ac := controllers.APIController{
+	ac := &controllers.APIController{
 		APISecret:                      []byte(atlantisToken),
 		Locker:                         locker,
 		Logger:                         logger,
@@ -1047,7 +1047,7 @@ func TestAPIController_Remediate_APIDisabled(t *testing.T) {
 	w := httptest.NewRecorder()
 	ac.Remediate(w, req)
 
-	Equals(t, http.StatusBadRequest, w.Code)
+	Equals(t, http.StatusServiceUnavailable, w.Code)
 
 	response, _ := io.ReadAll(w.Result().Body)
 	apiErr := parseAPIError(t, response)

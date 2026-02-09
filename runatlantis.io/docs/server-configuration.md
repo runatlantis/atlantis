@@ -604,6 +604,18 @@ Enable Atlantis to format Terraform plan output into a markdown-diff friendly fo
 
 Useful to enable for use with GitHub. Changed lines inside Terraform heredoc and multiline-string diffs are also formatted so diff-aware markdown renderers can color them.
 
+### `--enable-drift-detection`
+
+```bash
+atlantis server --enable-drift-detection
+# or
+ATLANTIS_ENABLE_DRIFT_DETECTION=true
+```
+
+Enable drift detection and remediation API endpoints. When enabled, Atlantis will initialize
+in-memory storage for drift detection results and a remediation service, making the
+`/api/drift/*` endpoints functional. Defaults to `false`.
+
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
 ```bash

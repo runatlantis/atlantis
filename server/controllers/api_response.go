@@ -4,6 +4,7 @@
 package controllers
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -174,8 +175,10 @@ func (a *APIResponder) NotFound(w http.ResponseWriter, r *http.Request, message 
 }
 
 // InternalError sends an internal server error response.
+// The full error is logged server-side but only a generic message is returned to the client.
 func (a *APIResponder) InternalError(w http.ResponseWriter, r *http.Request, err error) {
-	a.Error(w, r, http.StatusInternalServerError, NewAPIError(ErrCodeInternal, err.Error()))
+	a.Logger.Err("internal error [%s %s]: %v", r.Method, r.URL.Path, err)
+	a.Error(w, r, http.StatusInternalServerError, NewAPIError(ErrCodeInternal, "internal server error"))
 }
 
 // ServiceUnavailable sends a service unavailable error response.
@@ -212,13 +215,13 @@ func NewAPIMiddleware(apiSecret []byte, logger logging.SimpleLogging) *APIMiddle
 // Returns true if authentication passed, false if it failed (response already sent).
 func (m *APIMiddleware) RequireAuth(w http.ResponseWriter, r *http.Request) bool {
 	if len(m.APISecret) == 0 {
-		m.Responder.Error(w, r, http.StatusBadRequest,
+		m.Responder.Error(w, r, http.StatusServiceUnavailable,
 			NewAPIError(ErrCodeServiceUnavailable, "API is disabled"))
 		return false
 	}
 
 	secret := r.Header.Get(atlantisTokenHeader)
-	if secret != string(m.APISecret) {
+	if subtle.ConstantTimeCompare([]byte(secret), m.APISecret) != 1 {
 		m.Responder.Unauthorized(w, r, "invalid or missing API token")
 		return false
 	}
