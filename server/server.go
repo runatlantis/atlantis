@@ -42,6 +42,7 @@ import (
 	prometheus "github.com/uber-go/tally/v4/prometheus"
 	"github.com/urfave/negroni/v3"
 
+	"github.com/runatlantis/atlantis/server/core/drift"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	cfg "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -979,6 +980,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:               workingDirLocker,
 		CommitStatusUpdater:            commitStatusUpdater,
 		SilenceVCSStatusNoProjects:     userConfig.SilenceVCSStatusNoProjects,
+	}
+
+	if userConfig.EnableDriftDetection {
+		logger.Info("Drift detection is enabled")
+		driftStorage := drift.NewInMemoryStorage()
+		apiController.DriftStorage = driftStorage
+		apiController.RemediationService = drift.NewInMemoryRemediationService(driftStorage)
 	}
 
 	eventsController := &events_controllers.VCSEventsController{

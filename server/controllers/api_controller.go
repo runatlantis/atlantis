@@ -4,11 +4,13 @@
 package controllers
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -47,15 +49,16 @@ type APIController struct {
 	SilenceVCSStatusNoProjects bool
 
 	// apiMiddleware provides common authentication and response utilities.
-	// Initialized lazily via getAPIMiddleware().
-	apiMiddleware *APIMiddleware
+	// Initialized lazily via getAPIMiddleware() with sync.Once for thread safety.
+	apiMiddleware     *APIMiddleware
+	apiMiddlewareOnce sync.Once
 }
 
-// getAPIMiddleware returns the APIMiddleware, initializing it lazily.
+// getAPIMiddleware returns the APIMiddleware, initializing it lazily with sync.Once.
 func (a *APIController) getAPIMiddleware() *APIMiddleware {
-	if a.apiMiddleware == nil {
+	a.apiMiddlewareOnce.Do(func() {
 		a.apiMiddleware = NewAPIMiddleware(a.APISecret, a.Logger)
-	}
+	})
 	return a.apiMiddleware
 }
 
@@ -150,13 +153,13 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 	// Convert to API response format
 	apiResult := NewCommandResultAPI(result, command.Plan.String())
 
-	// Determine HTTP status based on result
-	httpCode := http.StatusOK
 	if result.HasErrors() {
-		httpCode = http.StatusInternalServerError
+		responder.Error(w, r, http.StatusInternalServerError,
+			NewAPIError(ErrCodeInternal, "plan had errors").WithDetails(apiResult))
+		return
 	}
 
-	responder.Success(w, r, httpCode, apiResult)
+	responder.Success(w, r, http.StatusOK, apiResult)
 }
 
 func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
@@ -193,13 +196,13 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	// Convert to API response format
 	apiResult := NewCommandResultAPI(result, command.Apply.String())
 
-	// Determine HTTP status based on result
-	httpCode := http.StatusOK
 	if result.HasErrors() {
-		httpCode = http.StatusInternalServerError
+		responder.Error(w, r, http.StatusInternalServerError,
+			NewAPIError(ErrCodeInternal, "apply had errors").WithDetails(apiResult))
+		return
 	}
 
-	responder.Success(w, r, httpCode, apiResult)
+	responder.Success(w, r, http.StatusOK, apiResult)
 }
 
 // LockDetail is deprecated - use LockDetailAPI instead.
@@ -403,9 +406,9 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled")
 	}
 
-	// Validate the secret token
+	// Validate the secret token using constant-time comparison to prevent timing attacks
 	secret := r.Header.Get(atlantisTokenHeader)
-	if secret != string(a.APISecret) {
+	if subtle.ConstantTimeCompare([]byte(secret), a.APISecret) != 1 {
 		return nil, nil, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader)
 	}
 
@@ -608,6 +611,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 	if err != nil {
 		return "", nil, err
 	}
+	defer e.controller.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
 
 	// Extract output and drift summary
 	var output strings.Builder
@@ -676,6 +680,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	if err != nil {
 		return "", fmt.Errorf("plan failed: %w", err)
 	}
+	defer e.controller.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
 
 	// Execute apply
 	result, err := e.controller.apiApply(request, ctx)
