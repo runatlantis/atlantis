@@ -111,3 +111,8 @@ func (t *TestOutputHandler) GetPullToJobMapping() []PullInfoWithJobIDs {
 func (t *TestOutputHandler) GetProjectOutputBuffer(_ string) OutputBuffer {
 	return OutputBuffer{}
 }
+
+// GetJobInfo returns nil for testing (implements interface).
+func (t *TestOutputHandler) GetJobInfo(_ string) *JobIDInfo {
+	return nil
+}

@@ -102,6 +102,9 @@ type ProjectCommandOutputHandler interface {
 
 	// GetProjectOutputBuffer returns the output buffer for a job (for persistence)
 	GetProjectOutputBuffer(jobID string) OutputBuffer
+
+	// GetJobInfo returns the job info for a job ID (for persistence timing)
+	GetJobInfo(jobID string) *JobIDInfo
 }
 
 func NewAsyncProjectCommandOutputHandler(
@@ -406,6 +409,21 @@ func (p *AsyncProjectCommandOutputHandler) setJobCompletionTime(jobID string) {
 	})
 }
 
+// GetJobInfo returns the job info for a job ID
+func (p *AsyncProjectCommandOutputHandler) GetJobInfo(jobID string) *JobIDInfo {
+	var result *JobIDInfo
+	p.pullToJobMapping.Range(func(key, value any) bool {
+		jobIDSyncMap := value.(*sync.Map)
+		if jobInfoValue, ok := jobIDSyncMap.Load(jobID); ok {
+			jobInfo := jobInfoValue.(JobIDInfo)
+			result = &jobInfo
+			return false // Found, stop iterating
+		}
+		return true // Continue looking
+	})
+	return result
+}
+
 // RegisterTestJob initializes a test job with PR association for dev mode testing.
 // This makes the job appear in the jobs list page.
 func (p *AsyncProjectCommandOutputHandler) RegisterTestJob(jobID string, pullInfo PullInfo, jobStep string) {
@@ -463,4 +481,8 @@ func (p *NoopProjectOutputHandler) GetPullToJobMapping() []PullInfoWithJobIDs {
 
 func (p *NoopProjectOutputHandler) GetProjectOutputBuffer(_ string) OutputBuffer {
 	return OutputBuffer{}
+}
+
+func (p *NoopProjectOutputHandler) GetJobInfo(_ string) *JobIDInfo {
+	return nil
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/jobs"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -262,4 +263,122 @@ func TestProjectOutputController_HighlightTerraformOutput(t *testing.T) {
 			Assert(t, strings.Contains(string(result), tt.contains), "should contain %s", tt.contains)
 		})
 	}
+}
+
+// mockOutputHandler implements jobs.ProjectCommandOutputHandler for testing
+type mockOutputHandler struct {
+	pullMappings []jobs.PullInfoWithJobIDs
+}
+
+func (m *mockOutputHandler) Send(_ command.ProjectContext, _ string, _ bool)                        {}
+func (m *mockOutputHandler) SendWorkflowHook(_ models.WorkflowHookCommandContext, _ string, _ bool) {}
+func (m *mockOutputHandler) Register(_ string, _ chan string)                                       {}
+func (m *mockOutputHandler) Deregister(_ string, _ chan string)                                     {}
+func (m *mockOutputHandler) IsKeyExists(_ string) bool                                              { return false }
+func (m *mockOutputHandler) Handle()                                                                {}
+func (m *mockOutputHandler) CleanUp(_ jobs.PullInfo)                                                {}
+func (m *mockOutputHandler) GetPullToJobMapping() []jobs.PullInfoWithJobIDs {
+	return m.pullMappings
+}
+func (m *mockOutputHandler) GetProjectOutputBuffer(_ string) jobs.OutputBuffer                      { return jobs.OutputBuffer{} }
+func (m *mockOutputHandler) GetJobInfo(_ string) *jobs.JobIDInfo                                    { return nil }
+
+func TestProjectOutputController_CompletedJobNotShownAsRunning(t *testing.T) {
+	// This test verifies that completed jobs are NOT shown as "Running" in the UI.
+	// Bug: findActiveJob was returning completed jobs as active because it didn't
+	// check CompletedAt.IsZero() to verify the job was still running.
+
+	now := time.Now()
+	completedTime := now.Add(-1 * time.Minute)
+
+	mockDB := &mockProjectOutputDB{
+		history: []models.ProjectOutput{
+			{
+				RepoFullName:  "owner/repo",
+				PullNum:       123,
+				Path:          "terraform/staging",
+				Workspace:     "default",
+				CommandName:   "plan",
+				RunTimestamp:  now.UnixMilli(),
+				Output:        "Plan: 1 to add, 0 to change, 0 to destroy.",
+				Status:        models.SuccessOutputStatus,
+				ResourceStats: models.ResourceStats{Add: 1},
+				PolicyPassed:  true,
+				TriggeredBy:   "testuser",
+				StartedAt:     now.Add(-2 * time.Minute),
+				CompletedAt:   now,
+			},
+			{
+				// Second history entry to make Run History section render (needs > 1)
+				RepoFullName:  "owner/repo",
+				PullNum:       123,
+				Path:          "terraform/staging",
+				Workspace:     "default",
+				CommandName:   "plan",
+				RunTimestamp:  now.Add(-10 * time.Minute).UnixMilli(),
+				Output:        "Plan: 0 to add, 0 to change, 0 to destroy.",
+				Status:        models.SuccessOutputStatus,
+				ResourceStats: models.ResourceStats{},
+				PolicyPassed:  true,
+				TriggeredBy:   "testuser",
+				StartedAt:     now.Add(-12 * time.Minute),
+				CompletedAt:   now.Add(-10 * time.Minute),
+			},
+		},
+	}
+
+	// Mock output handler returns a COMPLETED job (CompletedAt is set, not zero)
+	mockHandler := &mockOutputHandler{
+		pullMappings: []jobs.PullInfoWithJobIDs{
+			{
+				Pull: jobs.PullInfo{
+					RepoFullName: "owner/repo",
+					PullNum:      123,
+					Path:         "terraform/staging",
+					Workspace:    "default",
+				},
+				JobIDInfos: []jobs.JobIDInfo{
+					{
+						JobID:       "completed-job-123",
+						Time:        now.Add(-2 * time.Minute),
+						JobStep:     "plan",
+						CompletedAt: completedTime, // Job is COMPLETED - should NOT show as Running
+						TriggeredBy: "testuser",
+					},
+				},
+			},
+		},
+	}
+
+	controller := controllers.NewProjectOutputController(
+		mockDB,
+		web_templates.ProjectOutputTemplate,
+		web_templates.ProjectOutputPartialTemplate,
+		"1.0.0",
+		"",
+		func() bool { return false },
+		mockHandler,
+	)
+
+	req := httptest.NewRequest("GET", "/pr/owner/repo/pulls/123/project/terraform/staging?workspace=default", nil)
+	req = mux.SetURLVars(req, map[string]string{
+		"owner":    "owner",
+		"repo":     "repo",
+		"pull_num": "123",
+		"path":     "terraform/staging",
+	})
+	w := httptest.NewRecorder()
+
+	controller.ProjectOutput(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+
+	// Verify the page rendered correctly
+	Assert(t, strings.Contains(body, "terraform/staging"), "should contain project path")
+	Assert(t, strings.Contains(body, "Run History"), "should contain Run History section")
+
+	// A completed job should NOT show as "Running" in the history
+	// The history-item--live class is applied when there's an ActiveJob
+	Assert(t, !strings.Contains(body, "history-item--live"), "completed job should NOT show as live/running")
 }

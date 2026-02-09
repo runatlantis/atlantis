@@ -62,7 +62,7 @@
 
 <!-- Output content - main swap target -->
 {{ if .Output }}
-<pre class="terraform-output" id="terraform-output">{{ .OutputHTML }}</pre>
+<div id="output-terminal" class="output-terminal" data-output="{{ .Output }}" data-error="{{ .Error }}"></div>
 {{ else if eq .Status "pending" }}
 <div class="output-pending-state">
   <i data-lucide="loader-2" class="output-pending-spinner"></i>
@@ -76,10 +76,4 @@
   <p>Output may not have been captured for this command.</p>
 </div>
 {{ end }}
-
-<script>
-  // Re-initialize Lucide icons after HTMX swap
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
-</script>
+<script>if (window.lucide) window.lucide.createIcons();</script>

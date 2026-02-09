@@ -58,6 +58,21 @@ func (mock *MockProjectCommandOutputHandler) GetProjectOutputBuffer(jobID string
 	return _ret0
 }
 
+func (mock *MockProjectCommandOutputHandler) GetJobInfo(jobID string) *jobs.JobIDInfo {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
+	}
+	_params := []pegomock.Param{jobID}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetJobInfo", _params, []reflect.Type{reflect.TypeOf((**jobs.JobIDInfo)(nil)).Elem()})
+	var _ret0 *jobs.JobIDInfo
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(*jobs.JobIDInfo)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockProjectCommandOutputHandler) GetPullToJobMapping() []jobs.PullInfoWithJobIDs {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
