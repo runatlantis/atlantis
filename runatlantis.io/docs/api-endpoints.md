@@ -688,6 +688,192 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
 | 503         | SERVICE_UNAVAILABLE | Drift detection storage is not enabled on the server |
 | 500         | INTERNAL_ERROR      | Internal error during drift detection                |
 
+### GET /api/drift/remediate
+
+#### Description
+
+List remediation results for a repository. Returns a paginated list of past remediation operations. This is an authenticated endpoint that requires the API secret.
+
+::: tip Prerequisites
+Drift remediation must be enabled on the Atlantis server. If not enabled, this endpoint returns a `503 Service Unavailable` error.
+:::
+
+#### Query Parameters
+
+| Name       | Type   | Required | Description                                                  |
+|------------|--------|----------|--------------------------------------------------------------|
+| repository | string | Yes      | Full repository name (e.g., `owner/repo`)                    |
+| limit      | int    | No       | Maximum number of results to return (default: 10, max: 100)  |
+
+#### Sample Request
+
+```shell
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=owner/repo' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>'
+```
+
+#### Sample Request (with limit)
+
+```shell
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=owner/repo&limit=10' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>'
+```
+
+#### Sample Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "repository": "owner/repo",
+    "count": 2,
+    "results": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "repository": "owner/repo",
+        "ref": "main",
+        "action": "plan",
+        "status": "success",
+        "started_at": "2025-01-21T10:30:00Z",
+        "completed_at": "2025-01-21T10:31:00Z",
+        "projects": [],
+        "summary": {
+          "total_projects": 2,
+          "success_count": 2,
+          "failure_count": 0
+        }
+      },
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "repository": "owner/repo",
+        "ref": "main",
+        "action": "apply",
+        "status": "partial",
+        "started_at": "2025-01-21T09:00:00Z",
+        "completed_at": "2025-01-21T09:05:00Z",
+        "projects": [],
+        "summary": {
+          "total_projects": 3,
+          "success_count": 2,
+          "failure_count": 1
+        }
+      }
+    ]
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:30:00Z"
+}
+```
+
+#### Sample Response (no results)
+
+```json
+{
+  "success": true,
+  "data": {
+    "repository": "owner/repo",
+    "count": 0,
+    "results": []
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440001",
+  "timestamp": "2025-01-21T10:30:00Z"
+}
+```
+
+#### Error Responses
+
+| Status Code | Error Code          | Description                                    |
+|-------------|---------------------|------------------------------------------------|
+| 400         | VALIDATION_ERROR    | Missing required `repository` parameter        |
+| 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header   |
+| 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server |
+| 500         | INTERNAL_ERROR      | Internal error retrieving remediation data     |
+
+### GET /api/drift/remediate/{id}
+
+#### Description
+
+Get a specific remediation result by ID. Returns detailed information about a past remediation operation including per-project results. This is an authenticated endpoint that requires the API secret.
+
+::: tip Prerequisites
+Drift remediation must be enabled on the Atlantis server. If not enabled, this endpoint returns a `503 Service Unavailable` error.
+:::
+
+#### Path Parameters
+
+| Name | Type   | Required | Description                                |
+|------|--------|----------|--------------------------------------------|
+| id   | string | Yes      | The unique identifier of the remediation   |
+
+#### Sample Request
+
+```shell
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e29b-41d4-a716-446655440000' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>'
+```
+
+#### Sample Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "repository": "owner/repo",
+    "ref": "main",
+    "action": "plan",
+    "status": "success",
+    "started_at": "2025-01-21T10:30:00Z",
+    "completed_at": "2025-01-21T10:31:00Z",
+    "projects": [
+      {
+        "project_name": "vpc",
+        "directory": "modules/vpc",
+        "workspace": "production",
+        "status": "success",
+        "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated...",
+        "drift_before": {
+          "to_add": 0,
+          "to_change": 1,
+          "to_destroy": 0,
+          "to_import": 0,
+          "total_changes": 1,
+          "summary": "Plan: 0 to add, 1 to change, 0 to destroy.",
+          "changes_outside": false
+        }
+      },
+      {
+        "project_name": "ec2",
+        "directory": "modules/ec2",
+        "workspace": "production",
+        "status": "success",
+        "plan_output": "No changes. Infrastructure is up-to-date."
+      }
+    ],
+    "summary": {
+      "total_projects": 2,
+      "success_count": 2,
+      "failure_count": 0
+    }
+  },
+  "error": null,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-01-21T10:31:00Z"
+}
+```
+
+#### Error Responses
+
+| Status Code | Error Code          | Description                                           |
+|-------------|---------------------|-------------------------------------------------------|
+| 400         | VALIDATION_ERROR    | Missing required `id` parameter                       |
+| 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header          |
+| 404         | NOT_FOUND           | Remediation result not found                          |
+| 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server        |
+| 500         | INTERNAL_ERROR      | Internal error retrieving remediation data            |
+
 ## Other Endpoints
 
 The endpoints listed in this section are non-destructive and therefore don't require authentication nor special secret token.
@@ -853,187 +1039,6 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=own
 | 400         | VALIDATION_ERROR    | Missing required `repository` parameter      |
 | 503         | SERVICE_UNAVAILABLE | Drift detection is not enabled on the server |
 | 500         | INTERNAL_ERROR      | Internal error retrieving drift data         |
-
-### GET /api/drift/remediate
-
-#### Description
-
-List remediation results for a repository. Returns a paginated list of past remediation operations. This endpoint does not require authentication.
-
-::: tip Prerequisites
-Drift remediation must be enabled on the Atlantis server. If not enabled, this endpoint returns a `503 Service Unavailable` error.
-:::
-
-#### Query Parameters
-
-| Name       | Type   | Required | Description                                                  |
-|------------|--------|----------|--------------------------------------------------------------|
-| repository | string | Yes      | Full repository name (e.g., `owner/repo`)                    |
-| limit      | int    | No       | Maximum number of results to return (default: 50)            |
-
-#### Sample Request
-
-```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=owner/repo'
-```
-
-#### Sample Request (with limit)
-
-```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=owner/repo&limit=10'
-```
-
-#### Sample Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "repository": "owner/repo",
-    "count": 2,
-    "results": [
-      {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "repository": "owner/repo",
-        "ref": "main",
-        "action": "plan",
-        "status": "success",
-        "started_at": "2025-01-21T10:30:00Z",
-        "completed_at": "2025-01-21T10:31:00Z",
-        "projects": [],
-        "summary": {
-          "total_projects": 2,
-          "success_count": 2,
-          "failure_count": 0
-        }
-      },
-      {
-        "id": "550e8400-e29b-41d4-a716-446655440001",
-        "repository": "owner/repo",
-        "ref": "main",
-        "action": "apply",
-        "status": "partial",
-        "started_at": "2025-01-21T09:00:00Z",
-        "completed_at": "2025-01-21T09:05:00Z",
-        "projects": [],
-        "summary": {
-          "total_projects": 3,
-          "success_count": 2,
-          "failure_count": 1
-        }
-      }
-    ]
-  },
-  "error": null,
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "timestamp": "2025-01-21T10:30:00Z"
-}
-```
-
-#### Sample Response (no results)
-
-```json
-{
-  "success": true,
-  "data": {
-    "repository": "owner/repo",
-    "count": 0,
-    "results": []
-  },
-  "error": null,
-  "request_id": "550e8400-e29b-41d4-a716-446655440001",
-  "timestamp": "2025-01-21T10:30:00Z"
-}
-```
-
-#### Error Responses
-
-| Status Code | Error Code          | Description                                    |
-|-------------|---------------------|------------------------------------------------|
-| 400         | VALIDATION_ERROR    | Missing required `repository` parameter        |
-| 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server |
-| 500         | INTERNAL_ERROR      | Internal error retrieving remediation data     |
-
-### GET /api/drift/remediate/{id}
-
-#### Description
-
-Get a specific remediation result by ID. Returns detailed information about a past remediation operation including per-project results. This endpoint does not require authentication.
-
-::: tip Prerequisites
-Drift remediation must be enabled on the Atlantis server. If not enabled, this endpoint returns a `503 Service Unavailable` error.
-:::
-
-#### Path Parameters
-
-| Name | Type   | Required | Description                                |
-|------|--------|----------|--------------------------------------------|
-| id   | string | Yes      | The unique identifier of the remediation   |
-
-#### Sample Request
-
-```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e29b-41d4-a716-446655440000'
-```
-
-#### Sample Response
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "repository": "owner/repo",
-    "ref": "main",
-    "action": "plan",
-    "status": "success",
-    "started_at": "2025-01-21T10:30:00Z",
-    "completed_at": "2025-01-21T10:31:00Z",
-    "projects": [
-      {
-        "project_name": "vpc",
-        "directory": "modules/vpc",
-        "workspace": "production",
-        "status": "success",
-        "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated...",
-        "drift_before": {
-          "to_add": 0,
-          "to_change": 1,
-          "to_destroy": 0,
-          "to_import": 0,
-          "total_changes": 1,
-          "summary": "Plan: 0 to add, 1 to change, 0 to destroy.",
-          "changes_outside": false
-        }
-      },
-      {
-        "project_name": "ec2",
-        "directory": "modules/ec2",
-        "workspace": "production",
-        "status": "success",
-        "plan_output": "No changes. Infrastructure is up-to-date."
-      }
-    ],
-    "summary": {
-      "total_projects": 2,
-      "success_count": 2,
-      "failure_count": 0
-    }
-  },
-  "error": null,
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "timestamp": "2025-01-21T10:31:00Z"
-}
-```
-
-#### Error Responses
-
-| Status Code | Error Code          | Description                                           |
-|-------------|---------------------|-------------------------------------------------------|
-| 400         | VALIDATION_ERROR    | Missing required `id` parameter                       |
-| 404         | NOT_FOUND           | Remediation result not found                          |
-| 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server        |
-| 500         | INTERNAL_ERROR      | Internal error retrieving remediation data            |
 
 ### GET /status
 
