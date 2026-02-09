@@ -230,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const container = document.getElementById('output-terminal');
   if (!container) return;
 
-  const term = new Terminal({
+  let term = new Terminal({
     scrollback: 15000,
     disableStdin: true,
     convertEol: true,
@@ -303,13 +303,28 @@ document.addEventListener('DOMContentLoaded', function() {
   // Initial delayed fit
   setTimeout(() => fitAddon.fit(), 100);
 
-  // Handle history item clicks for switching output
+  // Handle history item clicks - reinitialize terminal on new container
   window.addEventListener('htmx:afterSwap', function(e) {
     if (e.detail.target.id === 'output-content') {
       const newContainer = document.getElementById('output-terminal');
       if (newContainer) {
-        term.clear();
+        term.dispose();
+        term = new Terminal({
+          scrollback: 15000,
+          disableStdin: true,
+          convertEol: true,
+          theme: { background: '#1e1e1e' }
+        });
+        term.loadAddon(fitAddon);
+        term.open(newContainer);
+        fitAddon.fit();
         writeContent(newContainer.dataset.output, newContainer.dataset.error);
+
+        // Toggle error styling on parent section
+        const section = document.querySelector('.output-section--terminal');
+        if (section) {
+          section.classList.toggle('output-section--error', !!newContainer.dataset.error);
+        }
       }
     }
   });

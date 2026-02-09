@@ -26,6 +26,21 @@ func NewOutputPersister(database db.Database, outputHandler jobs.ProjectCommandO
 
 // PersistResult saves the result of a project command to the database
 func (p *OutputPersister) PersistResult(ctx command.ProjectContext, result command.ProjectResult) error {
+	// Get actual job timing from in-memory tracker
+	now := time.Now().UTC()
+	startedAt := now
+	completedAt := now
+	if p.outputHandler != nil && ctx.JobID != "" {
+		if jobInfo := p.outputHandler.GetJobInfo(ctx.JobID); jobInfo != nil {
+			if !jobInfo.Time.IsZero() {
+				startedAt = jobInfo.Time.UTC()
+			}
+			if !jobInfo.CompletedAt.IsZero() {
+				completedAt = jobInfo.CompletedAt.UTC()
+			}
+		}
+	}
+
 	output := models.ProjectOutput{
 		RepoFullName: ctx.BaseRepo.FullName,
 		PullNum:      ctx.Pull.Num,
@@ -36,8 +51,8 @@ func (p *OutputPersister) PersistResult(ctx command.ProjectContext, result comma
 		JobID:        ctx.JobID,
 		RunTimestamp: time.Now().UTC().UnixMilli(),
 		TriggeredBy:  ctx.User.Username,
-		StartedAt:    time.Now().UTC(),
-		CompletedAt:  time.Now().UTC(),
+		StartedAt:    startedAt,
+		CompletedAt:  completedAt,
 		PullURL:      ctx.Pull.URL,
 		PullTitle:    ctx.Pull.Title,
 	}

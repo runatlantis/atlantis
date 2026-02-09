@@ -71,10 +71,11 @@ func (c *ProjectOutputController) findActiveJob(repoFullName string, pullNum int
 			pm.Pull.PullNum == pullNum &&
 			pm.Pull.Path == path &&
 			pm.Pull.Workspace == workspace {
-			// Return first (most recent) job
-			if len(pm.JobIDInfos) > 0 {
-				job := pm.JobIDInfos[0]
-				return &job
+			// Return first active (not completed) job
+			for _, job := range pm.JobIDInfos {
+				if job.CompletedAt.IsZero() {
+					return &job
+				}
 			}
 		}
 	}
