@@ -55,7 +55,6 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
-	"github.com/runatlantis/atlantis/server/controllers/websocket"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
@@ -959,13 +958,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand: deleteLockCommand,
 	}
 
-	wsMux := websocket.NewMultiplexor(
-		logger,
-		controllers.JobIDKeyGenerator{},
-		projectCmdOutputHandler,
-		userConfig.WebsocketCheckOrigin,
-	)
-
 	jobsController := &controllers.JobsController{
 		AtlantisVersion:          config.AtlantisVersion,
 		AtlantisURL:              parsedURL,
@@ -973,7 +965,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ProjectJobsTemplate:      web_templates.GetTemplate(web_templates.TemplateName_JobDetail),
 		ProjectJobsErrorTemplate: web_templates.GetTemplate(web_templates.TemplateName_ProjectJobsError),
 		Database:                 database,
-		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
 		OutputHandler:            projectCmdOutputHandler,
@@ -1220,7 +1211,6 @@ func (s *Server) Start() error {
 	}
 
 	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
-	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
 	s.Router.HandleFunc("/jobs/{job-id}/stream", s.JobsController.GetProjectJobsSSE).Methods("GET")
 
 	r, ok := s.StatsReporter.(prometheus.Reporter)

@@ -159,7 +159,6 @@ var testFlags = map[string]any{
 	WebBasicAuthFlag:                 false,
 	WebPasswordFlag:                  "atlantis",
 	WebUsernameFlag:                  "atlantis",
-	WebsocketCheckOrigin:             false,
 	WriteGitCredsFlag:                true,
 	DisableAutoplanFlag:              true,
 	DisableAutoplanLabelFlag:         "no-auto-plan",
