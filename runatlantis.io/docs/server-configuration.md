@@ -179,7 +179,7 @@ Examples:
 - Autoplan when any `*.tf` file is modified except in `project2/` directory
   - `--autoplan-file-list='**/*.tf,!project2'`
 - Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
-  - `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
+  - `--autoplan-file-list='**/*.tf,project1/**/*.yml'`
 
 ::: warning NOTE
 By default, changes to modules will not trigger autoplanning. See the flags below.
