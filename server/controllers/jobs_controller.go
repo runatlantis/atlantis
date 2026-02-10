@@ -13,7 +13,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
-	"github.com/runatlantis/atlantis/server/controllers/websocket"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -39,7 +38,6 @@ type JobsController struct {
 	ProjectJobsTemplate      web_templates.TemplateWriter `validate:"required"`
 	ProjectJobsErrorTemplate web_templates.TemplateWriter `validate:"required"`
 	Database                 db.Database                  `validate:"required"`
-	WsMux                    *websocket.Multiplexor       `validate:"required"`
 	KeyGenerator             JobIDKeyGenerator
 	StatsScope               tally.Scope                      `validate:"required"`
 	OutputHandler            jobs.ProjectCommandOutputHandler // For SSE streaming
@@ -186,30 +184,6 @@ func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) 
 	err := j.getProjectJobs(w, r)
 	if err != nil {
 		j.Logger.Err(err.Error())
-		errorCounter.Inc(1)
-	}
-}
-
-func (j *JobsController) getProjectJobsWS(w http.ResponseWriter, r *http.Request) error {
-	err := j.WsMux.Handle(w, r)
-
-	if err != nil {
-		j.respond(w, logging.Error, http.StatusInternalServerError, "%s", err.Error())
-		return err
-	}
-
-	return nil
-}
-
-func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request) {
-	jobsMetric := j.StatsScope.SubScope("getprojectjobs")
-	errorCounter := jobsMetric.Counter(metrics.ExecutionErrorMetric)
-	executionTime := jobsMetric.Timer(metrics.ExecutionTimeMetric).Start()
-	defer executionTime.Stop()
-
-	err := j.getProjectJobsWS(w, r)
-
-	if err != nil {
 		errorCounter.Inc(1)
 	}
 }

@@ -56,9 +56,6 @@
     {{ block "content" . }}{{ end }}
   </main>
 
-  <!-- Toast Container -->
-  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
-
   <!-- Confirmation Modal -->
   <div
     id="confirm-modal"
@@ -129,43 +126,6 @@
     // Re-initialize icons after htmx swaps
     document.body.addEventListener('htmx:afterSwap', function() {
       lucide.createIcons();
-    });
-
-    // Toast notification system
-    function showToast(message, type = 'info', duration = 5000) {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = 'toast toast--' + type;
-      toast.setAttribute('role', 'alert');
-
-      const icons = {
-        success: 'check-circle',
-        error: 'x-circle',
-        warning: 'alert-triangle',
-        info: 'info'
-      };
-
-      toast.innerHTML =
-        '<i data-lucide="' + icons[type] + '" class="icon-md toast-icon"></i>' +
-        '<div class="toast-content">' +
-        '<p class="toast-message">' + message + '</p>' +
-        '</div>' +
-        '<button type="button" class="toast-close" onclick="this.parentElement.remove()" aria-label="Dismiss">' +
-        '<i data-lucide="x" class="icon-sm"></i>' +
-        '</button>';
-
-      container.appendChild(toast);
-      lucide.createIcons({ nodes: [toast] });
-
-      setTimeout(function() {
-        toast.classList.add('toast--exit');
-        setTimeout(function() { toast.remove(); }, 300);
-      }, duration);
-    }
-
-    // Global htmx error handler
-    document.body.addEventListener('htmx:responseError', function(event) {
-      showToast('Request failed. Please try again.', 'error');
     });
 
     // Store for pending confirmation callbacks

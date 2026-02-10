@@ -162,7 +162,6 @@ const (
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
-	WebsocketCheckOrigin             = "websocket-check-origin"
 	DevModeFlag                      = "dev"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
@@ -641,10 +640,6 @@ var boolFlags = map[string]boolFlag{
 	},
 	RestrictFileList: {
 		description:  "Block plan requests from projects outside the files modified in the pull request.",
-		defaultValue: false,
-	},
-	WebsocketCheckOrigin: {
-		description:  "Enable websocket origin check",
 		defaultValue: false,
 	},
 	DevModeFlag: {

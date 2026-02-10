@@ -1540,16 +1540,6 @@ Additional headers added to each HTTP POST payload when using [http webhooks](se
 provided as a JSON string. The map key is the header name and the value is the header value
 (string) or values (array of string).
 
-### `--websocket-check-origin` <Badge text="v0.19.0+" type="info"/>
-
-```bash
-atlantis server --websocket-check-origin
-# or
-ATLANTIS_WEBSOCKET_CHECK_ORIGIN=true
-```
-
-Only allow websockets connection when they originate from the running Atlantis web server
-
 ### `--write-git-creds` <Badge text="v0.11.0+" type="info"/>
 
 ```bash
