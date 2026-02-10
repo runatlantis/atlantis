@@ -220,9 +220,12 @@ func (j *JobsController) getProjectJobsSSE(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	// Create channel and register with output handler
+	// Create channel and register with output handler.
+	// Register is called in a goroutine because it backfills the channel with
+	// existing output while holding locks. If the backfill exceeds the channel
+	// buffer capacity, the concurrent reader below prevents it from blocking.
 	receiver := make(chan string, 1000)
-	j.OutputHandler.Register(jobID, receiver)
+	go j.OutputHandler.Register(jobID, receiver)
 	defer j.OutputHandler.Deregister(jobID, receiver)
 
 	// Stream output as SSE events
@@ -231,7 +234,7 @@ streamLoop:
 		select {
 		case line, ok := <-receiver:
 			if !ok {
-				// Channel closed - job complete
+				// Channel closed — could be job completion or buffer overflow
 				break streamLoop
 			}
 			// SSE spec: multi-line data must use separate "data:" fields
@@ -246,9 +249,13 @@ streamLoop:
 		}
 	}
 
-	// Send completion event
-	fmt.Fprintf(w, "event: complete\ndata: done\n\n")
-	flusher.Flush()
+	// Only send completion event if the job actually completed.
+	// Channel closure can also happen on buffer overflow (slow client),
+	// in which case the job is still running.
+	if info := j.OutputHandler.GetJobInfo(jobID); info != nil && !info.CompletedAt.IsZero() {
+		fmt.Fprintf(w, "event: complete\ndata: done\n\n")
+		flusher.Flush()
+	}
 
 	return nil
 }
@@ -324,8 +331,14 @@ func (j *JobsController) CreateTestJob(w http.ResponseWriter, r *http.Request) {
 		Workspace:    "default",
 	}
 
+	handler, ok := j.OutputHandler.(*jobs.AsyncProjectCommandOutputHandler)
+	if !ok {
+		j.respond(w, logging.Warn, http.StatusInternalServerError, "Dev test jobs not supported with this output handler")
+		return
+	}
+
 	// Register the job with PR association
-	j.OutputHandler.(*jobs.AsyncProjectCommandOutputHandler).RegisterTestJob(jobID, pullInfo, jobStep)
+	handler.RegisterTestJob(jobID, pullInfo, jobStep)
 
 	// Create output channel
 	outputChan := make(chan string, 1000)
@@ -340,9 +353,9 @@ func (j *JobsController) CreateTestJob(w http.ResponseWriter, r *http.Request) {
 	// Feed output to handler
 	go func() {
 		for line := range outputChan {
-			j.OutputHandler.(*jobs.AsyncProjectCommandOutputHandler).SendTestLine(jobID, line)
+			handler.SendTestLine(jobID, line)
 		}
-		j.OutputHandler.(*jobs.AsyncProjectCommandOutputHandler).MarkComplete(jobID)
+		handler.MarkComplete(jobID)
 	}()
 
 	// Redirect to job page

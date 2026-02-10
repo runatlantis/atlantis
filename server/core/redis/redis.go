@@ -604,7 +604,7 @@ func (r *RedisDB) GetProjectOutputsByPull(repoFullName string, pullNum int) ([]m
 }
 
 // DeleteProjectOutputsByPull deletes all project outputs for a pull request
-// atomically using a Redis pipeline.
+// atomically using a Redis pipeline, including job-id-index entries.
 func (r *RedisDB) DeleteProjectOutputsByPull(repoFullName string, pullNum int) error {
 	indexKey := r.pullOutputIndexKey(repoFullName, pullNum)
 
@@ -613,9 +613,21 @@ func (r *RedisDB) DeleteProjectOutputsByPull(repoFullName string, pullNum int) e
 		return err
 	}
 
+	// Collect job-id-index keys to clean up
+	var jobIDIndexKeys []string
+	for _, key := range keys {
+		output, err := r.getProjectOutputByKey(key)
+		if err == nil && output != nil && output.JobID != "" {
+			jobIDIndexKeys = append(jobIDIndexKeys, r.jobIDIndexKey(output.JobID))
+		}
+	}
+
 	pipe := r.client.Pipeline()
 	if len(keys) > 0 {
 		pipe.Del(ctx, keys...)
+	}
+	for _, jk := range jobIDIndexKeys {
+		pipe.Del(ctx, jk)
 	}
 	pipe.Del(ctx, indexKey)
 	_, err = pipe.Exec(ctx)

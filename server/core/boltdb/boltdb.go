@@ -714,21 +714,29 @@ func (b *BoltDB) GetProjectOutputsByPull(repoFullName string, pullNum int) ([]mo
 	return outputs, nil
 }
 
-// DeleteProjectOutputsByPull deletes all project outputs for a pull request.
+// DeleteProjectOutputsByPull deletes all project outputs for a pull request,
+// including their job-id-index entries.
 func (b *BoltDB) DeleteProjectOutputsByPull(repoFullName string, pullNum int) error {
 	prefix := fmt.Sprintf("%s::%d::", repoFullName, pullNum)
 
 	return b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.projectOutputsBucketName)
 		if bucket == nil {
-			// No bucket means no outputs to delete
 			return nil
 		}
+		indexBucket := tx.Bucket(b.jobIDIndexBucketName)
 		c := bucket.Cursor()
 
 		var keysToDelete [][]byte
-		for k, _ := c.Seek([]byte(prefix)); k != nil && strings.HasPrefix(string(k), prefix); k, _ = c.Next() {
+		for k, v := c.Seek([]byte(prefix)); k != nil && strings.HasPrefix(string(k), prefix); k, v = c.Next() {
 			keysToDelete = append(keysToDelete, append([]byte{}, k...))
+			// Clean up job-id-index entry
+			if indexBucket != nil && v != nil {
+				var output models.ProjectOutput
+				if err := json.Unmarshal(v, &output); err == nil && output.JobID != "" {
+					_ = indexBucket.Delete([]byte(output.JobID))
+				}
+			}
 		}
 
 		for _, key := range keysToDelete {

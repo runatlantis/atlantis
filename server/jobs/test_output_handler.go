@@ -5,6 +5,7 @@ package jobs
 
 import (
 	"sync"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -20,13 +21,17 @@ type TestOutputHandler struct {
 
 	// receivers tracks registered channels per job ID
 	receivers map[string][]chan string
+
+	// completedJobs tracks completion times for GetJobInfo
+	completedJobs map[string]time.Time
 }
 
 // NewTestOutputHandler creates a new TestOutputHandler for testing.
 func NewTestOutputHandler() *TestOutputHandler {
 	return &TestOutputHandler{
-		jobExists: make(map[string]bool),
-		receivers: make(map[string][]chan string),
+		jobExists:     make(map[string]bool),
+		receivers:     make(map[string][]chan string),
+		completedJobs: make(map[string]time.Time),
 	}
 }
 
@@ -56,6 +61,7 @@ func (t *TestOutputHandler) CompleteJob(jobID string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	t.completedJobs[jobID] = time.Now()
 	for _, ch := range t.receivers[jobID] {
 		close(ch)
 	}
@@ -112,7 +118,16 @@ func (t *TestOutputHandler) GetProjectOutputBuffer(_ string) OutputBuffer {
 	return OutputBuffer{}
 }
 
-// GetJobInfo returns nil for testing (implements interface).
-func (t *TestOutputHandler) GetJobInfo(_ string) *JobIDInfo {
+// GetJobInfo returns job info if the job has been completed.
+func (t *TestOutputHandler) GetJobInfo(jobID string) *JobIDInfo {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	if completedAt, ok := t.completedJobs[jobID]; ok {
+		return &JobIDInfo{
+			JobID:       jobID,
+			CompletedAt: completedAt,
+		}
+	}
 	return nil
 }
