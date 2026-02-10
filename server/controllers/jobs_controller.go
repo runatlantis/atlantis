@@ -144,7 +144,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Compute badge based on job step and status
-	badgeText, badgeStyle, badgeIcon := computeJobBadge(jobStep, status)
+	badgeText, badgeStyle, _ := computeJobBadge(jobStep, status)
 
 	viewData := web_templates.JobDetailData{
 		LayoutData: web_templates.LayoutData{
@@ -169,7 +169,6 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 		TriggeredBy:  triggeredBy,
 		BadgeText:    badgeText,
 		BadgeStyle:   badgeStyle,
-		BadgeIcon:    badgeIcon,
 		AddCount:     addCount,
 		ChangeCount:  changeCount,
 		DestroyCount: destroyCount,
@@ -235,7 +234,11 @@ streamLoop:
 				// Channel closed - job complete
 				break streamLoop
 			}
-			fmt.Fprintf(w, "data: %s\n\n", line)
+			// SSE spec: multi-line data must use separate "data:" fields
+			for _, part := range strings.Split(line, "\n") {
+				fmt.Fprintf(w, "data: %s\n", part)
+			}
+			fmt.Fprint(w, "\n")
 			flusher.Flush()
 		case <-r.Context().Done():
 			// Client disconnected

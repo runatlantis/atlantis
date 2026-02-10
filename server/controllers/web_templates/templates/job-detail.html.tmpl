@@ -23,10 +23,6 @@ function jobTerminal() {
     jobStep: '{{ .JobStep }}',
 
     init() {
-      console.log('[JobTerminal] init() called');
-      console.log('[JobTerminal] Terminal available:', typeof Terminal);
-      console.log('[JobTerminal] FitAddon available:', typeof FitAddon);
-
       try {
         // Initialize terminal (no smooth scroll to avoid animations)
         this.term = new Terminal({
@@ -37,24 +33,18 @@ function jobTerminal() {
             background: '#1e1e1e'
           }
         });
-        console.log('[JobTerminal] Terminal instance created');
 
         this.fitAddon = new FitAddon.FitAddon();
         this.searchAddon = new SearchAddon.SearchAddon();
-        console.log('[JobTerminal] Addons created');
 
         this.term.loadAddon(this.fitAddon);
         this.term.loadAddon(this.searchAddon);
 
         const terminalContainer = document.getElementById('terminal');
-        console.log('[JobTerminal] Terminal container:', terminalContainer);
-        console.log('[JobTerminal] Container dimensions:', terminalContainer?.offsetWidth, terminalContainer?.offsetHeight);
 
         this.term.open(terminalContainer);
-        console.log('[JobTerminal] Terminal opened');
 
         this.fitAddon.fit();
-        console.log('[JobTerminal] Terminal fitted');
 
         // Handle resize
         if (window.ResizeObserver) {
@@ -86,52 +76,34 @@ function jobTerminal() {
         // Get data attributes
         const staticOutput = terminalContainer.dataset.output;
         const streamUrl = terminalContainer.dataset.streamUrl;
-        console.log('[JobTerminal] endTime:', this.endTime);
-        console.log('[JobTerminal] streamUrl:', streamUrl);
-        console.log('[JobTerminal] staticOutput length:', staticOutput?.length || 0);
 
         // If job already completed (endTime set from server), update status
         if (this.endTime > 0) {
           this.status = 'complete';
           this.statusLabel = this.jobStep === 'apply' ? 'Applied' : 'Planned';
-          console.log('[JobTerminal] Job complete, loading static output');
-          // Load static output from database
           if (staticOutput) {
             this.term.write(staticOutput.replace(/\n/g, '\r\n'));
           }
         } else {
-          // Job still running - start timer for live updates and connect to SSE
-          console.log('[JobTerminal] Job running, connecting to SSE');
           this.elapsedInterval = setInterval(() => this.updateElapsedTime(), 1000);
           this.connect(streamUrl);
         }
       } catch (error) {
-        console.error('[JobTerminal] Error in init():', error);
+        // Terminal initialization failed
       }
     },
 
     connect(streamURL) {
-      console.log('[JobTerminal] connect() called with URL:', streamURL);
-      if (!streamURL) {
-        console.error('[JobTerminal] No stream URL provided!');
-        return;
-      }
+      if (!streamURL) return;
 
       try {
         this.source = new EventSource(streamURL);
-        console.log('[JobTerminal] EventSource created');
-
-        this.source.onopen = () => {
-          console.log('[JobTerminal] SSE connection opened');
-        };
 
         this.source.onmessage = (event) => {
-          console.log('[JobTerminal] SSE message received:', event.data?.substring(0, 50));
           this.term.write(event.data + '\r\n');
         };
 
         this.source.addEventListener('complete', () => {
-          console.log('[JobTerminal] SSE complete event received');
           this.status = 'complete';
           this.statusLabel = this.jobStep === 'apply' ? 'Applied' : 'Planned';
           this.endTime = Date.now();
@@ -140,9 +112,7 @@ function jobTerminal() {
           this.source.close();
         });
 
-        this.source.onerror = (event) => {
-          console.error('[JobTerminal] SSE error:', event);
-          console.log('[JobTerminal] SSE readyState:', this.source.readyState);
+        this.source.onerror = () => {
           if (this.source.readyState === EventSource.CLOSED) {
             this.status = 'complete';
             this.statusLabel = this.jobStep === 'apply' ? 'Applied' : 'Planned';
@@ -152,7 +122,7 @@ function jobTerminal() {
           }
         };
       } catch (error) {
-        console.error('[JobTerminal] Error creating EventSource:', error);
+        // SSE connection failed
       }
     },
 

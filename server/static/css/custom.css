@@ -15,6 +15,14 @@
   --section-gap: 20px;
   --content-padding: 16px;
 
+  /* Colors */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --bg-secondary: #e2e8f0;
+  --bg-tertiary: #f1f5f9;
+  --warning: #eab308;
+  --warning-bg: rgba(234, 179, 8, 0.1);
+
   /* Component heights (for viewport calculations) */
   --breadcrumb-height: 16px;
   --pr-header-height: 80px;
@@ -144,21 +152,6 @@
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-}
-
-.sidebar-footer {
-  padding: 16px;
-  border-top: 1px solid #e9ecef;
-}
-
-.sidebar--emergency .sidebar-footer {
-  border-top-color: #fecaca;
-}
-
-.sidebar-version {
-  font-size: 11px;
-  color: #999;
-  font-family: monospace;
 }
 
 /* Main Content Area */
@@ -1155,18 +1148,6 @@
   background: #1e1e1e;
 }
 
-.output-section--terminal .terraform-output {
-  margin: 0;
-  padding: var(--content-padding);
-  background: #1e1e1e;
-  color: #d4d4d4;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
 .output-section-title {
   display: flex;
   align-items: center;
@@ -1388,38 +1369,6 @@
   text-align: center;
   padding: 40px 20px;
   color: #666;
-}
-
-/* Terraform Output Styling */
-.terraform-output {
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  padding: 16px;
-  border-radius: 4px;
-  /* max-height and overflow handled by parent .output-section-content */
-}
-
-/* Terraform plan diff highlighting */
-.tf-add {
-  color: #4ec9b0;
-}
-
-.tf-destroy {
-  color: #f14c4c;
-}
-
-.tf-change {
-  color: #dcdcaa;
-}
-
-.tf-resource {
-  color: #9cdcfe;
 }
 
 /* Policy Output */

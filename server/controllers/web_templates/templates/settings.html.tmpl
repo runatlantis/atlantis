@@ -137,8 +137,7 @@
           // Reload immediately - the new state is self-evident
           window.location.reload();
         } catch (error) {
-          // Keep error feedback - user needs to know something went wrong
-          showToast('Failed to enable apply commands. Please try again.', 'error');
+          alert('Failed to enable apply commands. Please try again.');
           this.isLoading = false;
         }
       }

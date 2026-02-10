@@ -96,7 +96,6 @@ func (c *PRController) buildPRListData() (web_templates.PRListData, error) {
 				RepoFullName:   pull.BaseRepo.FullName,
 				PullNum:        pull.Num,
 				Status:         "error",
-				StatusIcon:     "alert-circle",
 				ErrorMessage:   "Failed to load project data. The database may be temporarily unavailable.",
 				LastActivityTS: now,
 				LastActivity:   FormatRelativeTime(now),
@@ -168,7 +167,7 @@ func (c *PRController) buildPRListItem(pull models.PullRequest, outputs []models
 
 	item.LastActivityTS = latestActivity
 	item.LastActivity = FormatRelativeTime(latestActivity)
-	item.Status, item.StatusIcon = DetermineStatus(item.SuccessCount, item.FailedCount, item.PendingCount)
+	item.Status = DetermineStatus(item.SuccessCount, item.FailedCount, item.PendingCount)
 
 	// Get active job count if the function is provided
 	if c.getJobsForPull != nil {
@@ -178,23 +177,23 @@ func (c *PRController) buildPRListItem(pull models.PullRequest, outputs []models
 	return item
 }
 
-// DetermineStatus returns the overall status and icon for a PR based on project counts
-func DetermineStatus(success, failed, pending int) (status string, icon string) {
+// DetermineStatus returns the overall status for a PR based on project counts
+func DetermineStatus(success, failed, pending int) string {
 	total := success + failed + pending
 
 	if total == 0 {
-		return "pending", "pending"
+		return "pending"
 	}
 
 	if failed > 0 {
-		return "failed", "failed"
+		return "failed"
 	}
 
 	if pending > 0 {
-		return "pending", "pending"
+		return "pending"
 	}
 
-	return "passed", "passed"
+	return "passed"
 }
 
 // FormatRelativeTime formats a timestamp as a human-readable relative time

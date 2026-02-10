@@ -149,9 +149,7 @@ func StaticDirExists() bool {
 
 // Template name constants
 const (
-	TemplateName_Layout               = "layout"
 	TemplateName_ProjectJobsError     = "project-jobs-error"
-	TemplateName_GithubApp            = "github-app"
 	TemplateName_PRList               = "pr-list"
 	TemplateName_PRListRows           = "pr-list-rows"
 	TemplateName_PRDetail             = "pr-detail"
@@ -264,30 +262,6 @@ type LockIndexData struct {
 	TimeFormatted string
 }
 
-// ApplyLockData holds the fields to display in the index view
-type ApplyLockData struct {
-	Locked                 bool
-	GlobalApplyLockEnabled bool
-	Time                   time.Time
-	TimeFormatted          string
-}
-
-// LockDetailData holds the fields needed to display the lock detail view.
-type LockDetailData struct {
-	LockKeyEncoded  string
-	LockKey         string
-	RepoOwner       string
-	RepoName        string
-	PullRequestLink string
-	LockedBy        string
-	Workspace       string
-	AtlantisVersion string
-	// CleanedBasePath is the path Atlantis is accessible at externally. If
-	// not using a path-based proxy, this will be an empty string. Never ends
-	// in a '/' (hence "cleaned").
-	CleanedBasePath string
-}
-
 // ProjectJobData holds the data needed to stream the current PR information
 type ProjectJobData struct {
 	AtlantisVersion string
@@ -332,7 +306,6 @@ type PRListItem struct {
 	PullNum        int
 	Title          string // Future: from VCS
 	Status         string // "passed", "failed", "pending", "mixed", "error"
-	StatusIcon     string // Emoji/icon for status
 	ProjectCount   int
 	SuccessCount   int
 	FailedCount    int
@@ -345,9 +318,6 @@ type PRListItem struct {
 	ErrorMessage   string    // Non-empty if we failed to load PR data
 	ActiveJobCount int       // Number of active jobs for this PR
 }
-
-var PRListTemplate = mustParseLayoutTemplate(templateFileNames["pr-list"])
-var PRListRowsTemplate = templates.Lookup(templateFileNames["pr-list-rows"])
 
 // PRDetailData holds data for the PR detail page template
 type PRDetailData struct {
@@ -381,7 +351,6 @@ type PRDetailProject struct {
 	Status        string // "success", "failed", "pending", "applied"
 	StatusLabel   string // Human-readable: "Planned", "Applied", "Plan Failed", etc.
 	PolicyPassed  bool
-	PolicyIcon    string
 	AddCount      int
 	ChangeCount   int
 	DestroyCount  int
@@ -453,12 +422,9 @@ type ProjectOutputData struct {
 
 	// Output
 	Output     string
-	OutputHTML template.HTML // Pre-formatted with highlighting
-
 	// Policy
 	PolicyPassed     bool
 	PolicyOutput     string
-	PolicyOutputHTML template.HTML
 
 	// Error
 	Error string
@@ -504,8 +470,6 @@ type JobsPageData struct {
 	Repositories []string // Unique repos for filter dropdown
 }
 
-var JobsPageTemplate = mustParseLayoutTemplate(templateFileNames["jobs-page"])
-var JobsPartialTemplate = templates.Lookup(templateFileNames["jobs-partial"])
 
 // JobDetailData holds data for the job detail page template
 type JobDetailData struct {
@@ -525,16 +489,13 @@ type JobDetailData struct {
 
 	// Status
 	Status        string // "running", "complete", "error"
-	StartedAt     string
 	StartTimeUnix int64 // Unix timestamp in milliseconds for JS
 	EndTimeUnix   int64 // Unix timestamp in milliseconds for JS (0 if still running)
-	ElapsedTime   string
 
 	// Status panel fields
 	TriggeredBy string // Username who triggered the job
 	BadgeText   string // "Planning", "Applying", "Planned", "Applied", "Plan Failed", "Apply Failed"
 	BadgeStyle  string // "pending", "success", "failed"
-	BadgeIcon   string // "loader", "check-circle", "x-circle"
 
 	// Completion stats (progressive disclosure)
 	AddCount     int
@@ -549,4 +510,3 @@ type JobDetailData struct {
 	StreamURL string
 }
 
-var JobDetailTemplate = mustParseLayoutTemplate(templateFileNames["job-detail"])

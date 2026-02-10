@@ -234,37 +234,6 @@ func TestProjectOutputController_FormatDuration(t *testing.T) {
 	}
 }
 
-func TestProjectOutputController_HighlightTerraformOutput(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		contains string
-	}{
-		{
-			"add_line",
-			"  + resource \"aws_instance\" \"example\"",
-			"tf-add",
-		},
-		{
-			"destroy_line",
-			"  - resource \"aws_instance\" \"example\"",
-			"tf-destroy",
-		},
-		{
-			"change_line",
-			"  ~ ami = \"old\" -> \"new\"",
-			"tf-change",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := controllers.HighlightTerraformOutput(tt.input)
-			Assert(t, strings.Contains(string(result), tt.contains), "should contain %s", tt.contains)
-		})
-	}
-}
-
 // mockOutputHandler implements jobs.ProjectCommandOutputHandler for testing
 type mockOutputHandler struct {
 	pullMappings []jobs.PullInfoWithJobIDs

@@ -114,8 +114,6 @@ type Server struct {
 	StatusController               *controllers.StatusController
 	JobsController                 *controllers.JobsController
 	APIController                  *controllers.APIController
-	ProjectJobsTemplate            web_templates.TemplateWriter
-	ProjectJobsErrorTemplate       web_templates.TemplateWriter
 	SSLCertFile                    string
 	SSLKeyFile                     string
 	CertLastRefreshTime            time.Time
@@ -1042,8 +1040,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		JobsController:                 jobsController,
 		StatusController:               statusController,
 		APIController:                  apiController,
-		ProjectJobsTemplate:            web_templates.GetTemplate(web_templates.TemplateName_JobDetail),
-		ProjectJobsErrorTemplate:       web_templates.GetTemplate(web_templates.TemplateName_ProjectJobsError),
 		SSLKeyFile:                     userConfig.SSLKeyFile,
 		SSLCertFile:                    userConfig.SSLCertFile,
 		DisableGlobalApplyLock:         userConfig.DisableGlobalApplyLock,
