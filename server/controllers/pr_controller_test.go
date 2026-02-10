@@ -249,7 +249,6 @@ func TestPRController_PRList_ShowsErrorStateForPRsWithOutputErrors(t *testing.T)
 
 	// Verify the error PR has the correct error state
 	Equals(t, "error", errorPR.Status)
-	Equals(t, "alert-circle", errorPR.StatusIcon)
 	Assert(t, errorPR.ErrorMessage != "", "error PR should have error message")
 	Equals(t, 123, errorPR.PullNum)
 
@@ -318,23 +317,21 @@ func TestDetermineStatus(t *testing.T) {
 		success      int
 		failed       int
 		pending      int
-		expectedStat string
-		expectedIcon string
+		expected string
 	}{
-		{"all_success", 3, 0, 0, "passed", "passed"},
-		{"all_failed", 0, 2, 0, "failed", "failed"},
-		{"all_pending", 0, 0, 2, "pending", "pending"},
-		{"mixed_with_failure", 2, 1, 0, "failed", "failed"},
-		{"mixed_with_pending", 2, 0, 1, "pending", "pending"},
-		{"failure_takes_precedence", 1, 1, 1, "failed", "failed"},
-		{"no_projects", 0, 0, 0, "pending", "pending"},
+		{"all_success", 3, 0, 0, "passed"},
+		{"all_failed", 0, 2, 0, "failed"},
+		{"all_pending", 0, 0, 2, "pending"},
+		{"mixed_with_failure", 2, 1, 0, "failed"},
+		{"mixed_with_pending", 2, 0, 1, "pending"},
+		{"failure_takes_precedence", 1, 1, 1, "failed"},
+		{"no_projects", 0, 0, 0, "pending"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status, icon := controllers.DetermineStatus(tt.success, tt.failed, tt.pending)
-			Equals(t, tt.expectedStat, status)
-			Equals(t, tt.expectedIcon, icon)
+			status := controllers.DetermineStatus(tt.success, tt.failed, tt.pending)
+			Equals(t, tt.expected, status)
 		})
 	}
 }

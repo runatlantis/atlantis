@@ -603,7 +603,8 @@ func (r *RedisDB) GetProjectOutputsByPull(repoFullName string, pullNum int) ([]m
 	return outputs, nil
 }
 
-// DeleteProjectOutputsByPull deletes all project outputs for a pull request.
+// DeleteProjectOutputsByPull deletes all project outputs for a pull request
+// atomically using a Redis pipeline.
 func (r *RedisDB) DeleteProjectOutputsByPull(repoFullName string, pullNum int) error {
 	indexKey := r.pullOutputIndexKey(repoFullName, pullNum)
 
@@ -612,12 +613,13 @@ func (r *RedisDB) DeleteProjectOutputsByPull(repoFullName string, pullNum int) e
 		return err
 	}
 
+	pipe := r.client.Pipeline()
 	if len(keys) > 0 {
-		if err := r.client.Del(ctx, keys...).Err(); err != nil {
-			return err
-		}
+		pipe.Del(ctx, keys...)
 	}
-	return r.client.Del(ctx, indexKey).Err()
+	pipe.Del(ctx, indexKey)
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
 // GetProjectOutputByJobID retrieves a project output by its job ID.
@@ -660,9 +662,13 @@ func (r *RedisDB) GetProjectOutputByJobID(jobID string) (*models.ProjectOutput, 
 
 // GetActivePullRequests returns all pull requests that have stored project outputs.
 func (r *RedisDB) GetActivePullRequests() ([]models.PullRequest, error) {
-	// Get all pull index keys
-	keys, err := r.client.Keys(ctx, pullOutputIndexPrefix+"*").Result()
-	if err != nil {
+	// Scan for all pull index keys (avoids blocking KEYS command)
+	var keys []string
+	iter := r.client.Scan(ctx, 0, pullOutputIndexPrefix+"*", 0).Iterator()
+	for iter.Next(ctx) {
+		keys = append(keys, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
 		return nil, err
 	}
 

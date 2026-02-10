@@ -212,12 +212,10 @@
             const failures = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
 
             if (failures.length > 0) {
-              showToast(failures.length + ' lock(s) failed to unlock. Please try again.', 'error');
-            } else {
-              showToast('Successfully unlocked ' + lockCount + ' lock(s).', 'success');
+              alert(failures.length + ' lock(s) failed to unlock. Please try again.');
             }
 
-            setTimeout(() => window.location.reload(), 1000);
+            window.location.reload();
           }
         });
       }

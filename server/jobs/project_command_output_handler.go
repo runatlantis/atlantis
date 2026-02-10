@@ -247,48 +247,36 @@ func (p *AsyncProjectCommandOutputHandler) completeJob(jobID string) {
 }
 
 func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string) {
+	// Hold both locks to prevent race with completeJob/writeLogLine.
+	// Lock ordering: projectOutputBuffersLock -> receiverBuffersLock
+	// (matches completeJob ordering).
 	p.projectOutputBuffersLock.RLock()
+	p.receiverBuffersLock.Lock()
+
 	outputBuffer := p.projectOutputBuffers[jobID]
-	p.projectOutputBuffersLock.RUnlock()
 
 	for _, line := range outputBuffer.Buffer {
 		ch <- line
 	}
 
-	// No need register receiver since all the logs have been streamed
 	if outputBuffer.OperationComplete {
+		// Job already done — close immediately, don't register.
 		close(ch)
-		return
+	} else {
+		// Register so future lines are forwarded to this channel.
+		if p.receiverBuffers[jobID] == nil {
+			p.receiverBuffers[jobID] = map[chan string]bool{}
+		}
+		p.receiverBuffers[jobID][ch] = true
 	}
 
-	// add the channel to our registry after we backfill the contents of the buffer,
-	// to prevent new messages coming in interleaving with this backfill.
-	p.receiverBuffersLock.Lock()
-	if p.receiverBuffers[jobID] == nil {
-		p.receiverBuffers[jobID] = map[chan string]bool{}
-	}
-	p.receiverBuffers[jobID][ch] = true
 	p.receiverBuffersLock.Unlock()
+	p.projectOutputBuffersLock.RUnlock()
 }
 
-// Add log line to buffer and send to all current channels
+// Add log line to buffer and send to all current channels.
+// Lock ordering: projectOutputBuffersLock -> receiverBuffersLock
 func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line string) {
-	p.receiverBuffersLock.Lock()
-	for ch := range p.receiverBuffers[jobID] {
-		select {
-		case ch <- line:
-		default:
-			// Close channel gracefully instead of silent delete
-			// This allows SSE to auto-reconnect
-			close(ch)
-			delete(p.receiverBuffers[jobID], ch)
-			p.logger.Warn("Buffer full, closing connection", map[string]any{
-				"jobID": jobID,
-			})
-		}
-	}
-	p.receiverBuffersLock.Unlock()
-
 	p.projectOutputBuffersLock.Lock()
 	if _, ok := p.projectOutputBuffers[jobID]; !ok {
 		p.projectOutputBuffers[jobID] = OutputBuffer{
@@ -298,8 +286,21 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line strin
 	outputBuffer := p.projectOutputBuffers[jobID]
 	outputBuffer.Buffer = append(outputBuffer.Buffer, line)
 	p.projectOutputBuffers[jobID] = outputBuffer
-
 	p.projectOutputBuffersLock.Unlock()
+
+	p.receiverBuffersLock.Lock()
+	for ch := range p.receiverBuffers[jobID] {
+		select {
+		case ch <- line:
+		default:
+			close(ch)
+			delete(p.receiverBuffers[jobID], ch)
+			p.logger.Warn("Buffer full, closing connection", map[string]any{
+				"jobID": jobID,
+			})
+		}
+	}
+	p.receiverBuffersLock.Unlock()
 }
 
 // Remove channel, so client no longer receives Terraform output

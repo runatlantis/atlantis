@@ -205,11 +205,6 @@ func (c *PRDetailController) buildPRDetailData(owner, repo string, pullNum int) 
 func BuildDetailProject(output models.ProjectOutput) web_templates.PRDetailProject {
 	status, statusLabel := DetermineProjectStatus(output.CommandName, output.Status)
 
-	policyIcon := "checkmark"
-	if !output.PolicyPassed {
-		policyIcon = "x"
-	}
-
 	return web_templates.PRDetailProject{
 		ProjectName:   output.ProjectName,
 		Path:          output.Path,
@@ -217,7 +212,6 @@ func BuildDetailProject(output models.ProjectOutput) web_templates.PRDetailProje
 		Status:        status,
 		StatusLabel:   statusLabel,
 		PolicyPassed:  output.PolicyPassed,
-		PolicyIcon:    policyIcon,
 		AddCount:      output.ResourceStats.Add,
 		ChangeCount:   output.ResourceStats.Change,
 		DestroyCount:  output.ResourceStats.Destroy,

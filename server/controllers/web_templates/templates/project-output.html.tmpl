@@ -163,7 +163,7 @@
       </span>
       <span
         class="btn btn--secondary btn--sm"
-        @click.stop="navigator.clipboard.writeText(document.getElementById('terraform-output')?.textContent || ''); copied = true; setTimeout(() => copied = false, 2000)"
+        @click.stop="navigator.clipboard.writeText(document.getElementById('output-terminal')?.querySelector('.xterm-accessibility-tree')?.textContent || document.getElementById('output-terminal')?.dataset.output || ''); copied = true; setTimeout(() => copied = false, 2000)"
       >
         <i data-lucide="copy" class="icon-xs" x-show="!copied"></i>
         <i data-lucide="check" class="icon-xs" x-show="copied" x-cloak></i>

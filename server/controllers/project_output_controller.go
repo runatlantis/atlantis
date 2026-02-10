@@ -5,12 +5,8 @@ package controllers
 
 import (
 	"fmt"
-	"html"
-	"html/template"
 	"net/http"
-	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -18,14 +14,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
-)
-
-// Terraform output syntax highlighting patterns
-var (
-	tfAddPattern      = regexp.MustCompile(`^(\s*)\+`)
-	tfDestroyPattern  = regexp.MustCompile(`^(\s*)-`)
-	tfChangePattern   = regexp.MustCompile(`^(\s*)~`)
-	tfResourcePattern = regexp.MustCompile(`# ([\w_\.]+)`)
 )
 
 // ProjectOutputController handles web page requests for project output views
@@ -228,7 +216,6 @@ func (c *ProjectOutputController) ProjectOutputPartial(w http.ResponseWriter, r 
 		DestroyCount: output.ResourceStats.Destroy,
 		ImportCount:  output.ResourceStats.Import,
 		Output:       output.Output,
-		OutputHTML:   HighlightTerraformOutput(output.Output),
 		Error:        output.Error,
 		RunTimestamp: output.RunTimestamp,
 		PolicyPassed: output.PolicyPassed,
@@ -335,12 +322,10 @@ func (c *ProjectOutputController) buildProjectOutputData(output *models.ProjectO
 
 		// Output
 		Output:     output.Output,
-		OutputHTML: HighlightTerraformOutput(output.Output),
 
 		// Policy
 		PolicyPassed:     output.PolicyPassed,
 		PolicyOutput:     output.PolicyOutput,
-		PolicyOutputHTML: template.HTML(html.EscapeString(output.PolicyOutput)), //nolint:gosec // G203: input is escaped
 
 		// Error
 		Error: output.Error,
@@ -406,34 +391,3 @@ func FormatDuration(d time.Duration) string {
 	return fmt.Sprintf("%dh %dm %ds", hours, minutes, seconds)
 }
 
-// HighlightTerraformOutput applies syntax highlighting to terraform output
-func HighlightTerraformOutput(output string) template.HTML {
-	if output == "" {
-		return ""
-	}
-
-	// Escape HTML first
-	escaped := html.EscapeString(output)
-
-	// Split into lines for processing
-	lines := strings.Split(escaped, "\n")
-	var highlighted []string
-
-	for _, line := range lines {
-		switch {
-		case tfAddPattern.MatchString(line):
-			highlighted = append(highlighted, `<span class="tf-add">`+line+`</span>`)
-		case tfDestroyPattern.MatchString(line):
-			highlighted = append(highlighted, `<span class="tf-destroy">`+line+`</span>`)
-		case tfChangePattern.MatchString(line):
-			highlighted = append(highlighted, `<span class="tf-change">`+line+`</span>`)
-		case tfResourcePattern.MatchString(line):
-			// Highlight resource names in comments
-			highlighted = append(highlighted, tfResourcePattern.ReplaceAllString(line, `# <span class="tf-resource">$1</span>`))
-		default:
-			highlighted = append(highlighted, line)
-		}
-	}
-
-	return template.HTML(strings.Join(highlighted, "\n")) //nolint:gosec // G203: content is escaped via html.EscapeString above
-}
