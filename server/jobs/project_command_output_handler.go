@@ -86,7 +86,6 @@ type ProjectCommandOutputHandler interface {
 	// to read the channel in the same goroutine
 	Register(jobID string, receiver chan string)
 
-	// Deregister removes a channel from successive updates and closes it.
 	Deregister(jobID string, receiver chan string)
 
 	IsKeyExists(key string) bool
@@ -303,7 +302,6 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line strin
 	p.receiverBuffersLock.Unlock()
 }
 
-// Remove channel, so client no longer receives Terraform output
 func (p *AsyncProjectCommandOutputHandler) Deregister(jobID string, ch chan string) {
 	p.logger.Debug("Removing channel for %s", jobID)
 	p.receiverBuffersLock.Lock()
