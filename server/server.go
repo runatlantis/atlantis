@@ -114,6 +114,12 @@ type Server struct {
 	StatusController               *controllers.StatusController
 	JobsController                 *controllers.JobsController
 	APIController                  *controllers.APIController
+	PRController                   *controllers.PRController
+	PRDetailController             *controllers.PRDetailController
+	ProjectOutputController        *controllers.ProjectOutputController
+	SettingsController             *controllers.SettingsController
+	LocksPageController            *controllers.LocksPageController
+	JobsPageController             *controllers.JobsPageController
 	SSLCertFile                    string
 	SSLKeyFile                     string
 	CertLastRefreshTime            time.Time
@@ -1020,6 +1026,74 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
+	// Shared closure for checking apply lock state (used by page controllers)
+	isApplyLocked := func() bool {
+		lock, _ := applyLockingClient.CheckApplyLock()
+		return lock.Locked
+	}
+
+	prController := controllers.NewPRController(
+		database,
+		web_templates.GetTemplate(web_templates.TemplateName_PRList),
+		web_templates.GetTemplate(web_templates.TemplateName_PRListRows),
+		config.AtlantisVersion,
+		parsedURL.Path,
+		isApplyLocked,
+		func(repoFullName string, pullNum int) int {
+			mapping := projectCmdOutputHandler.GetPullToJobMapping()
+			for _, pullInfo := range mapping {
+				if pullInfo.Pull.RepoFullName == repoFullName && pullInfo.Pull.PullNum == pullNum {
+					return len(pullInfo.JobIDInfos)
+				}
+			}
+			return 0
+		},
+	)
+
+	prDetailController := controllers.NewPRDetailController(
+		database,
+		web_templates.GetTemplate(web_templates.TemplateName_PRDetail),
+		web_templates.GetTemplate(web_templates.TemplateName_PRDetailProjects),
+		config.AtlantisVersion,
+		parsedURL.Path,
+		isApplyLocked,
+	)
+
+	projectOutputController := controllers.NewProjectOutputController(
+		database,
+		web_templates.GetTemplate(web_templates.TemplateName_ProjectOutput),
+		web_templates.GetTemplate(web_templates.TemplateName_ProjectOutputPartial),
+		config.AtlantisVersion,
+		parsedURL.Path,
+		isApplyLocked,
+		projectCmdOutputHandler,
+	)
+
+	settingsController := controllers.NewSettingsController(
+		web_templates.GetTemplate(web_templates.TemplateName_Settings),
+		!userConfig.DisableGlobalApplyLock,
+		isApplyLocked,
+		config.AtlantisVersion,
+		parsedURL.Path,
+	)
+
+	locksPageController := controllers.NewLocksPageController(
+		web_templates.GetTemplate(web_templates.TemplateName_LocksPage),
+		func() (map[string]models.ProjectLock, error) { return lockingClient.List() },
+		isApplyLocked,
+		config.AtlantisVersion,
+		parsedURL.Path,
+	)
+
+	jobsPageController := controllers.NewJobsPageController(
+		web_templates.GetTemplate(web_templates.TemplateName_JobsPage),
+		web_templates.GetTemplate(web_templates.TemplateName_JobsPartial),
+		func() []jobs.PullInfoWithJobIDs { return projectCmdOutputHandler.GetPullToJobMapping() },
+		isApplyLocked,
+		config.AtlantisVersion,
+		parsedURL.Path,
+	)
+
 	server := &Server{
 		AtlantisVersion:                config.AtlantisVersion,
 		AtlantisURL:                    parsedURL,
@@ -1040,6 +1114,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		JobsController:                 jobsController,
 		StatusController:               statusController,
 		APIController:                  apiController,
+		PRController:                   prController,
+		PRDetailController:             prDetailController,
+		ProjectOutputController:        projectOutputController,
+		SettingsController:             settingsController,
+		LocksPageController:            locksPageController,
+		JobsPageController:             jobsPageController,
 		SSLKeyFile:                     userConfig.SSLKeyFile,
 		SSLCertFile:                    userConfig.SSLCertFile,
 		DisableGlobalApplyLock:         userConfig.DisableGlobalApplyLock,
@@ -1086,112 +1166,17 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
 	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
 
-	// PR list page controller
-	prController := controllers.NewPRController(
-		s.database,
-		web_templates.GetTemplate(web_templates.TemplateName_PRList),
-		web_templates.GetTemplate(web_templates.TemplateName_PRListRows),
-		s.AtlantisVersion,
-		s.AtlantisURL.Path,
-		func() bool {
-			lock, _ := s.ApplyLocker.CheckApplyLock()
-			return lock.Locked
-		},
-		func(repoFullName string, pullNum int) int {
-			// Count active jobs for this PR from the pull-to-job mapping
-			mapping := s.ProjectCmdOutputHandler.GetPullToJobMapping()
-			for _, pullInfo := range mapping {
-				if pullInfo.Pull.RepoFullName == repoFullName && pullInfo.Pull.PullNum == pullNum {
-					return len(pullInfo.JobIDInfos)
-				}
-			}
-			return 0
-		},
-	)
-
-	// PR list routes
-	s.Router.HandleFunc("/prs", prController.PRList).Methods("GET")
-	s.Router.HandleFunc("/prs/partial", prController.PRListPartial).Methods("GET")
-
-	// PR detail page controller
-	prDetailController := controllers.NewPRDetailController(
-		s.database,
-		web_templates.GetTemplate(web_templates.TemplateName_PRDetail),
-		web_templates.GetTemplate(web_templates.TemplateName_PRDetailProjects),
-		s.AtlantisVersion,
-		s.AtlantisURL.Path,
-		func() bool {
-			lock, _ := s.ApplyLocker.CheckApplyLock()
-			return lock.Locked
-		},
-	)
-
-	// PR detail routes
-	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}", prDetailController.PRDetail).Methods("GET")
-	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/projects", prDetailController.PRDetailProjects).Methods("GET")
-
-	// Project output page controller
-	projectOutputController := controllers.NewProjectOutputController(
-		s.database,
-		web_templates.GetTemplate(web_templates.TemplateName_ProjectOutput),
-		web_templates.GetTemplate(web_templates.TemplateName_ProjectOutputPartial),
-		s.AtlantisVersion,
-		s.AtlantisURL.Path,
-		func() bool {
-			lock, _ := s.ApplyLocker.CheckApplyLock()
-			return lock.Locked
-		},
-		s.ProjectCmdOutputHandler,
-	)
-
-	// Project output routes - path uses .+ to allow slashes in project paths
-	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/project/{path:.+}/output", projectOutputController.ProjectOutputPartial).Methods("GET")
-	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/project/{path:.+}", projectOutputController.ProjectOutput).Methods("GET")
-
-	// Settings page controller
-	settingsController := controllers.NewSettingsController(
-		web_templates.GetTemplate(web_templates.TemplateName_Settings),
-		!s.DisableGlobalApplyLock,
-		func() bool {
-			lock, _ := s.ApplyLocker.CheckApplyLock()
-			return lock.Locked
-		},
-		s.AtlantisVersion,
-		s.AtlantisURL.Path,
-	)
-	s.Router.HandleFunc("/settings", settingsController.Get).Methods("GET")
-
-	// Locks page controller
-	locksPageController := controllers.NewLocksPageController(
-		web_templates.GetTemplate(web_templates.TemplateName_LocksPage),
-		func() (map[string]models.ProjectLock, error) {
-			return s.Locker.List()
-		},
-		func() bool {
-			lock, _ := s.ApplyLocker.CheckApplyLock()
-			return lock.Locked
-		},
-		s.AtlantisVersion,
-		s.AtlantisURL.Path,
-	)
-	s.Router.HandleFunc("/locks", locksPageController.Get).Methods("GET")
-
-	// Jobs page controller
-	jobsPageController := controllers.NewJobsPageController(
-		web_templates.GetTemplate(web_templates.TemplateName_JobsPage),
-		web_templates.GetTemplate(web_templates.TemplateName_JobsPartial),
-		func() []jobs.PullInfoWithJobIDs {
-			return s.ProjectCmdOutputHandler.GetPullToJobMapping()
-		},
-		func() bool {
-			lock, _ := s.ApplyLocker.CheckApplyLock()
-			return lock.Locked
-		},
-		s.AtlantisVersion,
-		s.AtlantisURL.Path,
-	)
-	s.Router.HandleFunc("/jobs", jobsPageController.Get).Methods("GET")
-	s.Router.HandleFunc("/jobs/partial", jobsPageController.GetPartial).Methods("GET")
+	// Page routes
+	s.Router.HandleFunc("/prs", s.PRController.PRList).Methods("GET")
+	s.Router.HandleFunc("/prs/partial", s.PRController.PRListPartial).Methods("GET")
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}", s.PRDetailController.PRDetail).Methods("GET")
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/projects", s.PRDetailController.PRDetailProjects).Methods("GET")
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/project/{path:.+}/output", s.ProjectOutputController.ProjectOutputPartial).Methods("GET")
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/project/{path:.+}", s.ProjectOutputController.ProjectOutput).Methods("GET")
+	s.Router.HandleFunc("/settings", s.SettingsController.Get).Methods("GET")
+	s.Router.HandleFunc("/locks", s.LocksPageController.Get).Methods("GET")
+	s.Router.HandleFunc("/jobs", s.JobsPageController.Get).Methods("GET")
+	s.Router.HandleFunc("/jobs/partial", s.JobsPageController.GetPartial).Methods("GET")
 
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
