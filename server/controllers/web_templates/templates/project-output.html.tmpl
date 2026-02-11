@@ -167,7 +167,7 @@
       </span>
       <span
         class="btn btn--secondary btn--sm"
-        @click.stop="navigator.clipboard.writeText(document.getElementById('output-terminal')?.querySelector('.xterm-accessibility-tree')?.textContent || document.getElementById('output-terminal')?.dataset.output || ''); copied = true; setTimeout(() => copied = false, 2000)"
+        @click.stop="navigator.clipboard.writeText(document.getElementById('output-terminal')?.querySelector('.xterm-accessibility-tree')?.textContent || (document.getElementById('output-data') ? JSON.parse(document.getElementById('output-data').textContent).output : '') || ''); copied = true; setTimeout(() => copied = false, 2000)"
       >
         <i data-lucide="copy" class="icon-xs" x-show="!copied"></i>
         <i data-lucide="check" class="icon-xs" x-show="copied" x-cloak></i>
@@ -176,7 +176,8 @@
     </button>
     <div class="output-section-content" id="output-content" x-show="outputExpanded" x-collapse>
       {{ if or .Output .Error .ActiveJob }}
-      <div id="output-terminal" class="output-terminal" data-output="{{ .Output }}" data-error="{{ .Error }}" data-is-live="{{ if .ActiveJob }}true{{ else }}false{{ end }}" data-stream-url="{{ if .ActiveJob }}{{ .ActiveJob.StreamURL }}{{ end }}"></div>
+      <div id="output-terminal" class="output-terminal" data-is-live="{{ if .ActiveJob }}true{{ else }}false{{ end }}" data-stream-url="{{ if .ActiveJob }}{{ .ActiveJob.StreamURL }}{{ end }}"></div>
+      <script id="output-data" type="application/json">{"output": {{ .Output | js }}, "error": {{ .Error | js }}}</script>
       {{ else if eq .Status "pending" }}
       <div class="output-pending-state">
         <i data-lucide="loader-2" class="output-pending-spinner"></i>
@@ -259,8 +260,10 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   const isLive = container.dataset.isLive === 'true';
-  const staticOutput = container.dataset.output;
-  const staticError = container.dataset.error;
+  const outputDataEl = document.getElementById('output-data');
+  const outputData = outputDataEl ? JSON.parse(outputDataEl.textContent) : {};
+  const staticOutput = outputData.output || '';
+  const staticError = outputData.error || '';
 
   if (isLive) {
     // SSE streaming
@@ -322,12 +325,14 @@ document.addEventListener('DOMContentLoaded', function() {
         term.loadAddon(fitAddon);
         term.open(newContainer);
         fitAddon.fit();
-        writeContent(newContainer.dataset.output, newContainer.dataset.error);
+        const newDataEl = document.getElementById('output-data');
+        const newData = newDataEl ? JSON.parse(newDataEl.textContent) : {};
+        writeContent(newData.output || '', newData.error || '');
 
         // Toggle error styling on parent section
         const section = document.querySelector('.output-section--terminal');
         if (section) {
-          section.classList.toggle('output-section--error', !!newContainer.dataset.error);
+          section.classList.toggle('output-section--error', !!(newData.error));
         }
       }
     }

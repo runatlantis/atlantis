@@ -12,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // PRController handles web page requests for PR views
@@ -22,7 +23,8 @@ type PRController struct {
 	atlantisVersion    string
 	cleanedBasePath    string
 	applyLockChecker   func() bool
-	getJobsForPull     func(repoFullName string, pullNum int) int
+	getJobsForPull     func() map[string]int
+	logger             logging.SimpleLogging
 }
 
 // NewPRController creates a new PRController
@@ -33,7 +35,8 @@ func NewPRController(
 	atlantisVersion string,
 	cleanedBasePath string,
 	applyLockChecker func() bool,
-	getJobsForPull func(repoFullName string, pullNum int) int,
+	getJobsForPull func() map[string]int,
+	logger logging.SimpleLogging,
 ) *PRController {
 	return &PRController{
 		db:                 database,
@@ -43,6 +46,7 @@ func NewPRController(
 		cleanedBasePath:    cleanedBasePath,
 		applyLockChecker:   applyLockChecker,
 		getJobsForPull:     getJobsForPull,
+		logger:             logger,
 	}
 }
 
@@ -50,30 +54,28 @@ func NewPRController(
 func (c *PRController) PRList(w http.ResponseWriter, r *http.Request) {
 	data, err := c.buildPRListData()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "error loading PR data: %s", err)
+		if c.logger != nil {
+			c.logger.Err("error loading PR data: %s", err)
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	if err := c.prListTemplate.Execute(w, data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "error rendering template: %s", err)
-	}
+	renderTemplate(w, c.prListTemplate, data, c.logger)
 }
 
 // PRListPartial renders just the table rows for htmx refresh
 func (c *PRController) PRListPartial(w http.ResponseWriter, r *http.Request) {
 	data, err := c.buildPRListData()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "error loading PR data: %s", err)
+		if c.logger != nil {
+			c.logger.Err("error loading PR data: %s", err)
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	if err := c.prListRowsTemplate.Execute(w, data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "error rendering template: %s", err)
-	}
+	renderTemplate(w, c.prListRowsTemplate, data, c.logger)
 }
 
 // buildPRListData loads all PR data - status filtering is done client-side
@@ -81,6 +83,11 @@ func (c *PRController) buildPRListData() (web_templates.PRListData, error) {
 	pulls, err := c.db.GetActivePullRequests()
 	if err != nil {
 		return web_templates.PRListData{}, err
+	}
+
+	var jobCounts map[string]int
+	if c.getJobsForPull != nil {
+		jobCounts = c.getJobsForPull()
 	}
 
 	items := make([]web_templates.PRListItem, 0, len(pulls))
@@ -105,6 +112,10 @@ func (c *PRController) buildPRListData() (web_templates.PRListData, error) {
 		}
 
 		item := c.buildPRListItem(pull, outputs)
+		if jobCounts != nil {
+			key := fmt.Sprintf("%s/%d", pull.BaseRepo.FullName, pull.Num)
+			item.ActiveJobCount = jobCounts[key]
+		}
 		items = append(items, item)
 		repoSet[pull.BaseRepo.FullName] = true
 	}
@@ -168,11 +179,6 @@ func (c *PRController) buildPRListItem(pull models.PullRequest, outputs []models
 	item.LastActivityTS = latestActivity
 	item.LastActivity = FormatRelativeTime(latestActivity)
 	item.Status = DetermineStatus(item.SuccessCount, item.FailedCount, item.PendingCount)
-
-	// Get active job count if the function is provided
-	if c.getJobsForPull != nil {
-		item.ActiveJobCount = c.getJobsForPull(pull.BaseRepo.FullName, pull.Num)
-	}
 
 	return item
 }

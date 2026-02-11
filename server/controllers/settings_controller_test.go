@@ -20,6 +20,7 @@ func TestSettingsController_Get(t *testing.T) {
 			func() bool { return false }, // isLocked
 			"v0.1.0",
 			"",
+			nil, // logger
 		)
 
 		req := httptest.NewRequest(http.MethodGet, "/settings", nil)
@@ -41,6 +42,7 @@ func TestSettingsController_Get(t *testing.T) {
 			func() bool { return true }, // isLocked
 			"v0.1.0",
 			"",
+			nil, // logger
 		)
 
 		req := httptest.NewRequest(http.MethodGet, "/settings", nil)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/jobs"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // JobsPageController handles the jobs page
@@ -20,6 +21,7 @@ type JobsPageController struct {
 	isApplyLocked   func() bool
 	atlantisVersion string
 	cleanedBasePath string
+	logger          logging.SimpleLogging
 }
 
 // NewJobsPageController creates a new JobsPageController
@@ -30,6 +32,7 @@ func NewJobsPageController(
 	isApplyLocked func() bool,
 	atlantisVersion string,
 	cleanedBasePath string,
+	logger logging.SimpleLogging,
 ) *JobsPageController {
 	return &JobsPageController{
 		template:        template,
@@ -38,6 +41,7 @@ func NewJobsPageController(
 		isApplyLocked:   isApplyLocked,
 		atlantisVersion: atlantisVersion,
 		cleanedBasePath: cleanedBasePath,
+		logger:          logger,
 	}
 }
 
@@ -91,15 +95,11 @@ func (c *JobsPageController) buildJobsPageData(r *http.Request) web_templates.Jo
 // Get renders the jobs page
 func (c *JobsPageController) Get(w http.ResponseWriter, r *http.Request) {
 	data := c.buildJobsPageData(r)
-	if err := c.template.Execute(w, data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
+	renderTemplate(w, c.template, data, c.logger)
 }
 
 // GetPartial renders just the jobs list partial for HTMX refresh
 func (c *JobsPageController) GetPartial(w http.ResponseWriter, r *http.Request) {
 	data := c.buildJobsPageData(r)
-	if err := c.partialTemplate.Execute(w, data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
+	renderTemplate(w, c.partialTemplate, data, c.logger)
 }

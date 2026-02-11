@@ -163,7 +163,12 @@
           data-status="{{ .Status }}"
           data-has-policy-check="{{ .HasPolicyCheck }}"
           data-policy-passed="{{ .PolicyPassed }}"
-          onclick="window.location='{{ $basePath }}/pr/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ .Path }}?workspace={{ .Workspace }}{{ if .ProjectName }}&project={{ .ProjectName }}{{ end }}'"
+          data-href="{{ $basePath }}/pr/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ .Path }}?workspace={{ .Workspace }}{{ if .ProjectName }}&project={{ .ProjectName }}{{ end }}"
+          @click="window.location = $el.dataset.href"
+          @keydown.enter="window.location = $el.dataset.href"
+          tabindex="0"
+          role="link"
+          style="cursor: pointer;"
         >
           <td>
             <span class="status-badge status-badge--{{ .Status }}">

@@ -7,7 +7,12 @@
   data-path="{{ .Path }}"
   data-workspace="{{ .Workspace }}"
   data-project="{{ .ProjectName }}"
-  onclick="window.location='{{ $basePath }}/pr/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ .Path }}?workspace={{ .Workspace }}{{ if .ProjectName }}&project={{ .ProjectName }}{{ end }}'"
+  data-href="{{ $basePath }}/pr/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ .Path }}?workspace={{ .Workspace }}{{ if .ProjectName }}&project={{ .ProjectName }}{{ end }}"
+  @click="window.location = $el.dataset.href"
+  @keydown.enter="window.location = $el.dataset.href"
+  tabindex="0"
+  role="link"
+  style="cursor: pointer;"
 >
   <span class="pr-project-status-icon pr-project-status-icon--{{ .Status }}">
     {{ if eq .Status "success" }}✓{{ end }}

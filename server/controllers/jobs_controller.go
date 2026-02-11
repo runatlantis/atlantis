@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -20,6 +21,22 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics"
 	tally "github.com/uber-go/tally/v4"
 )
+
+// testOutputGenerators holds registered test output generators, keyed by pattern name.
+// Populated via init() in jobs_test_patterns.go (dev builds only).
+var testOutputGenerators map[string]func(chan<- string)
+
+// sseConnectionCount tracks active SSE connections
+var sseConnectionCount atomic.Int32
+
+// registerTestPattern registers a test output generator for dev mode.
+// Called from init() in build-tagged files.
+func registerTestPattern(name string, gen func(chan<- string)) {
+	if testOutputGenerators == nil {
+		testOutputGenerators = make(map[string]func(chan<- string))
+	}
+	testOutputGenerators[name] = gen
+}
 
 type JobIDKeyGenerator struct{}
 
@@ -43,6 +60,8 @@ type JobsController struct {
 	StatsScope               tally.Scope                      `validate:"required"`
 	OutputHandler            jobs.ProjectCommandOutputHandler `validate:"required"`
 	ApplyLockChecker         func() bool
+	SSEMaxConnections        int32
+	SSEIdleTimeout           time.Duration
 }
 
 // computeJobBadge returns badge text, style, and icon based on job step and status
@@ -208,6 +227,14 @@ func (j *JobsController) respond(w http.ResponseWriter, lvl logging.LogLevel, re
 }
 
 func (j *JobsController) getProjectJobsSSE(w http.ResponseWriter, r *http.Request) error {
+	// Check connection limit
+	if j.SSEMaxConnections > 0 && sseConnectionCount.Load() >= j.SSEMaxConnections {
+		j.respond(w, logging.Warn, http.StatusServiceUnavailable, "Too many active connections")
+		return fmt.Errorf("SSE connection limit reached: %d", j.SSEMaxConnections)
+	}
+	sseConnectionCount.Add(1)
+	defer sseConnectionCount.Add(-1)
+
 	jobID, err := j.KeyGenerator.Generate(r)
 	if err != nil {
 		j.respond(w, logging.Error, http.StatusBadRequest, "%s", err.Error())
@@ -233,29 +260,76 @@ func (j *JobsController) getProjectJobsSSE(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	// Create channel and register with output handler.
-	// Register is called in a goroutine because it backfills the channel with
-	// existing output while holding locks. If the backfill exceeds the channel
-	// buffer capacity, the concurrent reader below prevents it from blocking.
+	// Parse Last-Event-ID for SSE reconnection support.
+	// On reconnect, the browser sends this header with the last received event ID.
+	var resumeFrom int
+	if lastID := r.Header.Get("Last-Event-ID"); lastID != "" {
+		if n, err := strconv.Atoi(lastID); err == nil && n >= 0 {
+			resumeFrom = n + 1 // Resume from the line after the last received
+		}
+	}
+
+	// Register for live output and get buffered lines.
+	// Register is synchronous -- it snapshots the buffer under locks and
+	// returns without sending anything through the channel.
 	receiver := make(chan string, 1000)
-	go j.OutputHandler.Register(jobID, receiver)
+	buffered, complete := j.OutputHandler.Register(jobID, receiver)
 	defer j.OutputHandler.Deregister(jobID, receiver)
 
-	// Stream output as SSE events
+	// Write buffered lines directly to the response (not through the channel).
+	// Skip lines already received by the client (SSE reconnection).
+	for i, line := range buffered {
+		if i < resumeFrom {
+			continue
+		}
+		fmt.Fprintf(w, "id: %d\n", i)
+		for _, part := range strings.Split(line, "\n") {
+			fmt.Fprintf(w, "data: %s\n", part)
+		}
+		fmt.Fprint(w, "\n")
+	}
+	if len(buffered) > resumeFrom {
+		flusher.Flush()
+	}
+
+	// If job was already complete when we registered, send completion and return.
+	if complete {
+		if info := j.OutputHandler.GetJobInfo(jobID); info != nil && !info.CompletedAt.IsZero() {
+			fmt.Fprintf(w, "event: complete\ndata: done\n\n")
+			flusher.Flush()
+		}
+		return nil
+	}
+
+	// Stream live output as SSE events
+	lineNum := len(buffered)
+	idleTimeout := j.SSEIdleTimeout
+	if idleTimeout <= 0 {
+		idleTimeout = 30 * time.Minute
+	}
+	idleTimer := time.NewTimer(idleTimeout)
+	defer idleTimer.Stop()
+
 streamLoop:
 	for {
 		select {
 		case line, ok := <-receiver:
 			if !ok {
-				// Channel closed — could be job completion or buffer overflow
+				// Channel closed -- could be job completion or buffer overflow
 				break streamLoop
 			}
+			idleTimer.Reset(idleTimeout)
 			// SSE spec: multi-line data must use separate "data:" fields
+			fmt.Fprintf(w, "id: %d\n", lineNum)
 			for _, part := range strings.Split(line, "\n") {
 				fmt.Fprintf(w, "data: %s\n", part)
 			}
 			fmt.Fprint(w, "\n")
 			flusher.Flush()
+			lineNum++
+		case <-idleTimer.C:
+			j.Logger.Warn("SSE idle timeout for job %s", jobID)
+			break streamLoop
 		case <-r.Context().Done():
 			// Client disconnected
 			return nil
@@ -288,7 +362,10 @@ func (j *JobsController) GetProjectJobsSSE(w http.ResponseWriter, r *http.Reques
 }
 
 // CreateTestJob creates a test job for development/testing purposes.
-// Only available in dev mode.
+// Only available in dev mode. Test output generators are registered via
+// init() in jobs_test_patterns.go, which is only compiled with the "dev"
+// build tag. Without the tag, testOutputGenerators is nil and this
+// handler returns 404.
 // Query params:
 //   - pattern: output pattern (default, slow, burst, colors, error, long)
 //   - repo: repository full name (e.g., "acme/infrastructure")
@@ -296,9 +373,23 @@ func (j *JobsController) GetProjectJobsSSE(w http.ResponseWriter, r *http.Reques
 //   - project: project path
 //   - step: job step (plan, apply)
 func (j *JobsController) CreateTestJob(w http.ResponseWriter, r *http.Request) {
-	pattern := TestPattern(r.URL.Query().Get("pattern"))
-	if pattern == "" {
-		pattern = TestPatternDefault
+	if testOutputGenerators == nil {
+		http.Error(w, "Not available", http.StatusNotFound)
+		return
+	}
+
+	patternName := r.URL.Query().Get("pattern")
+	if patternName == "" {
+		patternName = "default"
+	}
+
+	gen, ok := testOutputGenerators[patternName]
+	if !ok {
+		gen, ok = testOutputGenerators["default"]
+		if !ok {
+			http.Error(w, "No test patterns registered", http.StatusNotFound)
+			return
+		}
 	}
 
 	// Parse PR params with defaults
@@ -360,7 +451,8 @@ func (j *JobsController) CreateTestJob(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		// Small delay to allow redirect to complete
 		time.Sleep(100 * time.Millisecond)
-		GenerateTestOutput(pattern, outputChan)
+		gen(outputChan)
+		close(outputChan)
 	}()
 
 	// Feed output to handler

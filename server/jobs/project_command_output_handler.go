@@ -82,9 +82,10 @@ type ProjectCommandOutputHandler interface {
 
 	SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool)
 
-	// Register registers a channel and blocks until it is caught up. Callers should call this asynchronously when attempting
-	// to read the channel in the same goroutine
-	Register(jobID string, receiver chan string)
+	// Register registers a channel for live output and returns any buffered lines.
+	// The caller should write the returned lines to the client before reading from the channel.
+	// If complete is true, the job is already done and the channel will not receive further lines.
+	Register(jobID string, receiver chan string) (buffered []string, complete bool)
 
 	Deregister(jobID string, receiver chan string)
 
@@ -188,8 +189,8 @@ func (p *AsyncProjectCommandOutputHandler) SendWorkflowHook(ctx models.WorkflowH
 	}
 }
 
-func (p *AsyncProjectCommandOutputHandler) Register(jobID string, receiver chan string) {
-	p.addChan(receiver, jobID)
+func (p *AsyncProjectCommandOutputHandler) Register(jobID string, receiver chan string) ([]string, bool) {
+	return p.addChan(receiver, jobID)
 }
 
 func (p *AsyncProjectCommandOutputHandler) Handle() {
@@ -245,7 +246,7 @@ func (p *AsyncProjectCommandOutputHandler) completeJob(jobID string) {
 
 }
 
-func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string) {
+func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string) ([]string, bool) {
 	// Hold both locks to prevent race with completeJob/writeLogLine.
 	// Lock ordering: projectOutputBuffersLock -> receiverBuffersLock
 	// (matches completeJob ordering).
@@ -254,11 +255,13 @@ func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string)
 
 	outputBuffer := p.projectOutputBuffers[jobID]
 
-	for _, line := range outputBuffer.Buffer {
-		ch <- line
-	}
+	// Snapshot the buffer under locks so the caller can write backfill
+	// directly to the HTTP response without holding any locks.
+	bufferedLines := make([]string, len(outputBuffer.Buffer))
+	copy(bufferedLines, outputBuffer.Buffer)
+	isComplete := outputBuffer.OperationComplete
 
-	if outputBuffer.OperationComplete {
+	if isComplete {
 		// Job already done — close immediately, don't register.
 		close(ch)
 	} else {
@@ -271,6 +274,8 @@ func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string)
 
 	p.receiverBuffersLock.Unlock()
 	p.projectOutputBuffersLock.RUnlock()
+
+	return bufferedLines, isComplete
 }
 
 // Add log line to buffer and send to all current channels.
@@ -460,7 +465,9 @@ func (p *NoopProjectOutputHandler) Send(_ command.ProjectContext, _ string, _ bo
 func (p *NoopProjectOutputHandler) SendWorkflowHook(_ models.WorkflowHookCommandContext, _ string, _ bool) {
 }
 
-func (p *NoopProjectOutputHandler) Register(_ string, _ chan string) {}
+func (p *NoopProjectOutputHandler) Register(_ string, _ chan string) ([]string, bool) {
+	return nil, false
+}
 
 func (p *NoopProjectOutputHandler) Deregister(_ string, _ chan string) {}
 

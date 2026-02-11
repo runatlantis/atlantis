@@ -56,6 +56,7 @@ func TestJobsPageController_Get(t *testing.T) {
 			func() bool { return false },
 			"v1.0.0",
 			"/base",
+			nil, // logger
 		)
 
 		req := httptest.NewRequest(http.MethodGet, "/jobs", nil)
@@ -82,6 +83,7 @@ func TestJobsPageController_Get(t *testing.T) {
 			func() bool { return false },
 			"v1.0.0",
 			"/base",
+			nil, // logger
 		)
 
 		req := httptest.NewRequest(http.MethodGet, "/jobs", nil)
@@ -108,6 +110,7 @@ func TestJobsPageController_Get(t *testing.T) {
 			func() bool { return false },
 			"v1.0.0",
 			"/base",
+			nil, // logger
 		)
 
 		req := httptest.NewRequest(http.MethodGet, "/jobs", nil)
@@ -144,6 +147,7 @@ func TestJobsPageController_Get(t *testing.T) {
 			func() bool { return false },
 			"v1.0.0",
 			"/base",
+			nil, // logger
 		)
 
 		req := httptest.NewRequest(http.MethodGet, "/jobs", nil)
@@ -183,6 +187,7 @@ func TestJobsPageController_GetPartial(t *testing.T) {
 			func() bool { return false },
 			"v1.0.0",
 			"/base",
+			nil, // logger
 		)
 
 		req := httptest.NewRequest(http.MethodGet, "/jobs/partial", nil)

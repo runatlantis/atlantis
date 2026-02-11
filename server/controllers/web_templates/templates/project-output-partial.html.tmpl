@@ -66,7 +66,8 @@
 
 <!-- Output content - main swap target -->
 {{ if .Output }}
-<div id="output-terminal" class="output-terminal" data-output="{{ .Output }}" data-error="{{ .Error }}"></div>
+<div id="output-terminal" class="output-terminal"></div>
+<script id="output-data" type="application/json">{"output": {{ .Output | js }}, "error": {{ .Error | js }}}</script>
 {{ else if eq .Status "pending" }}
 <div class="output-pending-state">
   <i data-lucide="loader-2" class="output-pending-spinner"></i>

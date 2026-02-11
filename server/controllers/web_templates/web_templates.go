@@ -53,13 +53,13 @@ func IsDevMode() bool {
 }
 
 // Read all the templates from the embedded filesystem (for non-layout templates)
-var templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
+var templates, _ = template.New("").Funcs(sprig.HtmlFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
 
 // mustParseLayoutTemplate creates a template set with the layout and a specific page template.
 // This is needed because Go templates use global definitions for blocks, so each page
 // that extends the layout needs its own template set.
 func mustParseLayoutTemplate(pageTemplate string) *template.Template {
-	t, err := template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS,
+	t, err := template.New("").Funcs(sprig.HtmlFuncMap()).ParseFS(templatesFS,
 		"templates/layout.html.tmpl",
 		"templates/"+pageTemplate,
 	)
@@ -76,7 +76,7 @@ func parseLayoutTemplateFromDisk(pageTemplate string) (*template.Template, error
 	layoutPath := filepath.Join(devTemplatesDir, "layout.html.tmpl")
 	pagePath := filepath.Join(devTemplatesDir, pageTemplate)
 
-	t, err := template.New("").Funcs(sprig.TxtFuncMap()).ParseFiles(layoutPath, pagePath)
+	t, err := template.New("").Funcs(sprig.HtmlFuncMap()).ParseFiles(layoutPath, pagePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse template %s from disk: %w", pageTemplate, err)
 	}
@@ -87,7 +87,7 @@ func parseLayoutTemplateFromDisk(pageTemplate string) (*template.Template, error
 func parseTemplateFromDisk(templateName string) (*template.Template, error) {
 	// Parse all templates to get shared definitions
 	pattern := filepath.Join(devTemplatesDir, "*.tmpl")
-	t, err := template.New("").Funcs(sprig.TxtFuncMap()).ParseGlob(pattern)
+	t, err := template.New("").Funcs(sprig.HtmlFuncMap()).ParseGlob(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse templates from disk: %w", err)
 	}

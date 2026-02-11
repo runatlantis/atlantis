@@ -144,6 +144,7 @@ var testFlags = map[string]any{
 	SlackTokenFlag:                   "slack-token",
 	SSLCertFileFlag:                  "cert-file",
 	SSLKeyFileFlag:                   "key-file",
+	SSEMaxConnectionsFlag:            100,
 	RestrictFileList:                 false,
 	TFDistributionFlag:               "terraform",
 	TFDownloadFlag:                   true,

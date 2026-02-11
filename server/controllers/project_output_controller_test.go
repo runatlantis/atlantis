@@ -112,6 +112,7 @@ func TestProjectOutputController_ProjectOutput_Success(t *testing.T) {
 		"",
 		func() bool { return false },
 		nil, // outputHandler
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/pr/owner/repo/pulls/123/project/terraform/staging?workspace=default", nil)
@@ -148,6 +149,7 @@ func TestProjectOutputController_ProjectOutput_NotFound(t *testing.T) {
 		"",
 		func() bool { return false },
 		nil, // outputHandler
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/pr/owner/repo/pulls/123/project/terraform/staging?workspace=default", nil)
@@ -194,6 +196,7 @@ func TestProjectOutputController_ProjectOutput_Failed(t *testing.T) {
 		"",
 		func() bool { return false },
 		nil, // outputHandler
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/pr/owner/repo/pulls/123/project/terraform/staging?workspace=default", nil)
@@ -241,7 +244,7 @@ type mockOutputHandler struct {
 
 func (m *mockOutputHandler) Send(_ command.ProjectContext, _ string, _ bool)                        {}
 func (m *mockOutputHandler) SendWorkflowHook(_ models.WorkflowHookCommandContext, _ string, _ bool) {}
-func (m *mockOutputHandler) Register(_ string, _ chan string)                                       {}
+func (m *mockOutputHandler) Register(_ string, _ chan string) ([]string, bool)                      { return nil, false }
 func (m *mockOutputHandler) Deregister(_ string, _ chan string)                                     {}
 func (m *mockOutputHandler) IsKeyExists(_ string) bool                                              { return false }
 func (m *mockOutputHandler) Handle()                                                                {}
@@ -327,6 +330,7 @@ func TestProjectOutputController_CompletedJobNotShownAsRunning(t *testing.T) {
 		"",
 		func() bool { return false },
 		mockHandler,
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/pr/owner/repo/pulls/123/project/terraform/staging?workspace=default", nil)

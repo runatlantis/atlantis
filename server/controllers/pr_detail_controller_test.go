@@ -59,6 +59,7 @@ func TestPRDetailController_PRDetail_Success(t *testing.T) {
 		"1.0.0",
 		"",
 		func() bool { return false },
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/pr/owner/repo/pulls/123", nil)
@@ -88,6 +89,7 @@ func TestPRDetailController_PRDetail_InvalidPullNum(t *testing.T) {
 		"1.0.0",
 		"",
 		func() bool { return false },
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/pr/owner/repo/pulls/invalid", nil)
@@ -118,6 +120,7 @@ func TestPRDetailController_PRDetailProjects_WithFilter(t *testing.T) {
 		"1.0.0",
 		"",
 		func() bool { return false },
+		nil, // logger
 	)
 
 	tests := []struct {
@@ -167,6 +170,7 @@ func TestPRDetailController_PRDetail_ShowsErrorStateOnDBFailure(t *testing.T) {
 		"1.0.0",
 		"",
 		func() bool { return false },
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/pr/owner/repo/pulls/123", nil)

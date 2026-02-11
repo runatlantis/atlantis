@@ -20,6 +20,7 @@ function jobTerminal() {
     endTime: {{ if .EndTimeUnix }}{{ .EndTimeUnix }}{{ else }}0{{ end }},
     elapsedTime: '0s',
     elapsedInterval: null,
+    receivedComplete: false,
     jobStep: '{{ .JobStep }}',
 
     init() {
@@ -73,8 +74,10 @@ function jobTerminal() {
         // Start elapsed time counter - update immediately, then every second
         this.updateElapsedTime();
 
-        // Get data attributes
-        const staticOutput = terminalContainer.dataset.output;
+        // Get data from JSON script block
+        const termDataEl = document.getElementById('terminal-data');
+        const termData = termDataEl ? JSON.parse(termDataEl.textContent) : {};
+        const staticOutput = termData.output || '';
         const streamUrl = terminalContainer.dataset.streamUrl;
 
         // If job already completed (endTime set from server), update status
@@ -104,6 +107,7 @@ function jobTerminal() {
         };
 
         this.source.addEventListener('complete', () => {
+          this.receivedComplete = true;
           this.status = 'complete';
           this.statusLabel = this.jobStep === 'apply' ? 'Applied' : 'Planned';
           this.endTime = Date.now();
@@ -114,10 +118,11 @@ function jobTerminal() {
 
         this.source.onerror = () => {
           if (this.source.readyState === EventSource.CLOSED) {
-            this.status = 'complete';
-            this.statusLabel = this.jobStep === 'apply' ? 'Applied' : 'Planned';
-            this.endTime = Date.now();
-            this.updateElapsedTime();
+            if (this.receivedComplete) {
+              return;
+            }
+            this.status = 'disconnected';
+            this.statusLabel = 'Disconnected';
             clearInterval(this.elapsedInterval);
           }
         };
@@ -261,6 +266,9 @@ function jobTerminal() {
         <template x-if="status === 'error'">
           <i data-lucide="x-circle" class="icon-xs"></i>
         </template>
+        <template x-if="status === 'disconnected'">
+          <i data-lucide="wifi-off" class="icon-xs"></i>
+        </template>
         <span x-text="statusLabel">{{ .BadgeText }}</span>
       </span>
     </div>
@@ -335,7 +343,8 @@ function jobTerminal() {
         </span>
       </template>
     </button>
-    <div id="terminal" class="job-terminal" data-output="{{ .Output }}" data-stream-url="{{ .StreamURL }}"></div>
+    <div id="terminal" class="job-terminal" data-stream-url="{{ .StreamURL }}"></div>
+    <script id="terminal-data" type="application/json">{"output": {{ .Output | js }}}</script>
   </div>
 </div>
 {{ end }}

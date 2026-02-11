@@ -146,6 +146,7 @@ const (
 	SlackTokenFlag                   = "slack-token"
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
+	SSEMaxConnectionsFlag            = "sse-max-connections"
 	RestrictFileList                 = "restrict-file-list"
 	TFDistributionFlag               = "tf-distribution" // deprecated for DefaultTFDistributionFlag
 	TFDownloadFlag                   = "tf-download"
@@ -189,6 +190,7 @@ const (
 	DefaultParallelPoolSize             = 15
 	DefaultStatsNamespace               = "atlantis"
 	DefaultPort                         = 4141
+	DefaultSSEMaxConnections            = 100
 	DefaultRedisDB                      = 0
 	DefaultRedisPort                    = 6379
 	DefaultRedisTLSEnabled              = false
@@ -686,6 +688,10 @@ var intFlags = map[string]intFlag{
 		description:  "The Redis Port for when using a Locking DB type of 'redis'.",
 		defaultValue: DefaultRedisPort,
 	},
+	SSEMaxConnectionsFlag: {
+		description:  "Maximum number of concurrent SSE streaming connections for job output.",
+		defaultValue: DefaultSSEMaxConnections,
+	},
 }
 
 var int64Flags = map[string]int64Flag{
@@ -958,6 +964,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
+	}
+	if c.SSEMaxConnections == 0 {
+		c.SSEMaxConnections = DefaultSSEMaxConnections
 	}
 	if c.RedisDB == 0 {
 		c.RedisDB = DefaultRedisDB
