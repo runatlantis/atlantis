@@ -42,6 +42,7 @@ func TestLocksPageController_Get(t *testing.T) {
 			func() bool { return false },
 			"v0.1.0",
 			"",
+			nil, // logger
 		)
 
 		req := httptest.NewRequest(http.MethodGet, "/locks", nil)
@@ -62,6 +63,7 @@ func TestLocksPageController_Get(t *testing.T) {
 			func() bool { return false },
 			"v0.1.0",
 			"",
+			nil, // logger
 		)
 
 		req := httptest.NewRequest(http.MethodGet, "/locks", nil)

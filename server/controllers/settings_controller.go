@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // SettingsController handles the settings page
@@ -16,6 +17,7 @@ type SettingsController struct {
 	isLocked               func() bool
 	version                string
 	cleanedBasePath        string
+	logger                 logging.SimpleLogging
 }
 
 func NewSettingsController(
@@ -24,6 +26,7 @@ func NewSettingsController(
 	isLocked func() bool,
 	version string,
 	cleanedBasePath string,
+	logger logging.SimpleLogging,
 ) *SettingsController {
 	return &SettingsController{
 		template:               template,
@@ -31,6 +34,7 @@ func NewSettingsController(
 		isLocked:               isLocked,
 		version:                version,
 		cleanedBasePath:        cleanedBasePath,
+		logger:                 logger,
 	}
 }
 
@@ -48,7 +52,5 @@ func (c *SettingsController) Get(w http.ResponseWriter, r *http.Request) {
 		Version:                c.version,
 	}
 
-	if err := c.template.Execute(w, data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
+	renderTemplate(w, c.template, data, c.logger)
 }

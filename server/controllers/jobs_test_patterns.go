@@ -1,3 +1,5 @@
+//go:build dev
+
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,36 +10,14 @@ import (
 	"time"
 )
 
-// TestPattern defines a pattern for generating test output
-type TestPattern string
-
-const (
-	TestPatternDefault TestPattern = "default"
-	TestPatternSlow    TestPattern = "slow"
-	TestPatternBurst   TestPattern = "burst"
-	TestPatternColors  TestPattern = "colors"
-	TestPatternError   TestPattern = "error"
-	TestPatternLong    TestPattern = "long"
-)
-
-// GenerateTestOutput generates test terraform-like output for the given pattern
-func GenerateTestOutput(pattern TestPattern, output chan<- string) {
-	defer close(output)
-
-	switch pattern {
-	case TestPatternSlow:
-		generateSlowOutput(output)
-	case TestPatternBurst:
-		generateBurstOutput(output)
-	case TestPatternColors:
-		generateColorOutput(output)
-	case TestPatternError:
-		generateErrorOutput(output)
-	case TestPatternLong:
-		generateLongOutput(output)
-	default:
-		generateDefaultOutput(output)
-	}
+//nolint:gochecknoinits // Registration pattern: dev-only generators self-register to avoid stub files in production builds.
+func init() {
+	registerTestPattern("default", generateDefaultOutput)
+	registerTestPattern("slow", generateSlowOutput)
+	registerTestPattern("burst", generateBurstOutput)
+	registerTestPattern("colors", generateColorOutput)
+	registerTestPattern("error", generateErrorOutput)
+	registerTestPattern("long", generateLongOutput)
 }
 
 func generateDefaultOutput(output chan<- string) {

@@ -63,6 +63,7 @@ func TestPRController_PRList_Success(t *testing.T) {
 		"/basepath",
 		func() bool { return false },
 		nil, // getJobsForPull
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/prs", nil)
@@ -92,6 +93,7 @@ func TestPRController_PRList_DBError(t *testing.T) {
 		"",
 		func() bool { return false },
 		nil, // getJobsForPull
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/prs", nil)
@@ -100,7 +102,7 @@ func TestPRController_PRList_DBError(t *testing.T) {
 	controller.PRList(w, req)
 
 	Equals(t, http.StatusInternalServerError, w.Code)
-	Assert(t, strings.Contains(w.Body.String(), "error loading PR data"), "should contain error message")
+	Assert(t, strings.Contains(w.Body.String(), "Internal server error"), "should contain generic error message")
 }
 
 func TestPRController_PRList_TemplateError(t *testing.T) {
@@ -120,6 +122,7 @@ func TestPRController_PRList_TemplateError(t *testing.T) {
 		"",
 		func() bool { return false },
 		nil, // getJobsForPull
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/prs", nil)
@@ -128,7 +131,7 @@ func TestPRController_PRList_TemplateError(t *testing.T) {
 	controller.PRList(w, req)
 
 	Equals(t, http.StatusInternalServerError, w.Code)
-	Assert(t, strings.Contains(w.Body.String(), "error rendering template"), "should contain template error message")
+	Assert(t, strings.Contains(w.Body.String(), "Internal server error"), "should contain generic error message")
 }
 
 func TestPRController_PRListPartial_Success(t *testing.T) {
@@ -153,6 +156,7 @@ func TestPRController_PRListPartial_Success(t *testing.T) {
 		"",
 		func() bool { return false },
 		nil, // getJobsForPull
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/prs/partial", nil)
@@ -180,6 +184,7 @@ func TestPRController_PRListPartial_DBError(t *testing.T) {
 		"",
 		func() bool { return false },
 		nil, // getJobsForPull
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/prs/partial", nil)
@@ -188,7 +193,7 @@ func TestPRController_PRListPartial_DBError(t *testing.T) {
 	controller.PRListPartial(w, req)
 
 	Equals(t, http.StatusInternalServerError, w.Code)
-	Assert(t, strings.Contains(w.Body.String(), "error loading PR data"), "should contain error message")
+	Assert(t, strings.Contains(w.Body.String(), "Internal server error"), "should contain generic error message")
 }
 
 func TestPRController_PRList_ShowsErrorStateForPRsWithOutputErrors(t *testing.T) {
@@ -226,6 +231,7 @@ func TestPRController_PRList_ShowsErrorStateForPRsWithOutputErrors(t *testing.T)
 		"",
 		func() bool { return false },
 		nil, // getJobsForPull
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/prs", nil)
@@ -297,6 +303,7 @@ func TestPRController_PRList_SortsByLastActivity(t *testing.T) {
 		"",
 		func() bool { return false },
 		nil, // getJobsForPull
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/prs", nil)
@@ -407,6 +414,7 @@ func TestPRController_PRList_AggregatesResourceStats(t *testing.T) {
 		"",
 		func() bool { return false },
 		nil, // getJobsForPull
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/prs", nil)
@@ -458,6 +466,7 @@ func TestPRController_PRList_MixedStatuses(t *testing.T) {
 		"",
 		func() bool { return false },
 		nil, // getJobsForPull
+		nil, // logger
 	)
 
 	req := httptest.NewRequest("GET", "/prs", nil)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // LocksPageController handles the locks page
@@ -19,6 +20,7 @@ type LocksPageController struct {
 	isApplyLocked   func() bool
 	atlantisVersion string
 	cleanedBasePath string
+	logger          logging.SimpleLogging
 }
 
 // NewLocksPageController creates a new LocksPageController
@@ -28,6 +30,7 @@ func NewLocksPageController(
 	isApplyLocked func() bool,
 	atlantisVersion string,
 	cleanedBasePath string,
+	logger logging.SimpleLogging,
 ) *LocksPageController {
 	return &LocksPageController{
 		template:        template,
@@ -35,6 +38,7 @@ func NewLocksPageController(
 		isApplyLocked:   isApplyLocked,
 		atlantisVersion: atlantisVersion,
 		cleanedBasePath: cleanedBasePath,
+		logger:          logger,
 	}
 }
 
@@ -42,7 +46,10 @@ func NewLocksPageController(
 func (c *LocksPageController) Get(w http.ResponseWriter, r *http.Request) {
 	locks, err := c.getLocks()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		if c.logger != nil {
+			c.logger.Err("error loading locks: %s", err)
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -88,7 +95,5 @@ func (c *LocksPageController) Get(w http.ResponseWriter, r *http.Request) {
 		Repositories: repos,
 	}
 
-	if err := c.template.Execute(w, data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
+	renderTemplate(w, c.template, data, c.logger)
 }

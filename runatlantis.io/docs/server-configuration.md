@@ -1361,6 +1361,18 @@ ATLANTIS_SLACK_TOKEN='token'
 
 API token for Slack notifications. See [Using Slack hooks](sending-notifications-via-webhooks.md#using-slack-hooks).
 
+### `--sse-max-connections`
+
+```bash
+atlantis server --sse-max-connections=100
+# or
+ATLANTIS_SSE_MAX_CONNECTIONS=100
+```
+
+Maximum number of concurrent SSE streaming connections for job output.
+When the limit is reached, new SSE connections will receive a 503 Service Unavailable response.
+Set to 0 to disable the limit. Defaults to `100`.
+
 ### `--ssl-cert-file` <Badge text="v0.2.4+" type="info"/>
 
 ```bash

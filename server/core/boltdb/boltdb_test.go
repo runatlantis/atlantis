@@ -1246,6 +1246,151 @@ func TestBoltDB_GetActivePullRequests_Empty(t *testing.T) {
 	Equals(t, 0, len(pulls))
 }
 
+func TestBoltDB_GetActivePullRequests_PullIndexPreservesMetadata(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	// Save output with PR metadata
+	output := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      42,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		PullURL:      "https://github.com/owner/repo/pull/42",
+		PullTitle:    "Add new feature",
+	}
+
+	err := db.SaveProjectOutput(output)
+	Ok(t, err)
+
+	pulls, err := db.GetActivePullRequests()
+	Ok(t, err)
+	Equals(t, 1, len(pulls))
+	Equals(t, 42, pulls[0].Num)
+	Equals(t, "https://github.com/owner/repo/pull/42", pulls[0].URL)
+	Equals(t, "Add new feature", pulls[0].Title)
+	Equals(t, "owner/repo", pulls[0].BaseRepo.FullName)
+}
+
+func TestBoltDB_GetActivePullRequests_PullIndexUpdatedOnSave(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	// Save first output without PR metadata
+	output1 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      42,
+		ProjectName:  "project1",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+	}
+	err := db.SaveProjectOutput(output1)
+	Ok(t, err)
+
+	// Save second output for the same PR with metadata
+	output2 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      42,
+		ProjectName:  "project2",
+		Workspace:    "default",
+		Path:         "terraform/prod",
+		PullURL:      "https://github.com/owner/repo/pull/42",
+		PullTitle:    "Updated title",
+	}
+	err = db.SaveProjectOutput(output2)
+	Ok(t, err)
+
+	// The pull index should reflect the latest save's metadata
+	pulls, err := db.GetActivePullRequests()
+	Ok(t, err)
+	Equals(t, 1, len(pulls))
+	Equals(t, 42, pulls[0].Num)
+	Equals(t, "https://github.com/owner/repo/pull/42", pulls[0].URL)
+	Equals(t, "Updated title", pulls[0].Title)
+}
+
+func TestBoltDB_GetActivePullRequests_PullIndexCleanedOnDelete(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	output := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      42,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		PullURL:      "https://github.com/owner/repo/pull/42",
+		PullTitle:    "My PR",
+	}
+
+	err := db.SaveProjectOutput(output)
+	Ok(t, err)
+
+	// Verify pull is active
+	pulls, err := db.GetActivePullRequests()
+	Ok(t, err)
+	Equals(t, 1, len(pulls))
+
+	// Delete the outputs for that pull
+	err = db.DeleteProjectOutputsByPull("owner/repo", 42)
+	Ok(t, err)
+
+	// Pull index should be empty now
+	pulls, err = db.GetActivePullRequests()
+	Ok(t, err)
+	Equals(t, 0, len(pulls))
+}
+
+func TestBoltDB_GetActivePullRequests_MultiplePRsAcrossRepos(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	outputs := []models.ProjectOutput{
+		{
+			RepoFullName: "owner/repo1",
+			PullNum:      1,
+			ProjectName:  "project",
+			Workspace:    "default",
+			Path:         "terraform",
+			PullURL:      "https://github.com/owner/repo1/pull/1",
+		},
+		{
+			RepoFullName: "owner/repo1",
+			PullNum:      2,
+			ProjectName:  "project",
+			Workspace:    "default",
+			Path:         "terraform",
+			PullURL:      "https://github.com/owner/repo1/pull/2",
+		},
+		{
+			RepoFullName: "owner/repo2",
+			PullNum:      1,
+			ProjectName:  "project",
+			Workspace:    "default",
+			Path:         "terraform",
+			PullURL:      "https://github.com/owner/repo2/pull/1",
+		},
+	}
+
+	for _, o := range outputs {
+		err := db.SaveProjectOutput(o)
+		Ok(t, err)
+	}
+
+	pulls, err := db.GetActivePullRequests()
+	Ok(t, err)
+	Equals(t, 3, len(pulls))
+
+	// Delete one PR's outputs
+	err = db.DeleteProjectOutputsByPull("owner/repo1", 1)
+	Ok(t, err)
+
+	pulls, err = db.GetActivePullRequests()
+	Ok(t, err)
+	Equals(t, 2, len(pulls))
+}
+
 func TestBoltDB_GetProjectOutputHistory_SortsDescending(t *testing.T) {
 	db := newTestDB2(t)
 	defer db.Close()

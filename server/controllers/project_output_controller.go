@@ -14,6 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // ProjectOutputController handles web page requests for project output views
@@ -25,6 +26,7 @@ type ProjectOutputController struct {
 	cleanedBasePath              string
 	applyLockChecker             func() bool
 	outputHandler                jobs.ProjectCommandOutputHandler
+	logger                       logging.SimpleLogging
 }
 
 // NewProjectOutputController creates a new ProjectOutputController
@@ -36,6 +38,7 @@ func NewProjectOutputController(
 	cleanedBasePath string,
 	applyLockChecker func() bool,
 	outputHandler jobs.ProjectCommandOutputHandler,
+	logger logging.SimpleLogging,
 ) *ProjectOutputController {
 	return &ProjectOutputController{
 		db:                           database,
@@ -45,6 +48,7 @@ func NewProjectOutputController(
 		cleanedBasePath:              cleanedBasePath,
 		applyLockChecker:             applyLockChecker,
 		outputHandler:                outputHandler,
+		logger:                       logger,
 	}
 }
 
@@ -95,8 +99,10 @@ func (c *ProjectOutputController) ProjectOutput(w http.ResponseWriter, r *http.R
 	// Fetch history for this project
 	history, err := c.db.GetProjectOutputHistory(repoFullName, pullNum, path, workspace, projectName)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "error fetching project history: %s", err)
+		if c.logger != nil {
+			c.logger.Err("error fetching project history: %s", err)
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -138,10 +144,7 @@ func (c *ProjectOutputController) ProjectOutput(w http.ResponseWriter, r *http.R
 
 	data := c.buildProjectOutputData(output, owner, repo, history, isHistorical)
 
-	if err := c.projectOutputTemplate.Execute(w, data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "error rendering template: %s", err)
-	}
+	renderTemplate(w, c.projectOutputTemplate, data, c.logger)
 }
 
 // ProjectOutputPartial returns just the output content for HTMX swaps
@@ -180,7 +183,10 @@ func (c *ProjectOutputController) ProjectOutputPartial(w http.ResponseWriter, r 
 	// Find the run - we need to search history since we don't know the command
 	history, err := c.db.GetProjectOutputHistory(repoFullName, pullNum, path, workspace, projectName)
 	if err != nil {
-		http.Error(w, "error fetching history", http.StatusInternalServerError)
+		if c.logger != nil {
+			c.logger.Err("error fetching project history for partial: %s", err)
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -222,9 +228,7 @@ func (c *ProjectOutputController) ProjectOutputPartial(w http.ResponseWriter, r 
 		HasPolicyCheck: output.CommandName == "policy_check" || output.PolicyOutput != "",
 	}
 
-	if err := c.projectOutputPartialTemplate.Execute(w, data); err != nil {
-		http.Error(w, "error rendering partial", http.StatusInternalServerError)
-	}
+	renderTemplate(w, c.projectOutputPartialTemplate, data, c.logger)
 }
 
 func (c *ProjectOutputController) buildProjectOutputData(output *models.ProjectOutput, owner, repo string, history []models.ProjectOutput, isHistorical bool) web_templates.ProjectOutputData {

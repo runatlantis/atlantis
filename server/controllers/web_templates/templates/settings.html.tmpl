@@ -116,7 +116,7 @@
       async disableApplies() {
         const response = await fetch(this.basePath + '/apply/lock', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: { 'Content-Type': 'application/json', 'X-Atlantis-CSRF': '1' }
         });
         if (!response.ok) {
           throw new Error('Failed to disable applies');
@@ -129,7 +129,8 @@
         this.isLoading = true;
         try {
           const response = await fetch(this.basePath + '/apply/unlock', {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'X-Atlantis-CSRF': '1' }
           });
           if (!response.ok) {
             throw new Error('Failed to enable applies');

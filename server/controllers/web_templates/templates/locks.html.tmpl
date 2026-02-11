@@ -183,7 +183,7 @@
           confirmPhrase: 'UNLOCK',
           confirmButtonText: 'Unlock',
           onConfirm: async () => {
-            const response = await fetch(lock.unlockUrl, { method: 'DELETE' });
+            const response = await fetch(lock.unlockUrl, { method: 'DELETE', headers: { 'X-Atlantis-CSRF': '1' } });
             if (response.ok) {
               window.location.reload();
             } else {
@@ -206,7 +206,7 @@
           confirmButtonText: 'Unlock All',
           onConfirm: async () => {
             const results = await Promise.allSettled(
-              group.locks.map(lock => fetch(lock.unlockUrl, { method: 'DELETE' }))
+              group.locks.map(lock => fetch(lock.unlockUrl, { method: 'DELETE', headers: { 'X-Atlantis-CSRF': '1' } }))
             );
 
             const failures = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));

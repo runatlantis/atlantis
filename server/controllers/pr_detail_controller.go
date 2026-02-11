@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // PRDetailDatabase defines the database methods needed by PRDetailController
@@ -28,6 +29,7 @@ type PRDetailController struct {
 	atlantisVersion          string
 	cleanedBasePath          string
 	applyLockChecker         func() bool
+	logger                   logging.SimpleLogging
 }
 
 // NewPRDetailController creates a new PRDetailController
@@ -38,6 +40,7 @@ func NewPRDetailController(
 	atlantisVersion string,
 	cleanedBasePath string,
 	applyLockChecker func() bool,
+	logger logging.SimpleLogging,
 ) *PRDetailController {
 	return &PRDetailController{
 		db:                       database,
@@ -46,6 +49,7 @@ func NewPRDetailController(
 		atlantisVersion:          atlantisVersion,
 		cleanedBasePath:          cleanedBasePath,
 		applyLockChecker:         applyLockChecker,
+		logger:                   logger,
 	}
 }
 
@@ -65,15 +69,14 @@ func (c *PRDetailController) PRDetail(w http.ResponseWriter, r *http.Request) {
 	// Filtering is done client-side, so always load all projects
 	data, err := c.buildPRDetailData(owner, repo, pullNum)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "error loading PR data: %s", err)
+		if c.logger != nil {
+			c.logger.Err("error loading PR detail data: %s", err)
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	if err := c.prDetailTemplate.Execute(w, data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "error rendering template: %s", err)
-	}
+	renderTemplate(w, c.prDetailTemplate, data, c.logger)
 }
 
 // PRDetailProjects renders just the project list for htmx filter updates
@@ -92,15 +95,14 @@ func (c *PRDetailController) PRDetailProjects(w http.ResponseWriter, r *http.Req
 	// Filtering is done client-side, so always load all projects
 	data, err := c.buildPRDetailData(owner, repo, pullNum)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "error loading PR data: %s", err)
+		if c.logger != nil {
+			c.logger.Err("error loading PR detail data: %s", err)
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	if err := c.prDetailProjectsTemplate.Execute(w, data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprintf(w, "error rendering template: %s", err)
-	}
+	renderTemplate(w, c.prDetailProjectsTemplate, data, c.logger)
 }
 
 func (c *PRDetailController) buildPRDetailData(owner, repo string, pullNum int) (web_templates.PRDetailData, error) {

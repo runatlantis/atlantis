@@ -111,12 +111,23 @@ func (mock *MockProjectCommandOutputHandler) IsKeyExists(key string) bool {
 	return _ret0
 }
 
-func (mock *MockProjectCommandOutputHandler) Register(jobID string, receiver chan string) {
+func (mock *MockProjectCommandOutputHandler) Register(jobID string, receiver chan string) ([]string, bool) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandOutputHandler().")
 	}
 	_params := []pegomock.Param{jobID, receiver}
-	pegomock.GetGenericMockFrom(mock).Invoke("Register", _params, []reflect.Type{})
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Register", _params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*bool)(nil)).Elem()})
+	var _ret0 []string
+	var _ret1 bool
+	if len(_result) > 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].([]string)
+		}
+		if len(_result) > 1 && _result[1] != nil {
+			_ret1 = _result[1].(bool)
+		}
+	}
+	return _ret0, _ret1
 }
 
 func (mock *MockProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg string, operationComplete bool) {

@@ -964,7 +964,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	// Shared closure for checking apply lock state (used by page controllers)
 	isApplyLocked := func() bool {
-		lock, _ := applyLockingClient.CheckApplyLock()
+		lock, err := applyLockingClient.CheckApplyLock()
+		if err != nil {
+			logger.Err("checking apply lock: %s", err)
+			return true // Fail closed: assume locked on error
+		}
 		return lock.Locked
 	}
 
@@ -979,6 +983,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatsScope:               statsScope.SubScope("api"),
 		OutputHandler:            projectCmdOutputHandler,
 		ApplyLockChecker:         isApplyLocked,
+		SSEMaxConnections:        int32(userConfig.SSEMaxConnections),
 	}
 
 	apiController := &controllers.APIController{
@@ -1040,15 +1045,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		config.AtlantisVersion,
 		parsedURL.Path,
 		isApplyLocked,
-		func(repoFullName string, pullNum int) int {
+		func() map[string]int {
 			mapping := projectCmdOutputHandler.GetPullToJobMapping()
+			result := make(map[string]int, len(mapping))
 			for _, pullInfo := range mapping {
-				if pullInfo.Pull.RepoFullName == repoFullName && pullInfo.Pull.PullNum == pullNum {
-					return len(pullInfo.JobIDInfos)
-				}
+				key := fmt.Sprintf("%s/%d", pullInfo.Pull.RepoFullName, pullInfo.Pull.PullNum)
+				result[key] = len(pullInfo.JobIDInfos)
 			}
-			return 0
+			return result
 		},
+		logger,
 	)
 
 	prDetailController := controllers.NewPRDetailController(
@@ -1058,6 +1064,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		config.AtlantisVersion,
 		parsedURL.Path,
 		isApplyLocked,
+		logger,
 	)
 
 	projectOutputController := controllers.NewProjectOutputController(
@@ -1068,6 +1075,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		parsedURL.Path,
 		isApplyLocked,
 		projectCmdOutputHandler,
+		logger,
 	)
 
 	settingsController := controllers.NewSettingsController(
@@ -1076,6 +1084,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		isApplyLocked,
 		config.AtlantisVersion,
 		parsedURL.Path,
+		logger,
 	)
 
 	locksPageController := controllers.NewLocksPageController(
@@ -1084,6 +1093,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		isApplyLocked,
 		config.AtlantisVersion,
 		parsedURL.Path,
+		logger,
 	)
 
 	jobsPageController := controllers.NewJobsPageController(
@@ -1093,6 +1103,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		isApplyLocked,
 		config.AtlantisVersion,
 		parsedURL.Path,
+		logger,
 	)
 
 	server := &Server{
@@ -1144,6 +1155,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 }
 
+// requireCSRFHeader returns middleware that checks for X-Atlantis-CSRF header
+// on state-changing requests. This prevents cross-site request forgery by
+// requiring a custom header that cannot be set by cross-origin form submissions.
+func requireCSRFHeader(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Atlantis-CSRF") == "" {
+			http.Error(w, "CSRF header required", http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	}
+}
+
 // Start creates the routes and starts serving traffic.
 func (s *Server) Start() error {
 	// Redirect index to /prs since PRs is now the primary view
@@ -1181,7 +1205,7 @@ func (s *Server) Start() error {
 
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
-	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
+	s.Router.HandleFunc("/locks", requireCSRFHeader(s.LocksController.DeleteLock)).Methods("DELETE").Queries("id", "{id:.*}")
 	// Redirect old /lock detail page to /locks (the detail page is no longer needed)
 	s.Router.HandleFunc("/lock", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, s.AtlantisURL.Path+"/locks", http.StatusMovedPermanently)
@@ -1200,8 +1224,8 @@ func (s *Server) Start() error {
 		s.Router.Handle(s.CommandRunner.GlobalCfg.Metrics.Prometheus.Endpoint, r.HTTPHandler())
 	}
 	if !s.DisableGlobalApplyLock {
-		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
-		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
+		s.Router.HandleFunc("/apply/lock", requireCSRFHeader(s.LocksController.LockApply)).Methods("POST").Queries()
+		s.Router.HandleFunc("/apply/unlock", requireCSRFHeader(s.LocksController.UnlockApply)).Methods("DELETE").Queries()
 	}
 
 	if s.EnableProfilingAPI {

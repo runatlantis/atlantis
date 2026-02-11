@@ -24,6 +24,9 @@ type TestOutputHandler struct {
 
 	// completedJobs tracks completion times for GetJobInfo
 	completedJobs map[string]time.Time
+
+	// bufferedLines holds pre-set buffered output returned by Register
+	bufferedLines map[string][]string
 }
 
 // NewTestOutputHandler creates a new TestOutputHandler for testing.
@@ -33,6 +36,17 @@ func NewTestOutputHandler() *TestOutputHandler {
 		receivers:     make(map[string][]chan string),
 		completedJobs: make(map[string]time.Time),
 	}
+}
+
+// SetBufferedLines sets buffered lines that Register will return for a job.
+// This simulates a job that already has output in its buffer.
+func (t *TestOutputHandler) SetBufferedLines(jobID string, lines []string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.bufferedLines == nil {
+		t.bufferedLines = make(map[string][]string)
+	}
+	t.bufferedLines[jobID] = lines
 }
 
 // SetJobExists sets whether a job ID exists (for IsKeyExists).
@@ -69,10 +83,12 @@ func (t *TestOutputHandler) CompleteJob(jobID string) {
 }
 
 // Register registers a channel to receive output for a job.
-func (t *TestOutputHandler) Register(jobID string, receiver chan string) {
+func (t *TestOutputHandler) Register(jobID string, receiver chan string) ([]string, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.receivers[jobID] = append(t.receivers[jobID], receiver)
+	buffered := t.bufferedLines[jobID]
+	return buffered, false
 }
 
 // Deregister removes a channel from receiving output for a job.
