@@ -299,9 +299,7 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line strin
 		default:
 			close(ch)
 			delete(p.receiverBuffers[jobID], ch)
-			p.logger.Warn("Buffer full, closing connection", map[string]any{
-				"jobID": jobID,
-			})
+			p.logger.Warn("Buffer full, closing connection for job %s", jobID)
 		}
 	}
 	p.receiverBuffersLock.Unlock()

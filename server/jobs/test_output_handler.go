@@ -83,11 +83,16 @@ func (t *TestOutputHandler) CompleteJob(jobID string) {
 }
 
 // Register registers a channel to receive output for a job.
+// If the job is already complete, the channel is closed immediately and complete=true is returned.
 func (t *TestOutputHandler) Register(jobID string, receiver chan string) ([]string, bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.receivers[jobID] = append(t.receivers[jobID], receiver)
 	buffered := t.bufferedLines[jobID]
+	if _, completed := t.completedJobs[jobID]; completed {
+		close(receiver)
+		return buffered, true
+	}
+	t.receivers[jobID] = append(t.receivers[jobID], receiver)
 	return buffered, false
 }
 

@@ -965,7 +965,7 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.Port == 0 {
 		c.Port = DefaultPort
 	}
-	if c.SSEMaxConnections == 0 {
+	if !v.IsSet(SSEMaxConnectionsFlag) {
 		c.SSEMaxConnections = DefaultSSEMaxConnections
 	}
 	if c.RedisDB == 0 {

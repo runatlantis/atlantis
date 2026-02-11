@@ -14,12 +14,6 @@ This project bundles the following third-party JavaScript libraries:
 - **Copyright:** (c) 2020 Big Sky Software
 - **Source:** https://github.com/bigskysoftware/htmx
 
-## jQuery
-- **Version:** 3.5.1
-- **License:** MIT
-- **Copyright:** (c) JS Foundation and other contributors
-- **Source:** https://github.com/jquery/jquery
-
 ## xterm.js
 - **Version:** 5.3.0
 - **License:** MIT
