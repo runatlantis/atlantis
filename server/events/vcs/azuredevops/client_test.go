@@ -106,7 +106,7 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token", azuredevopsclient.Config{})
 			client.Client.VsaexBaseURL = *testServerURL
 			Ok(t, err)
 			defer common.DisableSSLVerification()()
@@ -223,7 +223,7 @@ func TestAzureDevopsClient_UpdateStatus(t *testing.T) {
 
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
-			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token", azuredevopsclient.Config{})
 			Ok(t, err)
 			defer common.DisableSSLVerification()()
 
@@ -290,7 +290,7 @@ func TestAzureDevopsClient_GetModifiedFiles(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
+	client, err := azuredevopsclient.New(testServerURL.Host, "user", "token", azuredevopsclient.Config{})
 	Ok(t, err)
 	defer common.DisableSSLVerification()()
 
@@ -336,6 +336,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			},
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "PR has merge status: conflicts",
 			},
 		},
 		{
@@ -348,7 +349,9 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			},
 			models.MergeableStatus{
 				IsMergeable: false,
-			}},
+				Reason:      "blocking policy not approved: Not Atlantis/foo",
+			},
+		},
 		{
 			"merge succeeded",
 			azuredevops.MergeSucceeded.String(),
@@ -359,7 +362,8 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			},
 			models.MergeableStatus{
 				IsMergeable: true,
-			}},
+			},
+		},
 		{
 			"pending policy status",
 			azuredevops.MergeSucceeded.String(),
@@ -370,10 +374,11 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			},
 			models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      "blocking policy not approved: Not Atlantis/foo",
 			},
 		},
 		{
-			"atlantis apply status rejected",
+			"atlantis apply status rejected without bypass flag",
 			azuredevops.MergeSucceeded.String(),
 			Policy{
 				"Atlantis Bot/atlantis",
@@ -381,7 +386,8 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				"rejected",
 			},
 			models.MergeableStatus{
-				IsMergeable: true,
+				IsMergeable: false,
+				Reason:      "blocking policy not approved: Atlantis Bot/atlantis/apply",
 			},
 		},
 	}
@@ -421,7 +427,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token", azuredevopsclient.Config{})
 			Ok(t, err)
 
 			defer common.DisableSSLVerification()()
@@ -441,6 +447,278 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				}, models.PullRequest{
 					Num: 1,
 				}, "atlantis-test", []string{})
+			Ok(t, err)
+			Equals(t, c.expMergeable, actMergeable)
+		})
+	}
+}
+
+// TestAzureDevopsClient_PullIsMergeableWithAllowMergeableBypassApply tests the
+// AllowMergeableBypassApply feature flag that enables bypassing the apply status
+// check when determining if a PR is mergeable.
+func TestAzureDevopsClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
+	type Policy struct {
+		genre  string
+		name   string
+		status string
+	}
+
+	cases := []struct {
+		testName             string
+		mergeStatus          string
+		policy               Policy
+		allowBypass          bool
+		vcsstatusname        string
+		ignoreVCSStatusNames []string
+		expMergeable         models.MergeableStatus
+	}{
+		{
+			testName:    "bypass enabled - atlantis apply rejected is mergeable",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "Atlantis Bot/atlantis",
+				name:   "apply",
+				status: "rejected",
+			},
+			allowBypass:          true,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			testName:    "bypass enabled - atlantis apply pending is mergeable",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "Atlantis Bot/atlantis",
+				name:   "apply",
+				status: "running",
+			},
+			allowBypass:          true,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			testName:    "bypass disabled - atlantis apply rejected is not mergeable",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "Atlantis Bot/atlantis",
+				name:   "apply",
+				status: "rejected",
+			},
+			allowBypass:          false,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "blocking policy not approved: Atlantis Bot/atlantis/apply",
+			},
+		},
+		{
+			testName:    "bypass enabled - custom vcsstatusname matches and is mergeable",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "Atlantis Bot/custom-atlantis",
+				name:   "apply",
+				status: "rejected",
+			},
+			allowBypass:          true,
+			vcsstatusname:        "custom-atlantis",
+			ignoreVCSStatusNames: []string{},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			testName:    "bypass enabled - custom vcsstatusname does not match",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "Atlantis Bot/other-atlantis",
+				name:   "apply",
+				status: "rejected",
+			},
+			allowBypass:          true,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "blocking policy not approved: Atlantis Bot/other-atlantis/apply",
+			},
+		},
+		{
+			testName:    "bypass enabled - only apply is bypassed not plan",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "Atlantis Bot/atlantis",
+				name:   "plan",
+				status: "rejected",
+			},
+			allowBypass:          true,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "blocking policy not approved: Atlantis Bot/atlantis/plan",
+			},
+		},
+		{
+			testName:    "ignoreVCSStatusNames - other atlantis service in ignore list is mergeable",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "Atlantis Bot/other-atlantis",
+				name:   "plan",
+				status: "rejected",
+			},
+			allowBypass:          false,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{"other-atlantis"},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			testName:    "ignoreVCSStatusNames - multiple services in ignore list",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "Atlantis Bot/staging-atlantis",
+				name:   "apply",
+				status: "rejected",
+			},
+			allowBypass:          false,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{"prod-atlantis", "staging-atlantis"},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			testName:    "ignoreVCSStatusNames - non-atlantis service not ignored",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "External Bot/ci",
+				name:   "build",
+				status: "rejected",
+			},
+			allowBypass:          false,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{"ci"},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "blocking policy not approved: External Bot/ci/build",
+			},
+		},
+		{
+			testName:    "ignoreVCSStatusNames - status not in ignore list is not mergeable",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "Atlantis Bot/other-atlantis",
+				name:   "plan",
+				status: "rejected",
+			},
+			allowBypass:          false,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{"different-service"},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "blocking policy not approved: Atlantis Bot/other-atlantis/plan",
+			},
+		},
+		{
+			testName:    "bypass enabled with ignoreVCSStatusNames - both work together",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "Atlantis Bot/atlantis",
+				name:   "apply",
+				status: "rejected",
+			},
+			allowBypass:          true,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{"some-other-status"},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			testName:    "non-status policy rejected is not mergeable",
+			mergeStatus: azuredevops.MergeSucceeded.String(),
+			policy: Policy{
+				genre:  "",
+				name:   "",
+				status: "rejected",
+			},
+			allowBypass:          true,
+			vcsstatusname:        "atlantis",
+			ignoreVCSStatusNames: []string{},
+			expMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "blocking policy not approved: /",
+			},
+		},
+	}
+
+	jsonPullRequestBytes, err := os.ReadFile("testdata/pr.json")
+	Ok(t, err)
+
+	jsonPolicyEvaluationBytes, err := os.ReadFile("testdata/policyevaluations.json")
+	Ok(t, err)
+
+	pullRequestBody := string(jsonPullRequestBytes)
+	policyEvaluationsBody := string(jsonPolicyEvaluationBytes)
+
+	for _, c := range cases {
+		t.Run(c.testName, func(t *testing.T) {
+			pullRequestResponse := strings.Replace(pullRequestBody, `"mergeStatus": "notSet"`, fmt.Sprintf(`"mergeStatus": "%s"`, c.mergeStatus), 1)
+			policyEvaluationsResponse := strings.Replace(policyEvaluationsBody, `"status": "approved"`, fmt.Sprintf(`"status": "%s"`, c.policy.status), 1)
+			policyEvaluationsResponse = strings.Replace(policyEvaluationsResponse, `"statusGenre": "Atlantis Bot/atlantis"`, fmt.Sprintf(`"statusGenre": "%s"`, c.policy.genre), 1)
+			policyEvaluationsResponse = strings.Replace(policyEvaluationsResponse, `"statusName": "plan"`, fmt.Sprintf(`"statusName": "%s"`, c.policy.name), 1)
+
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
+						w.Write([]byte(pullRequestResponse)) // nolint: errcheck
+						return
+					case "/owner/project/_apis/policy/evaluations?api-version=5.1-preview&artifactId=vstfs%3A%2F%2F%2FCodeReview%2FCodeReviewId%2F33333333-3333-3333-333333333333%2F1":
+						w.Write([]byte(policyEvaluationsResponse)) // nolint: errcheck
+						return
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token", azuredevopsclient.Config{
+				AllowMergeableBypassApply: c.allowBypass,
+			})
+			Ok(t, err)
+
+			defer common.DisableSSLVerification()()
+
+			actMergeable, err := client.PullIsMergeable(
+				logger,
+				models.Repo{
+					FullName:          "owner/project/repo",
+					Owner:             "owner",
+					Name:              "repo",
+					CloneURL:          "",
+					SanitizedCloneURL: "",
+					VCSHost: models.VCSHost{
+						Type:     models.AzureDevops,
+						Hostname: "dev.azure.com",
+					},
+				}, models.PullRequest{
+					Num: 1,
+				}, c.vcsstatusname, c.ignoreVCSStatusNames)
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})
@@ -518,7 +796,7 @@ func TestAzureDevopsClient_PullIsApproved(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token", azuredevopsclient.Config{})
 			Ok(t, err)
 
 			defer common.DisableSSLVerification()()
@@ -566,7 +844,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 			}))
 		testServerURL, err := url.Parse(testServer.URL)
 		Ok(t, err)
-		client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
+		client, err := azuredevopsclient.New(testServerURL.Host, "user", "token", azuredevopsclient.Config{})
 		Ok(t, err)
 		defer common.DisableSSLVerification()()
 
@@ -588,7 +866,7 @@ func TestAzureDevopsClient_GetPullRequest(t *testing.T) {
 }
 
 func TestAzureDevopsClient_MarkdownPullLink(t *testing.T) {
-	client, err := azuredevopsclient.New("hostname", "user", "token")
+	client, err := azuredevopsclient.New("hostname", "user", "token", azuredevopsclient.Config{})
 	Ok(t, err)
 	pull := models.PullRequest{Num: 1}
 	s, _ := client.MarkdownPullLink(pull)
