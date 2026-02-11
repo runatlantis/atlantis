@@ -12,6 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/metrics"
 	tally "github.com/uber-go/tally/v4"
 )
 
@@ -139,8 +140,9 @@ type ProjectContext struct {
 	TeamAllowlistChecker TeamAllowlistChecker
 }
 
-// SetProjectScopeTags adds ProjectContext tags to a new returned scope.
-func (p ProjectContext) SetProjectScopeTags(scope tally.Scope) tally.Scope {
+// SetProjectScopeTags sets project-specific tags on a scope using the PR scope manager.
+// Creates a closeable PR-specific root scope with project-level tags.
+func (p ProjectContext) SetProjectScopeTags(prScopeManager *metrics.PRScopeManager) tally.Scope {
 	v := ""
 	if p.TerraformVersion != nil {
 		v = p.TerraformVersion.String()
@@ -155,7 +157,8 @@ func (p ProjectContext) SetProjectScopeTags(scope tally.Scope) tally.Scope {
 		Workspace:        p.Workspace,
 	}
 
-	return scope.Tagged(tags.Loadtags())
+	// Use PR scope manager to create closeable PR-specific root scope
+	return prScopeManager.GetOrCreatePRScope(p.BaseRepo.FullName, p.Pull.Num, tags.Loadtags())
 }
 
 // GetShowResultFileName returns the filename (not the path) to store the tf show result

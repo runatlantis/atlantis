@@ -91,6 +91,7 @@ type UserConfig struct {
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`
 	PendingApplyStatus              bool   `mapstructure:"pending-apply-status"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
+	MetricsInactivePRRetention      string `mapstructure:"metrics-inactive-pr-retention"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
 	Port                            int    `mapstructure:"port"`
 	QuietPolicyChecks               bool   `mapstructure:"quiet-policy-checks"`

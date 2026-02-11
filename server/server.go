@@ -39,7 +39,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/go-homedir"
 	tally "github.com/uber-go/tally/v4"
-	prometheus "github.com/uber-go/tally/v4/prometheus"
+	tallyprom "github.com/uber-go/tally/v4/prometheus"
 	"github.com/urfave/negroni/v3"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
@@ -108,6 +108,7 @@ type Server struct {
 	StatsScope                     tally.Scope
 	StatsReporter                  tally.BaseStatsReporter
 	StatsCloser                    io.Closer
+	PRScopeManager                 *metrics.PRScopeManager
 	Locker                         locking.Locker
 	ApplyLocker                    locking.ApplyLocker
 	VCSEventsController            *events_controllers.VCSEventsController
@@ -230,6 +231,27 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, fmt.Errorf("instantiating metrics scope: %w", err)
 	}
 
+	// Create PR scope manager for per-PR metrics that can be individually closed
+	scopeOptions := tally.ScopeOptions{
+		Prefix:          userConfig.StatsNamespace,
+		SanitizeOptions: &tallyprom.DefaultSanitizerOpts,
+		Separator:       tallyprom.DefaultSeparator,
+	}
+
+	// Parse retention period from config
+	retentionPeriod, err := time.ParseDuration(userConfig.MetricsInactivePRRetention)
+	if err != nil {
+		return nil, fmt.Errorf("parsing metrics-inactive-pr-retention: %w", err)
+	}
+
+	prScopeManager := metrics.NewPRScopeManager(
+		logger,
+		statsReporter,
+		scopeOptions,
+		time.Second,     // report interval
+		retentionPeriod, // retention period for inactive PRs
+	)
+
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
 		if userConfig.GithubAllowMergeableBypassApply {
 			githubConfig = github.Config{
@@ -273,7 +295,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, err
 		}
 
-		githubClient = github.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
+		githubClient = github.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger, prScopeManager)
 	}
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
@@ -533,6 +555,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		logger,
 	)
 
+	// Add PR scope manager cleanup job to clean up inactive PR scopes
+	// Cleanup runs at the same frequency as the retention period (no point running more often)
+	// Only add if retention period is set (non-zero)
+	if retentionPeriod > 0 {
+		scheduledExecutorService.AddJob(scheduled.JobDefinition{
+			Job:    prScopeManager,
+			Period: retentionPeriod,
+		})
+		logger.Info("Metrics cleanup enabled: retention period and cleanup interval = %v", retentionPeriod)
+	} else {
+		logger.Info("Metrics cleanup disabled (retention period is 0)")
+	}
+
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir
 	if githubAppEnabled {
 		if !userConfig.WriteGitCreds {
@@ -583,6 +618,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 			VCSClient:                vcsClient,
+			ScopeCleaner:             prScopeManager,
 		},
 	)
 
@@ -760,6 +796,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	instrumentedProjectCmdRunner := events.NewInstrumentedProjectCommandRunner(
 		statsScope,
 		projectOutputWrapper,
+		prScopeManager,
 	)
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
@@ -1025,6 +1062,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatsScope:                     statsScope,
 		StatsReporter:                  statsReporter,
 		StatsCloser:                    closer,
+		PRScopeManager:                 prScopeManager,
 		Locker:                         lockingClient,
 		ApplyLocker:                    applyLockingClient,
 		VCSEventsController:            eventsController,
@@ -1080,7 +1118,7 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
 	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
 
-	r, ok := s.StatsReporter.(prometheus.Reporter)
+	r, ok := s.StatsReporter.(tallyprom.Reporter)
 	if ok {
 		s.Router.Handle(s.CommandRunner.GlobalCfg.Metrics.Prometheus.Endpoint, r.HTTPHandler())
 	}

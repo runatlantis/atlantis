@@ -11,19 +11,21 @@ import (
 )
 
 // NewInstrumentedGithubClient creates a client proxy responsible for gathering stats and logging
-func NewInstrumentedGithubClient(client *Client, statsScope tally.Scope, logger logging.SimpleLogging) IGithubClient {
+func NewInstrumentedGithubClient(client *Client, statsScope tally.Scope, logger logging.SimpleLogging, prScopeManager *metrics.PRScopeManager) IGithubClient {
 	scope := statsScope.SubScope("github")
 
 	instrumentedGHClient := &common.InstrumentedClient{
-		Client:     client,
-		StatsScope: scope,
-		Logger:     logger,
+		Client:         client,
+		StatsScope:     scope,
+		PRScopeManager: prScopeManager,
+		Logger:         logger,
 	}
 
 	return &InstrumentedGithubClient{
 		InstrumentedClient: instrumentedGHClient,
 		PullRequestGetter:  client,
 		StatsScope:         scope,
+		PRScopeManager:     prScopeManager,
 		Logger:             logger,
 	}
 }
@@ -47,12 +49,12 @@ type InstrumentedGithubClient struct {
 	*common.InstrumentedClient
 	PullRequestGetter GithubPullRequestGetter
 	StatsScope        tally.Scope
+	PRScopeManager    *metrics.PRScopeManager
 	Logger            logging.SimpleLogging
 }
 
 func (c *InstrumentedGithubClient) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error) {
-	scope := c.StatsScope.SubScope("get_pull_request")
-	scope = common.SetGitScopeTags(scope, repo.FullName, pullNum)
+	scope := common.SetGitScopeTags(c.PRScopeManager, repo.FullName, pullNum).SubScope("get_pull_request")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()

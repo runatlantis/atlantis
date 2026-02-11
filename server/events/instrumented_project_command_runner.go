@@ -20,10 +20,11 @@ type IntrumentedCommandRunner interface {
 
 type InstrumentedProjectCommandRunner struct {
 	projectCommandRunner ProjectCommandRunner
-	scope                tally.Scope
+	prScopeManager       *metrics.PRScopeManager
+	scope                tally.Scope // fallback scope if PRScopeManager is nil
 }
 
-func NewInstrumentedProjectCommandRunner(scope tally.Scope, projectCommandRunner ProjectCommandRunner) *InstrumentedProjectCommandRunner {
+func NewInstrumentedProjectCommandRunner(scope tally.Scope, projectCommandRunner ProjectCommandRunner, prScopeManager *metrics.PRScopeManager) *InstrumentedProjectCommandRunner {
 	projectTags := command.ProjectScopeTags{}
 	scope = scope.SubScope("project").Tagged(projectTags.Loadtags())
 
@@ -33,38 +34,40 @@ func NewInstrumentedProjectCommandRunner(scope tally.Scope, projectCommandRunner
 
 	return &InstrumentedProjectCommandRunner{
 		projectCommandRunner: projectCommandRunner,
+		prScopeManager:       prScopeManager,
 		scope:                scope,
 	}
 }
 
 func (p *InstrumentedProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectCommandOutput {
-	return RunAndEmitStats(ctx, p.projectCommandRunner.Plan, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.Plan, p.prScopeManager, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) command.ProjectCommandOutput {
-	return RunAndEmitStats(ctx, p.projectCommandRunner.PolicyCheck, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.PolicyCheck, p.prScopeManager, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
-	return RunAndEmitStats(ctx, p.projectCommandRunner.Apply, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.Apply, p.prScopeManager, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectCommandOutput {
-	return RunAndEmitStats(ctx, p.projectCommandRunner.ApprovePolicies, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.ApprovePolicies, p.prScopeManager, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) Import(ctx command.ProjectContext) command.ProjectCommandOutput {
-	return RunAndEmitStats(ctx, p.projectCommandRunner.Import, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.Import, p.prScopeManager, p.scope)
 }
 
 func (p *InstrumentedProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectCommandOutput {
-	return RunAndEmitStats(ctx, p.projectCommandRunner.StateRm, p.scope)
+	return RunAndEmitStats(ctx, p.projectCommandRunner.StateRm, p.prScopeManager, p.scope)
 }
 
-func RunAndEmitStats(ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectCommandOutput, scope tally.Scope) command.ProjectCommandOutput {
+func RunAndEmitStats(ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectCommandOutput, prScopeManager *metrics.PRScopeManager, fallbackScope tally.Scope) command.ProjectCommandOutput {
 	commandName := ctx.CommandName.String()
 	// ensures we are differentiating between project level command and overall command
-	scope = ctx.SetProjectScopeTags(scope).SubScope(commandName)
+
+	scope := ctx.SetProjectScopeTags(prScopeManager).SubScope(commandName)
 	logger := ctx.Log
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()

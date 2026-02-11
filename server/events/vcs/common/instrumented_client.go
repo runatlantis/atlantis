@@ -15,13 +15,13 @@ import (
 
 type InstrumentedClient struct {
 	vcs.Client
-	StatsScope tally.Scope
-	Logger     logging.SimpleLogging
+	StatsScope     tally.Scope
+	PRScopeManager *metrics.PRScopeManager
+	Logger         logging.SimpleLogging
 }
 
 func (c *InstrumentedClient) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
-	scope := c.StatsScope.SubScope("get_modified_files")
-	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
+	scope := SetGitScopeTags(c.PRScopeManager, repo.FullName, pull.Num).SubScope("get_modified_files")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -42,8 +42,7 @@ func (c *InstrumentedClient) GetModifiedFiles(logger logging.SimpleLogging, repo
 }
 
 func (c *InstrumentedClient) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
-	scope := c.StatsScope.SubScope("create_comment")
-	scope = SetGitScopeTags(scope, repo.FullName, pullNum)
+	scope := SetGitScopeTags(c.PRScopeManager, repo.FullName, pullNum).SubScope("create_comment")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -62,7 +61,7 @@ func (c *InstrumentedClient) CreateComment(logger logging.SimpleLogging, repo mo
 }
 
 func (c *InstrumentedClient) ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error {
-	scope := c.StatsScope.SubScope("react_to_comment")
+	scope := SetGitScopeTags(c.PRScopeManager, repo.FullName, pullNum).SubScope("react_to_comment")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -81,8 +80,7 @@ func (c *InstrumentedClient) ReactToComment(logger logging.SimpleLogging, repo m
 }
 
 func (c *InstrumentedClient) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
-	scope := c.StatsScope.SubScope("hide_prev_plan_comments")
-	scope = SetGitScopeTags(scope, repo.FullName, pullNum)
+	scope := SetGitScopeTags(c.PRScopeManager, repo.FullName, pullNum).SubScope("hide_prev_plan_comments")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -102,8 +100,7 @@ func (c *InstrumentedClient) HidePrevCommandComments(logger logging.SimpleLoggin
 }
 
 func (c *InstrumentedClient) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error) {
-	scope := c.StatsScope.SubScope("pull_is_approved")
-	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
+	scope := SetGitScopeTags(c.PRScopeManager, repo.FullName, pull.Num).SubScope("pull_is_approved")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -124,8 +121,7 @@ func (c *InstrumentedClient) PullIsApproved(logger logging.SimpleLogging, repo m
 }
 
 func (c *InstrumentedClient) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
-	scope := c.StatsScope.SubScope("pull_is_mergeable")
-	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
+	scope := SetGitScopeTags(c.PRScopeManager, repo.FullName, pull.Num).SubScope("pull_is_mergeable")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -152,8 +148,7 @@ func (c *InstrumentedClient) UpdateStatus(logger logging.SimpleLogging, repo mod
 		return nil
 	}
 
-	scope := c.StatsScope.SubScope("update_status")
-	scope = SetGitScopeTags(scope, repo.FullName, pull.Num)
+	scope := SetGitScopeTags(c.PRScopeManager, repo.FullName, pull.Num).SubScope("update_status")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -172,8 +167,7 @@ func (c *InstrumentedClient) UpdateStatus(logger logging.SimpleLogging, repo mod
 }
 
 func (c *InstrumentedClient) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
-	scope := c.StatsScope.SubScope("merge_pull")
-	scope = SetGitScopeTags(scope, pull.BaseRepo.FullName, pull.Num)
+	scope := SetGitScopeTags(c.PRScopeManager, pull.BaseRepo.FullName, pull.Num).SubScope("merge_pull")
 
 	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer executionTime.Stop()
@@ -191,9 +185,13 @@ func (c *InstrumentedClient) MergePull(logger logging.SimpleLogging, pull models
 	return nil
 }
 
-func SetGitScopeTags(scope tally.Scope, repoFullName string, pullNum int) tally.Scope {
-	return scope.Tagged(map[string]string{
+// SetGitScopeTags sets git-level tags (repo and PR) on a scope using the PR scope manager.
+// Creates a closeable PR-specific root scope with git-level tags.
+func SetGitScopeTags(prScopeManager *metrics.PRScopeManager, repoFullName string, pullNum int) tally.Scope {
+	tags := map[string]string{
 		"base_repo": repoFullName,
 		"pr_number": strconv.Itoa(pullNum),
-	})
+	}
+
+	return prScopeManager.GetOrCreatePRScope(repoFullName, pullNum, tags)
 }

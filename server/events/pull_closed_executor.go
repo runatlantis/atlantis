@@ -46,6 +46,16 @@ type PullCleaner interface {
 	CleanUpPull(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error
 }
 
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_scope_cleaner.go ScopeCleaner
+
+// ScopeCleaner tracks and cleans up metric scopes for closed PRs.
+type ScopeCleaner interface {
+	// MarkPRClosed marks a PR as closed for metric cleanup.
+	MarkPRClosed(repoFullName string, pullNum int)
+	// CleanupStaleMetrics closes scopes that have exceeded the retention period.
+	CleanupStaleMetrics() int
+}
+
 // PullClosedExecutor executes the tasks required to clean up a closed pull
 // request.
 type PullClosedExecutor struct {
@@ -56,6 +66,7 @@ type PullClosedExecutor struct {
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
 	CancellationTracker      CancellationTracker
+	ScopeCleaner             ScopeCleaner
 }
 
 type templatedProject struct {
@@ -120,6 +131,10 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// Clear any operations to avoid unbounded growth.
 	if p.CancellationTracker != nil {
 		p.CancellationTracker.Clear(pull)
+	}
+
+	if p.ScopeCleaner != nil {
+		p.ScopeCleaner.MarkPRClosed(repo.FullName, pull.Num)
 	}
 
 	// If there are no locks then there's no need to comment.
