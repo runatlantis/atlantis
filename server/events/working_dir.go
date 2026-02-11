@@ -135,8 +135,8 @@ func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wra
 		logger.Info("repo is at correct commit %q so will not re-clone", c.pr.HeadCommit)
 		return true, nil
 	}
-	if !w.remoteHasBranch(logger, c, c.pr.BaseBranch) {
-		logger.Info("repo appears to have changed base branch, must reclone")
+	if w.CheckoutMerge && !w.remoteHasBranch(logger, c, c.pr.BaseBranch) {
+		logger.Info("repo appears to have changed base branch , must reclone")
 		return false, nil
 	}
 	logger.Info("repo was already cloned but branch is not at correct commit, updating to %q", c.pr.HeadCommit)
