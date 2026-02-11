@@ -161,6 +161,7 @@
           data-workspace="{{ .Workspace }}"
           data-project="{{ .ProjectName }}"
           data-status="{{ .Status }}"
+          data-has-policy-check="{{ .HasPolicyCheck }}"
           data-policy-passed="{{ .PolicyPassed }}"
           onclick="window.location='{{ $basePath }}/pr/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ .Path }}?workspace={{ .Workspace }}{{ if .ProjectName }}&project={{ .ProjectName }}{{ end }}'"
         >
@@ -186,10 +187,14 @@
             {{ if and (eq .AddCount 0) (eq .ChangeCount 0) (eq .DestroyCount 0) }}<span class="text-muted">-</span>{{ end }}
           </td>
           <td class="text-center">
-            {{ if .PolicyPassed }}
-            <i data-lucide="shield-check" class="icon-sm text-success" title="Policy passed"></i>
+            {{ if .HasPolicyCheck }}
+              {{ if .PolicyPassed }}
+              <i data-lucide="shield-check" class="icon-sm text-success" title="Policy passed"></i>
+              {{ else }}
+              <i data-lucide="shield-x" class="icon-sm text-danger" title="Policy failed"></i>
+              {{ end }}
             {{ else }}
-            <i data-lucide="shield-x" class="icon-sm text-danger" title="Policy failed"></i>
+              <i data-lucide="shield" class="icon-sm text-muted" title="No policy check"></i>
             {{ end }}
           </td>
           <td class="text-muted">{{ .LastUpdated }}</td>
@@ -243,6 +248,7 @@
           const workspace = (row.dataset.workspace || '').toLowerCase();
           const project = (row.dataset.project || '').toLowerCase();
           const status = row.dataset.status || '';
+          const hasPolicyCheck = row.dataset.hasPolicyCheck === 'true';
           const policyPassed = row.dataset.policyPassed === 'true';
 
           // Search filter
@@ -257,7 +263,7 @@
             matchesStatus = (this.statusFilters.failed && status === 'failed') ||
                            (this.statusFilters.passed && status === 'success') ||
                            (this.statusFilters.pending && status === 'pending') ||
-                           (this.statusFilters.policy && !policyPassed);
+                           (this.statusFilters.policy && hasPolicyCheck && !policyPassed);
           }
 
           row.style.display = (matchesSearch && matchesStatus) ? '' : 'none';

@@ -345,18 +345,19 @@ type PRDetailData struct {
 
 // PRDetailProject represents a single project in the PR detail view
 type PRDetailProject struct {
-	ProjectName   string
-	Path          string
-	Workspace     string
-	Status        string // "success", "failed", "pending", "applied"
-	StatusLabel   string // Human-readable: "Planned", "Applied", "Plan Failed", etc.
-	PolicyPassed  bool
-	AddCount      int
-	ChangeCount   int
-	DestroyCount  int
-	Error         string
-	LastUpdated   string
-	LastUpdatedTS time.Time
+	ProjectName    string
+	Path           string
+	Workspace      string
+	Status         string // "success", "failed", "pending", "applied"
+	StatusLabel    string // Human-readable: "Planned", "Applied", "Plan Failed", etc.
+	PolicyPassed   bool
+	HasPolicyCheck bool
+	AddCount       int
+	ChangeCount    int
+	DestroyCount   int
+	Error          string
+	LastUpdated    string
+	LastUpdatedTS  time.Time
 }
 
 var PRDetailTemplate = mustParseLayoutTemplate(templateFileNames["pr-detail"])
@@ -421,10 +422,11 @@ type ProjectOutputData struct {
 	Duration    string // e.g., "2m 34s"
 
 	// Output
-	Output     string
+	Output string
 	// Policy
-	PolicyPassed     bool
-	PolicyOutput     string
+	PolicyPassed   bool
+	HasPolicyCheck bool
+	PolicyOutput   string
 
 	// Error
 	Error string
@@ -470,7 +472,6 @@ type JobsPageData struct {
 	Repositories []string // Unique repos for filter dropdown
 }
 
-
 // JobDetailData holds data for the job detail page template
 type JobDetailData struct {
 	LayoutData
@@ -489,8 +490,8 @@ type JobDetailData struct {
 
 	// Status
 	Status        string // "running", "complete", "error"
-	StartTimeUnix int64 // Unix timestamp in milliseconds for JS
-	EndTimeUnix   int64 // Unix timestamp in milliseconds for JS (0 if still running)
+	StartTimeUnix int64  // Unix timestamp in milliseconds for JS
+	EndTimeUnix   int64  // Unix timestamp in milliseconds for JS (0 if still running)
 
 	// Status panel fields
 	TriggeredBy string // Username who triggered the job
@@ -498,10 +499,11 @@ type JobDetailData struct {
 	BadgeStyle  string // "pending", "success", "failed"
 
 	// Completion stats (progressive disclosure)
-	AddCount     int
-	ChangeCount  int
-	DestroyCount int
-	PolicyPassed bool
+	AddCount       int
+	ChangeCount    int
+	DestroyCount   int
+	PolicyPassed   bool
+	HasPolicyCheck bool
 
 	// Output (for completed jobs loaded from database)
 	Output string
@@ -509,4 +511,3 @@ type JobDetailData struct {
 	// Streaming (for live jobs)
 	StreamURL string
 }
-

@@ -146,7 +146,7 @@ func (c *PRDetailController) buildPRDetailData(owner, repo string, pullNum int) 
 			pendingCount++
 		}
 
-		if !output.PolicyPassed {
+		if (output.CommandName == "policy_check" || output.PolicyOutput != "") && !output.PolicyPassed {
 			policyFailCount++
 		}
 
@@ -206,18 +206,19 @@ func BuildDetailProject(output models.ProjectOutput) web_templates.PRDetailProje
 	status, statusLabel := DetermineProjectStatus(output.CommandName, output.Status)
 
 	return web_templates.PRDetailProject{
-		ProjectName:   output.ProjectName,
-		Path:          output.Path,
-		Workspace:     output.Workspace,
-		Status:        status,
-		StatusLabel:   statusLabel,
-		PolicyPassed:  output.PolicyPassed,
-		AddCount:      output.ResourceStats.Add,
-		ChangeCount:   output.ResourceStats.Change,
-		DestroyCount:  output.ResourceStats.Destroy,
-		Error:         output.Error,
-		LastUpdated:   FormatRelativeTime(output.CompletedAt),
-		LastUpdatedTS: output.CompletedAt,
+		ProjectName:    output.ProjectName,
+		Path:           output.Path,
+		Workspace:      output.Workspace,
+		Status:         status,
+		StatusLabel:    statusLabel,
+		PolicyPassed:   output.PolicyPassed,
+		HasPolicyCheck: output.CommandName == "policy_check" || output.PolicyOutput != "",
+		AddCount:       output.ResourceStats.Add,
+		ChangeCount:    output.ResourceStats.Change,
+		DestroyCount:   output.ResourceStats.Destroy,
+		Error:          output.Error,
+		LastUpdated:    FormatRelativeTime(output.CompletedAt),
+		LastUpdatedTS:  output.CompletedAt,
 	}
 }
 

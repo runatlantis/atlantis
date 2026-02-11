@@ -7,7 +7,7 @@
   data-path="{{ .Path }}"
   data-workspace="{{ .Workspace }}"
   data-project="{{ .ProjectName }}"
-  onclick="window.location='{{ $basePath }}/pr/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ .Path }}?workspace={{ .Workspace }}'"
+  onclick="window.location='{{ $basePath }}/pr/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ .Path }}?workspace={{ .Workspace }}{{ if .ProjectName }}&project={{ .ProjectName }}{{ end }}'"
 >
   <span class="pr-project-status-icon pr-project-status-icon--{{ .Status }}">
     {{ if eq .Status "success" }}✓{{ end }}
@@ -25,10 +25,14 @@
     {{ if and (eq .AddCount 0) (eq .ChangeCount 0) (eq .DestroyCount 0) }}—{{ end }}
   </div>
   <div class="pr-project-policy">
-    {{ if .PolicyPassed }}
-    <span class="pr-project-policy-icon--pass" title="Policy passed">✓</span>
+    {{ if .HasPolicyCheck }}
+      {{ if .PolicyPassed }}
+      <span class="pr-project-policy-icon--pass" title="Policy passed">✓</span>
+      {{ else }}
+      <span class="pr-project-policy-icon--fail" title="Policy failed">✗</span>
+      {{ end }}
     {{ else }}
-    <span class="pr-project-policy-icon--fail" title="Policy failed">✗</span>
+      <span class="pr-project-policy-icon--none" title="No policy check">-</span>
     {{ end }}
   </div>
 </div>

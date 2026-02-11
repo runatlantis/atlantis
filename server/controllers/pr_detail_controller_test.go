@@ -34,6 +34,7 @@ func TestPRDetailController_PRDetail_Success(t *testing.T) {
 			{
 				Path:          "terraform/staging",
 				Workspace:     "default",
+				CommandName:   "policy_check",
 				Status:        models.SuccessOutputStatus,
 				PolicyPassed:  true,
 				ResourceStats: models.ResourceStats{Add: 2, Change: 1},
@@ -42,6 +43,7 @@ func TestPRDetailController_PRDetail_Success(t *testing.T) {
 			{
 				Path:         "terraform/prod",
 				Workspace:    "default",
+				CommandName:  "plan",
 				Status:       models.FailedOutputStatus,
 				PolicyPassed: false,
 				Error:        "plan failed",
@@ -104,8 +106,8 @@ func TestPRDetailController_PRDetail_InvalidPullNum(t *testing.T) {
 func TestPRDetailController_PRDetailProjects_WithFilter(t *testing.T) {
 	mockDB := &mockPRDetailDB{
 		outputs: []models.ProjectOutput{
-			{Path: "staging", Status: models.SuccessOutputStatus, PolicyPassed: true},
-			{Path: "prod", Status: models.FailedOutputStatus, PolicyPassed: false},
+			{Path: "staging", CommandName: "policy_check", Status: models.SuccessOutputStatus, PolicyPassed: true},
+			{Path: "prod", CommandName: "plan", Status: models.FailedOutputStatus, PolicyPassed: false},
 		},
 	}
 
@@ -198,6 +200,7 @@ func TestBuildDetailProject(t *testing.T) {
 		Path:          "terraform/staging",
 		Workspace:     "default",
 		ProjectName:   "staging-vpc",
+		CommandName:   "policy_check",
 		Status:        models.SuccessOutputStatus,
 		PolicyPassed:  true,
 		ResourceStats: models.ResourceStats{Add: 5, Change: 2, Destroy: 1},
@@ -211,7 +214,43 @@ func TestBuildDetailProject(t *testing.T) {
 	Equals(t, "staging-vpc", project.ProjectName)
 	Equals(t, "success", project.Status)
 	Equals(t, true, project.PolicyPassed)
+	Equals(t, true, project.HasPolicyCheck)
 	Equals(t, 5, project.AddCount)
 	Equals(t, 2, project.ChangeCount)
 	Equals(t, 1, project.DestroyCount)
+}
+
+func TestBuildDetailProject_NonPolicyCommand(t *testing.T) {
+	output := models.ProjectOutput{
+		Path:          "terraform/staging",
+		Workspace:     "default",
+		CommandName:   "plan",
+		Status:        models.SuccessOutputStatus,
+		PolicyPassed:  false, // Default false for non-policy commands
+		ResourceStats: models.ResourceStats{Add: 1},
+		CompletedAt:   time.Now().Add(-5 * time.Minute),
+	}
+
+	project := controllers.BuildDetailProject(output)
+
+	Equals(t, false, project.HasPolicyCheck)
+	Equals(t, false, project.PolicyPassed)
+}
+
+func TestBuildDetailProject_PolicyOutputSetsHasPolicyCheck(t *testing.T) {
+	output := models.ProjectOutput{
+		Path:          "terraform/staging",
+		Workspace:     "default",
+		CommandName:   "plan",
+		Status:        models.SuccessOutputStatus,
+		PolicyPassed:  true,
+		PolicyOutput:  "Policies passed",
+		ResourceStats: models.ResourceStats{Add: 1},
+		CompletedAt:   time.Now().Add(-5 * time.Minute),
+	}
+
+	project := controllers.BuildDetailProject(output)
+
+	Equals(t, true, project.HasPolicyCheck)
+	Equals(t, true, project.PolicyPassed)
 }

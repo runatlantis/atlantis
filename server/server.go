@@ -962,6 +962,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DeleteLockCommand: deleteLockCommand,
 	}
 
+	// Shared closure for checking apply lock state (used by page controllers)
+	isApplyLocked := func() bool {
+		lock, _ := applyLockingClient.CheckApplyLock()
+		return lock.Locked
+	}
+
 	jobsController := &controllers.JobsController{
 		AtlantisVersion:          config.AtlantisVersion,
 		AtlantisURL:              parsedURL,
@@ -972,6 +978,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
 		OutputHandler:            projectCmdOutputHandler,
+		ApplyLockChecker:         isApplyLocked,
 	}
 
 	apiController := &controllers.APIController{
@@ -1024,12 +1031,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubSetupComplete: githubAppEnabled,
 		GithubHostname:      userConfig.GithubHostname,
 		GithubOrg:           userConfig.GithubOrg,
-	}
-
-	// Shared closure for checking apply lock state (used by page controllers)
-	isApplyLocked := func() bool {
-		lock, _ := applyLockingClient.CheckApplyLock()
-		return lock.Locked
 	}
 
 	prController := controllers.NewPRController(
