@@ -205,20 +205,21 @@ func (c *ProjectOutputController) ProjectOutputPartial(w http.ResponseWriter, r 
 	}
 
 	data := web_templates.ProjectOutputData{
-		Status:       status,
-		StatusLabel:  statusLabel,
-		CommandName:  output.CommandName,
-		TriggeredBy:  output.TriggeredBy,
-		Duration:     duration,
-		Workspace:    output.Workspace,
-		AddCount:     output.ResourceStats.Add,
-		ChangeCount:  output.ResourceStats.Change,
-		DestroyCount: output.ResourceStats.Destroy,
-		ImportCount:  output.ResourceStats.Import,
-		Output:       output.Output,
-		Error:        output.Error,
-		RunTimestamp: output.RunTimestamp,
-		PolicyPassed: output.PolicyPassed,
+		Status:         status,
+		StatusLabel:    statusLabel,
+		CommandName:    output.CommandName,
+		TriggeredBy:    output.TriggeredBy,
+		Duration:       duration,
+		Workspace:      output.Workspace,
+		AddCount:       output.ResourceStats.Add,
+		ChangeCount:    output.ResourceStats.Change,
+		DestroyCount:   output.ResourceStats.Destroy,
+		ImportCount:    output.ResourceStats.Import,
+		Output:         output.Output,
+		Error:          output.Error,
+		RunTimestamp:   output.RunTimestamp,
+		PolicyPassed:   output.PolicyPassed,
+		HasPolicyCheck: output.CommandName == "policy_check" || output.PolicyOutput != "",
 	}
 
 	if err := c.projectOutputPartialTemplate.Execute(w, data); err != nil {
@@ -321,11 +322,12 @@ func (c *ProjectOutputController) buildProjectOutputData(output *models.ProjectO
 		Duration:    duration,
 
 		// Output
-		Output:     output.Output,
+		Output: output.Output,
 
 		// Policy
-		PolicyPassed:     output.PolicyPassed,
-		PolicyOutput:     output.PolicyOutput,
+		PolicyPassed:   output.PolicyPassed,
+		HasPolicyCheck: output.CommandName == "policy_check" || output.PolicyOutput != "",
+		PolicyOutput:   output.PolicyOutput,
 
 		// Error
 		Error: output.Error,
@@ -390,4 +392,3 @@ func FormatDuration(d time.Duration) string {
 	seconds := int(d.Seconds()) % 60
 	return fmt.Sprintf("%dh %dm %ds", hours, minutes, seconds)
 }
-

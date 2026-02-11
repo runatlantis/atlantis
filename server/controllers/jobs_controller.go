@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -40,7 +41,8 @@ type JobsController struct {
 	Database                 db.Database                  `validate:"required"`
 	KeyGenerator             JobIDKeyGenerator
 	StatsScope               tally.Scope                      `validate:"required"`
-	OutputHandler            jobs.ProjectCommandOutputHandler // For SSE streaming
+	OutputHandler            jobs.ProjectCommandOutputHandler `validate:"required"`
+	ApplyLockChecker         func() bool
 }
 
 // computeJobBadge returns badge text, style, and icon based on job step and status
@@ -85,6 +87,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 	var startTimeUnix, endTimeUnix int64
 
 	pullMappings := j.OutputHandler.GetPullToJobMapping()
+outer:
 	for _, pm := range pullMappings {
 		for _, jobInfo := range pm.JobIDInfos {
 			if jobInfo.JobID == jobID {
@@ -103,7 +106,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 				if !jobInfo.CompletedAt.IsZero() {
 					endTimeUnix = jobInfo.CompletedAt.UnixMilli()
 				}
-				break
+				break outer
 			}
 		}
 	}
@@ -116,7 +119,7 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 	status := "running"
 	var output string
 	var addCount, changeCount, destroyCount int
-	var policyPassed bool
+	var policyPassed, hasPolicyCheck bool
 	if endTimeUnix > 0 {
 		status = "complete"
 		// First try to get output from in-memory buffer (for recently completed jobs)
@@ -126,19 +129,22 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 				output = strings.Join(buffer.Buffer, "\n")
 			}
 		}
-		// Fall back to database if buffer is empty
-		if output == "" {
-			if projectOutput, err := j.Database.GetProjectOutputByJobID(jobID); err == nil && projectOutput != nil {
+		// Always try database for stats and metadata (buffer only has raw output lines)
+		if projectOutput, err := j.Database.GetProjectOutputByJobID(jobID); err == nil && projectOutput != nil {
+			if output == "" {
 				output = projectOutput.Output
-				// Also load completion stats
-				addCount = projectOutput.ResourceStats.Add
-				changeCount = projectOutput.ResourceStats.Change
-				destroyCount = projectOutput.ResourceStats.Destroy
-				policyPassed = projectOutput.PolicyPassed
-				// Use TriggeredBy from DB if not available from live job
-				if triggeredBy == "" {
-					triggeredBy = projectOutput.TriggeredBy
-				}
+			}
+			addCount = projectOutput.ResourceStats.Add
+			changeCount = projectOutput.ResourceStats.Change
+			destroyCount = projectOutput.ResourceStats.Destroy
+			policyPassed = projectOutput.PolicyPassed
+			hasPolicyCheck = projectOutput.CommandName == "policy_check" || projectOutput.PolicyOutput != ""
+			if triggeredBy == "" {
+				triggeredBy = projectOutput.TriggeredBy
+			}
+			// Detect failed status from DB record
+			if projectOutput.Status == models.FailedOutputStatus || projectOutput.Error != "" {
+				status = "error"
 			}
 		}
 	}
@@ -146,11 +152,17 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 	// Compute badge based on job step and status
 	badgeText, badgeStyle, _ := computeJobBadge(jobStep, status)
 
+	var applyLockActive bool
+	if j.ApplyLockChecker != nil {
+		applyLockActive = j.ApplyLockChecker()
+	}
+
 	viewData := web_templates.JobDetailData{
 		LayoutData: web_templates.LayoutData{
 			AtlantisVersion: j.AtlantisVersion,
 			CleanedBasePath: j.AtlantisURL.Path,
 			ActiveNav:       "jobs",
+			ApplyLockActive: applyLockActive,
 		},
 		JobID:         jobID,
 		JobStep:       jobStep,
@@ -166,13 +178,14 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 		Output:        output,
 		StreamURL:     j.AtlantisURL.Path + "/jobs/" + jobID + "/stream",
 		// Status panel fields
-		TriggeredBy:  triggeredBy,
-		BadgeText:    badgeText,
-		BadgeStyle:   badgeStyle,
-		AddCount:     addCount,
-		ChangeCount:  changeCount,
-		DestroyCount: destroyCount,
-		PolicyPassed: policyPassed,
+		TriggeredBy:    triggeredBy,
+		BadgeText:      badgeText,
+		BadgeStyle:     badgeStyle,
+		AddCount:       addCount,
+		ChangeCount:    changeCount,
+		DestroyCount:   destroyCount,
+		PolicyPassed:   policyPassed,
+		HasPolicyCheck: hasPolicyCheck,
 	}
 
 	return j.ProjectJobsTemplate.Execute(w, viewData)

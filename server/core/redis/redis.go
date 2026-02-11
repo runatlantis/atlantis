@@ -579,19 +579,27 @@ func (r *RedisDB) getProjectOutputsByPattern(pattern string, sortDescending bool
 }
 
 // GetProjectOutputsByPull retrieves the latest output per project for a pull request.
+// Uses the pull-level index set (SMEMBERS) instead of SCAN for O(n) key lookup
+// instead of iterating over the entire keyspace.
 func (r *RedisDB) GetProjectOutputsByPull(repoFullName string, pullNum int) ([]models.ProjectOutput, error) {
-	pattern := fmt.Sprintf("%s::%d::*", repoFullName, pullNum)
-	allOutputs, err := r.getProjectOutputsByPattern(r.projectOutputKey(pattern), false)
+	indexKey := r.pullOutputIndexKey(repoFullName, pullNum)
+	keys, err := r.client.SMembers(ctx, indexKey).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	// Group by project key and keep only the latest per project
+	// Group by project key and keep only the latest per project.
+	// Errors from individual key lookups are intentionally skipped — index sets
+	// may contain stale references to expired or deleted keys.
 	latestByProject := make(map[string]models.ProjectOutput)
-	for _, output := range allOutputs {
+	for _, key := range keys {
+		output, err := r.getProjectOutputByKey(key)
+		if err != nil || output == nil {
+			continue
+		}
 		projectKey := output.ProjectKey()
 		if existing, ok := latestByProject[projectKey]; !ok || output.RunTimestamp > existing.RunTimestamp {
-			latestByProject[projectKey] = output
+			latestByProject[projectKey] = *output
 		}
 	}
 
@@ -613,7 +621,9 @@ func (r *RedisDB) DeleteProjectOutputsByPull(repoFullName string, pullNum int) e
 		return err
 	}
 
-	// Collect job-id-index keys to clean up
+	// Collect job-id-index keys to clean up.
+	// Errors from individual key lookups are intentionally skipped — index sets
+	// may contain stale references to expired or deleted keys.
 	var jobIDIndexKeys []string
 	for _, key := range keys {
 		output, err := r.getProjectOutputByKey(key)

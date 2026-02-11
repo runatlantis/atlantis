@@ -139,10 +139,14 @@
       <div class="run-stat">
         <span class="run-stat-label">Policy</span>
         <span class="run-stat-value">
-          {{ if .PolicyPassed }}
-          <i data-lucide="shield-check" class="icon-sm text-success" title="Policy passed"></i>
+          {{ if .HasPolicyCheck }}
+            {{ if .PolicyPassed }}
+            <i data-lucide="shield-check" class="icon-sm text-success" title="Policy passed"></i>
+            {{ else }}
+            <i data-lucide="shield-x" class="icon-sm text-danger" title="Policy failed"></i>
+            {{ end }}
           {{ else }}
-          <i data-lucide="shield-x" class="icon-sm text-danger" title="Policy failed"></i>
+            <i data-lucide="shield" class="icon-sm text-muted" title="No policy check"></i>
           {{ end }}
         </span>
       </div>
@@ -202,12 +206,12 @@
         <i data-lucide="shield" class="icon-sm"></i>
         <span>Policy Check Output</span>
       </span>
-      <span class="status-badge status-badge--{{ if .PolicyPassed }}passed{{ else }}failed{{ end }}">
+      <span class="status-badge status-badge--{{ if .PolicyPassed }}success{{ else }}failed{{ end }}">
         {{ if .PolicyPassed }}<i data-lucide="check-circle" class="icon-xs"></i> Passed{{ else }}<i data-lucide="x-circle" class="icon-xs"></i> Failed{{ end }}
       </span>
     </button>
     <div class="output-section-content" x-show="policyExpanded" x-collapse>
-      <pre class="policy-output">{{ .PolicyOutputHTML }}</pre>
+      <pre class="policy-output">{{ .PolicyOutput }}</pre>
     </div>
   </div>
   {{ end }}

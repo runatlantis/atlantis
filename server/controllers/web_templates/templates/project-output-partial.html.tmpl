@@ -29,10 +29,14 @@
   <div class="run-stat">
     <span class="run-stat-label">Policy</span>
     <span class="run-stat-value">
-      {{ if .PolicyPassed }}
-      <i data-lucide="shield-check" class="icon-sm text-success" title="Policy passed"></i>
+      {{ if .HasPolicyCheck }}
+        {{ if .PolicyPassed }}
+        <i data-lucide="shield-check" class="icon-sm text-success" title="Policy passed"></i>
+        {{ else }}
+        <i data-lucide="shield-x" class="icon-sm text-danger" title="Policy failed"></i>
+        {{ end }}
       {{ else }}
-      <i data-lucide="shield-x" class="icon-sm text-danger" title="Policy failed"></i>
+        <i data-lucide="shield" class="icon-sm text-muted" title="No policy check"></i>
       {{ end }}
     </span>
   </div>
