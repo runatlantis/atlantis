@@ -137,7 +137,6 @@ type UserConfig struct {
 	WebPassword                string          `mapstructure:"web-password"`
 	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
 	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
-	DevMode                    bool            `mapstructure:"dev"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName

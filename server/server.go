@@ -179,19 +179,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	logging.SuppressDefaultLogging()
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
 
-	// Initialize dev mode for templates if enabled
-	if userConfig.DevMode {
-		// Find templates directory relative to working directory
-		templatesDir := "server/controllers/web_templates/templates"
-		if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
-			// Try current directory structure
-			templatesDir = "controllers/web_templates/templates"
-			if _, statErr := os.Stat(templatesDir); os.IsNotExist(statErr) {
-				return nil, fmt.Errorf("dev mode enabled but templates directory not found. Run from project root or set ATLANTIS_DEV=false")
-			}
-		}
-		web_templates.SetDevMode(true, templatesDir)
-	}
 
 	if err != nil {
 		return nil, err
