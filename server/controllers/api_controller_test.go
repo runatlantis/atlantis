@@ -1148,3 +1148,145 @@ func TestAPIController_DetectDrift_Unauthorized(t *testing.T) {
 	apiErr := parseAPIError(t, response)
 	Equals(t, controllers.ErrCodeUnauthorized, apiErr.Code)
 }
+
+// TestAPIController_DetectDrift_ReturnsDetectionID verifies that DetectDrift
+// returns a non-empty detection ID and that each project's DetectionID matches.
+func TestAPIController_DetectDrift_ReturnsDetectionID(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, response, &result)
+
+	// Detection result must have a non-empty UUID
+	Assert(t, result.ID != "", "expected non-empty detection ID")
+
+	// Each project's DetectionID must match the result ID
+	for _, p := range result.Projects {
+		Equals(t, result.ID, p.DetectionID)
+	}
+}
+
+// TestAPIController_DetectDrift_AutoDiscoversProjects verifies that when no
+// projects or paths are specified in the request, drift detection still discovers
+// projects via BuildPlanCommands (auto-discovery).
+func TestAPIController_DetectDrift_AutoDiscoversProjects(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	// No projects or paths specified — relies on auto-discovery
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+	})
+
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+
+	// BuildPlanCommands should still be called once (auto-discovery with empty CommentCommand)
+	projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+}
+
+// TestAPIController_DetectDrift_PreWorkflowHooksRun verifies that pre-workflow
+// hooks are executed during drift detection. The first call runs before project
+// discovery (so hooks can generate atlantis.yaml), and the second call runs
+// per-project inside apiPlan.
+func TestAPIController_DetectDrift_PreWorkflowHooksRun(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	preWorkflowHooksRunner := ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner)
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+
+	// Pre-workflow hooks are called twice:
+	// 1) Before project discovery (DetectDrift handler) with Plan command
+	// 2) Per-project inside apiPlan with the project-specific command
+	_, capturedCmds := preWorkflowHooksRunner.VerifyWasCalled(Times(2)).
+		RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetAllCapturedArguments()
+
+	Assert(t, len(capturedCmds) == 2,
+		"expected 2 pre-workflow hook calls, got %d", len(capturedCmds))
+
+	// Both calls should use Plan command
+	Assert(t, capturedCmds[0].Name == command.Plan,
+		"expected first pre-hook command to be Plan, got %s", capturedCmds[0].Name.String())
+	Assert(t, capturedCmds[1].Name == command.Plan,
+		"expected second pre-hook command to be Plan, got %s", capturedCmds[1].Name.String())
+}
+
+// TestAPIController_DetectDrift_PreWorkflowHooksFailure verifies that when
+// FailOnPreWorkflowHookError is true, a pre-workflow hook failure stops drift detection.
+func TestAPIController_DetectDrift_PreWorkflowHooksFailure(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+	ac.FailOnPreWorkflowHookError = true
+
+	preWorkflowHooksRunner := ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner)
+	When(preWorkflowHooksRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn(fmt.Errorf("hook failed: generate atlantis.yaml error"))
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeInternal, apiErr.Code)
+}

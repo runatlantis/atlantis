@@ -112,7 +112,7 @@ func TestNewWebhooksManager_UnsupportedEvent(t *testing.T) {
 	configs[0].Event = unsupportedEvent
 	_, err := webhooks.NewMultiWebhookSender(configs, clients)
 	Assert(t, err != nil, "expected error")
-	Equals(t, "\"event: badevent\" not supported. Only \"event: apply\" is supported right now", err.Error())
+	Equals(t, "\"event: badevent\" not supported. Only \"event: apply\" and \"event: drift\" are supported", err.Error())
 }
 
 func TestNewWebhooksManager_NoKind(t *testing.T) {

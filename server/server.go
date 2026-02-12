@@ -405,13 +405,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing webhook http headers: %w", err)
 	}
-	webhooksManager, err := webhooks.NewMultiWebhookSender(
-		webhooksConfig,
-		webhooks.Clients{
-			Slack: webhooks.NewSlackClient(userConfig.SlackToken),
-			Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
-		},
-	)
+	webhookClients := webhooks.Clients{
+		Slack: webhooks.NewSlackClient(userConfig.SlackToken),
+		Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
+	}
+	webhooksManager, err := webhooks.NewMultiWebhookSender(webhooksConfig, webhookClients)
 	if err != nil {
 		return nil, fmt.Errorf("initializing webhooks: %w", err)
 	}
@@ -987,6 +985,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		driftStorage := drift.NewInMemoryStorage()
 		apiController.DriftStorage = driftStorage
 		apiController.RemediationService = drift.NewInMemoryRemediationService(driftStorage)
+
+		driftWebhookSender, err := webhooks.NewDriftWebhookSender(webhooksConfig, webhookClients)
+		if err != nil {
+			return nil, fmt.Errorf("initializing drift webhooks: %w", err)
+		}
+		apiController.DriftWebhookSender = driftWebhookSender
 	}
 
 	eventsController := &events_controllers.VCSEventsController{

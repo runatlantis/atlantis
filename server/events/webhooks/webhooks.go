@@ -79,8 +79,11 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 		if c.Kind == "" || c.Event == "" {
 			return nil, errors.New("must specify \"kind\" and \"event\" keys for webhooks")
 		}
+		if c.Event == DriftEvent {
+			continue // drift events are handled by DriftWebhookSender
+		}
 		if c.Event != ApplyEvent {
-			return nil, fmt.Errorf("\"event: %s\" not supported. Only \"event: %s\" is supported right now", c.Event, ApplyEvent)
+			return nil, fmt.Errorf("\"event: %s\" not supported. Only \"event: %s\" and \"event: %s\" are supported", c.Event, ApplyEvent, DriftEvent)
 		}
 		switch c.Kind {
 		case SlackKind:
