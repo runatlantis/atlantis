@@ -363,7 +363,7 @@ func (j *JobsController) getProjectJobsSSE(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 		fmt.Fprintf(w, "id: %d\n", i)
-		for _, part := range strings.Split(line, "\n") {
+		for part := range strings.SplitSeq(line, "\n") {
 			fmt.Fprintf(w, "data: %s\n", part)
 		}
 		fmt.Fprint(w, "\n")
@@ -401,7 +401,7 @@ streamLoop:
 			idleTimer.Reset(idleTimeout)
 			// SSE spec: multi-line data must use separate "data:" fields
 			fmt.Fprintf(w, "id: %d\n", lineNum)
-			for _, part := range strings.Split(line, "\n") {
+			for part := range strings.SplitSeq(line, "\n") {
 				fmt.Fprintf(w, "data: %s\n", part)
 			}
 			fmt.Fprint(w, "\n")

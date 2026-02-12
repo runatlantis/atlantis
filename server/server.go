@@ -972,7 +972,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatsScope:               statsScope.SubScope("api"),
 		OutputHandler:            projectCmdOutputHandler,
 		ApplyLockChecker:         isApplyLocked,
-		SSEMaxConnections:        int32(userConfig.SSEMaxConnections),
+		SSEMaxConnections:        int32(min(userConfig.SSEMaxConnections, int(^int32(0)))), //nolint:gosec // clamped to max int32
 	}
 
 	apiController := &controllers.APIController{
