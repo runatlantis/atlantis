@@ -627,18 +627,37 @@ func (r *RedisDB) GetProjectOutputsByPull(repoFullName string, pullNum int) ([]m
 		return nil, err
 	}
 
-	// Group by project key and keep only the latest per project.
+	// Separate policy_check records from non-policy records.
 	// Errors from individual key lookups are intentionally skipped — index sets
 	// may contain stale references to expired or deleted keys.
 	latestByProject := make(map[string]models.ProjectOutput)
+	policyByProject := make(map[string]models.ProjectOutput)
+
 	for _, key := range keys {
 		output, err := r.getProjectOutputByKey(key)
 		if err != nil || output == nil {
 			continue
 		}
 		projectKey := output.ProjectKey()
-		if existing, ok := latestByProject[projectKey]; !ok || output.RunTimestamp > existing.RunTimestamp {
-			latestByProject[projectKey] = *output
+		if output.CommandName == "policy_check" {
+			// Keep the latest policy_check per project for merging
+			if existing, ok := policyByProject[projectKey]; !ok || output.RunTimestamp > existing.RunTimestamp {
+				policyByProject[projectKey] = *output
+			}
+		} else {
+			// Keep the latest non-policy record per project
+			if existing, ok := latestByProject[projectKey]; !ok || output.RunTimestamp > existing.RunTimestamp {
+				latestByProject[projectKey] = *output
+			}
+		}
+	}
+
+	// Merge policy data into the latest non-policy record for each project
+	for projectKey, pc := range policyByProject {
+		if latest, ok := latestByProject[projectKey]; ok {
+			latest.PolicyOutput = pc.PolicyOutput
+			latest.PolicyPassed = pc.PolicyPassed
+			latestByProject[projectKey] = latest
 		}
 	}
 

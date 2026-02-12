@@ -107,6 +107,9 @@ func (c *ProjectOutputController) ProjectOutput(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Filter out policy_check records, merging their data into plan records
+	history = filterPolicyChecks(history)
+
 	if len(history) == 0 {
 		http.Error(w, "project output not found", http.StatusNotFound)
 		return
@@ -190,6 +193,9 @@ func (c *ProjectOutputController) ProjectOutputPartial(w http.ResponseWriter, r 
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	// Filter out policy_check records, merging their data into plan records
+	history = filterPolicyChecks(history)
 
 	var output *models.ProjectOutput
 	for i := range history {
@@ -390,6 +396,55 @@ func formatTime(t time.Time) string {
 		return ""
 	}
 	return t.Format("Jan 2, 2006 3:04 PM")
+}
+
+// filterPolicyChecks removes policy_check records from history and merges their
+// PolicyOutput/PolicyPassed data into the nearest preceding non-policy_check record
+// for the same project. History must be sorted DESC by timestamp.
+func filterPolicyChecks(history []models.ProjectOutput) []models.ProjectOutput {
+	// Separate policy checks from non-policy records
+	var filtered []models.ProjectOutput
+	var policyChecks []models.ProjectOutput
+
+	for _, h := range history {
+		if h.CommandName == "policy_check" {
+			policyChecks = append(policyChecks, h)
+		} else {
+			filtered = append(filtered, h)
+		}
+	}
+
+	if len(policyChecks) == 0 {
+		return history
+	}
+
+	// For each policy_check, find the nearest preceding (older) non-policy record
+	// with the same project key and merge policy data into it.
+	// History is DESC so "preceding" means later index (higher index = older).
+	for _, pc := range policyChecks {
+		pcProjectKey := pc.ProjectKey()
+		merged := false
+		for i := range filtered {
+			if filtered[i].ProjectKey() == pcProjectKey && filtered[i].RunTimestamp <= pc.RunTimestamp {
+				filtered[i].PolicyOutput = pc.PolicyOutput
+				filtered[i].PolicyPassed = pc.PolicyPassed
+				merged = true
+				break
+			}
+		}
+		// If no older record found, try to merge into any record with same project key
+		if !merged {
+			for i := range filtered {
+				if filtered[i].ProjectKey() == pcProjectKey {
+					filtered[i].PolicyOutput = pc.PolicyOutput
+					filtered[i].PolicyPassed = pc.PolicyPassed
+					break
+				}
+			}
+		}
+	}
+
+	return filtered
 }
 
 // FormatDuration formats a duration as a human-readable string

@@ -1989,17 +1989,32 @@
    ============================================ */
 
 .output-terminal {
-  min-height: 400px;
+  min-height: 0;
   height: 100%;
   background: #1e1e1e;
   border-radius: 4px;
 }
 
-/* Ensure output section content fills available space for terminal */
+/* Apply padding to the xterm element, not the outer container.
+   xterm.js reads CSS padding on .xterm and adjusts its viewport
+   calculations accordingly, preventing scroll/sizing issues. */
+.output-terminal .xterm {
+  padding: 16px;
+}
+
+/* Ensure output section content fills available space for terminal.
+   overflow: hidden prevents a parent scrollbar that conflicts with
+   xterm.js's own internal scrolling (which caused the scrollbar to
+   move out of view and clip the last few lines).
+   max-height: none lets flexbox constrain the height instead of the
+   static calc, which doesn't account for dynamic elements like the
+   policy section or expanded history. */
 .output-section--terminal .output-section-content {
   display: flex;
   flex-direction: column;
-  min-height: 400px;
+  min-height: 0;
+  overflow: hidden;
+  max-height: none;
 }
 
 .output-section--terminal .output-terminal {
