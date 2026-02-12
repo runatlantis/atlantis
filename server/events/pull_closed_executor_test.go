@@ -365,11 +365,13 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Ok(t, err)
 
-	// Verify ResourceCleaner.CleanUp was called twice (once for each project)
-	resourceCleaner.VerifyWasCalled(Times(2)).CleanUp(Any[jobs.PullInfo]())
+	// Verify ResourceCleaner.CleanUp was called 3 times:
+	// - Once for each project (2)
+	// - Once for workflow hooks (1)
+	resourceCleaner.VerifyWasCalled(Times(3)).CleanUp(Any[jobs.PullInfo]())
 
 	// Get the captured arguments to verify they contain all required fields
-	capturedArgs := resourceCleaner.VerifyWasCalled(Times(2)).CleanUp(Any[jobs.PullInfo]()).GetAllCapturedArguments()
+	capturedArgs := resourceCleaner.VerifyWasCalled(Times(3)).CleanUp(Any[jobs.PullInfo]()).GetAllCapturedArguments()
 
 	// Verify first project's PullInfo
 	expectedPullInfo1 := jobs.PullInfo{
@@ -392,4 +394,12 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 		Workspace:    "staging",
 	}
 	Equals(t, expectedPullInfo2, capturedArgs[1])
+
+	// Verify workflow hook cleanup PullInfo (no project-specific fields)
+	expectedHookPullInfo := jobs.PullInfo{
+		PullNum:      testdata.Pull.Num,
+		Repo:         testdata.Pull.BaseRepo.Name,
+		RepoFullName: testdata.Pull.BaseRepo.FullName,
+	}
+	Equals(t, expectedHookPullInfo, capturedArgs[2])
 }

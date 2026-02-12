@@ -16,24 +16,14 @@ package server_test
 import (
 	"bytes"
 	"crypto/tls"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
-	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/controllers/web_templates"
-	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
-	"github.com/runatlantis/atlantis/server/core/locking/mocks"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/jobs"
-	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -73,81 +63,6 @@ func TestNewServer_InvalidAtlantisURL(t *testing.T) {
 		AtlantisURLFlag: "atlantis-url",
 	})
 	ErrEquals(t, "parsing --atlantis-url flag \"example.com\": http or https must be specified", err)
-}
-
-func TestIndex_LockErr(t *testing.T) {
-	t.Log("index should return a 503 if unable to list locks")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.List()).ThenReturn(nil, errors.New("err"))
-	s := server.Server{
-		Locker: l,
-	}
-	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
-	s.Index(w, req)
-	ResponseContains(t, w, 503, "Could not retrieve locks: err")
-}
-
-func TestIndex_Success(t *testing.T) {
-	t.Log("Index should render the index template successfully.")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	al := mocks.NewMockApplyLocker()
-	// These are the locks that we expect to be rendered.
-	now := time.Now()
-	locks := map[string]models.ProjectLock{
-		"lkysow/atlantis-example/./default": {
-			Pull: models.PullRequest{
-				Num: 9,
-			},
-			Project: models.Project{
-				RepoFullName: "lkysow/atlantis-example",
-			},
-			Time: now,
-		},
-	}
-	When(l.List()).ThenReturn(locks, nil)
-	it := tMocks.NewMockTemplateWriter()
-	r := mux.NewRouter()
-	atlantisVersion := "0.3.1"
-	// Need to create a lock route since the server expects this route to exist.
-	r.NewRoute().Path("/lock").
-		Queries("id", "{id}").Name(server.LockViewRouteName)
-	u, err := url.Parse("https://example.com")
-	Ok(t, err)
-	s := server.Server{
-		Locker:                  l,
-		ApplyLocker:             al,
-		IndexTemplate:           it,
-		Router:                  r,
-		AtlantisVersion:         atlantisVersion,
-		AtlantisURL:             u,
-		Logger:                  logging.NewNoopLogger(t),
-		ProjectCmdOutputHandler: &jobs.NoopProjectOutputHandler{},
-	}
-	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	w := httptest.NewRecorder()
-	s.Index(w, req)
-	it.VerifyWasCalledOnce().Execute(w, web_templates.IndexData{
-		ApplyLock: web_templates.ApplyLockData{
-			Locked:        false,
-			Time:          time.Time{},
-			TimeFormatted: "0001-01-01 00:00:00",
-		},
-		Locks: []web_templates.LockIndexData{
-			{
-				LockPath:      "/lock?id=lkysow%252Fatlantis-example%252F.%252Fdefault",
-				RepoFullName:  "lkysow/atlantis-example",
-				PullNum:       9,
-				Time:          now,
-				TimeFormatted: now.Format("2006-01-02 15:04:05"),
-			},
-		},
-		PullToJobMapping: []jobs.PullInfoWithJobIDs{},
-		AtlantisVersion:  atlantisVersion,
-	})
-	ResponseContains(t, w, http.StatusOK, "")
 }
 
 func TestHealthz(t *testing.T) {

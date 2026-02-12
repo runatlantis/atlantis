@@ -72,11 +72,10 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		ch := make(chan string, 1)
 
-		// register channel and backfill from buffer
-		// Note: We call this synchronously because otherwise
-		// there could be a race where we are unable to register the channel
-		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		// Register returns buffered lines (none yet) and registers the channel
+		buffered, complete := projectOutputHandler.Register(ctx.JobID, ch)
+		assert.Empty(t, buffered)
+		assert.False(t, complete)
 
 		wg.Add(1)
 
@@ -102,40 +101,38 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		projectOutputHandler := createProjectCommandOutputHandler(t)
 
-		// send first message to populated the buffer
+		// send first message to populate the buffer
 		projectOutputHandler.Send(ctx, Msg, false)
+
+		// Give time for async processing so the buffer is populated
+		time.Sleep(10 * time.Millisecond)
 
 		ch := make(chan string, 2)
 
-		receivedMsgs := []string{}
+		// Register returns the buffered line and registers the channel for live output
+		buffered, complete := projectOutputHandler.Register(ctx.JobID, ch)
+		assert.False(t, complete)
+		assert.Equal(t, []string{Msg}, buffered)
 
+		// Now collect live messages from the channel
+		receivedMsgs := []string{}
 		wg.Add(1)
-		// read from channel asynchronously
 		go func() {
 			for msg := range ch {
 				receivedMsgs = append(receivedMsgs, msg)
-
-				// we're only expecting two messages here.
-				if len(receivedMsgs) >= 2 {
+				if len(receivedMsgs) >= 1 {
 					wg.Done()
 				}
 			}
 		}()
-		// register channel and backfill from buffer
-		// Note: We call this synchronously because otherwise
-		// there could be a race where we are unable to register the channel
-		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
 
 		projectOutputHandler.Send(ctx, Msg, false)
 		wg.Wait()
 		close(ch)
 
-		expectedMsgs := []string{Msg, Msg}
-		assert.Len(t, receivedMsgs, len(expectedMsgs))
-		for i := range expectedMsgs {
-			assert.Equal(t, expectedMsgs[i], receivedMsgs[i])
-		}
+		// The buffered line came from Register's return value, the live line from the channel
+		assert.Len(t, receivedMsgs, 1)
+		assert.Equal(t, Msg, receivedMsgs[0])
 	})
 
 	t.Run("clean up all jobs when PR is closed", func(t *testing.T) {
@@ -144,11 +141,10 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		ch := make(chan string, 2)
 
-		// register channel and backfill from buffer
-		// Note: We call this synchronously because otherwise
-		// there could be a race where we are unable to register the channel
-		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		// Register returns buffered lines (none yet) and registers the channel
+		buffered, complete := projectOutputHandler.Register(ctx.JobID, ch)
+		assert.Empty(t, buffered)
+		assert.False(t, complete)
 
 		wg.Add(1)
 
@@ -189,11 +185,10 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		ch := make(chan string, 2)
 
-		// register channel and backfill from buffer
-		// Note: We call this synchronously because otherwise
-		// there could be a race where we are unable to register the channel
-		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		// Register returns buffered lines (none yet) and registers the channel
+		buffered, complete := projectOutputHandler.Register(ctx.JobID, ch)
+		assert.Empty(t, buffered)
+		assert.False(t, complete)
 
 		// read from channel
 		go func() {
@@ -223,11 +218,10 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 
 		ch := make(chan string)
 
-		// register channel and backfill from buffer
-		// Note: We call this synchronously because otherwise
-		// there could be a race where we are unable to register the channel
-		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		// Register returns buffered lines (none yet) and registers the channel
+		buffered, complete := projectOutputHandler.Register(ctx.JobID, ch)
+		assert.Empty(t, buffered)
+		assert.False(t, complete)
 
 		// read from channel
 		go func() {
@@ -242,18 +236,16 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		ch2 := make(chan string, 2)
-		opComplete := make(chan bool)
 
-		// buffer channel will be closed immediately after logs are streamed
-		go func() {
-			for range ch2 { //revive:disable-line:empty-block
-			}
-			opComplete <- true
-		}()
+		// For a completed job, Register returns the buffered lines and complete=true.
+		// The channel is closed immediately (not registered for live output).
+		buffered2, complete2 := projectOutputHandler.Register(ctx.JobID, ch2)
+		assert.True(t, complete2)
+		assert.Equal(t, []string{Msg}, buffered2)
 
-		projectOutputHandler.Register(ctx.JobID, ch2)
-
-		assert.True(t, <-opComplete)
+		// Channel should be closed since job is complete
+		_, ok := <-ch2
+		assert.False(t, ok)
 	})
 }
 
@@ -353,6 +345,183 @@ func TestRaceConditionPrevention(t *testing.T) {
 }
 
 // TestHighConcurrencyStress performs stress testing with many concurrent operations
+func TestProjectCommandOutputHandler_GracefulClose(t *testing.T) {
+	t.Run("closes channel when buffer full instead of silent delete", func(t *testing.T) {
+		logger := logging.NewNoopLogger(t)
+		prjCmdOutputChan := make(chan *jobs.ProjectCmdOutputLine)
+		prjCmdOutputHandler := jobs.NewAsyncProjectCommandOutputHandler(
+			prjCmdOutputChan,
+			logger,
+		)
+
+		go prjCmdOutputHandler.Handle()
+
+		ctx := createTestProjectCmdContext(t)
+
+		// Register a channel with size 1 that we won't read from
+		slowCh := make(chan string, 1)
+		buffered, complete := prjCmdOutputHandler.Register(ctx.JobID, slowCh)
+		assert.Empty(t, buffered)
+		assert.False(t, complete)
+
+		// Send messages until buffer would overflow
+		// First message fills the channel
+		prjCmdOutputHandler.Send(ctx, "msg1", false)
+		// Second message should trigger close (not silent delete)
+		prjCmdOutputHandler.Send(ctx, "msg2", false)
+
+		// Give time for async processing
+		time.Sleep(100 * time.Millisecond)
+
+		// Channel should be closed, not just deleted
+		select {
+		case _, ok := <-slowCh:
+			if ok {
+				// Read the first message, try again
+				_, ok = <-slowCh
+			}
+			Assert(t, !ok, "channel should be closed after buffer overflow")
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("channel was not closed")
+		}
+	})
+}
+
+// TestRegisterLargeBufferNoDeadlock verifies that Register with >1000 buffered lines
+// does not deadlock. Before the fix, addChan sent buffered lines through the channel
+// while holding locks, which would block if the buffer exceeded channel capacity.
+func TestRegisterLargeBufferNoDeadlock(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	prjCmdOutputChan := make(chan *jobs.ProjectCmdOutputLine)
+	handler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutputChan, logger)
+
+	go handler.Handle()
+
+	ctx := createTestProjectCmdContext(t)
+
+	// Write 1500 lines (exceeding channel capacity of 1000)
+	numLines := 1500
+	for i := range numLines {
+		handler.Send(ctx, fmt.Sprintf("line-%d", i), false)
+	}
+
+	// Give time for async processing
+	time.Sleep(50 * time.Millisecond)
+
+	// Register should return immediately with all buffered lines (no deadlock)
+	done := make(chan struct{})
+	go func() {
+		ch := make(chan string, 1000)
+		buffered, complete := handler.Register(ctx.JobID, ch)
+		assert.Len(t, buffered, numLines)
+		assert.False(t, complete)
+		assert.Equal(t, "line-0", buffered[0])
+		assert.Equal(t, fmt.Sprintf("line-%d", numLines-1), buffered[numLines-1])
+
+		// Channel should still be open for live output
+		handler.Deregister(ctx.JobID, ch)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Success - no deadlock
+	case <-time.After(5 * time.Second):
+		t.Fatal("Register deadlocked with large buffer")
+	}
+
+	close(prjCmdOutputChan)
+}
+
+// TestRegisterThenWriteNoDuplicates verifies that after Register returns buffered lines,
+// subsequent writeLogLine calls send only new lines through the channel (no duplication).
+func TestRegisterThenWriteNoDuplicates(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	prjCmdOutputChan := make(chan *jobs.ProjectCmdOutputLine)
+	handler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutputChan, logger)
+
+	go handler.Handle()
+
+	ctx := createTestProjectCmdContext(t)
+
+	// Write initial lines
+	handler.Send(ctx, "pre-register-1", false)
+	handler.Send(ctx, "pre-register-2", false)
+	time.Sleep(10 * time.Millisecond)
+
+	ch := make(chan string, 100)
+	buffered, complete := handler.Register(ctx.JobID, ch)
+	assert.False(t, complete)
+	assert.Equal(t, []string{"pre-register-1", "pre-register-2"}, buffered)
+
+	// Now send more lines after registration
+	handler.Send(ctx, "post-register-1", false)
+	handler.Send(ctx, "post-register-2", false)
+
+	// Read from channel -- should only get post-register lines
+	var received []string
+	timeout := time.After(2 * time.Second)
+	for i := range 2 {
+		select {
+		case line := <-ch:
+			received = append(received, line)
+		case <-timeout:
+			t.Fatalf("timed out waiting for line %d", i)
+		}
+	}
+	assert.Equal(t, []string{"post-register-1", "post-register-2"}, received)
+
+	handler.Deregister(ctx.JobID, ch)
+	close(prjCmdOutputChan)
+}
+
+// TestJobStartTimePreserved verifies that the job start time (Time field) is set
+// on the first log message and not overwritten by subsequent messages.
+// This was a bug where every log line called time.Now(), making startedAt ≈ completedAt.
+func TestJobStartTimePreserved(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	prjCmdOutputChan := make(chan *jobs.ProjectCmdOutputLine)
+	handler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutputChan, logger)
+
+	go handler.Handle()
+
+	ctx := createTestProjectCmdContext(t)
+
+	// Send first message — this should set the start time
+	handler.Send(ctx, "first line", false)
+	time.Sleep(10 * time.Millisecond)
+
+	info1 := handler.GetJobInfo(ctx.JobID)
+	assert.NotNil(t, info1, "job info should exist after first message")
+	startTime := info1.Time
+
+	// Wait a bit to ensure time.Now() would return a different value
+	time.Sleep(50 * time.Millisecond)
+
+	// Send more messages — these should NOT change the start time
+	handler.Send(ctx, "second line", false)
+	handler.Send(ctx, "third line", false)
+	time.Sleep(10 * time.Millisecond)
+
+	info2 := handler.GetJobInfo(ctx.JobID)
+	assert.NotNil(t, info2, "job info should still exist")
+	assert.Equal(t, startTime, info2.Time, "start time should be preserved from first message, not overwritten")
+
+	// Complete the job and verify duration is meaningful
+	handler.Send(ctx, "", true)
+	time.Sleep(10 * time.Millisecond)
+
+	info3 := handler.GetJobInfo(ctx.JobID)
+	assert.NotNil(t, info3, "job info should still exist after completion")
+	assert.Equal(t, startTime, info3.Time, "start time should still be preserved after completion")
+	assert.False(t, info3.CompletedAt.IsZero(), "completed time should be set")
+
+	duration := info3.CompletedAt.Sub(info3.Time)
+	assert.True(t, duration >= 50*time.Millisecond, "duration should reflect actual elapsed time, got %v", duration)
+
+	close(prjCmdOutputChan)
+}
+
 func TestHighConcurrencyStress(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping stress test in short mode")

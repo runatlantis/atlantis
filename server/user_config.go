@@ -118,6 +118,7 @@ type UserConfig struct {
 	SlackToken                 string          `mapstructure:"slack-token"`
 	SSLCertFile                string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile                 string          `mapstructure:"ssl-key-file"`
+	SSEMaxConnections          int             `mapstructure:"sse-max-connections"`
 	RestrictFileList           bool            `mapstructure:"restrict-file-list"`
 	TFDistribution             string          `mapstructure:"tf-distribution"` // deprecated in favor of DefaultTFDistribution
 	TFDownload                 bool            `mapstructure:"tf-download"`
@@ -135,7 +136,6 @@ type UserConfig struct {
 	WebUsername                string          `mapstructure:"web-username"`
 	WebPassword                string          `mapstructure:"web-password"`
 	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
-	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
 	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
 }
 

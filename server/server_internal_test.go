@@ -15,6 +15,8 @@ package server
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -97,4 +99,62 @@ func TestServer_CloseDatabase(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestRequireCSRFHeader(t *testing.T) {
+	handlerCalled := false
+	inner := func(w http.ResponseWriter, r *http.Request) {
+		handlerCalled = true
+		w.WriteHeader(http.StatusOK)
+	}
+	wrapped := requireCSRFHeader(inner)
+
+	t.Run("rejects request without CSRF header", func(t *testing.T) {
+		handlerCalled = false
+		req := httptest.NewRequest(http.MethodDelete, "/locks?id=test", nil)
+		w := httptest.NewRecorder()
+
+		wrapped(w, req)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Contains(t, w.Body.String(), "CSRF header required")
+		assert.False(t, handlerCalled, "inner handler should not be called")
+	})
+
+	t.Run("rejects request with empty CSRF header", func(t *testing.T) {
+		handlerCalled = false
+		req := httptest.NewRequest(http.MethodDelete, "/locks?id=test", nil)
+		req.Header.Set("X-Atlantis-CSRF", "")
+		w := httptest.NewRecorder()
+
+		wrapped(w, req)
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		assert.Contains(t, w.Body.String(), "CSRF header required")
+		assert.False(t, handlerCalled, "inner handler should not be called")
+	})
+
+	t.Run("allows request with CSRF header", func(t *testing.T) {
+		handlerCalled = false
+		req := httptest.NewRequest(http.MethodDelete, "/locks?id=test", nil)
+		req.Header.Set("X-Atlantis-CSRF", "1")
+		w := httptest.NewRecorder()
+
+		wrapped(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, handlerCalled, "inner handler should be called")
+	})
+
+	t.Run("allows request with any non-empty CSRF header value", func(t *testing.T) {
+		handlerCalled = false
+		req := httptest.NewRequest(http.MethodPost, "/apply/lock", nil)
+		req.Header.Set("X-Atlantis-CSRF", "anything")
+		w := httptest.NewRecorder()
+
+		wrapped(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, handlerCalled, "inner handler should be called")
+	})
 }
