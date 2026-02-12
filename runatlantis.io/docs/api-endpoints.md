@@ -573,9 +573,11 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 
 Trigger drift detection for projects in a repository. This endpoint initiates a plan operation to detect infrastructure drift without requiring a pull request. Results are stored for later retrieval via the drift status endpoints.
 
+When drift is found and [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks) are configured (`event: drift`), webhook notifications are sent automatically to Slack channels and/or HTTP endpoints.
+
 ::: tip Prerequisites
 
-* Drift detection storage must be enabled on the Atlantis server
+* Drift detection storage must be enabled on the Atlantis server (`--enable-drift-detection`)
 
 :::
 
@@ -637,6 +639,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
 {
   "success": true,
   "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
     "repository": "owner/repo",
     "projects": [
       {
@@ -644,6 +647,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
         "directory": "modules/vpc",
         "workspace": "production",
         "ref": "main",
+        "detection_id": "550e8400-e29b-41d4-a716-446655440000",
         "has_drift": true,
         "drift": {
           "to_add": 1,

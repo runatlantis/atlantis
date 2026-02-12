@@ -570,7 +570,9 @@ ATLANTIS_ENABLE_DRIFT_DETECTION=true
 
 Enable drift detection and remediation API endpoints. When enabled, Atlantis will initialize
 in-memory storage for drift detection results and a remediation service, making the
-`/api/drift/*` endpoints functional. Defaults to `false`.
+`/api/drift/*` endpoints functional. If drift [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks)
+are configured (`event: drift`), notifications are sent to Slack or HTTP endpoints when drift
+is detected. Defaults to `false`.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
