@@ -461,7 +461,7 @@ func TestRegisterThenWriteNoDuplicates(t *testing.T) {
 	// Read from channel -- should only get post-register lines
 	var received []string
 	timeout := time.After(2 * time.Second)
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		select {
 		case line := <-ch:
 			received = append(received, line)

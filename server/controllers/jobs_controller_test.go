@@ -280,7 +280,7 @@ func TestJobsController_SSEEventIDs(t *testing.T) {
 		body := w.Body.String()
 
 		// Verify sequential id fields: id: 0, id: 1, id: 2
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			expected := fmt.Sprintf("id: %d\n", i)
 			Assert(t, strings.Contains(body, expected),
 				"expected %q in body, got:\n%s", expected, body)
