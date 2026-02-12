@@ -200,20 +200,23 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 			continue
 		}
 
-		// Add job to pullToJob mapping
+		// Add job to pullToJob mapping (only on first message per job
+		// to preserve the original start time for duration tracking)
 		if _, ok := p.pullToJobMapping.Load(msg.JobInfo.PullInfo); !ok {
 			p.pullToJobMapping.Store(msg.JobInfo.PullInfo, &sync.Map{})
 		}
 		value, _ := p.pullToJobMapping.Load(msg.JobInfo.PullInfo)
 		jobMapping := value.(*sync.Map)
-		jobMapping.Store(msg.JobID, JobIDInfo{
-			JobID:          msg.JobID,
-			JobIDUrl:       "/jobs/" + msg.JobID,
-			JobDescription: msg.JobInfo.JobDescription,
-			Time:           time.Now(),
-			JobStep:        msg.JobInfo.JobStep,
-			TriggeredBy:    msg.JobInfo.TriggeredBy,
-		})
+		if _, exists := jobMapping.Load(msg.JobID); !exists {
+			jobMapping.Store(msg.JobID, JobIDInfo{
+				JobID:          msg.JobID,
+				JobIDUrl:       "/jobs/" + msg.JobID,
+				JobDescription: msg.JobInfo.JobDescription,
+				Time:           time.Now(),
+				JobStep:        msg.JobInfo.JobStep,
+				TriggeredBy:    msg.JobInfo.TriggeredBy,
+			})
+		}
 
 		// Forward new message to all receiver channels and output buffer
 		p.writeLogLine(msg.JobID, msg.Line)
