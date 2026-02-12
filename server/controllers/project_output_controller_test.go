@@ -258,6 +258,131 @@ func (m *mockOutputHandler) GetProjectOutputBuffer(_ string) jobs.OutputBuffer {
 }
 func (m *mockOutputHandler) GetJobInfo(_ string) *jobs.JobIDInfo { return nil }
 
+func TestProjectOutputController_PolicyCheckFilteredFromHistory(t *testing.T) {
+	// Policy checks should be filtered out of history and their data merged
+	// into the preceding plan record. The header should show "Planned" not "Policy Checked".
+	now := time.Now()
+
+	mockDB := &mockProjectOutputDB{
+		// History sorted DESC by timestamp - policy_check is newer than plan
+		history: []models.ProjectOutput{
+			{
+				RepoFullName: "owner/repo",
+				PullNum:      123,
+				Path:         "terraform/staging",
+				Workspace:    "default",
+				CommandName:  "policy_check",
+				RunTimestamp: now.UnixMilli(),
+				Output:       "",
+				Status:       models.SuccessOutputStatus,
+				PolicyPassed: true,
+				PolicyOutput: "Policies passed: 2/2",
+				TriggeredBy:  "jwalton",
+				StartedAt:    now.Add(-30 * time.Second),
+				CompletedAt:  now,
+			},
+			{
+				RepoFullName:  "owner/repo",
+				PullNum:       123,
+				Path:          "terraform/staging",
+				Workspace:     "default",
+				CommandName:   "plan",
+				RunTimestamp:  now.Add(-1 * time.Minute).UnixMilli(),
+				Output:        "Plan: 1 to add, 0 to change, 0 to destroy.",
+				Status:        models.SuccessOutputStatus,
+				ResourceStats: models.ResourceStats{Add: 1},
+				TriggeredBy:   "jwalton",
+				StartedAt:     now.Add(-2 * time.Minute),
+				CompletedAt:   now.Add(-1 * time.Minute),
+			},
+		},
+	}
+
+	controller := controllers.NewProjectOutputController(
+		mockDB,
+		web_templates.ProjectOutputTemplate,
+		web_templates.ProjectOutputPartialTemplate,
+		"1.0.0",
+		"",
+		func() bool { return false },
+		nil, // outputHandler
+		nil, // logger
+	)
+
+	req := httptest.NewRequest("GET", "/pr/owner/repo/pulls/123/project/terraform/staging?workspace=default", nil)
+	req = mux.SetURLVars(req, map[string]string{
+		"owner":    "owner",
+		"repo":     "repo",
+		"pull_num": "123",
+		"path":     "terraform/staging",
+	})
+	w := httptest.NewRecorder()
+
+	controller.ProjectOutput(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	body := w.Body.String()
+
+	// Status should be "Planned" not "Policy Checked"
+	Assert(t, strings.Contains(body, "Planned"), "should show 'Planned' status, not 'Policy Checked'")
+	Assert(t, !strings.Contains(body, "Policy Checked"), "should NOT show 'Policy Checked' as the header status")
+
+	// Policy output should still appear in the policy section
+	Assert(t, strings.Contains(body, "Policies passed: 2/2"), "policy output should be merged into plan record")
+
+	// The plan output should be shown
+	Assert(t, strings.Contains(body, "Plan: 1 to add"), "plan output should be displayed")
+
+	// History should not contain policy_check command
+	Assert(t, !strings.Contains(body, "policy_check"), "policy_check should not appear in history")
+}
+
+func TestProjectOutputController_PolicyCheckOnlyHistory(t *testing.T) {
+	// If the only records are policy_check (no plan), we should get 404
+	now := time.Now()
+
+	mockDB := &mockProjectOutputDB{
+		history: []models.ProjectOutput{
+			{
+				RepoFullName: "owner/repo",
+				PullNum:      123,
+				Path:         "terraform/staging",
+				Workspace:    "default",
+				CommandName:  "policy_check",
+				RunTimestamp: now.UnixMilli(),
+				Status:       models.SuccessOutputStatus,
+				PolicyPassed: true,
+				PolicyOutput: "Policies passed: 2/2",
+			},
+		},
+	}
+
+	controller := controllers.NewProjectOutputController(
+		mockDB,
+		web_templates.ProjectOutputTemplate,
+		web_templates.ProjectOutputPartialTemplate,
+		"1.0.0",
+		"",
+		func() bool { return false },
+		nil,
+		nil,
+	)
+
+	req := httptest.NewRequest("GET", "/pr/owner/repo/pulls/123/project/terraform/staging?workspace=default", nil)
+	req = mux.SetURLVars(req, map[string]string{
+		"owner":    "owner",
+		"repo":     "repo",
+		"pull_num": "123",
+		"path":     "terraform/staging",
+	})
+	w := httptest.NewRecorder()
+
+	controller.ProjectOutput(w, req)
+
+	// With only policy_check records, filtering leaves nothing, so 404
+	Equals(t, http.StatusNotFound, w.Code)
+}
+
 func TestProjectOutputController_CompletedJobNotShownAsRunning(t *testing.T) {
 	// This test verifies that completed jobs are NOT shown as "Running" in the UI.
 	// Bug: findActiveJob was returning completed jobs as active because it didn't

@@ -1176,6 +1176,54 @@ func TestBoltDB_GetProjectOutputsByPull(t *testing.T) {
 	Equals(t, 2, len(outputs))
 }
 
+func TestBoltDB_GetProjectOutputsByPull_SkipsPolicyCheck(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	now := time.Now()
+
+	// Save a plan record and a policy_check record for the same project
+	planOutput := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "project1",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		RunTimestamp: now.Add(-1 * time.Minute).UnixMilli(),
+		Status:       models.SuccessOutputStatus,
+		Output:       "Plan: 1 to add",
+	}
+	policyOutput := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "project1",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "policy_check",
+		RunTimestamp: now.UnixMilli(),
+		Status:       models.SuccessOutputStatus,
+		PolicyPassed: true,
+		PolicyOutput: "Policies passed: 2/2",
+	}
+
+	err := db.SaveProjectOutput(planOutput)
+	Ok(t, err)
+	err = db.SaveProjectOutput(policyOutput)
+	Ok(t, err)
+
+	outputs, err := db.GetProjectOutputsByPull("owner/repo", 123)
+	Ok(t, err)
+
+	// Should return only the plan record, not the policy_check
+	Equals(t, 1, len(outputs))
+	Equals(t, "plan", outputs[0].CommandName)
+
+	// Policy data should be merged into the plan record
+	Equals(t, true, outputs[0].PolicyPassed)
+	Equals(t, "Policies passed: 2/2", outputs[0].PolicyOutput)
+}
+
 func TestBoltDB_GetProjectOutputsByPull_Empty(t *testing.T) {
 	db := newTestDB2(t)
 	defer db.Close()
