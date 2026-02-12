@@ -1433,6 +1433,88 @@ func TestHasDivergedWhenModified_PRDidNotTouchPattern(t *testing.T) {
 	Equals(t, true, hasDiverged)
 }
 
+// TestHasDivergedWhenModified_WithStaleOriginMain tests the actual Atlantis behavior
+// where origin/main can become stale and needs to be fetched.
+// This simulates:
+// 1. Atlantis clones main and merges PR branch (creating merge commit at HEAD)
+// 2. Main moves forward with new commits touching the pattern
+// 3. HasDivergedWhenModified should detect this by fetching fresh refs
+func TestHasDivergedWhenModified_WithStaleOriginMain(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Add initial project1 to main.
+	runCmd(t, repoDir, "mkdir", "-p", "project1")
+	runCmd(t, repoDir, "touch", "project1/main.tf")
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1 initial")
+
+	// Create a PR branch from main.
+	runCmd(t, repoDir, "git", "checkout", "-b", "feature-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "project2")
+	runCmd(t, repoDir, "touch", "project2/main.tf")
+	runCmd(t, repoDir, "git", "add", "project2/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project2")
+	prHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Simulate Atlantis checkout: clone main and merge PR (mimicking forceClone + mergeToBaseBranch).
+	atlantisDir := repoDir + "/atlantis-workspace"
+	runCmd(t, repoDir, "mkdir", "-p", "atlantis-workspace")
+	runCmd(t, atlantisDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, atlantisDir, "git", "remote", "add", "head", repoDir)
+	runCmd(t, atlantisDir, "git", "fetch", "head", "+refs/heads/feature-pr:")
+	runCmd(t, atlantisDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, atlantisDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, atlantisDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, atlantisDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// At this point, atlantisDir has HEAD = merge commit (main + feature-pr).
+	// origin/main points to main at the time of clone.
+
+	// Now simulate main moving forward with changes to project1.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "add", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "update project1 on main")
+
+	// At this point:
+	// - atlantisDir's HEAD includes old main + feature-pr
+	// - atlantisDir's origin/main is stale (before the "update project1 on main" commit)
+	// - repoDir's main has moved forward with a commit touching project1/**
+	// - HasDivergedWhenModified should fetch and detect this divergence
+
+	// Copy atlantis workspace to data dir to test.
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", atlantisDir, "repos/0/default")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "feature-pr",
+		BaseBranch: "main",
+		HeadCommit: prHeadCommit,
+	}
+
+	// Test 1: Pattern matching project1 should detect divergence.
+	// Even though HEAD has a merge commit, origin/main has a new commit touching project1/**
+	// that isn't in HEAD. The fetch should pick this up.
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**"}, pullRequest)
+	Equals(t, true, hasDiverged)
+
+	// Test 2: Pattern matching project2 should NOT detect divergence.
+	// Main has no new commits touching project2/**, so it hasn't diverged for this pattern.
+	hasDiverged = wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project2/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+}
+
 func initRepo(t *testing.T) string {
 	repoDir := t.TempDir()
 	runCmd(t, repoDir, "git", "init", "--initial-branch=main")

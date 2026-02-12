@@ -238,12 +238,15 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 }
 
 func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
+	logger.Debug("HasDiverged: starting divergence check in %s", cloneDir)
 	if !w.CheckoutMerge {
 		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
 		// we assume false here for 'branch' strategy.
+		logger.Debug("HasDiverged: CheckoutMerge is false, skipping divergence check")
 		return false
 	}
 
+	logger.Debug("HasDiverged: running git fetch")
 	statusFetchCmd := exec.Command("git", "fetch")
 	statusFetchCmd.Dir = cloneDir
 	outputStatusFetch, err := statusFetchCmd.CombinedOutput()
@@ -251,8 +254,10 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 		logger.Warn("fetching repo has failed: %s", string(outputStatusFetch))
 		return true
 	}
+	logger.Debug("HasDiverged: git fetch completed successfully")
 
 	// Check if remote main branch has diverged.
+	logger.Debug("HasDiverged: running git status --untracked-files=no")
 	statusUnoCmd := exec.Command("git", "status", "--untracked-files=no")
 	statusUnoCmd.Dir = cloneDir
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
@@ -260,14 +265,20 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 		logger.Warn("getting repo status has failed: %s", string(outputStatusUno))
 		return true
 	}
+	logger.Debug("HasDiverged: git status output: %s", string(outputStatusUno))
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
+	logger.Debug("HasDiverged: result=%t (contains 'have diverged': %t)", hasDiverged, hasDiverged)
 	return hasDiverged
 }
 
 func (w *FileWorkspace) HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+	logger.Debug("HasDivergedWhenModified: starting check in %s with %d patterns for PR %d (base: %s, head: %s)",
+		cloneDir, len(autoplanWhenModified), pullRequest.Num, pullRequest.BaseBranch, pullRequest.HeadCommit)
+
 	if !w.CheckoutMerge {
 		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
 		// we assume false here for 'branch' strategy.
+		logger.Debug("HasDivergedWhenModified: CheckoutMerge is false, skipping divergence check")
 		return false
 	}
 
@@ -275,49 +286,49 @@ func (w *FileWorkspace) HasDivergedWhenModified(logger logging.SimpleLogging, cl
 	// autodiscovered project or a project that doesn't have any when_modified patterns.
 	// Fall back to the regular HasDiverged check.
 	if len(autoplanWhenModified) == 0 {
+		logger.Debug("HasDivergedWhenModified: no when_modified patterns found, falling back to HasDiverged check")
 		return w.HasDiverged(logger, cloneDir)
 	}
 
-	// Iterate over the patterns and check if the remote ref is in the log for the pattern.
-	// If not, we return true.
+	// Fetch latest refs from origin to ensure we're comparing against the most up-to-date remote state
+	logger.Debug("HasDivergedWhenModified: fetching latest refs from origin")
+	fetchCmd := exec.Command("git", "fetch")
+	fetchCmd.Dir = cloneDir
+	outputFetch, err := fetchCmd.CombinedOutput()
+	if err != nil {
+		logger.Warn("HasDivergedWhenModified: fetching repo has failed: %s", string(outputFetch))
+		return true
+	}
+	logger.Debug("HasDivergedWhenModified: fetch completed successfully")
+
+	// Check if origin/baseBranch has commits affecting the patterns that aren't in HEAD (the merge commit).
+	// This works correctly with CheckoutMerge strategy since HEAD is the locally merged state.
 	for _, pattern := range autoplanWhenModified {
 		remoteRef := fmt.Sprintf("origin/%s", pullRequest.BaseBranch)
-		remoteRefCmd := exec.Command("git", "log", "-1", "--format=%H", remoteRef, "--", pattern)
-		remoteRefCmd.Dir = cloneDir
-		outputRemoteRef, err := remoteRefCmd.CombinedOutput()
+		logger.Debug("HasDivergedWhenModified: checking pattern '%s' for commits in %s not in HEAD", pattern, remoteRef)
+
+		// Check if there are any commits in origin/baseBranch that touch the pattern but aren't in HEAD
+		divergeCmd := exec.Command("git", "log", "HEAD.."+remoteRef, "--format=%H", "--", pattern)
+		logger.Debug("HasDivergedWhenModified: running command: %s", divergeCmd.String())
+		divergeCmd.Dir = cloneDir
+		outputDiverge, err := divergeCmd.CombinedOutput()
+		logger.Debug("HasDivergedWhenModified: command output: %s", string(outputDiverge))
+
 		if err != nil {
-			logger.Warn("getting remote ref for pattern %s has failed: %s", pattern, string(outputRemoteRef))
+			logger.Warn("HasDivergedWhenModified: checking divergence for pattern %s has failed: %s", pattern, string(outputDiverge))
 			return true
 		}
 
-		localRefCmd := exec.Command("git", "log", "--format=%H", pullRequest.HeadCommit, "--", pattern) //nolint:gosec // pullRequest.HeadCommit is a git commit SHA
-		localRefCmd.Dir = cloneDir
-		outputLocalRef, err := localRefCmd.CombinedOutput()
-		if err != nil {
-			logger.Warn("getting local ref for pattern %s has failed: %s", pattern, string(outputLocalRef))
+		// If there are any commits, the branch has diverged
+		divergedCommits := strings.TrimSpace(string(outputDiverge))
+		if divergedCommits != "" {
+			logger.Debug("HasDivergedWhenModified: pattern '%s' has diverged - found commits on %s not in HEAD: %s", pattern, remoteRef, divergedCommits)
 			return true
 		}
-
-		// Trim whitespace (including newlines) from the remote ref for comparison
-		remoteRefHash := strings.TrimSpace(string(outputRemoteRef))
-
-		// Split and filter out empty strings from the local refs
-		localRefsRaw := strings.Split(string(outputLocalRef), "\n")
-		var localRefs []string
-		for _, ref := range localRefsRaw {
-			trimmed := strings.TrimSpace(ref)
-			if trimmed != "" {
-				localRefs = append(localRefs, trimmed)
-			}
-		}
-
-		// If remote has commits that are not in local history, it has diverged.
-		// If remote has no ref for this pattern, the file is being created; no divergence.
-		if remoteRefHash != "" && !utils.SlicesContains(localRefs, remoteRefHash) {
-			return true
-		}
+		logger.Debug("HasDivergedWhenModified: pattern '%s' has not diverged", pattern)
 	}
 
+	logger.Debug("HasDivergedWhenModified: completed check - no divergence found")
 	return false
 }
 
