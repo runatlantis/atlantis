@@ -163,7 +163,6 @@ const (
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
-	DevModeFlag                      = "dev"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser                  = ""
@@ -642,10 +641,6 @@ var boolFlags = map[string]boolFlag{
 	},
 	RestrictFileList: {
 		description:  "Block plan requests from projects outside the files modified in the pull request.",
-		defaultValue: false,
-	},
-	DevModeFlag: {
-		description:  "Enable development mode: serve static files and templates from disk for hot reloading. Do not use in production.",
 		defaultValue: false,
 	},
 	HideUnchangedPlanComments: {

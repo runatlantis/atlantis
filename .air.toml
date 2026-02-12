@@ -3,11 +3,11 @@ tmp_dir = "tmp"
 
 [build]
   # Build command - compiles the binary
-  cmd = "go build -o ./tmp/atlantis ."
+  cmd = "go build -tags dev -o ./tmp/atlantis ."
   # Binary path
   bin = "./tmp/atlantis"
   # Full command with arguments
-  full_bin = "./tmp/atlantis server --atlantis-url=http://localhost:4141 --gh-user=test --gh-token=test --gh-webhook-secret=test --repo-allowlist=* --data-dir=data --dev"
+  full_bin = "./tmp/atlantis server --atlantis-url=http://localhost:4141 --gh-user=test --gh-token=test --gh-webhook-secret=test --repo-allowlist=* --data-dir=data"
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "node_modules", "data"]
   exclude_file = []
