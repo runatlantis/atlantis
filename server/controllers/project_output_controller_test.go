@@ -69,6 +69,7 @@ func (m *mockProjectOutputDB) UnlockCommand(cmdName command.Name) error { return
 func (m *mockProjectOutputDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
 	return nil, nil
 }
+func (m *mockProjectOutputDB) MarkInterruptedOutputs() error                       { return nil }
 func (m *mockProjectOutputDB) SaveProjectOutput(output models.ProjectOutput) error { return nil }
 func (m *mockProjectOutputDB) GetProjectOutputsByPull(repoFullName string, pullNum int) ([]models.ProjectOutput, error) {
 	return nil, nil

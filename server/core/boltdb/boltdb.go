@@ -601,11 +601,75 @@ func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectS
 	}
 }
 
+// MarkInterruptedOutputs transitions all project outputs with RunningOutputStatus
+// to InterruptedOutputStatus. This is called on server startup to mark any jobs
+// that were in progress when the server was killed.
+func (b *BoltDB) MarkInterruptedOutputs() error {
+	return b.db.Update(func(tx *bolt.Tx) error {
+		pullIndexBucket := tx.Bucket(b.pullIndexBucketName)
+		if pullIndexBucket == nil {
+			return nil
+		}
+		outputsBucket := tx.Bucket(b.projectOutputsBucketName)
+		if outputsBucket == nil {
+			return nil
+		}
+
+		// Collect all pull keys from the pull index
+		var pullKeys []string
+		if err := pullIndexBucket.ForEach(func(k, _ []byte) error {
+			pullKeys = append(pullKeys, string(k))
+			return nil
+		}); err != nil {
+			return fmt.Errorf("iterating pull index: %w", err)
+		}
+
+		// For each active PR, scan its project outputs
+		for _, pullKey := range pullKeys {
+			prefix := pullKey + "::"
+			c := outputsBucket.Cursor()
+			for k, v := c.Seek([]byte(prefix)); k != nil && strings.HasPrefix(string(k), prefix); k, v = c.Next() {
+				var output models.ProjectOutput
+				if err := json.Unmarshal(v, &output); err != nil {
+					continue // skip malformed
+				}
+				if output.Status == models.RunningOutputStatus {
+					output.Status = models.InterruptedOutputStatus
+					updated, err := json.Marshal(output)
+					if err != nil {
+						return fmt.Errorf("marshaling updated output: %w", err)
+					}
+					if err := outputsBucket.Put(k, updated); err != nil {
+						return fmt.Errorf("updating output to interrupted: %w", err)
+					}
+				}
+			}
+		}
+
+		return nil
+	})
+}
+
 // SaveProjectOutput saves a project output to the database.
+// If the output has a JobID that already exists in the job-id-index,
+// the existing record is updated (upsert) rather than creating a new one.
 func (b *BoltDB) SaveProjectOutput(output models.ProjectOutput) error {
 	return b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.projectOutputsBucketName)
-		key := output.Key()
+		indexBucket := tx.Bucket(b.jobIDIndexBucketName)
+
+		// Check if we should upsert an existing record by job ID
+		var key string
+		if output.JobID != "" && indexBucket != nil {
+			existingKey := indexBucket.Get([]byte(output.JobID))
+			if existingKey != nil {
+				key = string(existingKey)
+			}
+		}
+		if key == "" {
+			key = output.Key()
+		}
+
 		bytes, err := json.Marshal(output)
 		if err != nil {
 			return fmt.Errorf("marshaling project output: %w", err)
@@ -614,13 +678,10 @@ func (b *BoltDB) SaveProjectOutput(output models.ProjectOutput) error {
 			return err
 		}
 
-		// Also save the job ID index for O(1) lookups by job ID
-		if output.JobID != "" {
-			indexBucket := tx.Bucket(b.jobIDIndexBucketName)
-			if indexBucket != nil {
-				if err := indexBucket.Put([]byte(output.JobID), []byte(key)); err != nil {
-					return fmt.Errorf("saving job ID index: %w", err)
-				}
+		// Update the job ID index for O(1) lookups by job ID
+		if output.JobID != "" && indexBucket != nil {
+			if err := indexBucket.Put([]byte(output.JobID), []byte(key)); err != nil {
+				return fmt.Errorf("saving job ID index: %w", err)
 			}
 		}
 

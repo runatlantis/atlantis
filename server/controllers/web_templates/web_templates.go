@@ -165,13 +165,14 @@ const (
 
 // layoutTemplates tracks which templates use the layout wrapper
 var layoutTemplates = map[string]bool{
-	TemplateName_PRList:        true,
-	TemplateName_PRDetail:      true,
-	TemplateName_ProjectOutput: true,
-	TemplateName_Settings:      true,
-	TemplateName_LocksPage:     true,
-	TemplateName_JobsPage:      true,
-	TemplateName_JobDetail:     true,
+	TemplateName_ProjectJobsError: true,
+	TemplateName_PRList:           true,
+	TemplateName_PRDetail:         true,
+	TemplateName_ProjectOutput:    true,
+	TemplateName_Settings:         true,
+	TemplateName_LocksPage:        true,
+	TemplateName_JobsPage:         true,
+	TemplateName_JobDetail:        true,
 }
 
 // cachedTemplates holds pre-parsed templates for production mode
@@ -270,12 +271,10 @@ type ProjectJobData struct {
 }
 
 type ProjectJobsError struct {
-	AtlantisVersion string
-	ProjectPath     string
-	CleanedBasePath string
+	LayoutData
 }
 
-var ProjectJobsErrorTemplate = templates.Lookup(templateFileNames["project-jobs-error"])
+var ProjectJobsErrorTemplate = mustParseLayoutTemplate(templateFileNames["project-jobs-error"])
 
 // GithubSetupData holds the data for rendering the github app setup page
 type GithubSetupData struct {

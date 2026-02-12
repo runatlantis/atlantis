@@ -79,6 +79,8 @@ func computeJobBadge(jobStep, status string) (text, style, icon string) {
 		return "Plan Failed", "failed", "x-circle"
 	case status == "error" && jobStep == "apply":
 		return "Apply Failed", "failed", "x-circle"
+	case status == "interrupted":
+		return "Interrupted", "failed", "alert-triangle"
 	default:
 		return "Running", "pending", "loader"
 	}
@@ -91,12 +93,86 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 		return err
 	}
 
-	// Check if job exists
+	// Check if job exists in memory
 	if !j.OutputHandler.IsKeyExists(jobID) {
-		return j.ProjectJobsErrorTemplate.Execute(w, web_templates.ProjectJobData{
-			AtlantisVersion: j.AtlantisVersion,
-			ProjectPath:     jobID,
-			CleanedBasePath: j.AtlantisURL.Path,
+		// Check if job exists in the database (completed or interrupted jobs)
+		if dbOutput, err := j.Database.GetProjectOutputByJobID(jobID); err == nil && dbOutput != nil {
+			// Map DB status to UI status
+			var status string
+			switch dbOutput.Status {
+			case models.InterruptedOutputStatus, models.RunningOutputStatus:
+				status = "interrupted"
+			case models.SuccessOutputStatus:
+				status = "complete"
+			case models.FailedOutputStatus:
+				status = "error"
+			default:
+				status = "interrupted"
+			}
+
+			// Extract repo owner/name
+			var repoOwner, repoName string
+			if parts := strings.Split(dbOutput.RepoFullName, "/"); len(parts) == 2 {
+				repoOwner = parts[0]
+				repoName = parts[1]
+			}
+
+			badgeText, badgeStyle, _ := computeJobBadge(dbOutput.CommandName, status)
+
+			var applyLockActive bool
+			if j.ApplyLockChecker != nil {
+				applyLockActive = j.ApplyLockChecker()
+			}
+
+			viewData := web_templates.JobDetailData{
+				LayoutData: web_templates.LayoutData{
+					AtlantisVersion: j.AtlantisVersion,
+					CleanedBasePath: j.AtlantisURL.Path,
+					ActiveNav:       "jobs",
+					ApplyLockActive: applyLockActive,
+				},
+				JobID:        jobID,
+				JobStep:      dbOutput.CommandName,
+				RepoFullName: dbOutput.RepoFullName,
+				RepoOwner:    repoOwner,
+				RepoName:     repoName,
+				PullNum:      dbOutput.PullNum,
+				ProjectPath:  dbOutput.Path,
+				Workspace:    dbOutput.Workspace,
+				Status:       status,
+				Output:       dbOutput.Output,
+				TriggeredBy:  dbOutput.TriggeredBy,
+				BadgeText:    badgeText,
+				BadgeStyle:   badgeStyle,
+				AddCount:     dbOutput.ResourceStats.Add,
+				ChangeCount:  dbOutput.ResourceStats.Change,
+				DestroyCount: dbOutput.ResourceStats.Destroy,
+				PolicyPassed:   dbOutput.PolicyPassed,
+				HasPolicyCheck: dbOutput.CommandName == "policy_check" || dbOutput.PolicyOutput != "",
+			}
+
+			if !dbOutput.StartedAt.IsZero() {
+				viewData.StartTimeUnix = dbOutput.StartedAt.UnixMilli()
+			}
+			if !dbOutput.CompletedAt.IsZero() {
+				viewData.EndTimeUnix = dbOutput.CompletedAt.UnixMilli()
+			}
+
+			return j.ProjectJobsTemplate.Execute(w, viewData)
+		}
+
+		// Not found in memory or database
+		var applyLockActive bool
+		if j.ApplyLockChecker != nil {
+			applyLockActive = j.ApplyLockChecker()
+		}
+		return j.ProjectJobsErrorTemplate.Execute(w, web_templates.ProjectJobsError{
+			LayoutData: web_templates.LayoutData{
+				AtlantisVersion: j.AtlantisVersion,
+				CleanedBasePath: j.AtlantisURL.Path,
+				ActiveNav:       "jobs",
+				ApplyLockActive: applyLockActive,
+			},
 		})
 	}
 
@@ -222,6 +298,7 @@ func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) 
 func (j *JobsController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	j.Logger.Log(lvl, response)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(responseCode)
 	fmt.Fprintln(w, response)
 }

@@ -68,9 +68,10 @@ func TestProjectOutputStatus_String(t *testing.T) {
 		status   models.ProjectOutputStatus
 		expected string
 	}{
-		{models.PendingOutputStatus, "pending"},
+		{models.RunningOutputStatus, "running"},
 		{models.SuccessOutputStatus, "success"},
 		{models.FailedOutputStatus, "failed"},
+		{models.InterruptedOutputStatus, "interrupted"},
 	}
 
 	for _, tt := range tests {

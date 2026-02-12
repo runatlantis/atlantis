@@ -1471,6 +1471,202 @@ func TestBoltDB_GetProjectOutputByJobID_NotFound(t *testing.T) {
 	Assert(t, retrieved == nil, "expected nil result for non-existent job ID")
 }
 
+func TestBoltDB_MarkInterruptedOutputs_FlipsRunning(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	now := time.Now()
+	// Save a running output
+	running := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		JobID:        "job-running",
+		RunTimestamp: now.UnixMilli(),
+		Status:       models.RunningOutputStatus,
+	}
+	err := db.SaveProjectOutput(running)
+	Ok(t, err)
+
+	// Mark interrupted
+	err = db.MarkInterruptedOutputs()
+	Ok(t, err)
+
+	// Verify it was flipped
+	retrieved, err := db.GetProjectOutputByJobID("job-running")
+	Ok(t, err)
+	Assert(t, retrieved != nil, "expected non-nil result")
+	Equals(t, models.InterruptedOutputStatus, retrieved.Status)
+}
+
+func TestBoltDB_MarkInterruptedOutputs_LeavesOtherStatuses(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	now := time.Now()
+	// Save a success output
+	success := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "project1",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		JobID:        "job-success",
+		RunTimestamp: now.UnixMilli(),
+		Status:       models.SuccessOutputStatus,
+		Output:       "Plan: 1 to add",
+	}
+	// Save a failed output
+	failed := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "project2",
+		Workspace:    "default",
+		Path:         "terraform/prod",
+		CommandName:  "plan",
+		JobID:        "job-failed",
+		RunTimestamp: now.Add(time.Millisecond).UnixMilli(),
+		Status:       models.FailedOutputStatus,
+		Output:       "Error: something went wrong",
+	}
+
+	err := db.SaveProjectOutput(success)
+	Ok(t, err)
+	err = db.SaveProjectOutput(failed)
+	Ok(t, err)
+
+	// Mark interrupted
+	err = db.MarkInterruptedOutputs()
+	Ok(t, err)
+
+	// Verify success is untouched
+	retrievedSuccess, err := db.GetProjectOutputByJobID("job-success")
+	Ok(t, err)
+	Assert(t, retrievedSuccess != nil, "expected non-nil result")
+	Equals(t, models.SuccessOutputStatus, retrievedSuccess.Status)
+
+	// Verify failed is untouched
+	retrievedFailed, err := db.GetProjectOutputByJobID("job-failed")
+	Ok(t, err)
+	Assert(t, retrievedFailed != nil, "expected non-nil result")
+	Equals(t, models.FailedOutputStatus, retrievedFailed.Status)
+}
+
+func TestBoltDB_SaveProjectOutput_UpsertByJobID(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	now := time.Now()
+	// Save initial stub with running status
+	stub := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		JobID:        "job-upsert-123",
+		RunTimestamp: now.UnixMilli(),
+		Status:       models.RunningOutputStatus,
+		TriggeredBy:  "testuser",
+		StartedAt:    now,
+	}
+	err := db.SaveProjectOutput(stub)
+	Ok(t, err)
+
+	// Now upsert with completed output (same JobID, different timestamp in Key)
+	completed := models.ProjectOutput{
+		RepoFullName:  "owner/repo",
+		PullNum:       123,
+		ProjectName:   "myproject",
+		Workspace:     "default",
+		Path:          "terraform/staging",
+		CommandName:   "plan",
+		JobID:         "job-upsert-123",
+		RunTimestamp:  now.UnixMilli(),
+		Status:        models.SuccessOutputStatus,
+		Output:        "Plan: 1 to add, 0 to change, 0 to destroy.",
+		ResourceStats: models.ResourceStats{Add: 1},
+		TriggeredBy:   "testuser",
+		StartedAt:     now,
+		CompletedAt:   now.Add(30 * time.Second),
+	}
+	err = db.SaveProjectOutput(completed)
+	Ok(t, err)
+
+	// Verify only one record exists (not two)
+	history, err := db.GetProjectOutputHistory("owner/repo", 123, "terraform/staging", "default", "myproject")
+	Ok(t, err)
+	Equals(t, 1, len(history))
+	Equals(t, models.SuccessOutputStatus, history[0].Status)
+	Equals(t, "Plan: 1 to add, 0 to change, 0 to destroy.", history[0].Output)
+
+	// Verify lookup by job ID returns the updated record
+	retrieved, err := db.GetProjectOutputByJobID("job-upsert-123")
+	Ok(t, err)
+	Assert(t, retrieved != nil, "expected non-nil result")
+	Equals(t, models.SuccessOutputStatus, retrieved.Status)
+	Equals(t, completed.Output, retrieved.Output)
+}
+
+func TestBoltDB_SaveProjectOutput_InsertNewRecord(t *testing.T) {
+	db := newTestDB2(t)
+	defer db.Close()
+
+	now := time.Now()
+	// Save output without a matching job ID in the index
+	output := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		JobID:        "job-new-456",
+		RunTimestamp: now.UnixMilli(),
+		Status:       models.SuccessOutputStatus,
+		Output:       "Plan output",
+	}
+	err := db.SaveProjectOutput(output)
+	Ok(t, err)
+
+	// Save a second output with a different job ID
+	output2 := models.ProjectOutput{
+		RepoFullName: "owner/repo",
+		PullNum:      123,
+		ProjectName:  "myproject",
+		Workspace:    "default",
+		Path:         "terraform/staging",
+		CommandName:  "plan",
+		JobID:        "job-new-789",
+		RunTimestamp: now.Add(time.Minute).UnixMilli(),
+		Status:       models.SuccessOutputStatus,
+		Output:       "Plan output 2",
+	}
+	err = db.SaveProjectOutput(output2)
+	Ok(t, err)
+
+	// Verify two separate records exist
+	history, err := db.GetProjectOutputHistory("owner/repo", 123, "terraform/staging", "default", "myproject")
+	Ok(t, err)
+	Equals(t, 2, len(history))
+
+	// Verify each can be found by job ID
+	r1, err := db.GetProjectOutputByJobID("job-new-456")
+	Ok(t, err)
+	Assert(t, r1 != nil, "expected non-nil result for job-new-456")
+	Equals(t, "Plan output", r1.Output)
+
+	r2, err := db.GetProjectOutputByJobID("job-new-789")
+	Ok(t, err)
+	Assert(t, r2 != nil, "expected non-nil result for job-new-789")
+	Equals(t, "Plan output 2", r2.Output)
+}
+
 func TestBoltDB_GetProjectOutputByJobID_EmptyJobID(t *testing.T) {
 	db := newTestDB2(t)
 	defer db.Close()

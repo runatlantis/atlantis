@@ -1,30 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>atlantis</title>
-    <meta name="description" content="">
-    <meta name="author" content="">
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
-    <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
-    <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
-  </head>
+{{ define "title" }}Job Not Found - Atlantis{{ end }}
 
-  <body>
-    <div class="container">
-      <section class="header">
-        <a title="atlantis" href="{{ .CleanedBasePath }}"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
-        <p class="title-heading">atlantis</p>
-      </section>
-      <div class="spacer"></div>
-      <section>
-        <div style="text-align: center; padding: 2em;">
-          <h4>Job Not Found</h4>
-          <p>The requested job does not exist or has expired.</p>
-          <p><a href="{{ .CleanedBasePath }}/jobs">Back to Jobs</a></p>
-        </div>
-      </section>
-    </div>
-  </body>
-</html>
+{{ define "content" }}
+<div class="page-container">
+  <nav class="breadcrumb">
+    <a href="{{ .CleanedBasePath }}/jobs">Jobs</a>
+    <i data-lucide="chevron-right" class="icon-xs"></i>
+    <span>Not Found</span>
+  </nav>
+
+  <div class="empty-state">
+    <i data-lucide="search-x" class="empty-state-icon"></i>
+    <h3>Job Not Found</h3>
+    <p>The requested job does not exist or has expired.</p>
+  </div>
+</div>
+{{ end }}
+
+{{ template "layout" . }}

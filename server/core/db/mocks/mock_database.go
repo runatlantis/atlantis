@@ -234,6 +234,20 @@ func (mr *MockDatabaseMockRecorder) LockCommand(cmdName, lockTime any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockCommand", reflect.TypeOf((*MockDatabase)(nil).LockCommand), cmdName, lockTime)
 }
 
+// MarkInterruptedOutputs mocks base method.
+func (m *MockDatabase) MarkInterruptedOutputs() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkInterruptedOutputs")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkInterruptedOutputs indicates an expected call of MarkInterruptedOutputs.
+func (mr *MockDatabaseMockRecorder) MarkInterruptedOutputs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkInterruptedOutputs", reflect.TypeOf((*MockDatabase)(nil).MarkInterruptedOutputs))
+}
+
 // SaveProjectOutput mocks base method.
 func (m *MockDatabase) SaveProjectOutput(output models.ProjectOutput) error {
 	m.ctrl.T.Helper()

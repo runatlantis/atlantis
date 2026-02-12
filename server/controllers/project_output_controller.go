@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -247,9 +248,10 @@ func (c *ProjectOutputController) buildProjectOutputData(output *models.ProjectO
 		duration = FormatDuration(output.CompletedAt.Sub(output.StartedAt))
 	}
 
-	// Build PR URL from stored data, with GitHub URL as fallback
+	// Build PR URL from stored data, with GitHub URL as fallback.
+	// Validate scheme to prevent javascript: URL injection from stored data.
 	pullURL := output.PullURL
-	if pullURL == "" {
+	if pullURL == "" || (!strings.HasPrefix(pullURL, "https://") && !strings.HasPrefix(pullURL, "http://")) {
 		pullURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", owner, repo, output.PullNum)
 	}
 

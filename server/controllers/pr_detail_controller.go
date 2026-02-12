@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -144,8 +145,11 @@ func (c *PRDetailController) buildPRDetailData(owner, repo string, pullNum int) 
 		case models.FailedOutputStatus:
 			failedCount++
 			failedProjects = append(failedProjects, project)
-		case models.PendingOutputStatus:
+		case models.RunningOutputStatus:
 			pendingCount++
+		case models.InterruptedOutputStatus:
+			failedCount++
+			failedProjects = append(failedProjects, project)
 		}
 
 		if (output.CommandName == "policy_check" || output.PolicyOutput != "") && !output.PolicyPassed {
@@ -171,7 +175,7 @@ func (c *PRDetailController) buildPRDetailData(owner, repo string, pullNum int) 
 
 	// Build PR URL from stored data, with GitHub URL as fallback
 	pullURL := ""
-	if len(outputs) > 0 && outputs[0].PullURL != "" {
+	if len(outputs) > 0 && outputs[0].PullURL != "" && (strings.HasPrefix(outputs[0].PullURL, "https://") || strings.HasPrefix(outputs[0].PullURL, "http://")) {
 		pullURL = outputs[0].PullURL
 	} else {
 		pullURL = fmt.Sprintf("https://github.com/%s/pull/%d", repoFullName, pullNum)
@@ -227,10 +231,15 @@ func BuildDetailProject(output models.ProjectOutput) web_templates.PRDetailProje
 // DetermineProjectStatus returns the CSS status class and human-readable label
 // based on the command name and execution status
 func DetermineProjectStatus(commandName string, status models.ProjectOutputStatus) (statusClass string, statusLabel string) {
+	// Handle interrupted status uniformly across all command types
+	if status == models.InterruptedOutputStatus {
+		return "failed", "Interrupted"
+	}
+
 	switch commandName {
 	case "plan":
 		switch status {
-		case models.PendingOutputStatus:
+		case models.RunningOutputStatus:
 			return "pending", "Planning"
 		case models.SuccessOutputStatus:
 			return "success", "Planned"
@@ -239,7 +248,7 @@ func DetermineProjectStatus(commandName string, status models.ProjectOutputStatu
 		}
 	case "apply":
 		switch status {
-		case models.PendingOutputStatus:
+		case models.RunningOutputStatus:
 			return "pending", "Applying"
 		case models.SuccessOutputStatus:
 			return "applied", "Applied"
@@ -248,7 +257,7 @@ func DetermineProjectStatus(commandName string, status models.ProjectOutputStatu
 		}
 	case "policy_check":
 		switch status {
-		case models.PendingOutputStatus:
+		case models.RunningOutputStatus:
 			return "pending", "Checking Policy"
 		case models.SuccessOutputStatus:
 			return "success", "Policy Checked"
@@ -258,8 +267,8 @@ func DetermineProjectStatus(commandName string, status models.ProjectOutputStatu
 	default:
 		// Handle empty or unknown command name - fall back to simple status
 		switch status {
-		case models.PendingOutputStatus:
-			return "pending", "Pending"
+		case models.RunningOutputStatus:
+			return "pending", "Running"
 		case models.SuccessOutputStatus:
 			return "success", "Success"
 		case models.FailedOutputStatus:
@@ -267,7 +276,7 @@ func DetermineProjectStatus(commandName string, status models.ProjectOutputStatu
 		}
 	}
 	// Default fallback
-	return "pending", "Pending"
+	return "pending", "Running"
 }
 
 func statusPriority(status string) int {

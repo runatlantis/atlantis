@@ -24,6 +24,26 @@ func NewOutputPersister(database db.Database, outputHandler jobs.ProjectCommandO
 	return &OutputPersister{db: database, outputHandler: outputHandler}
 }
 
+// PersistStub saves a stub record with Running status before command execution begins
+func (p *OutputPersister) PersistStub(ctx command.ProjectContext, cmdName command.Name) error {
+	output := models.ProjectOutput{
+		RepoFullName: ctx.BaseRepo.FullName,
+		PullNum:      ctx.Pull.Num,
+		ProjectName:  ctx.ProjectName,
+		Workspace:    ctx.Workspace,
+		Path:         ctx.RepoRelDir,
+		CommandName:  cmdName.String(),
+		JobID:        ctx.JobID,
+		RunTimestamp: time.Now().UTC().UnixMilli(),
+		Status:       models.RunningOutputStatus,
+		TriggeredBy:  ctx.User.Username,
+		StartedAt:    time.Now().UTC(),
+		PullURL:      ctx.Pull.URL,
+		PullTitle:    ctx.Pull.Title,
+	}
+	return p.db.SaveProjectOutput(output)
+}
+
 // PersistResult saves the result of a project command to the database
 func (p *OutputPersister) PersistResult(ctx command.ProjectContext, result command.ProjectResult) error {
 	// Get actual job timing from in-memory tracker

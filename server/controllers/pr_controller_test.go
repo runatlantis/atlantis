@@ -447,7 +447,7 @@ func TestPRController_PRList_MixedStatuses(t *testing.T) {
 	When(mockDB.GetProjectOutputsByPull("owner/repo", 123)).ThenReturn([]models.ProjectOutput{
 		{Status: models.SuccessOutputStatus, CompletedAt: now},
 		{Status: models.FailedOutputStatus, CompletedAt: now},
-		{Status: models.PendingOutputStatus, CompletedAt: now},
+		{Status: models.RunningOutputStatus, CompletedAt: now},
 	}, nil)
 
 	var capturedData web_templates.PRListData

@@ -42,6 +42,7 @@ type Database interface {
 	CheckCommandLock(cmdName command.Name) (*command.Lock, error)
 
 	// Project Output
+	MarkInterruptedOutputs() error
 	SaveProjectOutput(output models.ProjectOutput) error
 	GetProjectOutputRun(repoFullName string, pullNum int, path string, workspace string, projectName string, command string, runTimestamp int64) (*models.ProjectOutput, error)
 	GetProjectOutputHistory(repoFullName string, pullNum int, path string, workspace string, projectName string) ([]models.ProjectOutput, error)

@@ -12,9 +12,10 @@ import (
 
 func TestProjectJobsErrorTemplate(t *testing.T) {
 	err := ProjectJobsErrorTemplate.Execute(io.Discard, ProjectJobsError{
-		AtlantisVersion: "v0.0.0",
-		ProjectPath:     "project path",
-		CleanedBasePath: "/path",
+		LayoutData: LayoutData{
+			AtlantisVersion: "v0.0.0",
+			CleanedBasePath: "/path",
+		},
 	})
 	Ok(t, err)
 }
