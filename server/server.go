@@ -172,13 +172,15 @@ type WebhookConfig struct {
 //go:embed static
 var staticAssets embed.FS
 
+// devRouteRegistrars holds route registration functions added by dev-tagged builds.
+var devRouteRegistrars []func(s *Server)
+
 // NewServer returns a new server. If there are issues starting the server or
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	logging.SuppressDefaultLogging()
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
-
 
 	if err != nil {
 		return nil, err
@@ -1218,9 +1220,9 @@ func (s *Server) Start() error {
 		http.Redirect(w, r, s.AtlantisURL.Path+"/locks", http.StatusMovedPermanently)
 	}).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	// Dev mode test endpoint - must be registered before /jobs/{job-id} to take precedence
-	if web_templates.IsDevMode() {
-		s.Router.HandleFunc("/jobs/test", s.JobsController.CreateTestJob).Methods("GET")
+	// Dev-only routes registered via init() in build-tagged files
+	for _, register := range devRouteRegistrars {
+		register(s)
 	}
 
 	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
