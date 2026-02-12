@@ -3,7 +3,11 @@
 
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // DriftSummary represents detected infrastructure drift from a plan output.
 // It captures the changes detected between the Terraform state and actual infrastructure.
@@ -63,6 +67,8 @@ type ProjectDrift struct {
 	Workspace string `json:"workspace"`
 	// Ref is the git reference (branch/tag/commit) that was checked.
 	Ref string `json:"ref"`
+	// DetectionID links this drift result to the detection run that produced it.
+	DetectionID string `json:"detection_id,omitempty"`
 	// Drift contains the drift summary for this project.
 	Drift DriftSummary `json:"drift"`
 	// LastChecked is when the drift was last detected.
@@ -145,6 +151,8 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 
 // DriftDetectionResult is the API response for POST /api/drift/detect.
 type DriftDetectionResult struct {
+	// ID is a unique identifier for this detection run.
+	ID string `json:"id"`
 	// Repository is the full repository name.
 	Repository string `json:"repository"`
 	// Projects contains the drift status for each project checked.
@@ -157,9 +165,10 @@ type DriftDetectionResult struct {
 	ProjectsWithDrift int `json:"projects_with_drift"`
 }
 
-// NewDriftDetectionResult creates a new DriftDetectionResult.
+// NewDriftDetectionResult creates a new DriftDetectionResult with a generated ID.
 func NewDriftDetectionResult(repository string) *DriftDetectionResult {
 	return &DriftDetectionResult{
+		ID:         uuid.New().String(),
 		Repository: repository,
 		Projects:   []ProjectDrift{},
 		DetectedAt: time.Now(),

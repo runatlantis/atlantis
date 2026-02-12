@@ -149,6 +149,8 @@ type DriftProjectAPI struct {
 	Workspace string `json:"workspace"`
 	// Ref is the git reference that was checked.
 	Ref string `json:"ref"`
+	// DetectionID links this result to the detection run that produced it.
+	DetectionID string `json:"detection_id,omitempty"`
 	// HasDrift indicates whether drift was detected.
 	HasDrift bool `json:"has_drift"`
 	// Drift contains drift details if drift was detected.
@@ -184,6 +186,7 @@ func NewDriftProjectAPI(pd models.ProjectDrift) DriftProjectAPI {
 		Directory:   pd.Path,
 		Workspace:   pd.Workspace,
 		Ref:         pd.Ref,
+		DetectionID: pd.DetectionID,
 		HasDrift:    pd.Drift.HasDrift,
 		LastChecked: pd.LastChecked,
 		Error:       pd.Error,
@@ -256,6 +259,8 @@ func NewDriftStatusAPI(ds models.DriftStatusResponse) DriftStatusAPI {
 
 // DriftDetectionResultAPI is the API response for drift detection.
 type DriftDetectionResultAPI struct {
+	// ID is a unique identifier for this detection run.
+	ID string `json:"id"`
 	// Repository is the full repository name.
 	Repository string `json:"repository"`
 	// Projects contains drift status for each project checked.
@@ -269,6 +274,7 @@ type DriftDetectionResultAPI struct {
 // NewDriftDetectionResultAPI converts an internal DriftDetectionResult to its API representation.
 func NewDriftDetectionResultAPI(dr *models.DriftDetectionResult) DriftDetectionResultAPI {
 	result := DriftDetectionResultAPI{
+		ID:         dr.ID,
 		Repository: dr.Repository,
 		Projects:   make([]DriftProjectAPI, 0, len(dr.Projects)),
 		DetectedAt: dr.DetectedAt,
