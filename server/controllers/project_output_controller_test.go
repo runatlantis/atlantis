@@ -253,8 +253,10 @@ func (m *mockOutputHandler) CleanUp(_ jobs.PullInfo)                            
 func (m *mockOutputHandler) GetPullToJobMapping() []jobs.PullInfoWithJobIDs {
 	return m.pullMappings
 }
-func (m *mockOutputHandler) GetProjectOutputBuffer(_ string) jobs.OutputBuffer                      { return jobs.OutputBuffer{} }
-func (m *mockOutputHandler) GetJobInfo(_ string) *jobs.JobIDInfo                                    { return nil }
+func (m *mockOutputHandler) GetProjectOutputBuffer(_ string) jobs.OutputBuffer {
+	return jobs.OutputBuffer{}
+}
+func (m *mockOutputHandler) GetJobInfo(_ string) *jobs.JobIDInfo { return nil }
 
 func TestProjectOutputController_CompletedJobNotShownAsRunning(t *testing.T) {
 	// This test verifies that completed jobs are NOT shown as "Running" in the UI.

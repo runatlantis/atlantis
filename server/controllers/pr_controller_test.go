@@ -320,10 +320,10 @@ func TestPRController_PRList_SortsByLastActivity(t *testing.T) {
 
 func TestDetermineStatus(t *testing.T) {
 	tests := []struct {
-		name         string
-		success      int
-		failed       int
-		pending      int
+		name     string
+		success  int
+		failed   int
+		pending  int
 		expected string
 	}{
 		{"all_success", 3, 0, 0, "passed"},
