@@ -475,6 +475,53 @@ func TestRegisterThenWriteNoDuplicates(t *testing.T) {
 	close(prjCmdOutputChan)
 }
 
+// TestJobStartTimePreserved verifies that the job start time (Time field) is set
+// on the first log message and not overwritten by subsequent messages.
+// This was a bug where every log line called time.Now(), making startedAt ≈ completedAt.
+func TestJobStartTimePreserved(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	prjCmdOutputChan := make(chan *jobs.ProjectCmdOutputLine)
+	handler := jobs.NewAsyncProjectCommandOutputHandler(prjCmdOutputChan, logger)
+
+	go handler.Handle()
+
+	ctx := createTestProjectCmdContext(t)
+
+	// Send first message — this should set the start time
+	handler.Send(ctx, "first line", false)
+	time.Sleep(10 * time.Millisecond)
+
+	info1 := handler.GetJobInfo(ctx.JobID)
+	assert.NotNil(t, info1, "job info should exist after first message")
+	startTime := info1.Time
+
+	// Wait a bit to ensure time.Now() would return a different value
+	time.Sleep(50 * time.Millisecond)
+
+	// Send more messages — these should NOT change the start time
+	handler.Send(ctx, "second line", false)
+	handler.Send(ctx, "third line", false)
+	time.Sleep(10 * time.Millisecond)
+
+	info2 := handler.GetJobInfo(ctx.JobID)
+	assert.NotNil(t, info2, "job info should still exist")
+	assert.Equal(t, startTime, info2.Time, "start time should be preserved from first message, not overwritten")
+
+	// Complete the job and verify duration is meaningful
+	handler.Send(ctx, "", true)
+	time.Sleep(10 * time.Millisecond)
+
+	info3 := handler.GetJobInfo(ctx.JobID)
+	assert.NotNil(t, info3, "job info should still exist after completion")
+	assert.Equal(t, startTime, info3.Time, "start time should still be preserved after completion")
+	assert.False(t, info3.CompletedAt.IsZero(), "completed time should be set")
+
+	duration := info3.CompletedAt.Sub(info3.Time)
+	assert.True(t, duration >= 50*time.Millisecond, "duration should reflect actual elapsed time, got %v", duration)
+
+	close(prjCmdOutputChan)
+}
+
 func TestHighConcurrencyStress(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping stress test in short mode")
