@@ -80,14 +80,21 @@ function jobTerminal() {
         const staticOutput = termData.output || '';
         const streamUrl = terminalContainer.dataset.streamUrl;
 
-        // If job already completed (endTime set from server), update status
-        if (this.endTime > 0) {
+        // If job was interrupted (server restarted), show message
+        if ('{{ .Status }}' === 'interrupted') {
+          this.status = 'interrupted';
+          this.statusLabel = 'Interrupted';
+          this.term.write('\r\n\x1b[33m⚠ Server was restarted while this job was running. Output was not preserved.\x1b[0m\r\n');
+          clearInterval(this.elapsedInterval);
+        } else if (this.endTime > 0) {
+          // Job already completed
           this.status = 'complete';
           this.statusLabel = this.jobStep === 'apply' ? 'Applied' : 'Planned';
           if (staticOutput) {
             this.term.write(staticOutput.replace(/\n/g, '\r\n'));
           }
         } else {
+          // Live streaming
           this.elapsedInterval = setInterval(() => this.updateElapsedTime(), 1000);
           this.connect(streamUrl);
         }
@@ -256,7 +263,7 @@ function jobTerminal() {
   <div class="pr-header-card">
     <div class="pr-header-title">
       <h1>{{ .ProjectPath }}</h1>
-      <span class="status-badge status-badge--{{ .BadgeStyle }}" :class="{ 'status-badge--pending': status === 'running', 'status-badge--success': status === 'complete', 'status-badge--failed': status === 'error' }">
+      <span class="status-badge status-badge--{{ .BadgeStyle }}" :class="{ 'status-badge--pending': status === 'running', 'status-badge--success': status === 'complete', 'status-badge--failed': status === 'error' || status === 'interrupted' }">
         <template x-if="status === 'running'">
           <span class="running-indicator"></span>
         </template>
@@ -265,6 +272,9 @@ function jobTerminal() {
         </template>
         <template x-if="status === 'error'">
           <i data-lucide="x-circle" class="icon-xs"></i>
+        </template>
+        <template x-if="status === 'interrupted'">
+          <i data-lucide="alert-triangle" class="icon-xs"></i>
         </template>
         <template x-if="status === 'disconnected'">
           <i data-lucide="wifi-off" class="icon-xs"></i>

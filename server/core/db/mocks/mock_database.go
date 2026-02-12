@@ -261,6 +261,21 @@ func (mock *MockDatabase) LockCommand(cmdName command.Name, lockTime time.Time) 
 	return _ret0, _ret1
 }
 
+func (mock *MockDatabase) MarkInterruptedOutputs() error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockDatabase().")
+	}
+	_params := []pegomock.Param{}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("MarkInterruptedOutputs", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(error)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockDatabase) SaveProjectOutput(output models.ProjectOutput) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDatabase().")
@@ -846,6 +861,23 @@ func (c *MockDatabase_LockCommand_OngoingVerification) GetAllCapturedArguments()
 		}
 	}
 	return
+}
+
+func (verifier *VerifierMockDatabase) MarkInterruptedOutputs() *MockDatabase_MarkInterruptedOutputs_OngoingVerification {
+	_params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "MarkInterruptedOutputs", _params, verifier.timeout)
+	return &MockDatabase_MarkInterruptedOutputs_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockDatabase_MarkInterruptedOutputs_OngoingVerification struct {
+	mock              *MockDatabase
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockDatabase_MarkInterruptedOutputs_OngoingVerification) GetCapturedArguments() {
+}
+
+func (c *MockDatabase_MarkInterruptedOutputs_OngoingVerification) GetAllCapturedArguments() {
 }
 
 func (verifier *VerifierMockDatabase) SaveProjectOutput(output models.ProjectOutput) *MockDatabase_SaveProjectOutput_OngoingVerification {

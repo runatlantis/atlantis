@@ -13,19 +13,22 @@ import (
 type ProjectOutputStatus int
 
 const (
-	PendingOutputStatus ProjectOutputStatus = iota
+	RunningOutputStatus ProjectOutputStatus = iota
 	SuccessOutputStatus
 	FailedOutputStatus
+	InterruptedOutputStatus
 )
 
 func (s ProjectOutputStatus) String() string {
 	switch s {
-	case PendingOutputStatus:
-		return "pending"
+	case RunningOutputStatus:
+		return "running"
 	case SuccessOutputStatus:
 		return "success"
 	case FailedOutputStatus:
 		return "failed"
+	case InterruptedOutputStatus:
+		return "interrupted"
 	default:
 		return "unknown"
 	}
@@ -43,12 +46,14 @@ func (s *ProjectOutputStatus) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch str {
-	case "pending":
-		*s = PendingOutputStatus
+	case "running":
+		*s = RunningOutputStatus
 	case "success":
 		*s = SuccessOutputStatus
 	case "failed":
 		*s = FailedOutputStatus
+	case "interrupted":
+		*s = InterruptedOutputStatus
 	default:
 		return fmt.Errorf("unknown status: %s", str)
 	}

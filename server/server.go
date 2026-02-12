@@ -1145,6 +1145,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		database:                       database,
 	}
 
+	// Mark any outputs that were left in "running" status from a previous run
+	// as interrupted. This must happen before the server starts accepting requests.
+	if server.database != nil {
+		if err := server.database.MarkInterruptedOutputs(); err != nil {
+			logger.Warn("failed to mark interrupted outputs: %v", err)
+		}
+	}
+
 	validate := validator.New(validator.WithRequiredStructEnabled())
 
 	err = validate.Struct(server)
@@ -1152,6 +1160,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	} else {
 		return server, nil
+	}
+}
+
+// securityHeadersMiddleware returns negroni middleware that sets security
+// headers on all responses to prevent clickjacking, MIME sniffing, and
+// provide defense-in-depth against XSS.
+func securityHeadersMiddleware() negroni.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		next(w, r)
 	}
 }
 
@@ -1246,6 +1266,7 @@ func (s *Server) Start() error {
 		StackAll:   false,
 		StackSize:  1024 * 8,
 	}, NewRequestLogger(s))
+	n.Use(securityHeadersMiddleware())
 	n.UseHandler(s.Router)
 
 	defer s.Logger.Flush()

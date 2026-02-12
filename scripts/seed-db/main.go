@@ -507,7 +507,7 @@ func main() {
 			CommandName:   "plan",
 			RunTimestamp:  now.Add(-2 * time.Minute).UnixMilli(),
 			Output:        "",
-			Status:        models.PendingOutputStatus,
+			Status:        models.RunningOutputStatus,
 			ResourceStats: models.ResourceStats{},
 			PolicyPassed:  true,
 			TriggeredBy:   "mchen",

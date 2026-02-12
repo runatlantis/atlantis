@@ -5,6 +5,7 @@ package controllers
 
 import (
 	"net/http"
+	"net/url"
 	"sort"
 	"time"
 
@@ -59,7 +60,7 @@ func (c *LocksPageController) Get(w http.ResponseWriter, r *http.Request) {
 	for id, lock := range locks {
 		lockData = append(lockData, web_templates.LockIndexData{
 			LockID:        id,
-			LockPath:      "/lock?id=" + id,
+			LockPath:      "/lock?id=" + url.QueryEscape(id),
 			RepoFullName:  lock.Project.RepoFullName,
 			PullNum:       lock.Pull.Num,
 			Path:          lock.Project.Path,

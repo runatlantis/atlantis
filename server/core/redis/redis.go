@@ -492,9 +492,48 @@ func (r *RedisDB) jobIDIndexKey(jobID string) string {
 	return jobIDIndexPrefix + jobID
 }
 
+// MarkInterruptedOutputs transitions all project outputs with RunningOutputStatus
+// to InterruptedOutputStatus. This is called on server startup to mark any jobs
+// that were in progress when the server was killed.
+func (r *RedisDB) MarkInterruptedOutputs() error {
+	// Scan all pull output index keys to find outputs still in "running" status
+	iter := r.client.Scan(ctx, 0, pullOutputIndexPrefix+"*", 0).Iterator()
+	for iter.Next(ctx) {
+		indexKey := iter.Val()
+		keys, err := r.client.SMembers(ctx, indexKey).Result()
+		if err != nil {
+			continue
+		}
+		for _, key := range keys {
+			output, err := r.getProjectOutputByKey(key)
+			if err != nil || output == nil {
+				continue
+			}
+			if output.Status == models.RunningOutputStatus {
+				output.Status = models.InterruptedOutputStatus
+				bytes, err := json.Marshal(output)
+				if err != nil {
+					continue
+				}
+				r.client.Set(ctx, key, bytes, 0)
+			}
+		}
+	}
+	return iter.Err()
+}
+
 // SaveProjectOutput saves a project output to Redis atomically.
+// If the output has a JobID that already exists in the job-id-index,
+// the existing record is updated (upsert) rather than creating a new one.
 func (r *RedisDB) SaveProjectOutput(output models.ProjectOutput) error {
+	// Check if we should upsert an existing record by job ID
 	key := r.projectOutputKey(output.Key())
+	if output.JobID != "" {
+		existingKey, err := r.client.Get(ctx, r.jobIDIndexKey(output.JobID)).Result()
+		if err == nil && existingKey != "" {
+			key = existingKey
+		}
+	}
 
 	bytes, err := json.Marshal(output)
 	if err != nil {

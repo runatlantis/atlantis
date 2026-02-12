@@ -163,8 +163,10 @@ func (c *PRController) buildPRListItem(pull models.PullRequest, outputs []models
 			item.SuccessCount++
 		case models.FailedOutputStatus:
 			item.FailedCount++
-		case models.PendingOutputStatus:
+		case models.RunningOutputStatus:
 			item.PendingCount++
+		case models.InterruptedOutputStatus:
+			item.FailedCount++
 		}
 
 		item.AddCount += output.ResourceStats.Add
