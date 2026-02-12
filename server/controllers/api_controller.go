@@ -20,6 +20,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
 )
@@ -45,6 +46,9 @@ type APIController struct {
 	WorkingDir                     events.WorkingDir                     `validate:"required"`
 	WorkingDirLocker               events.WorkingDirLocker               `validate:"required"`
 	CommitStatusUpdater            events.CommitStatusUpdater            `validate:"required"`
+	// DriftWebhookSender sends webhook notifications when drift is detected.
+	// Nil when no drift webhooks are configured.
+	DriftWebhookSender *webhooks.DriftWebhookSender
 	// SilenceVCSStatusNoProjects is whether API should set commit status if no projects are found
 	SilenceVCSStatusNoProjects bool
 
@@ -72,6 +76,11 @@ type APIRequest struct {
 		Directory string
 		Workspace string
 	}
+	// DiscoverProjects enables auto-discovery when no projects or paths
+	// are specified. This triggers BuildPlanCommands with an empty
+	// CommentCommand so atlantis.yaml (or repo config) is used to find
+	// all projects. Only drift detection and remediation set this.
+	DiscoverProjects bool `json:"-"`
 }
 
 func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
@@ -88,6 +97,14 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 			Name:       cmdName,
 			RepoRelDir: strings.TrimRight(path.Directory, "/"),
 			Workspace:  path.Workspace,
+		})
+	}
+
+	// When no specific projects or paths are provided and DiscoverProjects
+	// is set, use an empty CommentCommand to trigger auto-discovery.
+	if len(cc) == 0 && a.DiscoverProjects {
+		cc = append(cc, &events.CommentCommand{
+			Name: cmdName,
 		})
 	}
 
@@ -122,6 +139,8 @@ func (a *APIController) apiHandleParseError(w http.ResponseWriter, r *http.Reque
 		responder.Unauthorized(w, r, err.Error())
 	case http.StatusForbidden:
 		responder.Forbidden(w, r, err.Error())
+	case http.StatusServiceUnavailable:
+		responder.ServiceUnavailable(w, r, err.Error())
 	default:
 		responder.InternalError(w, r, err)
 	}
@@ -403,7 +422,7 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 
 func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *command.Context, int, error) {
 	if len(a.APISecret) == 0 {
-		return nil, nil, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled")
+		return nil, nil, http.StatusServiceUnavailable, fmt.Errorf("ignoring request since API is disabled")
 	}
 
 	// Validate the secret token using constant-time comparison to prevent timing attacks
@@ -572,9 +591,10 @@ type apiRemediationExecutor struct {
 func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectName, path, workspace string) (string, *models.DriftSummary, error) {
 	// Create a minimal API request for the plan
 	request := &APIRequest{
-		Repository: repository,
-		Ref:        ref,
-		Type:       vcsType,
+		Repository:       repository,
+		Ref:              ref,
+		Type:             vcsType,
+		DiscoverProjects: true,
 	}
 
 	if projectName != "" {
@@ -604,6 +624,15 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 	// Setup working directory
 	if err := e.controller.apiSetup(ctx, command.Plan); err != nil {
 		return "", nil, fmt.Errorf("setup failed: %w", err)
+	}
+
+	// Run pre-workflow hooks before project discovery
+	preHookCmd := &events.CommentCommand{Name: command.Plan}
+	if err := e.controller.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, preHookCmd); err != nil {
+		if e.controller.FailOnPreWorkflowHookError {
+			return "", nil, fmt.Errorf("pre-workflow hook failed: %w", err)
+		}
+		e.logger.Warn("pre-workflow hook error (continuing): %v", err)
 	}
 
 	// Execute plan
@@ -641,9 +670,10 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectName, path, workspace string) (string, error) {
 	// Create a minimal API request for the apply
 	request := &APIRequest{
-		Repository: repository,
-		Ref:        ref,
-		Type:       vcsType,
+		Repository:       repository,
+		Ref:              ref,
+		Type:             vcsType,
+		DiscoverProjects: true,
 	}
 
 	if projectName != "" {
@@ -673,6 +703,15 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	// Setup working directory
 	if err := e.controller.apiSetup(ctx, command.Apply); err != nil {
 		return "", fmt.Errorf("setup failed: %w", err)
+	}
+
+	// Run pre-workflow hooks before project discovery
+	preHookCmd := &events.CommentCommand{Name: command.Apply}
+	if err := e.controller.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, preHookCmd); err != nil {
+		if e.controller.FailOnPreWorkflowHookError {
+			return "", fmt.Errorf("pre-workflow hook failed: %w", err)
+		}
+		e.logger.Warn("pre-workflow hook error (continuing): %v", err)
 	}
 
 	// First run plan (required before apply)
@@ -890,9 +929,10 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 
 	// Build API request for plan
 	apiRequest := &APIRequest{
-		Repository: request.Repository,
-		Ref:        request.Ref,
-		Type:       request.Type,
+		Repository:       request.Repository,
+		Ref:              request.Ref,
+		Type:             request.Type,
+		DiscoverProjects: true, // Enable auto-discovery when no projects/paths specified
 	}
 
 	if len(request.Projects) > 0 {
@@ -922,10 +962,21 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		API:   true,
 	}
 
-	// Setup and run plan
+	// Setup working directory
 	if err := a.apiSetup(ctx, command.Plan); err != nil {
 		responder.InternalError(w, r, fmt.Errorf("setup failed: %w", err))
 		return
+	}
+
+	// Run pre-workflow hooks before project discovery so hooks can
+	// dynamically generate atlantis.yaml or other config files.
+	preHookCmd := &events.CommentCommand{Name: command.Plan}
+	if err := a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, preHookCmd); err != nil {
+		if a.FailOnPreWorkflowHookError {
+			responder.InternalError(w, r, fmt.Errorf("pre-workflow hook failed: %w", err))
+			return
+		}
+		a.Logger.Warn("pre-workflow hook error (continuing): %v", err)
 	}
 
 	result, err := a.apiPlan(apiRequest, ctx)
@@ -944,6 +995,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 			Path:        pr.RepoRelDir,
 			Workspace:   pr.Workspace,
 			Ref:         request.Ref,
+			DetectionID: detectionResult.ID,
 			LastChecked: time.Now(),
 		}
 
@@ -969,6 +1021,14 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		detectionResult.AddProject(projectDrift)
 	}
 
+	// Send drift webhook notifications if drift was detected
+	if a.DriftWebhookSender != nil && detectionResult.ProjectsWithDrift > 0 {
+		webhookResult := convertToDriftWebhookResult(detectionResult)
+		if err := a.DriftWebhookSender.Send(a.Logger, webhookResult); err != nil {
+			a.Logger.Warn("failed to send drift webhook: %v", err)
+		}
+	}
+
 	// Convert to API DTO and return
 	apiResult := NewDriftDetectionResultAPI(detectionResult)
 
@@ -977,4 +1037,34 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		code = http.StatusMultiStatus // 207 - some projects may have failed
 	}
 	responder.Success(w, r, code, apiResult)
+}
+
+// convertToDriftWebhookResult converts a DriftDetectionResult to a webhook DriftResult.
+func convertToDriftWebhookResult(dr *models.DriftDetectionResult) webhooks.DriftResult {
+	projects := make([]webhooks.DriftProjectResult, 0, len(dr.Projects))
+	for _, p := range dr.Projects {
+		projects = append(projects, webhooks.DriftProjectResult{
+			ProjectName: p.ProjectName,
+			Path:        p.Path,
+			Workspace:   p.Workspace,
+			HasDrift:    p.Drift.HasDrift,
+			ToAdd:       p.Drift.ToAdd,
+			ToChange:    p.Drift.ToChange,
+			ToDestroy:   p.Drift.ToDestroy,
+			Summary:     p.Drift.Summary,
+			Error:       p.Error,
+		})
+	}
+	var ref string
+	if len(dr.Projects) > 0 {
+		ref = dr.Projects[0].Ref
+	}
+	return webhooks.DriftResult{
+		Repository:        dr.Repository,
+		Ref:               ref,
+		DetectionID:       dr.ID,
+		ProjectsWithDrift: dr.ProjectsWithDrift,
+		TotalProjects:     dr.TotalProjects,
+		Projects:          projects,
+	}
 }
