@@ -13,33 +13,7 @@
        hx-trigger="every 30s"
        hx-swap="innerHTML"
        style="display: none;">
-    <script id="pr-data" type="application/json">
-    [
-      {{ $first := true }}
-      {{ range .PullRequests }}
-      {{ if not $first }},{{ end }}
-      {{ $first = false }}
-      {
-        "repo": {{ .RepoFullName | js }},
-        "pullNum": {{ .PullNum }},
-        "groupKey": {{ .RepoFullName | js }},
-        "groupDisplayName": {{ .RepoFullName | js }},
-        "title": {{ .Title | js }},
-        "status": {{ .Status | js }},
-        "projectCount": {{ .ProjectCount }},
-        "successCount": {{ .SuccessCount }},
-        "addCount": {{ .AddCount }},
-        "changeCount": {{ .ChangeCount }},
-        "destroyCount": {{ .DestroyCount }},
-        "lastActivity": {{ .LastActivity | js }},
-        "url": {{ printf "%s/pr/%s/pulls/%d" $.CleanedBasePath .RepoFullName .PullNum | js }},
-        "errorMessage": {{ .ErrorMessage | js }},
-        "activeJobCount": {{ .ActiveJobCount }},
-        "jobsUrl": {{ printf "%s/jobs?pr=%s/%d" $.CleanedBasePath .RepoFullName .PullNum | js }}
-      }
-      {{ end }}
-    ]
-    </script>
+    <div id="pr-data" hidden>{{ .ScriptData }}</div>
   </div>
 
   <div class="toolbar">

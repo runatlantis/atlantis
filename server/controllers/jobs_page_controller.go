@@ -79,6 +79,29 @@ func (c *JobsPageController) buildJobsPageData(r *http.Request) web_templates.Jo
 	}
 	sort.Strings(repositories)
 
+	// Build JSON data for Alpine.js
+	var jsonItems []map[string]any
+	for _, pull := range jobsList {
+		for _, job := range pull.JobIDInfos {
+			jsonItems = append(jsonItems, map[string]any{
+				"jobId":            job.JobID,
+				"jobUrl":           fmt.Sprintf("%s%s", c.cleanedBasePath, job.JobIDUrl),
+				"repo":             pull.Pull.RepoFullName,
+				"pullNum":          pull.Pull.PullNum,
+				"groupKey":         fmt.Sprintf("%s|%d", pull.Pull.RepoFullName, pull.Pull.PullNum),
+				"groupDisplayName": fmt.Sprintf("%s #%d", pull.Pull.RepoFullName, pull.Pull.PullNum),
+				"path":             pull.Pull.Path,
+				"workspace":        pull.Pull.Workspace,
+				"step":             job.JobStep,
+				"triggeredBy":      job.TriggeredBy,
+				"startedAtUnix":    job.Time.Unix(),
+			})
+		}
+	}
+	if jsonItems == nil {
+		jsonItems = []map[string]any{}
+	}
+
 	return web_templates.JobsPageData{
 		LayoutData: web_templates.LayoutData{
 			AtlantisVersion: c.atlantisVersion,
@@ -89,6 +112,7 @@ func (c *JobsPageController) buildJobsPageData(r *http.Request) web_templates.Jo
 		Jobs:         jobsList,
 		TotalCount:   totalJobs,
 		Repositories: repositories,
+		ScriptData:   web_templates.MustEncodeScriptData(jsonItems),
 	}
 }
 

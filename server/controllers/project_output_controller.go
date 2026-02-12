@@ -227,7 +227,12 @@ func (c *ProjectOutputController) ProjectOutputPartial(w http.ResponseWriter, r 
 		RunTimestamp:   output.RunTimestamp,
 		PolicyPassed:   output.PolicyPassed,
 		HasPolicyCheck: output.CommandName == "policy_check" || output.PolicyOutput != "",
+		PolicyOutput:   output.PolicyOutput,
 	}
+	data.OutputScriptData = web_templates.MustEncodeScriptData(map[string]string{
+		"output": output.Output,
+		"error":  output.Error,
+	})
 
 	renderTemplate(w, c.projectOutputPartialTemplate, data, c.logger)
 }
@@ -346,6 +351,12 @@ func (c *ProjectOutputController) buildProjectOutputData(output *models.ProjectO
 
 		// Live job
 		ActiveJob: activeJob,
+
+		// Pre-encoded script data
+		OutputScriptData: web_templates.MustEncodeScriptData(map[string]string{
+			"output": output.Output,
+			"error":  output.Error,
+		}),
 	}
 }
 

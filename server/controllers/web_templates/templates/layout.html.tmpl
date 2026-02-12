@@ -122,6 +122,11 @@
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       lucide.createIcons();
+      // Disable htmx eval and script tag execution for defense-in-depth
+      if (typeof htmx !== 'undefined') {
+        htmx.config.allowEval = false;
+        htmx.config.allowScriptTags = false;
+      }
     });
     // Re-initialize icons after htmx swaps
     document.body.addEventListener('htmx:afterSwap', function() {

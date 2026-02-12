@@ -14,14 +14,14 @@ function jobTerminal() {
     searchAddon: null,
     source: null,
     status: 'running',
-    statusLabel: '{{ .BadgeText }}',
+    statusLabel: '',
     isFullscreen: false,
-    startTime: {{ if .StartTimeUnix }}{{ .StartTimeUnix }}{{ else }}Date.now(){{ end }},
-    endTime: {{ if .EndTimeUnix }}{{ .EndTimeUnix }}{{ else }}0{{ end }},
+    startTime: 0,
+    endTime: 0,
     elapsedTime: '0s',
     elapsedInterval: null,
     receivedComplete: false,
-    jobStep: '{{ .JobStep }}',
+    jobStep: '',
 
     init() {
       try {
@@ -80,8 +80,14 @@ function jobTerminal() {
         const staticOutput = termData.output || '';
         const streamUrl = terminalContainer.dataset.streamUrl;
 
+        // Initialize from JSON data block
+        this.statusLabel = termData.badgeText || 'Running';
+        this.jobStep = termData.jobStep || '';
+        this.startTime = termData.startTime || Date.now();
+        this.endTime = termData.endTime || 0;
+
         // If job was interrupted (server restarted), show message
-        if ('{{ .Status }}' === 'interrupted') {
+        if (termData.status === 'interrupted') {
           this.status = 'interrupted';
           this.statusLabel = 'Interrupted';
           this.term.write('\r\n\x1b[33m⚠ Server was restarted while this job was running. Output was not preserved.\x1b[0m\r\n');
@@ -354,7 +360,7 @@ function jobTerminal() {
       </template>
     </button>
     <div id="terminal" class="job-terminal" data-stream-url="{{ .StreamURL }}"></div>
-    <script id="terminal-data" type="application/json">{"output": {{ .Output | js }}}</script>
+    <div id="terminal-data" hidden>{{ .TerminalScriptData }}</div>
   </div>
 </div>
 {{ end }}
