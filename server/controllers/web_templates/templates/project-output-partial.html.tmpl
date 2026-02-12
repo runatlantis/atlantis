@@ -57,8 +57,33 @@
       <span>Error</span>
     </span>
   </button>
-  <div class="output-section-content" x-show="expanded" x-collapse>
+  <div class="output-section-content" x-show="expanded">
     <pre class="alert-pre">{{ .Error }}</pre>
+  </div>
+</div>
+{{ end }}
+</div>
+
+<!-- Policy section - out-of-band swap -->
+<div id="output-policy" hx-swap-oob="true">
+{{ if .PolicyOutput }}
+<div class="output-section" x-data="{ expanded: true }">
+  <button
+    class="output-section-header output-section-header--clickable"
+    @click="expanded = !expanded"
+    :aria-expanded="expanded"
+  >
+    <span class="output-section-title">
+      <i data-lucide="chevron-right" class="icon-sm collapse-chevron" :class="{ 'collapse-chevron--open': expanded }"></i>
+      <i data-lucide="shield" class="icon-sm"></i>
+      <span>Policy Check Output</span>
+    </span>
+    <span class="status-badge status-badge--{{ if .PolicyPassed }}success{{ else }}failed{{ end }}">
+      {{ if .PolicyPassed }}<i data-lucide="check-circle" class="icon-xs"></i> Passed{{ else }}<i data-lucide="x-circle" class="icon-xs"></i> Failed{{ end }}
+    </span>
+  </button>
+  <div class="output-section-content" x-show="expanded">
+    <pre class="policy-output">{{ .PolicyOutput }}</pre>
   </div>
 </div>
 {{ end }}
@@ -67,7 +92,7 @@
 <!-- Output content - main swap target -->
 {{ if .Output }}
 <div id="output-terminal" class="output-terminal"></div>
-<script id="output-data" type="application/json">{"output": {{ .Output | js }}, "error": {{ .Error | js }}}</script>
+<div id="output-data" hidden>{{ .OutputScriptData }}</div>
 {{ else if eq .Status "pending" }}
 <div class="output-pending-state">
   <i data-lucide="loader-2" class="output-pending-spinner"></i>
@@ -81,4 +106,3 @@
   <p>Output may not have been captured for this command.</p>
 </div>
 {{ end }}
-<script>if (window.lucide) window.lucide.createIcons();</script>

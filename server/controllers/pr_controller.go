@@ -132,6 +132,29 @@ func (c *PRController) buildPRListData() (web_templates.PRListData, error) {
 	}
 	sort.Strings(repos)
 
+	// Build JSON data for Alpine.js
+	jsonItems := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		jsonItems = append(jsonItems, map[string]any{
+			"repo":             item.RepoFullName,
+			"pullNum":          item.PullNum,
+			"groupKey":         item.RepoFullName,
+			"groupDisplayName": item.RepoFullName,
+			"title":            item.Title,
+			"status":           item.Status,
+			"projectCount":     item.ProjectCount,
+			"successCount":     item.SuccessCount,
+			"addCount":         item.AddCount,
+			"changeCount":      item.ChangeCount,
+			"destroyCount":     item.DestroyCount,
+			"lastActivity":     item.LastActivity,
+			"url":              fmt.Sprintf("%s/pr/%s/pulls/%d", c.cleanedBasePath, item.RepoFullName, item.PullNum),
+			"errorMessage":     item.ErrorMessage,
+			"activeJobCount":   item.ActiveJobCount,
+			"jobsUrl":          fmt.Sprintf("%s/jobs?pr=%s/%d", c.cleanedBasePath, item.RepoFullName, item.PullNum),
+		})
+	}
+
 	// Status filtering is now done client-side via Alpine.js
 	return web_templates.PRListData{
 		LayoutData: web_templates.LayoutData{
@@ -144,6 +167,7 @@ func (c *PRController) buildPRListData() (web_templates.PRListData, error) {
 		TotalCount:   len(items),
 		Repositories: repos,
 		ActiveRepo:   "",
+		ScriptData:   web_templates.MustEncodeScriptData(jsonItems),
 	}, nil
 }
 

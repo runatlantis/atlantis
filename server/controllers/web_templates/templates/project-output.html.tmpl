@@ -43,7 +43,7 @@
         <span class="history-viewing-past" id="viewing-past-indicator" {{ if not .IsHistorical }}style="display: none;"{{ end }}>Viewing past run</span>
       </button>
 
-      <div class="history-list" x-show="expanded" x-collapse x-cloak>
+      <div class="history-list" x-show="expanded" x-cloak>
         {{ $basePath := .CleanedBasePath }}
         {{ $owner := .RepoOwner }}
         {{ $repo := .RepoName }}
@@ -174,10 +174,10 @@
         <span x-text="copied ? 'Copied!' : 'Copy'"></span>
       </span>
     </button>
-    <div class="output-section-content" id="output-content" x-show="outputExpanded" x-collapse>
+    <div class="output-section-content" id="output-content" x-show="outputExpanded">
       {{ if or .Output .Error .ActiveJob }}
       <div id="output-terminal" class="output-terminal" data-is-live="{{ if .ActiveJob }}true{{ else }}false{{ end }}" data-stream-url="{{ if .ActiveJob }}{{ .ActiveJob.StreamURL }}{{ end }}"></div>
-      <script id="output-data" type="application/json">{"output": {{ .Output | js }}, "error": {{ .Error | js }}}</script>
+      <div id="output-data" hidden>{{ .OutputScriptData }}</div>
       {{ else if eq .Status "pending" }}
       <div class="output-pending-state">
         <i data-lucide="loader-2" class="output-pending-spinner"></i>
@@ -194,7 +194,11 @@
     </div>
   </div>
 
-  <!-- Policy Output Section (if policy check ran) -->
+  <!-- Error section (OOB swap target for HTMX partial updates) -->
+  <div id="output-error"></div>
+
+  <!-- Policy Output Section (OOB swap target for HTMX partial updates) -->
+  <div id="output-policy">
   {{ if .PolicyOutput }}
   <div class="output-section">
     <button
@@ -211,11 +215,12 @@
         {{ if .PolicyPassed }}<i data-lucide="check-circle" class="icon-xs"></i> Passed{{ else }}<i data-lucide="x-circle" class="icon-xs"></i> Failed{{ end }}
       </span>
     </button>
-    <div class="output-section-content" x-show="policyExpanded" x-collapse>
+    <div class="output-section-content" x-show="policyExpanded">
       <pre class="policy-output">{{ .PolicyOutput }}</pre>
     </div>
   </div>
   {{ end }}
+  </div>
 
   <!-- Footer Links -->
   <div class="page-footer-links">
@@ -241,7 +246,7 @@ document.addEventListener('DOMContentLoaded', function() {
     convertEol: true,
     theme: { background: '#1e1e1e' }
   });
-  const fitAddon = new FitAddon.FitAddon();
+  let fitAddon = new FitAddon.FitAddon();
   term.loadAddon(fitAddon);
   term.open(container);
   fitAddon.fit();
@@ -301,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const historyList = document.querySelector('.history-list');
   if (historyList) {
     const historyObserver = new MutationObserver(() => {
-      // Delay to let x-collapse animation complete
+      // Delay to let animation complete
       setTimeout(() => fitAddon.fit(), 300);
     });
     historyObserver.observe(historyList, { attributes: true, attributeFilter: ['style'] });
@@ -310,32 +315,48 @@ document.addEventListener('DOMContentLoaded', function() {
   // Initial delayed fit
   setTimeout(() => fitAddon.fit(), 100);
 
-  // Handle history item clicks - reinitialize terminal on new container
-  window.addEventListener('htmx:afterSwap', function(e) {
+  // Dispose terminal before HTMX removes its container from the DOM.
+  // If we wait until afterSwap, xterm's viewport tries to refresh as
+  // the container disappears, crashing on undefined dimensions.
+  window.addEventListener('htmx:beforeSwap', function(e) {
     if (e.detail.target.id === 'output-content') {
-      const newContainer = document.getElementById('output-terminal');
-      if (newContainer) {
-        term.dispose();
-        term = new Terminal({
-          scrollback: 15000,
-          disableStdin: true,
-          convertEol: true,
-          theme: { background: '#1e1e1e' }
-        });
-        term.loadAddon(fitAddon);
-        term.open(newContainer);
-        fitAddon.fit();
-        const newDataEl = document.getElementById('output-data');
-        const newData = newDataEl ? JSON.parse(newDataEl.textContent) : {};
-        writeContent(newData.output || '', newData.error || '');
-
-        // Toggle error styling on parent section
-        const section = document.querySelector('.output-section--terminal');
-        if (section) {
-          section.classList.toggle('output-section--error', !!(newData.error));
-        }
-      }
+      term.dispose();
     }
+  });
+
+  // Reinitialize terminal in the new container after HTMX swap.
+  // NOTE: HTMX v2 fires htmx:afterSwap for every settled element (including
+  // OOB swaps) with the same e.detail.target, so we guard with a data attribute
+  // to ensure we only initialize the terminal once per swap.
+  window.addEventListener('htmx:afterSwap', function(e) {
+    if (e.detail.target.id !== 'output-content') return;
+    const newContainer = document.getElementById('output-terminal');
+    if (!newContainer || newContainer.dataset.initialized) return;
+    newContainer.dataset.initialized = 'true';
+
+    term = new Terminal({
+      scrollback: 15000,
+      disableStdin: true,
+      convertEol: true,
+      theme: { background: '#1e1e1e' }
+    });
+    fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(newContainer);
+    fitAddon.fit();
+    const newDataEl = document.getElementById('output-data');
+    const newData = newDataEl ? JSON.parse(newDataEl.textContent) : {};
+    writeContent(newData.output || '', newData.error || '');
+
+    // Toggle error styling on parent section
+    const section = document.querySelector('.output-section--terminal');
+    if (section) {
+      section.classList.toggle('output-section--error', !!(newData.error));
+    }
+
+    // Re-initialize Lucide icons in swapped content
+    // (inline <script> tags in partials are stripped by allowScriptTags=false)
+    if (window.lucide) window.lucide.createIcons();
   });
 });
 </script>

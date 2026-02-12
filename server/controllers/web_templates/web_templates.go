@@ -15,6 +15,7 @@ package web_templates
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -25,6 +26,29 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/runatlantis/atlantis/server/jobs"
 )
+
+// MustEncodeScriptData JSON-encodes data and returns it as template.HTML so that
+// html/template will not apply additional context-aware escaping. This prevents
+// double-escaping of special characters like ANSI escape codes (\x1b) which
+// would otherwise be rendered as literal "\u001B" in the browser.
+//
+// The output is safe for HTML contexts because json.Marshal escapes <, >, and &
+// to unicode escape sequences (\u003c, \u003e, \u0026).
+//
+// Use this in controllers to pre-encode data for hidden data carrier elements,
+// then output via {{ .FieldName }} in templates (no pipeline needed).
+//
+// NOTE: We use <div hidden> instead of <script type="application/json"> because
+// HTMX's allowScriptTags=false security setting strips all <script> tags from
+// swapped content, including non-executable data scripts.
+func MustEncodeScriptData(data any) template.HTML {
+	b, err := json.Marshal(data)
+	if err != nil {
+		// This should never happen with the data types we use
+		b = []byte("{}")
+	}
+	return template.HTML(b) //nolint:gosec // output is JSON-encoded, HTML-safe
+}
 
 //go:generate pegomock generate --package mocks -o mocks/mock_template_writer.go TemplateWriter
 
@@ -296,7 +320,10 @@ type PRListData struct {
 	TotalCount   int
 	Repositories []string // For repo filter dropdown
 	ActiveRepo   string   // Selected repo filter
-	// ActiveStatuses removed - filtering is now done client-side
+
+	// Pre-encoded JSON for hidden data carrier elements (<div hidden>).
+	// Use MustEncodeScriptData to populate. Templates output via {{ .ScriptData }}.
+	ScriptData template.HTML
 }
 
 // PRListItem represents a single PR in the list
@@ -438,6 +465,10 @@ type ProjectOutputData struct {
 
 	// Live job (if any)
 	ActiveJob *ProjectOutputActiveJob
+
+	// Pre-encoded JSON for hidden data carrier elements (<div hidden>).
+	// Use MustEncodeScriptData to populate. Templates output via {{ .OutputScriptData }}.
+	OutputScriptData template.HTML
 }
 
 var ProjectOutputTemplate = mustParseLayoutTemplate(templateFileNames["project-output"])
@@ -469,6 +500,10 @@ type JobsPageData struct {
 	Jobs         []jobs.PullInfoWithJobIDs
 	TotalCount   int
 	Repositories []string // Unique repos for filter dropdown
+
+	// Pre-encoded JSON for hidden data carrier elements (<div hidden>).
+	// Use MustEncodeScriptData to populate. Templates output via {{ .ScriptData }}.
+	ScriptData template.HTML
 }
 
 // JobDetailData holds data for the job detail page template
@@ -509,4 +544,8 @@ type JobDetailData struct {
 
 	// Streaming (for live jobs)
 	StreamURL string
+
+	// Pre-encoded JSON for hidden data carrier elements (<div hidden>).
+	// Use MustEncodeScriptData to populate. Templates output via {{ .TerminalScriptData }}.
+	TerminalScriptData template.HTML
 }

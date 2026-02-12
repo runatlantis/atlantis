@@ -1,27 +1,2 @@
 <!-- Jobs data as JSON for HTMX swap into Alpine.js -->
-<script id="jobs-data" type="application/json">
-[
-  {{ $first := true }}
-  {{ $basePath := .CleanedBasePath }}
-  {{ range .Jobs }}
-  {{ $pull := .Pull }}
-  {{ range .JobIDInfos }}
-  {{ if not $first }},{{ end }}
-  {{ $first = false }}
-  {
-    "jobId": {{ .JobID | js }},
-    "jobUrl": {{ printf "%s%s" $basePath .JobIDUrl | js }},
-    "repo": {{ $pull.RepoFullName | js }},
-    "pullNum": {{ $pull.PullNum }},
-    "groupKey": {{ printf "%s|%d" $pull.RepoFullName $pull.PullNum | js }},
-    "groupDisplayName": {{ printf "%s #%d" $pull.RepoFullName $pull.PullNum | js }},
-    "path": {{ $pull.Path | js }},
-    "workspace": {{ $pull.Workspace | js }},
-    "step": {{ .JobStep | js }},
-    "triggeredBy": {{ .TriggeredBy | js }},
-    "startedAtUnix": {{ .Time.Unix }}
-  }
-  {{ end }}
-  {{ end }}
-]
-</script>
+<div id="jobs-data" hidden>{{ .ScriptData }}</div>

@@ -18,6 +18,14 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+// lastSavedOutput returns the final ProjectOutput persisted to the mock DB.
+func lastSavedOutput(t *testing.T, mockDB *mocks.MockDatabase) models.ProjectOutput {
+	t.Helper()
+	verification := mockDB.VerifyWasCalled(AtLeast(1)).SaveProjectOutput(AnyProjectOutput())
+	all := verification.GetAllCapturedArguments()
+	return all[len(all)-1]
+}
+
 func TestOutputPersistingProjectCommandRunner_Plan(t *testing.T) {
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
@@ -46,15 +54,14 @@ func TestOutputPersistingProjectCommandRunner_Plan(t *testing.T) {
 	runner := events.NewOutputPersistingProjectCommandRunner(mockRunner, persister)
 	result := runner.Plan(ctx)
 
-	// Verify result is passed through
 	Assert(t, result.PlanSuccess != nil, "expected PlanSuccess to be set")
 	Equals(t, "Plan: 1 to add, 0 to change, 0 to destroy.", result.PlanSuccess.TerraformOutput)
 
-	// Verify inner runner was called
-	mockRunner.VerifyWasCalledOnce().Plan(AnyProjectContext())
-
-	// Verify output was persisted
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
+	saved := lastSavedOutput(t, mockDB)
+	Equals(t, "owner/repo", saved.RepoFullName)
+	Equals(t, 1, saved.PullNum)
+	Equals(t, "plan", saved.CommandName)
+	Equals(t, models.SuccessOutputStatus, saved.Status)
 }
 
 func TestOutputPersistingProjectCommandRunner_Apply(t *testing.T) {
@@ -83,11 +90,13 @@ func TestOutputPersistingProjectCommandRunner_Apply(t *testing.T) {
 	runner := events.NewOutputPersistingProjectCommandRunner(mockRunner, persister)
 	result := runner.Apply(ctx)
 
-	// Verify result is passed through
 	Equals(t, "Apply complete! Resources: 1 added, 0 changed, 0 destroyed.", result.ApplySuccess)
 
-	// Verify output was persisted
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
+	saved := lastSavedOutput(t, mockDB)
+	Equals(t, "owner/repo", saved.RepoFullName)
+	Equals(t, 2, saved.PullNum)
+	Equals(t, "apply", saved.CommandName)
+	Equals(t, models.SuccessOutputStatus, saved.Status)
 }
 
 func TestOutputPersistingProjectCommandRunner_Error(t *testing.T) {
@@ -116,12 +125,12 @@ func TestOutputPersistingProjectCommandRunner_Error(t *testing.T) {
 	runner := events.NewOutputPersistingProjectCommandRunner(mockRunner, persister)
 	result := runner.Plan(ctx)
 
-	// Verify error is passed through
 	Assert(t, result.Error != nil, "expected error to be set")
 	Equals(t, "terraform init failed", result.Error.Error())
 
-	// Verify output was persisted (even on error)
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
+	saved := lastSavedOutput(t, mockDB)
+	Equals(t, models.FailedOutputStatus, saved.Status)
+	Equals(t, "terraform init failed", saved.Error)
 }
 
 func TestOutputPersistingProjectCommandRunner_NilPersister(t *testing.T) {
@@ -148,7 +157,6 @@ func TestOutputPersistingProjectCommandRunner_NilPersister(t *testing.T) {
 	runner := events.NewOutputPersistingProjectCommandRunner(mockRunner, nil)
 	result := runner.Plan(ctx)
 
-	// Verify result is still passed through
 	Assert(t, result.PlanSuccess != nil, "expected PlanSuccess to be set")
 }
 
@@ -182,12 +190,13 @@ func TestOutputPersistingProjectCommandRunner_PolicyCheck(t *testing.T) {
 	runner := events.NewOutputPersistingProjectCommandRunner(mockRunner, persister)
 	result := runner.PolicyCheck(ctx)
 
-	// Verify result is passed through
 	Assert(t, result.PolicyCheckResults != nil, "expected PolicyCheckResults to be set")
 	Equals(t, 1, len(result.PolicyCheckResults.PolicySetResults))
 
-	// Verify output was persisted
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
+	saved := lastSavedOutput(t, mockDB)
+	Equals(t, "policy_check", saved.CommandName)
+	Equals(t, models.SuccessOutputStatus, saved.Status)
+	Equals(t, true, saved.PolicyPassed)
 }
 
 func TestOutputPersistingProjectCommandRunner_Version(t *testing.T) {
@@ -216,11 +225,11 @@ func TestOutputPersistingProjectCommandRunner_Version(t *testing.T) {
 	runner := events.NewOutputPersistingProjectCommandRunner(mockRunner, persister)
 	result := runner.Version(ctx)
 
-	// Verify result is passed through
 	Equals(t, "Terraform v1.5.0", result.VersionSuccess)
 
-	// Verify output was persisted
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
+	saved := lastSavedOutput(t, mockDB)
+	Equals(t, "version", saved.CommandName)
+	Equals(t, models.SuccessOutputStatus, saved.Status)
 }
 
 func TestOutputPersistingProjectCommandRunner_Import(t *testing.T) {
@@ -251,11 +260,11 @@ func TestOutputPersistingProjectCommandRunner_Import(t *testing.T) {
 	runner := events.NewOutputPersistingProjectCommandRunner(mockRunner, persister)
 	result := runner.Import(ctx)
 
-	// Verify result is passed through
 	Assert(t, result.ImportSuccess != nil, "expected ImportSuccess to be set")
 
-	// Verify output was persisted
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
+	saved := lastSavedOutput(t, mockDB)
+	Equals(t, "import", saved.CommandName)
+	Equals(t, models.SuccessOutputStatus, saved.Status)
 }
 
 func TestOutputPersistingProjectCommandRunner_StateRm(t *testing.T) {
@@ -286,11 +295,11 @@ func TestOutputPersistingProjectCommandRunner_StateRm(t *testing.T) {
 	runner := events.NewOutputPersistingProjectCommandRunner(mockRunner, persister)
 	result := runner.StateRm(ctx)
 
-	// Verify result is passed through
 	Assert(t, result.StateRmSuccess != nil, "expected StateRmSuccess to be set")
 
-	// Verify output was persisted
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
+	saved := lastSavedOutput(t, mockDB)
+	Equals(t, "state", saved.CommandName)
+	Equals(t, models.SuccessOutputStatus, saved.Status)
 }
 
 func TestOutputPersistingProjectCommandRunner_ApprovePolicies(t *testing.T) {
@@ -323,11 +332,11 @@ func TestOutputPersistingProjectCommandRunner_ApprovePolicies(t *testing.T) {
 	runner := events.NewOutputPersistingProjectCommandRunner(mockRunner, persister)
 	result := runner.ApprovePolicies(ctx)
 
-	// Verify result is passed through
 	Assert(t, result.PolicyCheckResults != nil, "expected PolicyCheckResults to be set")
 
-	// Verify output was persisted
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
+	saved := lastSavedOutput(t, mockDB)
+	Equals(t, "approve_policies", saved.CommandName)
+	Equals(t, models.SuccessOutputStatus, saved.Status)
 }
 
 func TestOutputPersistingProjectCommandRunner_DatabaseError(t *testing.T) {

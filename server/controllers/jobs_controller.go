@@ -157,6 +157,14 @@ func (j *JobsController) getProjectJobs(w http.ResponseWriter, r *http.Request) 
 			if !dbOutput.CompletedAt.IsZero() {
 				viewData.EndTimeUnix = dbOutput.CompletedAt.UnixMilli()
 			}
+			viewData.TerminalScriptData = web_templates.MustEncodeScriptData(map[string]any{
+				"output":    dbOutput.Output,
+				"badgeText": badgeText,
+				"jobStep":   dbOutput.CommandName,
+				"status":    status,
+				"startTime": viewData.StartTimeUnix,
+				"endTime":   viewData.EndTimeUnix,
+			})
 
 			return j.ProjectJobsTemplate.Execute(w, viewData)
 		}
@@ -282,6 +290,14 @@ outer:
 		PolicyPassed:   policyPassed,
 		HasPolicyCheck: hasPolicyCheck,
 	}
+	viewData.TerminalScriptData = web_templates.MustEncodeScriptData(map[string]any{
+		"output":    output,
+		"badgeText": badgeText,
+		"jobStep":   jobStep,
+		"status":    status,
+		"startTime": startTimeUnix,
+		"endTime":   endTimeUnix,
+	})
 
 	return j.ProjectJobsTemplate.Execute(w, viewData)
 }
