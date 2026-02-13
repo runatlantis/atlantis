@@ -233,10 +233,10 @@ This is a more targeted version of `undiverged` that only checks divergence for 
 Applies to `merge` checkout strategy only which you need to set via `--checkout-strategy` flag.
 
 :::tip Tip
-Use `undiverged_when_modified` instead of `undiverged` - not both. Choose based on your needs:
+Choose either `undiverged_when_modified` or `undiverged` based on your needs (you cannot use both):
 
 * **`undiverged`**: Checks all files (more conservative, can have false positives in monorepos)
-* **`undiverged_when_modified`**: Only checks `when_modified` patterns (better for monorepos)
+* **`undiverged_when_modified`**: Only checks `when_modified` patterns (better for monorepos with targeted autoplan)
 
 :::
 
@@ -377,10 +377,12 @@ If you only want some projects/repos to have apply requirements, then you must
 You can set any or all of `approved`, `mergeable`, `undiverged`, and `undiverged_when_modified` requirements.
 
 ::: warning
-`undiverged` and `undiverged_when_modified` are **mutually exclusive**. You should use one or the other, not both:
+`undiverged` and `undiverged_when_modified` are **mutually exclusive**. Atlantis will reject configurations that specify both:
 
 * Use `undiverged` to check if **any** files on the base branch have changed
 * Use `undiverged_when_modified` to check only files matching your project's `when_modified` patterns
+
+If you specify both in your configuration, you will receive a validation error.
 :::
 
 ## Who Can Apply?

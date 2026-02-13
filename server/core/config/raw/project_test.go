@@ -231,6 +231,38 @@ func TestProject_Validate(t *testing.T) {
 			expErr: "",
 		},
 		{
+			description: "plan reqs with both undiverged and undiverged_when_modified (mutually exclusive)",
+			input: raw.Project{
+				Dir:              String("."),
+				PlanRequirements: []string{"undiverged", "undiverged_when_modified"},
+			},
+			expErr: "plan_requirements: plan_requirements cannot contain both \"undiverged\" and \"undiverged_when_modified\" as they are mutually exclusive. Use \"undiverged\" to block on any main branch changes, or \"undiverged_when_modified\" to block only when specific patterns are affected.",
+		},
+		{
+			description: "apply reqs with both undiverged and undiverged_when_modified (mutually exclusive)",
+			input: raw.Project{
+				Dir:               String("."),
+				ApplyRequirements: []string{"undiverged", "undiverged_when_modified"},
+			},
+			expErr: "apply_requirements: apply_requirements cannot contain both \"undiverged\" and \"undiverged_when_modified\" as they are mutually exclusive. Use \"undiverged\" to block on any main branch changes, or \"undiverged_when_modified\" to block only when specific patterns are affected.",
+		},
+		{
+			description: "apply reqs with undiverged_when_modified only",
+			input: raw.Project{
+				Dir:               String("."),
+				ApplyRequirements: []string{"undiverged_when_modified"},
+			},
+			expErr: "",
+		},
+		{
+			description: "import reqs with both undiverged and undiverged_when_modified (mutually exclusive)",
+			input: raw.Project{
+				Dir:                String("."),
+				ImportRequirements: []string{"undiverged", "undiverged_when_modified"},
+			},
+			expErr: "import_requirements: import_requirements cannot contain both \"undiverged\" and \"undiverged_when_modified\" as they are mutually exclusive. Use \"undiverged\" to block on any main branch changes, or \"undiverged_when_modified\" to block only when specific patterns are affected.",
+		},
+		{
 			description: "import reqs with unsupported",
 			input: raw.Project{
 				Dir:                String("."),
