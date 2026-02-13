@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/moby/patternmatcher"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -49,7 +50,11 @@ type WorkingDir interface {
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
+	// HasDiverged checks if the branch has diverged
 	HasDiverged(logger logging.SimpleLogging, cloneDir string) bool
+	// HasDivergedWhenModified checks if the branch has diverged for the given autoplanWhenModified patterns
+	// projectPath is the directory of the project relative to the repo root (e.g., "project1" or ".")
+	HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error
@@ -235,12 +240,15 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 }
 
 func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
+	logger.Debug("HasDiverged: starting divergence check in %s", cloneDir)
 	if !w.CheckoutMerge {
 		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
 		// we assume false here for 'branch' strategy.
+		logger.Debug("HasDiverged: CheckoutMerge is false, skipping divergence check")
 		return false
 	}
 
+	logger.Debug("HasDiverged: running git fetch")
 	statusFetchCmd := exec.Command("git", "fetch")
 	statusFetchCmd.Dir = cloneDir
 	outputStatusFetch, err := statusFetchCmd.CombinedOutput()
@@ -248,8 +256,10 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 		logger.Warn("fetching repo has failed: %s", string(outputStatusFetch))
 		return true
 	}
+	logger.Debug("HasDiverged: git fetch completed successfully")
 
 	// Check if remote main branch has diverged.
+	logger.Debug("HasDiverged: running git status --untracked-files=no")
 	statusUnoCmd := exec.Command("git", "status", "--untracked-files=no")
 	statusUnoCmd.Dir = cloneDir
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
@@ -257,8 +267,124 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 		logger.Warn("getting repo status has failed: %s", string(outputStatusUno))
 		return true
 	}
+	logger.Debug("HasDiverged: git status output: %s", string(outputStatusUno))
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
+	logger.Debug("HasDiverged: result=%t (contains 'have diverged': %t)", hasDiverged, hasDiverged)
 	return hasDiverged
+}
+
+func (w *FileWorkspace) HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+	logger.Debug("HasDivergedWhenModified: starting check in %s for project %s with %d patterns for PR %d (base: %s, head: %s)",
+		cloneDir, projectPath, len(autoplanWhenModified), pullRequest.Num, pullRequest.BaseBranch, pullRequest.HeadCommit)
+
+	if !w.CheckoutMerge {
+		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
+		// we assume false here for 'branch' strategy.
+		logger.Debug("HasDivergedWhenModified: CheckoutMerge is false, skipping divergence check")
+		return false
+	}
+
+	// If there are no patterns to check, we assume that we're either checking an
+	// autodiscovered project or a project that doesn't have any when_modified patterns.
+	// Fall back to the regular HasDiverged check.
+	if len(autoplanWhenModified) == 0 {
+		logger.Debug("HasDivergedWhenModified: no when_modified patterns found, falling back to HasDiverged check")
+		return w.HasDiverged(logger, cloneDir)
+	}
+
+	// Fetch latest refs from origin to ensure we're comparing against the most up-to-date remote state
+	logger.Debug("HasDivergedWhenModified: fetching latest refs from origin")
+	fetchCmd := exec.Command("git", "fetch")
+	fetchCmd.Dir = cloneDir
+	outputFetch, err := fetchCmd.CombinedOutput()
+	if err != nil {
+		logger.Warn("HasDivergedWhenModified: fetching repo has failed: %s", string(outputFetch))
+		return true
+	}
+	logger.Debug("HasDivergedWhenModified: fetch completed successfully")
+
+	// Get the list of files changed in commits that are in origin/baseBranch but not in HEAD.
+	// This gives us the files that have been modified on the base branch since the PR diverged.
+	remoteRef := fmt.Sprintf("origin/%s", pullRequest.BaseBranch)
+	revisionRange := fmt.Sprintf("HEAD..%s", remoteRef)
+
+	logger.Debug("HasDivergedWhenModified: getting changed files in %s", revisionRange)
+	changedFilesCmd := exec.Command("git", "log", revisionRange, "--name-only", "--format=") //nolint:gosec // remoteRef is from pullRequest.BaseBranch, a controlled VCS branch name
+	changedFilesCmd.Dir = cloneDir
+	outputChangedFiles, err := changedFilesCmd.CombinedOutput()
+	if err != nil {
+		logger.Warn("HasDivergedWhenModified: getting changed files has failed: %s", string(outputChangedFiles))
+		return true
+	}
+
+	changedFiles := strings.Split(strings.TrimSpace(string(outputChangedFiles)), "\n")
+	// Filter out empty strings
+	var nonEmptyChangedFiles []string
+	for _, file := range changedFiles {
+		if strings.TrimSpace(file) != "" {
+			nonEmptyChangedFiles = append(nonEmptyChangedFiles, file)
+		}
+	}
+
+	if len(nonEmptyChangedFiles) == 0 {
+		logger.Debug("HasDivergedWhenModified: no changed files found in divergent commits")
+		logger.Debug("HasDivergedWhenModified: completed check - no divergence found")
+		return false
+	}
+
+	logger.Debug("HasDivergedWhenModified: found %d changed files in divergent commits", len(nonEmptyChangedFiles))
+
+	// Adjust when_modified patterns to be relative to repo root.
+	// The patterns are relative to the project directory, but changed files from git
+	// are relative to the repo root, so we need to prepend the project directory.
+	var whenModifiedRelToRepoRoot []string
+	for _, wm := range autoplanWhenModified {
+		wm = strings.TrimSpace(wm)
+		// An exclusion uses a '!' at the beginning. If it's there, we need
+		// to remove it, then add in the project path, then add it back.
+		exclusion := false
+		if wm != "" && wm[0] == '!' {
+			wm = wm[1:]
+			exclusion = true
+		}
+
+		// Prepend project dir to when modified patterns because the patterns
+		// are relative to the project dirs but our list of modified files is
+		// relative to the repo root.
+		// Use filepath.Clean to normalize the path and resolve any ".." components.
+		wmRelPath := filepath.Clean(filepath.Join(projectPath, wm))
+		if exclusion {
+			wmRelPath = "!" + wmRelPath
+		}
+		whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, wmRelPath)
+	}
+	logger.Debug("HasDivergedWhenModified: adjusted patterns to repo root: %v", whenModifiedRelToRepoRoot)
+
+	// Use patternmatcher to check if any of the changed files match the when_modified patterns.
+	// This correctly handles dockerignore-style patterns including exclusions (!pattern) and
+	// relative paths, which git pathspec does not handle the same way.
+	pm, err := patternmatcher.New(whenModifiedRelToRepoRoot)
+	if err != nil {
+		logger.Warn("HasDivergedWhenModified: creating pattern matcher has failed: %s", err)
+		return true
+	}
+
+	for _, file := range nonEmptyChangedFiles {
+		match, err := pm.MatchesOrParentMatches(file)
+		if err != nil {
+			logger.Debug("HasDivergedWhenModified: match error for file %q: %s", file, err)
+			continue
+		}
+		if match {
+			logger.Debug("HasDivergedWhenModified: file %q matched patterns - branch has diverged", file)
+			return true
+		}
+	}
+
+	logger.Debug("HasDivergedWhenModified: no changed files matched the patterns")
+
+	logger.Debug("HasDivergedWhenModified: completed check - no divergence found")
+	return false
 }
 
 func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {
