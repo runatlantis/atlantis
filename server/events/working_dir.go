@@ -53,7 +53,8 @@ type WorkingDir interface {
 	// HasDiverged checks if the branch has diverged
 	HasDiverged(logger logging.SimpleLogging, cloneDir string) bool
 	// HasDivergedWhenModified checks if the branch has diverged for the given autoplanWhenModified patterns
-	HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, autoplanWhenModified []string, pullRequest models.PullRequest) bool
+	// projectPath is the directory of the project relative to the repo root (e.g., "project1" or ".")
+	HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error
@@ -272,9 +273,9 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	return hasDiverged
 }
 
-func (w *FileWorkspace) HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
-	logger.Debug("HasDivergedWhenModified: starting check in %s with %d patterns for PR %d (base: %s, head: %s)",
-		cloneDir, len(autoplanWhenModified), pullRequest.Num, pullRequest.BaseBranch, pullRequest.HeadCommit)
+func (w *FileWorkspace) HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+	logger.Debug("HasDivergedWhenModified: starting check in %s for project %s with %d patterns for PR %d (base: %s, head: %s)",
+		cloneDir, projectPath, len(autoplanWhenModified), pullRequest.Num, pullRequest.BaseBranch, pullRequest.HeadCommit)
 
 	if !w.CheckoutMerge {
 		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
@@ -333,10 +334,36 @@ func (w *FileWorkspace) HasDivergedWhenModified(logger logging.SimpleLogging, cl
 
 	logger.Debug("HasDivergedWhenModified: found %d changed files in divergent commits", len(nonEmptyChangedFiles))
 
+	// Adjust when_modified patterns to be relative to repo root.
+	// The patterns are relative to the project directory, but changed files from git
+	// are relative to the repo root, so we need to prepend the project directory.
+	var whenModifiedRelToRepoRoot []string
+	for _, wm := range autoplanWhenModified {
+		wm = strings.TrimSpace(wm)
+		// An exclusion uses a '!' at the beginning. If it's there, we need
+		// to remove it, then add in the project path, then add it back.
+		exclusion := false
+		if wm != "" && wm[0] == '!' {
+			wm = wm[1:]
+			exclusion = true
+		}
+
+		// Prepend project dir to when modified patterns because the patterns
+		// are relative to the project dirs but our list of modified files is
+		// relative to the repo root.
+		// Use filepath.Clean to normalize the path and resolve any ".." components.
+		wmRelPath := filepath.Clean(filepath.Join(projectPath, wm))
+		if exclusion {
+			wmRelPath = "!" + wmRelPath
+		}
+		whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, wmRelPath)
+	}
+	logger.Debug("HasDivergedWhenModified: adjusted patterns to repo root: %v", whenModifiedRelToRepoRoot)
+
 	// Use patternmatcher to check if any of the changed files match the when_modified patterns.
 	// This correctly handles dockerignore-style patterns including exclusions (!pattern) and
 	// relative paths, which git pathspec does not handle the same way.
-	pm, err := patternmatcher.New(autoplanWhenModified)
+	pm, err := patternmatcher.New(whenModifiedRelToRepoRoot)
 	if err != nil {
 		logger.Warn("HasDivergedWhenModified: creating pattern matcher has failed: %s", err)
 		return true

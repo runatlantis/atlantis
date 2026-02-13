@@ -163,11 +163,11 @@ func (mock *MockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir s
 	return _ret0
 }
 
-func (mock *MockWorkingDir) HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+func (mock *MockWorkingDir) HasDivergedWhenModified(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
 	}
-	_params := []pegomock.Param{logger, cloneDir, autoplanWhenModified, pullRequest}
+	_params := []pegomock.Param{logger, cloneDir, projectPath, autoplanWhenModified, pullRequest}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("HasDivergedWhenModified", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
 	var _ret0 bool
 	if len(_result) != 0 {

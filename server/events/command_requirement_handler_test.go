@@ -106,10 +106,11 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				PlanRequirements:     []string{raw.UnDivergedWhenModifiedRequirement},
 				AutoplanWhenModified: []string{"project1/**"},
+				RepoRelDir:           ".",
 				Pull:                 models.PullRequest{BaseBranch: "main", HeadCommit: "abc123"},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDivergedWhenModified(Any[logging.SimpleLogging](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
+				When(workingDir.HasDivergedWhenModified(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running plan.",
 			wantErr:     assert.NoError,
@@ -229,10 +230,11 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				ApplyRequirements:    []string{raw.UnDivergedWhenModifiedRequirement},
 				AutoplanWhenModified: []string{"project1/**"},
+				RepoRelDir:           ".",
 				Pull:                 models.PullRequest{BaseBranch: "main", HeadCommit: "abc123"},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDivergedWhenModified(Any[logging.SimpleLogging](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
+				When(workingDir.HasDivergedWhenModified(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running apply.",
 			wantErr:     assert.NoError,
@@ -453,10 +455,11 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				ImportRequirements:   []string{raw.UnDivergedWhenModifiedRequirement},
 				AutoplanWhenModified: []string{"project1/**"},
+				RepoRelDir:           ".",
 				Pull:                 models.PullRequest{BaseBranch: "main", HeadCommit: "abc123"},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDivergedWhenModified(Any[logging.SimpleLogging](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
+				When(workingDir.HasDivergedWhenModified(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running import.",
 			wantErr:     assert.NoError,

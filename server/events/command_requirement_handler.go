@@ -76,7 +76,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 				return fmt.Sprintf("Default branch must be rebased onto pull request before running %s.", cmd), nil
 			}
 		case raw.UnDivergedWhenModifiedRequirement:
-			if a.WorkingDir.HasDivergedWhenModified(ctx.Log, repoDir, ctx.AutoplanWhenModified, ctx.Pull) {
+			if a.WorkingDir.HasDivergedWhenModified(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull) {
 				return fmt.Sprintf("Default branch must be rebased onto pull request before running %s.", cmd), nil
 			}
 		}

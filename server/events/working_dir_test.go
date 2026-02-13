@@ -863,7 +863,7 @@ func TestHasDivergedWhenModified_CheckoutMergeDisabled(t *testing.T) {
 	}
 
 	// Should return false when CheckoutMerge is disabled.
-	hasDiverged := wd.HasDivergedWhenModified(logger, firstPRDir, []string{"project1/**"}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, firstPRDir, ".", []string{"project1/**"}, pullRequest)
 	Equals(t, false, hasDiverged)
 }
 
@@ -934,7 +934,7 @@ func TestHasDivergedWhenModified_EmptyPatterns(t *testing.T) {
 	}
 
 	// With empty patterns, should fall back to regular HasDiverged which should return true.
-	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{}, pullRequest)
 	Equals(t, true, hasDiverged)
 }
 
@@ -1007,7 +1007,7 @@ func TestHasDivergedWhenModified_PatternHasDiverged(t *testing.T) {
 	}
 
 	// Pattern matches files that have diverged (project1 was modified in first-pr and merged to main).
-	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**"}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
 	Equals(t, true, hasDiverged)
 }
 
@@ -1068,7 +1068,7 @@ func TestHasDivergedWhenModified_PatternHasNotDiverged(t *testing.T) {
 
 	// Pattern matches project1 files. Main's last commit for project1 is in second-pr's history (since it branched from main).
 	// So it has not diverged.
-	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**"}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1129,7 +1129,7 @@ func TestHasDivergedWhenModified_MultiplePatterns(t *testing.T) {
 
 	// Both patterns match files. Main's commits for these patterns are in feature-pr's history.
 	// So neither has diverged.
-	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project2/**", "project3/**"}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{"project2/**", "project3/**"}, pullRequest)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1173,7 +1173,7 @@ func TestHasDivergedWhenModified_PatternMatchesNothing(t *testing.T) {
 	}
 
 	// Pattern matches no files (project2 doesn't exist), should not be considered diverged.
-	hasDiverged := wd.HasDivergedWhenModified(logger, firstPRDir, []string{"project2/**"}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, firstPRDir, ".", []string{"project2/**"}, pullRequest)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1221,7 +1221,7 @@ func TestHasDivergedWhenModified_BrandNewFiles(t *testing.T) {
 
 	// Pattern matches brand new files that main has never touched.
 	// Main hasn't "diverged" - we're just adding new content.
-	hasDiverged := wd.HasDivergedWhenModified(logger, prDir, []string{"project1/**"}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, prDir, ".", []string{"project1/**"}, pullRequest)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1284,7 +1284,7 @@ func TestHasDivergedWhenModified_FilesDeletedFromMain(t *testing.T) {
 
 	// Pattern matches project1 which has been deleted from main.
 	// This IS divergence - main has moved forward by deleting the files.
-	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**"}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
 	Equals(t, true, hasDiverged)
 }
 
@@ -1354,11 +1354,11 @@ func TestHasDivergedWhenModified_MixedPatternsOneDiverged(t *testing.T) {
 
 	// Check with both patterns: project1 (diverged) and project2 (not diverged).
 	// Should return true because at least one pattern has diverged.
-	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**", "project2/**"}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{"project1/**", "project2/**"}, pullRequest)
 	Equals(t, true, hasDiverged)
 
 	// Check with only project2 pattern (not diverged).
-	hasDiverged = wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project2/**"}, pullRequest)
+	hasDiverged = wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{"project2/**"}, pullRequest)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1429,7 +1429,7 @@ func TestHasDivergedWhenModified_PRDidNotTouchPattern(t *testing.T) {
 	// first-pr never touched project1, but main has moved forward on it.
 	// This IS considered diverged - the pattern is in autoplanWhenModified,
 	// and we want to ensure plans stay current with main's changes.
-	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**"}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
 	Equals(t, true, hasDiverged)
 }
 
@@ -1506,17 +1506,184 @@ func TestHasDivergedWhenModified_WithStaleOriginMain(t *testing.T) {
 	// Test 1: Pattern matching project1 should detect divergence.
 	// Even though HEAD has a merge commit, origin/main has a new commit touching project1/**
 	// that isn't in HEAD. The fetch should pick this up.
-	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project1/**"}, pullRequest)
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
 	Equals(t, true, hasDiverged)
 
 	// Test 2: Pattern matching project2 should NOT detect divergence.
 	// Main has no new commits touching project2/**, so it hasn't diverged for this pattern.
-	hasDiverged = wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project2/**"}, pullRequest)
+	hasDiverged = wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{"project2/**"}, pullRequest)
 	Equals(t, false, hasDiverged)
 }
 
 // TestHasDivergedWhenModified_PatternMatching tests that dockerignore-style patterns
 // are correctly handled, including *.tf, **/*.tf, and exclusions.
+// TestHasDivergedWhenModified_ProjectInSubdirectory tests that when a project
+// is in a subdirectory, the when_modified patterns are correctly adjusted to be
+// relative to the repo root.
+func TestHasDivergedWhenModified_ProjectInSubdirectory(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Simulate first PR with changes to modules directory.
+	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "modules/database")
+	runCmd(t, repoDir, "touch", "modules/database/main.tf")
+	runCmd(t, repoDir, "git", "add", "modules/database/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add database module")
+
+	// Atlantis checkout first PR.
+	firstPRDir := repoDir + "/first-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
+	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, firstPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Simulate second PR with project in subdirectory.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "checkout", "-b", "second-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "deployments/staging/app")
+	runCmd(t, repoDir, "touch", "deployments/staging/app/main.tf")
+	runCmd(t, repoDir, "git", "add", "deployments/staging/app/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add staging app")
+	secondHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout second PR.
+	secondPRDir := repoDir + "/second-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
+	runCmd(t, secondPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, secondPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "source", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, secondPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Merge first PR to create divergence.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "merge", "first-pr")
+
+	// Copy the second-pr repo to our data dir which has diverged remote main.
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", secondPRDir, "repos/0/default")
+
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "second-pr",
+		BaseBranch: "main",
+		HeadCommit: secondHeadCommit,
+	}
+
+	// Test 1: Project in subdirectory with pattern that references modules using relative path
+	// The pattern "../../../modules/**/*.tf" is relative to the project directory "deployments/staging/app".
+	// When adjusted, it should become "modules/**/*.tf" relative to repo root.
+	projectPath := "deployments/staging/app"
+	pattern := "../../../modules/**/*.tf" // 3 levels up from deployments/staging/app
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", projectPath, []string{pattern}, pullRequest)
+	Equals(t, true, hasDiverged) // Should detect that modules/database/main.tf changed
+
+	// Test 2: Pattern that matches files within the project directory itself
+	projectPattern := "*.tf"
+	hasDiverged = wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", projectPath, []string{projectPattern}, pullRequest)
+	Equals(t, false, hasDiverged) // No .tf files changed in the project directory in divergent commits
+
+	// Test 3: Pattern at repo root should also work
+	absolutePattern := "modules/**/*.tf"
+	hasDiverged = wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", []string{absolutePattern}, pullRequest)
+	Equals(t, true, hasDiverged)
+}
+
+// TestHasDivergedWhenModified_DeepProjectPath tests that a project in a very deep
+// subdirectory can reference files at the repo root or in other directories using
+// relative paths with multiple "../" components.
+func TestHasDivergedWhenModified_DeepProjectPath(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Create a file in a config directory at the repo root.
+	runCmd(t, repoDir, "git", "checkout", "-b", "first-pr")
+	runCmd(t, repoDir, "mkdir", "-p", "config")
+	runCmd(t, repoDir, "touch", "config/settings.yaml")
+	runCmd(t, repoDir, "git", "add", "config/settings.yaml")
+	runCmd(t, repoDir, "git", "commit", "-m", "add config file")
+
+	// Atlantis checkout first PR.
+	firstPRDir := repoDir + "/first-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "first-pr")
+	runCmd(t, firstPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, firstPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, firstPRDir, "git", "fetch", "source", "+refs/heads/first-pr")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, firstPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, firstPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, firstPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Create second PR with a project deeply nested.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "checkout", "-b", "second-pr")
+	deepPath := "a/b/c/d/e/f/project"
+	runCmd(t, repoDir, "mkdir", "-p", deepPath)
+	runCmd(t, repoDir, "touch", deepPath+"/main.tf")
+	runCmd(t, repoDir, "git", "add", deepPath+"/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add deep project")
+	secondHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checkout second PR.
+	secondPRDir := repoDir + "/second-pr"
+	runCmd(t, repoDir, "mkdir", "-p", "second-pr")
+	runCmd(t, secondPRDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, secondPRDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, secondPRDir, "git", "fetch", "source", "+refs/heads/second-pr")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, secondPRDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, secondPRDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, secondPRDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Merge first PR to create divergence.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "merge", "first-pr")
+
+	// Copy the second-pr repo to our data dir which has diverged remote main.
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, repoDir, "cp", "-R", secondPRDir, "repos/0/default")
+	runCmd(t, repoDir+"/repos/0/default", "git", "remote", "update")
+
+	logger := logging.NewNoopLogger(t)
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "second-pr",
+		BaseBranch: "main",
+		HeadCommit: secondHeadCommit,
+	}
+
+	projectPath := deepPath
+
+	whenModifiedPattern := "../../../../../../../config/**"
+	hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", projectPath, []string{whenModifiedPattern}, pullRequest)
+	Equals(t, true, hasDiverged) // Should detect that config/settings.yaml changed
+}
+
 func TestHasDivergedWhenModified_PatternMatching(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -1634,7 +1801,7 @@ func TestHasDivergedWhenModified_PatternMatching(t *testing.T) {
 				HeadCommit: prHeadCommit,
 			}
 
-			hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", tt.patterns, pullRequest)
+			hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", ".", tt.patterns, pullRequest)
 			if hasDiverged != tt.expectDivergence {
 				t.Errorf("expected divergence=%v, got=%v for patterns=%v and changedFiles=%v",
 					tt.expectDivergence, hasDiverged, tt.patterns, tt.changedFiles)
