@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/moby/patternmatcher"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -301,32 +302,59 @@ func (w *FileWorkspace) HasDivergedWhenModified(logger logging.SimpleLogging, cl
 	}
 	logger.Debug("HasDivergedWhenModified: fetch completed successfully")
 
-	// Check if origin/baseBranch has commits affecting the patterns that aren't in HEAD (the merge commit).
-	// This works correctly with CheckoutMerge strategy since HEAD is the locally merged state.
-	for _, pattern := range autoplanWhenModified {
-		remoteRef := fmt.Sprintf("origin/%s", pullRequest.BaseBranch)
-		logger.Debug("HasDivergedWhenModified: checking pattern '%s' for commits in %s not in HEAD", pattern, remoteRef)
+	// Get the list of files changed in commits that are in origin/baseBranch but not in HEAD.
+	// This gives us the files that have been modified on the base branch since the PR diverged.
+	remoteRef := fmt.Sprintf("origin/%s", pullRequest.BaseBranch)
+	revisionRange := fmt.Sprintf("HEAD..%s", remoteRef)
 
-		// Check if there are any commits in origin/baseBranch that touch the pattern but aren't in HEAD
-		divergeCmd := exec.Command("git", "log", "HEAD.."+remoteRef, "--format=%H", "--", pattern)
-		logger.Debug("HasDivergedWhenModified: running command: %s", divergeCmd.String())
-		divergeCmd.Dir = cloneDir
-		outputDiverge, err := divergeCmd.CombinedOutput()
-		logger.Debug("HasDivergedWhenModified: command output: %s", string(outputDiverge))
-
-		if err != nil {
-			logger.Warn("HasDivergedWhenModified: checking divergence for pattern %s has failed: %s", pattern, string(outputDiverge))
-			return true
-		}
-
-		// If there are any commits, the branch has diverged
-		divergedCommits := strings.TrimSpace(string(outputDiverge))
-		if divergedCommits != "" {
-			logger.Debug("HasDivergedWhenModified: pattern '%s' has diverged - found commits on %s not in HEAD: %s", pattern, remoteRef, divergedCommits)
-			return true
-		}
-		logger.Debug("HasDivergedWhenModified: pattern '%s' has not diverged", pattern)
+	logger.Debug("HasDivergedWhenModified: getting changed files in %s", revisionRange)
+	changedFilesCmd := exec.Command("git", "log", revisionRange, "--name-only", "--format=") //nolint:gosec // remoteRef is from pullRequest.BaseBranch, a controlled VCS branch name
+	changedFilesCmd.Dir = cloneDir
+	outputChangedFiles, err := changedFilesCmd.CombinedOutput()
+	if err != nil {
+		logger.Warn("HasDivergedWhenModified: getting changed files has failed: %s", string(outputChangedFiles))
+		return true
 	}
+
+	changedFiles := strings.Split(strings.TrimSpace(string(outputChangedFiles)), "\n")
+	// Filter out empty strings
+	var nonEmptyChangedFiles []string
+	for _, file := range changedFiles {
+		if strings.TrimSpace(file) != "" {
+			nonEmptyChangedFiles = append(nonEmptyChangedFiles, file)
+		}
+	}
+
+	if len(nonEmptyChangedFiles) == 0 {
+		logger.Debug("HasDivergedWhenModified: no changed files found in divergent commits")
+		logger.Debug("HasDivergedWhenModified: completed check - no divergence found")
+		return false
+	}
+
+	logger.Debug("HasDivergedWhenModified: found %d changed files in divergent commits", len(nonEmptyChangedFiles))
+
+	// Use patternmatcher to check if any of the changed files match the when_modified patterns.
+	// This correctly handles dockerignore-style patterns including exclusions (!pattern) and
+	// relative paths, which git pathspec does not handle the same way.
+	pm, err := patternmatcher.New(autoplanWhenModified)
+	if err != nil {
+		logger.Warn("HasDivergedWhenModified: creating pattern matcher has failed: %s", err)
+		return true
+	}
+
+	for _, file := range nonEmptyChangedFiles {
+		match, err := pm.MatchesOrParentMatches(file)
+		if err != nil {
+			logger.Debug("HasDivergedWhenModified: match error for file %q: %s", file, err)
+			continue
+		}
+		if match {
+			logger.Debug("HasDivergedWhenModified: file %q matched patterns - branch has diverged", file)
+			return true
+		}
+	}
+
+	logger.Debug("HasDivergedWhenModified: no changed files matched the patterns")
 
 	logger.Debug("HasDivergedWhenModified: completed check - no divergence found")
 	return false

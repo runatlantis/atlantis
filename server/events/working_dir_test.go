@@ -876,7 +876,6 @@ func TestHasDivergedWhenModified_EmptyPatterns(t *testing.T) {
 	runCmd(t, repoDir, "touch", "file1")
 	runCmd(t, repoDir, "git", "add", "file1")
 	runCmd(t, repoDir, "git", "commit", "-m", "file1")
-	headCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
 	// Atlantis checkout first PR.
 	firstPRDir := repoDir + "/first-pr"
@@ -895,6 +894,7 @@ func TestHasDivergedWhenModified_EmptyPatterns(t *testing.T) {
 	runCmd(t, repoDir, "touch", "file2")
 	runCmd(t, repoDir, "git", "add", "file2")
 	runCmd(t, repoDir, "git", "commit", "-m", "file2")
+	secondHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
 	// Atlantis checkout second PR.
 	secondPRDir := repoDir + "/second-pr"
@@ -930,7 +930,7 @@ func TestHasDivergedWhenModified_EmptyPatterns(t *testing.T) {
 		BaseRepo:   models.Repo{CloneURL: repoDir},
 		HeadBranch: "second-pr",
 		BaseBranch: "main",
-		HeadCommit: headCommit,
+		HeadCommit: secondHeadCommit,
 	}
 
 	// With empty patterns, should fall back to regular HasDiverged which should return true.
@@ -1513,6 +1513,134 @@ func TestHasDivergedWhenModified_WithStaleOriginMain(t *testing.T) {
 	// Main has no new commits touching project2/**, so it hasn't diverged for this pattern.
 	hasDiverged = wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", []string{"project2/**"}, pullRequest)
 	Equals(t, false, hasDiverged)
+}
+
+// TestHasDivergedWhenModified_PatternMatching tests that dockerignore-style patterns
+// are correctly handled, including *.tf, **/*.tf, and exclusions.
+func TestHasDivergedWhenModified_PatternMatching(t *testing.T) {
+	tests := []struct {
+		name             string
+		changedFiles     []string
+		patterns         []string
+		expectDivergence bool
+	}{
+		{
+			name:             "simple wildcard *.tf matches root level",
+			changedFiles:     []string{"main.tf"},
+			patterns:         []string{"*.tf"},
+			expectDivergence: true,
+		},
+		{
+			name:             "simple wildcard *.tf does not match subdirectory",
+			changedFiles:     []string{"project/main.tf"},
+			patterns:         []string{"*.tf"},
+			expectDivergence: false,
+		},
+		{
+			name:             "recursive **/*.tf matches any level",
+			changedFiles:     []string{"project/sub/main.tf"},
+			patterns:         []string{"**/*.tf"},
+			expectDivergence: true,
+		},
+		{
+			name:             "directory pattern matches files inside",
+			changedFiles:     []string{"project/main.tf"},
+			patterns:         []string{"project/**"},
+			expectDivergence: true,
+		},
+		{
+			name:             "exclusion pattern",
+			changedFiles:     []string{"project/excluded.tf"},
+			patterns:         []string{"**/*.tf", "!project/excluded.tf"},
+			expectDivergence: false,
+		},
+		{
+			name:             "exclusion pattern with directory",
+			changedFiles:     []string{"project/excluded/main.tf"},
+			patterns:         []string{"**/*.tf", "!project/excluded/**"},
+			expectDivergence: false,
+		},
+		{
+			name:             "multiple patterns, one matches",
+			changedFiles:     []string{"other/file.hcl"},
+			patterns:         []string{"*.tf", "**/*.hcl"},
+			expectDivergence: true,
+		},
+		{
+			name:             "exact file match",
+			changedFiles:     []string{"terragrunt.hcl"},
+			patterns:         []string{"terragrunt.hcl"},
+			expectDivergence: true,
+		},
+		{
+			name:             "no pattern match",
+			changedFiles:     []string{"README.md"},
+			patterns:         []string{"**/*.tf", "**/*.hcl"},
+			expectDivergence: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Initialize the git repo.
+			repoDir := initRepo(t)
+
+			// Create a PR branch.
+			runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+			runCmd(t, repoDir, "touch", "pr-file.txt")
+			runCmd(t, repoDir, "git", "add", "pr-file.txt")
+			runCmd(t, repoDir, "git", "commit", "-m", "pr change")
+			prHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+			// Atlantis checkout PR.
+			prDir := repoDir + "/pr-workspace"
+			runCmd(t, repoDir, "mkdir", "-p", "pr-workspace")
+			runCmd(t, prDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+			runCmd(t, prDir, "git", "remote", "add", "head", repoDir)
+			runCmd(t, prDir, "git", "fetch", "head", "+refs/heads/pr-branch:")
+			runCmd(t, prDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+			runCmd(t, prDir, "git", "config", "--local", "user.name", "atlantisbot")
+			runCmd(t, prDir, "git", "config", "--local", "commit.gpgsign", "false")
+			runCmd(t, prDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+			// Now add changed files to main to create divergence.
+			runCmd(t, repoDir, "git", "checkout", "main")
+			for _, file := range tt.changedFiles {
+				dir := filepath.Dir(file)
+				if dir != "." {
+					runCmd(t, repoDir, "mkdir", "-p", dir)
+				}
+				runCmd(t, repoDir, "touch", file)
+				runCmd(t, repoDir, "git", "add", file)
+			}
+			runCmd(t, repoDir, "git", "commit", "-m", "add test files")
+
+			// Copy to data dir for testing.
+			runCmd(t, repoDir, "mkdir", "-p", "repos/0/")
+			runCmd(t, repoDir, "cp", "-R", prDir, "repos/0/default")
+
+			logger := logging.NewNoopLogger(t)
+			wd := &events.FileWorkspace{
+				DataDir:             repoDir,
+				CheckoutMerge:       true,
+				CheckoutDepth:       50,
+				GpgNoSigningEnabled: true,
+			}
+
+			pullRequest := models.PullRequest{
+				BaseRepo:   models.Repo{CloneURL: repoDir},
+				HeadBranch: "pr-branch",
+				BaseBranch: "main",
+				HeadCommit: prHeadCommit,
+			}
+
+			hasDiverged := wd.HasDivergedWhenModified(logger, repoDir+"/repos/0/default", tt.patterns, pullRequest)
+			if hasDiverged != tt.expectDivergence {
+				t.Errorf("expected divergence=%v, got=%v for patterns=%v and changedFiles=%v",
+					tt.expectDivergence, hasDiverged, tt.patterns, tt.changedFiles)
+			}
+		})
+	}
 }
 
 func initRepo(t *testing.T) string {
