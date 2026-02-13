@@ -100,11 +100,11 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 
   Enter a value: 
 `
-	_, after, ok := strings.Cut(out, applyStartText)
-	if !ok {
+	applyStartIdx := strings.Index(out, applyStartText)
+	if applyStartIdx < 0 {
 		return out
 	}
-	return after
+	return out[applyStartIdx+len(applyStartText):]
 }
 
 // runRemoteApply handles running the apply and performing actions in real-time
@@ -210,11 +210,11 @@ func (a *ApplyStepRunner) remotePlanChanged(planfileContents string, applyOut st
 	output := StripRefreshingFromPlanOutput(applyOut, tfVersion)
 
 	// Strip plan output after the prompt to execute the plan.
-	before, _, ok := strings.Cut(output, "Do you want to perform these actions in workspace \"")
-	if !ok {
+	planEndIdx := strings.Index(output, "Do you want to perform these actions in workspace \"")
+	if planEndIdx < 0 {
 		return fmt.Errorf("couldn't find plan end when parsing apply output:\n%q", applyOut)
 	}
-	currPlan := strings.TrimSpace(before)
+	currPlan := strings.TrimSpace(output[:planEndIdx])
 
 	// Ensure we strip the remoteOpsHeader from the plan contents so the
 	// comparison is fair. We add this header in the plan phase so we can
