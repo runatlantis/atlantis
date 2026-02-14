@@ -127,6 +127,13 @@ func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wra
 	}
 	logger.Debug("clone directory '%s' already exists, checking if it's at the right commit", cloneDir)
 
+	// If this clone doesn't have a properly named remote (for example it was cloned with an old version of Atlantis that used a different name for the remote)
+	// it can't count as a proper dir for reuse.
+	// See: https://github.com/runatlantis/atlantis/issues/6023
+	if err := w.wrappedGit(logger, c, "remote", "get-url", prSourceRemote); err != nil {
+		return false, fmt.Errorf("cannot find remote %s", prSourceRemote)
+	}
+
 	isUpToDate, err := w.isBranchAtTargetRef(logger, c, c.pr.HeadCommit)
 	if err != nil {
 		return false, err
