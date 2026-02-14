@@ -862,6 +862,97 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 		)
 	})
 }
+func TestPlanCommandRunner_AutoplanFetchesPullStatus(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	t.Run("autoplan fetches pull request status", func(t *testing.T) {
+		tmp := t.TempDir()
+		db, err := boltdb.New(tmp)
+		t.Cleanup(func() {
+			db.Close()
+		})
+		Ok(t, err)
+
+		_ = setup(t, func(tc *TestConfig) {
+			tc.database = db
+		})
+
+		scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
+		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+		ctx := &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    scopeNull,
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.AutoTrigger,
+		}
+
+		expectedStatus := models.PullReqStatus{
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
+			ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+		}
+
+		When(pullReqStatusFetcher.FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))).ThenReturn(expectedStatus, nil)
+		When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{}, nil)
+
+		cmd := &events.CommentCommand{Name: command.Plan}
+		planCommandRunner.Run(ctx, cmd)
+
+		// Verify FetchPullStatus was called
+		pullReqStatusFetcher.VerifyWasCalledOnce().FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))
+
+		// Verify the status was set on the context
+		require.True(t, ctx.PullRequestStatus.MergeableStatus.IsMergeable, "PullRequestStatus.MergeableStatus.IsMergeable must be true")
+		require.True(t, ctx.PullRequestStatus.ApprovalStatus.IsApproved, "PullRequestStatus.ApprovalStatus.IsApproved must be true")
+	})
+
+	t.Run("autoplan continues when FetchPullStatus returns error", func(t *testing.T) {
+		tmp := t.TempDir()
+		db, err := boltdb.New(tmp)
+		t.Cleanup(func() {
+			db.Close()
+		})
+		Ok(t, err)
+
+		_ = setup(t, func(tc *TestConfig) {
+			tc.database = db
+		})
+
+		scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
+		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+		ctx := &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    scopeNull,
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.AutoTrigger,
+		}
+
+		When(pullReqStatusFetcher.FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))).ThenReturn(models.PullReqStatus{}, errors.New("api error"))
+		When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{
+			{CommandName: command.Plan},
+		}, nil)
+		When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+		cmd := &events.CommentCommand{Name: command.Plan}
+		planCommandRunner.Run(ctx, cmd)
+
+		// Verify FetchPullStatus was called despite returning an error
+		pullReqStatusFetcher.VerifyWasCalledOnce().FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))
+
+		// Verify autoplan continued (Plan was still executed)
+		projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
+
+		// Verify status defaults to false when FetchPullStatus errors
+		require.False(t, ctx.PullRequestStatus.MergeableStatus.IsMergeable, "IsMergeable must default to false on error")
+	})
+}
+
 func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
