@@ -482,8 +482,8 @@ func TestClone_ResetOnWrongCommit(t *testing.T) {
 }
 
 // Test that if the repo is already cloned, is at the wrong commit, and the base has changed
-// but for merge checkout strategy do not need to check remote
-func TestClone_DoNotReCloneOnBaseChangeForMergeStrategy(t *testing.T) {
+// but for the branch checkout strategy do not need to check remote
+func TestClone_DoNotReCloneOnBaseChangeForBranchStrategy(t *testing.T) {
 	repoDir := initRepo(t)
 	dataDir := t.TempDir()
 
@@ -529,7 +529,7 @@ func TestClone_DoNotReCloneOnBaseChangeForMergeStrategy(t *testing.T) {
 
 // Test that if the repo is already cloned but is at the wrong commit, but the base has changed
 // we need to reclone
-func TestClone_ReCloneOnBaseChange(t *testing.T) {
+func TestClone_ReCloneOnBaseChangeForMergeStrategy(t *testing.T) {
 	remoteRepoDir := initRepo(t)
 	dataDir := t.TempDir()
 	repoDir := filepath.Join(dataDir, "repos", "0", "default")
