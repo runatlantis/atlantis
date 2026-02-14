@@ -44,6 +44,36 @@ If the workspace **and** branch matches respective regex, an event will be sent.
 
 You can send POST requests with JSON payload to any HTTP/HTTPS server.
 
+### Security Considerations
+
+By default, Atlantis enforces strict security validation on webhook URLs to prevent SSRF (Server-Side Request Forgery) attacks:
+- Only HTTPS URLs are allowed
+- Private IP addresses (localhost, 127.0.0.1, 10.x.x.x, 192.168.x.x, 172.16-31.x.x) are blocked
+- Cloud metadata service IPs (169.254.169.254) are blocked
+
+This protects your Atlantis server from being used to access internal services.
+
+### Local Development and Testing
+
+For local development and testing purposes, you can use the `--allow-local-webhooks` flag to relax these restrictions:
+
+```bash
+atlantis server --allow-local-webhooks
+# or via environment variable
+export ATLANTIS_ALLOW_LOCAL_WEBHOOKS=true
+atlantis server
+```
+
+::: danger WARNING
+The `--allow-local-webhooks` flag should **ONLY** be used for local development and testing. 
+**NEVER** enable this in production environments as it exposes your system to SSRF attacks.
+:::
+
+When this flag is enabled:
+- Both HTTP and HTTPS schemes are allowed
+- Webhooks can target localhost, 127.0.0.1, and other private IPs
+- A warning will be logged at server startup
+
 ### Configuring Atlantis
 
 In your Atlantis [server-side configuration](server-configuration.md) you can add the following:

@@ -131,12 +131,16 @@ type UserConfig struct {
 	DefaultTFVersion           string          `mapstructure:"default-tf-version"`
 	Webhooks                   []WebhookConfig `mapstructure:"webhooks" flag:"false"`
 	WebhookHttpHeaders         string          `mapstructure:"webhook-http-headers"`
-	WebBasicAuth               bool            `mapstructure:"web-basic-auth"`
-	WebUsername                string          `mapstructure:"web-username"`
-	WebPassword                string          `mapstructure:"web-password"`
-	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
-	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
-	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
+	// AllowLocalWebhooks allows webhook URLs with local/private IPs and HTTP scheme.
+	// WARNING: This should only be used for local development and testing.
+	// Enabling this in production exposes the system to SSRF attacks.
+	AllowLocalWebhooks   bool   `mapstructure:"allow-local-webhooks"`
+	WebBasicAuth         bool   `mapstructure:"web-basic-auth"`
+	WebUsername          string `mapstructure:"web-username"`
+	WebPassword          string `mapstructure:"web-password"`
+	WriteGitCreds        bool   `mapstructure:"write-git-creds"`
+	WebsocketCheckOrigin bool   `mapstructure:"websocket-check-origin"`
+	UseTFPluginCache     bool   `mapstructure:"use-tf-plugin-cache"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName
