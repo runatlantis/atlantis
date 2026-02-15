@@ -64,6 +64,43 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 	}, res)
 }
 
+func TestDefaultProjectLocker_TryLockWhenLockedCustomExecutableName(t *testing.T) {
+	var githubClient *github.Client
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
+	mockLocker := mocks.NewMockLocker()
+	customExecutableName := "atlantis-my-custom-name"
+	locker := events.DefaultProjectLocker{
+		Locker:         mockLocker,
+		VCSClient:      mockClient,
+		ExecutableName: customExecutableName,
+	}
+	expProject := models.Project{}
+	expWorkspace := "default"
+	expPull := models.PullRequest{}
+	expUser := models.User{}
+
+	lockingPull := models.PullRequest{
+		Num: 2,
+	}
+	When(mockLocker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
+		locking.TryLockResponse{
+			LockAcquired: false,
+			CurrLock: models.ProjectLock{
+				Pull: lockingPull,
+			},
+			LockKey: "",
+		},
+		nil,
+	)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
+	link, _ := mockClient.MarkdownPullLink(lockingPull)
+	Ok(t, err)
+	Equals(t, &events.TryLockResponse{
+		LockAcquired:      false,
+		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `%s plan` here to re-plan.", link, link, customExecutableName),
+	}, res)
+}
+
 func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 	RegisterMockTestingT(t)
 	var githubClient *github.Client
