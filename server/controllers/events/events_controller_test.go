@@ -1000,7 +1000,8 @@ func TestPost_AzureDevopsServerHeader(t *testing.T) {
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	// We expect a 200 or 400 depending on how parsing goes, but the key is that it didn't return "Ignoring request"
-	Assert(t, w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "Ignoring request"), "Should not ignore request")
+	Assert(t, w.Code < 500, "unexpected server error")
+	Assert(t, !strings.Contains(w.Body.String(), "Ignoring request"), "Should not ignore request")
 }
 
 func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *mocks.MockAzureDevopsRequestValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {
