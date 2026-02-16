@@ -823,7 +823,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
 			s.Viper.SetDefault(name, f.defaultValue)
 		}
-		c.Flags().Int(name, 0, usage+"\n")
+		c.Flags().Int64(name, 0, usage+"\n")
 		if f.hidden {
 			c.Flags().MarkHidden(name) // nolint: errcheck
 		}
