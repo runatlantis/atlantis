@@ -107,6 +107,16 @@
       "matchPackageNames": ["golang"],
       "versioning": "docker",
       "allowedVersions": "/-alpine$/"
+    },
+    // Include testdata files for go-github updates
+    {
+      matchPackageNames: [
+        'github.com/google/go-github',
+      ],
+      matchDatasources: [
+        'go',
+      ],
+      ignorePaths: [],
     }
   ],
   customManagers: [
