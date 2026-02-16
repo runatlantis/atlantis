@@ -270,6 +270,10 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 
 	var projectResults []command.ProjectResult
 	for i, cmd := range cmds {
+                if i >= len(cc) {
+			ctx.Log.Warn("cmds (count %d) from getCommands are longer than commentCommand (len %d)", i, len(cc))
+                        break
+                }
 		err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
 		if err != nil {
 			if a.FailOnPreWorkflowHookError {
