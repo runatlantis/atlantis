@@ -110,13 +110,13 @@
     },
     // Include testdata files for go-github updates
     {
-      matchPackageNames: [
-        'github.com/google/go-github',
+      "matchPackageNames": [
+        "github.com/google/go-github"
       ],
-      matchDatasources: [
-        'go',
+      "matchDatasources": [
+        "go"
       ],
-      ignorePaths: [],
+      "ignorePaths": []
     }
   ],
   customManagers: [
