@@ -39,8 +39,10 @@ WORKDIR /app
 # https://github.com/golang/go/issues/27719
 # renovate: datasource=repology depName=alpine_3_22/bash versioning=loose
 ENV BUILDER_BASH_VERSION="5.2.37-r0"
+
 RUN apk add --no-cache \
-        bash=${BUILDER_BASH_VERSION}
+    bash=${BUILDER_BASH_VERSION}
+
 COPY go.mod go.sum ./
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -71,18 +73,25 @@ ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1+deb12u2"
 # renovate: datasource=repology depName=debian_12/openssl versioning=loose
 ENV DEBIAN_OPENSSL_VERSION="3.0.17-1~deb12u2"
 
+# Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
+RUN groupadd --gid 1000 atlantis && \
+    useradd --uid 100 --system --create-home --gid 1000 --shell /bin/bash atlantis && \
+    useradd --uid 1000 --system --home=/home/atlantis/ --gid 1000 --shell /bin/bash atlantis2 && \
+    chown atlantis:atlantis /home/atlantis/ && \
+    chmod ug+rwx /home/atlantis/
+
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates=${DEBIAN_CA_CERTIFICATES_VERSION} \
-        curl=${DEBIAN_CURL_VERSION} \
-        git=${DEBIAN_GIT_VERSION} \
-        unzip=${DEBIAN_UNZIP_VERSION} \
-        openssh-server=${DEBIAN_OPENSSH_SERVER_VERSION} \
-        dumb-init=${DEBIAN_DUMB_INIT_VERSION} \
-        gnupg=${DEBIAN_GNUPG_VERSION} \
-        openssl=${DEBIAN_OPENSSL_VERSION} && \
+    ca-certificates=${DEBIAN_CA_CERTIFICATES_VERSION} \
+    curl=${DEBIAN_CURL_VERSION} \
+    git=${DEBIAN_GIT_VERSION} \
+    unzip=${DEBIAN_UNZIP_VERSION} \
+    openssh-server=${DEBIAN_OPENSSH_SERVER_VERSION} \
+    dumb-init=${DEBIAN_DUMB_INIT_VERSION} \
+    gnupg=${DEBIAN_GNUPG_VERSION} \
+    openssl=${DEBIAN_OPENSSL_VERSION} && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -158,11 +167,11 @@ FROM alpine:${ALPINE_TAG} AS alpine
 EXPOSE ${ATLANTIS_PORT:-4141}
 
 HEALTHCHECK --interval=5m --timeout=3s \
-  CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
+    CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # Set up the 'atlantis' user and adjust permissions
-RUN addgroup atlantis && \
-    adduser -S -G atlantis atlantis && \
+RUN addgroup --gid 1000 atlantis && \
+    adduser -u 100 -S -G atlantis atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/
 
@@ -198,15 +207,15 @@ ENV COREUTILS_ENV_VERSION="9.8-r1"
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
-        ca-certificates=${CA_CERTIFICATES_VERSION} \
-        curl=${CURL_VERSION} \
-        git=${GIT_VERSION} \
-        unzip=${UNZIP_VERSION} \
-        bash=${BASH_VERSION} \
-        openssh=${OPENSSH_VERSION} \
-        dumb-init=${DUMB_INIT_VERSION} \
-        gcompat=${GCOMPAT_VERSION} \
-        coreutils-env=${COREUTILS_ENV_VERSION}
+    ca-certificates=${CA_CERTIFICATES_VERSION} \
+    curl=${CURL_VERSION} \
+    git=${GIT_VERSION} \
+    unzip=${UNZIP_VERSION} \
+    bash=${BASH_VERSION} \
+    openssh=${OPENSSH_VERSION} \
+    dumb-init=${DUMB_INIT_VERSION} \
+    gcompat=${GCOMPAT_VERSION} \
+    coreutils-env=${COREUTILS_ENV_VERSION}
 
 ARG DEFAULT_CONFTEST_VERSION
 ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
@@ -222,12 +231,7 @@ FROM debian-base AS debian
 EXPOSE ${ATLANTIS_PORT:-4141}
 
 HEALTHCHECK --interval=5m --timeout=3s \
-  CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
-
-# Set up the 'atlantis' user and adjust permissions
-RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
-    chown atlantis:root /home/atlantis/ && \
-    chmod u+rwx /home/atlantis/
+    CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
