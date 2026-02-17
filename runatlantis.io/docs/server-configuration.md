@@ -64,7 +64,8 @@ List of allowed commands to be run on the Atlantis server, Defaults to `version,
 Notes:
 
 - Accepts a comma separated list, ex. `command1,command2`.
-- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state` and `all` are available.
+- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state`, `policy_check` and `all` are available.
+- `policy_check` is an internal command that runs automatically after `plan` when [policy checking](policy-checking.md) is enabled. It must be explicitly allowlisted when using [`--gh-team-allowlist`](#gh-team-allowlist).
 - `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
 
 ### `--allow-draft-prs` <Badge text="v0.13.0" type="info"/>
@@ -179,7 +180,7 @@ Examples:
 - Autoplan when any `*.tf` file is modified except in `project2/` directory
   - `--autoplan-file-list='**/*.tf,!project2'`
 - Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
-  - `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
+  - `--autoplan-file-list='**/*.tf,project1/**/*.yml'`
 
 ::: warning NOTE
 By default, changes to modules will not trigger autoplanning. See the flags below.
@@ -749,6 +750,16 @@ Comma-separated list of GitHub teams and permission pairs.
 
 By default, any team can plan and apply.
 
+::: tip
+If you are using [policy checking](policy-checking.md), you must also allowlist the `policy_check` command for it to work on manual `atlantis plan` commands:
+
+```bash
+atlantis server --gh-team-allowlist="*:plan,*:policy_check,myteam:apply"
+```
+
+See [Policy Checking documentation](policy-checking.md#step-1-enable-the-workflow) for more details.
+:::
+
 ### `--gh-token` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
@@ -1046,6 +1057,8 @@ ATLANTIS_MAX_COMMENTS_PER_COMMAND=100
 ```
 
 Limit the number of comments published after a command is executed, to prevent spamming your VCS and Atlantis to get throttled as a result. Defaults to `100`. Set this option to `0` to disable log truncation. Note that the truncation will happen on the top of the command output, to preserve the most important parts of the output, often displayed at the end.
+
+When command output exceeds the VCS comment size limit (or when this limit applies), Atlantis splits the output into multiple comments using **intelligent comment splitting**. Split points are chosen so that markdown structure is preserved: the splitter detects whether it is inside a code block (`` ``` ``), a `<details>` block, or inline code (`` ` ``), and inserts appropriate closing and continuation markers so that each comment renders correctly. Continuation comments are labeled with the command name (e.g. "Continued plan output from previous comment") when available.
 
 ### `--parallel-apply` <Badge text="v0.22.0+" type="info"/>
 
