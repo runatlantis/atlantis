@@ -562,9 +562,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:     lockingClient,
-		NoOpLocker: noOpLocker,
-		VCSClient:  vcsClient,
+		Locker:           lockingClient,
+		NoOpLocker:       noOpLocker,
+		VCSClient:        vcsClient,
+		LockURLGenerator: router,
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
@@ -1072,8 +1073,10 @@ func (s *Server) Start() error {
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
 	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
+	s.Router.HandleFunc("/api/lock", s.APIController.CreateManualLock).Methods("POST")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
+	s.Router.HandleFunc("/locks/manual", s.LocksController.CreateManualLock).Methods("POST")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
 	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
@@ -1210,17 +1213,23 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	var lockResults []web_templates.LockIndexData
 	for id, v := range locks {
 		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
+		lockedBy := v.Pull.Author
+		if v.IsManualLock {
+			lockedBy = v.User.Username
+		}
 		lockResults = append(lockResults, web_templates.LockIndexData{
 			// NOTE: must use .String() instead of .Path because we need the
 			// query params as part of the lock URL.
 			LockPath:      lockURL.String(),
 			RepoFullName:  v.Project.RepoFullName,
-			LockedBy:      v.Pull.Author,
+			LockedBy:      lockedBy,
 			PullNum:       v.Pull.Num,
 			Path:          v.Project.Path,
 			Workspace:     v.Workspace,
 			Time:          v.Time,
 			TimeFormatted: v.Time.Format("2006-01-02 15:04:05"),
+			Note:          v.Note,
+			IsManualLock:  v.IsManualLock,
 		})
 	}
 

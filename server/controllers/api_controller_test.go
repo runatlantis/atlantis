@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +15,7 @@ import (
 
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	. "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -330,6 +332,143 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 	err := json.Unmarshal(response, &result)
 	Ok(t, err)
 	Equals(t, expected, result)
+}
+
+func TestAPIController_ListLocksManualLock(t *testing.T) {
+	ac, _, _ := setup(t)
+	now := time.Now()
+	mockLock := models.ProjectLock{
+		Project:      models.Project{ProjectName: "terraform", RepoFullName: "owner/repo", Path: "/path"},
+		User:         models.User{Username: "joseph"},
+		Workspace:    "default",
+		Time:         now,
+		Note:         "Blocked for incident",
+		IsManualLock: true,
+	}
+	When(ac.Locker.List()).ThenReturn(map[string]models.ProjectLock{"lock-id": mockLock}, nil)
+
+	req, _ := http.NewRequest("GET", "", nil)
+	w := httptest.NewRecorder()
+	ac.ListLocks(w, req)
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.ListLocksResult
+	err := json.Unmarshal(response, &result)
+	Ok(t, err)
+	Equals(t, 1, len(result.Locks))
+	Equals(t, true, result.Locks[0].IsManualLock)
+	Equals(t, "Blocked for incident", result.Locks[0].Note)
+}
+
+func TestAPIController_CreateManualLock_APIDisabled(t *testing.T) {
+	ac, _, _ := setup(t)
+	ac.APISecret = nil
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBufferString(`{}`))
+	w := httptest.NewRecorder()
+	ac.CreateManualLock(w, req)
+	Equals(t, http.StatusBadRequest, w.Code)
+}
+
+func TestAPIController_CreateManualLock_InvalidToken(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBufferString(`{}`))
+	req.Header.Set(atlantisTokenHeader, "wrong-token")
+	w := httptest.NewRecorder()
+	ac.CreateManualLock(w, req)
+	Equals(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestAPIController_CreateManualLock_MissingFields(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	body := `{"repo_full_name":"owner/repo"}`
+	req, _ := http.NewRequest("POST", "", bytes.NewBufferString(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.CreateManualLock(w, req)
+	Equals(t, http.StatusBadRequest, w.Code)
+}
+
+func TestAPIController_CreateManualLock_Success(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	When(ac.Locker.ManualLock(
+		Any[models.Project](), Any[string](), Any[string](), Any[models.User](),
+	)).ThenReturn(locking.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "owner/repo/./default/",
+	}, nil)
+
+	body := `{"repo_full_name":"owner/repo","workspace":"default","note":"test lock"}`
+	req, _ := http.NewRequest("POST", "", bytes.NewBufferString(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.CreateManualLock(w, req)
+	Equals(t, http.StatusOK, w.Code)
+
+	var result controllers.ManualLockAPIResponse
+	err := json.Unmarshal(w.Body.Bytes(), &result)
+	Ok(t, err)
+	Equals(t, "owner/repo/./default/", result.LockKey)
+}
+
+func TestAPIController_CreateManualLock_AlreadyLocked(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	When(ac.Locker.ManualLock(
+		Any[models.Project](), Any[string](), Any[string](), Any[models.User](),
+	)).ThenReturn(locking.TryLockResponse{
+		LockAcquired: false,
+		LockKey:      "owner/repo/./default/",
+	}, nil)
+
+	body := `{"repo_full_name":"owner/repo","workspace":"default","note":"test lock"}`
+	req, _ := http.NewRequest("POST", "", bytes.NewBufferString(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.CreateManualLock(w, req)
+	Equals(t, http.StatusConflict, w.Code)
+}
+
+func TestAPIController_CreateManualLock_LockerError(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	When(ac.Locker.ManualLock(
+		Any[models.Project](), Any[string](), Any[string](), Any[models.User](),
+	)).ThenReturn(locking.TryLockResponse{}, fmt.Errorf("db error"))
+
+	body := `{"repo_full_name":"owner/repo","workspace":"default","note":"test lock"}`
+	req, _ := http.NewRequest("POST", "", bytes.NewBufferString(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.CreateManualLock(w, req)
+	Equals(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestAPIController_CreateManualLock_DefaultPath(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	When(ac.Locker.ManualLock(
+		Any[models.Project](), Any[string](), Any[string](), Any[models.User](),
+	)).ThenReturn(locking.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "owner/repo/./default/",
+	}, nil)
+
+	// No "path" field — should default to "."
+	body := `{"repo_full_name":"owner/repo","workspace":"default","note":"test"}`
+	req, _ := http.NewRequest("POST", "", bytes.NewBufferString(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.CreateManualLock(w, req)
+	Equals(t, http.StatusOK, w.Code)
+
+	// Verify ManualLock was called with path "."
+	project, _, _, _ := ac.Locker.(*MockLocker).VerifyWasCalledOnce().ManualLock(
+		Any[models.Project](), Any[string](), Any[string](), Any[models.User](),
+	).GetCapturedArguments()
+	Equals(t, ".", project.Path)
 }
 
 func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {

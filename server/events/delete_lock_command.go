@@ -36,10 +36,13 @@ func (l *DefaultDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id s
 		return nil, nil
 	}
 
-	removeErr := l.WorkingDir.DeletePlan(logger, lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, lock.Project.ProjectName)
-	if removeErr != nil {
-		logger.Warn("Failed to delete plan: %s", removeErr)
-		return nil, removeErr
+	// Manual locks have no associated plan files to clean up.
+	if !lock.IsManualLock {
+		removeErr := l.WorkingDir.DeletePlan(logger, lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, lock.Project.ProjectName)
+		if removeErr != nil {
+			logger.Warn("Failed to delete plan: %s", removeErr)
+			return nil, removeErr
+		}
 	}
 
 	return lock, nil

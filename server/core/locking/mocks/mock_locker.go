@@ -45,6 +45,25 @@ func (mock *MockLocker) GetLock(key string) (*models.ProjectLock, error) {
 	return _ret0, _ret1
 }
 
+func (mock *MockLocker) ManualLock(p models.Project, workspace string, note string, user models.User) (locking.TryLockResponse, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockLocker().")
+	}
+	_params := []pegomock.Param{p, workspace, note, user}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("ManualLock", _params, []reflect.Type{reflect.TypeOf((*locking.TryLockResponse)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 locking.TryLockResponse
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(locking.TryLockResponse)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
 func (mock *MockLocker) List() (map[string]models.ProjectLock, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockLocker().")
@@ -181,6 +200,53 @@ func (c *MockLocker_GetLock_OngoingVerification) GetAllCapturedArguments() (_par
 			_param0 = make([]string, len(c.methodInvocations))
 			for u, param := range _params[0] {
 				_param0[u] = param.(string)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockLocker) ManualLock(p models.Project, workspace string, note string, user models.User) *MockLocker_ManualLock_OngoingVerification {
+	_params := []pegomock.Param{p, workspace, note, user}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ManualLock", _params, verifier.timeout)
+	return &MockLocker_ManualLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockLocker_ManualLock_OngoingVerification struct {
+	mock              *MockLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockLocker_ManualLock_OngoingVerification) GetCapturedArguments() (models.Project, string, string, models.User) {
+	p, workspace, note, user := c.GetAllCapturedArguments()
+	return p[len(p)-1], workspace[len(workspace)-1], note[len(note)-1], user[len(user)-1]
+}
+
+func (c *MockLocker_ManualLock_OngoingVerification) GetAllCapturedArguments() (_param0 []models.Project, _param1 []string, _param2 []string, _param3 []models.User) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]models.Project, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(models.Project)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(string)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(string)
+			}
+		}
+		if len(_params) > 3 {
+			_param3 = make([]models.User, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(models.User)
 			}
 		}
 	}

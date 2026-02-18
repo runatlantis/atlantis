@@ -48,6 +48,7 @@ type Locker interface {
 	List() (map[string]models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
 	GetLock(key string) (*models.ProjectLock, error)
+	ManualLock(p models.Project, workspace string, note string, user models.User) (TryLockResponse, error)
 }
 
 // NewClient returns a new locking client.
@@ -68,6 +69,23 @@ func (c *Client) TryLock(p models.Project, workspace string, pull models.PullReq
 		Project:   p,
 		User:      user,
 		Pull:      pull,
+	}
+	lockAcquired, currLock, err := c.database.TryLock(lock)
+	if err != nil {
+		return TryLockResponse{}, err
+	}
+	return TryLockResponse{lockAcquired, currLock, c.key(p, workspace)}, nil
+}
+
+// ManualLock creates a manual project lock with a note, not tied to any pull request.
+func (c *Client) ManualLock(p models.Project, workspace string, note string, user models.User) (TryLockResponse, error) {
+	lock := models.ProjectLock{
+		Workspace:    workspace,
+		Time:         time.Now().Local(),
+		Project:      p,
+		User:         user,
+		Note:         note,
+		IsManualLock: true,
 	}
 	lockAcquired, currLock, err := c.database.TryLock(lock)
 	if err != nil {
@@ -183,6 +201,11 @@ func (c *NoOpLocker) UnlockByPull(_ string, _ int) ([]models.ProjectLock, error)
 // (i.e. not if there was no lock).
 func (c *NoOpLocker) GetLock(_ string) (*models.ProjectLock, error) {
 	return nil, nil
+}
+
+// ManualLock is a no-op implementation that always succeeds.
+func (c *NoOpLocker) ManualLock(p models.Project, workspace string, _ string, _ models.User) (TryLockResponse, error) {
+	return TryLockResponse{true, models.ProjectLock{}, c.key(p, workspace)}, nil
 }
 
 func (c *NoOpLocker) key(p models.Project, workspace string) string {

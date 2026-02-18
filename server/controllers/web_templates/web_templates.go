@@ -57,6 +57,8 @@ type LockIndexData struct {
 	LockedBy      string
 	Time          time.Time
 	TimeFormatted string
+	Note          string
+	IsManualLock  bool
 }
 
 // ApplyLockData holds the fields to display in the index view
@@ -96,6 +98,8 @@ type LockDetailData struct {
 	// not using a path-based proxy, this will be an empty string. Never ends
 	// in a '/' (hence "cleaned").
 	CleanedBasePath string
+	Note            string
+	IsManualLock    bool
 }
 
 var LockTemplate = templates.Lookup(templateFileNames["lock"])

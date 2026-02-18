@@ -172,11 +172,13 @@ type LockDetail struct {
 	ProjectName     string
 	ProjectRepo     string
 	ProjectRepoPath string
-	PullID          int `json:",string"`
+	PullID          int    `json:",string"`
 	PullURL         string
 	User            string
 	Workspace       string
 	Time            time.Time
+	IsManualLock    bool   `json:",omitempty"`
+	Note            string `json:",omitempty"`
 }
 
 type ListLocksResult struct {
@@ -195,15 +197,17 @@ func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 	result := ListLocksResult{}
 	for name, lock := range locks {
 		lockDetail := LockDetail{
-			name,
-			lock.Project.ProjectName,
-			lock.Project.RepoFullName,
-			lock.Project.Path,
-			lock.Pull.Num,
-			lock.Pull.URL,
-			lock.User.Username,
-			lock.Workspace,
-			lock.Time,
+			Name:            name,
+			ProjectName:     lock.Project.ProjectName,
+			ProjectRepo:     lock.Project.RepoFullName,
+			ProjectRepoPath: lock.Project.Path,
+			PullID:          lock.Pull.Num,
+			PullURL:         lock.Pull.URL,
+			User:            lock.User.Username,
+			Workspace:       lock.Workspace,
+			Time:            lock.Time,
+			IsManualLock:    lock.IsManualLock,
+			Note:            lock.Note,
 		}
 		result.Locks = append(result.Locks, lockDetail)
 	}
@@ -214,6 +218,89 @@ func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.respond(w, logging.Warn, http.StatusOK, "%s", string(response))
+}
+
+// ManualLockAPIRequest is the JSON body for POST /api/lock.
+type ManualLockAPIRequest struct {
+	RepoFullName string `json:"repo_full_name"`
+	Path         string `json:"path"`
+	ProjectName  string `json:"project_name"`
+	Workspace    string `json:"workspace"`
+	Note         string `json:"note"`
+}
+
+// ManualLockAPIResponse is the JSON response for POST /api/lock.
+type ManualLockAPIResponse struct {
+	LockKey string `json:"lock_key"`
+	Message string `json:"message"`
+}
+
+// CreateManualLock handles POST /api/lock for creating manual locks via the API.
+func (a *APIController) CreateManualLock(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if len(a.APISecret) == 0 {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled"))
+		return
+	}
+	secret := r.Header.Get(atlantisTokenHeader)
+	if secret != string(a.APISecret) {
+		a.apiReportError(w, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader))
+		return
+	}
+
+	var req ManualLockAPIRequest
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to read request body: %v", err))
+		return
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("failed to parse JSON: %v", err))
+		return
+	}
+
+	if req.RepoFullName == "" || req.Workspace == "" || req.Note == "" {
+		a.apiReportError(w, http.StatusBadRequest, fmt.Errorf("repo_full_name, workspace, and note are required"))
+		return
+	}
+	if req.Path == "" {
+		req.Path = "."
+	}
+
+	username := "atlantis-api"
+	if user, _, ok := r.BasicAuth(); ok && user != "" {
+		username = user
+	}
+
+	project := models.NewProject(req.RepoFullName, req.Path, req.ProjectName)
+	user := models.User{Username: username}
+
+	lockAttempt, err := a.Locker.ManualLock(project, req.Workspace, req.Note, user)
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, fmt.Errorf("creating manual lock failed: %s", err))
+		return
+	}
+
+	if !lockAttempt.LockAcquired {
+		w.WriteHeader(http.StatusConflict)
+		resp, _ := json.Marshal(map[string]string{
+			"error":    fmt.Sprintf("project is already locked (key: %s)", lockAttempt.LockKey),
+			"lock_key": lockAttempt.LockKey,
+		})
+		fmt.Fprint(w, string(resp))
+		return
+	}
+
+	response, err := json.Marshal(ManualLockAPIResponse{
+		LockKey: lockAttempt.LockKey,
+		Message: fmt.Sprintf("Manual lock created for %s", lockAttempt.LockKey),
+	})
+	if err != nil {
+		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+	a.respond(w, logging.Info, http.StatusOK, "%s", string(response))
 }
 
 func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) error {
