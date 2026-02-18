@@ -76,7 +76,7 @@ ENV DEBIAN_OPENSSL_VERSION="3.0.17-1~deb12u2"
 # Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
 RUN groupadd --gid 1000 atlantis && \
     useradd --uid 100 --system --create-home --gid 1000 --shell /bin/bash atlantis && \
-    useradd --uid 1000 --system --home=/home/atlantis/ --gid 1000 --shell /bin/bash atlantis2 && \
+    useradd --uid 1000 --system --home=/home/atlantis --gid 1000 --shell /bin/bash atlantis2 && \
     chown atlantis:atlantis /home/atlantis/ && \
     chmod ug+rwx /home/atlantis/
 
