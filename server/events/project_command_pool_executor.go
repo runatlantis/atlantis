@@ -10,6 +10,7 @@ import (
 
 	"github.com/remeh/sizedwaitgroup"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 type prjCmdRunnerFunc func(ctx command.ProjectContext) command.ProjectCommandOutput
@@ -35,27 +36,46 @@ func runProjectCmdsParallel(
 	cmds []command.ProjectContext,
 	runnerFunc prjCmdRunnerFunc,
 	poolSize int,
+	cancellationTracker CancellationTracker,
+	pull models.PullRequest,
 ) command.Result {
 	var results []command.ProjectResult
 	mux := &sync.Mutex{}
 
 	wg := sizedwaitgroup.New(poolSize)
-	for _, pCmd := range cmds {
-		var execute func()
-		wg.Add()
+	cancelled := false
 
-		execute = func() {
+	for _, pCmd := range cmds {
+		if cancellationTracker != nil && cancellationTracker.IsCancelled(pull) {
+			cancelled = true
+			break
+		}
+		wg.Add()
+		go func(cmd command.ProjectContext) {
 			defer wg.Done()
-			res := RunOneProjectCmd(runnerFunc, pCmd)
+			res := RunOneProjectCmd(runnerFunc, cmd)
 			mux.Lock()
 			results = append(results, res)
 			mux.Unlock()
-		}
-
-		go execute()
+		}(pCmd)
 	}
 
 	wg.Wait()
+
+	if cancelled {
+		for _, pCmd := range cmds[len(results):] {
+			results = append(results, command.ProjectResult{
+				Command: pCmd.CommandName,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: fmt.Errorf("operation cancelled via `atlantis cancel` command"),
+				},
+				RepoRelDir:  pCmd.RepoRelDir,
+				Workspace:   pCmd.Workspace,
+				ProjectName: pCmd.ProjectName,
+			})
+		}
+	}
+
 	return command.Result{ProjectResults: results}
 }
 
@@ -96,11 +116,12 @@ func runProjectCmdsParallelGroups(
 	cmds []command.ProjectContext,
 	runnerFunc prjCmdRunnerFunc,
 	poolSize int,
+	cancellationTracker CancellationTracker,
 ) command.Result {
 	var results []command.ProjectResult
 	groups := splitByExecutionOrderGroup(cmds)
 	for _, group := range groups {
-		res := runProjectCmdsParallel(group, runnerFunc, poolSize)
+		res := runProjectCmdsParallel(group, runnerFunc, poolSize, cancellationTracker, ctx.Pull)
 		results = append(results, res.ProjectResults...)
 		if res.HasErrors() && group[0].AbortOnExecutionOrderFail {
 			ctx.Log.Info("abort on execution order when failed")
@@ -136,7 +157,12 @@ func runProjectCmdsWithCancellationTracker(
 			break
 		}
 
-		groupResult := runGroup(group, runnerFunc, isParallel, parallelPoolSize)
+		var groupResult command.Result
+		if isParallel && len(group) > 1 {
+			groupResult = runProjectCmdsParallel(group, runnerFunc, parallelPoolSize, cancellationTracker, ctx.Pull)
+		} else {
+			groupResult = runProjectCmds(group, runnerFunc)
+		}
 		results = append(results, groupResult.ProjectResults...)
 
 		if groupResult.HasErrors() && group[0].AbortOnExecutionOrderFail && isParallel {
@@ -183,16 +209,4 @@ func createCancelledResults(remainingGroups [][]command.ProjectContext) []comman
 		}
 	}
 	return cancelledResults
-}
-
-func runGroup(
-	group []command.ProjectContext,
-	runnerFunc prjCmdRunnerFunc,
-	isParallel bool,
-	parallelPoolSize int,
-) command.Result {
-	if isParallel && len(group) > 1 {
-		return runProjectCmdsParallel(group, runnerFunc, parallelPoolSize)
-	}
-	return runProjectCmds(group, runnerFunc)
 }
