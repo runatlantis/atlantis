@@ -51,13 +51,16 @@ func runProjectCmdsParallel(
 			break
 		}
 		wg.Add()
-		go func(cmd command.ProjectContext) {
+
+		execute := func(cmd command.ProjectContext) {
 			defer wg.Done()
 			res := RunOneProjectCmd(runnerFunc, cmd)
 			mux.Lock()
 			results = append(results, res)
 			mux.Unlock()
-		}(pCmd)
+		}
+
+		go execute(pCmd)
 	}
 
 	wg.Wait()
