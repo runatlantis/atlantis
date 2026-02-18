@@ -6,7 +6,7 @@ require (
 	code.gitea.io/sdk/gitea v0.23.2
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/alicebob/miniredis/v2 v2.36.1
-	github.com/bmatcuk/doublestar/v4 v4.8.1
+	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.15.0
 	github.com/briandowns/spinner v1.23.2
 	github.com/cactus/go-statsd-client/v5 v5.1.0
