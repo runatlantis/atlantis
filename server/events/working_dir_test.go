@@ -405,6 +405,77 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 }
 
+// Test that MergeAgain preserves shallow depth when using checkout-merge
+// with checkout-depth. Exercises recheckDiverged and verifies it does not
+// fetch all branches/history (which would unshallow the repo).
+func TestMergeAgain_PreservesShallowDepth(t *testing.T) {
+	// Initialize the git repo with enough history to distinguish shallow vs full.
+	repoDir := initRepo(t)
+
+	// Create several commits on main so we have history to test against.
+	runCmd(t, repoDir, "git", "commit", "--allow-empty", "-m", "old-commit-1")
+	runCmd(t, repoDir, "git", "commit", "--allow-empty", "-m", "old-commit-2")
+	runCmd(t, repoDir, "git", "commit", "--allow-empty", "-m", "merge-base")
+
+	// Create a PR branch from here.
+	runCmd(t, repoDir, "git", "branch", "-f", "branch", "HEAD")
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
+
+	// Advance main past the merge-base to create divergence.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-file")
+	runCmd(t, repoDir, "git", "add", "main-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "main-commit")
+
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		CheckoutDepth:               2,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+	}
+
+	// Initial clone — should be shallow.
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+	}, "default")
+	Ok(t, err)
+
+	isShallow := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "--is-shallow-repository"))
+	Assert(t, isShallow == "true", "repo should be shallow after initial clone, got %q", isShallow)
+
+	// Advance main again to trigger divergence on next MergeAgain.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-file-2")
+	runCmd(t, repoDir, "git", "add", "main-file-2")
+	runCmd(t, repoDir, "git", "commit", "-m", "main-commit-2")
+
+	// MergeAgain should detect divergence and re-merge.
+	mergedAgain, err := wd.MergeAgain(logger, models.Repo{CloneURL: overrideURL}, models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: overrideURL},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+	}, "default")
+	Ok(t, err)
+	Assert(t, mergedAgain == true, "MergeAgain should have detected divergence and merged")
+
+	// Verify the repo is still shallow — recheckDiverged should not have
+	// fetched all branches/history.
+	isShallow = strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "--is-shallow-repository"))
+	Assert(t, isShallow == "true", "repo should still be shallow after MergeAgain, got %q", isShallow)
+}
+
 // Test that if the repo is already cloned and is at the right commit, we
 // don't reclone.
 func TestClone_NoReclone(t *testing.T) {

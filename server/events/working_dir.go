@@ -216,7 +216,7 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 			"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL,
 		},
 		{
-			"git", "remote", "update",
+			"git", "fetch", "origin",
 		},
 	}
 
@@ -275,8 +275,8 @@ func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedG
 
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
-	// We use both `<prSourceRemote>` and `origin` remotes, update them both
-	if err := w.wrappedGit(logger, c, "fetch", "--all"); err != nil {
+	// Fetch origin only; the source remote is handled by mergeToBaseBranch with proper depth
+	if err := w.wrappedGit(logger, c, "fetch", "origin"); err != nil {
 		return err
 	}
 
