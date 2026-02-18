@@ -672,13 +672,81 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 	e.respond(w, lvl, code, "%s", msg)
 }
 
+// parseMultiLineComment checks whether a comment contains multiple Atlantis
+// commands on separate lines. If so it returns a merged CommentParseResult
+// whose Command carries SubCommands for aggregated execution. Otherwise it
+// returns nil so the caller can fall back to the normal single-command Parse.
+func (e *VCSEventsController) parseMultiLineComment(comment string, vcsHost models.VCSHostType) *events.CommentParseResult {
+	lines := strings.Split(comment, "\n")
+	var nonEmptyLines []string
+	for _, line := range lines {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			nonEmptyLines = append(nonEmptyLines, trimmed)
+		}
+	}
+	if len(nonEmptyLines) <= 1 {
+		return nil
+	}
+
+	var commands []*events.CommentCommand
+	for _, line := range nonEmptyLines {
+		result := e.CommentParser.Parse(line, vcsHost)
+		if result.Ignore {
+			continue
+		}
+		if result.CommentResponse != "" {
+			return &events.CommentParseResult{CommentResponse: result.CommentResponse}
+		}
+		commands = append(commands, result.Command)
+	}
+	if len(commands) <= 1 {
+		return nil
+	}
+
+	// All commands must be the same type (e.g. all plan or all apply).
+	for _, cmd := range commands[1:] {
+		if cmd.Name != commands[0].Name {
+			return &events.CommentParseResult{
+				CommentResponse: fmt.Sprintf(
+					"Cannot mix different command types in a single comment. "+
+						"All commands must be the same type (e.g., all `plan` or all `apply`). "+
+						"Got `%s` and `%s`.", commands[0].Name, cmd.Name),
+			}
+		}
+	}
+
+	// Collect flags from all sub-commands so the var-file allowlist check in
+	// RunCommentCommand sees every flag, and OR the verbose flag.
+	var allFlags []string
+	verbose := false
+	for _, cmd := range commands {
+		allFlags = append(allFlags, cmd.Flags...)
+		verbose = verbose || cmd.Verbose
+	}
+
+	return &events.CommentParseResult{
+		Command: &events.CommentCommand{
+			Name:        commands[0].Name,
+			Verbose:     verbose,
+			Flags:       allFlags,
+			SubCommands: commands,
+		},
+	}
+}
+
 func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, commentID int64, vcsHost models.VCSHostType) HTTPResponse {
 	logger = logger.WithHistory(
 		"repo", baseRepo.FullName,
 		"pull", pullNum,
 	)
 
-	parseResult := e.CommentParser.Parse(comment, vcsHost)
+	// Try multi-line parsing first; falls back to single-line Parse below.
+	var parseResult events.CommentParseResult
+	if multi := e.parseMultiLineComment(comment, vcsHost); multi != nil {
+		parseResult = *multi
+	} else {
+		parseResult = e.CommentParser.Parse(comment, vcsHost)
+	}
 	if parseResult.Ignore {
 		truncated := comment
 		truncateLen := 40

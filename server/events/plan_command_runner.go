@@ -201,7 +201,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		}
 	}
 
-	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
+	projectCmds, err := cmd.BuildProjectCmds(ctx, p.prjCmdBuilder.BuildPlanCommands)
 	if err != nil {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
