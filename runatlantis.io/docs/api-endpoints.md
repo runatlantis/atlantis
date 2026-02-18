@@ -173,6 +173,54 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 }
 ```
 
+### POST /api/lock
+
+#### Description
+
+Create a manual project lock. Manual locks prevent plans from running on the specified project and workspace without requiring an open pull request.
+
+#### Parameters
+
+| Name           | Type   | Required | Description                                                 |
+|----------------|--------|----------|-------------------------------------------------------------|
+| repo_full_name | string | Yes      | Full repository name in `owner/repo` format                 |
+| path           | string | No       | Directory relative to repo root (defaults to `.`)           |
+| project_name   | string | No       | Project name as defined in `atlantis.yaml`                  |
+| workspace      | string | Yes      | Terraform workspace                                         |
+| note           | string | Yes      | Reason for the lock (displayed in the UI and PR comments)   |
+
+#### Sample Request
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/lock' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "repo_full_name": "owner/repo",
+    "path": "infrastructure/vpc",
+    "workspace": "default",
+    "note": "Blocked for production incident #1234"
+}'
+```
+
+#### Sample Response
+
+```json
+{
+  "lock_key": "owner/repo/infrastructure/vpc/default/",
+  "message": "Manual lock created for owner/repo/infrastructure/vpc/default/"
+}
+```
+
+#### Error Responses
+
+| Status | Description                                        |
+|--------|----------------------------------------------------|
+| 400    | Missing required fields or API is disabled         |
+| 401    | Invalid or missing `X-Atlantis-Token`              |
+| 409    | Project is already locked                          |
+| 500    | Internal error creating the lock                   |
+
 ## Other Endpoints
 
 The endpoints listed in this section are non-destructive and therefore don't require authentication nor special secret token.
@@ -204,10 +252,27 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
       "User": "jdoe",
       "Workspace": "default",
       "Time": "2025-02-13T16:47:42.040856-08:00"
+    },
+    {
+      "Name": "owner/repo/infrastructure/vpc/default/",
+      "ProjectName": "",
+      "ProjectRepo": "owner/repo",
+      "ProjectRepoPath": "infrastructure/vpc",
+      "PullID": "0",
+      "PullURL": "",
+      "User": "joseph",
+      "Workspace": "default",
+      "Time": "2025-02-14T10:30:00.000000-08:00",
+      "IsManualLock": true,
+      "Note": "Blocked for production incident #1234"
     }
   ]
 }
 ```
+
+::: tip NOTE
+The `IsManualLock` and `Note` fields are only present on manually created locks. For locks created by pull request plans, these fields are omitted.
+:::
 
 ### GET /status
 

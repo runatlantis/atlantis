@@ -80,6 +80,42 @@ func TestDeleteLock_Success(t *testing.T) {
 		Eq(path), Eq(projectName))
 }
 
+func TestDeleteLock_ManualLockSkipsPlanDeletion(t *testing.T) {
+	t.Log("Deleting a manual lock should not attempt to delete plan files")
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+	l := lockmocks.NewMockLocker()
+	workingDir := events.NewMockWorkingDir()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
+		IsManualLock: true,
+		Note:         "blocked for incident",
+		Workspace:    "default",
+		Project: models.Project{
+			Path:         ".",
+			RepoFullName: "owner/repo",
+		},
+	}, nil)
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
+	Ok(t, err)
+	dlc := events.DefaultDeleteLockCommand{
+		Locker:           l,
+		Database:         db,
+		WorkingDirLocker: workingDirLocker,
+		WorkingDir:       workingDir,
+	}
+	lock, err := dlc.DeleteLock(logger, "id")
+	Ok(t, err)
+	Assert(t, lock != nil, "lock was nil")
+	Assert(t, lock.IsManualLock, "expected manual lock")
+	workingDir.VerifyWasCalled(Never()).DeletePlan(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string](), Any[string](), Any[string]())
+}
+
 func TestDeleteLocksByPull_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, returned a failed status")
 	logger := logging.NewNoopLogger(t)

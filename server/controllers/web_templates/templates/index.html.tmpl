@@ -67,7 +67,11 @@
     {{ range .Locks }}
         <div class="lock-row">
         <a class="lock-link" href="{{ $basePath }}{{.LockPath}}">
+          {{ if .IsManualLock }}
+          <span class="lock-reponame">{{.RepoFullName}} <code>Manual</code></span>
+          {{ else }}
           <span class="lock-reponame">{{.RepoFullName}} #{{.PullNum}}</span>
+          {{ end }}
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
           <span class="lock-path">{{.Path}}</span>
@@ -82,7 +86,11 @@
           <span class="lock-datetime">{{.TimeFormatted}}</span>
         </a>
         <a class="lock-link" tabindex="-1" href="{{ $basePath }}{{.LockPath}}">
+          {{ if .IsManualLock }}
+          <span><code>Locked Manually</code></span>
+          {{ else }}
           <span><code>Locked</code></span>
+          {{ end }}
         </a>
         </div>
     {{ end }}
@@ -90,6 +98,8 @@
     {{ else }}
     <p class="placeholder">No locks found.</p>
     {{ end }}
+  <br>
+  <a class="button button-primary" id="manualLockPrompt">Create Manual Lock</a>
   </section>
   <br>
   <br>
@@ -133,6 +143,30 @@
     <p class="placeholder">No jobs found.</p>
     {{ end }}
   </section>
+  <div id="manualLockModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="close" id="manualLockClose">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p><strong>Create a Manual Project Lock</strong></p>
+        <label for="mlRepoFullName">Repository (owner/repo):</label>
+        <input type="text" id="mlRepoFullName" placeholder="owner/repo" class="u-full-width" autocomplete="off">
+        <label for="mlPath">Directory (-d, default: .):</label>
+        <input type="text" id="mlPath" value="." class="u-full-width" autocomplete="off">
+        <label for="mlProjectName">Project (-p, optional):</label>
+        <input type="text" id="mlProjectName" class="u-full-width" autocomplete="off">
+        <label for="mlWorkspace">Workspace:</label>
+        <input type="text" id="mlWorkspace" value="default" class="u-full-width" autocomplete="off">
+        <label for="mlNote">Note (reason for lock):</label>
+        <textarea id="mlNote" placeholder="e.g., Blocked for #inc-123 investigation" class="u-full-width" autocomplete="off"></textarea>
+        <br>
+        <input class="button-primary" id="manualLockSubmit" type="submit" value="Create Lock">
+        <input type="button" class="cancel" id="manualLockCancel" value="Cancel">
+        <p id="manualLockError" style="color: red; display: none;"></p>
+      </div>
+    </div>
+  </div>
   <div id="applyLockMessageModal" class="modal">
     <!-- Modal content -->
     <div class="modal-content">
@@ -237,7 +271,50 @@
       if (event.target == modal) {
           modal.css("display", "none");
       }
+      if (event.target == $("#manualLockModal")[0]) {
+          $("#manualLockModal").css("display", "none");
+      }
   }
+
+  // Manual Lock Modal
+  $("#manualLockPrompt").click(function() {
+    $("#manualLockModal").css("display", "block");
+  });
+  $("#manualLockClose, #manualLockCancel").click(function() {
+    $("#manualLockModal").css("display", "none");
+    $("#manualLockError").hide();
+  });
+  $("#manualLockSubmit").click(function() {
+    var data = {
+      repo_full_name: $("#mlRepoFullName").val(),
+      path: $("#mlPath").val() || ".",
+      project_name: $("#mlProjectName").val(),
+      workspace: $("#mlWorkspace").val(),
+      note: $("#mlNote").val()
+    };
+    if (!data.repo_full_name || !data.workspace || !data.note) {
+      $("#manualLockError").text("Repository, workspace, and note are required.").show();
+      return;
+    }
+    $.ajax({
+      url: '{{ .CleanedBasePath }}/locks/manual',
+      type: 'POST',
+      data: data,
+      success: function(result) {
+        window.location.replace("{{ .CleanedBasePath }}/");
+      },
+      error: function(xhr) {
+        var msg = xhr.responseText;
+        var lockURL = xhr.getResponseHeader("X-Lock-URL");
+        if (lockURL) {
+          var $link = $("<a>").attr("href", lockURL).attr("target", "_blank").text("View Lock");
+          $("#manualLockError").text(msg + " ").append($link).show();
+        } else {
+          $("#manualLockError").text(msg).show();
+        }
+      }
+    });
+  });
 </script>
 </body>
 </html>

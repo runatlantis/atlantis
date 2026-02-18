@@ -82,16 +82,22 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	owner, repo := models.SplitRepoFullName(lock.Project.RepoFullName)
+	lockedBy := lock.Pull.Author
+	if lock.IsManualLock {
+		lockedBy = lock.User.Username
+	}
 	viewData := web_templates.LockDetailData{
 		LockKeyEncoded:  id,
 		LockKey:         idUnencoded,
 		PullRequestLink: lock.Pull.URL,
-		LockedBy:        lock.Pull.Author,
+		LockedBy:        lockedBy,
 		Workspace:       lock.Workspace,
 		AtlantisVersion: l.AtlantisVersion,
 		CleanedBasePath: l.AtlantisURL.Path,
 		RepoOwner:       owner,
 		RepoName:        repo,
+		Note:            lock.Note,
+		IsManualLock:    lock.IsManualLock,
 	}
 
 	err = l.LockDetailTemplate.Execute(w, viewData)
@@ -126,10 +132,12 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// NOTE: Because BaseRepo was added to the PullRequest model later, previous
-	// installations of Atlantis will have locks in their DB that do not have
-	// this field on PullRequest. We skip commenting in this case.
-	if lock.Pull.BaseRepo != (models.Repo{}) {
+	if lock.IsManualLock {
+		l.Logger.Info("manual lock '%s' released", id)
+	} else if lock.Pull.BaseRepo != (models.Repo{}) {
+		// NOTE: Because BaseRepo was added to the PullRequest model later, previous
+		// installations of Atlantis will have locks in their DB that do not have
+		// this field on PullRequest. We skip commenting in this case.
 		if err := l.Database.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
 			l.Logger.Err("unable to update project status: %s", err)
 		}
@@ -144,6 +152,47 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		l.Logger.Debug("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
 	}
 	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id '%s'", id)
+}
+
+// CreateManualLock handles creating a manual project lock via the web UI.
+func (l *LocksController) CreateManualLock(w http.ResponseWriter, r *http.Request) {
+	repoFullName := r.FormValue("repo_full_name")
+	path := r.FormValue("path")
+	projectName := r.FormValue("project_name")
+	workspace := r.FormValue("workspace")
+	note := r.FormValue("note")
+
+	if repoFullName == "" || workspace == "" || note == "" {
+		l.respond(w, logging.Warn, http.StatusBadRequest, "repo_full_name, workspace, and note are required")
+		return
+	}
+	if path == "" {
+		path = "."
+	}
+
+	// Derive username from basic auth if available, otherwise default.
+	username := "atlantis-ui"
+	if user, _, ok := r.BasicAuth(); ok && user != "" {
+		username = user
+	}
+
+	project := models.NewProject(repoFullName, path, projectName)
+	user := models.User{Username: username}
+
+	lockAttempt, err := l.Locker.ManualLock(project, workspace, note, user)
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "creating manual lock failed: %s", err)
+		return
+	}
+
+	if !lockAttempt.LockAcquired {
+		lockURL := fmt.Sprintf("%s/lock?id=%s", l.AtlantisURL.String(), url.QueryEscape(lockAttempt.LockKey))
+		w.Header().Set("X-Lock-URL", lockURL)
+		l.respond(w, logging.Warn, http.StatusConflict, "This project is already locked.")
+		return
+	}
+
+	l.respond(w, logging.Info, http.StatusOK, "Manual lock created for %s", lockAttempt.LockKey)
 }
 
 // respond is a helper function to respond and log the response. lvl is the log

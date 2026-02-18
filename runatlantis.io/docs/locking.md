@@ -60,6 +60,32 @@ to delete the lock.
 
 Once a plan is discarded, you'll need to run `plan` again prior to running `apply` when you go back to that pull request.
 
+## Manual Locks
+
+In addition to the automatic locks created by `plan`, you can manually lock a project and workspace via the Atlantis UI or API. This is useful for preventing plans during incidents, maintenance windows, or other situations where you want to block changes without an open pull request.
+
+### Creating a Manual Lock via the UI
+
+Click **Create Manual Lock** on the Atlantis index page. You'll be prompted for:
+
+| Field                      | Description                                                   |
+|----------------------------|---------------------------------------------------------------|
+| Repository                 | Full repo name in `owner/repo` format                         |
+| Directory (-d, default: .) | Directory relative to repo root                               |
+| Project (-p, optional)     | Project name from `atlantis.yaml`                             |
+| Workspace                  | Terraform workspace (defaults to `default`)                   |
+| Note                       | Reason for the lock (required)                                |
+
+### Creating a Manual Lock via the API
+
+See [POST /api/lock](api-endpoints.md#post-apilock) for details on creating locks programmatically.
+
+### How Manual Locks Work
+
+When a manual lock is held, any `atlantis plan` on the same project and workspace from a pull request will fail with a message indicating the project is manually locked, who locked it, the lock note, and a link to the Atlantis UI where the lock can be released.
+
+Manual locks appear in the lock list on the index page with a **Locked Manually** status. To remove a manual lock, click into the lock detail view and click **Unlock**.
+
 ## Relationship to Terraform State Locking
 
 Atlantis does not conflict with [Terraform State Locking](https://developer.hashicorp.com/terraform/language/state/locking). Under the hood, all

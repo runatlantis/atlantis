@@ -15,6 +15,7 @@ package events_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
@@ -61,6 +62,42 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 		LockAcquired:      false,
 		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.", link, link),
 	}, res)
+}
+
+func TestDefaultProjectLocker_TryLockWhenManuallyLocked(t *testing.T) {
+	var githubClient *github.Client
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
+	mockLocker := mocks.NewMockLocker()
+	locker := events.DefaultProjectLocker{
+		Locker:    mockLocker,
+		VCSClient: mockClient,
+	}
+	expProject := models.Project{}
+	expWorkspace := "default"
+	expPull := models.PullRequest{Num: 5}
+	expUser := models.User{}
+
+	When(mockLocker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
+		locking.TryLockResponse{
+			LockAcquired: false,
+			CurrLock: models.ProjectLock{
+				Pull:         models.PullRequest{Num: 0},
+				User:         models.User{Username: "joseph"},
+				Note:         "Blocked for incident 1231",
+				IsManualLock: true,
+			},
+			LockKey: "",
+		},
+		nil,
+	)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
+	Ok(t, err)
+	Equals(t, false, res.LockAcquired)
+	Assert(t, res.LockFailureReason != "", "expected failure reason")
+	Assert(t, strings.Contains(res.LockFailureReason, "locked manually by joseph"),
+		fmt.Sprintf("expected failure message to contain username, got: %s", res.LockFailureReason))
+	Assert(t, strings.Contains(res.LockFailureReason, "Blocked for incident 1231"),
+		fmt.Sprintf("expected failure message to contain note, got: %s", res.LockFailureReason))
 }
 
 func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {

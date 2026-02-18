@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -201,6 +202,160 @@ func TestGetLock_Success(t *testing.T) {
 		CleanedBasePath: "/basepath",
 	})
 	ResponseContains(t, w, http.StatusOK, "")
+}
+
+func TestGetLock_ManualLock(t *testing.T) {
+	t.Log("Should render a manual lock with note and IsManualLock fields")
+	RegisterMockTestingT(t)
+	l := mocks.NewMockLocker()
+	When(l.GetLock("id")).ThenReturn(&models.ProjectLock{
+		Project:      models.Project{RepoFullName: "owner/repo", Path: "path"},
+		Pull:         models.PullRequest{},
+		User:         models.User{Username: "joseph"},
+		Workspace:    "default",
+		Note:         "Blocked for incident 1231",
+		IsManualLock: true,
+	}, nil)
+	tmpl := tMocks.NewMockTemplateWriter()
+	atlantisURL, err := url.Parse("https://example.com/basepath")
+	Ok(t, err)
+	lc := controllers.LocksController{
+		Logger:             logging.NewNoopLogger(t),
+		Locker:             l,
+		LockDetailTemplate: tmpl,
+		AtlantisVersion:    "1300135",
+		AtlantisURL:        atlantisURL,
+	}
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
+	w := httptest.NewRecorder()
+	lc.GetLock(w, req)
+	tmpl.VerifyWasCalledOnce().Execute(w, web_templates.LockDetailData{
+		LockKeyEncoded:  "id",
+		LockKey:         "id",
+		RepoOwner:       "owner",
+		RepoName:        "repo",
+		PullRequestLink: "",
+		LockedBy:        "joseph",
+		Workspace:       "default",
+		AtlantisVersion: "1300135",
+		CleanedBasePath: "/basepath",
+		Note:            "Blocked for incident 1231",
+		IsManualLock:    true,
+	})
+	ResponseContains(t, w, http.StatusOK, "")
+}
+
+func TestDeleteLock_ManualLockSkipsComment(t *testing.T) {
+	t.Log("Deleting a manual lock should not comment on a pull request")
+	RegisterMockTestingT(t)
+	cp := vcsmocks.NewMockClient()
+	dlc := mocks2.NewMockDeleteLockCommand()
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{
+		IsManualLock: true,
+		Note:         "blocked for incident",
+		Project:      models.Project{RepoFullName: "owner/repo", Path: "path"},
+		Workspace:    "default",
+	}, nil)
+	lc := controllers.LocksController{
+		DeleteLockCommand: dlc,
+		Logger:            logging.NewNoopLogger(t),
+		VCSClient:         cp,
+	}
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
+	w := httptest.NewRecorder()
+	lc.DeleteLock(w, req)
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
+	cp.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+}
+
+func TestCreateManualLock_MissingFields(t *testing.T) {
+	t.Log("If required fields are missing we should get a 400")
+	lc := controllers.LocksController{
+		Logger: logging.NewNoopLogger(t),
+	}
+	req, _ := http.NewRequest("POST", "/locks/manual", bytes.NewBuffer(nil))
+	w := httptest.NewRecorder()
+	lc.CreateManualLock(w, req)
+	ResponseContains(t, w, http.StatusBadRequest, "repo_full_name, workspace, and note are required")
+}
+
+func TestCreateManualLock_Success(t *testing.T) {
+	t.Log("A manual lock should be created successfully")
+	RegisterMockTestingT(t)
+	l := mocks.NewMockLocker()
+	When(l.ManualLock(
+		Any[models.Project](), Any[string](), Any[string](), Any[models.User](),
+	)).ThenReturn(locking.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "owner/repo/./default/",
+	}, nil)
+	lc := controllers.LocksController{
+		Logger: logging.NewNoopLogger(t),
+		Locker: l,
+	}
+	form := url.Values{}
+	form.Set("repo_full_name", "owner/repo")
+	form.Set("workspace", "default")
+	form.Set("note", "Blocked for incident 1231")
+	req, _ := http.NewRequest("POST", "/locks/manual", bytes.NewBufferString(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	lc.CreateManualLock(w, req)
+	ResponseContains(t, w, http.StatusOK, "Manual lock created")
+}
+
+func TestCreateManualLock_AlreadyLocked(t *testing.T) {
+	t.Log("If the project is already locked we should get a 409")
+	RegisterMockTestingT(t)
+	l := mocks.NewMockLocker()
+	When(l.ManualLock(
+		Any[models.Project](), Any[string](), Any[string](), Any[models.User](),
+	)).ThenReturn(locking.TryLockResponse{
+		LockAcquired: false,
+		LockKey:      "owner/repo/./default/",
+	}, nil)
+	atlantisURL, _ := url.Parse("http://localhost:4141")
+	lc := controllers.LocksController{
+		Logger:      logging.NewNoopLogger(t),
+		Locker:      l,
+		AtlantisURL: atlantisURL,
+	}
+	form := url.Values{}
+	form.Set("repo_full_name", "owner/repo")
+	form.Set("workspace", "default")
+	form.Set("note", "Blocked for incident 1231")
+	req, _ := http.NewRequest("POST", "/locks/manual", bytes.NewBufferString(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	lc.CreateManualLock(w, req)
+	ResponseContains(t, w, http.StatusConflict, "This project is already locked.")
+	lockURL := w.Header().Get("X-Lock-URL")
+	Assert(t, lockURL != "", "expected X-Lock-URL header to be set")
+	Assert(t, strings.Contains(lockURL, "lock?id="), "expected lock URL to contain lock ID")
+}
+
+func TestCreateManualLock_LockerErr(t *testing.T) {
+	t.Log("If the locker returns an error we should get a 500")
+	RegisterMockTestingT(t)
+	l := mocks.NewMockLocker()
+	When(l.ManualLock(
+		Any[models.Project](), Any[string](), Any[string](), Any[models.User](),
+	)).ThenReturn(locking.TryLockResponse{}, errors.New("db error"))
+	lc := controllers.LocksController{
+		Logger: logging.NewNoopLogger(t),
+		Locker: l,
+	}
+	form := url.Values{}
+	form.Set("repo_full_name", "owner/repo")
+	form.Set("workspace", "default")
+	form.Set("note", "Blocked for incident 1231")
+	req, _ := http.NewRequest("POST", "/locks/manual", bytes.NewBufferString(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	lc.CreateManualLock(w, req)
+	ResponseContains(t, w, http.StatusInternalServerError, "creating manual lock failed")
 }
 
 func TestDeleteLock_NoLockID(t *testing.T) {

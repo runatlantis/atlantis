@@ -145,6 +145,48 @@ func TestGetLock(t *testing.T) {
 	Equals(t, &pl, lock)
 }
 
+func TestManualLock_Err(t *testing.T) {
+	RegisterMockTestingT(t)
+	database := mocks.NewMockDatabase()
+	When(database.TryLock(Any[models.ProjectLock]())).ThenReturn(false, models.ProjectLock{}, errExpected)
+	t.Log("when the database returns an error, ManualLock should return that error")
+	l := locking.NewClient(database)
+	_, err := l.ManualLock(project, workspace, "incident note", user)
+	Equals(t, errExpected, err)
+}
+
+func TestManualLock_Success(t *testing.T) {
+	RegisterMockTestingT(t)
+	currLock := models.ProjectLock{}
+	database := mocks.NewMockDatabase()
+	When(database.TryLock(Any[models.ProjectLock]())).ThenReturn(true, currLock, nil)
+	l := locking.NewClient(database)
+	r, err := l.ManualLock(project, workspace, "blocked for incident", user)
+	Ok(t, err)
+	Equals(t, true, r.LockAcquired)
+	Equals(t, "owner/repo/path/workspace/projectName", r.LockKey)
+}
+
+func TestManualLock_AlreadyLocked(t *testing.T) {
+	RegisterMockTestingT(t)
+	existingLock := models.ProjectLock{Project: project, Workspace: workspace}
+	database := mocks.NewMockDatabase()
+	When(database.TryLock(Any[models.ProjectLock]())).ThenReturn(false, existingLock, nil)
+	l := locking.NewClient(database)
+	r, err := l.ManualLock(project, workspace, "incident note", user)
+	Ok(t, err)
+	Equals(t, false, r.LockAcquired)
+	Equals(t, existingLock, r.CurrLock)
+}
+
+func TestManualLock_NoOpLocker(t *testing.T) {
+	l := locking.NewNoOpLocker()
+	r, err := l.ManualLock(project, workspace, "incident note", user)
+	Ok(t, err)
+	Equals(t, true, r.LockAcquired)
+	Equals(t, "owner/repo/path/workspace/projectName", r.LockKey)
+}
+
 func TestTryLock_NoOpLocker(t *testing.T) {
 	RegisterMockTestingT(t)
 	currLock := models.ProjectLock{}

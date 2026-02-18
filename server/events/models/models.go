@@ -237,7 +237,7 @@ type ProjectLock struct {
 	// Project is the project that is being locked.
 	Project Project
 	// Pull is the pull request from which the command was run that
-	// created this lock.
+	// created this lock. Empty for manual locks.
 	Pull PullRequest
 	// User is the username of the user that ran the command
 	// that created this lock.
@@ -247,6 +247,12 @@ type ProjectLock struct {
 	Workspace string
 	// Time is the time at which the lock was first created.
 	Time time.Time
+	// Note is an optional human-readable reason for the lock.
+	// Used for manual locks created via the UI.
+	Note string `json:"Note,omitempty"`
+	// IsManualLock indicates this lock was created manually via the UI
+	// rather than by a plan/apply command.
+	IsManualLock bool `json:"IsManualLock,omitempty"`
 }
 
 // Project represents a Terraform project. Since there may be multiple
