@@ -68,7 +68,7 @@ projects:
   branch: /main/ # Available since v0.21.0
   dir: . # Available since v0.1.0
   workspace: default # Available since v0.1.0
-  terraform_distribution: terraform # Available since v0.25.0
+  terraform_distribution: terraform # Available since v0.33.0
   terraform_version: v0.11.0 # Available since v0.1.0
   delete_source_branch_on_merge: true # Available since v0.17.0
   repo_locking: true # deprecated: use repo_locks instead, Available since v0.17.0
