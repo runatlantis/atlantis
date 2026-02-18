@@ -36,7 +36,7 @@ require (
 	github.com/opentofu/tofudl v0.0.1
 	github.com/petergtz/pegomock/v4 v4.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.7.3
+	github.com/redis/go-redis/v9 v9.17.3
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
 	github.com/slack-go/slack v0.16.0
