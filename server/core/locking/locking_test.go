@@ -152,7 +152,7 @@ func TestManualLock_Err(t *testing.T) {
 	t.Log("when the database returns an error, ManualLock should return that error")
 	l := locking.NewClient(database)
 	_, err := l.ManualLock(project, workspace, "incident note", user)
-	Equals(t, err, err)
+	Equals(t, errExpected, err)
 }
 
 func TestManualLock_Success(t *testing.T) {

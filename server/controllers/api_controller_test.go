@@ -6,8 +6,8 @@ package controllers_test
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
