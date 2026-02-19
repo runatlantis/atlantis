@@ -601,6 +601,72 @@ policy set: policy3: passed.`,
 	}
 }
 
+func TestPolicyCheckResults_HasWarnings(t *testing.T) {
+	cases := []struct {
+		description      string
+		policysetResults []models.PolicySetResult
+		exp              bool
+	}{
+		{
+			description: "no warnings",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					PolicyOutput:  "5 tests, 5 passed, 0 warnings, 0 failures, 0 exceptions",
+					Passed:        true,
+				},
+			},
+			exp: false,
+		},
+		{
+			description: "single warning",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					PolicyOutput:  "5 tests, 4 passed, 1 warning, 0 failures, 0 exceptions",
+					Passed:        true,
+				},
+			},
+			exp: true,
+		},
+		{
+			description: "multiple warnings",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					PolicyOutput:  "10 tests, 7 passed, 3 warnings, 0 failures, 0 exceptions",
+					Passed:        true,
+				},
+			},
+			exp: true,
+		},
+		{
+			description: "warnings in one of multiple policy sets",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					PolicyOutput:  "5 tests, 5 passed, 0 warnings, 0 failures, 0 exceptions",
+					Passed:        true,
+				},
+				{
+					PolicySetName: "policy2",
+					PolicyOutput:  "5 tests, 4 passed, 1 warning, 0 failures, 0 exceptions",
+					Passed:        true,
+				},
+			},
+			exp: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			pcs := models.PolicyCheckResults{
+				PolicySetResults: c.policysetResults,
+			}
+			Equals(t, c.exp, pcs.HasWarnings())
+		})
+	}
+}
+
 func TestPullStatus_StatusCount(t *testing.T) {
 	ps := models.PullStatus{
 		Projects: []models.ProjectStatus{
@@ -679,7 +745,7 @@ func TestPlanSuccessStats(t *testing.T) {
 		{
 			"with imports",
 			`Terraform used the selected providers to generate the following execution
-			plan. Resource actions are indicated with the following symbols:	
+			plan. Resource actions are indicated with the following symbols:
 			  + create
 			  ~ update in-place
 			  - destroy

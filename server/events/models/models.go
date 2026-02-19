@@ -515,6 +515,17 @@ func (p *PolicyCheckResults) Summary() string {
 	return strings.Trim(note, "\n")
 }
 
+// HasWarnings returns true if any policy set has warnings in its output.
+func (p *PolicyCheckResults) HasWarnings() bool {
+	r := regexp.MustCompile(`[1-9]\d* warnings?`)
+	for _, policySetResult := range p.PolicySetResults {
+		if r.MatchString(policySetResult.PolicyOutput) {
+			return true
+		}
+	}
+	return false
+}
+
 // PolicyCleared is used to determine if policies have all succeeded or been approved.
 func (p *PolicyCheckResults) PolicyCleared() bool {
 	passing := true
