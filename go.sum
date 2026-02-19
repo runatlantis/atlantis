@@ -361,8 +361,8 @@ github.com/opentofu/tofudl v0.0.1 h1:r2uD4nxMnq0Qkzhh/C9Ldxjt+piTJi0R0C40Kf4d+a8
 github.com/opentofu/tofudl v0.0.1/go.mod h1:HeIabsnOzo0WMnIRqI13Ho6hEi6tu2nrQpzSddWL/9w=
 github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=
 github.com/pelletier/go-toml/v2 v2.2.4/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
-github.com/petergtz/pegomock/v4 v4.2.0 h1:qL2AXgE6JaajLWled2ixupk1EAW3gjT9HowZdI5yLfY=
-github.com/petergtz/pegomock/v4 v4.2.0/go.mod h1:MWuKPa+Q58c+MtwRQKimUzOdOmrDMV71BOzYB7y0ukI=
+github.com/petergtz/pegomock/v4 v4.3.0 h1:GPHCrVK0Ao63qTBBLLpcI1jafy13S1KTsLbC/8jPFSU=
+github.com/petergtz/pegomock/v4 v4.3.0/go.mod h1:MWuKPa+Q58c+MtwRQKimUzOdOmrDMV71BOzYB7y0ukI=
 github.com/pjbgf/sha1cd v0.3.2 h1:a9wb0bp1oC2TGwStyn0Umc/IGKQnEgF0vVaZ8QF8eo4=
 github.com/pjbgf/sha1cd v0.3.2/go.mod h1:zQWigSxVmsHEZow5qaLtPYxpcKMMQpa09ixqBxuCS6A=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
