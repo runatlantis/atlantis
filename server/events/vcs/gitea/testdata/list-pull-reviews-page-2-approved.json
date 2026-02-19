@@ -1,0 +1,120 @@
+[
+  {
+    "id": 4,
+    "user": {
+      "id": 104,
+      "login": "reviewer-4",
+      "login_name": "reviewer-4",
+      "source_id": 0,
+      "full_name": "Reviewer Four",
+      "email": "reviewer-4@example.com",
+      "avatar_url": "https://gitea.example.com/avatars/104",
+      "language": "en-US",
+      "is_admin": false,
+      "last_login": "2026-01-11T09:00:00Z",
+      "created": "2024-06-01T09:00:00Z",
+      "restricted": false,
+      "active": true,
+      "prohibit_login": false,
+      "location": "Incheon, KR",
+      "website": "https://example.com/reviewer-4",
+      "description": "Maintainer",
+      "visibility": "public",
+      "followers_count": 2,
+      "following_count": 9,
+      "starred_repos_count": 3
+    },
+    "team": {
+      "id": 501,
+      "name": "core-reviewers",
+      "description": "Core platform reviewers",
+      "organization": {
+        "id": 9001,
+        "username": "owner",
+        "full_name": "Owner Org",
+        "avatar_url": "https://gitea.example.com/avatars/9001",
+        "description": "Main org",
+        "website": "https://example.com",
+        "location": "Seoul",
+        "visibility": "public"
+      },
+      "permission": "write",
+      "can_create_org_repo": false,
+      "includes_all_repositories": false,
+      "units": [
+        "repo.code",
+        "repo.pulls",
+        "repo.issues"
+      ]
+    },
+    "state": "COMMENT",
+    "body": "minor note",
+    "commit_id": "dddddddddddddddddddddddddddddddddddddddd",
+    "stale": false,
+    "official": true,
+    "dismissed": false,
+    "comments_count": 1,
+    "submitted_at": "2026-01-11T10:00:00Z",
+    "html_url": "https://gitea.example.com/owner/repo/pulls/1#review-4",
+    "pull_request_url": "https://gitea.example.com/api/v1/repos/owner/repo/pulls/1"
+  },
+  {
+    "id": 2,
+    "user": {
+      "id": 102,
+      "login": "reviewer-2",
+      "login_name": "reviewer-2",
+      "source_id": 0,
+      "full_name": "Reviewer Two",
+      "email": "reviewer-2@example.com",
+      "avatar_url": "https://gitea.example.com/avatars/102",
+      "language": "en-US",
+      "is_admin": false,
+      "last_login": "2026-01-11T11:00:00Z",
+      "created": "2024-05-02T10:00:00Z",
+      "restricted": false,
+      "active": true,
+      "prohibit_login": false,
+      "location": "Daejeon, KR",
+      "website": "https://example.com/reviewer-2",
+      "description": "Approver",
+      "visibility": "public",
+      "followers_count": 1,
+      "following_count": 3,
+      "starred_repos_count": 1
+    },
+    "team": {
+      "id": 501,
+      "name": "core-reviewers",
+      "description": "Core platform reviewers",
+      "organization": {
+        "id": 9001,
+        "username": "owner",
+        "full_name": "Owner Org",
+        "avatar_url": "https://gitea.example.com/avatars/9001",
+        "description": "Main org",
+        "website": "https://example.com",
+        "location": "Seoul",
+        "visibility": "public"
+      },
+      "permission": "write",
+      "can_create_org_repo": false,
+      "includes_all_repositories": false,
+      "units": [
+        "repo.code",
+        "repo.pulls",
+        "repo.issues"
+      ]
+    },
+    "state": "APPROVED",
+    "body": "approved",
+    "commit_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "stale": false,
+    "official": true,
+    "dismissed": false,
+    "comments_count": 1,
+    "submitted_at": "2026-01-11T12:34:56Z",
+    "html_url": "https://gitea.example.com/owner/repo/pulls/1#review-2",
+    "pull_request_url": "https://gitea.example.com/api/v1/repos/owner/repo/pulls/1"
+  }
+]

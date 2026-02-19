@@ -1,0 +1,11 @@
+[
+  {
+    "id": 303,
+    "name": "label-two",
+    "color": "bb00aa",
+    "description": "second label",
+    "exclusive": false,
+    "url": "https://gitea.example.com/api/v1/repos/owner/repo/labels/303",
+    "is_archived": false
+  }
+]

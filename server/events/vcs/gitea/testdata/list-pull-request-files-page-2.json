@@ -1,0 +1,15 @@
+[
+  {
+    "filename": "README.md",
+    "previous_filename": "",
+    "status": "added",
+    "additions": 8,
+    "deletions": 0,
+    "changes": 8,
+    "html_url": "https://gitea.example.com/owner/repo/src/branch/main/README.md",
+    "contents_url": "https://gitea.example.com/api/v1/repos/owner/repo/contents/README.md",
+    "raw_url": "https://gitea.example.com/owner/repo/raw/branch/main/README.md",
+    "sha": "aab0c7d4f8f86f8a3bf1fdbe9a1f82f700000003",
+    "patch": "@@ -0,0 +1,8 @@\n+# Atlantis Repo\n+..."
+  }
+]
