@@ -34,7 +34,7 @@ require (
 	github.com/moby/patternmatcher v0.6.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/opentofu/tofudl v0.0.1
-	github.com/petergtz/pegomock/v4 v4.2.0
+	github.com/petergtz/pegomock/v4 v4.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.17.3
 	github.com/remeh/sizedwaitgroup v1.0.0
