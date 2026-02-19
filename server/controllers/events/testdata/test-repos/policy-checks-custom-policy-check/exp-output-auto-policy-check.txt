@@ -1,0 +1,34 @@
+Ran Policy Check for dir: `.` workspace: `default`
+
+#### Policy Set: `security_policy`
+```diff
+Security check - 0 failures, 1 passed
+
+```
+
+#### Policy Set: `compliance_policy`
+```diff
+Compliance check - 0 failures, 1 passed
+
+```
+
+
+* :arrow_forward: To **apply** this plan, comment:
+  ```shell
+  atlantis apply -d .
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  ```shell
+  atlantis plan -d .
+  ```
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  ```shell
+  atlantis apply
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  ```shell
+  atlantis unlock
+  ```
