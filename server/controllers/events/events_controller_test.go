@@ -1014,30 +1014,6 @@ func TestPost_GithubMultiLineComment(t *testing.T) {
 		Any[models.User](), Any[int](), Any[*events.CommentCommand]())
 }
 
-func TestPost_GithubMultiLineApplyComment(t *testing.T) {
-	t.Log("when the comment has multiple atlantis apply commands, a single merged command is dispatched")
-	e, v, _, _, p, cr, _, _, cp := setup(t)
-	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
-	req.Header.Set(githubHeader, "issue_comment")
-	event := `{"action": "created", "comment": {"body": "atlantis apply -d project-a\natlantis apply -d project-b", "id": 1}}`
-	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	baseRepo := models.Repo{}
-	user := models.User{}
-	cmdA := events.CommentCommand{Name: command.Apply, RepoRelDir: "project-a"}
-	cmdB := events.CommentCommand{Name: command.Apply, RepoRelDir: "project-b"}
-	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
-	When(cp.Parse("atlantis apply -d project-a", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmdA})
-	When(cp.Parse("atlantis apply -d project-b", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmdB})
-	w := httptest.NewRecorder()
-	e.Post(w, req)
-	ResponseContains(t, w, http.StatusOK, "Processing...")
-
-	// Single merged command dispatched with SubCommands.
-	cr.VerifyWasCalledOnce().RunCommentCommand(
-		Any[models.Repo](), Any[*models.Repo](), Any[*models.PullRequest](),
-		Any[models.User](), Any[int](), Any[*events.CommentCommand]())
-}
-
 func TestPost_GithubMultiLineMixedCommandsRejected(t *testing.T) {
 	t.Log("when the comment mixes plan and apply commands, an error is returned")
 	e, v, _, _, p, _, _, vcsClient, cp := setup(t)

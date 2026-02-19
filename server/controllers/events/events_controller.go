@@ -672,11 +672,11 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 	e.respond(w, lvl, code, "%s", msg)
 }
 
-// parseMultiLineComment checks whether a comment contains multiple Atlantis
-// commands on separate lines. If so it returns a merged CommentParseResult
-// whose Command carries SubCommands for aggregated execution. Otherwise it
-// returns nil so the caller can fall back to the normal single-command Parse.
-func (e *VCSEventsController) parseMultiLineComment(comment string, vcsHost models.VCSHostType) *events.CommentParseResult {
+// resolveCommentCommands splits a comment into lines and delegates each to
+// CommentParser.Parse. For single-line comments this is equivalent to calling
+// Parse directly. For multi-line comments with multiple Atlantis commands, it
+// returns a merged result with SubCommands for aggregated execution.
+func (e *VCSEventsController) resolveCommentCommands(comment string, vcsHost models.VCSHostType) events.CommentParseResult {
 	lines := strings.Split(comment, "\n")
 	var nonEmptyLines []string
 	for _, line := range lines {
@@ -685,7 +685,9 @@ func (e *VCSEventsController) parseMultiLineComment(comment string, vcsHost mode
 		}
 	}
 	if len(nonEmptyLines) <= 1 {
-		return nil
+		// Single line (or empty): pass the raw comment to preserve existing
+		// backtick-stripping and whitespace handling in Parse.
+		return e.CommentParser.Parse(comment, vcsHost)
 	}
 
 	var commands []*events.CommentCommand
@@ -695,18 +697,21 @@ func (e *VCSEventsController) parseMultiLineComment(comment string, vcsHost mode
 			continue
 		}
 		if result.CommentResponse != "" {
-			return &events.CommentParseResult{CommentResponse: result.CommentResponse}
+			return events.CommentParseResult{CommentResponse: result.CommentResponse}
 		}
 		commands = append(commands, result.Command)
 	}
-	if len(commands) <= 1 {
-		return nil
+	if len(commands) == 0 {
+		return events.CommentParseResult{Ignore: true}
+	}
+	if len(commands) == 1 {
+		return events.CommentParseResult{Command: commands[0]}
 	}
 
 	// All commands must be the same type (e.g. all plan or all apply).
 	for _, cmd := range commands[1:] {
 		if cmd.Name != commands[0].Name {
-			return &events.CommentParseResult{
+			return events.CommentParseResult{
 				CommentResponse: fmt.Sprintf(
 					"Cannot mix different command types in a single comment. "+
 						"All commands must be the same type (e.g., all `plan` or all `apply`). "+
@@ -724,7 +729,7 @@ func (e *VCSEventsController) parseMultiLineComment(comment string, vcsHost mode
 		verbose = verbose || cmd.Verbose
 	}
 
-	return &events.CommentParseResult{
+	return events.CommentParseResult{
 		Command: &events.CommentCommand{
 			Name:        commands[0].Name,
 			Verbose:     verbose,
@@ -740,13 +745,7 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		"pull", pullNum,
 	)
 
-	// Try multi-line parsing first; falls back to single-line Parse below.
-	var parseResult events.CommentParseResult
-	if multi := e.parseMultiLineComment(comment, vcsHost); multi != nil {
-		parseResult = *multi
-	} else {
-		parseResult = e.CommentParser.Parse(comment, vcsHost)
-	}
+	parseResult := e.resolveCommentCommands(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
 		truncateLen := 40
