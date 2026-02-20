@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v71/github"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -69,6 +70,12 @@ type GithubChecksUpdater struct {
 	mu          sync.RWMutex
 	checkRunIDs map[string]int64
 }
+
+// Compile-time assertions that GithubChecksUpdater satisfies both the
+// CommitStatusUpdater (used throughout the events package) and the
+// runtime.StatusUpdater (used by plan/apply step runners) interfaces.
+var _ CommitStatusUpdater = (*GithubChecksUpdater)(nil)
+var _ runtime.StatusUpdater = (*GithubChecksUpdater)(nil)
 
 // NewGithubChecksUpdater returns a ready-to-use GithubChecksUpdater.
 func NewGithubChecksUpdater(client GithubChecksClientInterface, statusName string) *GithubChecksUpdater {

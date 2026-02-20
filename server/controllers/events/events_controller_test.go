@@ -880,11 +880,12 @@ func TestPost_GithubCheckRun_ApplyTriggered(t *testing.T) {
 	t.Log("when GithubChecksEnabled=true and action=requested_action with identifier=apply, RunCommentCommand should be called with an apply command")
 	e, v, _, _, p, cr, _, _, _ := setup(t)
 	e.GithubChecksEnabled = true
+	e.VCSStatusName = "atlantis"
 
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "check_run")
-	// Minimal valid payload: requested_action=apply, workspace::relDir encoded in external_id
-	event := `{"action":"requested_action","requested_action":{"identifier":"apply"},"check_run":{"id":1,"external_id":"staging::infra/vpc","pull_requests":[{"number":99}]},"repository":{"full_name":"myorg/myrepo","clone_url":"https://github.com/myorg/myrepo.git","name":"myrepo","owner":{"login":"myorg"}},"sender":{"login":"alice"}}`
+	// Minimal valid payload: name starts with "atlantis/", workspace::relDir encoded in external_id
+	event := `{"action":"requested_action","requested_action":{"identifier":"apply"},"check_run":{"id":1,"name":"atlantis/plan: infra/vpc","external_id":"staging::infra/vpc","pull_requests":[{"number":99}]},"repository":{"full_name":"myorg/myrepo","clone_url":"https://github.com/myorg/myrepo.git","name":"myrepo","owner":{"login":"myorg"}},"sender":{"login":"alice"}}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 
 	baseRepo := models.Repo{FullName: "myorg/myrepo"}
@@ -901,6 +902,33 @@ func TestPost_GithubCheckRun_ApplyTriggered(t *testing.T) {
 		Any[*models.PullRequest](),
 		Eq(models.User{Username: "alice"}),
 		Eq(99),
+		Any[*events.CommentCommand](),
+	)
+}
+
+func TestPost_GithubCheckRun_WrongCheckRunName_Ignored(t *testing.T) {
+	t.Log("when the check_run name does not start with the Atlantis status prefix, the event should be ignored")
+	e, v, _, _, _, cr, _, _, _ := setup(t)
+	e.GithubChecksEnabled = true
+	e.VCSStatusName = "atlantis"
+
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "check_run")
+	// Check run name belongs to another app, not Atlantis
+	event := `{"action":"requested_action","requested_action":{"identifier":"apply"},"check_run":{"id":1,"name":"other-app/plan","external_id":"default::.","pull_requests":[{"number":1}]},"repository":{"full_name":"myorg/myrepo","clone_url":"https://github.com/myorg/myrepo.git","name":"myrepo","owner":{"login":"myorg"}},"sender":{"login":"user1"}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	// Should be silently ignored (not a check run we created)
+	ResponseContains(t, w, http.StatusOK, "does not match Atlantis status prefix")
+	// RunCommentCommand must NOT have been called
+	cr.VerifyWasCalled(Never()).RunCommentCommand(
+		Any[models.Repo](),
+		Any[*models.Repo](),
+		Any[*models.PullRequest](),
+		Any[models.User](),
+		Any[int](),
 		Any[*events.CommentCommand](),
 	)
 }

@@ -108,6 +108,10 @@ type VCSEventsController struct {
 	// When true, check_run webhook events with action="requested_action" are handled
 	// to trigger apply commands when the "Apply" button in a plan check run is clicked.
 	GithubChecksEnabled bool
+	// VCSStatusName is the prefix used for check run names created by Atlantis
+	// (e.g. "atlantis"). It is used to validate that incoming check_run webhook
+	// events were created by this Atlantis instance before triggering any command.
+	VCSStatusName string
 }
 
 // Post handles POST webhook requests.
@@ -481,6 +485,18 @@ func (e *VCSEventsController) HandleGithubCheckRunEvent(logger logging.SimpleLog
 				code: http.StatusBadRequest,
 				err:  fmt.Errorf("missing check_run in event %s", githubReqID),
 			},
+		}
+	}
+
+	// Validate that this check run was created by this Atlantis instance by
+	// checking that the check run name starts with the configured status name
+	// prefix (e.g. "atlantis/"). This prevents a malicious actor from crafting
+	// a check_run event that triggers an apply on a check run not owned by us.
+	checkRunName := checkRun.GetName()
+	expectedPrefix := e.VCSStatusName + "/"
+	if e.VCSStatusName != "" && !strings.HasPrefix(checkRunName, expectedPrefix) {
+		return HTTPResponse{
+			body: fmt.Sprintf("Ignoring check_run %q: name does not match Atlantis status prefix %q %s", checkRunName, e.VCSStatusName, githubReqID),
 		}
 	}
 

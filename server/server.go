@@ -424,6 +424,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater = events.NewGithubChecksUpdater(rawGithubClient, userConfig.VCSStatusName)
 		logger.Info("using GitHub Checks API for commit status updates (experimental)")
 	} else {
+		if userConfig.GithubChecksEnabled && !githubAppEnabled {
+			logger.Warn("gh-checks-enabled is true but a GitHub App is not configured; falling back to commit status updates. Configure a GitHub App to use the Checks API.")
+		}
 		commitStatusUpdater = defaultStatusUpdater
 	}
 
@@ -1015,6 +1018,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsRequestValidator:     &events_controllers.DefaultAzureDevopsRequestValidator{},
 		GiteaWebhookSecret:              []byte(userConfig.GiteaWebhookSecret),
 		GithubChecksEnabled:             userConfig.GithubChecksEnabled,
+		VCSStatusName:                   userConfig.VCSStatusName,
 	}
 	githubAppController := &controllers.GithubAppController{
 		AtlantisURL:         parsedURL,
