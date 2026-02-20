@@ -61,12 +61,22 @@ type GithubChecksUpdater struct {
 	// StatusName is prepended to every check run name, e.g. "atlantis".
 	StatusName string
 
-	// checkRunIDs is an in-memory cache mapping
+	// checkRunIDs is a process-local cache mapping
 	// "{owner}/{repo}/{sha}/{checkRunName}" → checkRunID.
-	// It avoids an extra ListCheckRunsForRef API call on subsequent updates
-	// (pending → completed) within the same Atlantis process lifetime.
-	// A sync.RWMutex guards concurrent access since plan/apply can run in
-	// parallel goroutines.
+	//
+	// Purpose: avoids an extra ListCheckRunsForRef API call on the second
+	// update (pending → completed) that follows the initial create within the
+	// same Atlantis process lifetime, since plan/apply typically call
+	// UpdateCombined or UpdateProject twice in quick succession.
+	//
+	// Restart behaviour: the cache is intentionally in-memory only. On a
+	// server restart it is empty, so the next update for a given check run
+	// falls through to FindCheckRunID (a GitHub API lookup) which returns the
+	// existing check run ID. This means restarts do NOT create duplicate check
+	// runs; they merely pay one extra API call to re-discover the ID.
+	//
+	// A sync.RWMutex guards concurrent access since plan/apply runs can occur
+	// in parallel goroutines.
 	mu          sync.RWMutex
 	checkRunIDs map[string]int64
 }
