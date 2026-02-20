@@ -919,6 +919,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
 	}
+	if c.BlockedExtraArgs == "" {
+		c.BlockedExtraArgs = DefaultBlockedExtraArgs
+	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
 	}
