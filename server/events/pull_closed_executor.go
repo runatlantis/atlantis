@@ -104,9 +104,9 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// If any workspace is currently locked (i.e. a command is in progress),
 	// skip deleting the working directory to avoid corrupting the running
 	// operation. The stale directory will be cleaned up on the next PR close
-	// event or when the server restarts.
+	// event (including after a server restart).
 	if p.WorkingDirLocker != nil && p.WorkingDirLocker.IsLockedByPull(repo.FullName, pull.Num) {
-		logger.Warn("not deleting working directory for pull %d in %s: an operation is currently in progress", pull.Num, repo.FullName)
+		logger.Warn("not deleting working directory for pull %d in %s because an operation is currently in progress", pull.Num, repo.FullName)
 	} else if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
 		return fmt.Errorf("cleaning workspace: %w", err)
 	}
