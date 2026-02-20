@@ -532,6 +532,74 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 	}
 }
 
+func TestParse_WorkspaceTildeInvalid(t *testing.T) {
+	t.Log("if -w is used with a value starting with '~', should return an error (tilde expansion prevention)")
+	comments := []string{
+		"atlantis plan -w ~",
+		"atlantis apply -w ~",
+		"atlantis plan -w ~user",
+		"atlantis apply -w ~root",
+		"atlantis import -w ~ address id",
+		"atlantis state -w ~ rm address",
+	}
+	for _, c := range comments {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			exp := "Error: invalid workspace"
+			Assert(t, strings.Contains(r.CommentResponse, exp),
+				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		})
+	}
+}
+
+func TestParse_BlockedExtraArgs(t *testing.T) {
+	t.Log("extra args containing blocked Terraform flags should be rejected")
+	cases := []struct {
+		comment string
+		expMsg  string
+	}{
+		{
+			comment: "atlantis plan -- -chdir=../other",
+			expMsg:  `flag "-chdir=../other" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- --chdir=/tmp",
+			expMsg:  `flag "--chdir=/tmp" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- -chdir",
+			expMsg:  `flag "-chdir" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- --chdir",
+			expMsg:  `flag "--chdir" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- -plugin-dir=/tmp/evil",
+			expMsg:  `flag "-plugin-dir=/tmp/evil" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- --plugin-dir=/tmp/evil",
+			expMsg:  `flag "--plugin-dir=/tmp/evil" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis apply -- -chdir=../sensitive",
+			expMsg:  `flag "-chdir=../sensitive" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis import address id -- -chdir=..",
+			expMsg:  `flag "-chdir=.." is not allowed in extra args`,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.comment, func(t *testing.T) {
+			r := commentParser.Parse(c.comment, models.Github)
+			Assert(t, strings.Contains(r.CommentResponse, c.expMsg),
+				"For comment %q expected CommentResponse %q to contain %q", c.comment, r.CommentResponse, c.expMsg)
+		})
+	}
+}
+
 func TestParse_UsingProjectAtSameTimeAsWorkspaceOrDir(t *testing.T) {
 	cases := []string{
 		"atlantis plan -w workspace -p project",

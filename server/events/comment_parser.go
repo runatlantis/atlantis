@@ -51,6 +51,17 @@ const (
 	clearPolicyApprovalFlagShort = ""
 )
 
+// blockedExtraArgs contains Terraform CLI flag prefixes that are not allowed in
+// comment extra args (the args after "--"). These flags could be used to bypass
+// security controls (e.g. working-directory traversal or loading of malicious
+// Terraform providers) and must therefore be rejected at parse time.
+var blockedExtraArgs = []string{
+	"-chdir",
+	"--chdir",
+	"-plugin-dir",
+	"--plugin-dir",
+}
+
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
 // Atlantis commands. If the second line just has newlines then we let it pass
 // through because when you double click on a comment in GitHub and then you
@@ -315,7 +326,11 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	// Use the same validation that Terraform uses: https://git.io/vxGhU. Plus
 	// we also don't allow '..'. We don't want the workspace to contain a path
 	// since we create files based on the name.
-	if workspace != url.PathEscape(workspace) || strings.Contains(workspace, "..") {
+	// Additionally reject workspace names that start with '~': the shell
+	// expands leading tildes (tilde expansion) when the workspace name is
+	// used as a word in a "sh -c" command, which would produce unexpected and
+	// potentially unsafe behaviour.
+	if workspace != url.PathEscape(workspace) || strings.Contains(workspace, "..") || strings.HasPrefix(workspace, "~") {
 		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace: %q", workspace), cmd, flagSet)}
 	}
 
@@ -406,7 +421,27 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 	//     - from: `atlantis state rm ADDRESS1 ADDRESS2 -- -var foo=bar
 	//     - to: `terraform state rm -var foo=bar ADDRESS1 ADDRESS2` (subcommand=rm)
 	extraArgs = append(extraArgs, commandArgs...)
+
+	// Reject extra args that contain blocked Terraform CLI flags.
+	// These flags could be used to bypass security controls (e.g. directory
+	// traversal via -chdir, or loading malicious providers via -plugin-dir).
+	for _, arg := range extraArgs {
+		if isBlockedExtraArg(arg) {
+			return "", nil, e.errMarkdown(fmt.Sprintf("flag %q is not allowed in extra args", arg), name.String(), flagSet)
+		}
+	}
 	return subCommand, extraArgs, ""
+}
+
+// isBlockedExtraArg returns true if arg is a Terraform CLI flag that is not
+// permitted in comment extra args for security reasons.
+func isBlockedExtraArg(arg string) bool {
+	for _, blocked := range blockedExtraArgs {
+		if arg == blocked || strings.HasPrefix(arg, blocked+"=") {
+			return true
+		}
+	}
+	return false
 }
 
 // BuildPlanComment builds a plan comment for the specified args.
