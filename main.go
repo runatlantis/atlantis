@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	"github.com/runatlantis/atlantis/cmd"
+	"github.com/runatlantis/atlantis/plugin"
+	_ "github.com/runatlantis/atlantis/plugin/github" // register built-in GitHub plugin
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/spf13/viper"
 )
@@ -60,8 +62,10 @@ func main() {
 	}
 	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
 	testdrive := &cmd.TestdriveCmd{}
+	pluginCmd := &cmd.PluginCmd{Registry: plugin.DefaultRegistry}
 	cmd.RootCmd.AddCommand(server.Init())
 	cmd.RootCmd.AddCommand(version.Init())
 	cmd.RootCmd.AddCommand(testdrive.Init())
+	cmd.RootCmd.AddCommand(pluginCmd.Init())
 	cmd.Execute()
 }
