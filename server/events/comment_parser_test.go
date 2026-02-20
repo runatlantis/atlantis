@@ -70,7 +70,7 @@ func TestNewCommentParser(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.giteaUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands), "NewCommentParser(%v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
+			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.giteaUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands, nil), "NewCommentParser(%v, %v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.giteaUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
 		})
 	}
 }
@@ -306,6 +306,7 @@ func TestParse_InvalidCommand(t *testing.T) {
 			command.Plan,
 			command.Apply, // duplicate command is filtered
 		},
+		nil,
 	)
 	for _, c := range comments {
 		r := cp.Parse(c, models.Github)
@@ -598,6 +599,41 @@ func TestParse_BlockedExtraArgs(t *testing.T) {
 				"For comment %q expected CommentResponse %q to contain %q", c.comment, r.CommentResponse, c.expMsg)
 		})
 	}
+}
+
+func TestParse_CustomBlockedExtraArgs(t *testing.T) {
+	t.Log("a CommentParser with a custom BlockedExtraArgs list blocks exactly those flags and allows the defaults")
+
+	customParser := events.CommentParser{
+		ExecutableName:   "atlantis",
+		AllowCommands:    command.AllCommentCommands,
+		BlockedExtraArgs: []string{"-no-color", "--no-color"},
+	}
+
+	// The custom flag should be blocked.
+	t.Run("custom flag blocked", func(t *testing.T) {
+		r := customParser.Parse("atlantis plan -- -no-color", models.Github)
+		exp := `flag "-no-color" is not allowed in extra args`
+		Assert(t, strings.Contains(r.CommentResponse, exp),
+			"expected CommentResponse to contain %q, got: %q", exp, r.CommentResponse)
+	})
+
+	// The default flags (-chdir etc.) should now be allowed because the
+	// custom list replaces (rather than extends) the defaults.
+	t.Run("default flag allowed when overridden", func(t *testing.T) {
+		r := customParser.Parse("atlantis plan -- -chdir=other", models.Github)
+		Assert(t, r.CommentResponse == "",
+			"expected no CommentResponse but got: %q", r.CommentResponse)
+		Assert(t, r.Command != nil, "expected a Command to be parsed")
+	})
+
+	// Flags not in the custom list should pass through.
+	t.Run("unblocked flag allowed", func(t *testing.T) {
+		r := customParser.Parse("atlantis plan -- -var=foo=bar", models.Github)
+		Assert(t, r.CommentResponse == "",
+			"expected no CommentResponse but got: %q", r.CommentResponse)
+		Assert(t, r.Command != nil, "expected a Command to be parsed")
+	})
 }
 
 func TestParse_UsingProjectAtSameTimeAsWorkspaceOrDir(t *testing.T) {

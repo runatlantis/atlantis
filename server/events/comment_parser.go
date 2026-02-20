@@ -51,11 +51,12 @@ const (
 	clearPolicyApprovalFlagShort = ""
 )
 
-// blockedExtraArgs contains Terraform CLI flag prefixes that are not allowed in
-// comment extra args (the args after "--"). These flags could be used to bypass
-// security controls (e.g. working-directory traversal or loading of malicious
-// Terraform providers) and must therefore be rejected at parse time.
-var blockedExtraArgs = []string{
+// DefaultBlockedExtraArgs is the default set of Terraform CLI flag prefixes
+// that are rejected when supplied as comment extra args (after "--"). These
+// flags could be used to bypass security controls (e.g. working-directory
+// traversal via -chdir, or loading of malicious providers via -plugin-dir).
+// Operators may override this list via the --blocked-extra-args server flag.
+var DefaultBlockedExtraArgs = []string{
 	"-chdir",
 	"--chdir",
 	"-plugin-dir",
@@ -99,10 +100,16 @@ type CommentParser struct {
 	AzureDevopsUser string
 	ExecutableName  string
 	AllowCommands   []command.Name
+	// BlockedExtraArgs is the set of Terraform CLI flag prefixes that are
+	// rejected when supplied as comment extra args (after "--"). When nil or
+	// empty the package-level DefaultBlockedExtraArgs is used.
+	BlockedExtraArgs []string
 }
 
-// NewCommentParser returns a CommentParser
-func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name) *CommentParser {
+// NewCommentParser returns a CommentParser.
+// blockedExtraArgs overrides the default blocked flag list; pass nil to keep
+// the DefaultBlockedExtraArgs.
+func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name, blockedExtraArgs []string) *CommentParser {
 	var commentAllowCommands []command.Name
 	for _, acceptableCommand := range command.AllCommentCommands {
 		for _, allowCommand := range allowCommands {
@@ -114,13 +121,14 @@ func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDev
 	}
 
 	return &CommentParser{
-		GithubUser:      githubUser,
-		GitlabUser:      gitlabUser,
-		GiteaUser:       giteaUser,
-		BitbucketUser:   bitbucketUser,
-		AzureDevopsUser: azureDevopsUser,
-		ExecutableName:  executableName,
-		AllowCommands:   commentAllowCommands,
+		GithubUser:       githubUser,
+		GitlabUser:       gitlabUser,
+		GiteaUser:        giteaUser,
+		BitbucketUser:    bitbucketUser,
+		AzureDevopsUser:  azureDevopsUser,
+		ExecutableName:   executableName,
+		AllowCommands:    commentAllowCommands,
+		BlockedExtraArgs: blockedExtraArgs,
 	}
 }
 
@@ -426,7 +434,7 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 	// These flags could be used to bypass security controls (e.g. directory
 	// traversal via -chdir, or loading malicious providers via -plugin-dir).
 	for _, arg := range extraArgs {
-		if isBlockedExtraArg(arg) {
+		if e.isBlockedExtraArg(arg) {
 			return "", nil, e.errMarkdown(fmt.Sprintf("flag %q is not allowed in extra args", arg), name.String(), flagSet)
 		}
 	}
@@ -435,8 +443,13 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 
 // isBlockedExtraArg returns true if arg is a Terraform CLI flag that is not
 // permitted in comment extra args for security reasons.
-func isBlockedExtraArg(arg string) bool {
-	for _, blocked := range blockedExtraArgs {
+// It uses e.BlockedExtraArgs when set, otherwise DefaultBlockedExtraArgs.
+func (e *CommentParser) isBlockedExtraArg(arg string) bool {
+	list := e.BlockedExtraArgs
+	if len(list) == 0 {
+		list = DefaultBlockedExtraArgs
+	}
+	for _, blocked := range list {
 		if arg == blocked || strings.HasPrefix(arg, blocked+"=") {
 			return true
 		}
