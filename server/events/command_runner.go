@@ -567,8 +567,12 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 
 	repo := c.GlobalCfg.MatchingRepo(ctx.Pull.BaseRepo.ID())
 	if !repo.BranchMatches(ctx.Pull.BaseBranch) {
-		ctx.Log.Info("command was run on a pull request which doesn't match base branches")
-		// just ignore it to allow us to use any git workflows without malicious intentions.
+		ctx.Log.Info("Destination branch %s is not compatible with allowed branches %v. Command will be aborted.", ctx.Pull.BaseBranch, repo.BranchRegex.String())
+
+		errMsg := fmt.Sprintf("Commands are not enabled for branch `%s`. Destination branch does not match the required pattern: `%s`", ctx.Pull.BaseBranch, repo.BranchRegex.String())
+		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+			ctx.Log.Err("unable to comment: %s", err)
+		}
 		return false
 	}
 	return true
