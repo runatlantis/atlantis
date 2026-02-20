@@ -6,7 +6,6 @@
     "@types/node": "22.19.11",
     "@vueuse/core": "12.8.2",
     "markdown-it-footnote": "4.0.0",
-    "markdownlint-cli": "0.47.0",
     "mermaid": "11.12.2",
     "sitemap-ts": "1.10.1",
     "vite": "6.4.1",
@@ -16,9 +15,10 @@
   },
   "scripts": {
     "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
-    "website:lint": "markdownlint runatlantis.io",
-    "website:lint-fix": "markdownlint --fix runatlantis.io",
     "website:build": "vitepress build runatlantis.io",
     "e2e": "playwright test"
+  },
+  "comments": {
+    "markdown-linting": "Markdown linting is performed in CI using the markdownlint-cli2-action GitHub Action (see .github/workflows/website.yml). For local linting, use your editor's markdownlint extension or run the GitHub Action workflow."
   }
 }
