@@ -1,0 +1,368 @@
+{{ define "title" }}Job {{ .JobID }} - Atlantis{{ end }}
+
+{{ define "head" }}
+<link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm-5.3.0.css">
+<script src="{{ .CleanedBasePath }}/static/js/xterm-5.3.0.js"></script>
+<script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.8.0.js"></script>
+<script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-0.13.0.js"></script>
+<script src="{{ .CleanedBasePath }}/static/js/xterm-addon-search-bar.js"></script>
+<script>
+function jobTerminal() {
+  return {
+    term: null,
+    fitAddon: null,
+    searchAddon: null,
+    source: null,
+    status: 'running',
+    statusLabel: '',
+    isFullscreen: false,
+    startTime: 0,
+    endTime: 0,
+    elapsedTime: '0s',
+    elapsedInterval: null,
+    receivedComplete: false,
+    jobStep: '',
+
+    init() {
+      try {
+        // Initialize terminal (no smooth scroll to avoid animations)
+        this.term = new Terminal({
+          scrollback: 15000,
+          disableStdin: true,
+          convertEol: true,
+          theme: {
+            background: '#1e1e1e'
+          }
+        });
+
+        this.fitAddon = new FitAddon.FitAddon();
+        this.searchAddon = new SearchAddon.SearchAddon();
+
+        this.term.loadAddon(this.fitAddon);
+        this.term.loadAddon(this.searchAddon);
+
+        const terminalContainer = document.getElementById('terminal');
+
+        this.term.open(terminalContainer);
+
+        this.fitAddon.fit();
+
+        // Handle resize
+        if (window.ResizeObserver) {
+          const resizeObserver = new ResizeObserver(() => {
+            if (terminalContainer.offsetWidth > 0 && terminalContainer.offsetHeight > 0) {
+              this.fitAddon.fit();
+            }
+          });
+          resizeObserver.observe(terminalContainer.parentElement);
+        }
+        window.addEventListener('resize', () => this.fitAddon.fit());
+
+        // Handle Ctrl+F for search
+        this.term.attachCustomKeyEventHandler((event) => {
+          if (event.ctrlKey && event.key === 'f') {
+            event.preventDefault();
+            const query = prompt('Search:');
+            if (query) {
+              this.searchAddon.findNext(query);
+            }
+            return false;
+          }
+          return true;
+        });
+
+        // Start elapsed time counter - update immediately, then every second
+        this.updateElapsedTime();
+
+        // Get data from JSON script block
+        const termDataEl = document.getElementById('terminal-data');
+        const termData = termDataEl ? JSON.parse(termDataEl.textContent) : {};
+        const staticOutput = termData.output || '';
+        const streamUrl = terminalContainer.dataset.streamUrl;
+
+        // Initialize from JSON data block
+        this.statusLabel = termData.badgeText || 'Running';
+        this.jobStep = termData.jobStep || '';
+        this.startTime = termData.startTime || Date.now();
+        this.endTime = termData.endTime || 0;
+
+        // If job was interrupted (server restarted), show message
+        if (termData.status === 'interrupted') {
+          this.status = 'interrupted';
+          this.statusLabel = 'Interrupted';
+          this.term.write('\r\n\x1b[33m⚠ Server was restarted while this job was running. Output was not preserved.\x1b[0m\r\n');
+          clearInterval(this.elapsedInterval);
+        } else if (this.endTime > 0) {
+          // Job already completed
+          this.status = 'complete';
+          this.statusLabel = this.jobStep === 'apply' ? 'Applied' : 'Planned';
+          if (staticOutput) {
+            this.term.write(staticOutput.replace(/\n/g, '\r\n'));
+          }
+        } else {
+          // Live streaming
+          this.elapsedInterval = setInterval(() => this.updateElapsedTime(), 1000);
+          this.connect(streamUrl);
+        }
+      } catch (error) {
+        // Terminal initialization failed
+      }
+    },
+
+    connect(streamURL) {
+      if (!streamURL) return;
+
+      try {
+        this.source = new EventSource(streamURL);
+
+        this.source.onmessage = (event) => {
+          this.term.write(event.data + '\r\n');
+        };
+
+        this.source.addEventListener('complete', () => {
+          this.receivedComplete = true;
+          this.status = 'complete';
+          this.statusLabel = this.jobStep === 'apply' ? 'Applied' : 'Planned';
+          this.endTime = Date.now();
+          this.updateElapsedTime();
+          clearInterval(this.elapsedInterval);
+          this.source.close();
+        });
+
+        this.source.onerror = () => {
+          if (this.source.readyState === EventSource.CLOSED) {
+            if (this.receivedComplete) {
+              return;
+            }
+            this.status = 'disconnected';
+            this.statusLabel = 'Disconnected';
+            clearInterval(this.elapsedInterval);
+          }
+        };
+      } catch (error) {
+        // SSE connection failed
+      }
+    },
+
+    toggleFullscreen() {
+      this.isFullscreen = !this.isFullscreen;
+      const terminalContainer = document.getElementById('terminal');
+      const parentContainer = terminalContainer?.parentElement;
+
+      // Refit terminal after layout change
+      const fit = () => {
+        if (terminalContainer && parentContainer) {
+          // Force reflow by reading offsetHeight - this ensures CSS changes are applied
+          void parentContainer.offsetHeight;
+          void terminalContainer.offsetHeight;
+        }
+        this.fitAddon.fit();
+      };
+
+      // Use requestAnimationFrame to ensure DOM updates are complete,
+      // then fit with delays to handle CSS transition completion
+      requestAnimationFrame(() => {
+        fit();
+        // Re-initialize Lucide icons after Alpine.js DOM updates
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons();
+        }
+        // Additional fits after transitions settle
+        setTimeout(fit, 100);
+        setTimeout(fit, 300);
+      });
+    },
+
+    updateElapsedTime() {
+      // Use endTime if job completed, otherwise use current time
+      const endMs = this.endTime > 0 ? this.endTime : Date.now();
+      const seconds = Math.floor((endMs - this.startTime) / 1000);
+      if (seconds < 60) {
+        this.elapsedTime = seconds + 's';
+      } else if (seconds < 3600) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        this.elapsedTime = mins + 'm ' + secs + 's';
+      } else {
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        this.elapsedTime = hours + 'h ' + mins + 'm';
+      }
+    },
+
+    destroy() {
+      if (this.source) this.source.close();
+      if (this.elapsedInterval) clearInterval(this.elapsedInterval);
+      if (this.term) this.term.dispose();
+    }
+  };
+}
+</script>
+<style>
+  /* Terminal container - fills remaining space */
+  .job-terminal-container {
+    position: relative;
+    flex: 1;
+    min-height: 0; /* Allow flex shrinking to prevent page scroll */
+    background: #1e1e1e;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .job-terminal {
+    height: 100%;
+    padding: 0.5rem;
+  }
+
+  /* Fullscreen mode */
+  .job-terminal-container--fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    border-radius: 0;
+    min-height: auto;
+  }
+
+  /* Fullscreen button (always visible in top-right of terminal) */
+  .job-fullscreen-btn {
+    position: absolute;
+    top: 1rem;
+    right: 2.5rem;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .job-fullscreen-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+</style>
+{{ end }}
+
+{{ define "content" }}
+<div class="page-container--full-height" x-data="jobTerminal()">
+  <!-- Breadcrumb Navigation -->
+  <nav class="breadcrumb">
+    <a href="{{ .CleanedBasePath }}/jobs">Jobs</a>
+    <i data-lucide="chevron-right" class="icon-xs"></i>
+    {{ if .RepoFullName }}
+    <a href="{{ .CleanedBasePath }}/pr/{{ .RepoOwner }}/{{ .RepoName }}/pulls/{{ .PullNum }}">{{ .RepoFullName }} #{{ .PullNum }}</a>
+    <i data-lucide="chevron-right" class="icon-xs"></i>
+    {{ end }}
+    <span>{{ .JobStep }}{{ if .ProjectPath }} - {{ .ProjectPath }}{{ end }}</span>
+  </nav>
+
+  <!-- Header Card -->
+  <div class="pr-header-card">
+    <div class="pr-header-title">
+      <h1>{{ .ProjectPath }}</h1>
+      <span class="status-badge status-badge--{{ .BadgeStyle }}" :class="{ 'status-badge--pending': status === 'running', 'status-badge--success': status === 'complete', 'status-badge--failed': status === 'error' || status === 'interrupted' }">
+        <template x-if="status === 'running'">
+          <span class="running-indicator"></span>
+        </template>
+        <template x-if="status === 'complete'">
+          <i data-lucide="check-circle" class="icon-xs"></i>
+        </template>
+        <template x-if="status === 'error'">
+          <i data-lucide="x-circle" class="icon-xs"></i>
+        </template>
+        <template x-if="status === 'interrupted'">
+          <i data-lucide="alert-triangle" class="icon-xs"></i>
+        </template>
+        <template x-if="status === 'disconnected'">
+          <i data-lucide="wifi-off" class="icon-xs"></i>
+        </template>
+        <span x-text="statusLabel">{{ .BadgeText }}</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Stats Card -->
+  <div class="run-info-card">
+    <div class="run-stats-row">
+      <!-- Always visible stats -->
+      <div class="run-stat">
+        <span class="run-stat-label">Workspace</span>
+        <span class="run-stat-value"><span class="badge">{{ .Workspace }}</span></span>
+      </div>
+      <div class="run-stat">
+        <span class="run-stat-label">Command</span>
+        <span class="run-stat-value">{{ .JobStep }}</span>
+      </div>
+      <div class="run-stat">
+        <span class="run-stat-label">Triggered By</span>
+        <span class="run-stat-value">{{ if .TriggeredBy }}{{ .TriggeredBy }}{{ else }}-{{ end }}</span>
+      </div>
+      <div class="run-stat">
+        <span class="run-stat-label">Duration</span>
+        <span class="run-stat-value" x-text="elapsedTime">-</span>
+      </div>
+
+      <!-- Progressive disclosure: show after completion -->
+      <template x-if="status === 'complete'">
+        <div class="run-stat">
+          <span class="run-stat-label">Changes</span>
+          <span class="run-stat-value resource-changes">
+            {{ if gt .AddCount 0 }}<span class="text-success">+{{ .AddCount }}</span>{{ end }}
+            {{ if gt .ChangeCount 0 }}<span class="text-warning">~{{ .ChangeCount }}</span>{{ end }}
+            {{ if gt .DestroyCount 0 }}<span class="text-danger">-{{ .DestroyCount }}</span>{{ end }}
+            {{ if and (eq .AddCount 0) (eq .ChangeCount 0) (eq .DestroyCount 0) }}<span class="text-muted">No changes</span>{{ end }}
+          </span>
+        </div>
+      </template>
+      <template x-if="status === 'complete'">
+        <div class="run-stat">
+          <span class="run-stat-label">Policy</span>
+          <span class="run-stat-value">
+            {{ if .HasPolicyCheck }}
+              {{ if .PolicyPassed }}
+              <i data-lucide="shield-check" class="icon-sm text-success" title="Policy passed"></i>
+              {{ else }}
+              <i data-lucide="shield-x" class="icon-sm text-danger" title="Policy failed"></i>
+              {{ end }}
+            {{ else }}
+              <i data-lucide="shield" class="icon-sm text-muted" title="No policy check"></i>
+            {{ end }}
+          </span>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Terminal -->
+  <div class="job-terminal-container" :class="{ 'job-terminal-container--fullscreen': isFullscreen }" @keydown.escape.window="isFullscreen = false">
+    <!-- Fullscreen toggle button (always visible in top-right) -->
+    <button class="job-fullscreen-btn" @click="toggleFullscreen">
+      <template x-if="!isFullscreen">
+        <span style="display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="maximize-2" class="icon-sm"></i>
+          <span>Fullscreen</span>
+        </span>
+      </template>
+      <template x-if="isFullscreen">
+        <span style="display: flex; align-items: center; gap: 0.5rem;">
+          <i data-lucide="minimize-2" class="icon-sm"></i>
+          <span>Exit Fullscreen (ESC)</span>
+        </span>
+      </template>
+    </button>
+    <div id="terminal" class="job-terminal" data-stream-url="{{ .StreamURL }}"></div>
+    <div id="terminal-data" hidden>{{ .TerminalScriptData }}</div>
+  </div>
+</div>
+{{ end }}
+
+{{ template "layout" . }}

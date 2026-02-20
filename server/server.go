@@ -31,7 +31,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -56,7 +55,6 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
-	"github.com/runatlantis/atlantis/server/controllers/websocket"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
@@ -116,10 +114,12 @@ type Server struct {
 	StatusController               *controllers.StatusController
 	JobsController                 *controllers.JobsController
 	APIController                  *controllers.APIController
-	IndexTemplate                  web_templates.TemplateWriter
-	LockDetailTemplate             web_templates.TemplateWriter
-	ProjectJobsTemplate            web_templates.TemplateWriter
-	ProjectJobsErrorTemplate       web_templates.TemplateWriter
+	PRController                   *controllers.PRController
+	PRDetailController             *controllers.PRDetailController
+	ProjectOutputController        *controllers.ProjectOutputController
+	SettingsController             *controllers.SettingsController
+	LocksPageController            *controllers.LocksPageController
+	JobsPageController             *controllers.JobsPageController
 	SSLCertFile                    string
 	SSLKeyFile                     string
 	CertLastRefreshTime            time.Time
@@ -171,6 +171,9 @@ type WebhookConfig struct {
 
 //go:embed static
 var staticAssets embed.FS
+
+// devRouteRegistrars holds route registration functions added by dev-tagged builds.
+var devRouteRegistrars []func(s *Server)
 
 // NewServer returns a new server. If there are issues starting the server or
 // its dependencies an error will be returned. This is like the main() function
@@ -762,11 +765,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectOutputWrapper,
 	)
 
+	// Wrap the instrumented runner with output persistence to save command results to the database
+	outputPersister := events.NewOutputPersister(database, projectCmdOutputHandler)
+	persistingProjectCmdRunner := events.NewOutputPersistingProjectCommandRunner(
+		instrumentedProjectCmdRunner,
+		outputPersister,
+	)
+
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
 		dbUpdater,
 		pullUpdater,
 		commitStatusUpdater,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceVCSStatusNoProjects,
 		userConfig.QuietPolicyChecks,
@@ -781,7 +791,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		workingDir,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
@@ -802,7 +812,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		applyLockingClient,
 		commitStatusUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 		cancellationTracker,
 		autoMerger,
 		pullUpdater,
@@ -817,7 +827,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 		pullUpdater,
 		dbUpdater,
 		userConfig.SilenceNoProjects,
@@ -835,7 +845,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	versionCommandRunner := events.NewVersionCommandRunner(
 		pullUpdater,
 		projectCommandBuilder,
-		projectOutputWrapper,
+		persistingProjectCmdRunner,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 	)
@@ -844,14 +854,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullUpdater,
 		pullReqStatusFetcher,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 		userConfig.SilenceNoProjects,
 	)
 
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
 		projectCommandBuilder,
-		instrumentedProjectCmdRunner,
+		persistingProjectCmdRunner,
 	)
 
 	cancelCommandRunner := events.NewCancelCommandRunner(
@@ -929,36 +939,40 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 	locksController := &controllers.LocksController{
-		AtlantisVersion:    config.AtlantisVersion,
-		AtlantisURL:        parsedURL,
-		Locker:             lockingClient,
-		ApplyLocker:        applyLockingClient,
-		Logger:             logger,
-		VCSClient:          vcsClient,
-		LockDetailTemplate: web_templates.LockTemplate,
-		WorkingDir:         workingDir,
-		WorkingDirLocker:   workingDirLocker,
-		Database:           database,
-		DeleteLockCommand:  deleteLockCommand,
+		AtlantisVersion:   config.AtlantisVersion,
+		AtlantisURL:       parsedURL,
+		Locker:            lockingClient,
+		ApplyLocker:       applyLockingClient,
+		Logger:            logger,
+		VCSClient:         vcsClient,
+		WorkingDir:        workingDir,
+		WorkingDirLocker:  workingDirLocker,
+		Database:          database,
+		DeleteLockCommand: deleteLockCommand,
 	}
 
-	wsMux := websocket.NewMultiplexor(
-		logger,
-		controllers.JobIDKeyGenerator{},
-		projectCmdOutputHandler,
-		userConfig.WebsocketCheckOrigin,
-	)
+	// Shared closure for checking apply lock state (used by page controllers)
+	isApplyLocked := func() bool {
+		lock, err := applyLockingClient.CheckApplyLock()
+		if err != nil {
+			logger.Err("checking apply lock: %s", err)
+			return true // Fail closed: assume locked on error
+		}
+		return lock.Locked
+	}
 
 	jobsController := &controllers.JobsController{
 		AtlantisVersion:          config.AtlantisVersion,
 		AtlantisURL:              parsedURL,
 		Logger:                   logger,
-		ProjectJobsTemplate:      web_templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate: web_templates.ProjectJobsErrorTemplate,
+		ProjectJobsTemplate:      web_templates.GetTemplate(web_templates.TemplateName_JobDetail),
+		ProjectJobsErrorTemplate: web_templates.GetTemplate(web_templates.TemplateName_ProjectJobsError),
 		Database:                 database,
-		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
+		OutputHandler:            projectCmdOutputHandler,
+		ApplyLockChecker:         isApplyLocked,
+		SSEMaxConnections:        int32(min(userConfig.SSEMaxConnections, int(^int32(0)))), //nolint:gosec // clamped to max int32
 	}
 
 	apiController := &controllers.APIController{
@@ -1013,6 +1027,74 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubOrg:           userConfig.GithubOrg,
 	}
 
+	prController := controllers.NewPRController(
+		database,
+		web_templates.GetTemplate(web_templates.TemplateName_PRList),
+		web_templates.GetTemplate(web_templates.TemplateName_PRListRows),
+		config.AtlantisVersion,
+		parsedURL.Path,
+		isApplyLocked,
+		func() map[string]int {
+			mapping := projectCmdOutputHandler.GetPullToJobMapping()
+			result := make(map[string]int, len(mapping))
+			for _, pullInfo := range mapping {
+				key := fmt.Sprintf("%s/%d", pullInfo.Pull.RepoFullName, pullInfo.Pull.PullNum)
+				result[key] = len(pullInfo.JobIDInfos)
+			}
+			return result
+		},
+		logger,
+	)
+
+	prDetailController := controllers.NewPRDetailController(
+		database,
+		web_templates.GetTemplate(web_templates.TemplateName_PRDetail),
+		web_templates.GetTemplate(web_templates.TemplateName_PRDetailProjects),
+		config.AtlantisVersion,
+		parsedURL.Path,
+		isApplyLocked,
+		logger,
+	)
+
+	projectOutputController := controllers.NewProjectOutputController(
+		database,
+		web_templates.GetTemplate(web_templates.TemplateName_ProjectOutput),
+		web_templates.GetTemplate(web_templates.TemplateName_ProjectOutputPartial),
+		config.AtlantisVersion,
+		parsedURL.Path,
+		isApplyLocked,
+		projectCmdOutputHandler,
+		logger,
+	)
+
+	settingsController := controllers.NewSettingsController(
+		web_templates.GetTemplate(web_templates.TemplateName_Settings),
+		!userConfig.DisableGlobalApplyLock,
+		isApplyLocked,
+		config.AtlantisVersion,
+		parsedURL.Path,
+		logger,
+	)
+
+	locksPageController := controllers.NewLocksPageController(
+		web_templates.GetTemplate(web_templates.TemplateName_LocksPage),
+		func() (map[string]models.ProjectLock, error) { return lockingClient.List() },
+		isApplyLocked,
+		config.AtlantisVersion,
+		parsedURL.Path,
+		logger,
+	)
+
+	jobsPageController := controllers.NewJobsPageController(
+		web_templates.GetTemplate(web_templates.TemplateName_JobsPage),
+		web_templates.GetTemplate(web_templates.TemplateName_JobsPartial),
+		func() []jobs.PullInfoWithJobIDs { return projectCmdOutputHandler.GetPullToJobMapping() },
+		isApplyLocked,
+		config.AtlantisVersion,
+		parsedURL.Path,
+		logger,
+	)
+
 	server := &Server{
 		AtlantisVersion:                config.AtlantisVersion,
 		AtlantisURL:                    parsedURL,
@@ -1033,10 +1115,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		JobsController:                 jobsController,
 		StatusController:               statusController,
 		APIController:                  apiController,
-		IndexTemplate:                  web_templates.IndexTemplate,
-		LockDetailTemplate:             web_templates.LockTemplate,
-		ProjectJobsTemplate:            web_templates.ProjectJobsTemplate,
-		ProjectJobsErrorTemplate:       web_templates.ProjectJobsErrorTemplate,
+		PRController:                   prController,
+		PRDetailController:             prDetailController,
+		ProjectOutputController:        projectOutputController,
+		SettingsController:             settingsController,
+		LocksPageController:            locksPageController,
+		JobsPageController:             jobsPageController,
 		SSLKeyFile:                     userConfig.SSLKeyFile,
 		SSLCertFile:                    userConfig.SSLCertFile,
 		DisableGlobalApplyLock:         userConfig.DisableGlobalApplyLock,
@@ -1050,6 +1134,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		database:                       database,
 	}
 
+	// Mark any outputs that were left in "running" status from a previous run
+	// as interrupted. This must happen before the server starts accepting requests.
+	if server.database != nil {
+		if err := server.database.MarkInterruptedOutputs(); err != nil {
+			logger.Warn("failed to mark interrupted outputs: %v", err)
+		}
+	}
+
 	validate := validator.New(validator.WithRequiredStructEnabled())
 
 	err = validate.Struct(server)
@@ -1060,33 +1152,89 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 }
 
+// securityHeadersMiddleware returns negroni middleware that sets security
+// headers on all responses to prevent clickjacking, MIME sniffing, and
+// provide defense-in-depth against XSS.
+func securityHeadersMiddleware() negroni.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		next(w, r)
+	}
+}
+
+// requireCSRFHeader returns middleware that checks for X-Atlantis-CSRF header
+// on state-changing requests. This prevents cross-site request forgery by
+// requiring a custom header that cannot be set by cross-origin form submissions.
+func requireCSRFHeader(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Atlantis-CSRF") == "" {
+			http.Error(w, "CSRF header required", http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	}
+}
+
 // Start creates the routes and starts serving traffic.
 func (s *Server) Start() error {
-	s.Router.HandleFunc("/", s.Index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
+	// Redirect index to /prs since PRs is now the primary view
+	s.Router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, s.AtlantisURL.Path+"/prs", http.StatusFound)
+	}).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
-	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
+	// Serve static files - from disk in dev mode, embedded otherwise
+	if web_templates.IsDevMode() && web_templates.StaticDirExists() {
+		staticDir := web_templates.GetStaticDir()
+		s.Logger.Info("Dev mode: serving static files from %s", staticDir)
+		s.Router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
+	} else {
+		s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
+	}
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
 	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
+
+	// Page routes
+	s.Router.HandleFunc("/prs", s.PRController.PRList).Methods("GET")
+	s.Router.HandleFunc("/prs/partial", s.PRController.PRListPartial).Methods("GET")
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}", s.PRDetailController.PRDetail).Methods("GET")
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/projects", s.PRDetailController.PRDetailProjects).Methods("GET")
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/project/{path:.+}/output", s.ProjectOutputController.ProjectOutputPartial).Methods("GET")
+	s.Router.HandleFunc("/pr/{owner}/{repo}/pulls/{pull_num}/project/{path:.+}", s.ProjectOutputController.ProjectOutput).Methods("GET")
+	s.Router.HandleFunc("/settings", s.SettingsController.Get).Methods("GET")
+	s.Router.HandleFunc("/locks", s.LocksPageController.Get).Methods("GET")
+	s.Router.HandleFunc("/jobs", s.JobsPageController.Get).Methods("GET")
+	s.Router.HandleFunc("/jobs/partial", s.JobsPageController.GetPartial).Methods("GET")
+
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
-	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
-	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
+	s.Router.HandleFunc("/locks", requireCSRFHeader(s.LocksController.DeleteLock)).Methods("DELETE").Queries("id", "{id:.*}")
+	// Redirect old /lock detail page to /locks (the detail page is no longer needed)
+	s.Router.HandleFunc("/lock", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, s.AtlantisURL.Path+"/locks", http.StatusMovedPermanently)
+	}).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
+	// Dev-only routes registered via init() in build-tagged files
+	for _, register := range devRouteRegistrars {
+		register(s)
+	}
+
 	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
-	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
+	s.Router.HandleFunc("/jobs/{job-id}/stream", s.JobsController.GetProjectJobsSSE).Methods("GET")
 
 	r, ok := s.StatsReporter.(prometheus.Reporter)
 	if ok {
 		s.Router.Handle(s.CommandRunner.GlobalCfg.Metrics.Prometheus.Endpoint, r.HTTPHandler())
 	}
 	if !s.DisableGlobalApplyLock {
-		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
-		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
+		s.Router.HandleFunc("/apply/lock", requireCSRFHeader(s.LocksController.LockApply)).Methods("POST").Queries()
+		s.Router.HandleFunc("/apply/unlock", requireCSRFHeader(s.LocksController.UnlockApply)).Methods("DELETE").Queries()
 	}
 
 	if s.EnableProfilingAPI {
@@ -1107,6 +1255,7 @@ func (s *Server) Start() error {
 		StackAll:   false,
 		StackSize:  1024 * 8,
 	}, NewRequestLogger(s))
+	n.Use(securityHeadersMiddleware())
 	n.UseHandler(s.Router)
 
 	defer s.Logger.Flush()
@@ -1196,95 +1345,6 @@ func (s *Server) closeDatabase(timeout time.Duration) error {
 	case <-time.After(timeout):
 		return fmt.Errorf("database close timed out after %s", timeout)
 	}
-}
-
-// Index is the / route.
-func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
-	locks, err := s.Locker.List()
-	if err != nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Could not retrieve locks: %s", err)
-		return
-	}
-
-	var lockResults []web_templates.LockIndexData
-	for id, v := range locks {
-		lockURL, _ := s.Router.Get(LockViewRouteName).URL("id", url.QueryEscape(id))
-		lockResults = append(lockResults, web_templates.LockIndexData{
-			// NOTE: must use .String() instead of .Path because we need the
-			// query params as part of the lock URL.
-			LockPath:      lockURL.String(),
-			RepoFullName:  v.Project.RepoFullName,
-			LockedBy:      v.Pull.Author,
-			PullNum:       v.Pull.Num,
-			Path:          v.Project.Path,
-			Workspace:     v.Workspace,
-			Time:          v.Time,
-			TimeFormatted: v.Time.Format("2006-01-02 15:04:05"),
-		})
-	}
-
-	applyCmdLock, err := s.ApplyLocker.CheckApplyLock()
-	s.Logger.Debug("Apply Lock: %v", applyCmdLock)
-	if err != nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Could not retrieve global apply lock: %s", err)
-		return
-	}
-
-	applyLockData := web_templates.ApplyLockData{
-		Time:                   applyCmdLock.Time,
-		Locked:                 applyCmdLock.Locked,
-		GlobalApplyLockEnabled: applyCmdLock.GlobalApplyLockEnabled,
-		TimeFormatted:          applyCmdLock.Time.Format("2006-01-02 15:04:05"),
-	}
-	//Sort by date - newest to oldest.
-	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
-
-	err = s.IndexTemplate.Execute(w, web_templates.IndexData{
-		Locks:            lockResults,
-		PullToJobMapping: preparePullToJobMappings(s),
-		ApplyLock:        applyLockData,
-		AtlantisVersion:  s.AtlantisVersion,
-		CleanedBasePath:  s.AtlantisURL.Path,
-	})
-	if err != nil {
-		s.Logger.Err(err.Error())
-	}
-}
-
-func preparePullToJobMappings(s *Server) []jobs.PullInfoWithJobIDs {
-
-	pullToJobMappings := s.ProjectCmdOutputHandler.GetPullToJobMapping()
-
-	for i := range pullToJobMappings {
-		for j := range pullToJobMappings[i].JobIDInfos {
-			jobUrl, _ := s.Router.Get(ProjectJobsViewRouteName).URL("job-id", pullToJobMappings[i].JobIDInfos[j].JobID)
-			pullToJobMappings[i].JobIDInfos[j].JobIDUrl = jobUrl.String()
-			pullToJobMappings[i].JobIDInfos[j].TimeFormatted = pullToJobMappings[i].JobIDInfos[j].Time.Format("2006-01-02 15:04:05")
-		}
-
-		//Sort by date - newest to oldest.
-		sort.SliceStable(pullToJobMappings[i].JobIDInfos, func(x, y int) bool {
-			return pullToJobMappings[i].JobIDInfos[x].Time.After(pullToJobMappings[i].JobIDInfos[y].Time)
-		})
-	}
-
-	//Sort by repository, project, path, workspace then date.
-	sort.SliceStable(pullToJobMappings, func(x, y int) bool {
-		if pullToJobMappings[x].Pull.RepoFullName != pullToJobMappings[y].Pull.RepoFullName {
-			return pullToJobMappings[x].Pull.RepoFullName < pullToJobMappings[y].Pull.RepoFullName
-		}
-		if pullToJobMappings[x].Pull.ProjectName != pullToJobMappings[y].Pull.ProjectName {
-			return pullToJobMappings[x].Pull.ProjectName < pullToJobMappings[y].Pull.ProjectName
-		}
-		if pullToJobMappings[x].Pull.Path != pullToJobMappings[y].Pull.Path {
-			return pullToJobMappings[x].Pull.Path < pullToJobMappings[y].Pull.Path
-		}
-		return pullToJobMappings[x].Pull.Workspace < pullToJobMappings[y].Pull.Workspace
-	})
-
-	return pullToJobMappings
 }
 
 func mkSubDir(parentDir string, subDir string) (string, error) {

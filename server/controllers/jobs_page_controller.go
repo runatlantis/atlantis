@@ -1,0 +1,129 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package controllers
+
+import (
+	"fmt"
+	"net/http"
+	"sort"
+
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
+	"github.com/runatlantis/atlantis/server/jobs"
+	"github.com/runatlantis/atlantis/server/logging"
+)
+
+// JobsPageController handles the jobs page
+type JobsPageController struct {
+	template        web_templates.TemplateWriter
+	partialTemplate web_templates.TemplateWriter
+	getJobs         func() []jobs.PullInfoWithJobIDs
+	isApplyLocked   func() bool
+	atlantisVersion string
+	cleanedBasePath string
+	logger          logging.SimpleLogging
+}
+
+// NewJobsPageController creates a new JobsPageController
+func NewJobsPageController(
+	template web_templates.TemplateWriter,
+	partialTemplate web_templates.TemplateWriter,
+	getJobs func() []jobs.PullInfoWithJobIDs,
+	isApplyLocked func() bool,
+	atlantisVersion string,
+	cleanedBasePath string,
+	logger logging.SimpleLogging,
+) *JobsPageController {
+	return &JobsPageController{
+		template:        template,
+		partialTemplate: partialTemplate,
+		getJobs:         getJobs,
+		isApplyLocked:   isApplyLocked,
+		atlantisVersion: atlantisVersion,
+		cleanedBasePath: cleanedBasePath,
+		logger:          logger,
+	}
+}
+
+// buildJobsPageData builds the page data from current jobs
+func (c *JobsPageController) buildJobsPageData(r *http.Request) web_templates.JobsPageData {
+	jobsList := c.getJobs()
+
+	// Apply PR filter if specified
+	prFilter := r.URL.Query().Get("pr")
+	if prFilter != "" {
+		var filteredJobs []jobs.PullInfoWithJobIDs
+		for _, pull := range jobsList {
+			pullKey := fmt.Sprintf("%s/%d", pull.Pull.RepoFullName, pull.Pull.PullNum)
+			if pullKey == prFilter || pull.Pull.RepoFullName == prFilter {
+				filteredJobs = append(filteredJobs, pull)
+			}
+		}
+		jobsList = filteredJobs
+	}
+
+	// Count total jobs and extract unique repositories
+	totalJobs := 0
+	repoSet := make(map[string]struct{})
+	for _, pull := range jobsList {
+		totalJobs += len(pull.JobIDInfos)
+		if pull.Pull.RepoFullName != "" {
+			repoSet[pull.Pull.RepoFullName] = struct{}{}
+		}
+	}
+
+	// Sort repositories alphabetically
+	repositories := make([]string, 0, len(repoSet))
+	for repo := range repoSet {
+		repositories = append(repositories, repo)
+	}
+	sort.Strings(repositories)
+
+	// Build JSON data for Alpine.js
+	var jsonItems []map[string]any
+	for _, pull := range jobsList {
+		for _, job := range pull.JobIDInfos {
+			jsonItems = append(jsonItems, map[string]any{
+				"jobId":            job.JobID,
+				"jobUrl":           fmt.Sprintf("%s%s", c.cleanedBasePath, job.JobIDUrl),
+				"repo":             pull.Pull.RepoFullName,
+				"pullNum":          pull.Pull.PullNum,
+				"groupKey":         fmt.Sprintf("%s|%d", pull.Pull.RepoFullName, pull.Pull.PullNum),
+				"groupDisplayName": fmt.Sprintf("%s #%d", pull.Pull.RepoFullName, pull.Pull.PullNum),
+				"path":             pull.Pull.Path,
+				"workspace":        pull.Pull.Workspace,
+				"step":             job.JobStep,
+				"triggeredBy":      job.TriggeredBy,
+				"startedAtUnix":    job.Time.Unix(),
+			})
+		}
+	}
+	if jsonItems == nil {
+		jsonItems = []map[string]any{}
+	}
+
+	return web_templates.JobsPageData{
+		LayoutData: web_templates.LayoutData{
+			AtlantisVersion: c.atlantisVersion,
+			CleanedBasePath: c.cleanedBasePath,
+			ActiveNav:       "jobs",
+			ApplyLockActive: c.isApplyLocked(),
+		},
+		Jobs:         jobsList,
+		TotalCount:   totalJobs,
+		Repositories: repositories,
+		ScriptData:   web_templates.MustEncodeScriptData(jsonItems),
+	}
+}
+
+// Get renders the jobs page
+func (c *JobsPageController) Get(w http.ResponseWriter, r *http.Request) {
+	data := c.buildJobsPageData(r)
+	renderTemplate(w, c.template, data, c.logger)
+}
+
+// GetPartial renders just the jobs list partial for HTMX refresh
+func (c *JobsPageController) GetPartial(w http.ResponseWriter, r *http.Request) {
+	data := c.buildJobsPageData(r)
+	renderTemplate(w, c.partialTemplate, data, c.logger)
+}

@@ -41,5 +41,15 @@ type Database interface {
 	UnlockCommand(cmdName command.Name) error
 	CheckCommandLock(cmdName command.Name) (*command.Lock, error)
 
+	// Project Output
+	MarkInterruptedOutputs() error
+	SaveProjectOutput(output models.ProjectOutput) error
+	GetProjectOutputRun(repoFullName string, pullNum int, path string, workspace string, projectName string, command string, runTimestamp int64) (*models.ProjectOutput, error)
+	GetProjectOutputHistory(repoFullName string, pullNum int, path string, workspace string, projectName string) ([]models.ProjectOutput, error)
+	GetProjectOutputsByPull(repoFullName string, pullNum int) ([]models.ProjectOutput, error)
+	GetProjectOutputByJobID(jobID string) (*models.ProjectOutput, error)
+	DeleteProjectOutputsByPull(repoFullName string, pullNum int) error
+	GetActivePullRequests() ([]models.PullRequest, error)
+
 	Close() error
 }
