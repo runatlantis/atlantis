@@ -26,11 +26,11 @@ func NewMockSender(options ...pegomock.Option) *MockSender {
 func (mock *MockSender) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockSender) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockSender) Send(log logging.SimpleLogging, applyResult webhooks.ApplyResult) error {
+func (mock *MockSender) Send(log logging.SimpleLogging, eventResult webhooks.EventResult) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSender().")
 	}
-	_params := []pegomock.Param{log, applyResult}
+	_params := []pegomock.Param{log, eventResult}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("Send", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 error
 	if len(_result) != 0 {
@@ -78,8 +78,8 @@ type VerifierMockSender struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockSender) Send(log logging.SimpleLogging, applyResult webhooks.ApplyResult) *MockSender_Send_OngoingVerification {
-	_params := []pegomock.Param{log, applyResult}
+func (verifier *VerifierMockSender) Send(log logging.SimpleLogging, eventResult webhooks.EventResult) *MockSender_Send_OngoingVerification {
+	_params := []pegomock.Param{log, eventResult}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Send", _params, verifier.timeout)
 	return &MockSender_Send_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -89,12 +89,12 @@ type MockSender_Send_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockSender_Send_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, webhooks.ApplyResult) {
-	log, applyResult := c.GetAllCapturedArguments()
-	return log[len(log)-1], applyResult[len(applyResult)-1]
+func (c *MockSender_Send_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, webhooks.EventResult) {
+	log, eventResult := c.GetAllCapturedArguments()
+	return log[len(log)-1], eventResult[len(eventResult)-1]
 }
 
-func (c *MockSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []webhooks.ApplyResult) {
+func (c *MockSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []webhooks.EventResult) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -104,9 +104,9 @@ func (c *MockSender_Send_OngoingVerification) GetAllCapturedArguments() (_param0
 			}
 		}
 		if len(_params) > 1 {
-			_param1 = make([]webhooks.ApplyResult, len(c.methodInvocations))
+			_param1 = make([]webhooks.EventResult, len(c.methodInvocations))
 			for u, param := range _params[1] {
-				_param1[u] = param.(webhooks.ApplyResult)
+				_param1[u] = param.(webhooks.EventResult)
 			}
 		}
 	}

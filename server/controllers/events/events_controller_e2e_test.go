@@ -1698,7 +1698,7 @@ func (m *mockLockURLGenerator) GenerateLockURL(_ string) string {
 
 type mockWebhookSender struct{}
 
-func (w *mockWebhookSender) Send(_ logging.SimpleLogging, _ webhooks.ApplyResult) error {
+func (w *mockWebhookSender) Send(_ logging.SimpleLogging, _ webhooks.EventResult) error {
 	return nil
 }
 

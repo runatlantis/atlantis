@@ -1,12 +1,8 @@
 # Sending notifications via webhooks
 
-It is possible to send notifications to external systems whenever an apply is being done.
+It is possible to send notifications to external systems whenever a plan or apply is being done.
 
 You can make requests to any HTTP endpoint or send messages directly to your Slack channel.
-
-::: tip NOTE
-Currently only `apply` events are supported.
-:::
 
 ## Configuration
 
@@ -17,6 +13,15 @@ workspaces/branches. Here is example configuration to send Slack messages for ev
 ```yaml
 webhooks:
 - event: apply
+  kind: slack
+  channel: my-channel-id
+```
+
+To send notifications for plan events:
+
+```yaml
+webhooks:
+- event: plan
   kind: slack
   channel: my-channel-id
 ```
@@ -55,19 +60,29 @@ webhooks:
   url: https://example.com/hooks
 ```
 
-The `apply` event information will be POSTed to `https://example.com/hooks`.
+For plan events:
+
+```yaml
+webhooks:
+- event: plan
+  kind: http
+  url: https://example.com/hooks
+```
+
+The event information will be POSTed to `https://example.com/hooks`.
 
 You can supply any additional headers with `--webhook-http-headers` parameter (or environment variable),
 for example for authentication purposes. See [webhook-http-headers](server-configuration.md#webhook-http-headers) for details.
 
 ### JSON payload
 
-The payload is a JSON-marshalled [ApplyResult](https://pkg.go.dev/github.com/runatlantis/atlantis/server/events/webhooks#ApplyResult) struct.
+The payload is a JSON-marshalled [EventResult](https://pkg.go.dev/github.com/runatlantis/atlantis/server/events/webhooks#EventResult) struct. The `Event` field indicates the event type (`apply` or `plan`).
 
 Example payload:
 
 ```json
 {
+  "Event": "apply",
   "Workspace": "default",
   "Repo": {
     "FullName": "octocat/Hello-World",
@@ -109,6 +124,8 @@ Example payload:
   "ProjectName": "example-project"
 }
 ```
+
+For `plan` events, the `Event` field will be `"plan"` instead of `"apply"`.
 
 ## Using Slack hooks
 
