@@ -6,6 +6,7 @@ package websocket
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -34,17 +35,28 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 		return fmt.Errorf("upgrading websocket connection: %w", err)
 	}
 
-	// block on reading our input channel
+	// Use defer to ensure Close Frame is always sent (RFC 6455 compliance)
+	defer func() {
+		closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+		deadline := time.Now().Add(time.Second)
+		if err := conn.WriteControl(websocket.CloseMessage, closeMsg, deadline); err != nil {
+			w.log.Warn("Failed to send ws close frame: %s", err)
+		}
+		if err := conn.Close(); err != nil {
+			w.log.Warn("Failed to close ws connection: %s", err)
+		}
+	}()
+
+	// Block on reading our input channel.
+	// Add small delay between messages to work around GCP HTTP(S) LB
+	// buffering issues with rapid WebSocket frames.
 	for msg := range input {
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte("\r"+msg+"\n")); err != nil {
 			w.log.Warn("Failed to write ws message: %s", err)
 			return err
 		}
+		time.Sleep(time.Millisecond)
 	}
 
-	// close ws conn after input channel is closed
-	if err = conn.Close(); err != nil {
-		w.log.Warn("Failed to close ws connection: %s", err)
-	}
 	return nil
 }
