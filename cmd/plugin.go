@@ -55,21 +55,40 @@ func (p *PluginCmd) listCmd() *cobra.Command {
 }
 
 // addCmd returns the "atlantis plugin add <name>" subcommand.
+// If the plugin is installed it shows its configuration requirements along with
+// its source URL. If the plugin is not installed but is a known plugin in the
+// built-in catalog, it shows download instructions. Unknown plugin names produce
+// an error.
 func (p *PluginCmd) addCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "add <name>",
-		Short: "Show configuration instructions for a VCS provider plugin",
+		Short: "Show configuration for an installed plugin or download instructions for a known one",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
+			out := cmd.OutOrStdout()
+
 			pl, ok := p.Registry.Get(name)
 			if !ok {
-				return fmt.Errorf("plugin %q is not registered; run \"atlantis plugin list\" to see available plugins", name)
+				// Not installed locally; check the built-in catalog.
+				sourceURL, known := plugin.LookupSource(name)
+				if !known {
+					return fmt.Errorf("plugin %q is not registered and is not a known plugin; run \"atlantis plugin list\" to see installed plugins", name)
+				}
+				fmt.Fprintf(out, "Plugin %q is not installed locally.\n\n", name)
+				fmt.Fprintf(out, "Source:  %s\n", sourceURL)
+				fmt.Fprintf(out, "To install, download the binary for your platform from:\n")
+				fmt.Fprintf(out, "  %s/releases\n\n", sourceURL)
+				fmt.Fprintln(out, "After installing, restart Atlantis for the plugin to take effect.")
+				return nil
 			}
 
-			out := cmd.OutOrStdout()
 			fmt.Fprintf(out, "Plugin %q (v%s)\n", pl.Name(), pl.Version())
-			fmt.Fprintf(out, "%s\n\n", pl.Description())
+			fmt.Fprintf(out, "%s\n", pl.Description())
+			if url := pl.SourceURL(); url != "" {
+				fmt.Fprintf(out, "Source:  %s\n", url)
+			}
+			fmt.Fprintln(out)
 
 			var required, optional []plugin.ConfigKey
 			for _, k := range pl.ConfigKeys() {

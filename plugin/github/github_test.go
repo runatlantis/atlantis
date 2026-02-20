@@ -4,6 +4,7 @@
 package github_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/plugin"
@@ -59,4 +60,12 @@ func TestGitHubPlugin_RegistersInDefaultRegistry(t *testing.T) {
 	p, ok := plugin.DefaultRegistry.Get("github")
 	Assert(t, ok, "expected GitHub plugin to be present in DefaultRegistry by default")
 	Equals(t, "github", p.Name())
+}
+
+func TestGitHubPlugin_SourceURL(t *testing.T) {
+	p := &ghplugin.GitHubPlugin{}
+	url := p.SourceURL()
+	Assert(t, url != "", "expected non-empty SourceURL")
+	Assert(t, strings.HasPrefix(url, "https://"), "expected SourceURL to be an https URL, got: %q", url)
+	Assert(t, strings.Contains(url, "github"), "expected 'github' in SourceURL, got: %q", url)
 }

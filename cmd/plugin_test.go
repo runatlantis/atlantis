@@ -15,16 +15,18 @@ import (
 
 // stubPlugin is a minimal plugin used in CLI tests.
 type stubPlugin struct {
-	name     string
-	desc     string
-	version  string
-	required []plugin.ConfigKey
-	optional []plugin.ConfigKey
+	name      string
+	desc      string
+	version   string
+	sourceURL string
+	required  []plugin.ConfigKey
+	optional  []plugin.ConfigKey
 }
 
 func (s *stubPlugin) Name() string        { return s.name }
 func (s *stubPlugin) Description() string { return s.desc }
 func (s *stubPlugin) Version() string     { return s.version }
+func (s *stubPlugin) SourceURL() string   { return s.sourceURL }
 func (s *stubPlugin) ConfigKeys() []plugin.ConfigKey {
 	return append(s.required, s.optional...)
 }
@@ -93,6 +95,7 @@ func TestPluginAdd_UnknownPlugin(t *testing.T) {
 	_, err := captureOutput(t, pc, "add", "unknown")
 	Assert(t, err != nil, "expected error for unknown plugin")
 	Assert(t, strings.Contains(err.Error(), "unknown"), "expected plugin name in error, got: %q", err.Error())
+	Assert(t, strings.Contains(err.Error(), "not a known plugin"), "expected 'not a known plugin' in error, got: %q", err.Error())
 }
 
 func TestPluginAdd_ShowsPluginInfo(t *testing.T) {
@@ -135,4 +138,30 @@ func TestPluginAdd_MissingArgument(t *testing.T) {
 	pc := &cmd.PluginCmd{Registry: plugin.NewRegistry()}
 	_, err := captureOutput(t, pc, "add")
 	Assert(t, err != nil, "expected error when no plugin name is given")
+}
+
+func TestPluginAdd_ShowsSourceURL(t *testing.T) {
+	p := &stubPlugin{
+		name:      "myprovider",
+		desc:      "My custom VCS provider",
+		version:   "1.0.0",
+		sourceURL: "https://github.com/example/atlantis-plugin-myprovider",
+	}
+	r := newTestRegistry(t, p)
+	pc := &cmd.PluginCmd{Registry: r}
+	out, err := captureOutput(t, pc, "add", "myprovider")
+	Ok(t, err)
+	Assert(t, strings.Contains(out, "https://github.com/example/atlantis-plugin-myprovider"), "expected source URL in output, got: %q", out)
+	Assert(t, strings.Contains(out, "Source:"), "expected 'Source:' label in output, got: %q", out)
+}
+
+func TestPluginAdd_KnownButNotInstalled_ShowsDownloadInstructions(t *testing.T) {
+	// "github" is in the built-in catalog but NOT in this empty registry,
+	// simulating the future state when GitHub is extracted to a separate repo.
+	pc := &cmd.PluginCmd{Registry: plugin.NewRegistry()}
+	out, err := captureOutput(t, pc, "add", "github")
+	Ok(t, err) // known plugins are informational, not an error
+	Assert(t, strings.Contains(out, "not installed locally"), "expected 'not installed locally' message, got: %q", out)
+	Assert(t, strings.Contains(out, "https://github.com/runatlantis/atlantis-plugin-github"), "expected source URL in output, got: %q", out)
+	Assert(t, strings.Contains(out, "/releases"), "expected releases URL in output, got: %q", out)
 }

@@ -40,6 +40,11 @@ type Plugin interface {
 	// ConfigKeys returns the ordered list of configuration keys needed to
 	// operate this provider with Atlantis.
 	ConfigKeys() []ConfigKey
+	// SourceURL returns the canonical URL of the repository where this plugin
+	// is (or will be) hosted, e.g. "https://github.com/runatlantis/atlantis-plugin-github".
+	// It is used by "atlantis plugin add" to show where the plugin can be
+	// downloaded from, both now and after it is extracted to a separate repo.
+	SourceURL() string
 }
 
 // Registry holds registered VCS provider plugins.
@@ -115,7 +120,8 @@ func (g *githubPlugin) Name() string { return "github" }
 func (g *githubPlugin) Description() string {
 	return "GitHub VCS provider (github.com and GitHub Enterprise)"
 }
-func (g *githubPlugin) Version() string { return "1.0.0" }
+func (g *githubPlugin) Version() string   { return "1.0.0" }
+func (g *githubPlugin) SourceURL() string { return githubSourceURL }
 func (g *githubPlugin) ConfigKeys() []ConfigKey {
 	return []ConfigKey{
 		{
@@ -179,4 +185,30 @@ func (g *githubPlugin) ConfigKeys() []ConfigKey {
 			Required: false,
 		},
 	}
+}
+
+// githubSourceURL is the canonical source URL for the built-in GitHub plugin.
+// It is the single source of truth used by githubPlugin.SourceURL(),
+// knownPlugins, and (indirectly) plugin/github.GitHubPlugin.SourceURL via
+// LookupSource.
+const githubSourceURL = "https://github.com/runatlantis/atlantis-plugin-github"
+
+// knownPlugins is a static catalog mapping plugin names to their canonical
+// source URL. It enables "atlantis plugin add <name>" to show download
+// instructions for plugins that are not yet installed locally.
+//
+// When a built-in plugin is extracted to a separate repository in the atlantis
+// org, update its entry here so that users can still discover and install it
+// with "atlantis plugin add <name>" even before it is bundled.
+var knownPlugins = map[string]string{
+	"github": githubSourceURL,
+}
+
+// LookupSource returns the canonical source URL for a known plugin name.
+// It returns ("", false) if the plugin is not in the built-in catalog.
+// This is used by "atlantis plugin add" to show where a plugin can be
+// downloaded from when it is not currently installed.
+func LookupSource(name string) (string, bool) {
+	url, ok := knownPlugins[name]
+	return url, ok
 }

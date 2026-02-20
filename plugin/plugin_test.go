@@ -20,6 +20,7 @@ type fakePlugin struct {
 func (f *fakePlugin) Name() string                   { return f.name }
 func (f *fakePlugin) Description() string            { return "fake plugin for testing" }
 func (f *fakePlugin) Version() string                { return f.version }
+func (f *fakePlugin) SourceURL() string              { return "" }
 func (f *fakePlugin) ConfigKeys() []plugin.ConfigKey { return nil }
 
 func TestRegistry_RegisterAndGet(t *testing.T) {
@@ -84,4 +85,21 @@ func TestDefaultRegistry_ContainsGitHub(t *testing.T) {
 	Assert(t, ok, "expected github to be present in DefaultRegistry by default")
 	Equals(t, "github", p.Name())
 	Assert(t, len(p.ConfigKeys()) > 0, "expected github plugin to have config keys")
+}
+
+func TestDefaultRegistry_GitHubHasSourceURL(t *testing.T) {
+	p, ok := plugin.DefaultRegistry.Get("github")
+	Assert(t, ok, "expected github to be present in DefaultRegistry")
+	Assert(t, p.SourceURL() != "", "expected github plugin to have a non-empty SourceURL")
+}
+
+func TestLookupSource_KnownPlugin(t *testing.T) {
+	url, ok := plugin.LookupSource("github")
+	Assert(t, ok, "expected 'github' to be found in the plugin catalog")
+	Assert(t, url != "", "expected non-empty source URL for github")
+}
+
+func TestLookupSource_UnknownPlugin(t *testing.T) {
+	_, ok := plugin.LookupSource("nonexistent")
+	Assert(t, !ok, "expected 'nonexistent' not to be found in the plugin catalog")
 }

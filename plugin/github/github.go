@@ -25,6 +25,18 @@ func (g *GitHubPlugin) Description() string {
 // Version returns the plugin version.
 func (g *GitHubPlugin) Version() string { return "1.0.0" }
 
+// SourceURL returns the canonical source repository for the GitHub plugin.
+// It delegates to plugin.LookupSource so that the URL is defined exactly once
+// in the plugin catalog (plugin/plugin.go), preventing drift.
+//
+// When the plugin is extracted to its own repository, only the catalog entry
+// in plugin/plugin.go needs updating; this method automatically reflects the
+// new value.
+func (g *GitHubPlugin) SourceURL() string {
+	url, _ := plugin.LookupSource("github")
+	return url
+}
+
 // ConfigKeys returns the configuration keys required and accepted by the
 // GitHub provider.
 //
