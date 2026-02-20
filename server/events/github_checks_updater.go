@@ -277,9 +277,11 @@ func (g *GithubChecksUpdater) UpdateCombinedCount(
 }
 
 // UpdateProject creates or updates a per-project check run.
-// For successful plan check runs the full plan output is included in the check
-// run text and an "Apply" action button is attached so the user can trigger
-// the apply directly from the GitHub Checks UI.
+// For successful plan check runs, the full plan output is included in the check
+// run text field (truncated to the GitHub limit of 65 535 chars). An "Apply"
+// action button is attached only when the plan reports actual resource changes
+// (i.e. PlanSuccess.NoChanges() == false), so that plans with no changes do
+// not present an unnecessary Apply button.
 func (g *GithubChecksUpdater) UpdateProject(
 	ctx command.ProjectContext,
 	cmdName command.Name,
@@ -501,14 +503,21 @@ func commitStatusToCheckRun(s models.CommitStatus) (status, conclusion string) {
 
 // truncateString truncates s to at most maxLen characters, appending an
 // ellipsis when truncation occurs so the reader knows content was cut.
+// When maxLen is smaller than the ellipsis itself, only the first maxLen bytes
+// of s are returned without an ellipsis.
 func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
 	const ellipsis = "\n\n[Output truncated due to GitHub check run size limit]"
 	cutAt := maxLen - len(ellipsis)
-	if cutAt < 0 {
-		cutAt = 0
+	if cutAt <= 0 {
+		// maxLen is too small to include both content and the ellipsis; just
+		// return as many bytes of the original string as the limit allows.
+		if maxLen <= 0 {
+			return ""
+		}
+		return s[:maxLen]
 	}
 	return s[:cutAt] + ellipsis
 }

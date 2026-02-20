@@ -5,6 +5,7 @@ package events_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/v71/github"
@@ -315,7 +316,7 @@ func TestGithubChecksUpdater_UpdateCombinedCount(t *testing.T) {
 	Assert(t, update.opts.Output.Summary != nil, "summary should not be nil")
 	Assert(t, len(*update.opts.Output.Summary) > 0, "summary should not be empty")
 	// Summary should contain the counts.
-	Assert(t, contains(*update.opts.Output.Summary, "2/3"), "summary should contain '2/3' but got: "+*update.opts.Output.Summary)
+	Assert(t, strings.Contains(*update.opts.Output.Summary, "2/3"), "summary should contain '2/3' but got: "+*update.opts.Output.Summary)
 }
 
 // TestGithubChecksUpdater_CreateError propagates errors from CreateCheckRun.
@@ -347,18 +348,4 @@ func TestGithubChecksUpdater_UpdateError(t *testing.T) {
 
 	err := updater.UpdateCombined(logger, repo, pull, models.SuccessCommitStatus, command.Plan)
 	Assert(t, err != nil, "expected error from UpdateCheckRun to be propagated")
-}
-
-// contains is a simple substring helper used in assertions.
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(sub) == 0 || (len(s) > 0 && indexOf(s, sub) >= 0))
-}
-
-func indexOf(s, sub string) int {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
-		}
-	}
-	return -1
 }
