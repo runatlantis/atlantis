@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-github/v71/github"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
@@ -103,6 +104,10 @@ type VCSEventsController struct {
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator `validate:"required"`
 	GiteaWebhookSecret              []byte
+	// GithubChecksEnabled enables the experimental GitHub Checks API integration.
+	// When true, check_run webhook events with action="requested_action" are handled
+	// to trigger apply commands when the "Apply" button in a plan check run is clicked.
+	GithubChecksEnabled bool
 }
 
 // Post handles POST webhook requests.
@@ -201,6 +206,16 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 		resp = e.HandleGithubPullRequestEvent(logger, event, githubReqID)
 		scope = scope.SubScope(fmt.Sprintf("pr_%s", *event.Action))
 		scope = common.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetNumber())
+	case *github.CheckRunEvent:
+		if e.GithubChecksEnabled {
+			resp = e.HandleGithubCheckRunEvent(logger, event, githubReqID)
+			scope = scope.SubScope(fmt.Sprintf("check_run_%s", event.GetAction()))
+			scope = common.SetGitScopeTags(scope, event.GetRepo().GetFullName(), 0)
+		} else {
+			resp = HTTPResponse{
+				body: fmt.Sprintf("Ignoring check_run event, gh-checks-enabled is false %s", githubReqID),
+			}
+		}
 	default:
 		resp = HTTPResponse{
 			body: fmt.Sprintf("Ignoring unsupported event %s", githubReqID),
@@ -432,6 +447,129 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 	// We pass in nil for maybeHeadRepo because the head repo data isn't
 	// available in the GithubIssueComment event.
 	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, pullNum, comment.GetBody(), comment.GetID(), models.Github)
+}
+
+// HandleGithubCheckRunEvent handles check_run webhook events from GitHub.
+// This is only called when GithubChecksEnabled=true (the experimental GitHub
+// Checks API integration). It processes "requested_action" events that are
+// fired when a user clicks an action button on a check run — specifically the
+// "Apply" button that Atlantis attaches to successful plan check runs.
+func (e *VCSEventsController) HandleGithubCheckRunEvent(logger logging.SimpleLogging, event *github.CheckRunEvent, githubReqID string) HTTPResponse {
+	action := event.GetAction()
+	if action != "requested_action" {
+		return HTTPResponse{
+			body: fmt.Sprintf("Ignoring check_run event with action %q %s", action, githubReqID),
+		}
+	}
+
+	requestedAction := event.GetRequestedAction()
+	if requestedAction == nil || requestedAction.Identifier != "apply" {
+		identifier := ""
+		if requestedAction != nil {
+			identifier = requestedAction.Identifier
+		}
+		return HTTPResponse{
+			body: fmt.Sprintf("Ignoring check_run requested_action with identifier %q %s", identifier, githubReqID),
+		}
+	}
+
+	checkRun := event.GetCheckRun()
+	if checkRun == nil {
+		return HTTPResponse{
+			body: fmt.Sprintf("Missing check_run in event %s", githubReqID),
+			err: HTTPError{
+				code: http.StatusBadRequest,
+				err:  fmt.Errorf("missing check_run in event %s", githubReqID),
+			},
+		}
+	}
+
+	// Determine the pull request number. GitHub populates the PullRequests
+	// slice on the check run for PRs in the same repo.
+	if len(checkRun.PullRequests) == 0 {
+		return HTTPResponse{
+			body: fmt.Sprintf("check_run has no associated pull requests, ignoring %s", githubReqID),
+		}
+	}
+	pullNum := checkRun.PullRequests[0].GetNumber()
+	if pullNum == 0 {
+		return HTTPResponse{
+			body: fmt.Sprintf("check_run pull request number is 0, ignoring %s", githubReqID),
+		}
+	}
+
+	ghRepo := event.GetRepo()
+	if ghRepo == nil {
+		return HTTPResponse{
+			body: fmt.Sprintf("Missing repository in check_run event %s", githubReqID),
+			err: HTTPError{
+				code: http.StatusBadRequest,
+				err:  fmt.Errorf("missing repository in check_run event %s", githubReqID),
+			},
+		}
+	}
+
+	baseRepo, err := e.Parser.ParseGithubRepo(ghRepo)
+	if err != nil {
+		wrapped := fmt.Errorf("parsing repo from check_run event: %s: %w", githubReqID, err)
+		return HTTPResponse{
+			body: wrapped.Error(),
+			err: HTTPError{
+				code: http.StatusBadRequest,
+				err:  wrapped,
+			},
+		}
+	}
+
+	if !e.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		e.commentNotAllowlisted(baseRepo, pullNum)
+		err := fmt.Errorf("repo %q not allowlisted", baseRepo.FullName)
+		return HTTPResponse{
+			body: err.Error(),
+			err: HTTPError{
+				err:        err,
+				code:       http.StatusForbidden,
+				isSilenced: e.SilenceAllowlistErrors,
+			},
+		}
+	}
+
+	sender := event.GetSender()
+	if sender == nil {
+		return HTTPResponse{
+			body: fmt.Sprintf("Missing sender in check_run event %s", githubReqID),
+			err: HTTPError{
+				code: http.StatusBadRequest,
+				err:  fmt.Errorf("missing sender in check_run event %s", githubReqID),
+			},
+		}
+	}
+	user := models.User{Username: sender.GetLogin()}
+
+	// Parse the external_id encoded by GithubChecksUpdater to reconstruct the
+	// project coordinates (workspace + relDir, or projectName).
+	externalID := checkRun.GetExternalID()
+	projectName, workspace, relDir := events.ParseCheckRunExternalID(externalID)
+
+	cmd := &events.CommentCommand{
+		Name:        command.Apply,
+		Workspace:   workspace,
+		RepoRelDir:  relDir,
+		ProjectName: projectName,
+	}
+
+	logger.Info("Handling check_run apply action for repo %q pull %d project %q workspace %q dir %q",
+		baseRepo.FullName, pullNum, projectName, workspace, relDir)
+
+	if !e.TestingMode {
+		go e.CommandRunner.RunCommentCommand(baseRepo, nil, nil, user, pullNum, cmd)
+	} else {
+		e.CommandRunner.RunCommentCommand(baseRepo, nil, nil, user, pullNum, cmd)
+	}
+
+	return HTTPResponse{
+		body: "Processing...",
+	}
 }
 
 // HandleBitbucketCloudCommentEvent handles comment events from Bitbucket.

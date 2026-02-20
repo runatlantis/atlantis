@@ -830,6 +830,107 @@ func TestPost_GithubClosedPullRequestSuccess(t *testing.T) {
 	ResponseContains(t, w, http.StatusOK, "Pull request cleaned successfully")
 }
 
+// ---- GitHub Checks API (check_run) tests ----
+
+func TestPost_GithubCheckRun_DisabledIgnored(t *testing.T) {
+	t.Log("when GithubChecksEnabled is false, check_run events are ignored")
+	e, v, _, _, _, _, _, _, _ := setup(t)
+	e.GithubChecksEnabled = false
+
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "check_run")
+	// A minimal requested_action event payload
+	event := `{"action":"requested_action","requested_action":{"identifier":"apply"},"check_run":{"id":1,"external_id":"default::infra","pull_requests":[{"number":42}]},"repository":{"full_name":"myorg/myrepo","clone_url":"https://github.com/myorg/myrepo.git","name":"myrepo","owner":{"login":"myorg"}},"sender":{"login":"user1"}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	// Should respond with 200 and a message saying the flag is false
+	ResponseContains(t, w, http.StatusOK, "gh-checks-enabled is false")
+}
+
+func TestPost_GithubCheckRun_NonRequestedAction_Ignored(t *testing.T) {
+	t.Log("when the check_run action is not requested_action it should be ignored")
+	e, v, _, _, _, _, _, _, _ := setup(t)
+	e.GithubChecksEnabled = true
+
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "check_run")
+	event := `{"action":"completed","check_run":{"id":1},"repository":{"full_name":"myorg/myrepo"}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, `Ignoring check_run event with action "completed"`)
+}
+
+func TestPost_GithubCheckRun_NonApplyIdentifier_Ignored(t *testing.T) {
+	t.Log("when the requested_action identifier is not 'apply' it should be ignored")
+	e, v, _, _, _, _, _, _, _ := setup(t)
+	e.GithubChecksEnabled = true
+
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "check_run")
+	event := `{"action":"requested_action","requested_action":{"identifier":"other"},"check_run":{"id":1},"repository":{"full_name":"myorg/myrepo"}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, `Ignoring check_run requested_action with identifier "other"`)
+}
+
+func TestPost_GithubCheckRun_ApplyTriggered(t *testing.T) {
+	t.Log("when GithubChecksEnabled=true and action=requested_action with identifier=apply, RunCommentCommand should be called with an apply command")
+	e, v, _, _, p, cr, _, _, _ := setup(t)
+	e.GithubChecksEnabled = true
+
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "check_run")
+	// Minimal valid payload: requested_action=apply, workspace::relDir encoded in external_id
+	event := `{"action":"requested_action","requested_action":{"identifier":"apply"},"check_run":{"id":1,"external_id":"staging::infra/vpc","pull_requests":[{"number":99}]},"repository":{"full_name":"myorg/myrepo","clone_url":"https://github.com/myorg/myrepo.git","name":"myrepo","owner":{"login":"myorg"}},"sender":{"login":"alice"}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+
+	baseRepo := models.Repo{FullName: "myorg/myrepo"}
+	When(p.ParseGithubRepo(Any[*github.Repository]())).ThenReturn(baseRepo, nil)
+
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, "Processing...")
+
+	// Verify RunCommentCommand was called with the Apply command and correct project coords.
+	cr.VerifyWasCalledOnce().RunCommentCommand(
+		Eq(baseRepo),
+		Any[*models.Repo](),
+		Any[*models.PullRequest](),
+		Eq(models.User{Username: "alice"}),
+		Eq(99),
+		Any[*events.CommentCommand](),
+	)
+}
+
+func TestPost_GithubCheckRun_NotAllowlisted(t *testing.T) {
+	t.Log("when the repo is not on the allowlist, a 403 should be returned")
+	e, v, _, _, p, _, _, _, _ := setup(t)
+	e.GithubChecksEnabled = true
+
+	// Override the allowlist to block repos.
+	repoChecker, err := events.NewRepoAllowlistChecker("other-org/*")
+	Ok(t, err)
+	e.RepoAllowlistChecker = repoChecker
+
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "check_run")
+	event := `{"action":"requested_action","requested_action":{"identifier":"apply"},"check_run":{"id":1,"external_id":"default::.","pull_requests":[{"number":1}]},"repository":{"full_name":"myorg/myrepo","clone_url":"https://github.com/myorg/myrepo.git","name":"myrepo","owner":{"login":"myorg"}},"sender":{"login":"user1"}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+
+	baseRepo := models.Repo{
+		FullName: "myorg/myrepo",
+		VCSHost:  models.VCSHost{Hostname: "github.com"},
+	}
+	When(p.ParseGithubRepo(Any[*github.Repository]())).ThenReturn(baseRepo, nil)
+
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusForbidden, "not allowlisted")
+}
+
 func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	t.Skip("relies too much on mocks, should use real event parser")
 	t.Log("when the event is a gitlab merge request and the cleanup works we return a 200")
