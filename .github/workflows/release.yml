@@ -48,4 +48,4 @@ jobs:
           -f target_commitish=main \
           -q .body > tmp-CHANGELOG.md
       env:
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
