@@ -26,4 +26,7 @@ jobs:
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-      - run: npx --package=renovate@latest -c renovate-config-validator
+      - run: npx --package="renovate@${RENOVATE_VERSION}" -c renovate-config-validator
+        env:
+          # renovate: datasource=npm depName=renovate
+          RENOVATE_VERSION: 39.68.4
