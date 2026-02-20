@@ -1,11 +1,12 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package github registers the built-in GitHub VCS provider plugin.
-// Import this package for its side-effects to make the GitHub plugin
-// available in the DefaultRegistry:
+// Package github provides the GitHubPlugin type for the built-in GitHub VCS
+// provider. The plugin is pre-registered in plugin.DefaultRegistry by the
+// plugin package itself, so no import side-effects are required.
 //
-//	import _ "github.com/runatlantis/atlantis/plugin/github"
+// This package is useful when you need to reference or instantiate the
+// exported GitHubPlugin type directly (e.g. in tests or custom integrations).
 package github
 
 import "github.com/runatlantis/atlantis/plugin"
@@ -26,6 +27,9 @@ func (g *GitHubPlugin) Version() string { return "1.0.0" }
 
 // ConfigKeys returns the configuration keys required and accepted by the
 // GitHub provider.
+//
+// NOTE: This list is intentionally mirrored in plugin.githubPlugin.ConfigKeys
+// (plugin/plugin.go) to avoid an import cycle. Keep both in sync.
 func (g *GitHubPlugin) ConfigKeys() []plugin.ConfigKey {
 	return []plugin.ConfigKey{
 		{
@@ -89,10 +93,4 @@ func (g *GitHubPlugin) ConfigKeys() []plugin.ConfigKey {
 			Required: false,
 		},
 	}
-}
-
-func init() {
-	// Self-register into the default registry so that importing this package
-	// (even for side-effects) makes the GitHub plugin available.
-	_ = plugin.DefaultRegistry.Register(&GitHubPlugin{})
 }

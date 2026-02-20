@@ -21,7 +21,6 @@ import (
 
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/plugin"
-	_ "github.com/runatlantis/atlantis/plugin/github" // register built-in GitHub plugin
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/spf13/viper"
 )

@@ -54,9 +54,9 @@ func TestGitHubPlugin_ConfigKeys_FieldsPopulated(t *testing.T) {
 }
 
 func TestGitHubPlugin_RegistersInDefaultRegistry(t *testing.T) {
-	// Importing plugin/github triggers init() which registers the plugin into
-	// plugin.DefaultRegistry. Verify the registration is present.
+	// GitHub is pre-registered in DefaultRegistry by the plugin package itself;
+	// no import side-effect is required.
 	p, ok := plugin.DefaultRegistry.Get("github")
-	Assert(t, ok, "expected GitHub plugin to be registered in DefaultRegistry after package import")
+	Assert(t, ok, "expected GitHub plugin to be present in DefaultRegistry by default")
 	Equals(t, "github", p.Name())
 }

@@ -75,3 +75,13 @@ func TestRegistry_List_Empty(t *testing.T) {
 	r := plugin.NewRegistry()
 	Equals(t, 0, len(r.List()))
 }
+
+func TestDefaultRegistry_ContainsGitHub(t *testing.T) {
+	// DefaultRegistry must have GitHub pre-populated without any blank import.
+	// This test imports only the plugin package, proving no side-effect import
+	// is required by callers.
+	p, ok := plugin.DefaultRegistry.Get("github")
+	Assert(t, ok, "expected github to be present in DefaultRegistry by default")
+	Equals(t, "github", p.Name())
+	Assert(t, len(p.ConfigKeys()) > 0, "expected github plugin to have config keys")
+}
