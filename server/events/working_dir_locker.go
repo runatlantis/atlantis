@@ -36,6 +36,9 @@ type WorkingDirLocker interface {
 	TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) (func(), error)
 	// UnlockByPull unlocks all workspaces for a specific pull request
 	UnlockByPull(repoFullName string, pullNum int)
+	// IsLockedByPull returns true if any workspace is currently locked for
+	// the given pull request, indicating an operation is in progress.
+	IsLockedByPull(repoFullName string, pullNum int) bool
 }
 
 // DefaultWorkingDirLocker implements WorkingDirLocker.
@@ -65,6 +68,21 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 	return func() {
 		d.unlock(repoFullName, pullNum, workspace, path, projectName)
 	}, nil
+}
+
+// IsLockedByPull returns true if any workspace is currently locked for the
+// given pull request, meaning an operation is in progress.
+func (d *DefaultWorkingDirLocker) IsLockedByPull(repoFullName string, pullNum int) bool {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	prefix := fmt.Sprintf("%s/%d/", repoFullName, pullNum)
+	for key := range d.locks {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // UnlockByPull unlocks all workspaces for a specific pull request

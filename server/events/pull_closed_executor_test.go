@@ -393,3 +393,74 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 	}
 	Equals(t, expectedPullInfo2, capturedArgs[1])
 }
+
+// TestCleanUpPull_SkipsDeleteWhenLocked verifies that when an operation is
+// in-progress (workspace lock held) a PR-closed event does not delete the
+// working directory, protecting the running command from having the rug pulled
+// out from under it.
+func TestCleanUpPull_SkipsDeleteWhenLocked(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	w := mocks.NewMockWorkingDir()
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() { db.Close() })
+	Ok(t, err)
+
+	locker := events.NewDefaultWorkingDirLocker()
+	// Simulate an in-progress plan by holding a workspace lock.
+	unlock, lockErr := locker.TryLock(testdata.GithubRepo.FullName, testdata.Pull.Num, "default", ".", "", command.Plan)
+	Ok(t, lockErr)
+	defer unlock()
+
+	lockClient := lockmocks.NewMockLocker()
+	When(lockClient.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
+
+	pce := events.PullClosedExecutor{
+		WorkingDir:         w,
+		WorkingDirLocker:   locker,
+		Locker:             lockClient,
+		PullClosedTemplate: &events.PullClosedEventTemplate{},
+		Database:           db,
+		VCSClient:          vcsmocks.NewMockClient(),
+	}
+
+	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+	Ok(t, actualErr)
+
+	// Delete should NOT have been called because the workspace is locked.
+	w.VerifyWasCalled(Never()).Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+}
+
+// TestCleanUpPull_DeletesWhenNotLocked verifies that when no workspace lock is
+// held the working directory is deleted normally on PR close.
+func TestCleanUpPull_DeletesWhenNotLocked(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	w := mocks.NewMockWorkingDir()
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() { db.Close() })
+	Ok(t, err)
+
+	// Locker with no active locks.
+	locker := events.NewDefaultWorkingDirLocker()
+
+	lockClient := lockmocks.NewMockLocker()
+	When(lockClient.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
+
+	pce := events.PullClosedExecutor{
+		WorkingDir:         w,
+		WorkingDirLocker:   locker,
+		Locker:             lockClient,
+		PullClosedTemplate: &events.PullClosedEventTemplate{},
+		Database:           db,
+		VCSClient:          vcsmocks.NewMockClient(),
+	}
+
+	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+	Ok(t, actualErr)
+
+	// Delete SHOULD have been called because there is no active lock.
+	w.VerifyWasCalledOnce().Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+}
