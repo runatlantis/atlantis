@@ -6,6 +6,9 @@ on:
       - v*.*.*
   workflow_dispatch:
 
+permissions:
+  contents: write  # for goreleaser to create releases and upload release assets
+
 jobs:
   goreleaser:
     runs-on: ubuntu-24.04
