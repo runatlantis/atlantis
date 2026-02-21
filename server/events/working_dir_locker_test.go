@@ -224,3 +224,68 @@ func TestUnlockDifferentProjectNames(t *testing.T) {
 	_, err = locker.TryLock(repo, 1, workspace, path, newProjectName, cmd)
 	Ok(t, err)
 }
+
+func TestIsLockedByPull_NoLocks(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	t.Log("IsLockedByPull returns false when no locks are held")
+	Assert(t, !locker.IsLockedByPull(repo, 1), "exp not locked")
+}
+
+func TestIsLockedByPull_LockedPull(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	t.Log("IsLockedByPull returns true when a workspace is locked for the given pull")
+	unlock, err := locker.TryLock(repo, 1, workspace, path, projectName, cmd)
+	Ok(t, err)
+	Assert(t, locker.IsLockedByPull(repo, 1), "exp locked")
+
+	unlock()
+	Assert(t, !locker.IsLockedByPull(repo, 1), "exp not locked after unlock")
+}
+
+func TestIsLockedByPull_DifferentPull(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	t.Log("IsLockedByPull returns false for a different pull request")
+	_, err := locker.TryLock(repo, 1, workspace, path, projectName, cmd)
+	Ok(t, err)
+	Assert(t, !locker.IsLockedByPull(repo, 2), "exp not locked for pull 2")
+	Assert(t, locker.IsLockedByPull(repo, 1), "exp locked for pull 1")
+}
+
+func TestIsLockedByPull_DifferentRepo(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	t.Log("IsLockedByPull returns false for a different repo")
+	_, err := locker.TryLock(repo, 1, workspace, path, projectName, cmd)
+	Ok(t, err)
+	Assert(t, !locker.IsLockedByPull("other/repo", 1), "exp not locked for other repo")
+	Assert(t, locker.IsLockedByPull(repo, 1), "exp locked for original repo")
+}
+
+func TestIsLockedByPull_MultipleWorkspaces(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	t.Log("IsLockedByPull returns true if any workspace is locked")
+	unlock1, err := locker.TryLock(repo, 1, workspace, path, projectName, cmd)
+	Ok(t, err)
+	unlock2, err := locker.TryLock(repo, 1, "other-workspace", path, projectName, cmd)
+	Ok(t, err)
+
+	Assert(t, locker.IsLockedByPull(repo, 1), "exp locked")
+
+	unlock1()
+	Assert(t, locker.IsLockedByPull(repo, 1), "exp still locked after first unlock")
+
+	unlock2()
+	Assert(t, !locker.IsLockedByPull(repo, 1), "exp not locked after both unlocks")
+}
+
+func TestIsLockedByPull_UnlockByPull(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	t.Log("IsLockedByPull returns false after UnlockByPull clears all locks")
+	_, err := locker.TryLock(repo, 1, workspace, path, projectName, cmd)
+	Ok(t, err)
+	_, err = locker.TryLock(repo, 1, "other-workspace", path, projectName, cmd)
+	Ok(t, err)
+
+	Assert(t, locker.IsLockedByPull(repo, 1), "exp locked before unlock")
+	locker.UnlockByPull(repo, 1)
+	Assert(t, !locker.IsLockedByPull(repo, 1), "exp not locked after UnlockByPull")
+}

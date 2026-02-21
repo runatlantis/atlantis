@@ -39,6 +39,7 @@ func NewPlanCommandRunner(
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	PendingApplyStatus bool,
+	workingDirLocker WorkingDirLocker,
 
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
@@ -62,6 +63,7 @@ func NewPlanCommandRunner(
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 		PendingApplyStatus:         PendingApplyStatus,
+		workingDirLocker:           workingDirLocker,
 	}
 }
 
@@ -95,7 +97,12 @@ type PlanCommandRunner struct {
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	SilencePRComments     []string
 	PendingApplyStatus    bool
+	workingDirLocker      WorkingDirLocker
 }
+
+// concurrentRunError is the message returned when a plan or autoplan is
+// triggered while another command is already running for the same pull request.
+const concurrentRunError = "An Atlantis operation is already running for this pull request. Wait for it to finish and try again."
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
@@ -132,6 +139,14 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 			// When silence is enabled and no projects are found, don't set any status
 			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
+		return
+	}
+
+	// Refuse to run if another operation is in progress for this pull request
+	// to avoid corrupting in-progress runs (e.g. deleting their project locks or plan files).
+	if p.workingDirLocker != nil && p.workingDirLocker.IsLockedByPull(baseRepo.FullName, pull.Num) {
+		ctx.Log.Info("not running autoplan: %s", concurrentRunError)
+		p.pullUpdater.updatePull(ctx, AutoplanCommand{}, command.Result{Failure: concurrentRunError})
 		return
 	}
 
@@ -258,6 +273,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	// if the plan is generic, new plans will be generated based on changes
 	// discard previous plans that might not be relevant anymore
 	if !cmd.IsForSpecificProject() {
+		// Refuse to run if another operation is in progress for this pull request
+		// to avoid corrupting in-progress runs (e.g. deleting their project locks or plan files).
+		if p.workingDirLocker != nil && p.workingDirLocker.IsLockedByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num) {
+			ctx.Log.Info("not running plan: %s", concurrentRunError)
+			p.pullUpdater.updatePull(ctx, cmd, command.Result{Failure: concurrentRunError})
+			return
+		}
 		ctx.Log.Debug("deleting previous plans and locks")
 		p.deletePlans(ctx)
 		_, err := p.lockingLocker.UnlockByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
