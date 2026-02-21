@@ -73,6 +73,49 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 	}
 }
 
+func TestUserConfig_ToBlockedExtraArgs(t *testing.T) {
+	tests := []struct {
+		name             string
+		blockedExtraArgs string
+		want             []string
+	}{
+		{
+			name:             "empty returns nil (caller uses defaults)",
+			blockedExtraArgs: "",
+			want:             nil,
+		},
+		{
+			name:             "single flag",
+			blockedExtraArgs: "-chdir",
+			want:             []string{"-chdir"},
+		},
+		{
+			name:             "multiple flags comma-separated",
+			blockedExtraArgs: "-chdir,--chdir,-plugin-dir,--plugin-dir",
+			want:             []string{"-chdir", "--chdir", "-plugin-dir", "--plugin-dir"},
+		},
+		{
+			name:             "custom flag list overrides defaults",
+			blockedExtraArgs: "-no-color,--no-color",
+			want:             []string{"-no-color", "--no-color"},
+		},
+		{
+			name:             "whitespace around flags is trimmed",
+			blockedExtraArgs: " -chdir , --chdir ",
+			want:             []string{"-chdir", "--chdir"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := server.UserConfig{
+				BlockedExtraArgs: tt.blockedExtraArgs,
+			}
+			got := u.ToBlockedExtraArgs()
+			assert.Equalf(t, tt.want, got, "ToBlockedExtraArgs()")
+		})
+	}
+}
+
 func TestUserConfig_ToWebhookHttpHeaders(t *testing.T) {
 	tcs := []struct {
 		name  string
