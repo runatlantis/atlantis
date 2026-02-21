@@ -185,6 +185,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient github.IGithubClient
+	var rawGithubClient *github.Client
 	var githubAppEnabled bool
 	var githubConfig github.Config
 	var githubCredentials github.Credentials
@@ -268,7 +269,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		rawGithubClient, err := github.New(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
+		rawGithubClient, err = github.New(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
 		if err != nil {
 			return nil, err
 		}
@@ -415,7 +416,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, fmt.Errorf("initializing webhooks: %w", err)
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient, giteaClient)
-	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
+	var commitStatusUpdater events.CommitStatusUpdater
+	defaultStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
+	// When the experimental GitHub Checks API integration is enabled and a GitHub
+	// App (not a personal access token) is configured, use GithubChecksUpdater.
+	if userConfig.GithubChecksEnabled && githubAppEnabled {
+		commitStatusUpdater = events.NewGithubChecksUpdater(rawGithubClient, userConfig.VCSStatusName)
+		logger.Info("using GitHub Checks API for commit status updates (experimental)")
+	} else {
+		if userConfig.GithubChecksEnabled && !githubAppEnabled {
+			logger.Warn("gh-checks-enabled is true but a GitHub App is not configured; falling back to commit status updates. Configure a GitHub App to use the Checks API.")
+		}
+		commitStatusUpdater = defaultStatusUpdater
+	}
 
 	binDir, err := mkSubDir(userConfig.DataDir, BinDirName)
 
@@ -1004,6 +1017,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
 		AzureDevopsRequestValidator:     &events_controllers.DefaultAzureDevopsRequestValidator{},
 		GiteaWebhookSecret:              []byte(userConfig.GiteaWebhookSecret),
+		GithubChecksEnabled:             userConfig.GithubChecksEnabled,
+		VCSStatusName:                   userConfig.VCSStatusName,
 	}
 	githubAppController := &controllers.GithubAppController{
 		AtlantisURL:         parsedURL,
