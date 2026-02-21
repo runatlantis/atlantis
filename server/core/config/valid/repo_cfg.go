@@ -126,16 +126,11 @@ func isRegexAllowed(name string, allowedRegexpPrefixes []string) bool {
 	return false
 }
 
-// This function returns a final true/false decision for whether AutoDiscover is enabled
-// for a repo. It takes into account the defaultAutoDiscoverMode when there is no explicit
-// repo config. The defaultAutoDiscoverMode param should be understood as the default
-// AutoDiscover mode as may be set via CLI params or server side repo config.
-func (r RepoCfg) AutoDiscoverEnabled(defaultAutoDiscoverMode AutoDiscoverMode) bool {
-	autoDiscoverMode := defaultAutoDiscoverMode
-	if r.AutoDiscover != nil {
-		autoDiscoverMode = r.AutoDiscover.Mode
-	}
-
+// AutoDiscoverEnabled returns a final true/false decision for whether AutoDiscover is enabled
+// for a repo. It expects the caller to determine the correct precdence for which AutoDiscoverMode
+// to use. Specifically it does *not* take r.AutoDiscover into account, since the caller might
+// want to enforce different precedence
+func (r RepoCfg) AutoDiscoverEnabled(autoDiscoverMode AutoDiscoverMode) bool {
 	if autoDiscoverMode == AutoDiscoverAutoMode {
 		// AutoDiscover is enabled by default when no projects are defined
 		return len(r.Projects) == 0
