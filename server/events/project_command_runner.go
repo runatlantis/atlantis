@@ -829,6 +829,10 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.ProjectContext, absPath string) ([]string, error) {
 	var outputs []string
 
+	// Hold a read lock for the whole step run so clone/reset/merge cannot run in this dir until we're done.
+	unlock := p.WorkingDir.GitReadLock(absPath)
+	defer unlock()
+
 	envs := make(map[string]string)
 	for _, step := range steps {
 		var out string
