@@ -26,6 +26,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
+	"github.com/runatlantis/atlantis/server/workingdir"
 
 	"github.com/google/go-github/v83/github"
 	. "github.com/petergtz/pegomock/v4"
@@ -45,7 +46,7 @@ var azuredevopsGetter *mocks.MockAzureDevopsPullGetter
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
 var ch events.DefaultCommandRunner
-var workingDir events.WorkingDir
+var workingDir workingdir.WorkingDir
 var pendingPlanFinder *mocks.MockPendingPlanFinder
 var drainer *events.Drainer
 var deleteLockCommand *mocks.MockDeleteLockCommand

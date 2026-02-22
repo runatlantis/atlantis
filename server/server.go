@@ -51,6 +51,7 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
+	"github.com/runatlantis/atlantis/server/workingdir"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/controllers"
@@ -519,9 +520,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	disableGlobalApplyLock := userConfig.DisableGlobalApplyLock
 
 	applyLockingClient = locking.NewApplyClient(database, disableApply, disableGlobalApplyLock)
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := workingdir.NewDefaultLocker()
 
-	var workingDir events.WorkingDir = &events.FileWorkspace{
+	var workingDir workingdir.WorkingDir = &workingdir.FileWorkspace{
 		DataDir:          userConfig.DataDir,
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:    userConfig.CheckoutDepth,
@@ -538,7 +539,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		if !userConfig.WriteGitCreds {
 			return nil, errors.New("github App requires --write-git-creds to support cloning")
 		}
-		workingDir = &events.GithubAppWorkingDir{
+		workingDir = &workingdir.GithubAppWorkingDir{
 			WorkingDir:     workingDir,
 			Credentials:    githubCredentials,
 			GithubHostname: userConfig.GithubHostname,

@@ -8,6 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/workingdir"
 )
 
 //go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_delete_lock_command.go DeleteLockCommand
@@ -21,8 +22,8 @@ type DeleteLockCommand interface {
 // DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
 type DefaultDeleteLockCommand struct {
 	Locker           locking.Locker
-	WorkingDir       WorkingDir
-	WorkingDirLocker WorkingDirLocker
+	WorkingDir       workingdir.WorkingDir
+	WorkingDirLocker workingdir.Locker
 	Database         db.Database
 }
 

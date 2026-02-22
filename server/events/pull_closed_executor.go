@@ -23,6 +23,7 @@ import (
 	"text/template"
 
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/workingdir"
 
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -51,7 +52,7 @@ type PullCleaner interface {
 type PullClosedExecutor struct {
 	Locker                   locking.Locker
 	VCSClient                vcs.Client
-	WorkingDir               WorkingDir
+	WorkingDir               workingdir.WorkingDir
 	Database                 db.Database
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner

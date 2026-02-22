@@ -8,6 +8,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/workingdir"
 )
 
 // GenerateLockID creates a consistent lock ID for a project context.
@@ -23,7 +24,7 @@ func NewPlanCommandRunner(
 	silenceVCSStatusNoProjects bool,
 	vcsClient vcs.Client,
 	pendingPlanFinder PendingPlanFinder,
-	workingDir WorkingDir,
+	workingDir workingdir.WorkingDir,
 	commitStatusUpdater CommitStatusUpdater,
 	projectCommandBuilder ProjectPlanCommandBuilder,
 	projectCommandRunner ProjectPlanCommandRunner,
@@ -78,7 +79,7 @@ type PlanCommandRunner struct {
 	silenceVCSStatusNoProjects bool
 	commitStatusUpdater        CommitStatusUpdater
 	pendingPlanFinder          PendingPlanFinder
-	workingDir                 WorkingDir
+	workingDir                 workingdir.WorkingDir
 	prjCmdBuilder              ProjectPlanCommandBuilder
 	prjCmdRunner               ProjectPlanCommandRunner
 	cancellationTracker        CancellationTracker

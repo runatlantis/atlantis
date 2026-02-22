@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
+	"github.com/runatlantis/atlantis/server/workingdir"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -28,8 +29,8 @@ type LocksController struct {
 	ApplyLocker        locking.ApplyLocker          `validate:"required"`
 	VCSClient          vcs.Client                   `validate:"required"`
 	LockDetailTemplate web_templates.TemplateWriter `validate:"required"`
-	WorkingDir         events.WorkingDir            `validate:"required"`
-	WorkingDirLocker   events.WorkingDirLocker      `validate:"required"`
+	WorkingDir         workingdir.WorkingDir        `validate:"required"`
+	WorkingDirLocker   workingdir.Locker            `validate:"required"`
 	Database           db.Database                  `validate:"required"`
 	DeleteLockCommand  events.DeleteLockCommand     `validate:"required"`
 }

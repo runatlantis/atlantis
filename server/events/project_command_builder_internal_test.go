@@ -18,6 +18,7 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
+	"github.com/runatlantis/atlantis/server/workingdir"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -659,7 +660,7 @@ projects:
 				&DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				NewDefaultWorkingDirLocker(),
+				workingdir.NewDefaultLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},
 				&CommentParser{ExecutableName: "atlantis"},
@@ -876,7 +877,7 @@ projects:
 				&DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				NewDefaultWorkingDirLocker(),
+				workingdir.NewDefaultLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},
 				&CommentParser{ExecutableName: "atlantis"},
@@ -1123,7 +1124,7 @@ workflows:
 				&DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				NewDefaultWorkingDirLocker(),
+				workingdir.NewDefaultLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},
 				&CommentParser{ExecutableName: "atlantis"},
@@ -1275,7 +1276,7 @@ projects:
 				&DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				NewDefaultWorkingDirLocker(),
+				workingdir.NewDefaultLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},
 				&CommentParser{ExecutableName: "atlantis"},
@@ -1497,7 +1498,7 @@ autodiscover:
 				&DefaultProjectFinder{},
 				vcsClient,
 				workingDir,
-				NewDefaultWorkingDirLocker(),
+				workingdir.NewDefaultLocker(),
 				globalCfg,
 				&DefaultPendingPlanFinder{},
 				&CommentParser{ExecutableName: "atlantis"},
