@@ -327,13 +327,8 @@ func escapeArgs(args []string) []string {
 	var escaped []string
 	for _, arg := range args {
 		var escapedArg strings.Builder
-		// Iterate over raw bytes so that every byte – including each byte of
-		// multi-byte UTF-8 sequences – is individually backslash-escaped.
-		// This prevents any shell metacharacter from being interpreted when
-		// the assembled command string is later executed via "sh -c".
-		for i := 0; i < len(arg); i++ {
-			escapedArg.WriteByte('\\')
-			escapedArg.WriteByte(arg[i])
+		for i := range arg {
+			escapedArg.WriteString("\\" + string(arg[i]))
 		}
 		escaped = append(escaped, escapedArg.String())
 	}

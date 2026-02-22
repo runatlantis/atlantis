@@ -26,11 +26,12 @@ import (
 )
 
 var commentParser = events.CommentParser{
-	GithubUser:     "github-user",
-	GitlabUser:     "gitlab-user",
-	GiteaUser:      "gitea-user",
-	ExecutableName: "atlantis",
-	AllowCommands:  command.AllCommentCommands,
+	GithubUser:       "github-user",
+	GitlabUser:       "gitlab-user",
+	GiteaUser:        "gitea-user",
+	ExecutableName:   "atlantis",
+	AllowCommands:    command.AllCommentCommands,
+	BlockedExtraArgs: events.DefaultBlockedExtraArgs,
 }
 
 func TestNewCommentParser(t *testing.T) {
@@ -54,7 +55,8 @@ func TestNewCommentParser(t *testing.T) {
 				allowCommands: []command.Name{command.Plan, command.Plan, command.Plan},
 			},
 			want: &events.CommentParser{
-				AllowCommands: []command.Name{command.Plan},
+				AllowCommands:    []command.Name{command.Plan},
+				BlockedExtraArgs: events.DefaultBlockedExtraArgs,
 			},
 		},
 		{
@@ -64,7 +66,8 @@ func TestNewCommentParser(t *testing.T) {
 				allowCommands: []command.Name{command.Plan, command.Apply, command.Unlock, command.PolicyCheck, command.ApprovePolicies, command.Autoplan, command.Version, command.Import},
 			},
 			want: &events.CommentParser{
-				AllowCommands: []command.Name{command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import},
+				AllowCommands:    []command.Name{command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import},
+				BlockedExtraArgs: events.DefaultBlockedExtraArgs,
 			},
 		},
 	}

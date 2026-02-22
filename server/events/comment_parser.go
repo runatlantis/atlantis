@@ -101,14 +101,14 @@ type CommentParser struct {
 	ExecutableName  string
 	AllowCommands   []command.Name
 	// BlockedExtraArgs is the set of Terraform CLI flag prefixes that are
-	// rejected when supplied as comment extra args (after "--"). When nil or
-	// empty the package-level DefaultBlockedExtraArgs is used.
+	// rejected when supplied as comment extra args (after "--").
+	// Always populated by NewCommentParser; defaults to DefaultBlockedExtraArgs.
 	BlockedExtraArgs []string
 }
 
 // NewCommentParser returns a CommentParser.
-// blockedExtraArgs overrides the default blocked flag list; pass nil to keep
-// the DefaultBlockedExtraArgs.
+// blockedExtraArgs overrides the default blocked flag list; pass nil to use
+// DefaultBlockedExtraArgs.
 func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name, blockedExtraArgs []string) *CommentParser {
 	var commentAllowCommands []command.Name
 	for _, acceptableCommand := range command.AllCommentCommands {
@@ -118,6 +118,12 @@ func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDev
 				break // for distinct
 			}
 		}
+	}
+
+	// Resolve defaults at construction time so the CommentParser always holds
+	// a concrete list and does not need to know about DefaultBlockedExtraArgs.
+	if len(blockedExtraArgs) == 0 {
+		blockedExtraArgs = DefaultBlockedExtraArgs
 	}
 
 	return &CommentParser{
@@ -443,13 +449,8 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 
 // isBlockedExtraArg returns true if arg is a Terraform CLI flag that is not
 // permitted in comment extra args for security reasons.
-// It uses e.BlockedExtraArgs when set, otherwise DefaultBlockedExtraArgs.
 func (e *CommentParser) isBlockedExtraArg(arg string) bool {
-	list := e.BlockedExtraArgs
-	if len(list) == 0 {
-		list = DefaultBlockedExtraArgs
-	}
-	for _, blocked := range list {
+	for _, blocked := range e.BlockedExtraArgs {
 		if arg == blocked || strings.HasPrefix(arg, blocked+"=") {
 			return true
 		}
