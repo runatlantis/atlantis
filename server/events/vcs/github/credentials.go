@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v83/github"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_credentials.go Credentials
