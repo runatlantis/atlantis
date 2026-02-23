@@ -26,6 +26,13 @@ jobs:
       with:
         go-version-file: go.mod
 
+    - name: Import GPG key
+      id: import_gpg
+      uses: crazy-max/ghaction-import-gpg@e89d40939c28e39f97cf32126055eeae86ba74ec # v6.3.0
+      with:
+        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+        passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
     - name: Run GoReleaser for stable release
       uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
       if: (!contains(github.ref, 'pre'))
@@ -37,6 +44,7 @@ jobs:
         version: "~> v2" # or 'latest', 'nightly', semver
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
     - name: Generate changelog for pre release
       if: contains(github.ref, 'pre')
