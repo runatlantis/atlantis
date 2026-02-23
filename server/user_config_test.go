@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -80,9 +81,9 @@ func TestUserConfig_ToBlockedExtraArgs(t *testing.T) {
 		want             []string
 	}{
 		{
-			name:             "empty returns nil (caller uses defaults)",
+			name:             "empty returns defaults",
 			blockedExtraArgs: "",
-			want:             nil,
+			want:             events.DefaultBlockedExtraArgs,
 		},
 		{
 			name:             "single flag",

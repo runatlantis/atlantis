@@ -102,13 +102,11 @@ type CommentParser struct {
 	AllowCommands   []command.Name
 	// BlockedExtraArgs is the set of Terraform CLI flag prefixes that are
 	// rejected when supplied as comment extra args (after "--").
-	// Always populated by NewCommentParser; defaults to DefaultBlockedExtraArgs.
+	// Populated by NewCommentParser from UserConfig.ToBlockedExtraArgs().
 	BlockedExtraArgs []string
 }
 
 // NewCommentParser returns a CommentParser.
-// blockedExtraArgs overrides the default blocked flag list; pass nil to use
-// DefaultBlockedExtraArgs.
 func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name, blockedExtraArgs []string) *CommentParser {
 	var commentAllowCommands []command.Name
 	for _, acceptableCommand := range command.AllCommentCommands {
@@ -118,12 +116,6 @@ func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDev
 				break // for distinct
 			}
 		}
-	}
-
-	// Resolve defaults at construction time so the CommentParser always holds
-	// a concrete list and does not need to know about DefaultBlockedExtraArgs.
-	if len(blockedExtraArgs) == 0 {
-		blockedExtraArgs = DefaultBlockedExtraArgs
 	}
 
 	return &CommentParser{

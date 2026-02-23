@@ -56,7 +56,7 @@ func TestNewCommentParser(t *testing.T) {
 			},
 			want: &events.CommentParser{
 				AllowCommands:    []command.Name{command.Plan},
-				BlockedExtraArgs: events.DefaultBlockedExtraArgs,
+				BlockedExtraArgs: nil,
 			},
 		},
 		{
@@ -67,7 +67,7 @@ func TestNewCommentParser(t *testing.T) {
 			},
 			want: &events.CommentParser{
 				AllowCommands:    []command.Name{command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import},
-				BlockedExtraArgs: events.DefaultBlockedExtraArgs,
+				BlockedExtraArgs: nil,
 			},
 		},
 	}
