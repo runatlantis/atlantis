@@ -816,7 +816,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 		{
 			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
-			[]string{gitlabVersionOver15_6, gitlabVersion15_6},
+			gitlabServerVersions,
 			defaultMr,
 			models.MergeableStatus{
 				IsMergeable: true,
@@ -825,7 +825,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
-			[]string{gitlabVersionOver15_6, gitlabVersion15_6},
+			gitlabServerVersions,
 			defaultMr,
 			models.MergeableStatus{
 				IsMergeable: true,
@@ -854,7 +854,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.SuccessCommitStatus,
-			[]string{gitlabVersionOver15_6, gitlabVersion15_6},
+			gitlabServerVersions,
 			defaultMr,
 			models.MergeableStatus{
 				IsMergeable: true,
@@ -863,7 +863,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
-			[]string{gitlabVersionOver15_6, gitlabVersion15_6},
+			gitlabServerVersions,
 			ciMustPassMR,
 			models.MergeableStatus{
 				IsMergeable: true,
@@ -879,15 +879,17 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
 			},
 		},
-		// For GitLab < 15.6, merge status is unavailable since merge_status field was removed from the API.
+		// For GitLab < 15.6, fall back to the legacy merge_status field.
+		// testdata/detailed-merge-status-need-rebase.json has merge_status="can_be_merged"
+		// so old GitLab reports the MR as mergeable even though detailed_merge_status
+		// (used by >= 15.6) correctly reports need_rebase.
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.SuccessCommitStatus,
 			[]string{gitlabVersionUnder15_6},
 			needRebaseMR,
 			models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      "merge status unavailable: please upgrade to GitLab >= 15.6",
+				IsMergeable: true,
 			},
 		},
 		{
@@ -903,7 +905,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 		{
 			fmt.Sprintf("%s/apply: resource/default", vcsStatusName),
 			models.FailedCommitStatus,
-			[]string{gitlabVersionOver15_6, gitlabVersion15_6},
+			gitlabServerVersions,
 			noHeadPipelineMR,
 			models.MergeableStatus{
 				IsMergeable: true,
@@ -912,7 +914,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
-			[]string{gitlabVersionOver15_6, gitlabVersion15_6},
+			gitlabServerVersions,
 			noHeadPipelineMR,
 			models.MergeableStatus{
 				IsMergeable: true,
@@ -951,20 +953,22 @@ func TestClient_PullIsMergeable(t *testing.T) {
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.SuccessCommitStatus,
-			[]string{gitlabVersionOver15_6, gitlabVersion15_6},
+			gitlabServerVersions,
 			noHeadPipelineMR,
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
 		},
+		// approvals_before_merge is still returned by the GitLab API and captured
+		// by legacyMergeRequest, so this check works for all GitLab versions.
 		{
 			fmt.Sprintf("%s/plan", vcsStatusName),
 			models.SuccessCommitStatus,
-			[]string{gitlabVersionOver15_6, gitlabVersion15_6},
+			gitlabServerVersions,
 			remainingApprovalsMR,
 			models.MergeableStatus{
 				IsMergeable: false,
-				Reason:      "Merge status is not_approved",
+				Reason:      "Still require 2 approvals",
 			},
 		},
 		{
@@ -1090,8 +1094,24 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		mr                          *gitlab.MergeRequest
 		project                     *gitlab.Project
 		supportsDetailedMergeStatus bool
+		legacyMergeStatus           string
+		legacyApprovalsBeforeMerge  int
 		expected                    models.MergeableStatus
 	}{
+		{
+			description: "requires approvals (legacy field, all GitLab versions)",
+			mr: &gitlab.MergeRequest{
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+				},
+			},
+			project:                    &gitlab.Project{},
+			legacyApprovalsBeforeMerge: 2,
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Still require 2 approvals",
+			},
+		},
 		{
 			description: "blocking discussions unresolved",
 			mr: &gitlab.MergeRequest{
@@ -1209,11 +1229,36 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 				Reason:      "Merge status is can_be_merged",
 			},
 		},
+		{
+			description: "legacy merge status can_be_merged (GitLab < 15.6)",
+			mr: &gitlab.MergeRequest{
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+				},
+			},
+			project:           &gitlab.Project{},
+			legacyMergeStatus: "can_be_merged",
+			expected:          models.MergeableStatus{IsMergeable: true},
+		},
+		{
+			description: "legacy merge status cannot_be_merged (GitLab < 15.6)",
+			mr: &gitlab.MergeRequest{
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+				},
+			},
+			project:           &gitlab.Project{},
+			legacyMergeStatus: "cannot_be_merged",
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Merge status is cannot_be_merged",
+			},
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			actual := isMergeable(c.mr, c.project, c.supportsDetailedMergeStatus)
+			actual := isMergeable(c.mr, c.project, c.supportsDetailedMergeStatus, c.legacyMergeStatus, c.legacyApprovalsBeforeMerge)
 			Equals(t, c.expected, actual)
 		})
 	}

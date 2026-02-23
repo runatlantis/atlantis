@@ -15,6 +15,7 @@ package gitlab
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -49,6 +50,40 @@ type Client struct {
 	PollingTimeout time.Duration
 	// StatusRetryEnabled enables enhanced retry logic for pipeline status updates.
 	StatusRetryEnabled bool
+}
+
+// legacyMergeRequest extends the library's MergeRequest with fields removed in
+// gitlab.com/gitlab-org/api/client-go v0.161.1 that are still returned by the
+// GitLab REST API and required for backward compatibility with GitLab < 15.6.
+type legacyMergeRequest struct {
+	gitlab.MergeRequest
+	// MergeStatus is the pre-15.6 merge status field (deprecated in favour of
+	// DetailedMergeStatus, but still returned by the GitLab API).
+	MergeStatus string `json:"merge_status"`
+	// ApprovalsBeforeMerge is the number of approvals still required before the
+	// MR can be merged (removed from the library struct, but present in the API).
+	ApprovalsBeforeMerge int `json:"approvals_before_merge"`
+}
+
+// UnmarshalJSON overrides the promoted gitlab.MergeRequest.UnmarshalJSON so
+// that the legacy fields are also captured from the raw JSON payload.
+func (m *legacyMergeRequest) UnmarshalJSON(data []byte) error {
+	if err := m.MergeRequest.UnmarshalJSON(data); err != nil {
+		return err
+	}
+	// Unmarshal only the legacy fields into a plain struct to avoid infinite
+	// recursion; this is safe because the type has no UnmarshalJSON of its own.
+	type legacyFields struct {
+		MergeStatus          string `json:"merge_status"`
+		ApprovalsBeforeMerge int    `json:"approvals_before_merge"`
+	}
+	var lf legacyFields
+	if err := json.Unmarshal(data, &lf); err != nil {
+		return err
+	}
+	m.MergeStatus = lf.MergeStatus
+	m.ApprovalsBeforeMerge = lf.ApprovalsBeforeMerge
+	return nil
 }
 
 // commonMarkSupported is a version constraint that is true when this version of
@@ -286,13 +321,24 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
 func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if GitLab merge request %d is mergeable", pull.Num)
-	mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
+
+	// Use a custom struct to also capture legacy fields (merge_status,
+	// approvals_before_merge) that were removed from the library struct in
+	// v0.161.1 but are still returned by older GitLab instances (< 15.6).
+	apiURL := fmt.Sprintf("projects/%s/merge_requests/%d", url.PathEscape(repo.FullName), pull.Num)
+	req, err := g.Client.NewRequest("GET", apiURL, nil, nil)
+	if err != nil {
+		return models.MergeableStatus{}, err
+	}
+	lmr := &legacyMergeRequest{}
+	resp, err := g.Client.Do(req, lmr)
 	if resp != nil {
 		logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repo.FullName, pull.Num, resp.StatusCode)
 	}
 	if err != nil {
 		return models.MergeableStatus{}, err
 	}
+	mr := &lmr.MergeRequest
 
 	// Prevent nil pointer error when mr.HeadPipeline is empty
 	// See: https://github.com/runatlantis/atlantis/issues/1852
@@ -339,9 +385,11 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 
 	if supportsDetailedMergeStatus {
 		logger.Debug("Detailed merge status: '%s'", mr.DetailedMergeStatus)
+	} else {
+		logger.Debug("Merge status: '%s'", lmr.MergeStatus)
 	}
 
-	res := isMergeable(mr, project, supportsDetailedMergeStatus)
+	res := isMergeable(mr, project, supportsDetailedMergeStatus, lmr.MergeStatus, lmr.ApprovalsBeforeMerge)
 	if res.IsMergeable {
 		logger.Debug("Merge request is mergeable")
 	} else {
@@ -352,12 +400,20 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 
 // gitlabIsMergeable a pure function that encapsulates the tricky logic behind determining whether a gitlab MR is mergeable
 // It doesn't make any external calls and cannot error, so is much easier to test
-func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetailedMergeStatus bool) models.MergeableStatus {
+func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetailedMergeStatus bool, legacyMergeStatus string, legacyApprovalsBeforeMerge int) models.MergeableStatus {
 	isPipelineSkipped := false
 	if mr.HeadPipeline != nil {
 		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
 	}
 
+	// approvals_before_merge is still returned by the GitLab API even though it
+	// was removed from the library struct.  Check it for all GitLab versions.
+	if legacyApprovalsBeforeMerge > 0 {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      fmt.Sprintf("Still require %d approvals", legacyApprovalsBeforeMerge),
+		}
+	}
 	if !mr.BlockingDiscussionsResolved {
 		return models.MergeableStatus{
 			IsMergeable: false,
@@ -391,9 +447,16 @@ func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetai
 		}
 	}
 
+	// Fallback for GitLab < 15.6: use the legacy merge_status field (removed
+	// from the library struct but still present in the API JSON response).
+	if legacyMergeStatus == "can_be_merged" {
+		return models.MergeableStatus{
+			IsMergeable: true,
+		}
+	}
 	return models.MergeableStatus{
 		IsMergeable: false,
-		Reason:      "merge status unavailable: please upgrade to GitLab >= 15.6",
+		Reason:      fmt.Sprintf("Merge status is %s", legacyMergeStatus),
 	}
 }
 
