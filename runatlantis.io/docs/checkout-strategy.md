@@ -62,3 +62,18 @@ To optimize cloning time, Atlantis can perform a shallow clone by specifying the
 * If the merge base is not present, it means that either of the branches are ahead of the merge base by more than `--checkout-depth` commits. In this case full repo history is fetched.
 
 If the commit history often diverges by more than the default checkout depth then the `--checkout-depth` flag should be tuned to avoid full fetches.
+
+## Local Git Caching
+
+For large repositories or monorepos, cloning the entire repository for every pull request can be time-consuming and resource-intensive. Atlantis supports **Local Git Caching** to significantly improve performance by sharing git objects between multiple workspaces.
+
+When enabled via the `--local-git-cache` flag, Atlantis maintains a central repository cache (using `git clone --mirror`) within the `git-cache` directory in your data directory.
+
+When a pull request workspace is created:
+1. Atlantis ensures the central cache is up to date.
+2. It uses `git clone --reference <cache-dir>` to create the workspace.
+3. This allows the new clone to share the underlying git objects with the cache, reducing network traffic and disk space usage.
+
+::: tip PERFORMANCE
+This strategy is particularly effective for monorepos where multiple projects might be planned or applied simultaneously, as it avoids redundant downloads of the same repository data.
+:::
