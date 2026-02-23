@@ -126,38 +126,21 @@ func (g *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 	const maxPerPage = 100
 	var files []string
 	nextPage := 1
-	// Constructing the api url by hand so we can do pagination.
-	apiURL := fmt.Sprintf("projects/%s/merge_requests/%d/changes", url.QueryEscape(repo.FullName), pull.Num)
 	for {
-		opts := gitlab.ListOptions{
-			Page:    nextPage,
-			PerPage: maxPerPage,
+		opts := &gitlab.ListMergeRequestDiffsOptions{
+			ListOptions: gitlab.ListOptions{
+				Page:    nextPage,
+				PerPage: maxPerPage,
+			},
 		}
-		req, err := g.Client.NewRequest("GET", apiURL, opts, nil)
+		diffs, resp, err := g.Client.MergeRequests.ListMergeRequestDiffs(repo.FullName, pull.Num, opts)
+		if resp != nil {
+			logger.Debug("GET /projects/%s/merge_requests/%d/diffs returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+		}
 		if err != nil {
 			return nil, err
 		}
-		resp := new(gitlab.Response)
-		mr := new(gitlab.MergeRequest)
-		pollingStart := time.Now()
-		for {
-			resp, err = g.Client.Do(req, mr)
-			if resp != nil {
-				logger.Debug("GET %s returned: %d", apiURL, resp.StatusCode)
-			}
-			if err != nil {
-				return nil, err
-			}
-			if mr.ChangesCount != "" {
-				break
-			}
-			if time.Since(pollingStart) > g.PollingTimeout {
-				return nil, fmt.Errorf("giving up polling %q after %s", apiURL, g.PollingTimeout.String())
-			}
-			time.Sleep(g.PollingInterval)
-		}
-
-		for _, f := range mr.Changes {
+		for _, f := range diffs {
 			files = append(files, f.NewPath)
 
 			// If the file was renamed, we'll want to run plan in the directory
@@ -356,8 +339,6 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 
 	if supportsDetailedMergeStatus {
 		logger.Debug("Detailed merge status: '%s'", mr.DetailedMergeStatus)
-	} else {
-		logger.Debug("Merge status: '%s'", mr.MergeStatus) //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
 	}
 
 	res := isMergeable(mr, project, supportsDetailedMergeStatus)
@@ -377,12 +358,6 @@ func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetai
 		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
 	}
 
-	if mr.ApprovalsBeforeMerge > 0 {
-		return models.MergeableStatus{
-			IsMergeable: false,
-			Reason:      fmt.Sprintf("Still require %d approvals", mr.ApprovalsBeforeMerge),
-		}
-	}
 	if !mr.BlockingDiscussionsResolved {
 		return models.MergeableStatus{
 			IsMergeable: false,
@@ -416,15 +391,9 @@ func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetai
 		}
 	}
 
-	mergeStatus := mr.MergeStatus //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
-	if mergeStatus == "can_be_merged" {
-		return models.MergeableStatus{
-			IsMergeable: true,
-		}
-	}
 	return models.MergeableStatus{
 		IsMergeable: false,
-		Reason:      fmt.Sprintf("Merge status is %s", mergeStatus),
+		Reason:      "merge status unavailable: please upgrade to GitLab >= 15.6",
 	}
 }
 
