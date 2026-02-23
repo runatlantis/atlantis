@@ -1,7 +1,7 @@
 package github
 
 import (
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v83/github"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
