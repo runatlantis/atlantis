@@ -71,13 +71,13 @@ func (m *legacyMergeRequest) UnmarshalJSON(data []byte) error {
 	if err := m.MergeRequest.UnmarshalJSON(data); err != nil {
 		return err
 	}
-	// Unmarshal only the legacy fields into a plain struct to avoid infinite
-	// recursion; this is safe because the type has no UnmarshalJSON of its own.
-	type legacyFields struct {
+	// Unmarshal only the legacy fields into an anonymous struct to avoid
+	// infinite recursion; using an anonymous struct here prevents method
+	// promotion and ensures standard json.Unmarshal behavior.
+	var lf struct {
 		MergeStatus          string `json:"merge_status"`
 		ApprovalsBeforeMerge int    `json:"approvals_before_merge"`
 	}
-	var lf legacyFields
 	if err := json.Unmarshal(data, &lf); err != nil {
 		return err
 	}
@@ -325,7 +325,7 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	// Use a custom struct to also capture legacy fields (merge_status,
 	// approvals_before_merge) that were removed from the library struct in
 	// v0.161.1 but are still returned by older GitLab instances (< 15.6).
-	apiURL := fmt.Sprintf("projects/%s/merge_requests/%d", url.PathEscape(repo.FullName), pull.Num)
+	apiURL := fmt.Sprintf("projects/%s/merge_requests/%d", gitlab.PathEscape(repo.FullName), pull.Num)
 	req, err := g.Client.NewRequest("GET", apiURL, nil, nil)
 	if err != nil {
 		return models.MergeableStatus{}, err
@@ -420,7 +420,9 @@ func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetai
 			Reason:      "Blocking discussions unresolved",
 		}
 	}
-	if mr.WorkInProgress {
+	// Check draft/WIP status. mr.Draft is the modern field; mr.WorkInProgress is
+	// the legacy alias (still populated by older GitLab instances).
+	if mr.Draft || mr.WorkInProgress { //nolint:staticcheck
 		return models.MergeableStatus{
 			IsMergeable: false,
 			Reason:      "Work in progress",

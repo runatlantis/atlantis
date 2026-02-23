@@ -1241,6 +1241,23 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 			expected:          models.MergeableStatus{IsMergeable: true},
 		},
 		{
+			// Known limitation: GitLab < 15.6 uses the legacy merge_status field which
+			// returns "can_be_merged" even when the MR actually needs a rebase. On these
+			// older instances, detailed_merge_status is unavailable so we cannot detect
+			// the need_rebase condition. The MR is incorrectly reported as mergeable.
+			description: "legacy merge status can_be_merged but needs rebase (GitLab < 15.6 known limitation)",
+			mr: &gitlab.MergeRequest{
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					// DetailedMergeStatus is not populated on GitLab < 15.6
+				},
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: false, // GitLab < 15.6
+			legacyMergeStatus:           "can_be_merged",
+			expected:                    models.MergeableStatus{IsMergeable: true},
+		},
+		{
 			description: "legacy merge status cannot_be_merged (GitLab < 15.6)",
 			mr: &gitlab.MergeRequest{
 				BasicMergeRequest: gitlab.BasicMergeRequest{
@@ -1252,6 +1269,20 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 			expected: models.MergeableStatus{
 				IsMergeable: false,
 				Reason:      "Merge status is cannot_be_merged",
+			},
+		},
+		{
+			description: "draft via modern Draft field (GitLab >= 14.0)",
+			mr: &gitlab.MergeRequest{
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					Draft:                       true,
+				},
+			},
+			project: &gitlab.Project{},
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Work in progress",
 			},
 		},
 	}
