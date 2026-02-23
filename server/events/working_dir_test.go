@@ -834,3 +834,45 @@ func initRepo(t *testing.T) string {
 	runCmd(t, repoDir, "git", "branch", "branch")
 	return repoDir
 }
+
+func TestClone_LocalGitCache(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	dataDir := t.TempDir()
+	gitCacheDir := filepath.Join(dataDir, "git-cache")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		TestingOverrideBaseCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+		LocalGitCache:               true,
+		GitCacheDir:                 gitCacheDir,
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{FullName: "owner/repo"}, models.PullRequest{
+		BaseRepo:   models.Repo{FullName: "owner/repo"},
+		HeadBranch: "branch",
+	}, "default")
+	Ok(t, err)
+
+	// Use rev-parse to verify at correct commit.
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
+	Equals(t, expCommit, actCommit)
+
+	// Verify that the cache directory was created.
+	cacheDir := filepath.Join(gitCacheDir, "owner/repo")
+	assert.DirExists(t, cacheDir)
+
+	// Verify that the clone used the reference.
+	alternatesFile := filepath.Join(cloneDir, ".git/objects/info/alternates")
+	assert.FileExists(t, alternatesFile)
+	content, err := os.ReadFile(alternatesFile)
+	Ok(t, err)
+	assert.Contains(t, string(content), cacheDir)
+}
