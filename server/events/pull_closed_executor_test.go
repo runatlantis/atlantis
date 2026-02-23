@@ -28,6 +28,7 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
+	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -64,7 +65,8 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
 	w := mocks.NewMockWorkingDir()
-	l := lockmocks.NewMockLocker()
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
 	tmp := t.TempDir()
 	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
@@ -78,7 +80,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	err = errors.New("err")
-	When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, err)
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, err)
 	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Equals(t, "cleaning up locks: err", actualErr.Error())
 }
@@ -88,7 +90,8 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	t.Log("when there are no locks to clean up, we don't comment")
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkingDir()
-	l := lockmocks.NewMockLocker()
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
 	cp := vcsmocks.NewMockClient()
 	tmp := t.TempDir()
 	db, err := boltdb.New(tmp)
@@ -102,7 +105,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 		WorkingDir: w,
 		Database:   db,
 	}
-	When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Ok(t, err)
 	cp.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
@@ -189,7 +192,8 @@ func TestCleanUpPullComments(t *testing.T) {
 		func() {
 			w := mocks.NewMockWorkingDir()
 			cp := vcsmocks.NewMockClient()
-			l := lockmocks.NewMockLocker()
+			ctrl := gomock.NewController(t)
+			l := lockmocks.NewMockLocker(ctrl)
 			tmp := t.TempDir()
 			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
@@ -203,7 +207,7 @@ func TestCleanUpPullComments(t *testing.T) {
 				Database:   db,
 			}
 			t.Log("testing: " + c.Description)
-			When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(c.Locks, nil)
+			l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(c.Locks, nil)
 			err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 			Ok(t, err)
 			_, _, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(
@@ -273,7 +277,8 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		Ok(t, err)
 
 		workingDir := mocks.NewMockWorkingDir()
-		locker := lockmocks.NewMockLocker()
+		gmockCtrl := gomock.NewController(t)
+		locker := lockmocks.NewMockLocker(gmockCtrl)
 		client := vcsmocks.NewMockClient()
 		logger := loggermocks.NewMockSimpleLogging()
 
@@ -292,7 +297,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 				Workspace: "default",
 			},
 		}
-		When(locker.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(locks, nil)
+		locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(locks, nil)
 
 		// Clean up.
 		err = pullClosedExecutor.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
@@ -318,7 +323,8 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 
 	// Create mocks
 	workingDir := mocks.NewMockWorkingDir()
-	locker := lockmocks.NewMockLocker()
+	gmockCtrl := gomock.NewController(t)
+	locker := lockmocks.NewMockLocker(gmockCtrl)
 	client := vcsmocks.NewMockClient()
 	resourceCleaner := mocks.NewMockResourceCleaner()
 
@@ -359,7 +365,7 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 	}
 
 	// Setup mock expectations
-	When(locker.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
+	locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
 
 	// Execute CleanUpPull
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
