@@ -156,7 +156,7 @@ func TestClient_GetModifiedFiles(t *testing.T) {
 	testServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.RequestURI {
-			case "/api/v4/projects/lkysow%2Fatlantis-example/merge_requests/8312/diffs?page=1&per_page=100":
+			case "/api/v4/projects/runatlantis%2Fatlantis-example/merge_requests/8312/diffs?page=1&per_page=100":
 				w.WriteHeader(200)
 				w.Write(diffs) // nolint: errcheck
 			default:
@@ -175,15 +175,15 @@ func TestClient_GetModifiedFiles(t *testing.T) {
 	filenames, err := client.GetModifiedFiles(
 		logger,
 		models.Repo{
-			FullName: "lkysow/atlantis-example",
-			Owner:    "lkysow",
+			FullName: "runatlantis/atlantis-example",
+			Owner:    "runatlantis",
 			Name:     "atlantis-example",
 		},
 		models.PullRequest{
 			Num: 8312,
 			BaseRepo: models.Repo{
-				FullName: "lkysow/atlantis-example",
-				Owner:    "lkysow",
+				FullName: "runatlantis/atlantis-example",
+				Owner:    "runatlantis",
 				Name:     "atlantis-example",
 			},
 		})
