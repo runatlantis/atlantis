@@ -54,7 +54,8 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			vcsClient := setup(t, func(tc *TestConfig) {
-				tc.skipApplyLockCheckerSetup = true
+				tc.applyLockCheckerReturn = locking.ApplyCommandLock{Locked: c.ApplyLocked}
+				tc.applyLockCheckerErr = c.ApplyLockError
 			})
 
 			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
@@ -75,7 +76,6 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 
-			applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{Locked: c.ApplyLocked}, c.ApplyLockError)
 			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(

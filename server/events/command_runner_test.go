@@ -23,6 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
@@ -81,7 +82,8 @@ type TestConfig struct {
 	database                   db.Database
 	DisableUnlockLabel         string
 	PendingApplyStatus         bool
-	skipApplyLockCheckerSetup  bool
+	applyLockCheckerReturn     locking.ApplyCommandLock
+	applyLockCheckerErr        error
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -128,11 +130,8 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	applyLockChecker = lockingmocks.NewMockApplyLockChecker(lockCtrl)
 	lockingLocker = lockingmocks.NewMockLocker(lockCtrl)
 	// Allow incidental calls to CheckApplyLock (called internally during apply operations).
-	// Tests that need specific return values should set skipApplyLockCheckerSetup=true
-	// and register their own expectations after setup().
-	if !testConfig.skipApplyLockCheckerSetup {
-		applyLockChecker.EXPECT().CheckApplyLock().AnyTimes()
-	}
+	// Tests that need specific return values should set applyLockCheckerReturn/applyLockCheckerErr in TestConfig.
+	applyLockChecker.EXPECT().CheckApplyLock().Return(testConfig.applyLockCheckerReturn, testConfig.applyLockCheckerErr).AnyTimes()
 	// Allow incidental calls to UnlockByPull (called during plan operations to clean up locks)
 	lockingLocker.EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
