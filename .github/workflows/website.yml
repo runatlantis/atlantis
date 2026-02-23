@@ -45,6 +45,9 @@ jobs:
               - 'package-lock.json'
               - 'package.json'
               - '.github/workflows/website.yml'
+              - '.vale.ini'
+              - '_typos.toml'
+              - '.github/styles/**'
 
   # Check that the website builds and there's no missing links.
   website-check:
@@ -59,6 +62,21 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Spell check
+        uses: crate-ci/typos@57b11c6b7e54c402ccd9cda953f1072ec4f78e33 # v1.43.5
+        with:
+          files: ./runatlantis.io/docs
+
+      - name: Vale prose linting
+        uses: errata-ai/vale-action@d89dee975228ae261d22c15adcd03578634d429c # v2.1.1
+        with:
+          files: runatlantis.io/docs
+          fail_on_error: true
+          reporter: local
+          # api-endpoints.md intentionally uses "Github"/"Gitlab" as literal API
+          # string values matching the Go source code constants; exclude it here.
+          vale_flags: "--glob=!*api-endpoints.md"
 
       - name: markdown-lint
         uses: DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265 # v19
