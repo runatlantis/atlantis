@@ -47,7 +47,7 @@ jobs:
           output-sarif: true
 
       - name: Upload Sarif
-        if: always()
-        uses: github/codeql-action/upload-sarif@45580472a5bb82c4681c4ac726cfdb60060c2ee1 # v3
+        if: steps.run.outputs.sarif-path != ''
+        uses: github/codeql-action/upload-sarif@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4
         with:
           sarif_file: ${{ steps.run.outputs.sarif-path }}

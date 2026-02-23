@@ -1,12 +1,11 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package config_test
+package config
 
 import (
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
@@ -25,7 +24,7 @@ projects:
     enabled: true
 `))
 
-	pv := config.ParserValidator{}
+	pv := ParserValidator{}
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
 
 	f.Fuzz(func(t *testing.T, data []byte) {
