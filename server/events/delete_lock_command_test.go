@@ -10,11 +10,11 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
-	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 func TestDeleteLock_LockerErr(t *testing.T) {

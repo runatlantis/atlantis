@@ -28,7 +28,6 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
-	"go.uber.org/mock/gomock"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -36,6 +35,7 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	loggermocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
