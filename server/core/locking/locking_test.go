@@ -43,7 +43,7 @@ func TestTryLock_Err(t *testing.T) {
 	t.Log("when the database returns an error, TryLock should return that error")
 	l := locking.NewClient(database)
 	_, err := l.TryLock(project, workspace, pull, user)
-	Equals(t, err, err)
+	Equals(t, errExpected, err)
 }
 
 func TestTryLock_Success(t *testing.T) {
@@ -73,7 +73,7 @@ func TestUnlock_Err(t *testing.T) {
 	database.EXPECT().Unlock(project, "workspace").Return(nil, errExpected).Times(1)
 	l := locking.NewClient(database)
 	_, err := l.Unlock("owner/repo/path/workspace/projectName")
-	Equals(t, err, err)
+	Equals(t, errExpected, err)
 }
 
 func TestUnlock(t *testing.T) {
