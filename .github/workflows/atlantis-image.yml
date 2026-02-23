@@ -189,13 +189,16 @@ jobs:
         # Sign dev tags, version tags, and latest tags
         echo "${TAGS}" | xargs -I {} cosign sign \
           --yes \
-          -a actor=${{ github.actor}} \
-          -a ref_name=${{ github.ref_name}} \
-          -a ref=${{ github.sha }} \
+          -a "actor=${ACTOR}" \
+          -a "ref_name=${REF_NAME}" \
+          -a "ref=${SHA}" \
           {}@${DIGEST}
       env:
         TAGS: ${{ steps.meta.outputs.tags }}
         DIGEST: ${{ steps.build.outputs.digest }}
+        ACTOR: ${{ github.actor }}
+        REF_NAME: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
 
   test:
     needs: [changes]
