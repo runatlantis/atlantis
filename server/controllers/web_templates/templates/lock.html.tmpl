@@ -17,7 +17,7 @@
     <section class="header">
     <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
-    <p class="title-heading"><strong>{{.LockKey}}</strong> <code>Locked</code></p>
+    <p class="title-heading"><strong>{{.LockKey}}</strong> {{ if .IsManualLock }}<code>Locked Manually</code>{{ else }}<code>Locked</code>{{ end }}</p>
     </section>
     <div class="navbar-spacer"></div>
     <br>
@@ -25,12 +25,21 @@
       <div class="lock-detail-grid">
         <div><strong>Repo Owner:</strong></div><div>{{.RepoOwner}}</div>
         <div><strong>Repo Name:</strong></div><div>{{.RepoName}}</div>
+        {{ if .IsManualLock }}
+        <div><strong>Lock Type:</strong></div><div><code>Manual Lock</code></div>
+        <div><strong>Note:</strong></div><div>{{.Note}}</div>
+        {{ else }}
         <div><strong>Pull Request Link:</strong></div><div><a href="{{.PullRequestLink}}" target="_blank">{{.PullRequestLink}}</a></div>
+        {{ end }}
         <div><strong>Locked By:</strong></div><div>{{.LockedBy}}</div>
         <div><strong>Workspace:</strong></div><div>{{.Workspace}}</div>
       </div>
       <br>
+        {{ if .IsManualLock }}
+        <a class="button button-primary" id="discardPlanUnlock">Unlock</a>
+        {{ else }}
         <a class="button button-primary" id="discardPlanUnlock">Discard Plan & Unlock</a>
+        {{ end }}
     </section>
   </div>
   <div id="discardMessageModal" class="modal">
@@ -40,7 +49,11 @@
         <span class="close">&times;</span>
       </div>
       <div class="modal-body">
+        {{ if .IsManualLock }}
+        <p><strong>Are you sure you want to remove this manual lock?</strong></p>
+        {{ else }}
         <p><strong>Are you sure you want to discard the plan and unlock?</strong></p>
+        {{ end }}
         <input class="button-primary" id="discardYes" type="submit" value="Yes" data="{{.LockKeyEncoded}}">
         <input type="button" class="cancel" value="Cancel">
       </div>

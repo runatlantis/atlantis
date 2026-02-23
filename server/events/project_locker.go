@@ -38,9 +38,10 @@ type ProjectLocker interface {
 
 // DefaultProjectLocker implements ProjectLocker.
 type DefaultProjectLocker struct {
-	Locker     locking.Locker
-	NoOpLocker locking.Locker
-	VCSClient  vcs.Client
+	Locker           locking.Locker
+	NoOpLocker       locking.Locker
+	VCSClient        vcs.Client
+	LockURLGenerator LockURLGenerator
 }
 
 // TryLockResponse is the result of trying to lock a project.
@@ -70,14 +71,27 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 		return nil, err
 	}
 	if !lockAttempt.LockAcquired && lockAttempt.CurrLock.Pull.Num != pull.Num {
-		link, err := p.VCSClient.MarkdownPullLink(lockAttempt.CurrLock.Pull)
-		if err != nil {
-			return nil, err
+		var failureMsg string
+		if lockAttempt.CurrLock.IsManualLock {
+			lockURL := lockAttempt.LockKey
+			if p.LockURLGenerator != nil {
+				lockURL = p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey)
+			}
+			failureMsg = fmt.Sprintf(
+				"This project is currently locked manually by %s.\n\n**Note**: %s\n\nTo continue, the manual lock must be removed via the [Atlantis UI](%s).\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+				lockAttempt.CurrLock.User.Username,
+				lockAttempt.CurrLock.Note,
+				lockURL)
+		} else {
+			link, err := p.VCSClient.MarkdownPullLink(lockAttempt.CurrLock.Pull)
+			if err != nil {
+				return nil, err
+			}
+			failureMsg = fmt.Sprintf(
+				"This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
+				link,
+				link)
 		}
-		failureMsg := fmt.Sprintf(
-			"This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.",
-			link,
-			link)
 		return &TryLockResponse{
 			LockAcquired:      false,
 			LockFailureReason: failureMsg,
