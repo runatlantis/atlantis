@@ -544,7 +544,7 @@ Defaults to "" (empty string).
 Each VCS provider supports a different list of emojis:
 
 - [GitHub](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
-- [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
+- [GitLab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
 - [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
 
    :::
@@ -889,7 +889,7 @@ atlantis server --gitlab-hostname="my.gitlab.enterprise.com"
 ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 ```
 
-Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
+Hostname of your GitLab Enterprise installation. If using [GitLab.com](https://gitlab.com),
 don't set. Defaults to `gitlab.com`.
 
 ### `--gitlab-status-retry-enabled`
