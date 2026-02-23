@@ -130,6 +130,9 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	if strings.Contains(repo, "/") {
 		return Repo{}, fmt.Errorf("invalid repo format %q, repo %q should not contain any /'s", repoFullName, owner)
 	}
+	if strings.Contains(owner, "..") || strings.Contains(repo, "..") {
+		return Repo{}, fmt.Errorf("invalid repo format %q, owner or repo cannot contain '..'", repoFullName)
+	}
 
 	return Repo{
 		FullName:          repoFullName,

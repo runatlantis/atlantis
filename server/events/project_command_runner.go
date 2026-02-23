@@ -29,6 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 const OperationComplete = true
@@ -453,6 +454,15 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		return nil, "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
+
+		// let's unlock here since something probably nuked our directory between the plan and policy check phase
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
+
+		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
+	}
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
 
 		// let's unlock here since something probably nuked our directory between the plan and policy check phase
@@ -625,6 +635,9 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	}
 
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if err := utils.EnsureSubPath(repoDir, projAbsPath); err != nil {
+		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
+	}
 	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
@@ -661,6 +674,9 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
+		return "", "", fmt.Errorf("project path traversal detected: %w", err)
+	}
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
@@ -720,6 +736,9 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 		return "", "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
+		return "", "", fmt.Errorf("project path traversal detected: %w", err)
+	}
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
@@ -746,6 +765,9 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 		return nil, "", cloneErr
 	}
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if err = utils.EnsureSubPath(repoDir, projAbsPath); err != nil {
+		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
+	}
 	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
@@ -792,6 +814,9 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 		return nil, "", cloneErr
 	}
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if err = utils.EnsureSubPath(repoDir, projAbsPath); err != nil {
+		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
+	}
 	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
