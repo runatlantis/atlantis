@@ -77,3 +77,7 @@ When a pull request workspace is created:
 ::: tip PERFORMANCE
 This strategy is particularly effective for monorepos where multiple projects might be planned or applied simultaneously, as it avoids redundant downloads of the same repository data.
 :::
+
+::: warning
+Note: The `git-cache` directory will grow over time as new repositories and commits are cached. For long-running Atlantis instances or environments with many repositories, monitor disk usage and consider implementing a periodic cleanup process for repositories that are no longer in use.
+:::

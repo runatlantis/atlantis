@@ -610,8 +610,20 @@ func (w *FileWorkspace) ensureBaseClone(logger logging.SimpleLogging, c wrappedG
 	}
 
 	// If it already exists, fetch the latest objects.
-	logger.Debug("base clone %q already exists, fetching latest", cacheDir)
-	cmd := exec.Command("git", "remote", "update")
+	logger.Debug("base clone %q already exists, checking validity", cacheDir)
+	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
+	cmd.Dir = cacheDir
+	if err := cmd.Run(); err != nil {
+		logger.Info("base clone %q is invalid, removing corrupt cache and recloning", cacheDir)
+		if err := os.RemoveAll(cacheDir); err != nil {
+			return fmt.Errorf("removing corrupt base clone %q: %w", cacheDir, err)
+		}
+		// Retry the clone since we removed the corrupt cache.
+		return w.ensureBaseClone(logger, c)
+	}
+
+	logger.Debug("base clone %q is valid, fetching latest", cacheDir)
+	cmd = exec.Command("git", "remote", "update")
 	cmd.Dir = cacheDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
