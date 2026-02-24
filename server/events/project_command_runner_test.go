@@ -1882,6 +1882,55 @@ func TestDefaultProjectCommandRunner_PathTraversal(t *testing.T) {
 	}
 
 	for _, tc := range cases {
+		// Test multiple traversal patterns for the Plan runner (representative of all runners).
+		if tc.name == "Plan" {
+			traversalPatterns := []string{
+				"../../../../etc", // multi-level relative traversal
+				"../etc",          // single-level relative traversal
+				"sub/../../etc",   // traversal through a subdirectory
+			}
+			for _, pattern := range traversalPatterns {
+				pattern := pattern
+				t.Run(tc.name+" rejects traversal pattern "+pattern, func(t *testing.T) {
+					RegisterMockTestingT(t)
+					mockWorkingDir := mocks.NewMockWorkingDir()
+					mockLocker := mocks.NewMockProjectLocker()
+					runner := &events.DefaultProjectCommandRunner{
+						Locker:           mockLocker,
+						LockURLGenerator: mockURLGenerator{},
+						WorkingDir:       mockWorkingDir,
+						WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+					}
+					repoDir := t.TempDir()
+					tc.setupWorkingDir(mockWorkingDir, repoDir)
+					When(mockLocker.TryLock(
+						Any[logging.SimpleLogging](),
+						Any[models.PullRequest](),
+						Any[models.User](),
+						Any[string](),
+						Any[models.Project](),
+						AnyBool(),
+					)).ThenReturn(&events.TryLockResponse{
+						LockAcquired: true,
+						LockKey:      "lock-key",
+						UnlockFn:     func() error { return nil },
+					}, nil)
+					ctx := command.ProjectContext{
+						Log:        logging.NewNoopLogger(t),
+						Workspace:  "default",
+						RepoRelDir: pattern,
+						RePlanCmd:  "atlantis plan -d .",
+					}
+					err := tc.runFn(runner, ctx)
+					Assert(t, err != nil, "expected error for RepoRelDir %q", pattern)
+					Assert(t,
+						strings.Contains(err.Error(), "traversal") || strings.Contains(err.Error(), "path"),
+						"expected path traversal error for RepoRelDir %q, got: %s", pattern, err,
+					)
+				})
+			}
+		}
+
 		t.Run(tc.name+" rejects traversal in RepoRelDir", func(t *testing.T) {
 			RegisterMockTestingT(t)
 			mockWorkingDir := mocks.NewMockWorkingDir()

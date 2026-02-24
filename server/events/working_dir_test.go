@@ -837,6 +837,9 @@ func initRepo(t *testing.T) string {
 
 // TestFileWorkspace_PathTraversal verifies that maliciously crafted repo names,
 // workspace names, or project paths that attempt directory traversal are rejected.
+// These tests intentionally construct Repo/PullRequest structs directly (bypassing
+// NewRepo() validation) in order to test the defense-in-depth layer in working_dir.go
+// independently of the parse-time input validation in models.go.
 func TestFileWorkspace_PathTraversal(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	dataDir := t.TempDir()
@@ -846,7 +849,9 @@ func TestFileWorkspace_PathTraversal(t *testing.T) {
 		GpgNoSigningEnabled: true,
 	}
 
-	// A repo with a malicious FullName containing ".."
+	// A repo with a malicious FullName containing "..". The struct is constructed
+	// directly to simulate a scenario where parse-time validation is bypassed
+	// (e.g., a bug in NewRepo, or a new VCS provider without validation).
 	maliciousRepo := models.Repo{FullName: "../../../etc"}
 	pull := models.PullRequest{
 		Num:      1,
