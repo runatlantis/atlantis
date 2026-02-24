@@ -600,7 +600,6 @@ func (w *FileWorkspace) gitReadLock(workspaceDir string) func() {
 	return func() { mu.RUnlock() }
 }
 
-
 // gitRefLock acquires an exclusive lock for ref update operations.
 // It is separate from the repo read lock to allow for concurrent repo read operations
 // and not introduce uneccessary latency.
