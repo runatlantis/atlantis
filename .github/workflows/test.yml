@@ -59,7 +59,7 @@ jobs:
     runs-on: ubuntu-24.04
     # Use latest testing environment for automatic updates
     # Previous: ghcr.io/runatlantis/testing-env:latest@sha256:725981e9090c977f8055f5ec5ba7a63430a8f0337ab955978e6b8cc2cd0236c3
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:401987b9ee74a0533311d420660ee1253599b50a0ae7a793cce6b9b3df5b357f
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:770aa1715a16437bb581f0f94c447fab1fdb39d07537e44600c386ec509ba600
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
@@ -130,7 +130,7 @@ jobs:
       - run: 'echo "No build required"'
 
   e2e-github:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # dont run e2e tests on forked PRs
     if: github.event.pull_request.head.repo.fork == false
     env:
@@ -171,7 +171,7 @@ jobs:
           make build-service
           ./scripts/e2e.sh
   e2e-gitlab:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # dont run e2e tests on forked PRs
     if: github.event.pull_request.head.repo.fork == false
     env:

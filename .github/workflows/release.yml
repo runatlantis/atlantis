@@ -6,6 +6,9 @@ on:
       - v*.*.*
   workflow_dispatch:
 
+permissions:
+  contents: write  # for goreleaser to create releases and upload release assets
+
 jobs:
   goreleaser:
     runs-on: ubuntu-24.04
@@ -45,4 +48,4 @@ jobs:
           -f target_commitish=main \
           -q .body > tmp-CHANGELOG.md
       env:
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
