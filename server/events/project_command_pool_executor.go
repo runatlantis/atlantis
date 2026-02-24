@@ -203,7 +203,7 @@ func createCancelledResults(remainingGroups [][]command.ProjectContext) []comman
 			cancelledResults = append(cancelledResults, command.ProjectResult{
 				Command: cmd.CommandName,
 				ProjectCommandOutput: command.ProjectCommandOutput{
-					Error: fmt.Errorf("operation cancelled"),
+					Error: fmt.Errorf("operation cancelled via `atlantis cancel` command"),
 				},
 				RepoRelDir:  cmd.RepoRelDir,
 				Workspace:   cmd.Workspace,
