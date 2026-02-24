@@ -167,9 +167,10 @@ jobs:
           git config --global user.email "maintainers@runatlantis.io"
           git config --global user.name "atlantisbot"
 
-      - run: |
-          make build-service
-          ./scripts/e2e.sh
+      - name: Build service
+        run: make build-service
+      - name: Run e2e tests
+        run: ./scripts/e2e.sh
   e2e-gitlab:
     runs-on: ubuntu-24.04
     # dont run e2e tests on forked PRs
@@ -208,6 +209,7 @@ jobs:
           git config --global user.email "maintainers@runatlantis.io"
           git config --global user.name "atlantisbot"
 
-      - run: |
-          make build-service
-          ./scripts/e2e.sh
+      - name: Build service
+        run: make build-service
+      - name: Run e2e tests
+        run: ./scripts/e2e.sh
