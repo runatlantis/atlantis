@@ -1026,7 +1026,7 @@ ATLANTIS_LOCAL_GIT_CACHE=true
 ```
 
 Enable local git caching to improve performance in large repositories or monorepos. When enabled, Atlantis maintains a central repository cache and uses `git clone --reference` when creating pull request workspaces. This allows workspaces to share git objects, reducing network traffic and disk space usage. See [Checkout Strategy](checkout-strategy.md#local-git-caching) for more details.
- Defaults to `false`.
+Defaults to `false`.
 
 ### `--log-level` <Badge text="v0.1.3+" type="info"/>
 

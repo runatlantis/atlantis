@@ -432,12 +432,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 
-	gitCacheDir, err := mkSubDir(userConfig.DataDir, GitCacheDirName)
+	var gitCacheDir string
+	if userConfig.LocalGitCache {
+		gitCacheDir, err = mkSubDir(userConfig.DataDir, GitCacheDirName)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
-
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing --%s flag %q: %w", config.AtlantisURLFlag, userConfig.AtlantisURL, err)

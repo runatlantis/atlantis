@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -875,4 +876,116 @@ func TestClone_LocalGitCache(t *testing.T) {
 	content, err := os.ReadFile(alternatesFile)
 	Ok(t, err)
 	assert.Contains(t, string(content), cacheDir)
+
+	// Clone again to verify second clone uses cache without recloning base
+	cloneDir2, err := wd.Clone(logger, models.Repo{FullName: "owner/repo"}, models.PullRequest{
+		BaseRepo:   models.Repo{FullName: "owner/repo"},
+		HeadBranch: "branch",
+	}, "second_workspace")
+	Ok(t, err)
+
+	// Verify secondary clone is also at correct commit
+	actCommit2 := strings.TrimSpace(runCmd(t, cloneDir2, "git", "rev-parse", "HEAD"))
+	Equals(t, expCommit, actCommit2)
+
+	// Verify the second clone also used the reference
+	alternatesFile2 := filepath.Join(cloneDir2, ".git/objects/info/alternates")
+	assert.FileExists(t, alternatesFile2)
+	content2, err := os.ReadFile(alternatesFile2)
+	Ok(t, err)
+	assert.Contains(t, string(content2), cacheDir)
+}
+
+func TestClone_LocalGitCache_MergeStrategy(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	dataDir := t.TempDir()
+	gitCacheDir := filepath.Join(dataDir, "git-cache")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		TestingOverrideBaseCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+		LocalGitCache:               true,
+		GitCacheDir:                 gitCacheDir,
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{FullName: "owner/repo"}, models.PullRequest{
+		BaseRepo:   models.Repo{FullName: "owner/repo"},
+		BaseBranch: "main",
+		HeadBranch: "branch",
+	}, "default")
+	Ok(t, err)
+
+	// Use rev-parse to verify at correct commit. Since main and branch
+	// currently point to the same commit, the merge is a no-op and the
+	// resulting HEAD should match the original commit.
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
+	Equals(t, expCommit, actCommit)
+
+	// Verify that the cache directory was created.
+	cacheDir := filepath.Join(gitCacheDir, "owner/repo")
+	assert.DirExists(t, cacheDir)
+
+	// Verify that the clone used the reference via the local git cache.
+	alternatesFile := filepath.Join(cloneDir, ".git/objects/info/alternates")
+	assert.FileExists(t, alternatesFile)
+	content, err := os.ReadFile(alternatesFile)
+	Ok(t, err)
+	assert.Contains(t, string(content), cacheDir)
+}
+
+func TestClone_LocalGitCache_Parallel(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	dataDir := t.TempDir()
+	gitCacheDir := filepath.Join(dataDir, "git-cache")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		TestingOverrideBaseCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+		LocalGitCache:               true,
+		GitCacheDir:                 gitCacheDir,
+	}
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 10)
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			workspace := fmt.Sprintf("workspace-%d", i)
+			_, err := wd.Clone(logger, models.Repo{FullName: "owner/repo"}, models.PullRequest{
+				BaseRepo:   models.Repo{FullName: "owner/repo"},
+				HeadBranch: "branch",
+			}, workspace)
+			if err != nil {
+				errCh <- err
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		Ok(t, err)
+	}
+
+	// Verify that the cache directory was created.
+	cacheDir := filepath.Join(gitCacheDir, "owner/repo")
+	assert.DirExists(t, cacheDir)
 }
