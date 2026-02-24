@@ -830,7 +830,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 	var outputs []string
 
 	// Hold a read lock for the whole step run so clone/reset/merge cannot run in this dir until we're done.
-	unlock := p.WorkingDir.GitReadLock(absPath)
+	unlock := p.WorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	defer unlock()
 
 	envs := make(map[string]string)

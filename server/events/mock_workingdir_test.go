@@ -181,11 +181,11 @@ func (mock *MockWorkingDir) MergeAgain(logger logging.SimpleLogging, headRepo mo
 	return _ret0, _ret1
 }
 
-func (mock *MockWorkingDir) GitReadLock(cloneDir string) func() {
+func (mock *MockWorkingDir) GitReadLock(r models.Repo, p models.PullRequest, workspace string) func() {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
 	}
-	_params := []pegomock.Param{cloneDir}
+	_params := []pegomock.Param{r, p, workspace}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("GitReadLock", _params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem()})
 	var _ret0 func()
 	if len(_result) != 0 && _result[0] != nil {

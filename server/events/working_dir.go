@@ -60,7 +60,7 @@ type WorkingDir interface {
 	// GetGitUntrackedFiles returns a list of Git untracked files in the working dir.
 	GetGitUntrackedFiles(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) ([]string, error)
 	// GitReadLock acquires a shared lock so clone/reset/merge cannot run while the caller is using the working dir (e.g. running plan/apply). Call the returned function when done.
-	GitReadLock(cloneDir string) func()
+	GitReadLock(r models.Repo, p models.PullRequest, workspace string) func()
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -121,6 +121,7 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 // - (true, nil) → reuse succeeded; caller should use this cloneDir directly
 // - (false, nil) → reuse was not possible for an expected reason; caller should force clone
 // - (false, err) → an unexpected error occurred; caller should log the error and force clone
+// Locks are acquired by the caller.
 func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wrappedGitContext, cloneDir string) (bool, error) {
 	// If the directory doesn't exist yet, surely we can't reuse it
 	if _, err := os.Stat(cloneDir); err != nil {
@@ -193,6 +194,7 @@ func (w *FileWorkspace) MergeAgain(
 // and we have to perform a new merge.
 // If there are any errors we return true since we prefer to assume divergence
 // for safety.
+// Locks are acquired by the caller.
 func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that main has diverged if we're using
@@ -230,7 +232,10 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 		}
 	}
 
-	return w.HasDiverged(logger, cloneDir)
+	// We already hold the write lock; take ref lock so fetch is serialized with other HasDiverged callers.
+	unlockRef := w.gitRefLock(cloneDir)
+	defer unlockRef()
+	return w.hasDiverged(logger, cloneDir)
 }
 
 func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
@@ -240,8 +245,27 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 		return false
 	}
 
-	if !w.runGitFetch(logger, cloneDir) {
-		logger.Warn("HasDiverged: fetching repo has failed")
+	// Hold ref lock and repo read lock for the full duration (fetch + status) so we don't race with
+	// clone/reset/merge. recheckDiverged does not take the read lock because it already holds the write lock.
+	unlockGitRefLock := w.gitRefLock(cloneDir)
+	defer unlockGitRefLock()
+
+	unlockGitReadLock := w.gitReadLock(cloneDir)
+	defer unlockGitReadLock()
+
+	return w.hasDiverged(logger, cloneDir)
+}
+
+// hasDivergedWithFetchAndStatus runs fetch and git status to detect divergence. Caller must hold
+// gitRefLock(cloneDir); if not already holding the repo write lock (e.g. from recheckDiverged),
+// caller must also hold gitReadLock(cloneDir).
+func (w *FileWorkspace) hasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
+	logger.Debug("runGitFetch: running git fetch in %s", cloneDir)
+	cmd := exec.Command("git", "fetch")
+	cmd.Dir = cloneDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Warn("HasDiverged: fetching repo has failed: %s", string(output))
 		return true
 	}
 
@@ -253,8 +277,7 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 		logger.Warn("getting repo status has failed: %s", string(outputStatusUno))
 		return true
 	}
-	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
-	return hasDiverged
+	return strings.Contains(string(outputStatusUno), "have diverged")
 }
 
 func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {
@@ -563,37 +586,28 @@ func (w *FileWorkspace) gitWriteLock(cloneDir string) func() {
 
 // GitReadLock acquires a shared lock so that clone/reset/merge (write lock) cannot run
 // while steps are using the working dir. Call the returned function when steps are done.
-func (w *FileWorkspace) GitReadLock(cloneDir string) func() {
-	key := fmt.Sprintf("repo-lock/%s", cloneDir)
+func (w *FileWorkspace) GitReadLock(r models.Repo, p models.PullRequest, workspace string) func() {
+	return w.gitReadLock(w.cloneDir(r, p, workspace))
+}
+
+// gitReadLockByDir acquires the same read lock as GitReadLock but by workspace dir path.
+// Used when only the path is available (e.g. runGitFetch).
+func (w *FileWorkspace) gitReadLock(workspaceDir string) func() {
+	key := fmt.Sprintf("repo-lock/%s", workspaceDir)
 	value, _ := gitLocks.LoadOrStore(key, new(sync.RWMutex))
 	mu := value.(*sync.RWMutex)
 	mu.RLock()
 	return func() { mu.RUnlock() }
 }
 
-// runGitFetch runs git fetch in cloneDir. Serialized per dir (fetch mutex) to avoid
-// concurrent ref updates (e.g. "incorrect old value provided"). Also holds the repo
-// read lock so clone/reset/merge cannot run while we fetch (and vice versa).
-// Used by HasDiverged and HasDivergedWhenModified.
-func (w *FileWorkspace) runGitFetch(logger logging.SimpleLogging, cloneDir string) bool {
-	key := fmt.Sprintf("fetch-lock/%s", cloneDir)
+
+// gitRefLock acquires an exclusive lock for ref update operations.
+// It is separate from the repo read lock to allow for concurrent repo read operations
+// and not introduce uneccessary latency.
+func (w *FileWorkspace) gitRefLock(workspaceDir string) func() {
+	key := fmt.Sprintf("ref-lock/%s", workspaceDir)
 	value, _ := gitLocks.LoadOrStore(key, new(sync.Mutex))
 	mu := value.(*sync.Mutex)
 	mu.Lock()
-	defer mu.Unlock()
-
-	// Prevent clone/reset/merge from running while we update refs.
-	unlock := w.GitReadLock(cloneDir)
-	defer unlock()
-
-	logger.Debug("runGitFetch: running git fetch in %s", cloneDir)
-	cmd := exec.Command("git", "fetch")
-	cmd.Dir = cloneDir
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		logger.Warn("runGitFetch failed: %s", string(output))
-		return false
-	}
-	logger.Debug("runGitFetch: completed successfully")
-	return true
+	return func() { mu.Unlock() }
 }
