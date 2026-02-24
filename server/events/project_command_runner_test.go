@@ -1890,7 +1890,6 @@ func TestDefaultProjectCommandRunner_PathTraversal(t *testing.T) {
 				"sub/../../etc",   // traversal through a subdirectory
 			}
 			for _, pattern := range traversalPatterns {
-				pattern := pattern
 				t.Run(tc.name+" rejects traversal pattern "+pattern, func(t *testing.T) {
 					RegisterMockTestingT(t)
 					mockWorkingDir := mocks.NewMockWorkingDir()
