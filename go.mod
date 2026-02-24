@@ -48,6 +48,7 @@ require (
 	github.com/urfave/negroni/v3 v3.1.1
 	gitlab.com/gitlab-org/api/client-go v0.118.0
 	go.etcd.io/bbolt v1.4.3
+	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/term v0.40.0
 	golang.org/x/text v0.34.0

@@ -23,7 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_database.go Database
+//go:generate mockgen -package mocks -destination mocks/mock_database.go . Database
 
 // Database is an implementation of the database API we require.
 type Database interface {
