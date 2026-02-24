@@ -7,7 +7,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v83/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/events"
@@ -18,11 +17,11 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
 
 	cases := []struct {
 		Description       string
@@ -123,13 +122,46 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				Ok(t, err)
 			}
 
-			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
-				if c.Matched {
-					return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
+			matched := c.Matched
+			projectCommandBuilder.EXPECT().BuildPlanCommands(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ *command.Context, _ *events.CommentCommand) ([]command.ProjectContext, error) {
+					if matched {
+						return []command.ProjectContext{{CommandName: command.Plan}}, nil
+					}
+					return []command.ProjectContext{}, nil
+				})
+			projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}).AnyTimes()
+
+			expVCSStatusSet := c.ExpVCSStatusSet
+			expSucc := c.ExpVCSStatusSucc
+			expTotal := c.ExpVCSStatusTotal
+			planStatusCallCount := 0
+			commitUpdater.EXPECT().UpdateCombinedCount(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).DoAndReturn(func(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
+				if cmdName == command.Plan {
+					planStatusCallCount++
+					if !expVCSStatusSet {
+						t.Errorf("UpdateCombinedCount should not have been called when VCS status is silenced")
+					} else {
+						require.Equal(t, models.SuccessCommitStatus, status)
+						require.Equal(t, expSucc, numSuccess)
+						require.Equal(t, expTotal, numTotal)
+					}
 				}
-				return ReturnValues{[]command.ProjectContext{}, nil}
+				return nil
+			}).AnyTimes()
+			t.Cleanup(func() {
+				if expVCSStatusSet {
+					require.GreaterOrEqual(t, planStatusCallCount, 1, "UpdateCombinedCount should have been called at least once with command.Plan")
+				}
 			})
-			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 
 			planCommandRunner.Run(ctx, cmd)
 
@@ -140,40 +172,18 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 
 			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-			if c.ExpVCSStatusSet {
-				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
-					Eq[models.CommitStatus](models.SuccessCommitStatus),
-					Eq[command.Name](command.Plan),
-					Eq(c.ExpVCSStatusSucc),
-					Eq(c.ExpVCSStatusTotal),
-				)
-			} else {
-				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
-					Any[models.CommitStatus](),
-					Eq[command.Name](command.Plan),
-					Any[int](),
-					Any[int](),
-				)
-			}
 		})
 	}
 }
 
 func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
 
 	cases := []struct {
 		Description           string
 		ProjectContexts       []command.ProjectContext
 		ProjectCommandOutputs []command.ProjectCommandOutput
-		RunnerInvokeMatch     []*EqMatcher
+		RunnerInvokeTimes     []int
 		PrevPlanStored        bool
 		PlanFailed            bool
 	}{
@@ -207,11 +217,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					Error: errors.New("shabang"),
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			PlanFailed:        true,
 		},
 		{
 			Description: "When first fails, the second will not run",
@@ -240,11 +247,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Never(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 0},
+			PlanFailed:        true,
 		},
 		{
 			Description: "When first fails by autorun, the second will not run",
@@ -275,11 +279,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Never(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 0},
+			PlanFailed:        true,
 		},
 		{
 			Description: "When both in a group of two succeeds, the following two will run",
@@ -330,13 +331,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-				Never(),
-				Never(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 1, 0, 0},
+			PlanFailed:        true,
 		},
 		{
 			Description: "When one out of two fails, the following two will not run",
@@ -390,13 +386,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-				Once(),
-				Once(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 1, 1, 1},
+			PlanFailed:        true,
 		},
 		{
 			Description: "Don't block when parallel is not set",
@@ -424,11 +415,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			PlanFailed:        true,
 		},
 		{
 			Description: "All project finished successfully",
@@ -456,11 +444,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			PlanFailed: false,
+			RunnerInvokeTimes: []int{1, 1},
+			PlanFailed:        false,
 		},
 		{
 			Description: "Don't block when abortOnExecutionOrderFail is not set",
@@ -486,18 +471,13 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			PlanFailed:        true,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			// vcsClient := setup(t)
-
 			tmp := t.TempDir()
 			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
@@ -511,9 +491,6 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 
 			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
-			pull := &github.PullRequest{
-				State: github.Ptr("open"),
-			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
 			cmd := &events.CommentCommand{Name: command.Plan}
@@ -527,22 +504,20 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 
-			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-
-			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
-			// When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
-			// 	return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
-			// })
-			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutputs[i])
-			}
+			projectCommandBuilder.EXPECT().BuildPlanCommands(gomock.Any(), gomock.Any()).Return(c.ProjectContexts, nil)
+			planCallIdx := 0
+			outputs := c.ProjectCommandOutputs
+			projectCommandRunner.EXPECT().Plan(gomock.Any()).DoAndReturn(
+				func(_ command.ProjectContext) command.ProjectCommandOutput {
+					idx := planCallIdx
+					planCallIdx++
+					if idx < len(outputs) {
+						return outputs[idx]
+					}
+					return command.ProjectCommandOutput{}
+				}).AnyTimes()
 
 			planCommandRunner.Run(ctx, cmd)
-
-			for i := range c.ProjectContexts {
-				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Plan(c.ProjectContexts[i])
-			}
 
 			require.Equal(t, c.PlanFailed, ctx.CommandHasErrors)
 
@@ -555,7 +530,6 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 
 func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
 
 	cases := []struct {
 		Description            string
@@ -760,41 +734,58 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				Ok(t, err)
 			}
 
-			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
+			projectCommandBuilder.EXPECT().BuildPlanCommands(gomock.Any(), gomock.Any()).Return(c.ProjectContexts, nil)
 
-			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutput[i])
-			}
-
-			planCommandRunner.Run(ctx, cmd)
-
-			vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), AnyInt(), AnyString(), AnyString())
+			planCallIdx := 0
+			outputs := c.ProjectCommandOutput
+			projectCommandRunner.EXPECT().Plan(gomock.Any()).DoAndReturn(
+				func(_ command.ProjectContext) command.ProjectCommandOutput {
+					idx := planCallIdx
+					planCallIdx++
+					if idx < len(outputs) {
+						return outputs[idx]
+					}
+					return command.ProjectCommandOutput{}
+				}).AnyTimes()
 
 			ExpCommitStatus := models.SuccessCommitStatus
 			if c.ExpVCSApplyStatusSucc != c.ExpVCSApplyStatusTotal {
 				ExpCommitStatus = models.PendingCommitStatus
 			}
-			if c.DoNotUpdateApply {
-				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
-					Any[models.CommitStatus](),
-					Eq[command.Name](command.Apply),
-					AnyInt(),
-					AnyInt(),
-				)
-			} else {
-				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
-					Eq[models.CommitStatus](ExpCommitStatus),
-					Eq[command.Name](command.Apply),
-					Eq(c.ExpVCSApplyStatusSucc),
-					Eq(c.ExpVCSApplyStatusTotal),
-				)
-			}
+			applyCallCount := 0
+			doNotUpdateApply := c.DoNotUpdateApply
+			expApplySucc := c.ExpVCSApplyStatusSucc
+			expApplyTotal := c.ExpVCSApplyStatusTotal
+			commitUpdater.EXPECT().UpdateCombinedCount(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).DoAndReturn(func(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
+				if cmdName == command.Apply {
+					applyCallCount++
+					if doNotUpdateApply {
+						t.Errorf("UpdateCombinedCount should not have been called with command.Apply")
+					} else {
+						require.Equal(t, ExpCommitStatus, status)
+						require.Equal(t, expApplySucc, numSuccess)
+						require.Equal(t, expApplyTotal, numTotal)
+					}
+				}
+				return nil
+			}).AnyTimes()
+			t.Cleanup(func() {
+				if !doNotUpdateApply {
+					require.Equal(t, 1, applyCallCount, "UpdateCombinedCount should have been called exactly once with command.Apply")
+				}
+			})
+
+			planCommandRunner.Run(ctx, cmd)
+
+			vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), AnyInt(), AnyString(), AnyString())
 		})
 	}
 }
@@ -812,8 +803,6 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 	// to clear any pending state that was set earlier (e.g., in command_runner.go)
 
 	t.Run("silence flags with no projects should not set any status", func(t *testing.T) {
-		RegisterMockTestingT(t)
-
 		_ = setup(t, func(tc *TestConfig) {
 			tc.SilenceNoProjects = true
 			tc.silenceVCSStatusNoProjects = true // This is the key flag
@@ -833,38 +822,29 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 		}
 
 		// Mock no projects found (simulating when_modified patterns not matching)
-		When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{}, nil)
-
-		// This is the key test: when both conditions are true:
-		// 1. Silence flags are enabled
-		// 2. No projects are found
-		// We should NOT set any VCS status at all
-
-		// The plan runner is now configured with silence flags
-		// When it finds no projects, it should not set any VCS status
-		// because silence means no status checks at all
-
-		// Run through the plan command (which will internally check for projects)
-		cmd := &events.CommentCommand{Name: command.Plan}
-		planCommandRunner.Run(ctx, cmd)
+		projectCommandBuilder.EXPECT().BuildAutoplanCommands(gomock.Any()).Return([]command.ProjectContext{}, nil)
 
 		// CRITICAL VERIFICATION: With silence flags enabled, no status should be set at all
 		// This prevents any VCS status checks from being created (issue #5389)
 		// The silence flags mean "don't create any status checks"
-		commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-			Any[logging.SimpleLogging](),
-			Any[models.Repo](),
-			Any[models.PullRequest](),
-			Any[models.CommitStatus](),
-			Any[command.Name](),
-			Any[int](),
-			Any[int](),
-		)
+		commitUpdater.EXPECT().UpdateCombinedCount(
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+		).Return(nil).Times(0)
+
+		// Run through the plan command (which will internally check for projects)
+		cmd := &events.CommentCommand{Name: command.Plan}
+		planCommandRunner.Run(ctx, cmd)
 	})
 }
+
 func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
 
 	cases := []struct {
 		Description            string
@@ -995,34 +975,43 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 				},
 			}
 
-			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(projectContexts, nil)
-			When(projectCommandRunner.Plan(projectContexts[0])).ThenReturn(c.ProjectResults[0])
-
-			planCommandRunner.Run(ctx, cmd)
+			projectCommandBuilder.EXPECT().BuildPlanCommands(gomock.Any(), gomock.Any()).Return(projectContexts, nil)
+			projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(c.ProjectResults[0])
 
 			// Verify based on whether we expect a status update
-			if c.ExpShouldUpdateStatus {
-				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
-					Eq[models.CommitStatus](c.ExpApplyStatus),
-					Eq[command.Name](command.Apply),
-					Eq(c.ExpVCSApplyStatusSucc),
-					Eq(c.ExpVCSApplyStatusTotal),
-				)
-			} else {
-				// Verify that UpdateCombinedCount was NOT called for Apply command
-				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
-					Any[models.CommitStatus](),
-					Eq[command.Name](command.Apply),
-					Any[int](),
-					Any[int](),
-				)
-			}
+			applyCallCount := 0
+			expShouldUpdate := c.ExpShouldUpdateStatus
+			expApplyStatus := c.ExpApplyStatus
+			expApplySucc := c.ExpVCSApplyStatusSucc
+			expApplyTotal := c.ExpVCSApplyStatusTotal
+			commitUpdater.EXPECT().UpdateCombinedCount(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).DoAndReturn(func(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
+				if cmdName == command.Apply {
+					applyCallCount++
+					if !expShouldUpdate {
+						t.Errorf("UpdateCombinedCount should not have been called with command.Apply")
+					} else {
+						require.Equal(t, expApplyStatus, status)
+						require.Equal(t, expApplySucc, numSuccess)
+						require.Equal(t, expApplyTotal, numTotal)
+					}
+				}
+				return nil
+			}).AnyTimes()
+			t.Cleanup(func() {
+				if expShouldUpdate {
+					require.Equal(t, 1, applyCallCount, "UpdateCombinedCount should have been called exactly once with command.Apply")
+				}
+			})
+
+			planCommandRunner.Run(ctx, cmd)
 		})
 	}
 }

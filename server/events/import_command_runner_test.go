@@ -14,11 +14,11 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 func TestImportCommandRunner_Run(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
 
 	tests := []struct {
 		name          string
@@ -76,7 +76,7 @@ func TestImportCommandRunner_Run(t *testing.T) {
 			cmd := &events.CommentCommand{Name: command.Import}
 
 			When(pullReqStatusFetcher.FetchPullStatus(logger, modelPull)).ThenReturn(tt.pullReqStatus, nil)
-			When(projectCommandBuilder.BuildImportCommands(ctx, cmd)).ThenReturn(tt.projectCmds, nil)
+			projectCommandBuilder.EXPECT().BuildImportCommands(gomock.Any(), gomock.Any()).Return(tt.projectCmds, nil)
 
 			importCommandRunner.Run(ctx, cmd)
 

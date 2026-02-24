@@ -45,6 +45,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 // In the e2e test, we use `conftest` not `conftest$version`.
@@ -646,8 +647,8 @@ func TestGitHubWorkflow(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(githubGetter.GetPullRequest(
-				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
+			githubGetter.EXPECT().GetPullRequest(
+				gomock.Any(), gomock.Any(), gomock.Any()).Return(GitHubPullRequestParsed(headSHA), nil).AnyTimes()
 			When(vcsClient.GetModifiedFiles(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
@@ -827,7 +828,7 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
-			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
+			githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Any(), gomock.Any()).Return(GitHubPullRequestParsed(headSHA), nil).AnyTimes()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
 			// First, send the open pull request event which triggers autoplan.
@@ -1224,8 +1225,8 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(models.ApprovalStatus{
 				IsApproved: true,
 			}, nil)
-			When(githubGetter.GetPullRequest(
-				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int]())).ThenReturn(GitHubPullRequestParsed(headSHA), nil)
+			githubGetter.EXPECT().GetPullRequest(
+				gomock.Any(), gomock.Any(), gomock.Any()).Return(GitHubPullRequestParsed(headSHA), nil).AnyTimes()
 			When(vcsClient.GetModifiedFiles(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 
@@ -1308,11 +1309,12 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	allowForkPRs := false
 	discardApprovalOnPlan := true
 	dataDir, binDir, cacheDir := mkSubDirs(t)
+	gmockCtrl := gomock.NewController(t)
 	// Mocks.
 	e2eVCSClient := vcsmocks.NewMockClient()
 	e2eStatusUpdater := &events.DefaultCommitStatusUpdater{Client: e2eVCSClient}
-	e2eGithubGetter := mocks.NewMockGithubPullGetter()
-	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter()
+	e2eGithubGetter := mocks.NewMockGithubPullGetter(gmockCtrl)
+	e2eGitlabGetter := mocks.NewMockGitlabMergeRequestGetter(gmockCtrl)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
 
 	// Real dependencies.
@@ -1402,11 +1404,17 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	disableUnlockLabel := "do-not-unlock"
 
 	statusUpdater := runtimemocks.NewMockStatusUpdater()
-	commitStatusUpdater := mocks.NewMockCommitStatusUpdater()
+	commitStatusUpdater := mocks.NewMockCommitStatusUpdater(gmockCtrl)
+	// Allow any calls to commit status updater methods
+	commitStatusUpdater.EXPECT().UpdateCombined(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	commitStatusUpdater.EXPECT().UpdateCombinedCount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	commitStatusUpdater.EXPECT().UpdatePreWorkflowHook(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	commitStatusUpdater.EXPECT().UpdatePostWorkflowHook(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
 
 	mockPreWorkflowHookRunner = runtimemocks.NewMockPreWorkflowHookRunner()
-	preWorkflowHookURLGenerator := mocks.NewMockPreWorkflowHookURLGenerator()
+	preWorkflowHookURLGenerator := mocks.NewMockPreWorkflowHookURLGenerator(gmockCtrl)
+	preWorkflowHookURLGenerator.EXPECT().GenerateProjectWorkflowHookURL(gomock.Any()).Return("", nil).AnyTimes()
 	preWorkflowHooksCommandRunner := &events.DefaultPreWorkflowHooksCommandRunner{
 		VCSClient:             e2eVCSClient,
 		GlobalCfg:             globalCfg,
@@ -1418,7 +1426,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	}
 
 	mockPostWorkflowHookRunner = runtimemocks.NewMockPostWorkflowHookRunner()
-	postWorkflowHookURLGenerator := mocks.NewMockPostWorkflowHookURLGenerator()
+	postWorkflowHookURLGenerator := mocks.NewMockPostWorkflowHookURLGenerator(gmockCtrl)
+	postWorkflowHookURLGenerator.EXPECT().GenerateProjectWorkflowHookURL(gomock.Any()).Return("", nil).AnyTimes()
 	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
 		VCSClient:              e2eVCSClient,
 		GlobalCfg:              globalCfg,
@@ -1603,8 +1612,11 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		e2eVCSClient,
 	)
 
+	deleteLockCommand := mocks.NewMockDeleteLockCommand(gmockCtrl)
+	deleteLockCommand.EXPECT().DeleteLocksByPull(gomock.Any(), gomock.Any(), gomock.Any()).Return(0, nil).AnyTimes()
+
 	unlockCommandRunner := events.NewUnlockCommandRunner(
-		mocks.NewMockDeleteLockCommand(),
+		deleteLockCommand,
 		e2eVCSClient,
 		silenceNoProjects,
 		disableUnlockLabel,

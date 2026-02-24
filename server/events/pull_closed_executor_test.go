@@ -40,9 +40,9 @@ import (
 
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	t.Log("when workspace.Delete returns an error, we return it")
-	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
-	w := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	w := mocks.NewMockWorkingDir(ctrl)
 	tmp := t.TempDir()
 	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
@@ -54,18 +54,17 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 		Database:           db,
 	}
-	err = errors.New("err")
-	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
+	expErr := errors.New("err")
+	w.EXPECT().Delete(logger, testdata.GithubRepo, testdata.Pull).Return(expErr)
 	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Equals(t, "cleaning workspace: err", actualErr.Error())
 }
 
 func TestCleanUpPullUnlockErr(t *testing.T) {
 	t.Log("when locker.UnlockByPull returns an error, we return it")
-	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
-	w := mocks.NewMockWorkingDir()
 	ctrl := gomock.NewController(t)
+	w := mocks.NewMockWorkingDir(ctrl)
 	l := lockmocks.NewMockLocker(ctrl)
 	tmp := t.TempDir()
 	db, err := boltdb.New(tmp)
@@ -79,8 +78,9 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 		Database:           db,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
-	err = errors.New("err")
-	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, err)
+	expErr := errors.New("err")
+	w.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, expErr)
 	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Equals(t, "cleaning up locks: err", actualErr.Error())
 }
@@ -89,8 +89,8 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	t.Log("when there are no locks to clean up, we don't comment")
 	RegisterMockTestingT(t)
-	w := mocks.NewMockWorkingDir()
 	ctrl := gomock.NewController(t)
+	w := mocks.NewMockWorkingDir(ctrl)
 	l := lockmocks.NewMockLocker(ctrl)
 	cp := vcsmocks.NewMockClient()
 	tmp := t.TempDir()
@@ -105,6 +105,7 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 		WorkingDir: w,
 		Database:   db,
 	}
+	w.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Ok(t, err)
@@ -190,9 +191,9 @@ func TestCleanUpPullComments(t *testing.T) {
 	}
 	for _, c := range cases {
 		func() {
-			w := mocks.NewMockWorkingDir()
-			cp := vcsmocks.NewMockClient()
 			ctrl := gomock.NewController(t)
+			w := mocks.NewMockWorkingDir(ctrl)
+			cp := vcsmocks.NewMockClient()
 			l := lockmocks.NewMockLocker(ctrl)
 			tmp := t.TempDir()
 			db, err := boltdb.New(tmp)
@@ -207,6 +208,7 @@ func TestCleanUpPullComments(t *testing.T) {
 				Database:   db,
 			}
 			t.Log("testing: " + c.Description)
+			w.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(c.Locks, nil)
 			err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 			Ok(t, err)
@@ -276,8 +278,8 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		_, err = database.UpdatePullWithResults(testdata.Pull, result)
 		Ok(t, err)
 
-		workingDir := mocks.NewMockWorkingDir()
 		gmockCtrl := gomock.NewController(t)
+		workingDir := mocks.NewMockWorkingDir(gmockCtrl)
 		locker := lockmocks.NewMockLocker(gmockCtrl)
 		client := vcsmocks.NewMockClient()
 		logger := loggermocks.NewMockSimpleLogging()
@@ -297,6 +299,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 				Workspace: "default",
 			},
 		}
+		workingDir.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(locks, nil)
 
 		// Clean up.
@@ -318,15 +321,15 @@ func TestCleanUpLogStreaming(t *testing.T) {
 
 func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 	t.Log("CleanUpPull should call LogStreamResourceCleaner.CleanUp with complete PullInfo including RepoFullName and Path")
-	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
 
 	// Create mocks
-	workingDir := mocks.NewMockWorkingDir()
-	gmockCtrl := gomock.NewController(t)
-	locker := lockmocks.NewMockLocker(gmockCtrl)
+	ctrl := gomock.NewController(t)
+	workingDir := mocks.NewMockWorkingDir(ctrl)
+	locker := lockmocks.NewMockLocker(ctrl)
+	RegisterMockTestingT(t)
 	client := vcsmocks.NewMockClient()
-	resourceCleaner := mocks.NewMockResourceCleaner()
+	resourceCleaner := mocks.NewMockResourceCleaner(ctrl)
 
 	// Create temporary database
 	tmp := t.TempDir()
@@ -364,18 +367,18 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 		LogStreamResourceCleaner: resourceCleaner,
 	}
 
-	// Setup mock expectations
+	// Setup mock expectations BEFORE execution
+	workingDir.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
+
+	var capturedArgs []jobs.PullInfo
+	resourceCleaner.EXPECT().CleanUp(gomock.Any()).Times(2).Do(func(pullInfo jobs.PullInfo) {
+		capturedArgs = append(capturedArgs, pullInfo)
+	})
 
 	// Execute CleanUpPull
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Ok(t, err)
-
-	// Verify ResourceCleaner.CleanUp was called twice (once for each project)
-	resourceCleaner.VerifyWasCalled(Times(2)).CleanUp(Any[jobs.PullInfo]())
-
-	// Get the captured arguments to verify they contain all required fields
-	capturedArgs := resourceCleaner.VerifyWasCalled(Times(2)).CleanUp(Any[jobs.PullInfo]()).GetAllCapturedArguments()
 
 	// Verify first project's PullInfo
 	expectedPullInfo1 := jobs.PullInfo{

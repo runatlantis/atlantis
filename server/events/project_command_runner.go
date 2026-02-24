@@ -43,7 +43,7 @@ func (d DirNotExistErr) Error() string {
 	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
+//go:generate mockgen -package mocks -destination mocks/mock_lock_url_generator.go . LockURLGenerator
 
 // LockURLGenerator generates urls to locks.
 type LockURLGenerator interface {
@@ -51,7 +51,7 @@ type LockURLGenerator interface {
 	GenerateLockURL(lockID string) string
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_step_runner.go StepRunner
+//go:generate mockgen -package mocks -destination mocks/mock_step_runner.go . StepRunner
 
 // StepRunner runs steps. Steps are individual pieces of execution like
 // `terraform plan`.
@@ -60,7 +60,7 @@ type StepRunner interface {
 	Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_custom_step_runner.go CustomStepRunner
+//go:generate mockgen -package mocks -destination mocks/mock_custom_step_runner.go . CustomStepRunner
 
 // CustomStepRunner runs custom run steps.
 type CustomStepRunner interface {
@@ -77,7 +77,7 @@ type CustomStepRunner interface {
 	) (string, error)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_env_step_runner.go EnvStepRunner
+//go:generate mockgen -package mocks -destination mocks/mock_env_step_runner.go . EnvStepRunner
 
 // EnvStepRunner runs env steps.
 type EnvStepRunner interface {
@@ -104,7 +104,7 @@ type MultiEnvStepRunner interface {
 	) (string, error)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_webhooks_sender.go WebhooksSender
+//go:generate mockgen -package mocks -destination mocks/mock_webhooks_sender.go . WebhooksSender
 
 // WebhooksSender sends webhook.
 type WebhooksSender interface {
@@ -112,7 +112,7 @@ type WebhooksSender interface {
 	Send(log logging.SimpleLogging, res webhooks.ApplyResult) error
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
+//go:generate mockgen -package mocks -destination mocks/mock_project_command_runner.go . ProjectCommandRunner
 
 type ProjectPlanCommandRunner interface {
 	// Plan runs terraform plan for the project described by ctx.
@@ -161,7 +161,7 @@ type ProjectCommandRunner interface {
 	ProjectStateCommandRunner
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_job_url_setter.go JobURLSetter
+//go:generate mockgen -package mocks -destination mocks/mock_job_url_setter.go . JobURLSetter
 
 type JobURLSetter interface {
 	// SetJobURLWithStatus sets the commit status for the project represented by
@@ -169,7 +169,7 @@ type JobURLSetter interface {
 	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
+//go:generate mockgen -package mocks -destination mocks/mock_job_message_sender.go . JobMessageSender
 
 type JobMessageSender interface {
 	Send(ctx command.ProjectContext, msg string, operationComplete bool)

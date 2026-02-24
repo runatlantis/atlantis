@@ -7,16 +7,14 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
-	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/logging"
-
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 )
 
 func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
@@ -50,7 +48,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(false)
+				workingDir.EXPECT().HasDiverged(gomock.Any(), gomock.Any()).Return(false)
 			},
 			wantErr: assert.NoError,
 		},
@@ -96,7 +94,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 				PlanRequirements: []string{raw.UnDivergedRequirement},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
+				workingDir.EXPECT().HasDiverged(gomock.Any(), gomock.Any()).Return(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running plan.",
 			wantErr:     assert.NoError,
@@ -104,8 +102,8 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			ctrl := gomock.NewController(t)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			if tt.setup != nil {
 				tt.setup(workingDir)
@@ -150,7 +148,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(false)
+				workingDir.EXPECT().HasDiverged(gomock.Any(), gomock.Any()).Return(false)
 			},
 			wantErr: assert.NoError,
 		},
@@ -206,7 +204,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				ApplyRequirements: []string{raw.UnDivergedRequirement},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
+				workingDir.EXPECT().HasDiverged(gomock.Any(), gomock.Any()).Return(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running apply.",
 			wantErr:     assert.NoError,
@@ -214,8 +212,8 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			ctrl := gomock.NewController(t)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			if tt.setup != nil {
 				tt.setup(workingDir)
@@ -343,8 +341,8 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			ctrl := gomock.NewController(t)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			gotFailure, err := a.ValidateProjectDependencies(tt.ctx)
 			if !tt.wantErr(t, err, fmt.Sprintf("ValidateProjectDependencies(%v)", tt.ctx)) {
@@ -385,7 +383,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(false)
+				workingDir.EXPECT().HasDiverged(gomock.Any(), gomock.Any()).Return(false)
 			},
 			wantErr: assert.NoError,
 		},
@@ -417,7 +415,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 				ImportRequirements: []string{raw.UnDivergedRequirement},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
+				workingDir.EXPECT().HasDiverged(gomock.Any(), gomock.Any()).Return(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running import.",
 			wantErr:     assert.NoError,
@@ -425,8 +423,8 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			workingDir := mocks.NewMockWorkingDir()
+			ctrl := gomock.NewController(t)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
 			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
 			if tt.setup != nil {
 				tt.setup(workingDir)

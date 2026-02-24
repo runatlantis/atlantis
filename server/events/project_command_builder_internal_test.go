@@ -19,6 +19,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 // Test different permutations of global and repo config.
@@ -632,9 +633,9 @@ projects:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, nil)
+			ctrl := gomock.NewController(t)
+			workingDir := NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(tmp, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -847,9 +848,9 @@ projects:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, nil)
+			ctrl := gomock.NewController(t)
+			workingDir := NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(tmp, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -1092,9 +1093,9 @@ workflows:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, nil)
+			ctrl := gomock.NewController(t)
+			workingDir := NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(tmp, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -1246,9 +1247,9 @@ projects:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, nil)
+			ctrl := gomock.NewController(t)
+			workingDir := NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(tmp, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"modules/module/main.tf"}, nil)
@@ -1466,9 +1467,9 @@ autodiscover:
 				},
 			})
 
-			workingDir := NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmp, nil)
+			ctrl := gomock.NewController(t)
+			workingDir := NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(tmp, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(c.modifiedFiles, nil)
