@@ -172,9 +172,14 @@ jobs:
       - name: Run e2e tests
         run: ./scripts/e2e.sh
   e2e-gitlab:
+    needs: [e2e-github]
     runs-on: ubuntu-24.04
     # dont run e2e tests on forked PRs
-    if: github.event.pull_request.head.repo.fork == false
+    # always() ensures this job runs even when e2e-github fails, while still
+    # respecting the fork check; sequential execution prevents ngrok auth
+    # token conflicts (both jobs share the same token and ngrok only allows
+    # one active tunnel per token at a time).
+    if: always() && github.event.pull_request.head.repo.fork == false
     env:
       ATLANTIS_GITLAB_USER: ${{ secrets.ATLANTISBOT_GITLAB_USERNAME }}
       ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
