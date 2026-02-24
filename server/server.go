@@ -567,10 +567,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:  vcsClient,
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
-		Locker:           lockingClient,
-		WorkingDir:       workingDir,
-		WorkingDirLocker: workingDirLocker,
-		Database:         database,
+		Locker:                         lockingClient,
+		WorkingDir:                     workingDir,
+		WorkingDirLocker:               workingDirLocker,
+		Database:                       database,
+		SkipWorkingDirDeletionOnUnlock: userConfig.SkipWorkingDirDeletionOnUnlock,
 	}
 
 	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
