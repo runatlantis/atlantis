@@ -13,6 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/workingdir"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -46,7 +47,7 @@ func TestDeleteLock_Success(t *testing.T) {
 	l := lockmocks.NewMockLocker()
 	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
 	workingDir := events.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := workingdir.NewDefaultLocker()
 	workspace := "workspace"
 	path := "path"
 	projectName := ""

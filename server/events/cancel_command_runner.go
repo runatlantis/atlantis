@@ -3,6 +3,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/workingdir"
 )
 
 const cancelComment = "Cancelled all queued operations and released working directory locks for this pull request.\n" +
@@ -12,7 +13,7 @@ func NewCancelCommandRunner(
 	vcsClient vcs.Client,
 	projectCmdRunner ProjectCommandRunner,
 	pullUpdater *PullUpdater,
-	workingDirLocker WorkingDirLocker,
+	workingDirLocker workingdir.Locker,
 	silenceNoProjects bool,
 ) *CancelCommandRunner {
 	return &CancelCommandRunner{
@@ -28,7 +29,7 @@ type CancelCommandRunner struct {
 	VCSClient         vcs.Client
 	ProjectCmdRunner  ProjectCommandRunner
 	PullUpdater       *PullUpdater
-	WorkingDirLocker  WorkingDirLocker
+	WorkingDirLocker  workingdir.Locker
 	SilenceNoProjects bool
 }
 

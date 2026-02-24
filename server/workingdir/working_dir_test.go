@@ -1,22 +1,23 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package events_test
+package workingdir_test
 
 import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/workingdir"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -41,7 +42,7 @@ func TestClone_NoneExisting(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -70,7 +71,7 @@ func TestClone_MainBranchWithMergeStrategy(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		TestingOverrideHeadCloneURL: overrideURL,
@@ -138,7 +139,7 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	dataDir := t.TempDir()
 
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		CheckoutDepth:               50,
@@ -188,7 +189,7 @@ func TestClone_CheckoutMergeNoReclone(t *testing.T) {
 	// Run the clone for the first time.
 	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		CheckoutDepth:               50,
@@ -238,7 +239,7 @@ func TestClone_CheckoutMergeNoRecloneFastForward(t *testing.T) {
 	// Run the clone for the first time.
 	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		CheckoutDepth:               50,
@@ -293,7 +294,7 @@ func TestClone_CheckoutMergeConflict(t *testing.T) {
 	// We're set up, now trigger the Atlantis clone.
 	dataDir := t.TempDir()
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		CheckoutDepth:               50,
@@ -349,7 +350,7 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 		dataDir := t.TempDir()
 
-		wd := &events.FileWorkspace{
+		wd := &workingdir.FileWorkspace{
 			DataDir:       dataDir,
 			CheckoutMerge: true,
 			// retrieve two commits in each branch:
@@ -380,7 +381,7 @@ func TestClone_CheckoutMergeShallow(t *testing.T) {
 
 		dataDir := t.TempDir()
 
-		wd := &events.FileWorkspace{
+		wd := &workingdir.FileWorkspace{
 			DataDir:       dataDir,
 			CheckoutMerge: true,
 			// 1 is not enough to retrieve merge-base, so full clone should be performed
@@ -418,7 +419,7 @@ func TestClone_NoReclone(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -461,7 +462,7 @@ func TestClone_ResetOnWrongCommit(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -507,7 +508,7 @@ func TestClone_ReCloneOnBaseChange(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -556,7 +557,7 @@ func TestClone_ReCloneOnErrorAttemptingReuse(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -624,7 +625,7 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               true,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -699,7 +700,7 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	// Run the clone.
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:             repoDir,
 		CheckoutMerge:       false,
 		CheckoutDepth:       50,
@@ -806,7 +807,7 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	// Run the clone.
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:             repoDir,
 		CheckoutMerge:       true,
 		CheckoutDepth:       50,
@@ -833,4 +834,29 @@ func initRepo(t *testing.T) string {
 	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, repoDir, "git", "branch", "branch")
 	return repoDir
+}
+
+func runCmdErrCode(t *testing.T, dir string, errCode int, name string, args ...string) string {
+	t.Helper()
+	cpCmd := exec.Command(name, args...)
+	cpCmd.Dir = dir
+	cpOut, err := cpCmd.CombinedOutput()
+	cmd := strings.Join(append([]string{name}, args...), " ")
+	if err != nil {
+		if eerr, ok := err.(*exec.ExitError); ok {
+			Assert(t, errCode == eerr.ExitCode(), "unexpected exit code: want %v, got %v, running %q: %s", errCode, eerr.ExitCode(), cmd, cpCmd)
+			return string(cpOut)
+		}
+	}
+	Assert(t, false, "invalid exit code, running %q: %s", cmd, cpOut)
+	return string(cpOut)
+}
+
+func runCmd(t *testing.T, dir string, name string, args ...string) string {
+	t.Helper()
+	cpCmd := exec.Command(name, args...)
+	cpCmd.Dir = dir
+	cpOut, err := cpCmd.CombinedOutput()
+	Assert(t, err == nil, "err running %q: %s", strings.Join(append([]string{name}, args...), " "), cpOut)
+	return string(cpOut)
 }

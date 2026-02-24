@@ -18,6 +18,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/workingdir"
 	tally "github.com/uber-go/tally/v4"
 )
 
@@ -37,8 +38,8 @@ type APIController struct {
 	RepoAllowlistChecker           *events.RepoAllowlistChecker          `validate:"required"`
 	Scope                          tally.Scope                           `validate:"required"`
 	VCSClient                      vcs.Client                            `validate:"required"`
-	WorkingDir                     events.WorkingDir                     `validate:"required"`
-	WorkingDirLocker               events.WorkingDirLocker               `validate:"required"`
+	WorkingDir                     workingdir.WorkingDir                 `validate:"required"`
+	WorkingDirLocker               workingdir.Locker                     `validate:"required"`
 	CommitStatusUpdater            events.CommitStatusUpdater            `validate:"required"`
 	// SilenceVCSStatusNoProjects is whether API should set commit status if no projects are found
 	SilenceVCSStatusNoProjects bool

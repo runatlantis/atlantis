@@ -18,6 +18,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/workingdir"
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -44,8 +45,8 @@ func NewInstrumentedProjectCommandBuilder(
 	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
 	vcsClient vcs.Client,
-	workingDir WorkingDir,
-	workingDirLocker WorkingDirLocker,
+	workingDir workingdir.WorkingDir,
+	workingDirLocker workingdir.Locker,
 	globalCfg valid.GlobalCfg,
 	pendingPlanFinder *DefaultPendingPlanFinder,
 	commentBuilder CommentBuilder,
@@ -104,8 +105,8 @@ func NewProjectCommandBuilder(
 	parserValidator *config.ParserValidator,
 	projectFinder ProjectFinder,
 	vcsClient vcs.Client,
-	workingDir WorkingDir,
-	workingDirLocker WorkingDirLocker,
+	workingDir workingdir.WorkingDir,
+	workingDirLocker workingdir.Locker,
 	globalCfg valid.GlobalCfg,
 	pendingPlanFinder *DefaultPendingPlanFinder,
 	commentBuilder CommentBuilder,
@@ -217,9 +218,9 @@ type DefaultProjectCommandBuilder struct {
 	// Used to make API calls to a VCS host like GitHub or GitLab.
 	VCSClient vcs.Client
 	// Handles the workspace on disk for running commands.
-	WorkingDir WorkingDir
+	WorkingDir workingdir.WorkingDir
 	// Used to prevent multiple commands from executing at the same time for a single repo, pull, and workspace.
-	WorkingDirLocker WorkingDirLocker
+	WorkingDirLocker workingdir.Locker
 	// The final parsed version of the server-side repo config.
 	GlobalCfg valid.GlobalCfg
 	// Finds unapplied plans.

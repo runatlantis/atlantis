@@ -11,7 +11,7 @@
 // limitations under the License.
 // Modified hereafter by contributors to runatlantis/atlantis.
 
-package events
+package workingdir
 
 import (
 	"fmt"
@@ -28,7 +28,7 @@ import (
 // this from happening because a specific repo/pull/workspace has a single workspace
 // on disk and we haven't written Atlantis (yet) to handle concurrent execution
 // within this workspace.
-type WorkingDirLocker interface {
+type Locker interface {
 	// TryLock tries to acquire a lock for this repo, pull, workspace, and path.
 	// It returns a function that should be used to unlock the workspace and
 	// an error if the workspace is already locked. The error is expected to
@@ -39,7 +39,7 @@ type WorkingDirLocker interface {
 }
 
 // DefaultWorkingDirLocker implements WorkingDirLocker.
-type DefaultWorkingDirLocker struct {
+type DefaultLocker struct {
 	// mutex prevents against multiple threads calling functions on this struct
 	// concurrently. It's only used for entry/exit to each function.
 	mutex sync.Mutex
@@ -48,11 +48,11 @@ type DefaultWorkingDirLocker struct {
 }
 
 // NewDefaultWorkingDirLocker is a constructor.
-func NewDefaultWorkingDirLocker() *DefaultWorkingDirLocker {
-	return &DefaultWorkingDirLocker{locks: make(map[string]command.Name)}
+func NewDefaultLocker() *DefaultLocker {
+	return &DefaultLocker{locks: make(map[string]command.Name)}
 }
 
-func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) (func(), error) {
+func (d *DefaultLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) (func(), error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -68,7 +68,7 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 }
 
 // UnlockByPull unlocks all workspaces for a specific pull request
-func (d *DefaultWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int) {
+func (d *DefaultLocker) UnlockByPull(repoFullName string, pullNum int) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -82,7 +82,7 @@ func (d *DefaultWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int)
 }
 
 // Unlock unlocks the workspace for this pull.
-func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, workspace string, path string, projectName string) {
+func (d *DefaultLocker) unlock(repoFullName string, pullNum int, workspace string, path string, projectName string) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -90,6 +90,6 @@ func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, works
 	delete(d.locks, workspaceKey)
 }
 
-func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace string, path string, projectName string) string {
+func (d *DefaultLocker) workspaceKey(repo string, pull int, workspace string, path string, projectName string) string {
 	return strings.TrimRight(fmt.Sprintf("%s/%d/%s/%s/%s", repo, pull, workspace, path, projectName), "/")
 }

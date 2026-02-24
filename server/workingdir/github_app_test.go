@@ -1,20 +1,20 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package events_test
+package workingdir_test
 
 import (
 	"fmt"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/events"
 	eventMocks "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	githubMocks "github.com/runatlantis/atlantis/server/events/vcs/github/mocks"
 	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/workingdir"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -28,7 +28,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 
-	wd := &events.FileWorkspace{
+	wd := &workingdir.FileWorkspace{
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
@@ -38,7 +38,7 @@ func TestClone_GithubAppNoneExisting(t *testing.T) {
 	testServer, err := githubtestdata.GithubAppTestServer(t)
 	Ok(t, err)
 
-	gwd := &events.GithubAppWorkingDir{
+	gwd := &workingdir.GithubAppWorkingDir{
 		WorkingDir: wd,
 		Credentials: &github.AppCredentials{
 			Key:      []byte(githubtestdata.PrivateKey),
@@ -68,7 +68,7 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	credentials := githubMocks.NewMockCredentials()
 
-	ghAppWorkingDir := events.GithubAppWorkingDir{
+	ghAppWorkingDir := workingdir.GithubAppWorkingDir{
 		WorkingDir:     workingDir,
 		Credentials:    credentials,
 		GithubHostname: "some-host",
@@ -113,7 +113,7 @@ func TestMergeAgain_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	credentials := githubMocks.NewMockCredentials()
 
-	ghAppWorkingDir := events.GithubAppWorkingDir{
+	ghAppWorkingDir := workingdir.GithubAppWorkingDir{
 		WorkingDir:     workingDir,
 		Credentials:    credentials,
 		GithubHostname: "some-host",

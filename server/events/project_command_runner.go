@@ -29,6 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/workingdir"
 )
 
 const OperationComplete = true
@@ -240,9 +241,9 @@ type DefaultProjectCommandRunner struct {
 	EnvStepRunner             EnvStepRunner
 	MultiEnvStepRunner        MultiEnvStepRunner
 	PullApprovedChecker       runtime.PullApprovedChecker
-	WorkingDir                WorkingDir
+	WorkingDir                workingdir.WorkingDir
 	Webhooks                  WebhooksSender
-	WorkingDirLocker          WorkingDirLocker
+	WorkingDirLocker          workingdir.Locker
 	CommandRequirementHandler CommandRequirementHandler
 	CancellationTracker       CancellationTracker
 }

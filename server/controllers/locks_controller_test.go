@@ -19,10 +19,10 @@ import (
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/workingdir"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/events"
 
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -284,7 +284,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	l := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := workingdir.NewDefaultLocker()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: repoName},
 	}
@@ -351,7 +351,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	}, nil)
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := workingdir.NewDefaultLocker()
 	var database db.Database
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
@@ -378,7 +378,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	dlc := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	workingDirLocker := workingdir.NewDefaultLocker()
 	var database db.Database
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
