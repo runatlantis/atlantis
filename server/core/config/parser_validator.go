@@ -19,7 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	yaml "gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // ParserValidator parses and validates server-side repo config files and
