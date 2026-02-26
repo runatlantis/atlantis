@@ -45,6 +45,7 @@ const githubHeader = "X-Github-Event"
 const giteaHeader = "X-Gitea-Event"
 const gitlabHeader = "X-Gitlab-Event"
 const azuredevopsHeader = "Request-Id"
+const azuredevopsServerHeader = "X-VSS-ActivityId"
 
 var user = []byte("user")
 var secret = []byte("secret")
@@ -987,6 +988,20 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 			cr.VerifyWasCalledOnce().RunAutoplanCommand(models.Repo{}, models.Repo{}, models.PullRequest{State: models.ClosedPullState}, models.User{})
 		})
 	}
+}
+
+func TestPost_AzureDevopsServerHeader(t *testing.T) {
+	t.Log("when the request has the Azure DevOps Server header it is handled")
+	e, _, _, ado, _, _, _, _, _ := setup(t)
+	payload := `{"eventType": "git.pullrequest.created", "resource": {"repository": {"url": "https://dev.azure.com/owner/repo/_apis/git/repositories/repo-id"}}}`
+	req, _ := http.NewRequest("POST", "", strings.NewReader(payload))
+	req.Header.Set(azuredevopsServerHeader, "activityID")
+	When(ado.Validate(req, user, secret)).ThenReturn([]byte(payload), nil)
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	// We expect a 200 or 400 depending on how parsing goes, but the key is that it didn't return "Ignoring request"
+	Assert(t, w.Code < 500, "unexpected server error")
+	Assert(t, !strings.Contains(w.Body.String(), "Ignoring request"), "Should not ignore request")
 }
 
 func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *mocks.MockAzureDevopsRequestValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {
