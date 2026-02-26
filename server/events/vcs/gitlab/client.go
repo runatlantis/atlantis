@@ -282,17 +282,13 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	if err != nil {
 		return approvalStatus, err
 	}
-	if approvals.ApprovalsLeft > 0 {
-		return approvalStatus, nil
-	}
 	numApprovals := len(approvals.ApprovedBy)
-	if numApprovals == 0 {
+	approvalStatus.NumApprovals = numApprovals
+	if approvals.ApprovalsLeft > 0 || numApprovals == 0 {
 		return approvalStatus, nil
 	}
-	return models.ApprovalStatus{
-		IsApproved: true,
-		NumApprovals: numApprovals,
-	}, nil
+	approvalStatus.IsApproved = true
+	return approvalStatus, nil
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
