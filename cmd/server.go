@@ -84,6 +84,8 @@ const (
 	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
+	EmojiRunReaction                 = "emoji-run-reaction"
+	EmojiErrorReaction               = "emoji-error-reaction"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
@@ -299,7 +301,15 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: "",
 	},
 	EmojiReaction: {
-		description:  "Emoji Reaction to use to react to comments.",
+		description:  "Emoji Reaction to use to react to received comments.",
+		defaultValue: DefaultEmojiReaction,
+	},
+	EmojiRunReaction: {
+		description:  "Emoji Reaction to use to react to running command.",
+		defaultValue: DefaultEmojiReaction,
+	},
+	EmojiErrorReaction: {
+		description:  "Emoji Reaction to use to react to errors.",
 		defaultValue: DefaultEmojiReaction,
 	},
 	ExecutableName: {
@@ -934,6 +944,12 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.EmojiReaction == "" {
 		c.EmojiReaction = DefaultEmojiReaction
+	}
+	if c.EmojiRunReaction == "" {
+		c.EmojiRunReaction = DefaultEmojiReaction
+	}
+	if c.EmojiErrorReaction == "" {
+		c.EmojiErrorReaction = DefaultEmojiReaction
 	}
 	if c.ExecutableName == "" {
 		c.ExecutableName = DefaultExecutableName

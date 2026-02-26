@@ -60,15 +60,17 @@ const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/
 // VCSEventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
 type VCSEventsController struct {
-	CommandRunner  events.CommandRunner  `validate:"required"`
-	PullCleaner    events.PullCleaner    `validate:"required"`
-	Logger         logging.SimpleLogging `validate:"required"`
-	Scope          tally.Scope           `validate:"required"`
-	Parser         events.EventParsing   `validate:"required"`
-	CommentParser  events.CommentParsing `validate:"required"`
-	ApplyDisabled  bool
-	EmojiReaction  string
-	ExecutableName string
+	CommandRunner      events.CommandRunner  `validate:"required"`
+	PullCleaner        events.PullCleaner    `validate:"required"`
+	Logger             logging.SimpleLogging `validate:"required"`
+	Scope              tally.Scope           `validate:"required"`
+	Parser             events.EventParsing   `validate:"required"`
+	CommentParser      events.CommentParsing `validate:"required"`
+	ApplyDisabled      bool
+	EmojiReaction      string
+	EmojiRunReaction   string
+	EmojiErrorReaction string
+	ExecutableName     string
 	// GithubWebhookSecret is the secret added to this webhook via the GitHub
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
@@ -655,6 +657,12 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 	// todo: can gitlab return the pull request here too?
 	baseRepo, headRepo, commentID, user, err := e.Parser.ParseGitlabMergeRequestCommentEvent(event)
 	if err != nil {
+		if e.EmojiErrorReaction != "" {
+			err = e.VCSClient.ReactToComment(e.Logger, baseRepo, event.MergeRequest.IID, int64(commentID), e.EmojiErrorReaction)
+			if err != nil {
+				e.Logger.Warn("Failed to react to comment: %s", err)
+			}
+		}
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
@@ -665,6 +673,13 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 	code := http.StatusOK
 	msg := resp.body
 	if resp.err.code != 0 {
+		if e.EmojiErrorReaction != "" {
+			err = e.VCSClient.ReactToComment(e.Logger, baseRepo, event.MergeRequest.IID, int64(commentID), e.EmojiErrorReaction)
+			if err != nil {
+				e.Logger.Warn("Failed to react to comment: %s", err)
+			}
+		}
+
 		lvl = logging.Error
 		code = resp.err.code
 		msg = resp.err.err.Error()
@@ -727,6 +742,12 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		if err := e.VCSClient.CreateComment(logger, baseRepo, pullNum, parseResult.CommentResponse, ""); err != nil {
 			logger.Err("Unable to comment on pull request: %s", err)
 		}
+		if e.EmojiErrorReaction != "" {
+			err := e.VCSClient.ReactToComment(e.Logger, baseRepo, pullNum, int64(commentID), e.EmojiErrorReaction)
+			if err != nil {
+				e.Logger.Warn("Failed to react to comment: %s", err)
+			}
+		}
 		return HTTPResponse{
 			body: "Commenting back on pull request",
 		}
@@ -737,6 +758,14 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 	} else {
 		logger.Info("Running comment command '%v' for user '%v'.", parseResult.Command.Name, user.Username)
 	}
+
+	if e.EmojiRunReaction != "" {
+		err := e.VCSClient.ReactToComment(e.Logger, baseRepo, pullNum, int64(commentID), e.EmojiRunReaction)
+		if err != nil {
+			e.Logger.Warn("Failed to react to comment: %s", err)
+		}
+	}
+
 	if !e.TestingMode {
 		// Respond with success and then actually execute the command asynchronously.
 		// We use a goroutine so that this function returns and the connection is

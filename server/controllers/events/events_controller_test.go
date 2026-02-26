@@ -1006,6 +1006,8 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 	e := events_controllers.VCSEventsController{
 		ExecutableName:                  "atlantis",
 		EmojiReaction:                   "eyes",
+		EmojiRunReaction:                "rocket",
+		EmojiErrorReaction:              "bomb",
 		TestingMode:                     true,
 		Logger:                          logger,
 		Scope:                           scope,

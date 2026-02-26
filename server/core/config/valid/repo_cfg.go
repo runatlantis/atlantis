@@ -31,6 +31,8 @@ type RepoCfg struct {
 	RepoLocks                 *RepoLocks
 	CustomPolicyCheck         *bool
 	EmojiReaction             string
+	EmojiRunReaction          string
+	EmojiErrorReaction        string
 	AllowedRegexpPrefixes     []string
 	AbortOnExecutionOrderFail bool
 	SilencePRComments         []string
