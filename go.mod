@@ -6,8 +6,8 @@ require (
 	code.gitea.io/sdk/gitea v0.23.2
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/alicebob/miniredis/v2 v2.36.1
-	github.com/bmatcuk/doublestar/v4 v4.8.1
-	github.com/bradleyfalzon/ghinstallation/v2 v2.15.0
+	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
 	github.com/briandowns/spinner v1.23.2
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/drmaxgit/go-azuredevops v0.13.2
@@ -15,8 +15,8 @@ require (
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/go-test/deep v1.1.1
 	github.com/gofri/go-github-ratelimit v1.1.1
-	github.com/golang-jwt/jwt/v5 v5.2.2
-	github.com/google/go-github/v71 v71.0.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/go-github/v83 v83.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -34,7 +34,7 @@ require (
 	github.com/moby/patternmatcher v0.6.0
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/opentofu/tofudl v0.0.1
-	github.com/petergtz/pegomock/v4 v4.2.0
+	github.com/petergtz/pegomock/v4 v4.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.17.3
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -48,8 +48,9 @@ require (
 	github.com/urfave/negroni/v3 v3.1.1
 	gitlab.com/gitlab-org/api/client-go v0.118.0
 	go.etcd.io/bbolt v1.4.3
+	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.1
-	golang.org/x/term v0.39.0
+	golang.org/x/term v0.40.0
 	golang.org/x/text v0.34.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -57,7 +58,7 @@ require (
 require (
 	github.com/agext/levenshtein v1.2.3
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
-	github.com/hashicorp/hcl/v2 v2.23.0
+	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 )
@@ -77,7 +78,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudflare/circl v1.6.1 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/davidmz/go-pageant v1.0.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
@@ -92,7 +93,8 @@ require (
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/google/go-github/v75 v75.0.0 // indirect
+	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -128,7 +130,7 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
-	github.com/zclconf/go-cty v1.14.4 // indirect
+	github.com/zclconf/go-cty v1.16.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
@@ -137,7 +139,7 @@ require (
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
