@@ -318,8 +318,24 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.AzureDevopsUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
 
+		// Parse bypass teams from comma-separated string
+		var bypassTeams []string
+		if userConfig.AzureDevopsBypassMergeRequirementTeams != "" {
+			for team := range strings.SplitSeq(userConfig.AzureDevopsBypassMergeRequirementTeams, ",") {
+				team = strings.TrimSpace(team)
+				if team != "" {
+					bypassTeams = append(bypassTeams, team)
+				}
+			}
+		}
+
+		azuredevopsConfig := azuredevops.Config{
+			AllowMergeableBypassApply:   userConfig.AzureDevopsAllowMergeableBypassApply,
+			BypassMergeRequirementTeams: bypassTeams,
+		}
+
 		var err error
-		azuredevopsClient, err = azuredevops.New(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
+		azuredevopsClient, err = azuredevops.New(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, azuredevopsConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -750,6 +766,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	autoMerger := &events.AutoMerger{
 		VCSClient:       vcsClient,
 		GlobalAutomerge: userConfig.Automerge,
+		VCSStatusName:   userConfig.VCSStatusName,
 	}
 
 	projectOutputWrapper := &events.ProjectOutputWrapper{
