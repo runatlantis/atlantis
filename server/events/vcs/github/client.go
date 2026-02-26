@@ -395,6 +395,11 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		}
 		for _, review := range pageReviews {
 			if review != nil && review.User != nil && review.User.Login != nil && review.SubmittedAt != nil {
+				// Skip reviews from the pull request author
+				if *review.User.Login == pull.Author {
+					continue
+				}
+
 				if review.GetState() == "APPROVED" {
 					approvedBy[*review.User.Login] = review.SubmittedAt.Time
 				} else if review.GetState() == "CHANGES_REQUESTED" || review.GetState() == "DISMISSED" {
