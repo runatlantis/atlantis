@@ -263,11 +263,16 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		}
 
 		for _, review := range pullReviews {
+			// Skip reviews from the pull request author
+			if review.Reviewer.UserName == pull.Author {
+				continue
+			}
+
 			if review.State == gitea.ReviewStateApproved {
 				approvedBy[review.Reviewer.UserName] = true
-				approvalStatus.IsApproved = true
-				approvalStatus.ApprovedBy = review.Reviewer.UserName
-				approvalStatus.Date = review.Submitted
+			} else if review.State == gitea.ReviewStateRequestChanges || review.State == gitea.ReviewStateRequestReview {
+				// Remove approval if reviewer later requested changes
+				delete(approvedBy, review.Reviewer.UserName)
 			}
 		}
 
@@ -280,6 +285,9 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	}
 
 	approvalStatus.NumApprovals = len(approvedBy)
+	if approvalStatus.NumApprovals > 0 {
+		approvalStatus.IsApproved = true
+	}
 	return approvalStatus, nil
 }
 
