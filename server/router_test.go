@@ -50,13 +50,14 @@ func TestRouter_GenerateLockURL(t *testing.T) {
 
 	queryParam := "id"
 	routeName := "routename"
-	underlyingRouter := mux.NewRouter()
-	underlyingRouter.HandleFunc("/lock", func(_ http.ResponseWriter, _ *http.Request) {}).Methods("GET").Queries(queryParam, "{id}").Name(routeName)
 
 	for _, c := range cases {
 		t.Run(c.AtlantisURL, func(t *testing.T) {
 			atlantisURL, err := server.ParseAtlantisURL(c.AtlantisURL)
 			Ok(t, err)
+			basePath := server.GetBasePath(atlantisURL)
+			underlyingRouter := mux.NewRouter()
+			underlyingRouter.PathPrefix(basePath).Subrouter().HandleFunc("/lock", func(_ http.ResponseWriter, _ *http.Request) {}).Methods("GET").Queries(queryParam, "{id}").Name(routeName)
 
 			router := &server.Router{
 				AtlantisURL:               atlantisURL,
@@ -69,12 +70,12 @@ func TestRouter_GenerateLockURL(t *testing.T) {
 	}
 }
 
-func setupJobsRouter(t *testing.T) *server.Router {
-	atlantisURL, err := server.ParseAtlantisURL("http://localhost:4141")
+func setupJobsRouter(t *testing.T, basepath string) *server.Router {
+	atlantisURL, err := server.ParseAtlantisURL("http://localhost:4141/" + basepath)
 	Ok(t, err)
 
 	underlyingRouter := mux.NewRouter()
-	underlyingRouter.HandleFunc("/jobs/{job-id}", func(_ http.ResponseWriter, _ *http.Request) {}).Methods("GET").Name("project-jobs-detail")
+	underlyingRouter.PathPrefix(basepath).Subrouter().HandleFunc("/jobs/{job-id}", func(_ http.ResponseWriter, _ *http.Request) {}).Methods("GET").Name("project-jobs-detail")
 
 	return &server.Router{
 		AtlantisURL:              atlantisURL,
@@ -84,32 +85,51 @@ func setupJobsRouter(t *testing.T) *server.Router {
 }
 
 func TestGenerateProjectJobURL_ShouldGenerateURLWhenJobIDSpecified(t *testing.T) {
-	router := setupJobsRouter(t)
-	jobID := uuid.New().String()
-	ctx := command.ProjectContext{
-		JobID: jobID,
+	basepaths := []string{
+		"/",
+		"/base/basepath/",
 	}
-	expectedURL := fmt.Sprintf("http://localhost:4141/jobs/%s", jobID)
-	gotURL, err := router.GenerateProjectJobURL(ctx)
-	Ok(t, err)
 
-	Equals(t, expectedURL, gotURL)
+	for _, basepath := range basepaths {
+		t.Run(basepath, func(t *testing.T) {
+			router := setupJobsRouter(t, basepath)
+			jobID := uuid.New().String()
+			ctx := command.ProjectContext{
+				JobID: jobID,
+			}
+			expectedURL := fmt.Sprintf("http://localhost:4141%sjobs/%s", basepath, jobID)
+			gotURL, err := router.GenerateProjectJobURL(ctx)
+			Ok(t, err)
+
+			Equals(t, expectedURL, gotURL)
+		})
+	}
+
 }
 
 func TestGenerateProjectJobURL_ShouldReturnErrorWhenJobIDNotSpecified(t *testing.T) {
-	router := setupJobsRouter(t)
-	ctx := command.ProjectContext{
-		Pull: models.PullRequest{
-			BaseRepo: models.Repo{
-				Owner: "test-owner",
-				Name:  "test-repo",
-			},
-			Num: 1,
-		},
-		RepoRelDir: "ops/terraform/",
+	basepaths := []string{
+		"/",
+		"/base/basepath/",
 	}
-	expectedErrString := "no job id in ctx"
-	gotURL, err := router.GenerateProjectJobURL(ctx)
-	require.EqualError(t, err, expectedErrString)
-	Equals(t, "", gotURL)
+
+	for _, basepath := range basepaths {
+		t.Run(basepath, func(t *testing.T) {
+			router := setupJobsRouter(t, basepath)
+			ctx := command.ProjectContext{
+				Pull: models.PullRequest{
+					BaseRepo: models.Repo{
+						Owner: "test-owner",
+						Name:  "test-repo",
+					},
+					Num: 1,
+				},
+				RepoRelDir: "ops/terraform/",
+			}
+			expectedErrString := "no job id in ctx"
+			gotURL, err := router.GenerateProjectJobURL(ctx)
+			require.EqualError(t, err, expectedErrString)
+			Equals(t, "", gotURL)
+		})
+	}
 }

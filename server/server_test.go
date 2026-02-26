@@ -293,3 +293,58 @@ func TestParseAtlantisURL(t *testing.T) {
 		})
 	}
 }
+
+func TestGetBasePath(t *testing.T) {
+	cases := []struct {
+		RawUrl           string
+		ExpectedBasePath string
+	}{
+		// Valid URLs should work.
+		{
+			RawUrl:           "https://example.com",
+			ExpectedBasePath: "",
+		},
+		{
+			RawUrl:           "http://example.com",
+			ExpectedBasePath: "",
+		},
+		{
+			RawUrl:           "http://example.com/",
+			ExpectedBasePath: "",
+		},
+		{
+			RawUrl:           "http://example.com",
+			ExpectedBasePath: "",
+		},
+		{
+			RawUrl:           "http://example.com:4141",
+			ExpectedBasePath: "",
+		},
+		{
+			RawUrl:           "http://example.com:4141/",
+			ExpectedBasePath: "",
+		},
+		{
+			RawUrl:           "http://example.com/baseurl",
+			ExpectedBasePath: "/baseurl",
+		},
+		{
+			RawUrl:           "http://example.com/baseurl/",
+			ExpectedBasePath: "/baseurl",
+		},
+		{
+			RawUrl:           "http://example.com/baseurl/test",
+			ExpectedBasePath: "/baseurl/test",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.RawUrl, func(t *testing.T) {
+			parsedUrl, err := server.ParseAtlantisURL(c.RawUrl)
+			Ok(t, err)
+
+			basePath := server.GetBasePath(parsedUrl)
+			Equals(t, c.ExpectedBasePath, basePath)
+		})
+	}
+}

@@ -99,6 +99,7 @@ const (
 type Server struct {
 	AtlantisVersion                string
 	AtlantisURL                    *url.URL
+	BasePath                       string
 	Router                         *mux.Router
 	Port                           int
 	PostWorkflowHooksCommandRunner *events.DefaultPostWorkflowHooksCommandRunner
@@ -432,6 +433,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing --%s flag %q: %w", config.AtlantisURLFlag, userConfig.AtlantisURL, err)
+	}
+
+	basePath := GetBasePath(parsedURL)
+	if basePath != "/" {
+		logger.Info("All endpoints will use base path: %s", basePath)
 	}
 
 	underlyingRouter := mux.NewRouter()
@@ -1016,6 +1022,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	server := &Server{
 		AtlantisVersion:                config.AtlantisVersion,
 		AtlantisURL:                    parsedURL,
+		BasePath:                       basePath,
 		Router:                         underlyingRouter,
 		Port:                           userConfig.Port,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
@@ -1062,31 +1069,35 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 // Start creates the routes and starts serving traffic.
 func (s *Server) Start() error {
-	s.Router.HandleFunc("/", s.Index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
-		return r.URL.Path == "/" || r.URL.Path == "/index.html"
-	})
-	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
-	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
-	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
-	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
-	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
-	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
-	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
-	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
-	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
-	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
-	s.Router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
+	// Exclude the trailing slash
+	router := s.Router.PathPrefix(s.BasePath).Subrouter()
+
+	router.HandleFunc("", s.Index).Methods("GET")
+	router.HandleFunc("/", s.Index).Methods("GET")
+	router.HandleFunc("/index.html", s.Index).Methods("GET")
+
+	router.HandleFunc("/healthz", s.Healthz).Methods("GET")
+	router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
+	router.PathPrefix("/static/").Handler(http.StripPrefix(s.BasePath, http.FileServer(http.FS(staticAssets))))
+	router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
+	router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
+	router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
+	router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
+	router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
+	router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
+	router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
+	router.HandleFunc("/lock", s.LocksController.GetLock).Methods("GET").
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
-	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
-	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
+	router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
+	router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
 
 	r, ok := s.StatsReporter.(prometheus.Reporter)
 	if ok {
-		s.Router.Handle(s.CommandRunner.GlobalCfg.Metrics.Prometheus.Endpoint, r.HTTPHandler())
+		router.Handle(s.CommandRunner.GlobalCfg.Metrics.Prometheus.Endpoint, r.HTTPHandler())
 	}
 	if !s.DisableGlobalApplyLock {
-		s.Router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
-		s.Router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
+		router.HandleFunc("/apply/lock", s.LocksController.LockApply).Methods("POST").Queries()
+		router.HandleFunc("/apply/unlock", s.LocksController.UnlockApply).Methods("DELETE").Queries()
 	}
 
 	if s.EnableProfilingAPI {
@@ -1097,7 +1108,7 @@ func (s *Server) Start() error {
 			"/symbol":  pprof.Symbol,
 			"/trace":   pprof.Trace,
 		} {
-			s.Router.HandleFunc("/debug/pprof"+p, h).Methods("GET")
+			router.HandleFunc("/debug/pprof"+p, h).Methods("GET")
 		}
 	}
 
@@ -1346,4 +1357,13 @@ func ParseAtlantisURL(u string) (*url.URL, error) {
 	// use it in the rest of the program.
 	parsed.Path = strings.TrimSuffix(parsed.Path, "/")
 	return parsed, nil
+}
+
+func GetBasePath(atlantisUrl *url.URL) string {
+	if atlantisUrl.Path == "" || atlantisUrl.Path == "/" {
+		return ""
+	}
+
+	basePath := strings.TrimPrefix(strings.TrimSuffix(atlantisUrl.Path, "/"), "/")
+	return "/" + basePath
 }
