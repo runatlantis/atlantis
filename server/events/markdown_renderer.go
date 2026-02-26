@@ -235,110 +235,110 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 			ProjectName:  result.ProjectName,
 			IsSuccessful: result.IsSuccessful(),
 		}
-		if result.PlanSuccess != nil {
-			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
+		if result.ProjectCommandOutput.PlanSuccess != nil {
+			result.ProjectCommandOutput.PlanSuccess.TerraformOutput = strings.TrimSpace(result.ProjectCommandOutput.PlanSuccess.TerraformOutput)
 			data := planSuccessData{
-				PlanSuccess:              *result.PlanSuccess,
+				PlanSuccess:              *result.ProjectCommandOutput.PlanSuccess,
 				PlanWasDeleted:           common.PlansDeleted,
 				DisableApply:             common.DisableApply,
 				DisableRepoLocking:       common.DisableRepoLocking,
 				EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat,
-				PlanStats:                result.PlanSuccess.Stats(),
+				PlanStats:                result.ProjectCommandOutput.PlanSuccess.Stats(),
 			}
-			if m.shouldUseWrappedTmpl(vcsHost, result.PlanSuccess.TerraformOutput) {
-				data.PlanSummary = result.PlanSuccess.Summary()
+			if m.shouldUseWrappedTmpl(vcsHost, result.ProjectCommandOutput.PlanSuccess.TerraformOutput) {
+				data.PlanSummary = result.ProjectCommandOutput.PlanSuccess.Summary()
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessWrapped"), data)
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("planSuccessUnwrapped"), data)
 			}
-			resultData.NoChanges = result.PlanSuccess.NoChanges()
-			if result.PlanSuccess.NoChanges() {
+			resultData.NoChanges = result.ProjectCommandOutput.PlanSuccess.NoChanges()
+			if result.ProjectCommandOutput.PlanSuccess.NoChanges() {
 				numPlansWithNoChanges++
 			} else {
 				numPlansWithChanges++
 			}
 			numPlanSuccesses++
-		} else if result.PolicyCheckResults != nil && common.Command == policyCheckCommandTitle {
+		} else if result.ProjectCommandOutput.PolicyCheckResults != nil && common.Command == policyCheckCommandTitle {
 			policyCheckResults := policyCheckResultsData{
-				PreConftestOutput:     result.PolicyCheckResults.PreConftestOutput,
-				PostConftestOutput:    result.PolicyCheckResults.PostConftestOutput,
-				PolicyCheckResults:    *result.PolicyCheckResults,
-				PolicyCheckSummary:    result.PolicyCheckResults.Summary(),
-				PolicyApprovalSummary: result.PolicyCheckResults.PolicySummary(),
-				PolicyCleared:         result.PolicyCheckResults.PolicyCleared(),
+				PreConftestOutput:     result.ProjectCommandOutput.PolicyCheckResults.PreConftestOutput,
+				PostConftestOutput:    result.ProjectCommandOutput.PolicyCheckResults.PostConftestOutput,
+				PolicyCheckResults:    *result.ProjectCommandOutput.PolicyCheckResults,
+				PolicyCheckSummary:    result.ProjectCommandOutput.PolicyCheckResults.Summary(),
+				PolicyApprovalSummary: result.ProjectCommandOutput.PolicyCheckResults.PolicySummary(),
+				PolicyCleared:         result.ProjectCommandOutput.PolicyCheckResults.PolicyCleared(),
 				commonData:            common,
 			}
-			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckResults.CombinedOutput()) {
+			if m.shouldUseWrappedTmpl(vcsHost, result.ProjectCommandOutput.PolicyCheckResults.CombinedOutput()) {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsWrapped"), policyCheckResults)
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsUnwrapped"), policyCheckResults)
 			}
-			if result.Error == nil && result.Failure == "" {
+			if result.ProjectCommandOutput.Error == nil && result.ProjectCommandOutput.Failure == "" {
 				numPolicyCheckSuccesses++
 			}
-		} else if result.PolicyCheckResults != nil && common.Command == approvePoliciesCommandTitle {
+		} else if result.ProjectCommandOutput.PolicyCheckResults != nil && common.Command == approvePoliciesCommandTitle {
 			policyCheckResults := policyCheckResultsData{
-				PolicyCheckResults:    *result.PolicyCheckResults,
-				PolicyCheckSummary:    result.PolicyCheckResults.Summary(),
-				PolicyApprovalSummary: result.PolicyCheckResults.PolicySummary(),
-				PolicyCleared:         result.PolicyCheckResults.PolicyCleared(),
+				PolicyCheckResults:    *result.ProjectCommandOutput.PolicyCheckResults,
+				PolicyCheckSummary:    result.ProjectCommandOutput.PolicyCheckResults.Summary(),
+				PolicyApprovalSummary: result.ProjectCommandOutput.PolicyCheckResults.PolicySummary(),
+				PolicyCleared:         result.ProjectCommandOutput.PolicyCheckResults.PolicyCleared(),
 				commonData:            common,
 			}
-			if m.shouldUseWrappedTmpl(vcsHost, result.PolicyCheckResults.CombinedOutput()) {
+			if m.shouldUseWrappedTmpl(vcsHost, result.ProjectCommandOutput.PolicyCheckResults.CombinedOutput()) {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsWrapped"), policyCheckResults)
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsUnwrapped"), policyCheckResults)
 			}
-			if result.Error == nil && result.Failure == "" {
+			if result.ProjectCommandOutput.Error == nil && result.ProjectCommandOutput.Failure == "" {
 				numPolicyApprovalSuccesses++
 			}
-		} else if result.ApplySuccess != "" {
-			output := strings.TrimSpace(result.ApplySuccess)
-			if m.shouldUseWrappedTmpl(vcsHost, result.ApplySuccess) {
+		} else if result.ProjectCommandOutput.ApplySuccess != "" {
+			output := strings.TrimSpace(result.ProjectCommandOutput.ApplySuccess)
+			if m.shouldUseWrappedTmpl(vcsHost, result.ProjectCommandOutput.ApplySuccess) {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyWrappedSuccess"), struct{ Output string }{output})
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyUnwrappedSuccess"), struct{ Output string }{output})
 			}
 			numApplySuccesses++
-		} else if result.VersionSuccess != "" {
-			output := strings.TrimSpace(result.VersionSuccess)
+		} else if result.ProjectCommandOutput.VersionSuccess != "" {
+			output := strings.TrimSpace(result.ProjectCommandOutput.VersionSuccess)
 			if m.shouldUseWrappedTmpl(vcsHost, output) {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionWrappedSuccess"), struct{ Output string }{output})
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("versionUnwrappedSuccess"), struct{ Output string }{output})
 			}
 			numVersionSuccesses++
-		} else if result.ImportSuccess != nil {
-			result.ImportSuccess.Output = strings.TrimSpace(result.ImportSuccess.Output)
-			if m.shouldUseWrappedTmpl(vcsHost, result.ImportSuccess.Output) {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessWrapped"), result.ImportSuccess)
+		} else if result.ProjectCommandOutput.ImportSuccess != nil {
+			result.ProjectCommandOutput.ImportSuccess.Output = strings.TrimSpace(result.ProjectCommandOutput.ImportSuccess.Output)
+			if m.shouldUseWrappedTmpl(vcsHost, result.ProjectCommandOutput.ImportSuccess.Output) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessWrapped"), result.ProjectCommandOutput.ImportSuccess)
 			} else {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessUnwrapped"), result.ImportSuccess)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("importSuccessUnwrapped"), result.ProjectCommandOutput.ImportSuccess)
 			}
-		} else if result.StateRmSuccess != nil {
-			result.StateRmSuccess.Output = strings.TrimSpace(result.StateRmSuccess.Output)
-			if m.shouldUseWrappedTmpl(vcsHost, result.StateRmSuccess.Output) {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessWrapped"), result.StateRmSuccess)
+		} else if result.ProjectCommandOutput.StateRmSuccess != nil {
+			result.ProjectCommandOutput.StateRmSuccess.Output = strings.TrimSpace(result.ProjectCommandOutput.StateRmSuccess.Output)
+			if m.shouldUseWrappedTmpl(vcsHost, result.ProjectCommandOutput.StateRmSuccess.Output) {
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessWrapped"), result.ProjectCommandOutput.StateRmSuccess)
 			} else {
-				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.StateRmSuccess)
+				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("stateRmSuccessUnwrapped"), result.ProjectCommandOutput.StateRmSuccess)
 			}
 			// Error out if no template was found, only if there are no errors or failures.
 			// This is because some errors and failures rely on additional context rendered by templates, but not all errors or failures.
-		} else if result.Error == nil && result.Failure == "" {
+		} else if result.ProjectCommandOutput.Error == nil && result.ProjectCommandOutput.Failure == "" {
 			resultData.Rendered = "Found no template. This is a bug!"
 		}
 		// Render error or failure templates. Done outside of previous block so that other context can be rendered for use here.
-		if result.Error != nil {
+		if result.ProjectCommandOutput.Error != nil {
 			tmpl := templates.Lookup("unwrappedErr")
-			if m.shouldUseWrappedTmpl(vcsHost, result.Error.Error()) {
+			if m.shouldUseWrappedTmpl(vcsHost, result.ProjectCommandOutput.Error.Error()) {
 				tmpl = templates.Lookup("wrappedErr")
 			}
-			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), resultData.Rendered, common})
+			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.ProjectCommandOutput.Error.Error(), resultData.Rendered, common})
 			if common.Command == applyCommandTitle {
 				numApplyErrors++
 			}
-		} else if result.Failure != "" {
-			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, resultData.Rendered, common})
+		} else if result.ProjectCommandOutput.Failure != "" {
+			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.ProjectCommandOutput.Failure, resultData.Rendered, common})
 			if common.Command == applyCommandTitle {
 				numApplyFailures++
 			}
