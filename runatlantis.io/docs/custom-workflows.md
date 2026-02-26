@@ -285,7 +285,7 @@ If using the server `repos.yaml` file, you would use the following config:
 
 ```yaml
 # repos.yaml
-# Specify TERRAGRUNT_TFPATH environment variable to accommodate setting --default-tf-version
+# Specify TG_TF_PATH environment variable to accommodate setting --default-tf-version
 # Generate json plan via terragrunt for policy checks
 repos:
 - id: "/.*/"
@@ -295,7 +295,7 @@ workflows:
     plan:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
@@ -310,7 +310,7 @@ workflows:
     apply:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
@@ -320,7 +320,7 @@ workflows:
     import:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
       - env:
           name: TF_VAR_author
@@ -330,7 +330,7 @@ workflows:
     state_rm:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
       # Allow for state removals as not supported for Terraform wrappers by default
       - run: terragrunt state rm $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
@@ -350,7 +350,7 @@ workflows:
     plan:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
@@ -362,7 +362,7 @@ workflows:
     apply:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
