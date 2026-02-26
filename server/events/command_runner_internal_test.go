@@ -292,7 +292,7 @@ func (m *MockCSU) UpdateCombined(_ logging.SimpleLogging, _ models.Repo, _ model
 	return nil
 }
 
-func (m *MockCSU) UpdateProject(_ command.ProjectContext, _ command.Name, _ models.CommitStatus, _ string, _ *command.ProjectResult) error {
+func (m *MockCSU) UpdateProject(_ command.ProjectContext, _ command.Name, _ models.CommitStatus, _ string, _ *command.ProjectCommandOutput) error {
 	return nil
 }
 
