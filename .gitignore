@@ -38,3 +38,4 @@ test-results/
 
 #Cursor dirs
 .cursor
+e2e/e2e
