@@ -56,12 +56,17 @@ release:
   # Default is false.
   prerelease: auto
 
-# TODO: This requires a gpg_private_key
-#       https://github.com/marketplace/actions/goreleaser-action#signing
-# signs:
-#   # https://goreleaser.com/customization/sign/
-#   -
-#     artifacts: all
+signs:
+  # https://goreleaser.com/customization/sign/
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "-u"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
