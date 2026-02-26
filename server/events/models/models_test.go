@@ -656,6 +656,39 @@ func TestPolicyCheckResults_HasWarnings(t *testing.T) {
 			},
 			exp: true,
 		},
+		{
+			description: "JSON format warnings",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					PolicyOutput:  `{"warnings": ["some warning message"]}`,
+					Passed:        true,
+				},
+			},
+			exp: true,
+		},
+		{
+			description: "WARN prefix",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "policy1",
+					PolicyOutput:  "WARN - some warning message",
+					Passed:        true,
+				},
+			},
+			exp: true,
+		},
+		{
+			description: "custom policy output with warnings",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName: "custom-policy",
+					PolicyOutput:  "Policy check completed: 10 tests, 8 passed, 2 warnings, 0 failures",
+					Passed:        true,
+				},
+			},
+			exp: true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {

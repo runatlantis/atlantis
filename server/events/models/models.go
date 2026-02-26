@@ -516,10 +516,12 @@ func (p *PolicyCheckResults) Summary() string {
 }
 
 // HasWarnings returns true if any policy set has warnings in its output.
+// Checks for text format (e.g., "1 warning", "2 warnings"), JSON format ("warnings": [...]),
+// and WARN prefix (conftest warning output).
 func (p *PolicyCheckResults) HasWarnings() bool {
-	r := regexp.MustCompile(`[1-9]\d* warnings?`)
+	r := regexp.MustCompile(`([1-9][0-9]* warning|warnings": \[)`)
 	for _, policySetResult := range p.PolicySetResults {
-		if r.MatchString(policySetResult.PolicyOutput) {
+		if r.MatchString(policySetResult.PolicyOutput) || strings.HasPrefix(strings.TrimSpace(policySetResult.PolicyOutput), "WARN") {
 			return true
 		}
 	}

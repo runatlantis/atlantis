@@ -102,7 +102,6 @@ func (p *PolicyCheckCommandRunner) isParallelEnabled(cmds []command.ProjectConte
 	return len(cmds) > 0 && cmds[0].ParallelPolicyCheckEnabled
 }
 
-// resultHasWarnings checks if any project result has policy check warnings.
 func (p *PolicyCheckCommandRunner) resultHasWarnings(result command.Result) bool {
 	for _, pr := range result.ProjectResults {
 		if pr.PolicyCheckResults != nil && pr.PolicyCheckResults.HasWarnings() {
