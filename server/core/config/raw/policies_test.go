@@ -202,16 +202,18 @@ func TestPolicySets_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.PolicySets{
-				Version:      version,
-				ApproveCount: 1,
+				Version:         version,
+				ApproveCount:    1,
+				PolicyItemRegex: valid.DefaultPolicyItemRegex,
 				Owners: valid.PolicyOwners{
 					Users: []string{"test"},
 					Teams: []string{"testteam"},
 				},
 				PolicySets: []valid.PolicySet{
 					{
-						Name:         "good-policy",
-						ApproveCount: 1,
+						Name:            "good-policy",
+						ApproveCount:    1,
+						PolicyItemRegex: valid.DefaultPolicyItemRegex,
 						Owners: valid.PolicyOwners{
 							Users: []string{
 								"john-doe",
@@ -243,8 +245,9 @@ func TestPolicySets_ToValid(t *testing.T) {
 				},
 			},
 			exp: valid.PolicySets{
-				Version:      version,
-				ApproveCount: 1,
+				Version:         version,
+				ApproveCount:    1,
+				PolicyItemRegex: valid.DefaultPolicyItemRegex,
 				PolicySets: []valid.PolicySet{
 					{
 						Name: "good-policy",
@@ -254,9 +257,10 @@ func TestPolicySets_ToValid(t *testing.T) {
 								"jane-doe",
 							},
 						},
-						Path:         "rel/path/to/source",
-						Source:       "local",
-						ApproveCount: 1,
+						Path:            "rel/path/to/source",
+						Source:          "local",
+						ApproveCount:    1,
+						PolicyItemRegex: valid.DefaultPolicyItemRegex,
 					},
 				},
 			},

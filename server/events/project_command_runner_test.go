@@ -1409,8 +1409,8 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
 				},
 			},
 			expFailure: "One or more policy sets require additional approval.",
@@ -1435,14 +1435,14 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  2,
-					CurApprovals:  1,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 2,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 			},
 			expFailure: "One or more policy sets require additional approval.",
@@ -1467,14 +1467,13 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  2,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 2,
 				},
 			},
 			expFailure: "One or more policy sets require additional approval.",
@@ -1499,14 +1498,14 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 			},
 			expFailure: "",
@@ -1532,14 +1531,13 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 1,
 				},
 			},
 			expFailure: "One or more policy sets require additional approval.",
@@ -1561,14 +1559,14 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     2,
+					Approvals:     make([]models.PolicySetApproval, 2),
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  2,
-					CurApprovals:  2,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 2,
+					Approvals:        make([]models.PolicySetApproval, 2),
 				},
 			},
 			expFailure: ``,
@@ -1592,15 +1590,14 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        true,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  2,
-					CurApprovals:  0,
-					Passed:        true,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 2,
+					Passed:           true,
 				},
 			},
 			expFailure: ``,
@@ -1631,25 +1628,24 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     0,
+					Approvals:     nil,
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     0,
+					Approvals:     nil,
 					Passed:        false,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 1,
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,
@@ -1680,25 +1676,25 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  2,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 2,
+					Approvals:        []models.PolicySetApproval{},
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,
@@ -1729,25 +1725,25 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  2,
-					CurApprovals:  1,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 2,
+					Approvals:        make([]models.PolicySetApproval, 1),
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,
@@ -1779,25 +1775,25 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        make([]models.PolicySetApproval, 1),
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  2,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 2,
+					Approvals:        []models.PolicySetApproval{},
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,
@@ -1829,25 +1825,24 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     0,
+					Approvals:     nil,
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     0,
+					Approvals:     nil,
 					Passed:        false,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 1,
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,

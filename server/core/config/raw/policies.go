@@ -11,10 +11,12 @@ import (
 
 // PolicySets is the raw schema for repo-level atlantis.yaml config.
 type PolicySets struct {
-	Version      *string      `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
-	Owners       PolicyOwners `yaml:"owners" json:"owners"`
-	PolicySets   []PolicySet  `yaml:"policy_sets" json:"policy_sets"`
-	ApproveCount int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
+	Version         *string      `yaml:"conftest_version,omitempty" json:"conftest_version,omitempty"`
+	Owners          PolicyOwners `yaml:"owners" json:"owners"`
+	PolicySets      []PolicySet  `yaml:"policy_sets" json:"policy_sets"`
+	StickyApprovals bool         `yaml:"sticky_policy_approvals,omitempty" json:"sticky_policy_approvals,omitempty"`
+	PolicyItemRegex *string      `yaml:"policy_item_regex,omitempty" json:"policy_item_regex,omitempty"`
+	ApproveCount    int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
 }
 
 func (p PolicySets) Validate() error {
@@ -38,6 +40,12 @@ func (p PolicySets) ToValid() valid.PolicySets {
 		policySets.ApproveCount = 1
 	}
 
+	policySets.StickyApprovals = p.StickyApprovals
+	policySets.PolicyItemRegex = valid.DefaultPolicyItemRegex
+	if p.PolicyItemRegex != nil {
+		policySets.PolicyItemRegex = *p.PolicyItemRegex
+	}
+
 	policySets.Owners = p.Owners.ToValid()
 
 	validPolicySets := make([]valid.PolicySet, 0)
@@ -47,7 +55,14 @@ func (p PolicySets) ToValid() valid.PolicySets {
 		if rawPolicySet.ApproveCount <= 0 {
 			rawPolicySet.ApproveCount = policySets.ApproveCount
 		}
-		validPolicySets = append(validPolicySets, rawPolicySet.ToValid())
+		stickyApprovals := policySets.StickyApprovals
+		if rawPolicySet.StickyApprovals != nil {
+			stickyApprovals = *rawPolicySet.StickyApprovals
+		}
+		if rawPolicySet.PolicyItemRegex == nil {
+			rawPolicySet.PolicyItemRegex = &policySets.PolicyItemRegex
+		}
+		validPolicySets = append(validPolicySets, rawPolicySet.ToValid(stickyApprovals))
 	}
 	policySets.PolicySets = validPolicySets
 
@@ -78,6 +93,8 @@ type PolicySet struct {
 	Name               string       `yaml:"name" json:"name"`
 	Owners             PolicyOwners `yaml:"owners" json:"owners"`
 	ApproveCount       int          `yaml:"approve_count,omitempty" json:"approve_count,omitempty"`
+	StickyApprovals    *bool        `yaml:"sticky_policy_approvals,omitempty" json:"sticky_policy_approvals,omitempty"`
+	PolicyItemRegex    *string      `yaml:"policy_item_regex,omitempty" json:"policy_item_regex,omitempty"`
 	PreventSelfApprove bool         `yaml:"prevent_self_approve,omitempty" json:"prevent_self_approve,omitempty"`
 }
 
@@ -91,15 +108,19 @@ func (p PolicySet) Validate() error {
 	)
 }
 
-func (p PolicySet) ToValid() valid.PolicySet {
+func (p PolicySet) ToValid(stickyApprovals bool) valid.PolicySet {
 	var policySet valid.PolicySet
 
 	policySet.Name = p.Name
 	policySet.Path = p.Path
 	policySet.Source = p.Source
 	policySet.ApproveCount = p.ApproveCount
+	policySet.StickyApprovals = stickyApprovals
 	policySet.PreventSelfApprove = p.PreventSelfApprove
 	policySet.Owners = p.Owners.ToValid()
+	if p.PolicyItemRegex != nil {
+		policySet.PolicyItemRegex = *p.PolicyItemRegex
+	}
 
 	return policySet
 }
