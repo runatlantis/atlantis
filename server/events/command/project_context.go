@@ -208,7 +208,7 @@ func (p ProjectContext) PolicyCleared() bool {
 		}
 		for _, psCfg := range p.PolicySets.PolicySets {
 			if psStatus.PolicySetName == psCfg.Name {
-				if psStatus.Approvals != psCfg.ApproveCount {
+				if psStatus.GetCurApprovals() != psCfg.ApproveCount {
 					passing = false
 				}
 			}

@@ -397,15 +397,15 @@ $$$
 									PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-									Passed:       false,
-									ReqApprovals: 1,
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 								{
 									PolicySetName: "policy2",
 									// strings.Repeat require to get wrapped result
-									PolicyOutput: "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
-									Passed:       true,
-									ReqApprovals: 1,
+									PolicyOutput:     "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+									Passed:           true,
+									ReqApprovalCount: 1,
 								},
 							},
 							LockURL:   "lock-url",
@@ -476,8 +476,8 @@ $$$
 									PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-									Passed:       false,
-									ReqApprovals: 1,
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 							},
 							LockURL:   "lock-url",
@@ -1041,10 +1041,10 @@ $$$
 						PolicyCheckResults: &models.PolicyCheckResults{
 							PolicySetResults: []models.PolicySetResult{
 								{
-									PolicySetName: "policy1",
-									PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
-									Passed:        false,
-									ReqApprovals:  1,
+									PolicySetName:    "policy1",
+									PolicyOutput:     "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 							}, LockURL: "lock-url",
 							ApplyCmd:  "atlantis apply -d path -w workspace",
@@ -1324,14 +1324,14 @@ func TestRenderProjectResultsWithQuietPolicyChecks(t *testing.T) {
 									PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-									Passed:       false,
-									ReqApprovals: 1,
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 								{
-									PolicySetName: "policy2",
-									PolicyOutput:  "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
-									Passed:        true,
-									ReqApprovals:  1,
+									PolicySetName:    "policy2",
+									PolicyOutput:     "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+									Passed:           true,
+									ReqApprovalCount: 1,
 								},
 							},
 							LockURL:   "lock-url",
@@ -1402,8 +1402,8 @@ $$$
 									PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-									Passed:       false,
-									ReqApprovals: 1,
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 							},
 							LockURL:   "lock-url",
@@ -1563,10 +1563,10 @@ Ran Policy Check for 2 projects:
 						PolicyCheckResults: &models.PolicyCheckResults{
 							PolicySetResults: []models.PolicySetResult{
 								{
-									PolicySetName: "policy1",
-									PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
-									Passed:        false,
-									ReqApprovals:  1,
+									PolicySetName:    "policy1",
+									PolicyOutput:     "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 							}, LockURL: "lock-url",
 							ApplyCmd:  "atlantis apply -d path -w workspace",

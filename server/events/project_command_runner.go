@@ -362,7 +362,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 			ignorePolicy := false
 			if policySet.Name == policyStatus.PolicySetName {
 				// Policy set either passed or has sufficient approvals. Move on.
-				if policyStatus.Passed || (policyStatus.Approvals == policySet.ApproveCount) {
+				if policyStatus.Passed || (policyStatus.GetCurApprovals() == policySet.ApproveCount) {
 					if !ctx.ClearPolicyApproval {
 						ignorePolicy = true
 					}
@@ -373,10 +373,19 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 				}
 				// Increment approval if user is owner.
 				if isOwner && !ignorePolicy && (ctx.User.Username != ctx.Pull.Author || !policySet.PreventSelfApprove) {
-					if !ctx.ClearPolicyApproval {
-						prjPolicyStatus[i].Approvals = policyStatus.Approvals + 1
-					} else {
-						prjPolicyStatus[i].Approvals = 0
+					alreadyFullyApproved := policyStatus.OwnerHasFullyApproved(ctx.User.Username) && policyStatus.GetCurApprovals() < policySet.ApproveCount
+					if alreadyFullyApproved {
+						prjErr = errors.Join(prjErr, fmt.Errorf("policy set: requires %d additional approvals from policy owners other than %s", policySet.ApproveCount-policyStatus.GetCurApprovals(), ctx.User.Username))
+					}
+					if !alreadyFullyApproved {
+						if !ctx.ClearPolicyApproval {
+							prjPolicyStatus[i].Approvals = append(prjPolicyStatus[i].Approvals, models.PolicySetApproval{
+								Approver: ctx.User.Username,
+								Hashes:   policyStatus.Hashes,
+							})
+						} else {
+							prjPolicyStatus[i].Approvals = []models.PolicySetApproval{}
+						}
 					}
 					// User matches the author and prevent self approve is set to true
 				} else if isOwner && !ignorePolicy && ctx.User.Username == ctx.Pull.Author && policySet.PreventSelfApprove {
@@ -386,15 +395,16 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 					prjErr = errors.Join(prjErr, fmt.Errorf("policy set: %s user %s is not a policy owner - please contact policy owners to approve failing policies", policySet.Name, ctx.User.Username))
 				}
 				// Still bubble up this failure, even if policy set is not targeted.
-				if !policyStatus.Passed && (prjPolicyStatus[i].Approvals != policySet.ApproveCount) {
+				if !policyStatus.Passed && (prjPolicyStatus[i].GetCurApprovals() != policySet.ApproveCount) {
 					allPassed = false
 				}
 
 				prjPolicySetResults = append(prjPolicySetResults, models.PolicySetResult{
-					PolicySetName: policySet.Name,
-					Passed:        policyStatus.Passed,
-					CurApprovals:  prjPolicyStatus[i].Approvals,
-					ReqApprovals:  policySet.ApproveCount,
+					PolicySetName:    policySet.Name,
+					Passed:           policyStatus.Passed,
+					Approvals:        prjPolicyStatus[i].Approvals,
+					ReqApprovalCount: policySet.ApproveCount,
+					Hashes:           policyStatus.Hashes,
 				})
 			}
 		}
@@ -527,7 +537,14 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 				policyOutput = output
 			}
 
-			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: policySetName, PolicyOutput: policyOutput, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
+			policySetResults = append(policySetResults,
+				*models.NewPolicySetResult(
+					policySetName,
+					policyOutput,
+					passed,
+					1,
+					ctx.PolicySets.PolicyItemRegex,
+				))
 			preConftestOutput = append(preConftestOutput, "")
 		}
 	}
@@ -546,6 +563,35 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 				len(policySetResults),
 				len(inputPolicySets))
 		}
+	}
+
+	// For policy sets with sticky approvals, see if we can carry over previous approvals.
+	stickyPolicySetNames := make(map[string]bool)
+	for _, ps := range ctx.PolicySets.PolicySets {
+		if ps.StickyApprovals {
+			stickyPolicySetNames[ps.Name] = true
+		}
+	}
+	resultByName := make(map[string]*models.PolicySetResult)
+	for i := range policySetResults {
+		resultByName[policySetResults[i].PolicySetName] = &policySetResults[i]
+	}
+	for _, status := range ctx.ProjectPolicyStatus {
+		if !stickyPolicySetNames[status.PolicySetName] {
+			continue
+		}
+		result := resultByName[status.PolicySetName]
+		if result == nil {
+			continue
+		}
+		// Only carry over approvals that still cover the current policy set's hashes.
+		var carried []models.PolicySetApproval
+		for _, approval := range status.Approvals {
+			if models.ApprovalCoversAllHashes(approval.Hashes, result.Hashes) {
+				carried = append(carried, approval)
+			}
+		}
+		result.Approvals = carried
 	}
 
 	// Check if we have any policy check results

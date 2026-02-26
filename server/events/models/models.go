@@ -391,19 +391,80 @@ type PlanSuccess struct {
 	MergedAgain bool
 }
 
-type PolicySetResult struct {
-	PolicySetName string
-	PolicyOutput  string
-	Passed        bool
-	ReqApprovals  int
-	CurApprovals  int
+func NewPolicySetResult(policySetName string, policyOutput string, passed bool, reqApprovalCount int, policyItemRegex string) *PolicySetResult {
+	re := regexp.MustCompile(policyItemRegex)
+	matches := re.FindAllStringSubmatch(policyOutput, -1)
+	hashes := []string{}
+	for _, match := range matches {
+		hashes = append(hashes, match[0])
+	}
+	return &PolicySetResult{
+		PolicySetName:    policySetName,
+		PolicyOutput:     policyOutput,
+		Passed:           passed,
+		ReqApprovalCount: reqApprovalCount,
+		Hashes:           hashes,
+	}
 }
 
-// PolicySetApproval tracks the number of approvals a given policy set has.
+type PolicySetResult struct {
+	PolicySetName    string
+	PolicyOutput     string
+	Passed           bool
+	ReqApprovalCount int
+	Approvals        []PolicySetApproval
+	Hashes           []string
+}
+
+type PolicySetApproval struct {
+	Approver string
+	Hashes   []string
+}
+
+// ApprovalCoversAllHashes reports whether approvalHashes contains every element of required.
+func ApprovalCoversAllHashes(approvalHashes, required []string) bool {
+	if len(required) == 0 {
+		return true
+	}
+	set := make(map[string]struct{}, len(approvalHashes))
+	for _, h := range approvalHashes {
+		set[h] = struct{}{}
+	}
+	for _, h := range required {
+		if _, ok := set[h]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// PolicySetApproval tracks the number of approvals a given policy set has
+// and the set of hashes evaluated from the policy output and the PolicyItemRegex.
 type PolicySetStatus struct {
 	PolicySetName string
 	Passed        bool
-	Approvals     int
+	Approvals     []PolicySetApproval
+	Hashes        []string
+}
+
+// GetCurApprovals returns the number of approvals that cover all hashes in this policy set.
+func (pss *PolicySetStatus) GetCurApprovals() int {
+	n := 0
+	for _, approval := range pss.Approvals {
+		if ApprovalCoversAllHashes(approval.Hashes, pss.Hashes) {
+			n++
+		}
+	}
+	return n
+}
+
+func (pss *PolicySetStatus) OwnerHasFullyApproved(owner string) bool {
+	for _, approval := range pss.Approvals {
+		if approval.Approver == owner {
+			return ApprovalCoversAllHashes(approval.Hashes, pss.Hashes)
+		}
+	}
+	return false
 }
 
 // Summary regexes
@@ -519,7 +580,7 @@ func (p *PolicyCheckResults) Summary() string {
 func (p *PolicyCheckResults) PolicyCleared() bool {
 	passing := true
 	for _, policySetResult := range p.PolicySetResults {
-		if !policySetResult.Passed && (policySetResult.CurApprovals != policySetResult.ReqApprovals) {
+		if !policySetResult.Passed && (policySetResult.GetCurApprovals() != policySetResult.ReqApprovalCount) {
 			passing = false
 		}
 	}
@@ -532,13 +593,34 @@ func (p *PolicyCheckResults) PolicySummary() string {
 	for _, policySetResult := range p.PolicySetResults {
 		if policySetResult.Passed {
 			summary = append(summary, fmt.Sprintf("policy set: %s: passed.", policySetResult.PolicySetName))
-		} else if policySetResult.CurApprovals == policySetResult.ReqApprovals {
+		} else if policySetResult.GetCurApprovals() == policySetResult.ReqApprovalCount {
 			summary = append(summary, fmt.Sprintf("policy set: %s: approved.", policySetResult.PolicySetName))
 		} else {
-			summary = append(summary, fmt.Sprintf("policy set: %s: requires: %d approval(s), have: %d.", policySetResult.PolicySetName, policySetResult.ReqApprovals, policySetResult.CurApprovals))
+			summary = append(summary, fmt.Sprintf("policy set: %s: requires: %d approval(s), have: %d.", policySetResult.PolicySetName, policySetResult.ReqApprovalCount, policySetResult.GetCurApprovals()))
 		}
 	}
 	return strings.Join(summary, "\n")
+}
+
+// GetCurApprovals returns the number of approvals that cover all hashes in this policy set result.
+func (p *PolicySetResult) GetCurApprovals() int {
+	n := 0
+	for _, approval := range p.Approvals {
+		if ApprovalCoversAllHashes(approval.Hashes, p.Hashes) {
+			n++
+		}
+	}
+	return n
+}
+
+func (p *PolicySetResult) PolicySetHashes(PolicyItemRegex string) []string {
+	hashes := []string{}
+	re := regexp.MustCompile(PolicyItemRegex)
+	matches := re.FindAllStringSubmatch(p.PolicyOutput, -1)
+	for _, match := range matches {
+		hashes = append(hashes, match[0])
+	}
+	return hashes
 }
 
 type VersionSuccess struct {

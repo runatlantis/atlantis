@@ -979,8 +979,8 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
 							},
 						},
 					},
@@ -996,8 +996,8 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
 							},
 						},
 					},
@@ -1016,9 +1016,9 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
-								CurApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
+								Approvals:        make([]models.PolicySetApproval, 1),
 							},
 						},
 					},
@@ -1042,7 +1042,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     1,
+						Approvals:     make([]models.PolicySetApproval, 1),
 					},
 				},
 			},
@@ -1054,7 +1054,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     0,
+						Approvals:     nil,
 					},
 				},
 			},
