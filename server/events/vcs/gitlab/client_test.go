@@ -1697,3 +1697,81 @@ func TestClient_UpdateStatusTransitionAlreadyComplete(t *testing.T) {
 
 	Ok(t, err)
 }
+
+func TestClient_PullIsApproved_ApprovalCount(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description     string
+		approvedBy      int
+		expApproved     bool
+		expNumApprovals int
+	}{
+		{
+			"no approvals",
+			0,
+			false,
+			0,
+		},
+		{
+			"single approval",
+			1,
+			true,
+			1,
+		},
+		{
+			"multiple approvals",
+			3,
+			true,
+			3,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			var resp string
+			if c.approvedBy == 0 {
+				resp = `{"approved_by":[]}`
+			} else {
+				approvers := make([]string, c.approvedBy)
+				for i := 0; i < c.approvedBy; i++ {
+					approvers[i] = fmt.Sprintf(`{"user":{"id":%d}}`, i+1)
+				}
+				resp = fmt.Sprintf(`{"approved_by":[%s]}`, strings.Join(approvers, ","))
+			}
+
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/owner%2Frepo/merge_requests/1/approvals":
+						w.WriteHeader(http.StatusOK)
+						w.Write([]byte(resp)) // nolint: errcheck
+					case "/api/v4/":
+						w.WriteHeader(http.StatusOK)
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &Client{
+				Client:  internalClient,
+				Version: nil,
+			}
+
+			approvalStatus, err := client.PullIsApproved(
+				logger,
+				models.Repo{
+					FullName: "owner/repo",
+					Owner:    "owner",
+					Name:     "repo",
+				}, models.PullRequest{
+					Num: 1,
+				})
+			Ok(t, err)
+			Equals(t, c.expApproved, approvalStatus.IsApproved)
+			Equals(t, c.expNumApprovals, approvalStatus.NumApprovals)
+		})
+	}
+}

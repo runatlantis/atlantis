@@ -21,16 +21,44 @@ If the requirement is not met, users will see an error if they try to run `atlan
 The `approved` requirement will prevent applies unless the pull request is approved
 by at least one person other than the author.
 
+You can also specify a minimum number of approvals required by using the format `approved:N`,
+where N is the number of approvals needed. For example:
+- `approved` or `approved:1` requires at least 1 approval
+- `approved:2` requires at least 2 approvals
+- `approved:3` requires at least 3 approvals
+
+:::tip Note
+Approvals are counted per unique user. If the same user approves multiple times,
+it only counts as one approval. The pull request author's approval (if allowed by
+the VCS provider) does not count toward the requirement.
+:::
+
 #### Usage
 
-The `approved` requirement by:
+Set the `approved` requirement by:
 
 1. Creating a `repos.yaml` file with the `apply_requirements` key:
 
    ```yaml
    repos:
    - id: /.*/
-     apply_requirements: [approved]
+     apply_requirements: [approved]  # Requires 1 approval (default)
+   ```
+
+   Or to require multiple approvals:
+
+   ```yaml
+   repos:
+   - id: /.*/
+     apply_requirements: [approved:2]  # Requires 2 approvals
+   ```
+
+   You can also combine requirements:
+
+   ```yaml
+   repos:
+   - id: /.*/
+     apply_requirements: [approved:2, mergeable]  # Requires 2 approvals AND mergeable
    ```
 
 1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in the `repos.yaml` config:
@@ -49,7 +77,18 @@ The `approved` requirement by:
     version: 3
     projects:
     - dir: .
-      apply_requirements: [approved]
+      apply_requirements: [approved:3]  # Requires 3 approvals
+    ```
+
+    Or set different requirements per project:
+
+    ```yaml
+    version: 3
+    projects:
+    - dir: production
+      apply_requirements: [approved:3, mergeable]  # Production requires 3 approvals
+    - dir: sandbox
+      apply_requirements: [approved:1]  # Sandbox requires only 1 approval
     ```
 
 #### Meaning

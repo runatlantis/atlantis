@@ -251,6 +251,7 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		},
 	}
 
+	approvedBy := make(map[string]bool)
 	for page < nextPage {
 		page = +1
 		listOptions.Page = page
@@ -263,11 +264,10 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 
 		for _, review := range pullReviews {
 			if review.State == gitea.ReviewStateApproved {
+				approvedBy[review.Reviewer.UserName] = true
 				approvalStatus.IsApproved = true
 				approvalStatus.ApprovedBy = review.Reviewer.UserName
 				approvalStatus.Date = review.Submitted
-
-				return approvalStatus, nil
 			}
 		}
 
@@ -279,6 +279,7 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		}
 	}
 
+	approvalStatus.NumApprovals = len(approvedBy)
 	return approvalStatus, nil
 }
 

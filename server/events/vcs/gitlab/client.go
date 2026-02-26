@@ -285,8 +285,13 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	if approvals.ApprovalsLeft > 0 {
 		return approvalStatus, nil
 	}
+	numApprovals := len(approvals.ApprovedBy)
+	if numApprovals == 0 {
+		return approvalStatus, nil
+	}
 	return models.ApprovalStatus{
 		IsApproved: true,
+		NumApprovals: numApprovals,
 	}, nil
 }
 

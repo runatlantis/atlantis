@@ -226,14 +226,19 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		return approvalStatus, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	authorUUID := *pullResp.Author.UUID
+	numApprovals := 0
 	for _, participant := range pullResp.Participants {
 		// Bitbucket allows the author to approve their own pull request. This
 		// defeats the purpose of approvals so we don't count that approval.
 		if *participant.Approved && *participant.User.UUID != authorUUID {
-			return models.ApprovalStatus{
-				IsApproved: true,
-			}, nil
+			numApprovals++
 		}
+	}
+	if numApprovals > 0 {
+		return models.ApprovalStatus{
+			IsApproved: true,
+			NumApprovals: numApprovals,
+		}, nil
 	}
 	return approvalStatus, nil
 }
