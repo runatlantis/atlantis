@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
@@ -71,6 +72,7 @@ func TestRenderErr(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -146,6 +148,7 @@ func TestRenderFailure(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -196,6 +199,7 @@ func TestRenderErrAndFailure(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	ctx := &command.Context{
@@ -1261,6 +1265,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -1649,6 +1654,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		true,       // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -1858,6 +1864,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2051,6 +2058,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2110,6 +2118,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2187,6 +2196,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2299,6 +2309,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 					"atlantis",                // executableName
 					false,                     // hideUnchangedPlanComments
 					false,                     // quietPolicyChecks
+					false,                     // liveReloadEnabled
 				)
 				logger := logging.NewNoopLogger(t).WithHistory()
 				logText := "log"
@@ -2447,6 +2458,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 						"atlantis",                // executableName
 						false,                     // hideUnchangedPlanComments
 						false,                     // quietPolicyChecks
+						false,                     // liveReloadEnabled
 					)
 					logger := logging.NewNoopLogger(t).WithHistory()
 					logText := "log"
@@ -2602,6 +2614,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2686,6 +2699,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -2927,6 +2941,7 @@ This plan was not saved because one or more projects failed and automerge requir
 				"atlantis", // executableName
 				false,      // hideUnchangedPlanComments
 				false,      // quietPolicyChecks
+				false,      // liveReloadEnabled
 			)
 			logger := logging.NewNoopLogger(t).WithHistory()
 			logText := "log"
@@ -3524,6 +3539,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -3666,6 +3682,7 @@ $$$
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -4128,6 +4145,7 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -4184,6 +4202,7 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(b).WithHistory()
 	logText := "log"
@@ -4409,6 +4428,7 @@ Ran Plan for 3 projects:
 		"atlantis", // executableName
 		true,       // hideUnchangedPlanComments
 		false,      // quietPolicyChecks
+		false,      // liveReloadEnabled
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
@@ -4448,4 +4468,165 @@ Ran Plan for 3 projects:
 			}
 		})
 	}
+}
+
+// TestLiveReload tests that templates are reloaded when live reload is enabled
+func TestLiveReload(t *testing.T) {
+	tests := []struct {
+		name              string
+		liveReloadEnabled bool
+		expectReload      bool
+	}{
+		{
+			name:              "live reload enabled",
+			liveReloadEnabled: true,
+			expectReload:      true,
+		},
+		{
+			name:              "live reload disabled",
+			liveReloadEnabled: false,
+			expectReload:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temporary directory for template overrides
+			tmpDir := t.TempDir()
+
+			// Create initial template override
+			initialTemplate := `{{ define "planSuccessWrapped" -}}
+<details><summary>Initial Template</summary>
+{{ .TerraformOutput }}
+</details>
+{{ end -}}`
+
+			initialTemplatePath := fmt.Sprintf("%s/plan_success_wrapped.tmpl", tmpDir)
+			err := os.WriteFile(initialTemplatePath, []byte(initialTemplate), 0600)
+			Ok(t, err)
+
+			// Create markdown renderer with live reload setting
+			renderer := events.NewMarkdownRenderer(
+				false,                // gitlabSupportsCommonMark
+				false,                // disableApplyAll
+				false,                // disableApply
+				false,                // disableMarkdownFolding
+				false,                // disableRepoLocking
+				false,                // enableDiffMarkdownFormat
+				tmpDir,               // markdownTemplateOverridesDir
+				"atlantis",           // executableName
+				false,                // hideUnchangedPlanComments
+				false,                // quietPolicyChecks
+				tt.liveReloadEnabled, // liveReloadEnabled
+			)
+
+			// Create test context and result
+			ctx := &command.Context{
+				Log: logging.NewNoopLogger(t).WithHistory(),
+				Pull: models.PullRequest{
+					BaseRepo: models.Repo{
+						VCSHost: models.VCSHost{
+							Type: models.Github,
+						},
+					},
+				},
+			}
+
+			planSuccess := &models.PlanSuccess{
+				TerraformOutput: strings.Repeat("test output line\n", 15), // Make it long enough to use wrapped template
+				LockURL:         "https://example.com/lock",
+				RePlanCmd:       "atlantis plan",
+				ApplyCmd:        "atlantis apply",
+			}
+
+			res := command.Result{
+				ProjectResults: []command.ProjectResult{
+					{
+						Workspace:   "default",
+						RepoRelDir:  ".",
+						ProjectName: "test",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: planSuccess,
+						},
+					},
+				},
+			}
+
+			cmd := &events.CommentCommand{
+				Name:    command.Plan,
+				Verbose: false,
+			}
+
+			// Test initial template
+			rendered := renderer.Render(ctx, res, cmd)
+			Assert(t, strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' in rendered output, got: %s", rendered)
+			Assert(t, !strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' to NOT be in rendered output, got: %s", rendered)
+
+			// Update the template file
+			updatedTemplate := `{{ define "planSuccessWrapped" -}}
+<details><summary>Updated Template</summary>
+{{ .TerraformOutput }}
+</details>
+{{ end -}}`
+
+			err = os.WriteFile(initialTemplatePath, []byte(updatedTemplate), 0600)
+			Ok(t, err)
+
+			// Test that the template is updated or not based on live reload setting
+			rendered = renderer.Render(ctx, res, cmd)
+			if tt.expectReload {
+				Assert(t, strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' in rendered output, got: %s", rendered)
+				Assert(t, !strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' to NOT be in rendered output, got: %s", rendered)
+			} else {
+				Assert(t, strings.Contains(rendered, "Initial Template"), "Expected 'Initial Template' to still be in rendered output (live reload disabled), got: %s", rendered)
+				Assert(t, !strings.Contains(rendered, "Updated Template"), "Expected 'Updated Template' to NOT be in rendered output (live reload disabled), got: %s", rendered)
+			}
+		})
+	}
+}
+
+// TestMarkdownRendererRace tests that concurrent calls to Render don't cause data races.
+func TestMarkdownRendererRace(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		true,       // liveReloadEnabled
+	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res := command.Result{
+				Error: errors.New("error"),
+			}
+			cmd := &events.CommentCommand{
+				Name: command.Apply,
+			}
+			r.Render(ctx, res, cmd)
+		}()
+	}
+	wg.Wait()
 }
