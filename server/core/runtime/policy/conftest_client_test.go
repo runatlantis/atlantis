@@ -176,10 +176,8 @@ func TestRun(t *testing.T) {
 
 	ctx := command.ProjectContext{
 		PolicySets: valid.PolicySets{
-			PolicySets: []valid.PolicySet{
-				policySet1,
-				policySet2,
-			},
+			PolicySets:      []valid.PolicySet{policySet1, policySet2},
+			PolicyItemRegex: valid.DefaultPolicyItemRegex,
 		},
 		ProjectName: "testproj",
 		Workspace:   "default",
@@ -190,7 +188,7 @@ func TestRun(t *testing.T) {
 		var extraArgs []string
 
 		expectedOutput := "Success"
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"Success","Passed":true,"ReqApprovals":0,"CurApprovals":0},{"PolicySetName":"policy2","PolicyOutput":"Success","Passed":true,"ReqApprovals":0,"CurApprovals":0}]`
+		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"Success","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":["Success"]},{"PolicySetName":"policy2","PolicyOutput":"Success","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":["Success"]}]`
 
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
@@ -215,7 +213,7 @@ func TestRun(t *testing.T) {
 		extraArgs := []string{"--all-namespaces"}
 
 		expectedOutput := "Success"
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"","Passed":true,"ReqApprovals":0,"CurApprovals":0},{"PolicySetName":"policy2","PolicyOutput":"","Passed":true,"ReqApprovals":0,"CurApprovals":0}]`
+		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":[""]},{"PolicySetName":"policy2","PolicyOutput":"","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":[""]}]`
 
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
@@ -240,7 +238,7 @@ func TestRun(t *testing.T) {
 		var extraArgs []string
 
 		expectedOutput := "Success"
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"Success","Passed":true,"ReqApprovals":0,"CurApprovals":0}]`
+		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"Success","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":["Success"]}]`
 
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
@@ -283,7 +281,7 @@ func TestRun(t *testing.T) {
 
 		expectedOutputPolicy1 := fmt.Sprintf("FAIL - %s - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions", filepath.Join(workdir, "testproj-default.json"))
 		expectedOutputPolicy2 := "Success"
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovals":0,"CurApprovals":0},{"PolicySetName":"policy2","PolicyOutput":"Success","Passed":true,"ReqApprovals":0,"CurApprovals":0}]`
+		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovalCount":0,"Approvals":null,"Hashes":["FAIL - <redacted plan file> - failure","1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"]},{"PolicySetName":"policy2","PolicyOutput":"Success","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":["Success"]}]`
 
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
@@ -305,7 +303,7 @@ func TestRun(t *testing.T) {
 		var extraArgs []string
 
 		expectedOutput := fmt.Sprintf("FAIL - %s - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions", filepath.Join(workdir, "testproj-default.json"))
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovals":0,"CurApprovals":0},{"PolicySetName":"policy2","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovals":0,"CurApprovals":0}]`
+		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovalCount":0,"Approvals":null,"Hashes":["FAIL - <redacted plan file> - failure","1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"]},{"PolicySetName":"policy2","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovalCount":0,"Approvals":null,"Hashes":["FAIL - <redacted plan file> - failure","1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"]}]`
 
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
@@ -328,7 +326,7 @@ func TestRun(t *testing.T) {
 
 		// Simulate a Rego parse error output
 		parseErrorOutput := "Error: running test: load: loading policies: load: 2 errors occurred during loading:"
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"Error: running test: load: loading policies: load: 2 errors occurred during loading:","Passed":false,"ReqApprovals":0,"CurApprovals":0}]`
+		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"Error: running test: load: loading policies: load: 2 errors occurred during loading:","Passed":false,"ReqApprovalCount":0,"Approvals":null,"Hashes":["Error: running test: load: loading policies: load: 2 errors occurred during loading:"]}]`
 
 		expectedArgsPolicy := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 
@@ -337,7 +335,8 @@ func TestRun(t *testing.T) {
 
 		ctxSinglePolicy := command.ProjectContext{
 			PolicySets: valid.PolicySets{
-				PolicySets: []valid.PolicySet{policySet1},
+				PolicySets:      []valid.PolicySet{policySet1},
+				PolicyItemRegex: valid.DefaultPolicyItemRegex,
 			},
 			ProjectName: "testproj",
 			Workspace:   "default",
