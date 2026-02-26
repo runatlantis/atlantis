@@ -336,6 +336,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 	}
 
+	vcsFeatures := GetVCSFeatures()
+
+	result := vcsFeatures.Validate(supportedVCSHosts, userConfig)
+	if result.Err != nil {
+		return nil, result.Err
+	}
+	for _, warn := range result.Warnings {
+		logger.Warn(warn)
+	}
+
 	var supportedVCSHostsStr []string
 	for _, host := range supportedVCSHosts {
 		supportedVCSHostsStr = append(supportedVCSHostsStr, host.String())
