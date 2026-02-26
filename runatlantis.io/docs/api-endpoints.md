@@ -50,6 +50,7 @@ At least one of `Directory` or `Workspace` should be specified.
 |-----------|--------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Directory | string | No       | Which directory to run plan in relative to root of repo                                                                                                   |
 | Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
+| ExtraArgs | []string | No       | [Additional Terraform flags](https://www.runatlantis.io/docs/using-atlantis.html#additional-terraform-flags) |
 
 #### Sample Request
 
