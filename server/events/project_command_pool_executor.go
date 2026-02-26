@@ -1,4 +1,4 @@
-// Copyright 2025 The Atlantis Authors
+// Copyright 2026 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package events
@@ -142,6 +142,19 @@ func runProjectCmdsWithCancellationTracker(
 		if groupResult.HasErrors() && group[0].AbortOnExecutionOrderFail && isParallel {
 			ctx.Log.Info("abort on execution order when failed")
 			break
+		}
+
+		if ctx.PullStatus != nil {
+			for _, result := range groupResult.ProjectResults {
+				for i := range ctx.PullStatus.Projects {
+					if result.Workspace == ctx.PullStatus.Projects[i].Workspace &&
+						result.RepoRelDir == ctx.PullStatus.Projects[i].RepoRelDir &&
+						result.ProjectName == ctx.PullStatus.Projects[i].ProjectName {
+						ctx.PullStatus.Projects[i].Status = result.PlanStatus()
+						break
+					}
+				}
+			}
 		}
 	}
 
