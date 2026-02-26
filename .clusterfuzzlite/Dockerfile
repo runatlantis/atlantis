@@ -1,4 +1,4 @@
-FROM gcr.io/oss-fuzz-base/base-builder-go@sha256:4fdcdc77a3f18074faea7cacabb1af430d8cab57e536b129fac02838535d4e83
+FROM gcr.io/oss-fuzz-base/base-builder-go@sha256:153f35fc70b091cb68d7243476b452c30ea5ff40504f970d60ac49d2f949293c
 COPY . $SRC/atlantis
 COPY .clusterfuzzlite/build.sh $SRC/build.sh
 WORKDIR $SRC/atlantis
