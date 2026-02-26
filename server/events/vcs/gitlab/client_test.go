@@ -1729,14 +1729,18 @@ func TestClient_PullIsApproved_ApprovalCount(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			var resp string
+			approvalsLeft := 0
+			if !c.expApproved {
+				approvalsLeft = 1
+			}
 			if c.approvedBy == 0 {
-				resp = `{"approved_by":[]}`
+				resp = fmt.Sprintf(`{"approved_by":[],"approvals_left":%d}`, approvalsLeft)
 			} else {
 				approvers := make([]string, c.approvedBy)
 				for i := 0; i < c.approvedBy; i++ {
 					approvers[i] = fmt.Sprintf(`{"user":{"id":%d}}`, i+1)
 				}
-				resp = fmt.Sprintf(`{"approved_by":[%s]}`, strings.Join(approvers, ","))
+				resp = fmt.Sprintf(`{"approved_by":[%s],"approvals_left":%d}`, strings.Join(approvers, ","), approvalsLeft)
 			}
 
 			testServer := httptest.NewServer(
