@@ -1,11 +1,11 @@
 # Sending notifications via webhooks
 
-It is possible to send notifications to external systems whenever an apply is being done.
+It is possible to send notifications to external systems whenever an apply is being done or drift is detected.
 
 You can make requests to any HTTP endpoint or send messages directly to your Slack channel.
 
 ::: tip NOTE
-Currently only `apply` events are supported.
+The `apply` and `drift` events are supported.
 :::
 
 ## Configuration
@@ -149,3 +149,81 @@ webhooks:
   kind: slack
   channel: my-channel-id
 ```
+
+## Drift detection webhooks
+
+When [drift detection](api-endpoints.md#post-apidriftdetect) is enabled (`--enable-drift-detection`), you can configure webhooks to be notified whenever infrastructure drift is detected. Drift webhooks are sent automatically after a `POST /api/drift/detect` request finds projects with drift.
+
+::: tip NOTE
+Drift webhooks use `event: drift` in the webhook configuration. They are independent from `event: apply` webhooks.
+:::
+
+### Configuring drift webhooks
+
+Drift webhooks are configured alongside apply webhooks in the same `webhooks` configuration block. You can send drift notifications to Slack, HTTP endpoints, or both:
+
+```yaml
+webhooks:
+# Apply webhook (existing)
+- event: apply
+  kind: slack
+  channel: apply-notifications
+
+# Drift webhooks
+- event: drift
+  kind: slack
+  channel: drift-alerts
+- event: drift
+  kind: http
+  url: https://example.com/drift-webhook
+```
+
+::: tip NOTE
+Unlike apply webhooks, drift webhooks do not support `workspace-regex` or `branch-regex` filtering because drift detection operates at the repository level, not in the context of a pull request.
+:::
+
+### Slack drift message format
+
+When drift is detected, the Slack message includes:
+
+* **Color**: Red if drift was found, green if no drift
+* **Text**: "Drift detected in owner/repo" or "No drift in owner/repo"
+* **Fields**: Repository, Ref, Projects with drift (count), Detection ID
+
+### HTTP drift webhook payload
+
+The HTTP webhook sends a POST request with the following JSON payload:
+
+```json
+{
+  "repository": "octocat/Hello-World",
+  "ref": "main",
+  "detection_id": "550e8400-e29b-41d4-a716-446655440000",
+  "projects_with_drift": 1,
+  "total_projects": 2,
+  "projects": [
+    {
+      "project_name": "vpc",
+      "path": "modules/vpc",
+      "workspace": "production",
+      "has_drift": true,
+      "to_add": 1,
+      "to_change": 2,
+      "to_destroy": 0,
+      "summary": "Plan: 1 to add, 2 to change, 0 to destroy."
+    },
+    {
+      "project_name": "ec2",
+      "path": "modules/ec2",
+      "workspace": "production",
+      "has_drift": false,
+      "to_add": 0,
+      "to_change": 0,
+      "to_destroy": 0,
+      "summary": ""
+    }
+  ]
+}
+```
+
+The same `--webhook-http-headers` headers configured for apply webhooks are also sent with drift webhook requests.

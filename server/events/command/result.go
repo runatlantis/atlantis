@@ -3,6 +3,8 @@
 
 package command
 
+import "encoding/json"
+
 // Result is the result of running a Command.
 type Result struct {
 	Error          error
@@ -26,4 +28,27 @@ func (c Result) HasErrors() bool {
 		}
 	}
 	return false
+}
+
+// MarshalJSON implements custom JSON marshaling to properly serialize the Error field.
+// Go's error interface serializes as {} by default since it has no exported fields.
+// This method converts the error to a string pointer for proper JSON output.
+// The ProjectResults slice uses ProjectResult's MarshalJSON automatically.
+func (c Result) MarshalJSON() ([]byte, error) {
+	// Convert error to string pointer for proper serialization
+	var errMsg *string
+	if c.Error != nil {
+		msg := c.Error.Error()
+		errMsg = &msg
+	}
+
+	// Use type alias to avoid infinite recursion, then override Error field
+	type Alias Result
+	return json.Marshal(&struct {
+		Error *string `json:"Error"`
+		*Alias
+	}{
+		Error: errMsg,
+		Alias: (*Alias)(&c),
+	})
 }
