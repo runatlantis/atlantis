@@ -175,17 +175,17 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 			continue
 		}
 
-        if review.GetVote() == azuredevops.VoteApproved || review.GetVote() == azuredevops.VoteApprovedWithSuggestions {
-            numApprovals++
-        }
-    }
+		if review.GetVote() == azuredevops.VoteApproved || review.GetVote() == azuredevops.VoteApprovedWithSuggestions {
+			numApprovals++
+		}
+	}
 
-    if numApprovals > 0 {
-        return models.ApprovalStatus{
-            IsApproved: true,
-            NumApprovals: numApprovals,
-        }, nil
-    }
+	if numApprovals > 0 {
+		return models.ApprovalStatus{
+			IsApproved:   true,
+			NumApprovals: numApprovals,
+		}, nil
+	}
 
 	return approvalStatus, nil
 }
