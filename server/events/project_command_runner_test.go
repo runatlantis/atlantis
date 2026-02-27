@@ -1246,6 +1246,135 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckFailureDetection(t *testin
 	}
 }
 
+// Test that custom policy checks do not produce any additional output in the PreConftestOutput or PostConfTestOutput blocks
+// This is a regression test for two bugs:
+// 1. A blank code block would appear in custom policy check comments due PreConftestOutput being present.
+// 2. The last policy output would appear both in the PolicySetResults and in PostConftestOutput.
+func TestDefaultProjectCommandRunner_CustomPolicyCheck_NoPreOrPostConftestOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		description   string
+		policyOutputs []string
+		policySets    []valid.PolicySet
+	}{
+		{
+			description:   "Single custom policy check",
+			policyOutputs: []string{"Custom policy check - 0 failures, 5 passed"},
+			policySets: []valid.PolicySet{
+				{
+					Name:         "policy1",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Teams: []string{"team-1"},
+					},
+				},
+			},
+		},
+		{
+			description: "Multiple custom policy checks",
+			policyOutputs: []string{
+				"Custom policy check 1 - 0 failures, 5 passed",
+				"Custom policy check 2 - 1 failures, 3 passed",
+			},
+			policySets: []valid.PolicySet{
+				{
+					Name:         "policy1",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Teams: []string{"team-1"},
+					},
+				},
+				{
+					Name:         "policy2",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Teams: []string{"team-2"},
+					},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			mockPolicyCheck := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                mockLocker,
+				LockURLGenerator:      mockURLGenerator{},
+				PolicyCheckStepRunner: mockPolicyCheck,
+				WorkingDir:            mockWorkingDir,
+				WorkingDirLocker:      events.NewDefaultWorkingDirLocker(),
+			}
+
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[string](),
+			)).ThenReturn(repoDir, nil)
+
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				Any[bool](),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
+
+			var steps []valid.Step
+			for range c.policyOutputs {
+				steps = append(steps, valid.Step{StepName: "policy_check"})
+			}
+
+			mockCall := When(mockPolicyCheck.Run(
+				Any[command.ProjectContext](),
+				Any[[]string](),
+				Any[string](),
+				Any[map[string]string](),
+			))
+			for _, output := range c.policyOutputs {
+				mockCall = mockCall.ThenReturn(output, nil)
+			}
+
+			ctx := command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				Workspace:         "default",
+				RepoRelDir:        ".",
+				CustomPolicyCheck: true,
+				PolicySets: valid.PolicySets{
+					PolicySets: c.policySets,
+				},
+				Steps: steps,
+			}
+
+			res := runner.PolicyCheck(ctx)
+
+			Assert(t, res.Error == nil, "not expecting error: %v", res.Error)
+			Assert(t, res.PolicyCheckResults != nil, "expecting policy check results")
+
+			policyResults := res.PolicyCheckResults.PolicySetResults
+			Equals(t, len(c.policyOutputs), len(policyResults))
+
+			for i, expectedOutput := range c.policyOutputs {
+				Equals(t, c.policySets[i].Name, policyResults[i].PolicySetName)
+				Equals(t, expectedOutput, policyResults[i].PolicyOutput)
+			}
+
+			// All outputs should be in PolicySetResults, not in PreConftestOutput or PostConftestOutput
+			Equals(t, "", res.PolicyCheckResults.PreConftestOutput)
+			Equals(t, "", res.PolicyCheckResults.PostConftestOutput)
+		})
+	}
+}
+
 // Test approve policies logic.
 func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 	cases := []struct {
