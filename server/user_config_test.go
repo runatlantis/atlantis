@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -69,6 +70,49 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 				require.ErrorContains(t, err, tt.wantErr, "ToAllowCommandNames()")
 			}
 			assert.Equalf(t, tt.want, got, "ToAllowCommandNames()")
+		})
+	}
+}
+
+func TestUserConfig_ToBlockedExtraArgs(t *testing.T) {
+	tests := []struct {
+		name             string
+		blockedExtraArgs string
+		want             []string
+	}{
+		{
+			name:             "empty returns defaults",
+			blockedExtraArgs: "",
+			want:             events.DefaultBlockedExtraArgs,
+		},
+		{
+			name:             "single flag",
+			blockedExtraArgs: "-chdir",
+			want:             []string{"-chdir"},
+		},
+		{
+			name:             "multiple flags comma-separated",
+			blockedExtraArgs: "-chdir,--chdir,-plugin-dir,--plugin-dir",
+			want:             []string{"-chdir", "--chdir", "-plugin-dir", "--plugin-dir"},
+		},
+		{
+			name:             "custom flag list overrides defaults",
+			blockedExtraArgs: "-no-color,--no-color",
+			want:             []string{"-no-color", "--no-color"},
+		},
+		{
+			name:             "whitespace around flags is trimmed",
+			blockedExtraArgs: " -chdir , --chdir ",
+			want:             []string{"-chdir", "--chdir"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := server.UserConfig{
+				BlockedExtraArgs: tt.blockedExtraArgs,
+			}
+			got := u.ToBlockedExtraArgs()
+			assert.Equalf(t, tt.want, got, "ToBlockedExtraArgs()")
 		})
 	}
 }
