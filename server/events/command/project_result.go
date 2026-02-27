@@ -49,7 +49,8 @@ func (p ProjectResult) PolicyStatus() []models.PolicySetStatus {
 			policyStatus := models.PolicySetStatus{
 				PolicySetName: policySet.PolicySetName,
 				Passed:        policySet.Passed,
-				Approvals:     policySet.CurApprovals,
+				Approvals:     policySet.Approvals,
+				Hashes:        policySet.Hashes,
 			}
 			policyStatuses = append(policyStatuses, policyStatus)
 		}

@@ -16,7 +16,7 @@ FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibit
 
 
 ```diff
-[{"PolicySetName":"test_policy","PolicyOutput":"FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.\n\n1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions\n","Passed":false,"ReqApprovals":1,"CurApprovals":0}]
+[{"PolicySetName":"test_policy","PolicyOutput":"FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.\n\n1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions\n","Passed":false,"ReqApprovalCount":1,"Approvals":null,"Hashes":["FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.","","1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions",""]}]
 post-conftest output
 
 ```

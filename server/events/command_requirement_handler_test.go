@@ -174,7 +174,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 					{
 						PolicySetName: "policy1",
 						Passed:        false,
-						Approvals:     0,
+						Approvals:     nil,
 					},
 				},
 				PolicySets: valid.PolicySets{

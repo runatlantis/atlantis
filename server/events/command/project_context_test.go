@@ -34,7 +34,7 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        false,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 			},
 			policyClearedExp: false,
@@ -53,7 +53,7 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        true,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 			},
 			policyClearedExp: true,
@@ -72,7 +72,7 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        false,
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 				},
 			},
 			policyClearedExp: true,
@@ -99,17 +99,17 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        false,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 				{
 					PolicySetName: "policy2",
 					Passed:        false,
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 				},
 				{
 					PolicySetName: "policy3",
 					Passed:        true,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 			},
 			policyClearedExp: false,
@@ -136,17 +136,17 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        false,
-					Approvals:     2,
+					Approvals:     make([]models.PolicySetApproval, 2),
 				},
 				{
 					PolicySetName: "policy2",
 					Passed:        false,
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 				},
 				{
 					PolicySetName: "policy3",
 					Passed:        true,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 			},
 			policyClearedExp: true,

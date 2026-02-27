@@ -227,12 +227,13 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 			passed = false
 		}
 
-		policySetResults = append(policySetResults, models.PolicySetResult{
-			PolicySetName: policySet.Name,
-			PolicyOutput:  cmdOutput,
-			Passed:        passed,
-			ReqApprovals:  policySet.ApproveCount,
-		})
+		policySetResults = append(policySetResults, *models.NewPolicySetResult(
+			policySet.Name,
+			cmdOutput,
+			passed,
+			policySet.ApproveCount,
+			ctx.PolicySets.PolicyItemRegex,
+		))
 	}
 
 	if policySetResults == nil {
