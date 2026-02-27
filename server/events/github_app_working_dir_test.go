@@ -16,6 +16,7 @@ import (
 	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 // Test that if we don't have any existing files, we check out the repo with a github app.
@@ -63,8 +64,9 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	workingDir := eventMocks.NewMockWorkingDir()
+	workingDir := eventMocks.NewMockWorkingDir(ctrl)
 
 	credentials := githubMocks.NewMockCredentials()
 
@@ -92,12 +94,9 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 	modifiedBaseRepo.SanitizedCloneURL = "https://github.com/runatlantis/atlantis.git"
 
 	When(credentials.GetToken()).ThenReturn("token", nil)
-	When(workingDir.Clone(Any[logging.SimpleLogging](), Eq(modifiedBaseRepo), Eq(models.PullRequest{BaseRepo: modifiedBaseRepo}),
-		Eq("default"))).ThenReturn("", nil)
+	workingDir.EXPECT().Clone(gomock.Any(), modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default").Return("", nil)
 
 	_, err := ghAppWorkingDir.Clone(logger, headRepo, models.PullRequest{BaseRepo: baseRepo}, "default")
-
-	workingDir.VerifyWasCalledOnce().Clone(logger, modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")
 
 	Ok(t, err)
 }
@@ -108,8 +107,9 @@ func TestMergeAgain_GithubAppSetsCorrectUrl(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
 	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	workingDir := eventMocks.NewMockWorkingDir()
+	workingDir := eventMocks.NewMockWorkingDir(ctrl)
 
 	credentials := githubMocks.NewMockCredentials()
 
@@ -137,13 +137,9 @@ func TestMergeAgain_GithubAppSetsCorrectUrl(t *testing.T) {
 	modifiedBaseRepo.SanitizedCloneURL = "https://github.com/runatlantis/atlantis.git"
 
 	When(credentials.GetToken()).ThenReturn("token", nil)
-	When(workingDir.MergeAgain(Any[logging.SimpleLogging](), Eq(modifiedBaseRepo), Eq(models.PullRequest{BaseRepo: modifiedBaseRepo}),
-		Eq("default"))).ThenReturn(false, nil)
+	workingDir.EXPECT().MergeAgain(gomock.Any(), modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default").Return(false, nil)
 
 	_, err := ghAppWorkingDir.MergeAgain(logger, headRepo, models.PullRequest{BaseRepo: baseRepo}, "default")
-
-	// MergeAgain
-	workingDir.VerifyWasCalledOnce().MergeAgain(logger, modifiedBaseRepo, models.PullRequest{BaseRepo: modifiedBaseRepo}, "default")
 
 	Ok(t, err)
 }
