@@ -282,7 +282,13 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	if err != nil {
 		return approvalStatus, err
 	}
-	numApprovals := len(approvals.ApprovedBy)
+	// Count approvals excluding the pull request author
+	numApprovals := 0
+	for _, approver := range approvals.ApprovedBy {
+		if approver.User.Username != pull.Author {
+			numApprovals++
+		}
+	}
 	approvalStatus.NumApprovals = numApprovals
 	if approvals.ApprovalsLeft > 0 || numApprovals == 0 {
 		return approvalStatus, nil
