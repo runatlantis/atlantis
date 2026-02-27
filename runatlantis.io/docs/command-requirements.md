@@ -19,18 +19,19 @@ If the requirement is not met, users will see an error if they try to run `atlan
 ### Approved
 
 The `approved` requirement will prevent applies unless the pull request is approved
-by at least one person other than the author.
+according to your VCS provider's rules.
 
 You can also specify a minimum number of approvals required by using the format `approved:N`,
-where N is the number of approvals needed. For example:
-- `approved` or `approved:1` requires at least 1 approval
+where N is the number of unique approvals Atlantis will enforce. For example:
+- `approved:1` requires at least 1 approval
 - `approved:2` requires at least 2 approvals
 - `approved:3` requires at least 3 approvals
 
 :::tip Note
-Approvals are counted per unique user. If the same user approves multiple times,
-it only counts as one approval. The pull request author's approval (if allowed by
-the VCS provider) does not count toward the requirement.
+`approved:N` adds an additional Atlantis-enforced minimum on top of your VCS provider's
+rules. Both requirements must be satisfied. For example, if GitLab requires 3 approvals
+and you set `approved:2`, you still need 3 approvals to apply. The pull request author's
+approval (if allowed by the VCS provider) does not count toward Atlantis's count.
 :::
 
 #### Usage
