@@ -497,7 +497,7 @@ func TestApprovalCount_ValidateApplyProject(t *testing.T) {
 					ApprovalStatus: models.ApprovalStatus{IsApproved: false, NumApprovals: 0},
 				},
 			},
-			wantFailure: "Pull request requires 3 approval(s) but only has 0 before running apply.",
+			wantFailure: "Pull request must be approved according to the project's approval rules before running apply.",
 			wantErr:     assert.NoError,
 		},
 		{

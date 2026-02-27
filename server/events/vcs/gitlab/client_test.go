@@ -1738,7 +1738,7 @@ func TestClient_PullIsApproved_ApprovalCount(t *testing.T) {
 			} else {
 				approvers := make([]string, c.approvedBy)
 				for i := 0; i < c.approvedBy; i++ {
-					approvers[i] = fmt.Sprintf(`{"user":{"id":%d}}`, i+1)
+					approvers[i] = fmt.Sprintf(`{"user":{"id":%d,"username":"user%d"}}`, i+1, i+1)
 				}
 				resp = fmt.Sprintf(`{"approved_by":[%s],"approvals_left":%d}`, strings.Join(approvers, ","), approvalsLeft)
 			}
