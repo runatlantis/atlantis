@@ -51,7 +51,7 @@ jobs:
     needs: [changes]
     if: github.event.pull_request.draft == false && needs.changes.outputs.should-run-website-check == 'true'
     name: Website Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
@@ -79,7 +79,7 @@ jobs:
             ./runatlantis.io
 
       - name: setup npm
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
         with:
           cache: 'npm'
 
@@ -101,7 +101,7 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-website-check == 'false'
     name: Website Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
