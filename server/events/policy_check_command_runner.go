@@ -68,8 +68,8 @@ func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.Proj
 		result = runProjectCmds(cmds, p.prjCmdRunner.PolicyCheck)
 	}
 
-	// Quiet policy checks unless there's an error
-	if result.HasErrors() || !p.quietPolicyChecks {
+	// Quiet policy checks unless there's an error or warnings
+	if result.HasErrors() || p.resultHasWarnings(result) || !p.quietPolicyChecks {
 		p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
 	}
 
@@ -100,4 +100,13 @@ func (p *PolicyCheckCommandRunner) updateCommitStatus(ctx *command.Context, pull
 
 func (p *PolicyCheckCommandRunner) isParallelEnabled(cmds []command.ProjectContext) bool {
 	return len(cmds) > 0 && cmds[0].ParallelPolicyCheckEnabled
+}
+
+func (p *PolicyCheckCommandRunner) resultHasWarnings(result command.Result) bool {
+	for _, pr := range result.ProjectResults {
+		if pr.PolicyCheckResults != nil && pr.PolicyCheckResults.HasWarnings() {
+			return true
+		}
+	}
+	return false
 }
