@@ -481,9 +481,9 @@ func TestClone_ResetOnWrongCommit(t *testing.T) {
 	Equals(t, expCommit, actCommit)
 }
 
-// Test that if the repo is already cloned but is at the wrong commit, but the base has changed
-// we need to reclone
-func TestClone_ReCloneOnBaseChange(t *testing.T) {
+// Test that if the repo is already cloned, is at the wrong commit, and the base has changed
+// but for the branch checkout strategy do not need to check remote
+func TestClone_DoNotReCloneOnBaseChangeForBranchStrategy(t *testing.T) {
 	repoDir := initRepo(t)
 	dataDir := t.TempDir()
 
@@ -511,6 +511,60 @@ func TestClone_ReCloneOnBaseChange(t *testing.T) {
 		DataDir:                     dataDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		HeadCommit: expCommit,
+		BaseBranch: "some-other-base-branch",
+	}, "default")
+	Ok(t, err)
+	assert.FileExists(t, planFile, "Plan file should not wiped out by the reclone")
+
+	// Use rev-parse to verify at correct commit.
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
+	Equals(t, expCommit, actCommit)
+}
+
+// Test that if the repo is already cloned but is at the wrong commit, but the base has changed
+// we need to reclone
+func TestClone_ReCloneOnBaseChangeForMergeStrategy(t *testing.T) {
+	remoteRepoDir := initRepo(t)
+	dataDir := t.TempDir()
+	repoDir := filepath.Join(dataDir, "repos", "0", "default")
+
+	// Copy the repo to our data dir.
+	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, dataDir, "git", "clone", remoteRepoDir, repoDir)
+	t.Log("Remote dir", remoteRepoDir)
+	t.Log("Cloned dir", repoDir)
+
+	// Now add a commit to the repo, so the one in the data dir is out of date.
+	runCmd(t, remoteRepoDir, "git", "checkout", "branch")
+	runCmd(t, remoteRepoDir, "touch", "newfile")
+	runCmd(t, remoteRepoDir, "git", "add", "newfile")
+	runCmd(t, remoteRepoDir, "git", "commit", "-m", "newfile")
+	expCommit := strings.TrimSpace(runCmd(t, remoteRepoDir, "git", "rev-parse", "HEAD"))
+
+	// In addition create the new branch so we can pull that
+	newBaseBranch := "some-other-base-branch"
+	runCmd(t, remoteRepoDir, "git", "branch", newBaseBranch)
+
+	// Pretend that terraform has created a plan file, we'll check for it later
+	planFile := filepath.Join(repoDir, "default.tfplan")
+	assert.NoFileExists(t, planFile)
+	_, err := os.Create(planFile)
+	Assert(t, err == nil, "creating plan file: %v", err)
+	assert.FileExists(t, planFile)
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", remoteRepoDir),
+		TestingOverrideBaseCloneURL: fmt.Sprintf("file://%s", remoteRepoDir),
 		GpgNoSigningEnabled:         true,
 	}
 	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
