@@ -61,6 +61,11 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 			if parseErr != nil || requiredApprovals <= 0 {
 				return fmt.Sprintf("Invalid approval requirement format: %s", req), nil
 			}
+			// Check VCS provider's approval rules first
+			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
+				return fmt.Sprintf("Pull request must be approved according to the project's approval rules before running %s.", cmd), nil
+			}
+			// Then check Atlantis's minimum approval count
 			if ctx.PullReqStatus.ApprovalStatus.NumApprovals < requiredApprovals {
 				return fmt.Sprintf("Pull request requires %d approval(s) but only has %d before running %s.", requiredApprovals, ctx.PullReqStatus.ApprovalStatus.NumApprovals, cmd), nil
 			}
