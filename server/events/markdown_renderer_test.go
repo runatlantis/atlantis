@@ -1693,6 +1693,7 @@ func TestRenderProjectResultsWithQuietPolicyChecksShowsWarnings(t *testing.T) {
 	cases := []struct {
 		Description    string
 		Command        command.Name
+		SubCommand     string
 		ProjectResults []command.ProjectResult
 		VCSHost        models.VCSHostType
 		Expected       string
@@ -1700,6 +1701,7 @@ func TestRenderProjectResultsWithQuietPolicyChecksShowsWarnings(t *testing.T) {
 		{
 			"successful policy check with warnings should be shown when quiet policy checks enabled",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					ProjectCommandOutput: command.ProjectCommandOutput{
@@ -1755,6 +1757,7 @@ $$$
 		{
 			"successful policy check without warnings should be hidden when quiet policy checks enabled",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -1815,6 +1818,7 @@ Ran Policy Check for 2 projects:
 		{
 			"multiple projects - one with warnings shown, one without warnings hidden",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					Workspace:  "workspace",
@@ -1893,6 +1897,7 @@ $$$
 		{
 			"WARN prefix should be shown when quiet policy checks enabled",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					ProjectCommandOutput: command.ProjectCommandOutput{
@@ -1948,6 +1953,7 @@ $$$
 		{
 			"JSON format warnings should be shown when quiet policy checks enabled",
 			command.PolicyCheck,
+			"",
 			[]command.ProjectResult{
 				{
 					ProjectCommandOutput: command.ProjectCommandOutput{
@@ -2033,9 +2039,10 @@ $$$
 				ProjectResults: c.ProjectResults,
 			}
 			for _, verbose := range []bool{true, false} {
-				t.Run(fmt.Sprintf("verbose_%t", verbose), func(t *testing.T) {
+				t.Run(c.Description, func(t *testing.T) {
 					cmd := &events.CommentCommand{
 						Name:    c.Command,
+						SubName: c.SubCommand,
 						Verbose: verbose,
 					}
 					s := r.Render(ctx, res, cmd)
