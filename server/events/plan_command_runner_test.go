@@ -5,6 +5,8 @@ package events_test
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/v83/github"
@@ -1025,4 +1027,204 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPlanCommandRunner_ConcurrentRunError verifies that when a workspace lock
+// is already held (i.e. another command is in progress) a generic plan command
+// early-exits with a human-readable error rather than corrupting the running job.
+func TestPlanCommandRunner_ConcurrentRunError(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	t.Run("generic plan early-exits when workspace is locked", func(t *testing.T) {
+		tmp := t.TempDir()
+		db, err := boltdb.New(tmp)
+		t.Cleanup(func() { db.Close() })
+		Ok(t, err)
+
+		vcsClient := setup(t, func(tc *TestConfig) {
+			tc.database = db
+		})
+
+		scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
+		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+		cmd := &events.CommentCommand{Name: command.Plan}
+		ctx := &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    scopeNull,
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.CommentTrigger,
+		}
+
+		projectContexts := []command.ProjectContext{{CommandName: command.Plan, RepoRelDir: "mydir"}}
+		When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(projectContexts, nil)
+
+		// Simulate an in-progress operation by acquiring the working dir lock
+		// directly on the real locker that the planCommandRunner uses.
+		locker := events.NewDefaultWorkingDirLocker()
+		unlock, lockErr := locker.TryLock(testdata.GithubRepo.FullName, modelPull.Num, "default", "mydir", "", command.Plan)
+		Ok(t, lockErr)
+		defer unlock()
+
+		// Build a runner that uses the same locker that already has the lock.
+		concurrentPlanRunner := events.NewPlanCommandRunner(
+			false, false,
+			vcsClient,
+			pendingPlanFinder,
+			workingDir,
+			commitUpdater,
+			projectCommandBuilder,
+			projectCommandRunner,
+			cancellationTracker,
+			dbUpdater,
+			pullUpdater,
+			policyCheckCommandRunner,
+			autoMerger,
+			1,
+			false,
+			db,
+			lockingLocker,
+			false,
+			pullReqStatusFetcher,
+			false,
+			locker,
+		)
+
+		concurrentPlanRunner.Run(ctx, cmd)
+
+		// The plan runner should have commented on the PR with the error message
+		// and NOT invoked the underlying project runner.
+		projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+		_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+			Any[logging.SimpleLogging](), Any[models.Repo](), AnyInt(), AnyString(), AnyString(),
+		).GetCapturedArguments()
+		Assert(t, strings.Contains(comment, "already running"), fmt.Sprintf("expected comment to mention concurrent run, got: %q", comment))
+	})
+
+	t.Run("autoplan early-exits when workspace is locked", func(t *testing.T) {
+		tmp := t.TempDir()
+		db, err := boltdb.New(tmp)
+		t.Cleanup(func() { db.Close() })
+		Ok(t, err)
+
+		vcsClient := setup(t, func(tc *TestConfig) {
+			tc.database = db
+		})
+
+		scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
+		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+		ctx := &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    scopeNull,
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.AutoTrigger,
+		}
+
+		projectContexts := []command.ProjectContext{{CommandName: command.Plan, RepoRelDir: "mydir"}}
+		When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn(projectContexts, nil)
+
+		locker := events.NewDefaultWorkingDirLocker()
+		unlock, lockErr := locker.TryLock(testdata.GithubRepo.FullName, modelPull.Num, "default", "mydir", "", command.Plan)
+		Ok(t, lockErr)
+		defer unlock()
+
+		concurrentPlanRunner := events.NewPlanCommandRunner(
+			false, false,
+			vcsClient,
+			pendingPlanFinder,
+			workingDir,
+			commitUpdater,
+			projectCommandBuilder,
+			projectCommandRunner,
+			cancellationTracker,
+			dbUpdater,
+			pullUpdater,
+			policyCheckCommandRunner,
+			autoMerger,
+			1,
+			false,
+			db,
+			lockingLocker,
+			false,
+			pullReqStatusFetcher,
+			false,
+			locker,
+		)
+
+		concurrentPlanRunner.Run(ctx, nil)
+
+		projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+		_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+			Any[logging.SimpleLogging](), Any[models.Repo](), AnyInt(), AnyString(), AnyString(),
+		).GetCapturedArguments()
+		Assert(t, strings.Contains(comment, "already running"), fmt.Sprintf("expected comment to mention concurrent run, got: %q", comment))
+	})
+
+	t.Run("specific project plan is not blocked by lock on different workspace", func(t *testing.T) {
+		tmp := t.TempDir()
+		db, err := boltdb.New(tmp)
+		t.Cleanup(func() { db.Close() })
+		Ok(t, err)
+
+		vcsClient := setup(t, func(tc *TestConfig) {
+			tc.database = db
+		})
+
+		scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
+		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+		// A specific-project command (has RepoRelDir set) skips the concurrent-run check.
+		cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "mydir"}
+		ctx := &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    scopeNull,
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.CommentTrigger,
+		}
+
+		projectContexts := []command.ProjectContext{{CommandName: command.Plan, RepoRelDir: "mydir"}}
+		When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(projectContexts, nil)
+		When(projectCommandRunner.Plan(projectContexts[0])).ThenReturn(command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{},
+		})
+
+		locker := events.NewDefaultWorkingDirLocker()
+		// Lock a different workspace – the specific plan should still proceed.
+		unlock, lockErr := locker.TryLock(testdata.GithubRepo.FullName, modelPull.Num, "other-workspace", "otherdir", "", command.Apply)
+		Ok(t, lockErr)
+		defer unlock()
+
+		concurrentPlanRunner := events.NewPlanCommandRunner(
+			false, false,
+			vcsClient,
+			pendingPlanFinder,
+			workingDir,
+			commitUpdater,
+			projectCommandBuilder,
+			projectCommandRunner,
+			cancellationTracker,
+			dbUpdater,
+			pullUpdater,
+			policyCheckCommandRunner,
+			autoMerger,
+			1,
+			false,
+			db,
+			lockingLocker,
+			false,
+			pullReqStatusFetcher,
+			false,
+			locker,
+		)
+
+		concurrentPlanRunner.Run(ctx, cmd)
+
+		// The project runner SHOULD have been invoked because this is a specific-project plan.
+		projectCommandRunner.VerifyWasCalledOnce().Plan(projectContexts[0])
+	})
 }
