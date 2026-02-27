@@ -19,12 +19,14 @@ type HttpWebhook struct {
 	Client         *HttpClient
 	WorkspaceRegex *regexp.Regexp
 	BranchRegex    *regexp.Regexp
+	ProjectRegex   *regexp.Regexp
+	DirectoryRegex *regexp.Regexp
 	URL            string
 }
 
 // Send sends the webhook to URL if workspace and branch matches their respective regex.
 func (h *HttpWebhook) Send(_ logging.SimpleLogging, applyResult ApplyResult) error {
-	if !h.WorkspaceRegex.MatchString(applyResult.Workspace) || !h.BranchRegex.MatchString(applyResult.Pull.BaseBranch) {
+	if !h.WorkspaceRegex.MatchString(applyResult.Workspace) || !h.BranchRegex.MatchString(applyResult.Pull.BaseBranch) || !h.ProjectRegex.MatchString(applyResult.ProjectName) || !h.DirectoryRegex.MatchString(applyResult.Directory) {
 		return nil
 	}
 	if err := h.doSend(applyResult); err != nil {

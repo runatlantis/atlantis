@@ -159,6 +159,14 @@ type WebhookConfig struct {
 	// that is being modified for this event. If the regex matches, we'll
 	// send the webhook, ex. "main.*".
 	BranchRegex string `mapstructure:"branch-regex"`
+	// ProjectRegex is a regex that is used to match against the project
+	// that is being modified for this event. If the regex matches, we'll
+	// send the webhook, ex. "project-.*".
+	ProjectRegex string `mapstructure:"project-regex"`
+	// DirectoryRegex is a regex that is used to match against the directory
+	// that is being modified for this event. If the regex matches, we'll
+	// send the webhook, ex. "/projects/my-directory/.*".
+	DirectoryRegex string `mapstructure:"directory-regex"`
 	// Kind is the type of webhook we should send, ex. slack or http.
 	Kind string `mapstructure:"kind"`
 	// Channel is the channel to send this webhook to. It only applies to
