@@ -1364,6 +1364,16 @@ ATLANTIS_SKIP_CLONE_NO_CHANGES=true
 
 `--skip-clone-no-changes` will skip cloning the repo during autoplan if there are no changes to Terraform projects. This will only apply for GitHub and GitLab and only for repos that have `atlantis.yaml` file. Defaults to `false`.
 
+### `--skip-working-dir-deletion-on-unlock`
+
+```bash
+atlantis server --skip-working-dir-deletion-on-unlock
+# or
+ATLANTIS_SKIP_WORKING_DIR_DELETION_ON_UNLOCK=true
+```
+
+When set, `atlantis unlock` will only delete plan files and preserve the cloned working directory. By default (`false`), unlocking a project deletes the full workspace directory to prevent lock and filesystem state from diverging. Set to `true` if you want to preserve working directories on unlock for faster re-planning. Defaults to `false`.
+
 ### `--slack-token` <Badge text="v0.43.0+" type="info"/>
 
 ```bash
