@@ -370,6 +370,82 @@ func TestClient_PullIsMergeable(t *testing.T) {
 
 }
 
+// TestClient_GetModifiedFiles_SSRFPrevented verifies that a malicious "next"
+// pagination URL pointing to a different host is rejected to prevent SSRF.
+func TestClient_GetModifiedFiles_SSRFPrevented(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	resp := `{
+		"pagelen": 1,
+		"values": [
+			{
+				"status": "modified",
+				"old": {"path": "file1.txt"},
+				"new": {"path": "file1.txt"}
+			}
+		],
+		"next": "http://internal.evil.host/steal-secrets"
+	}`
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.RequestURI {
+		case diffstatURL:
+			w.Write([]byte(resp)) // nolint: errcheck
+		default:
+			t.Errorf("got unexpected request at %q", r.RequestURI)
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	}))
+	defer testServer.Close()
+
+	client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+	client.BaseURL = testServer.URL
+
+	_, err := client.GetModifiedFiles(logger, models.Repo{
+		FullName: "owner/repo",
+		VCSHost:  models.VCSHost{Type: models.BitbucketCloud, Hostname: "bitbucket.org"},
+	}, models.PullRequest{Num: 1})
+	Assert(t, err != nil, "expected error for malicious next page URL")
+	Assert(t, strings.Contains(err.Error(), "does not match base URL host"), "error should mention host mismatch, got: %s", err.Error())
+}
+
+// TestClient_PullIsMergeable_SSRFPrevented verifies that a malicious "next"
+// pagination URL pointing to a different host is rejected to prevent SSRF.
+func TestClient_PullIsMergeable_SSRFPrevented(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	resp := `{
+		"pagelen": 1,
+		"values": [
+			{
+				"status": "modified",
+				"old": {"path": "main.tf"},
+				"new": {"path": "main.tf"}
+			}
+		],
+		"next": "http://internal.evil.host/steal-secrets"
+	}`
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.RequestURI {
+		case diffstatURL:
+			w.Write([]byte(resp)) // nolint: errcheck
+		default:
+			t.Errorf("got unexpected request at %q", r.RequestURI)
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	}))
+	defer testServer.Close()
+
+	client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+	client.BaseURL = testServer.URL
+
+	_, err := client.PullIsMergeable(logger, models.Repo{
+		FullName: "owner/repo",
+		VCSHost:  models.VCSHost{Type: models.BitbucketCloud, Hostname: "bitbucket.org"},
+	}, models.PullRequest{Num: 1}, "", []string{})
+	Assert(t, err != nil, "expected error for malicious next page URL")
+	Assert(t, strings.Contains(err.Error(), "does not match base URL host"), "error should mention host mismatch, got: %s", err.Error())
+}
+
 func TestClient_MarkdownPullLink(t *testing.T) {
 	client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 	pull := models.PullRequest{Num: 1}
