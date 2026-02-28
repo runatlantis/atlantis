@@ -94,7 +94,10 @@ type FileWorkspace struct {
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
-	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
+	cloneDir, err := w.cloneDir(p.BaseRepo, p, workspace)
+	if err != nil {
+		return "", err
+	}
 
 	// Unconditionally wait for the clone lock here, if anyone else is doing any clone
 	// operation in this directory, we wait for it to finish before we check anything.
@@ -160,7 +163,10 @@ func (w *FileWorkspace) MergeAgain(
 		return false, nil
 	}
 
-	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
+	cloneDir, err := w.cloneDir(p.BaseRepo, p, workspace)
+	if err != nil {
+		return false, err
+	}
 	// We atomically set the recheckRequiredMap flag here before grabbing the clone lock.
 	// If the flag is cleared after we grab the lock, it means some other thread
 	// did the necessary work late enough that we do not have to do it again.
@@ -475,7 +481,10 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 
 // GetWorkingDir returns the path to the workspace for this repo and pull.
 func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
-	repoDir := w.cloneDir(r, p, workspace)
+	repoDir, err := w.cloneDir(r, p, workspace)
+	if err != nil {
+		return "", err
+	}
 	if _, err := os.Stat(repoDir); err != nil {
 		return "", fmt.Errorf("checking if workspace exists: %w", err)
 	}
@@ -485,7 +494,10 @@ func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, works
 // GetPullDir returns the dir where the workspaces for this pull are cloned.
 // If the dir doesn't exist it will return an error.
 func (w *FileWorkspace) GetPullDir(r models.Repo, p models.PullRequest) (string, error) {
-	dir := w.repoPullDir(r, p)
+	dir, err := w.repoPullDir(r, p)
+	if err != nil {
+		return "", err
+	}
 	if _, err := os.Stat(dir); err != nil {
 		return "", err
 	}
@@ -494,24 +506,42 @@ func (w *FileWorkspace) GetPullDir(r models.Repo, p models.PullRequest) (string,
 
 // Delete deletes the workspace for this repo and pull.
 func (w *FileWorkspace) Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error {
-	repoPullDir := w.repoPullDir(r, p)
+	repoPullDir, err := w.repoPullDir(r, p)
+	if err != nil {
+		return err
+	}
 	logger.Info("Deleting repo pull directory: " + repoPullDir)
 	return os.RemoveAll(repoPullDir)
 }
 
 // DeleteForWorkspace deletes the working dir for this workspace.
 func (w *FileWorkspace) DeleteForWorkspace(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) error {
-	workspaceDir := w.cloneDir(r, p, workspace)
+	workspaceDir, err := w.cloneDir(r, p, workspace)
+	if err != nil {
+		return err
+	}
 	logger.Info("Deleting workspace directory: " + workspaceDir)
 	return os.RemoveAll(workspaceDir)
 }
 
-func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string {
-	return filepath.Join(w.DataDir, workingDirPrefix, r.FullName, strconv.Itoa(p.Num))
+func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) (string, error) {
+	dir := filepath.Join(w.DataDir, workingDirPrefix, r.FullName, strconv.Itoa(p.Num))
+	if err := utils.EnsureSubPath(filepath.Join(w.DataDir, workingDirPrefix), dir); err != nil {
+		return "", fmt.Errorf("repo path traversal detected: %w", err)
+	}
+	return dir, nil
 }
 
-func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) string {
-	return filepath.Join(w.repoPullDir(r, p), workspace)
+func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
+	pullDir, err := w.repoPullDir(r, p)
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(pullDir, workspace)
+	if err := utils.EnsureSubPath(pullDir, dir); err != nil {
+		return "", fmt.Errorf("workspace path traversal detected: %w", err)
+	}
+	return dir, nil
 }
 
 // sanitizeGitCredentials replaces any git clone urls that contain credentials
@@ -527,7 +557,14 @@ func (w *FileWorkspace) SetCheckForUpstreamChanges() {
 }
 
 func (w *FileWorkspace) DeletePlan(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string, projectPath string, projectName string) error {
-	planPath := filepath.Join(w.cloneDir(r, p, workspace), projectPath, runtime.GetPlanFilename(workspace, projectName))
+	cloneDir, err := w.cloneDir(r, p, workspace)
+	if err != nil {
+		return err
+	}
+	planPath := filepath.Join(cloneDir, projectPath, runtime.GetPlanFilename(workspace, projectName))
+	if err := utils.EnsureSubPath(cloneDir, planPath); err != nil {
+		return fmt.Errorf("plan path traversal detected: %w", err)
+	}
 	logger.Info("Deleting plan: " + planPath)
 	return utils.RemoveIgnoreNonExistent(planPath)
 }

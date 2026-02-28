@@ -834,3 +834,79 @@ func initRepo(t *testing.T) string {
 	runCmd(t, repoDir, "git", "branch", "branch")
 	return repoDir
 }
+
+// TestFileWorkspace_PathTraversal verifies that maliciously crafted repo names,
+// workspace names, or project paths that attempt directory traversal are rejected.
+// These tests intentionally construct Repo/PullRequest structs directly (bypassing
+// NewRepo() validation) in order to test the defense-in-depth layer in working_dir.go
+// independently of the parse-time input validation in models.go.
+func TestFileWorkspace_PathTraversal(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+
+	wd := &events.FileWorkspace{
+		DataDir:             dataDir,
+		GpgNoSigningEnabled: true,
+	}
+
+	// A repo with a malicious FullName containing "..". The struct is constructed
+	// directly to simulate a scenario where parse-time validation is bypassed
+	// (e.g., a bug in NewRepo, or a new VCS provider without validation).
+	maliciousRepo := models.Repo{FullName: "../../../etc"}
+	pull := models.PullRequest{
+		Num:      1,
+		BaseRepo: maliciousRepo,
+	}
+
+	t.Run("GetWorkingDir rejects traversal in repo name", func(t *testing.T) {
+		_, err := wd.GetWorkingDir(maliciousRepo, pull, "default")
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("GetPullDir rejects traversal in repo name", func(t *testing.T) {
+		_, err := wd.GetPullDir(maliciousRepo, pull)
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("Delete rejects traversal in repo name", func(t *testing.T) {
+		err := wd.Delete(logger, maliciousRepo, pull)
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("DeleteForWorkspace rejects traversal in repo name", func(t *testing.T) {
+		err := wd.DeleteForWorkspace(logger, maliciousRepo, pull, "default")
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("DeleteForWorkspace rejects traversal in workspace name", func(t *testing.T) {
+		safeRepo := models.Repo{FullName: "owner/repo"}
+		safePull := models.PullRequest{Num: 1, BaseRepo: safeRepo}
+		err := wd.DeleteForWorkspace(logger, safeRepo, safePull, "../../etc")
+		Assert(t, err != nil, "expected error for path traversal in workspace name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("Clone rejects traversal in repo name", func(t *testing.T) {
+		_, err := wd.Clone(logger, maliciousRepo, pull, "default")
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("DeletePlan rejects traversal in project path", func(t *testing.T) {
+		// Create the clone dir so the call gets past the path existence check.
+		safeRepo := models.Repo{FullName: "owner/repo"}
+		safePull := models.PullRequest{Num: 1, BaseRepo: safeRepo}
+		cloneDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default")
+		if err := os.MkdirAll(cloneDir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		// A projectPath that traverses out of the clone dir.
+		err := wd.DeletePlan(logger, safeRepo, safePull, "default", "../../../../etc", "")
+		Assert(t, err != nil, "expected error for path traversal in project path")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+}

@@ -107,6 +107,14 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 			"/b",
 			`invalid repo format "/b", owner "" or repo "b" was empty`,
 		},
+		{
+			"owner../repo",
+			`invalid repo format "owner../repo", owner or repo cannot contain '..'`,
+		},
+		{
+			"owner/..repo",
+			`invalid repo format "owner/..repo", owner or repo cannot contain '..'`,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.repoFullName, func(t *testing.T) {
