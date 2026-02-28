@@ -533,3 +533,52 @@ func TestClient_HidePRComments(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 2, called)
 }
+
+func TestClient_PullIsApproved_ApprovalCount(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description     string
+		testdata        string
+		expApproved     bool
+		expNumApprovals int
+	}{
+		{
+			"no approvers",
+			"pull-unapproved.json",
+			false,
+			0,
+		},
+		{
+			"single approver",
+			"pull-approved.json",
+			true,
+			1,
+		},
+		{
+			"two approvers",
+			"pull-approved-multiple.json",
+			true,
+			2,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			json, err := os.ReadFile(filepath.Join("testdata", c.testdata))
+			Ok(t, err)
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Write(json) // nolint: errcheck
+			}))
+			defer testServer.Close()
+
+			client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+			client.BaseURL = testServer.URL
+
+			repo, _ := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo.git", "user", "token")
+			approvalStatus, err := client.PullIsApproved(logger, repo, models.PullRequest{Num: 1})
+			Ok(t, err)
+			Equals(t, c.expApproved, approvalStatus.IsApproved)
+			Equals(t, c.expNumApprovals, approvalStatus.NumApprovals)
+		})
+	}
+}

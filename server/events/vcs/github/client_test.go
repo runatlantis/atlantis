@@ -1948,3 +1948,78 @@ func TestClient_SecondaryRateLimitHandling_CreateComment(t *testing.T) {
 	Assert(t, calls > maxCalls, "Expected more than %d calls due to rate limiting, but got %d", maxCalls, calls)
 
 }
+
+func TestClient_PullIsApproved_ApprovalCount(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description    string
+		reviews        string
+		expApproved    bool
+		expNumApprovals int
+	}{
+		{
+			"no reviews",
+			"[]",
+			false,
+			0,
+		},
+		{
+			"single approval",
+			`[{"id":1,"user":{"login":"user1"},"state":"APPROVED","submitted_at":"2023-01-01T00:00:00Z"}]`,
+			true,
+			1,
+		},
+		{
+			"multiple approvals",
+			`[{"id":1,"user":{"login":"user1"},"state":"APPROVED","submitted_at":"2023-01-01T00:00:00Z"},{"id":2,"user":{"login":"user2"},"state":"APPROVED","submitted_at":"2023-01-01T00:01:00Z"}]`,
+			true,
+			2,
+		},
+		{
+			"approval then changes requested",
+			`[{"id":1,"user":{"login":"user1"},"state":"APPROVED","submitted_at":"2023-01-01T00:00:00Z"},{"id":2,"user":{"login":"user1"},"state":"CHANGES_REQUESTED","submitted_at":"2023-01-01T00:01:00Z"}]`,
+			false,
+			0,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v3/repos/owner/repo/pulls/1/reviews?per_page=300":
+						w.Write([]byte(c.reviews)) // nolint: errcheck
+						return
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+				}))
+
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logging.NewNoopLogger(t))
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			approvalStatus, err := client.PullIsApproved(
+				logger,
+				models.Repo{
+					FullName: "owner/repo",
+					Owner:    "owner",
+					Name:     "repo",
+					VCSHost: models.VCSHost{
+						Type:     models.Github,
+						Hostname: "github.com",
+					},
+				}, models.PullRequest{
+					Num: 1,
+				})
+			Ok(t, err)
+			Equals(t, c.expApproved, approvalStatus.IsApproved)
+			Equals(t, c.expNumApprovals, approvalStatus.NumApprovals)
+		})
+	}
+}

@@ -132,7 +132,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:              String("."),
 				PlanRequirements: []string{"unsupported"},
 			},
-			expErr: "plan_requirements: \"unsupported\" is not a valid plan_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.",
+			expErr: "plan_requirements: \"unsupported\" is not a valid plan_requirement, only \"approved\", \"approved:N\", \"mergeable\" and \"undiverged\" are supported.",
 		},
 		{
 			description: "plan reqs with undiverged, mergeable and approved requirements",
@@ -172,7 +172,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:               String("."),
 				ApplyRequirements: []string{"unsupported"},
 			},
-			expErr: "apply_requirements: \"unsupported\" is not a valid apply_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.",
+			expErr: "apply_requirements: \"unsupported\" is not a valid apply_requirement, only \"approved\", \"approved:N\", \"mergeable\" and \"undiverged\" are supported.",
 		},
 		{
 			description: "apply reqs with approved requirement",
@@ -236,7 +236,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:                String("."),
 				ImportRequirements: []string{"unsupported"},
 			},
-			expErr: "import_requirements: \"unsupported\" is not a valid import_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.",
+			expErr: "import_requirements: \"unsupported\" is not a valid import_requirement, only \"approved\", \"approved:N\", \"mergeable\" and \"undiverged\" are supported.",
 		},
 		{
 			description: "import reqs with undiverged, mergeable and approved requirements",

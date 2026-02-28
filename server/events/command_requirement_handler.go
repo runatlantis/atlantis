@@ -5,6 +5,8 @@ package events
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -52,6 +54,23 @@ func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string,
 
 func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir string, ctx command.ProjectContext, cmd command.Name, requirements []string) (failure string, err error) {
 	for _, req := range requirements {
+		// Check if it's approved:N format
+		if strings.HasPrefix(req, raw.ApprovedRequirementPrefix) {
+			numStr := strings.TrimPrefix(req, raw.ApprovedRequirementPrefix)
+			requiredApprovals, parseErr := strconv.Atoi(numStr)
+			if parseErr != nil || requiredApprovals <= 0 {
+				return fmt.Sprintf("Invalid approval requirement format: %s", req), nil
+			}
+			// Check VCS provider's approval rules first
+			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
+				return fmt.Sprintf("Pull request must be approved according to the project's approval rules before running %s.", cmd), nil
+			}
+			// Then check Atlantis's minimum approval count
+			if ctx.PullReqStatus.ApprovalStatus.NumApprovals < requiredApprovals {
+				return fmt.Sprintf("Pull request requires %d approval(s) but only has %d before running %s.", requiredApprovals, ctx.PullReqStatus.ApprovalStatus.NumApprovals, cmd), nil
+			}
+			continue
+		}
 		switch req {
 		case raw.ApprovedRequirement:
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {

@@ -19,18 +19,47 @@ If the requirement is not met, users will see an error if they try to run `atlan
 ### Approved
 
 The `approved` requirement will prevent applies unless the pull request is approved
-by at least one person other than the author.
+according to your VCS provider's rules.
+
+You can also specify a minimum number of approvals required by using the format `approved:N`,
+where N is the number of unique approvals Atlantis will enforce. For example:
+- `approved:1` requires at least 1 approval
+- `approved:2` requires at least 2 approvals
+- `approved:3` requires at least 3 approvals
+
+:::tip Note
+`approved:N` adds an additional Atlantis-enforced minimum on top of your VCS provider's
+rules. Both requirements must be satisfied. For example, if GitLab requires 3 approvals
+and you set `approved:2`, you still need 3 approvals to apply. The pull request author's
+approval (if allowed by the VCS provider) does not count toward Atlantis's count.
+:::
 
 #### Usage
 
-The `approved` requirement by:
+Set the `approved` requirement by:
 
 1. Creating a `repos.yaml` file with the `apply_requirements` key:
 
    ```yaml
    repos:
    - id: /.*/
-     apply_requirements: [approved]
+     apply_requirements: [approved]  # Requires 1 approval (default)
+   ```
+
+   Or to require multiple approvals:
+
+   ```yaml
+   repos:
+   - id: /.*/
+     apply_requirements: [approved:2]  # Requires 2 approvals
+   ```
+
+   You can also combine requirements:
+
+   ```yaml
+   repos:
+   - id: /.*/
+     apply_requirements: [approved:2, mergeable]  # Requires 2 approvals AND mergeable
    ```
 
 1. Or by allowing an `atlantis.yaml` file to specify the `apply_requirements` key in the `repos.yaml` config:
@@ -49,7 +78,18 @@ The `approved` requirement by:
     version: 3
     projects:
     - dir: .
-      apply_requirements: [approved]
+      apply_requirements: [approved:3]  # Requires 3 approvals
+    ```
+
+    Or set different requirements per project:
+
+    ```yaml
+    version: 3
+    projects:
+    - dir: production
+      apply_requirements: [approved:3, mergeable]  # Production requires 3 approvals
+    - dir: sandbox
+      apply_requirements: [approved:1]  # Sandbox requires only 1 approval
     ```
 
 #### Meaning

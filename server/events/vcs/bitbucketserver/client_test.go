@@ -267,3 +267,105 @@ func TestClient_MarkdownPullLink(t *testing.T) {
 	exp := "#1"
 	Equals(t, exp, s)
 }
+
+func TestClient_PullIsApproved_ApprovalCount(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description     string
+		reviewers       []string
+		expApproved     bool
+		expNumApprovals int
+	}{
+		{
+			"no approvals",
+			[]string{},
+			false,
+			0,
+		},
+		{
+			"single approval",
+			[]string{`{"user":{"name":"user1"},"approved":true}`},
+			true,
+			1,
+		},
+		{
+			"multiple approvals",
+			[]string{
+				`{"user":{"name":"user1"},"approved":true}`,
+				`{"user":{"name":"user2"},"approved":true}`,
+			},
+			true,
+			2,
+		},
+		{
+			"mixed approvals",
+			[]string{
+				`{"user":{"name":"user1"},"approved":true}`,
+				`{"user":{"name":"user2"},"approved":false}`,
+			},
+			true,
+			1,
+		},
+	}
+
+		for _, c := range cases {
+			t.Run(c.description, func(t *testing.T) {
+				resp := fmt.Sprintf(`{
+					"id": 1,
+					"version": 1,
+					"state": "OPEN",
+					"fromRef": {
+						"id": "refs/heads/branch",
+						"displayId": "branch",
+						"latestCommit": "abc123",
+						"repository": {
+							"slug": "repo",
+							"project": {"key": "ow", "name": "owner"}
+						}
+					},
+					"toRef": {
+						"id": "refs/heads/main",
+						"displayId": "main",
+						"latestCommit": "def456",
+						"repository": {
+							"slug": "repo",
+							"project": {"key": "ow", "name": "owner"}
+						}
+					},
+					"reviewers":[%s]
+				}`, strings.Join(c.reviewers, ","))
+
+				testServer := httptest.NewServer(
+					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						switch r.RequestURI {
+						case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1":
+							w.Write([]byte(resp)) // nolint: errcheck
+						default:
+							t.Errorf("got unexpected request at %q", r.RequestURI)
+							http.Error(w, "not found", http.StatusNotFound)
+						}
+					}))
+
+			client, err := bitbucketserver.NewClient(http.DefaultClient, "user", "pass", testServer.URL, "runatlantis.io")
+			Ok(t, err)
+
+			approvalStatus, err := client.PullIsApproved(
+				logger,
+				models.Repo{
+					FullName:          "owner/repo",
+					Owner:             "owner",
+					Name:              "repo",
+					SanitizedCloneURL: fmt.Sprintf("%s/scm/ow/repo.git", testServer.URL),
+					VCSHost: models.VCSHost{
+						Type:     models.BitbucketServer,
+						Hostname: "bitbucket.org",
+					},
+				}, models.PullRequest{
+					Num: 1,
+				})
+			Ok(t, err)
+			Equals(t, c.expApproved, approvalStatus.IsApproved)
+			Equals(t, c.expNumApprovals, approvalStatus.NumApprovals)
+		})
+	}
+}

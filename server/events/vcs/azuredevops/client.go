@@ -165,6 +165,7 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		return approvalStatus, fmt.Errorf("getting pull request: %w", err)
 	}
 
+	numApprovals := 0
 	for _, review := range adPull.Reviewers {
 		if review == nil {
 			continue
@@ -175,10 +176,15 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		}
 
 		if review.GetVote() == azuredevops.VoteApproved || review.GetVote() == azuredevops.VoteApprovedWithSuggestions {
-			return models.ApprovalStatus{
-				IsApproved: true,
-			}, nil
+			numApprovals++
 		}
+	}
+
+	if numApprovals > 0 {
+		return models.ApprovalStatus{
+			IsApproved:   true,
+			NumApprovals: numApprovals,
+		}, nil
 	}
 
 	return approvalStatus, nil
