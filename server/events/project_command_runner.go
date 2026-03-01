@@ -109,7 +109,7 @@ type MultiEnvStepRunner interface {
 // WebhooksSender sends webhook.
 type WebhooksSender interface {
 	// Send sends the webhook.
-	Send(log logging.SimpleLogging, res webhooks.ApplyResult) error
+	Send(log logging.SimpleLogging, res webhooks.EventResult) error
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_project_command_runner.go ProjectCommandRunner
@@ -636,6 +636,21 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 
+	webhookSendErr := p.Webhooks.Send(ctx.Log, webhooks.EventResult{ // nolint: errcheck
+		Event:       webhooks.PlanEvent,
+		Workspace:   ctx.Workspace,
+		User:        ctx.User,
+		Repo:        ctx.Pull.BaseRepo,
+		Pull:        ctx.Pull,
+		Success:     err == nil,
+		Directory:   ctx.RepoRelDir,
+		ProjectName: ctx.ProjectName,
+	})
+
+	if webhookSendErr != nil {
+		ctx.Log.Err("error sending plan webhook; %v", webhookSendErr)
+	}
+
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -694,7 +709,8 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 
-	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
+	webhookSendErr := p.Webhooks.Send(ctx.Log, webhooks.EventResult{ // nolint: errcheck
+		Event:       webhooks.ApplyEvent,
 		Workspace:   ctx.Workspace,
 		User:        ctx.User,
 		Repo:        ctx.Pull.BaseRepo,
@@ -703,6 +719,10 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		Directory:   ctx.RepoRelDir,
 		ProjectName: ctx.ProjectName,
 	})
+
+	if webhookSendErr != nil {
+		ctx.Log.Err("error sending apply webhook; %v", webhookSendErr)
+	}
 
 	if err != nil {
 		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
