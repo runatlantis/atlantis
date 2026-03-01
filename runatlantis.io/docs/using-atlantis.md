@@ -4,7 +4,7 @@ Atlantis triggers commands via pull request comments.
 ![Help Command](./images/pr-comment-help.png)
 
 ::: tip
-You can use following executable names.
+You can use the following executable names.
 
 * `atlantis help`
   * `atlantis` is executable name. You can configure by [Executable Name](server-configuration.md#executable-name).
@@ -80,7 +80,7 @@ atlantis plan -w staging
 * `--verbose` Append Atlantis log to comment.
 
 ::: warning NOTE
-A `atlantis plan` (without flags), like autoplans, discards all plans previously created with `atlantis plan` `-p`/`-d`/`-w`
+An `atlantis plan` (without flags), like autoplans, discards all plans previously created with `atlantis plan` `-p`/`-d`/`-w`
 :::
 
 ### Additional Terraform flags
@@ -136,7 +136,7 @@ atlantis plan -d dir -- -destroy
 ```
 
 ::: warning NOTE
-The `-destroy` flag generates a destroy plan, If this plan is applied it can result in data loss or service disruptions. Ensure that you have thoroughly reviewed your Terraform configuration and intend to remove the specified resources before using this flag.
+The `-destroy` flag generates a destroy plan. If this plan is applied it can result in data loss or service disruptions. Ensure that you have thoroughly reviewed your Terraform configuration and intend to remove the specified resources before using this flag.
 :::
 
 ---
@@ -256,7 +256,7 @@ atlantis import -w staging ADDRESS ID
 
 ::: tip
 
-* If import for_each resources, it requires a single quoted address.
+* When importing `for_each` resources, a single quoted address is required.
   * ex. `atlantis import 'aws_instance.example["foo"]' i-1234567890abcdef0`
 :::
 
@@ -288,7 +288,7 @@ atlantis state [options] rm ADDRESS... -- [terraform state rm flags]
 ### Explanation
 
 Runs `terraform state rm` that matches the directory/project/workspace.
-This command discards the terraform plan result. After run state rm and before an apply, another `atlantis plan` must be run again.
+This command discards the terraform plan result. After running `state rm` and before an apply, another `atlantis plan` must be run again.
 
 To allow the `state` command requires [--allow-commands](server-configuration.md#allow-commands) configuration.
 
@@ -310,7 +310,7 @@ atlantis state -w staging rm ADDRESS
 
 ::: tip
 
-* If run state rm to for_each resources, it requires a single quoted address.
+* When running `state rm` on `for_each` resources, a single quoted address is required.
   * ex. `atlantis state rm 'aws_instance.example["foo"]'`
 :::
 

@@ -45,6 +45,9 @@ jobs:
               - 'package-lock.json'
               - 'package.json'
               - '.github/workflows/website.yml'
+              - '.vale.ini'
+              - '_typos.toml'
+              - '.github/styles/**'
 
   # Check that the website builds and there's no missing links.
   website-check:
@@ -59,6 +62,23 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Spell check
+        uses: crate-ci/typos@57b11c6b7e54c402ccd9cda953f1072ec4f78e33 # v1.43.5
+        with:
+          files: ./runatlantis.io/docs
+
+      - name: Vale prose linting
+        run: |
+          VALE_VERSION="3.9.4"
+          VALE_TARBALL="vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+          curl -sLO "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/${VALE_TARBALL}"
+          echo "551f7ef5cabd53affb7b2c8bdbd4cfb6216270d53c4d6e571a567c5b5df0921d  ${VALE_TARBALL}" | sha256sum --check
+          tar xz -C /tmp vale -f "${VALE_TARBALL}"
+          rm "${VALE_TARBALL}"
+          # api-endpoints.md intentionally uses "Github"/"Gitlab" as literal API
+          # string values matching the Go source code constants; exclude it here.
+          /tmp/vale --glob='!*api-endpoints.md' runatlantis.io/docs/
 
       - name: markdown-lint
         uses: DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265 # v19
