@@ -33,6 +33,7 @@ const workingDirPrefix = "repos"
 const prSourceRemote = "source"
 
 var cloneLocks sync.Map
+var baseCloneLocks sync.Map
 var recheckRequiredMap sync.Map
 
 //go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
@@ -86,6 +87,10 @@ type FileWorkspace struct {
 	GpgNoSigningEnabled bool
 	// flag indicating if we have to merge with potential new changes upstream (directly after grabbing project lock)
 	CheckForUpstreamChanges bool
+	// LocalGitCache is true if we should use a local git cache to speed up clones.
+	LocalGitCache bool
+	// GitCacheDir is the directory where we store our git cache.
+	GitCacheDir string
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -104,6 +109,12 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 	defer mutex.Unlock()
 
 	c := wrappedGitContext{cloneDir, headRepo, p}
+
+	if w.LocalGitCache {
+		if err := w.ensureBaseClone(logger, c); err != nil {
+			return "", fmt.Errorf("ensuring base clone: %w", err)
+		}
+	}
 	ok, err := w.attemptReuseCloneDir(logger, c, cloneDir)
 	if ok && err == nil {
 		return cloneDir, nil
@@ -361,18 +372,33 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 
 	// if branch strategy, use depth=1
 	if !w.CheckoutMerge {
-		return w.wrappedGit(logger, c, "clone", "--depth=1", "--branch", c.pr.HeadBranch, "--single-branch", headCloneURL, c.dir)
+		args := []string{"clone", "--depth=1", "--branch", c.pr.HeadBranch, "--single-branch"}
+		if w.LocalGitCache {
+			args = append(args, "--reference", w.repoCacheDir(c.pr.BaseRepo))
+		}
+		args = append(args, headCloneURL, c.dir)
+		return w.wrappedGit(logger, c, args...)
 	}
 
 	// if merge strategy...
 
 	// if no checkout depth, omit depth arg
 	if w.CheckoutDepth == 0 {
-		if err := w.wrappedGit(logger, c, "clone", "--branch", c.pr.BaseBranch, "--single-branch", baseCloneURL, c.dir); err != nil {
+		args := []string{"clone", "--branch", c.pr.BaseBranch, "--single-branch"}
+		if w.LocalGitCache {
+			args = append(args, "--reference", w.repoCacheDir(c.pr.BaseRepo))
+		}
+		args = append(args, baseCloneURL, c.dir)
+		if err := w.wrappedGit(logger, c, args...); err != nil {
 			return err
 		}
 	} else {
-		if err := w.wrappedGit(logger, c, "clone", "--depth", fmt.Sprint(w.CheckoutDepth), "--branch", c.pr.BaseBranch, "--single-branch", baseCloneURL, c.dir); err != nil {
+		args := []string{"clone", "--depth", fmt.Sprint(w.CheckoutDepth), "--branch", c.pr.BaseBranch, "--single-branch"}
+		if w.LocalGitCache {
+			args = append(args, "--reference", w.repoCacheDir(c.pr.BaseRepo))
+		}
+		args = append(args, baseCloneURL, c.dir)
+		if err := w.wrappedGit(logger, c, args...); err != nil {
 			return err
 		}
 	}
@@ -551,4 +577,62 @@ func (w *FileWorkspace) GetGitUntrackedFiles(logger logging.SimpleLogging, r mod
 	untrackedFiles := strings.Split(string(output), "\n")[:]
 	logger.Debug("Untracked files: '%s'", strings.Join(untrackedFiles, ","))
 	return untrackedFiles, nil
+}
+
+func (w *FileWorkspace) ensureBaseClone(logger logging.SimpleLogging, c wrappedGitContext) error {
+	cacheDir := w.repoCacheDir(c.pr.BaseRepo)
+
+	// Unconditionally wait for the base clone lock here.
+	value, _ := baseCloneLocks.LoadOrStore(cacheDir, new(sync.Mutex))
+	mutex := value.(*sync.Mutex)
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		logger.Info("creating base clone in %q", cacheDir)
+		if err := os.MkdirAll(filepath.Dir(cacheDir), 0700); err != nil {
+			return fmt.Errorf("creating base clone parent dir: %w", err)
+		}
+
+		cloneURL := c.pr.BaseRepo.CloneURL
+		if w.TestingOverrideBaseCloneURL != "" {
+			cloneURL = w.TestingOverrideBaseCloneURL
+		}
+
+		// We use --mirror because it includes all refs and is suitable for a reference repository.
+		cmd := exec.Command("git", "clone", "--mirror", cloneURL, cacheDir)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			sanitizedOutput := w.sanitizeGitCredentials(string(output), c.pr.BaseRepo, c.head)
+			return fmt.Errorf("cloning base repo %q: %s: %w", c.pr.BaseRepo.SanitizedCloneURL, sanitizedOutput, err)
+		}
+		return nil
+	}
+
+	// If it already exists, fetch the latest objects.
+	logger.Debug("base clone %q already exists, checking validity", cacheDir)
+	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
+	cmd.Dir = cacheDir
+	if err := cmd.Run(); err != nil {
+		logger.Info("base clone %q is invalid, removing corrupt cache and recloning", cacheDir)
+		if err := os.RemoveAll(cacheDir); err != nil {
+			return fmt.Errorf("removing corrupt base clone %q: %w", cacheDir, err)
+		}
+		// Retry the clone since we removed the corrupt cache.
+		return w.ensureBaseClone(logger, c)
+	}
+
+	logger.Debug("base clone %q is valid, fetching latest", cacheDir)
+	cmd = exec.Command("git", "remote", "update")
+	cmd.Dir = cacheDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		sanitizedOutput := w.sanitizeGitCredentials(string(output), c.pr.BaseRepo, c.head)
+		return fmt.Errorf("updating base repo %q: %s: %w", c.pr.BaseRepo.SanitizedCloneURL, sanitizedOutput, err)
+	}
+	return nil
+}
+
+func (w *FileWorkspace) repoCacheDir(r models.Repo) string {
+	return filepath.Join(w.GitCacheDir, r.FullName)
 }

@@ -93,6 +93,9 @@ const (
 	// terraformPluginCacheDir is the name of the dir inside our data dir
 	// where we tell terraform to cache plugins and modules.
 	TerraformPluginCacheDirName = "plugin-cache"
+	// gitCacheDirName is the name of the dir inside our data dir
+	// where we store base clones of repositories.
+	GitCacheDirName = "git-cache"
 )
 
 // Server runs the Atlantis web server.
@@ -429,6 +432,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 
+	var gitCacheDir string
+	if userConfig.LocalGitCache {
+		gitCacheDir, err = mkSubDir(userConfig.DataDir, GitCacheDirName)
+
+		if err != nil {
+			return nil, err
+		}
+	}
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing --%s flag %q: %w", config.AtlantisURLFlag, userConfig.AtlantisURL, err)
@@ -526,6 +537,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:    userConfig.CheckoutDepth,
 		GithubAppEnabled: githubAppEnabled,
+		LocalGitCache:    userConfig.LocalGitCache,
+		GitCacheDir:      gitCacheDir,
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(
