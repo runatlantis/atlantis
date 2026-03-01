@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cactus/go-statsd-client/v5/statsd"
+	"github.com/cactus/go-statsd-client/v6/statsd"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
