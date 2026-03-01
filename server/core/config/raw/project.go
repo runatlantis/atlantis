@@ -18,10 +18,11 @@ import (
 )
 
 const (
-	DefaultWorkspace      = "default"
-	ApprovedRequirement   = "approved"
-	MergeableRequirement  = "mergeable"
-	UnDivergedRequirement = "undiverged"
+	DefaultWorkspace                  = "default"
+	ApprovedRequirement               = "approved"
+	MergeableRequirement              = "mergeable"
+	UnDivergedRequirement             = "undiverged"
+	UnDivergedWhenModifiedRequirement = "undiverged_when_modified"
 )
 
 type Project struct {
@@ -204,32 +205,45 @@ func validProjectName(name string) bool {
 }
 
 func validPlanReq(value any) error {
-	reqs := value.([]string)
-	for _, r := range reqs {
-		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
-			return fmt.Errorf("%q is not a valid plan_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
-		}
-	}
-	return nil
+	return validateRequirements(value.([]string), "plan_requirement", "plan_requirements")
 }
 
 func validApplyReq(value any) error {
-	reqs := value.([]string)
-	for _, r := range reqs {
-		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
-			return fmt.Errorf("%q is not a valid apply_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
-		}
-	}
-	return nil
+	return validateRequirements(value.([]string), "apply_requirement", "apply_requirements")
 }
 
 func validImportReq(value any) error {
-	reqs := value.([]string)
+	return validateRequirements(value.([]string), "import_requirement", "import_requirements")
+}
+
+// validateRequirements checks that all requirements are valid and that mutually exclusive
+// requirements (undiverged and undiverged_when_modified) are not both present.
+func validateRequirements(reqs []string, reqTypeSingular string, reqTypePlural string) error {
+	hasUndiverged := false
+	hasUndivergedWhenModified := false
+
 	for _, r := range reqs {
-		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
-			return fmt.Errorf("%q is not a valid import_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
+		// Validate each requirement is one of the allowed values
+		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement && r != UnDivergedWhenModifiedRequirement {
+			return fmt.Errorf("%q is not a valid %s, only %q, %q, %q and %q are supported",
+				r, reqTypeSingular, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement, UnDivergedWhenModifiedRequirement)
+		}
+
+		// Track undiverged requirements for mutual exclusivity check
+		if r == UnDivergedRequirement {
+			hasUndiverged = true
+		}
+		if r == UnDivergedWhenModifiedRequirement {
+			hasUndivergedWhenModified = true
 		}
 	}
+
+	// Check mutual exclusivity
+	if hasUndiverged && hasUndivergedWhenModified {
+		return fmt.Errorf("%s cannot contain both %q and %q as they are mutually exclusive. Use %q to block on any main branch changes, or %q to block only when specific patterns are affected",
+			reqTypePlural, UnDivergedRequirement, UnDivergedWhenModifiedRequirement, UnDivergedRequirement, UnDivergedWhenModifiedRequirement)
+	}
+
 	return nil
 }
 
