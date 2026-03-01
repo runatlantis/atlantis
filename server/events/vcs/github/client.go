@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofri/go-github-ratelimit/github_ratelimit"
+	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
 	"github.com/google/go-github/v83/github"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
