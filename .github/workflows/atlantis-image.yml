@@ -81,7 +81,7 @@ jobs:
 
     # Lint the Dockerfile first before setting anything up
     - name: Lint Dockerfile
-      uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+      uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
       with:
         dockerfile: "Dockerfile"
 
