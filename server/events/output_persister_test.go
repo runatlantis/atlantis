@@ -47,6 +47,8 @@ func TestOutputPersister_PersistPlanSuccess(t *testing.T) {
 		},
 	}
 
+	// Expect lookup for existing stub's RunTimestamp (returns nil = no stub found)
+	mockDB.EXPECT().GetProjectOutputByJobID("job-123").Return(nil, nil)
 	mockDB.EXPECT().SaveProjectOutput(gomock.Any()).Return(nil)
 
 	err := persister.PersistResult(ctx, result)
@@ -251,6 +253,9 @@ func TestOutputPersister_PersistsPullURLAndTitle(t *testing.T) {
 		},
 	}
 
+	// Expect lookup for existing stub's RunTimestamp (returns nil = no stub found)
+	mockDB.EXPECT().GetProjectOutputByJobID("job-456").Return(nil, nil)
+
 	// Capture the output that gets passed to SaveProjectOutput
 	var capturedOutput models.ProjectOutput
 	mockDB.EXPECT().SaveProjectOutput(gomock.Any()).DoAndReturn(func(output models.ProjectOutput) error {
@@ -266,4 +271,57 @@ func TestOutputPersister_PersistsPullURLAndTitle(t *testing.T) {
 		"expected PullURL to be captured from ctx.Pull.URL")
 	Assert(t, capturedOutput.PullTitle == "Upgrade database to version 2.0",
 		"expected PullTitle to be captured from ctx.Pull.Title")
+}
+
+func TestOutputPersister_ReusesStubTimestamp(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockDB := mocks.NewMockDatabase(ctrl)
+	persister := events.NewOutputPersister(mockDB, nil)
+
+	ctx := command.ProjectContext{
+		BaseRepo:    models.Repo{FullName: "owner/repo"},
+		Pull:        models.PullRequest{Num: 123},
+		RepoRelDir:  "terraform/staging",
+		Workspace:   "default",
+		ProjectName: "myproject",
+		User:        models.User{Username: "testuser"},
+		CommandName: command.Plan,
+		JobID:       "job-789",
+	}
+
+	result := command.ProjectResult{
+		Command:     command.Plan,
+		RepoRelDir:  "terraform/staging",
+		Workspace:   "default",
+		ProjectName: "myproject",
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{
+				TerraformOutput: "Plan: 1 to add.",
+			},
+		},
+	}
+
+	// Simulate existing stub with a specific timestamp
+	stubTimestamp := int64(1709400000000) // Fixed timestamp from stub
+	existingStub := &models.ProjectOutput{
+		JobID:        "job-789",
+		RunTimestamp: stubTimestamp,
+	}
+
+	// Expect lookup to return the existing stub
+	mockDB.EXPECT().GetProjectOutputByJobID("job-789").Return(existingStub, nil)
+
+	// Capture the output and verify it uses the stub's timestamp
+	var capturedOutput models.ProjectOutput
+	mockDB.EXPECT().SaveProjectOutput(gomock.Any()).DoAndReturn(func(output models.ProjectOutput) error {
+		capturedOutput = output
+		return nil
+	})
+
+	err := persister.PersistResult(ctx, result)
+	Ok(t, err)
+
+	// CRITICAL: RunTimestamp must match the stub's timestamp for database lookups
+	Assert(t, capturedOutput.RunTimestamp == stubTimestamp,
+		"expected RunTimestamp to be reused from stub for consistent database lookups")
 }

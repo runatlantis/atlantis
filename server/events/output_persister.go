@@ -50,6 +50,24 @@ func (p *OutputPersister) PersistResult(ctx command.ProjectContext, result comma
 	now := time.Now().UTC()
 	startedAt := now
 	completedAt := now
+
+	// Look up the stub's RunTimestamp to maintain consistency for database lookups
+	// that rely on the composite key including runTimestamp
+	var runTimestamp int64
+	if ctx.JobID != "" {
+		if existingOutput, err := p.db.GetProjectOutputByJobID(ctx.JobID); err == nil && existingOutput != nil {
+			runTimestamp = existingOutput.RunTimestamp
+			if !existingOutput.StartedAt.IsZero() {
+				startedAt = existingOutput.StartedAt
+			}
+		}
+	}
+
+	// Fallback if no existing stub found
+	if runTimestamp == 0 {
+		runTimestamp = now.UnixMilli()
+	}
+
 	if p.outputHandler != nil && ctx.JobID != "" {
 		if jobInfo := p.outputHandler.GetJobInfo(ctx.JobID); jobInfo != nil {
 			if !jobInfo.Time.IsZero() {
@@ -69,7 +87,7 @@ func (p *OutputPersister) PersistResult(ctx command.ProjectContext, result comma
 		Path:         ctx.RepoRelDir,
 		CommandName:  ctx.CommandName.String(),
 		JobID:        ctx.JobID,
-		RunTimestamp: time.Now().UTC().UnixMilli(),
+		RunTimestamp: runTimestamp,
 		TriggeredBy:  ctx.User.Username,
 		StartedAt:    startedAt,
 		CompletedAt:  completedAt,
