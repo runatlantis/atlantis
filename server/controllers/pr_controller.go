@@ -197,8 +197,9 @@ func (c *PRController) buildPRListItem(pull models.PullRequest, outputs []models
 		item.ChangeCount += output.ResourceStats.Change
 		item.DestroyCount += output.ResourceStats.Destroy
 
-		if output.CompletedAt.After(latestActivity) {
-			latestActivity = output.CompletedAt
+		activityTime := LatestActivityTime(output)
+		if activityTime.After(latestActivity) {
+			latestActivity = activityTime
 		}
 	}
 

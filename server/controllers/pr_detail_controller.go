@@ -160,8 +160,9 @@ func (c *PRDetailController) buildPRDetailData(owner, repo string, pullNum int) 
 		changeCount += output.ResourceStats.Change
 		destroyCount += output.ResourceStats.Destroy
 
-		if output.CompletedAt.After(latestActivity) {
-			latestActivity = output.CompletedAt
+		activityTime := LatestActivityTime(output)
+		if activityTime.After(latestActivity) {
+			latestActivity = activityTime
 		}
 	}
 
@@ -211,6 +212,7 @@ func (c *PRDetailController) buildPRDetailData(owner, repo string, pullNum int) 
 func BuildDetailProject(output models.ProjectOutput) web_templates.PRDetailProject {
 	status, statusLabel := DetermineProjectStatus(output.CommandName, output.Status)
 
+	activityTime := LatestActivityTime(output)
 	return web_templates.PRDetailProject{
 		ProjectName:    output.ProjectName,
 		Path:           output.Path,
@@ -223,8 +225,8 @@ func BuildDetailProject(output models.ProjectOutput) web_templates.PRDetailProje
 		ChangeCount:    output.ResourceStats.Change,
 		DestroyCount:   output.ResourceStats.Destroy,
 		Error:          output.Error,
-		LastUpdated:    FormatRelativeTime(output.CompletedAt),
-		LastUpdatedTS:  output.CompletedAt,
+		LastUpdated:    FormatRelativeTime(activityTime),
+		LastUpdatedTS:  activityTime,
 	}
 }
 
@@ -290,4 +292,14 @@ func statusPriority(status string) int {
 	default:
 		return 3
 	}
+}
+
+// LatestActivityTime returns the most recent activity time for a project output.
+// For running jobs (CompletedAt is zero), uses StartedAt.
+// For completed jobs, uses CompletedAt.
+func LatestActivityTime(output models.ProjectOutput) time.Time {
+	if output.CompletedAt.IsZero() {
+		return output.StartedAt
+	}
+	return output.CompletedAt
 }
