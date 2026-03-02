@@ -517,7 +517,7 @@ func TestJobStartTimePreserved(t *testing.T) {
 	assert.False(t, info3.CompletedAt.IsZero(), "completed time should be set")
 
 	duration := info3.CompletedAt.Sub(info3.Time)
-	assert.True(t, duration >= 50*time.Millisecond, "duration should reflect actual elapsed time, got %v", duration)
+	assert.GreaterOrEqual(t, duration, 50*time.Millisecond, "duration should reflect actual elapsed time, got %v", duration)
 
 	close(prjCmdOutputChan)
 }
