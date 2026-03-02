@@ -5,10 +5,8 @@ package events_test
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -20,11 +18,10 @@ import (
 )
 
 func TestOutputPersistingProjectCommandRunner_Plan(t *testing.T) {
-	RegisterMockTestingT(t)
 	ctrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
 	mockDB := mocks.NewMockDatabase(ctrl)
-	mockRunner := eventmocks.NewMockProjectCommandRunner()
+	mockRunner := eventmocks.NewMockProjectCommandRunner(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -43,7 +40,7 @@ func TestOutputPersistingProjectCommandRunner_Plan(t *testing.T) {
 		},
 	}
 
-	When(mockRunner.Plan(AnyProjectContext())).ThenReturn(expectedOutput)
+	mockRunner.EXPECT().Plan(gomock.Any()).Return(expectedOutput)
 
 	// First call is PersistStub (running status), second is PersistResult (final status)
 	var capturedOutput models.ProjectOutput
@@ -68,11 +65,10 @@ func TestOutputPersistingProjectCommandRunner_Plan(t *testing.T) {
 }
 
 func TestOutputPersistingProjectCommandRunner_Apply(t *testing.T) {
-	RegisterMockTestingT(t)
 	ctrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
 	mockDB := mocks.NewMockDatabase(ctrl)
-	mockRunner := eventmocks.NewMockProjectCommandRunner()
+	mockRunner := eventmocks.NewMockProjectCommandRunner(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -89,7 +85,7 @@ func TestOutputPersistingProjectCommandRunner_Apply(t *testing.T) {
 		ApplySuccess: "Apply complete! Resources: 1 added, 0 changed, 0 destroyed.",
 	}
 
-	When(mockRunner.Apply(AnyProjectContext())).ThenReturn(expectedOutput)
+	mockRunner.EXPECT().Apply(gomock.Any()).Return(expectedOutput)
 
 	// First call is PersistStub (running status), second is PersistResult (final status)
 	var capturedOutput models.ProjectOutput
@@ -113,11 +109,10 @@ func TestOutputPersistingProjectCommandRunner_Apply(t *testing.T) {
 }
 
 func TestOutputPersistingProjectCommandRunner_Error(t *testing.T) {
-	RegisterMockTestingT(t)
 	ctrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
 	mockDB := mocks.NewMockDatabase(ctrl)
-	mockRunner := eventmocks.NewMockProjectCommandRunner()
+	mockRunner := eventmocks.NewMockProjectCommandRunner(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -134,7 +129,7 @@ func TestOutputPersistingProjectCommandRunner_Error(t *testing.T) {
 		Error: errors.New("terraform init failed"),
 	}
 
-	When(mockRunner.Plan(AnyProjectContext())).ThenReturn(expectedOutput)
+	mockRunner.EXPECT().Plan(gomock.Any()).Return(expectedOutput)
 
 	// First call is PersistStub (running status), second is PersistResult (final status)
 	var capturedOutput models.ProjectOutput
@@ -157,9 +152,9 @@ func TestOutputPersistingProjectCommandRunner_Error(t *testing.T) {
 }
 
 func TestOutputPersistingProjectCommandRunner_NilPersister(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	mockRunner := eventmocks.NewMockProjectCommandRunner()
+	mockRunner := eventmocks.NewMockProjectCommandRunner(ctrl)
 
 	ctx := command.ProjectContext{
 		Log:         logger,
@@ -174,7 +169,7 @@ func TestOutputPersistingProjectCommandRunner_NilPersister(t *testing.T) {
 		},
 	}
 
-	When(mockRunner.Plan(AnyProjectContext())).ThenReturn(expectedOutput)
+	mockRunner.EXPECT().Plan(gomock.Any()).Return(expectedOutput)
 
 	// Create runner with nil persister - should not panic
 	runner := events.NewOutputPersistingProjectCommandRunner(mockRunner, nil)
@@ -184,11 +179,10 @@ func TestOutputPersistingProjectCommandRunner_NilPersister(t *testing.T) {
 }
 
 func TestOutputPersistingProjectCommandRunner_PolicyCheck(t *testing.T) {
-	RegisterMockTestingT(t)
 	ctrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
 	mockDB := mocks.NewMockDatabase(ctrl)
-	mockRunner := eventmocks.NewMockProjectCommandRunner()
+	mockRunner := eventmocks.NewMockProjectCommandRunner(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -209,7 +203,7 @@ func TestOutputPersistingProjectCommandRunner_PolicyCheck(t *testing.T) {
 		},
 	}
 
-	When(mockRunner.PolicyCheck(AnyProjectContext())).ThenReturn(expectedOutput)
+	mockRunner.EXPECT().PolicyCheck(gomock.Any()).Return(expectedOutput)
 
 	// First call is PersistStub (running status), second is PersistResult (final status)
 	var capturedOutput models.ProjectOutput
@@ -233,11 +227,10 @@ func TestOutputPersistingProjectCommandRunner_PolicyCheck(t *testing.T) {
 }
 
 func TestOutputPersistingProjectCommandRunner_Version(t *testing.T) {
-	RegisterMockTestingT(t)
 	ctrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
 	mockDB := mocks.NewMockDatabase(ctrl)
-	mockRunner := eventmocks.NewMockProjectCommandRunner()
+	mockRunner := eventmocks.NewMockProjectCommandRunner(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -254,7 +247,7 @@ func TestOutputPersistingProjectCommandRunner_Version(t *testing.T) {
 		VersionSuccess: "Terraform v1.5.0",
 	}
 
-	When(mockRunner.Version(AnyProjectContext())).ThenReturn(expectedOutput)
+	mockRunner.EXPECT().Version(gomock.Any()).Return(expectedOutput)
 
 	// First call is PersistStub (running status), second is PersistResult (final status)
 	var capturedOutput models.ProjectOutput
@@ -276,11 +269,10 @@ func TestOutputPersistingProjectCommandRunner_Version(t *testing.T) {
 }
 
 func TestOutputPersistingProjectCommandRunner_Import(t *testing.T) {
-	RegisterMockTestingT(t)
 	ctrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
 	mockDB := mocks.NewMockDatabase(ctrl)
-	mockRunner := eventmocks.NewMockProjectCommandRunner()
+	mockRunner := eventmocks.NewMockProjectCommandRunner(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -299,7 +291,7 @@ func TestOutputPersistingProjectCommandRunner_Import(t *testing.T) {
 		},
 	}
 
-	When(mockRunner.Import(AnyProjectContext())).ThenReturn(expectedOutput)
+	mockRunner.EXPECT().Import(gomock.Any()).Return(expectedOutput)
 
 	// First call is PersistStub (running status), second is PersistResult (final status)
 	var capturedOutput models.ProjectOutput
@@ -321,11 +313,10 @@ func TestOutputPersistingProjectCommandRunner_Import(t *testing.T) {
 }
 
 func TestOutputPersistingProjectCommandRunner_StateRm(t *testing.T) {
-	RegisterMockTestingT(t)
 	ctrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
 	mockDB := mocks.NewMockDatabase(ctrl)
-	mockRunner := eventmocks.NewMockProjectCommandRunner()
+	mockRunner := eventmocks.NewMockProjectCommandRunner(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -344,7 +335,7 @@ func TestOutputPersistingProjectCommandRunner_StateRm(t *testing.T) {
 		},
 	}
 
-	When(mockRunner.StateRm(AnyProjectContext())).ThenReturn(expectedOutput)
+	mockRunner.EXPECT().StateRm(gomock.Any()).Return(expectedOutput)
 
 	// First call is PersistStub (running status), second is PersistResult (final status)
 	var capturedOutput models.ProjectOutput
@@ -366,11 +357,10 @@ func TestOutputPersistingProjectCommandRunner_StateRm(t *testing.T) {
 }
 
 func TestOutputPersistingProjectCommandRunner_ApprovePolicies(t *testing.T) {
-	RegisterMockTestingT(t)
 	ctrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
 	mockDB := mocks.NewMockDatabase(ctrl)
-	mockRunner := eventmocks.NewMockProjectCommandRunner()
+	mockRunner := eventmocks.NewMockProjectCommandRunner(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -391,7 +381,7 @@ func TestOutputPersistingProjectCommandRunner_ApprovePolicies(t *testing.T) {
 		},
 	}
 
-	When(mockRunner.ApprovePolicies(AnyProjectContext())).ThenReturn(expectedOutput)
+	mockRunner.EXPECT().ApprovePolicies(gomock.Any()).Return(expectedOutput)
 
 	// First call is PersistStub (running status), second is PersistResult (final status)
 	var capturedOutput models.ProjectOutput
@@ -413,11 +403,10 @@ func TestOutputPersistingProjectCommandRunner_ApprovePolicies(t *testing.T) {
 }
 
 func TestOutputPersistingProjectCommandRunner_DatabaseError(t *testing.T) {
-	RegisterMockTestingT(t)
 	ctrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
 	mockDB := mocks.NewMockDatabase(ctrl)
-	mockRunner := eventmocks.NewMockProjectCommandRunner()
+	mockRunner := eventmocks.NewMockProjectCommandRunner(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -433,7 +422,7 @@ func TestOutputPersistingProjectCommandRunner_DatabaseError(t *testing.T) {
 		},
 	}
 
-	When(mockRunner.Plan(AnyProjectContext())).ThenReturn(expectedOutput)
+	mockRunner.EXPECT().Plan(gomock.Any()).Return(expectedOutput)
 
 	// First call (stub) fails, second call (result) also fails
 	gomock.InOrder(
@@ -448,10 +437,4 @@ func TestOutputPersistingProjectCommandRunner_DatabaseError(t *testing.T) {
 
 	// Verify result is still passed through
 	Assert(t, result.PlanSuccess != nil, "expected PlanSuccess to be set")
-}
-
-// AnyProjectContext returns a pegomock matcher for command.ProjectContext
-func AnyProjectContext() command.ProjectContext {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeFor[command.ProjectContext]()))
-	return command.ProjectContext{}
 }

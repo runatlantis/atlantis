@@ -12,29 +12,29 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
 	"github.com/runatlantis/atlantis/server/core/db/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 func TestPRController_PRList_Success(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	mockDB := mocks.NewMockDatabase()
-	mockTemplate := tMocks.NewMockTemplateWriter()
+	mockDB := mocks.NewMockDatabase(ctrl)
+	mockTemplate := tMocks.NewMockTemplateWriter(ctrl)
 
 	now := time.Now()
 
-	When(mockDB.GetActivePullRequests()).ThenReturn([]models.PullRequest{
+	mockDB.EXPECT().GetActivePullRequests().Return([]models.PullRequest{
 		{Num: 123, BaseRepo: models.Repo{FullName: "owner/repo1"}},
 		{Num: 456, BaseRepo: models.Repo{FullName: "owner/repo2"}},
 	}, nil)
 
-	When(mockDB.GetProjectOutputsByPull("owner/repo1", 123)).ThenReturn([]models.ProjectOutput{
+	mockDB.EXPECT().GetProjectOutputsByPull("owner/repo1", 123).Return([]models.ProjectOutput{
 		{
 			Status:        models.SuccessOutputStatus,
 			ResourceStats: models.ResourceStats{Add: 1, Change: 2},
@@ -42,7 +42,7 @@ func TestPRController_PRList_Success(t *testing.T) {
 		},
 	}, nil)
 
-	When(mockDB.GetProjectOutputsByPull("owner/repo2", 456)).ThenReturn([]models.ProjectOutput{
+	mockDB.EXPECT().GetProjectOutputsByPull("owner/repo2", 456).Return([]models.ProjectOutput{
 		{
 			Status:        models.FailedOutputStatus,
 			ResourceStats: models.ResourceStats{},
@@ -55,10 +55,12 @@ func TestPRController_PRList_Success(t *testing.T) {
 		},
 	}, nil)
 
+	mockTemplate.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil)
+
 	controller := controllers.NewPRController(
 		mockDB,
 		mockTemplate,
-		tMocks.NewMockTemplateWriter(),
+		tMocks.NewMockTemplateWriter(ctrl),
 		"1.0.0",
 		"/basepath",
 		func() bool { return false },
@@ -72,23 +74,20 @@ func TestPRController_PRList_Success(t *testing.T) {
 	controller.PRList(w, req)
 
 	Equals(t, http.StatusOK, w.Code)
-
-	// Verify template was called
-	mockTemplate.VerifyWasCalledOnce().Execute(Any[io.Writer](), Any[any]())
 }
 
 func TestPRController_PRList_DBError(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	mockDB := mocks.NewMockDatabase()
-	mockTemplate := tMocks.NewMockTemplateWriter()
+	mockDB := mocks.NewMockDatabase(ctrl)
+	mockTemplate := tMocks.NewMockTemplateWriter(ctrl)
 
-	When(mockDB.GetActivePullRequests()).ThenReturn(nil, errors.New("database error"))
+	mockDB.EXPECT().GetActivePullRequests().Return(nil, errors.New("database error"))
 
 	controller := controllers.NewPRController(
 		mockDB,
 		mockTemplate,
-		tMocks.NewMockTemplateWriter(),
+		tMocks.NewMockTemplateWriter(ctrl),
 		"1.0.0",
 		"",
 		func() bool { return false },
@@ -106,18 +105,18 @@ func TestPRController_PRList_DBError(t *testing.T) {
 }
 
 func TestPRController_PRList_TemplateError(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	mockDB := mocks.NewMockDatabase()
-	mockTemplate := tMocks.NewMockTemplateWriter()
+	mockDB := mocks.NewMockDatabase(ctrl)
+	mockTemplate := tMocks.NewMockTemplateWriter(ctrl)
 
-	When(mockDB.GetActivePullRequests()).ThenReturn([]models.PullRequest{}, nil)
-	When(mockTemplate.Execute(Any[io.Writer](), Any[any]())).ThenReturn(errors.New("template error"))
+	mockDB.EXPECT().GetActivePullRequests().Return([]models.PullRequest{}, nil)
+	mockTemplate.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(errors.New("template error"))
 
 	controller := controllers.NewPRController(
 		mockDB,
 		mockTemplate,
-		tMocks.NewMockTemplateWriter(),
+		tMocks.NewMockTemplateWriter(ctrl),
 		"1.0.0",
 		"",
 		func() bool { return false },
@@ -135,22 +134,24 @@ func TestPRController_PRList_TemplateError(t *testing.T) {
 }
 
 func TestPRController_PRListPartial_Success(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	mockDB := mocks.NewMockDatabase()
-	mockRowsTemplate := tMocks.NewMockTemplateWriter()
+	mockDB := mocks.NewMockDatabase(ctrl)
+	mockRowsTemplate := tMocks.NewMockTemplateWriter(ctrl)
 
-	When(mockDB.GetActivePullRequests()).ThenReturn([]models.PullRequest{
+	mockDB.EXPECT().GetActivePullRequests().Return([]models.PullRequest{
 		{Num: 123, BaseRepo: models.Repo{FullName: "owner/repo"}},
 	}, nil)
 
-	When(mockDB.GetProjectOutputsByPull("owner/repo", 123)).ThenReturn([]models.ProjectOutput{
+	mockDB.EXPECT().GetProjectOutputsByPull("owner/repo", 123).Return([]models.ProjectOutput{
 		{Status: models.SuccessOutputStatus},
 	}, nil)
 
+	mockRowsTemplate.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil)
+
 	controller := controllers.NewPRController(
 		mockDB,
-		tMocks.NewMockTemplateWriter(),
+		tMocks.NewMockTemplateWriter(ctrl),
 		mockRowsTemplate,
 		"1.0.0",
 		"",
@@ -165,20 +166,19 @@ func TestPRController_PRListPartial_Success(t *testing.T) {
 	controller.PRListPartial(w, req)
 
 	Equals(t, http.StatusOK, w.Code)
-	mockRowsTemplate.VerifyWasCalledOnce().Execute(Any[io.Writer](), Any[any]())
 }
 
 func TestPRController_PRListPartial_DBError(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	mockDB := mocks.NewMockDatabase()
-	mockRowsTemplate := tMocks.NewMockTemplateWriter()
+	mockDB := mocks.NewMockDatabase(ctrl)
+	mockRowsTemplate := tMocks.NewMockTemplateWriter(ctrl)
 
-	When(mockDB.GetActivePullRequests()).ThenReturn(nil, errors.New("database error"))
+	mockDB.EXPECT().GetActivePullRequests().Return(nil, errors.New("database error"))
 
 	controller := controllers.NewPRController(
 		mockDB,
-		tMocks.NewMockTemplateWriter(),
+		tMocks.NewMockTemplateWriter(ctrl),
 		mockRowsTemplate,
 		"1.0.0",
 		"",
@@ -197,36 +197,37 @@ func TestPRController_PRListPartial_DBError(t *testing.T) {
 }
 
 func TestPRController_PRList_ShowsErrorStateForPRsWithOutputErrors(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	mockDB := mocks.NewMockDatabase()
-	mockTemplate := tMocks.NewMockTemplateWriter()
+	mockDB := mocks.NewMockDatabase(ctrl)
+	mockTemplate := tMocks.NewMockTemplateWriter(ctrl)
 
-	When(mockDB.GetActivePullRequests()).ThenReturn([]models.PullRequest{
+	mockDB.EXPECT().GetActivePullRequests().Return([]models.PullRequest{
 		{Num: 123, BaseRepo: models.Repo{FullName: "owner/repo1"}},
 		{Num: 456, BaseRepo: models.Repo{FullName: "owner/repo2"}},
 	}, nil)
 
 	// First PR fails to get outputs
-	When(mockDB.GetProjectOutputsByPull("owner/repo1", 123)).ThenReturn(nil, errors.New("output error"))
+	mockDB.EXPECT().GetProjectOutputsByPull("owner/repo1", 123).Return(nil, errors.New("output error"))
 
 	// Second PR succeeds
-	When(mockDB.GetProjectOutputsByPull("owner/repo2", 456)).ThenReturn([]models.ProjectOutput{
+	mockDB.EXPECT().GetProjectOutputsByPull("owner/repo2", 456).Return([]models.ProjectOutput{
 		{Status: models.SuccessOutputStatus},
 	}, nil)
 
 	var capturedData web_templates.PRListData
-	When(mockTemplate.Execute(Any[io.Writer](), Any[any]())).Then(func(params []Param) ReturnValues {
-		if data, ok := params[1].(web_templates.PRListData); ok {
-			capturedData = data
-		}
-		return []ReturnValue{nil}
-	})
+	mockTemplate.EXPECT().Execute(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(wr io.Writer, data any) error {
+			if d, ok := data.(web_templates.PRListData); ok {
+				capturedData = d
+			}
+			return nil
+		})
 
 	controller := controllers.NewPRController(
 		mockDB,
 		mockTemplate,
-		tMocks.NewMockTemplateWriter(),
+		tMocks.NewMockTemplateWriter(ctrl),
 		"1.0.0",
 		"",
 		func() bool { return false },
@@ -265,40 +266,41 @@ func TestPRController_PRList_ShowsErrorStateForPRsWithOutputErrors(t *testing.T)
 }
 
 func TestPRController_PRList_SortsByLastActivity(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	mockDB := mocks.NewMockDatabase()
-	mockTemplate := tMocks.NewMockTemplateWriter()
+	mockDB := mocks.NewMockDatabase(ctrl)
+	mockTemplate := tMocks.NewMockTemplateWriter(ctrl)
 
 	now := time.Now()
 
-	When(mockDB.GetActivePullRequests()).ThenReturn([]models.PullRequest{
+	mockDB.EXPECT().GetActivePullRequests().Return([]models.PullRequest{
 		{Num: 1, BaseRepo: models.Repo{FullName: "owner/old"}},
 		{Num: 2, BaseRepo: models.Repo{FullName: "owner/new"}},
 	}, nil)
 
 	// Old PR - older activity
-	When(mockDB.GetProjectOutputsByPull("owner/old", 1)).ThenReturn([]models.ProjectOutput{
+	mockDB.EXPECT().GetProjectOutputsByPull("owner/old", 1).Return([]models.ProjectOutput{
 		{Status: models.SuccessOutputStatus, CompletedAt: now.Add(-2 * time.Hour)},
 	}, nil)
 
 	// New PR - recent activity
-	When(mockDB.GetProjectOutputsByPull("owner/new", 2)).ThenReturn([]models.ProjectOutput{
+	mockDB.EXPECT().GetProjectOutputsByPull("owner/new", 2).Return([]models.ProjectOutput{
 		{Status: models.SuccessOutputStatus, CompletedAt: now.Add(-5 * time.Minute)},
 	}, nil)
 
 	var capturedData web_templates.PRListData
-	When(mockTemplate.Execute(Any[io.Writer](), Any[any]())).Then(func(params []Param) ReturnValues {
-		if data, ok := params[1].(web_templates.PRListData); ok {
-			capturedData = data
-		}
-		return []ReturnValue{nil}
-	})
+	mockTemplate.EXPECT().Execute(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(wr io.Writer, data any) error {
+			if d, ok := data.(web_templates.PRListData); ok {
+				capturedData = d
+			}
+			return nil
+		})
 
 	controller := controllers.NewPRController(
 		mockDB,
 		mockTemplate,
-		tMocks.NewMockTemplateWriter(),
+		tMocks.NewMockTemplateWriter(ctrl),
 		"1.0.0",
 		"",
 		func() bool { return false },
@@ -374,18 +376,18 @@ func TestFormatRelativeTime(t *testing.T) {
 }
 
 func TestPRController_PRList_AggregatesResourceStats(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	mockDB := mocks.NewMockDatabase()
-	mockTemplate := tMocks.NewMockTemplateWriter()
+	mockDB := mocks.NewMockDatabase(ctrl)
+	mockTemplate := tMocks.NewMockTemplateWriter(ctrl)
 
 	now := time.Now()
 
-	When(mockDB.GetActivePullRequests()).ThenReturn([]models.PullRequest{
+	mockDB.EXPECT().GetActivePullRequests().Return([]models.PullRequest{
 		{Num: 123, BaseRepo: models.Repo{FullName: "owner/repo"}},
 	}, nil)
 
-	When(mockDB.GetProjectOutputsByPull("owner/repo", 123)).ThenReturn([]models.ProjectOutput{
+	mockDB.EXPECT().GetProjectOutputsByPull("owner/repo", 123).Return([]models.ProjectOutput{
 		{
 			Status:        models.SuccessOutputStatus,
 			ResourceStats: models.ResourceStats{Add: 1, Change: 2, Destroy: 0},
@@ -399,17 +401,18 @@ func TestPRController_PRList_AggregatesResourceStats(t *testing.T) {
 	}, nil)
 
 	var capturedData web_templates.PRListData
-	When(mockTemplate.Execute(Any[io.Writer](), Any[any]())).Then(func(params []Param) ReturnValues {
-		if data, ok := params[1].(web_templates.PRListData); ok {
-			capturedData = data
-		}
-		return []ReturnValue{nil}
-	})
+	mockTemplate.EXPECT().Execute(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(wr io.Writer, data any) error {
+			if d, ok := data.(web_templates.PRListData); ok {
+				capturedData = d
+			}
+			return nil
+		})
 
 	controller := controllers.NewPRController(
 		mockDB,
 		mockTemplate,
-		tMocks.NewMockTemplateWriter(),
+		tMocks.NewMockTemplateWriter(ctrl),
 		"1.0.0",
 		"",
 		func() bool { return false },
@@ -433,35 +436,36 @@ func TestPRController_PRList_AggregatesResourceStats(t *testing.T) {
 }
 
 func TestPRController_PRList_MixedStatuses(t *testing.T) {
-	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 
-	mockDB := mocks.NewMockDatabase()
-	mockTemplate := tMocks.NewMockTemplateWriter()
+	mockDB := mocks.NewMockDatabase(ctrl)
+	mockTemplate := tMocks.NewMockTemplateWriter(ctrl)
 
 	now := time.Now()
 
-	When(mockDB.GetActivePullRequests()).ThenReturn([]models.PullRequest{
+	mockDB.EXPECT().GetActivePullRequests().Return([]models.PullRequest{
 		{Num: 123, BaseRepo: models.Repo{FullName: "owner/repo"}},
 	}, nil)
 
-	When(mockDB.GetProjectOutputsByPull("owner/repo", 123)).ThenReturn([]models.ProjectOutput{
+	mockDB.EXPECT().GetProjectOutputsByPull("owner/repo", 123).Return([]models.ProjectOutput{
 		{Status: models.SuccessOutputStatus, CompletedAt: now},
 		{Status: models.FailedOutputStatus, CompletedAt: now},
 		{Status: models.RunningOutputStatus, CompletedAt: now},
 	}, nil)
 
 	var capturedData web_templates.PRListData
-	When(mockTemplate.Execute(Any[io.Writer](), Any[any]())).Then(func(params []Param) ReturnValues {
-		if data, ok := params[1].(web_templates.PRListData); ok {
-			capturedData = data
-		}
-		return []ReturnValue{nil}
-	})
+	mockTemplate.EXPECT().Execute(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(wr io.Writer, data any) error {
+			if d, ok := data.(web_templates.PRListData); ok {
+				capturedData = d
+			}
+			return nil
+		})
 
 	controller := controllers.NewPRController(
 		mockDB,
 		mockTemplate,
-		tMocks.NewMockTemplateWriter(),
+		tMocks.NewMockTemplateWriter(ctrl),
 		"1.0.0",
 		"",
 		func() bool { return false },

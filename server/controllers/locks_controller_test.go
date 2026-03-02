@@ -27,7 +27,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 	"go.uber.org/mock/gomock"
-	"go.uber.org/mock/gomock"
 )
 
 func TestCreateApplyLock(t *testing.T) {

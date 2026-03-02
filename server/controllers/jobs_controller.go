@@ -302,6 +302,7 @@ func (j *JobsController) respond(w http.ResponseWriter, lvl logging.LogLevel, re
 	response := fmt.Sprintf(format, args...)
 	j.Logger.Log(lvl, response)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(responseCode)
 	fmt.Fprintln(w, response)
 }

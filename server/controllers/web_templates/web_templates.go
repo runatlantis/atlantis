@@ -50,7 +50,7 @@ func MustEncodeScriptData(data any) template.HTML {
 	return template.HTML(b) //nolint:gosec // output is JSON-encoded, HTML-safe
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_template_writer.go TemplateWriter
+//go:generate mockgen -package mocks -destination mocks/mock_template_writer.go github.com/runatlantis/atlantis/server/controllers/web_templates TemplateWriter
 
 //go:embed templates/*
 var templatesFS embed.FS
