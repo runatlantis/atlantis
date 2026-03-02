@@ -5,20 +5,19 @@ package events_test
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 
-	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 func TestOutputPersister_PersistPlanSuccess(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockDB := mocks.NewMockDatabase()
+	ctrl := gomock.NewController(t)
+	mockDB := mocks.NewMockDatabase(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -48,16 +47,15 @@ func TestOutputPersister_PersistPlanSuccess(t *testing.T) {
 		},
 	}
 
+	mockDB.EXPECT().SaveProjectOutput(gomock.Any()).Return(nil)
+
 	err := persister.PersistResult(ctx, result)
 	Ok(t, err)
-
-	// Verify SaveProjectOutput was called
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
 }
 
 func TestOutputPersister_PersistFailure(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockDB := mocks.NewMockDatabase()
+	ctrl := gomock.NewController(t)
+	mockDB := mocks.NewMockDatabase(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -80,15 +78,15 @@ func TestOutputPersister_PersistFailure(t *testing.T) {
 		},
 	}
 
+	mockDB.EXPECT().SaveProjectOutput(gomock.Any()).Return(nil)
+
 	err := persister.PersistResult(ctx, result)
 	Ok(t, err)
-
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
 }
 
 func TestOutputPersister_PersistApplySuccess(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockDB := mocks.NewMockDatabase()
+	ctrl := gomock.NewController(t)
+	mockDB := mocks.NewMockDatabase(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -111,15 +109,15 @@ func TestOutputPersister_PersistApplySuccess(t *testing.T) {
 		},
 	}
 
+	mockDB.EXPECT().SaveProjectOutput(gomock.Any()).Return(nil)
+
 	err := persister.PersistResult(ctx, result)
 	Ok(t, err)
-
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
 }
 
 func TestOutputPersister_PersistError(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockDB := mocks.NewMockDatabase()
+	ctrl := gomock.NewController(t)
+	mockDB := mocks.NewMockDatabase(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -142,15 +140,15 @@ func TestOutputPersister_PersistError(t *testing.T) {
 		},
 	}
 
+	mockDB.EXPECT().SaveProjectOutput(gomock.Any()).Return(nil)
+
 	err := persister.PersistResult(ctx, result)
 	Ok(t, err)
-
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
 }
 
 func TestOutputPersister_PersistPolicyCheck(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockDB := mocks.NewMockDatabase()
+	ctrl := gomock.NewController(t)
+	mockDB := mocks.NewMockDatabase(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -181,15 +179,15 @@ func TestOutputPersister_PersistPolicyCheck(t *testing.T) {
 		},
 	}
 
+	mockDB.EXPECT().SaveProjectOutput(gomock.Any()).Return(nil)
+
 	err := persister.PersistResult(ctx, result)
 	Ok(t, err)
-
-	mockDB.VerifyWasCalledOnce().SaveProjectOutput(AnyProjectOutput())
 }
 
 func TestOutputPersister_DatabaseError(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockDB := mocks.NewMockDatabase()
+	ctrl := gomock.NewController(t)
+	mockDB := mocks.NewMockDatabase(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -214,8 +212,7 @@ func TestOutputPersister_DatabaseError(t *testing.T) {
 		},
 	}
 
-	// Set up mock to return an error
-	When(mockDB.SaveProjectOutput(AnyProjectOutput())).ThenReturn(errors.New("database error"))
+	mockDB.EXPECT().SaveProjectOutput(gomock.Any()).Return(errors.New("database error"))
 
 	err := persister.PersistResult(ctx, result)
 	Assert(t, err != nil, "expected error from database")
@@ -223,8 +220,8 @@ func TestOutputPersister_DatabaseError(t *testing.T) {
 }
 
 func TestOutputPersister_PersistsPullURLAndTitle(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockDB := mocks.NewMockDatabase()
+	ctrl := gomock.NewController(t)
+	mockDB := mocks.NewMockDatabase(ctrl)
 	persister := events.NewOutputPersister(mockDB, nil)
 
 	ctx := command.ProjectContext{
@@ -256,9 +253,9 @@ func TestOutputPersister_PersistsPullURLAndTitle(t *testing.T) {
 
 	// Capture the output that gets passed to SaveProjectOutput
 	var capturedOutput models.ProjectOutput
-	When(mockDB.SaveProjectOutput(AnyProjectOutput())).Then(func(params []Param) ReturnValues {
-		capturedOutput = params[0].(models.ProjectOutput)
-		return []ReturnValue{nil}
+	mockDB.EXPECT().SaveProjectOutput(gomock.Any()).DoAndReturn(func(output models.ProjectOutput) error {
+		capturedOutput = output
+		return nil
 	})
 
 	err := persister.PersistResult(ctx, result)
@@ -269,10 +266,4 @@ func TestOutputPersister_PersistsPullURLAndTitle(t *testing.T) {
 		"expected PullURL to be captured from ctx.Pull.URL")
 	Assert(t, capturedOutput.PullTitle == "Upgrade database to version 2.0",
 		"expected PullTitle to be captured from ctx.Pull.Title")
-}
-
-// AnyProjectOutput returns a pegomock matcher for models.ProjectOutput
-func AnyProjectOutput() models.ProjectOutput {
-	RegisterMatcher(NewAnyMatcher(reflect.TypeFor[models.ProjectOutput]()))
-	return models.ProjectOutput{}
 }
