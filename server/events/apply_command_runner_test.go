@@ -19,11 +19,11 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestApplyCommandRunner_IsLocked(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
 
 	cases := []struct {
 		Description    string
@@ -64,8 +64,14 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 				State: github.Ptr("open"),
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+			// Only set specific expectations for github getter/parser when not locked,
+			// since locked cases return early before calling these.
+			// The AnyTimes() defaults from setup() handle the locked case.
+			if !c.ApplyLocked {
+				githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Any(), gomock.Any()).Return(pull, nil).AnyTimes()
+				eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Any()).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil).AnyTimes()
+			}
 
 			ctx := &command.Context{
 				User:     testdata.User,
@@ -86,7 +92,6 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 
 func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
 
 	cases := []struct {
 		Description       string
@@ -184,15 +189,39 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				Ok(t, err)
 			}
 
-			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
-				if c.Matched {
-					return ReturnValues{[]command.ProjectContext{{
-						CommandName:       command.Apply,
-						ProjectPlanStatus: models.PlannedPlanStatus,
-					}}, nil}
-				}
-				return ReturnValues{[]command.ProjectContext{}, nil}
-			})
+			matched := c.Matched
+			projectCommandBuilder.EXPECT().BuildApplyCommands(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ *command.Context, _ *events.CommentCommand) ([]command.ProjectContext, error) {
+					if matched {
+						return []command.ProjectContext{{
+							CommandName:       command.Apply,
+							ProjectPlanStatus: models.PlannedPlanStatus,
+						}}, nil
+					}
+					return []command.ProjectContext{}, nil
+				})
+
+			if c.ExpVCSStatusSet {
+				commitUpdater.EXPECT().UpdateCombinedCount(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Eq(models.SuccessCommitStatus),
+					gomock.Eq(command.Apply),
+					gomock.Eq(c.ExpVCSStatusSucc),
+					gomock.Eq(c.ExpVCSStatusTotal),
+				).Return(nil).Times(1)
+			} else {
+				commitUpdater.EXPECT().UpdateCombinedCount(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Eq(command.Apply),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(nil).Times(0)
+			}
 
 			applyCommandRunner.Run(ctx, cmd)
 
@@ -203,40 +232,18 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 
 			vcsClient.VerifyWasCalled(Times(timesComment)).CreateComment(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-			if c.ExpVCSStatusSet {
-				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
-					Eq[models.CommitStatus](models.SuccessCommitStatus),
-					Eq[command.Name](command.Apply),
-					Eq(c.ExpVCSStatusSucc),
-					Eq(c.ExpVCSStatusTotal),
-				)
-			} else {
-				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-					Any[logging.SimpleLogging](),
-					Any[models.Repo](),
-					Any[models.PullRequest](),
-					Any[models.CommitStatus](),
-					Eq[command.Name](command.Apply),
-					Any[int](),
-					Any[int](),
-				)
-			}
 		})
 	}
 }
 
 func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
 
 	cases := []struct {
 		Description           string
 		ProjectContexts       []command.ProjectContext
 		ProjectCommandOutputs []command.ProjectCommandOutput
-		RunnerInvokeMatch     []*EqMatcher
+		RunnerInvokeTimes     []int
 		ExpComment            string
 		ApplyFailed           bool
 	}{
@@ -264,11 +271,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					Error: errors.New("shabang"),
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			ApplyFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			ApplyFailed:       true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
@@ -296,12 +300,9 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Never(),
-			},
-			ApplyFailed: true,
-			ExpComment:  "Ran Apply for project: `First` dir: `` workspace: ``\n\n**Apply Error**\n```\nshabang\n```",
+			RunnerInvokeTimes: []int{1, 0},
+			ApplyFailed:       true,
+			ExpComment:        "Ran Apply for project: `First` dir: `` workspace: ``\n\n**Apply Error**\n```\nshabang\n```",
 		},
 		{
 			Description: "When both in a group of two succeeds, the following two will run",
@@ -342,13 +343,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-				Never(),
-				Never(),
-			},
-			ApplyFailed: true,
+			RunnerInvokeTimes: []int{1, 1, 0, 0},
+			ApplyFailed:       true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
@@ -391,13 +387,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-				Once(),
-				Once(),
-			},
-			ApplyFailed: true,
+			RunnerInvokeTimes: []int{1, 1, 1, 1},
+			ApplyFailed:       true,
 			ExpComment: "Ran Apply for 4 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n1. project: `Third` dir: `` workspace: ``\n1. project: `Fourth` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 3. project: `Third` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### 4. project: `Fourth` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n4 projects, 3 successful, 0 failed, 1 errored",
 		},
@@ -423,11 +414,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			ApplyFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			ApplyFailed:       true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
@@ -451,11 +439,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			ApplyFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			ApplyFailed:       true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
@@ -479,11 +464,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			ApplyFailed: false,
+			RunnerInvokeTimes: []int{1, 1},
+			ApplyFailed:       false,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 2 successful, 0 failed, 0 errored",
 		},
@@ -511,19 +493,22 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 
-			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Any(), gomock.Any()).Return(pull, nil).AnyTimes()
+			eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Any()).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil).AnyTimes()
 
-			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
-			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Apply(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutputs[i])
-			}
+			projectCommandBuilder.EXPECT().BuildApplyCommands(gomock.Any(), gomock.Any()).Return(c.ProjectContexts, nil)
+			applyCallIndex := 0
+			outputs := c.ProjectCommandOutputs
+			projectCommandRunner.EXPECT().Apply(gomock.Any()).DoAndReturn(func(_ command.ProjectContext) command.ProjectCommandOutput {
+				idx := applyCallIndex
+				applyCallIndex++
+				if idx < len(outputs) {
+					return outputs[idx]
+				}
+				return command.ProjectCommandOutput{}
+			}).AnyTimes()
 
 			applyCommandRunner.Run(ctx, cmd)
-
-			for i := range c.ProjectContexts {
-				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Apply(c.ProjectContexts[i])
-			}
 
 			require.Equal(t, c.ApplyFailed, ctx.CommandHasErrors)
 

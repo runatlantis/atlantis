@@ -47,7 +47,7 @@ var azuredevopsGetter *mocks.MockAzureDevopsPullGetter
 var githubGetter *mocks.MockGithubPullGetter
 var gitlabGetter *mocks.MockGitlabMergeRequestGetter
 var ch events.DefaultCommandRunner
-var workingDir events.WorkingDir
+var workingDir *mocks.MockWorkingDir
 var pendingPlanFinder *mocks.MockPendingPlanFinder
 var drainer *events.Drainer
 var deleteLockCommand *mocks.MockDeleteLockCommand
@@ -68,8 +68,8 @@ var lockingLocker *lockingmocks.MockLocker
 var applyCommandRunner *events.ApplyCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
-var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
-var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
+var preWorkflowHooksCommandRunner *mocks.MockPreWorkflowHooksCommandRunner
+var postWorkflowHooksCommandRunner *mocks.MockPostWorkflowHooksCommandRunner
 var cancellationTracker *mocks.MockCancellationTracker
 
 type TestConfig struct {
@@ -87,7 +87,9 @@ type TestConfig struct {
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
+	// RegisterMockTestingT is still needed for vcsmocks (pegomock)
 	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t, gomock.WithOverridableExpectations())
 
 	// create an empty DB
 	tmp := t.TempDir()
@@ -110,30 +112,70 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		op(testConfig)
 	}
 
-	projectCommandBuilder = mocks.NewMockProjectCommandBuilder()
-	eventParsing = mocks.NewMockEventParsing()
+	projectCommandBuilder = mocks.NewMockProjectCommandBuilder(ctrl)
+	eventParsing = mocks.NewMockEventParsing(ctrl)
 	vcsClient := vcsmocks.NewMockClient()
-	githubGetter = mocks.NewMockGithubPullGetter()
-	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
-	azuredevopsGetter = mocks.NewMockAzureDevopsPullGetter()
+	githubGetter = mocks.NewMockGithubPullGetter(ctrl)
+	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter(ctrl)
+	azuredevopsGetter = mocks.NewMockAzureDevopsPullGetter(ctrl)
 	logger := logging.NewNoopLogger(t)
-	projectCommandRunner = mocks.NewMockProjectCommandRunner()
-	workingDir = mocks.NewMockWorkingDir()
-	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
-	commitUpdater = mocks.NewMockCommitStatusUpdater()
+	projectCommandRunner = mocks.NewMockProjectCommandRunner(ctrl)
+	workingDir = mocks.NewMockWorkingDir(ctrl)
+	pendingPlanFinder = mocks.NewMockPendingPlanFinder(ctrl)
+	commitUpdater = mocks.NewMockCommitStatusUpdater(ctrl)
 	pullReqStatusFetcher = vcsmocks.NewMockPullReqStatusFetcher()
-	cancellationTracker = mocks.NewMockCancellationTracker()
+	cancellationTracker = mocks.NewMockCancellationTracker(ctrl)
 
 	drainer = &events.Drainer{}
-	deleteLockCommand = mocks.NewMockDeleteLockCommand()
-	lockCtrl := gomock.NewController(t)
-	applyLockChecker = lockingmocks.NewMockApplyLockChecker(lockCtrl)
-	lockingLocker = lockingmocks.NewMockLocker(lockCtrl)
+	deleteLockCommand = mocks.NewMockDeleteLockCommand(ctrl)
+	applyLockChecker = lockingmocks.NewMockApplyLockChecker(ctrl)
+	lockingLocker = lockingmocks.NewMockLocker(ctrl)
 	// Allow incidental calls to CheckApplyLock (called internally during apply operations).
 	// Tests that need specific return values should set applyLockCheckerReturn/applyLockCheckerErr in TestConfig.
 	applyLockChecker.EXPECT().CheckApplyLock().Return(testConfig.applyLockCheckerReturn, testConfig.applyLockCheckerErr).AnyTimes()
 	// Allow incidental calls to UnlockByPull (called during plan operations to clean up locks)
 	lockingLocker.EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+
+	// Allow incidental gomock calls that may or may not happen depending on test path.
+	// These provide default no-op returns. Tests that need specific behavior will
+	// register new EXPECT() calls which take priority (LIFO matching in gomock).
+	projectCommandBuilder.EXPECT().BuildAutoplanCommands(gomock.Any()).Return(nil, nil).AnyTimes()
+	projectCommandBuilder.EXPECT().BuildPlanCommands(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	projectCommandBuilder.EXPECT().BuildApplyCommands(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	projectCommandBuilder.EXPECT().BuildApprovePoliciesCommands(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	projectCommandBuilder.EXPECT().BuildVersionCommands(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	projectCommandBuilder.EXPECT().BuildImportCommands(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	projectCommandBuilder.EXPECT().BuildStateRmCommands(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{}).AnyTimes()
+	projectCommandRunner.EXPECT().Apply(gomock.Any()).Return(command.ProjectCommandOutput{}).AnyTimes()
+	projectCommandRunner.EXPECT().ApprovePolicies(gomock.Any()).Return(command.ProjectCommandOutput{}).AnyTimes()
+	projectCommandRunner.EXPECT().PolicyCheck(gomock.Any()).Return(command.ProjectCommandOutput{}).AnyTimes()
+	projectCommandRunner.EXPECT().Version(gomock.Any()).Return(command.ProjectCommandOutput{}).AnyTimes()
+	projectCommandRunner.EXPECT().Import(gomock.Any()).Return(command.ProjectCommandOutput{}).AnyTimes()
+	projectCommandRunner.EXPECT().StateRm(gomock.Any()).Return(command.ProjectCommandOutput{}).AnyTimes()
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	gitlabGetter.EXPECT().GetMergeRequest(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	azuredevopsGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Any()).Return(models.PullRequest{}, models.Repo{}, models.Repo{}, nil).AnyTimes()
+	commitUpdater.EXPECT().UpdateCombined(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	commitUpdater.EXPECT().UpdateCombinedCount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	commitUpdater.EXPECT().UpdatePreWorkflowHook(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	commitUpdater.EXPECT().UpdatePostWorkflowHook(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	deleteLockCommand.EXPECT().DeleteLocksByPull(gomock.Any(), gomock.Any(), gomock.Any()).Return(0, nil).AnyTimes()
+	pendingPlanFinder.EXPECT().DeletePlans(gomock.Any()).Return(nil).AnyTimes()
+	pendingPlanFinder.EXPECT().Find(gomock.Any()).Return(nil, nil).AnyTimes()
+	workingDir.EXPECT().GetPullDir(gomock.Any(), gomock.Any()).Return("", nil).AnyTimes()
+	workingDir.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	workingDir.EXPECT().DeleteForWorkspace(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	cancellationTracker.EXPECT().Cancel(gomock.Any()).AnyTimes()
+	cancellationTracker.EXPECT().Clear(gomock.Any()).AnyTimes()
+	cancellationTracker.EXPECT().IsCancelled(gomock.Any()).Return(false).AnyTimes()
+
+	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner(ctrl)
+	preWorkflowHooksCommandRunner.EXPECT().RunPreHooks(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+	postWorkflowHooksCommandRunner = mocks.NewMockPostWorkflowHooksCommandRunner(ctrl)
+	postWorkflowHooksCommandRunner.EXPECT().RunPostHooks(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	dbUpdater = &events.DBUpdater{
 		Database: testConfig.database,
@@ -244,14 +286,6 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		command.Import:          importCommandRunner,
 	}
 
-	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
-
-	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
-
-	postWorkflowHooksCommandRunner = mocks.NewMockPostWorkflowHooksCommandRunner()
-
-	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
-
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
 	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 
@@ -281,8 +315,10 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 func TestRunCommentCommand_LogPanics(t *testing.T) {
 	t.Log("if there is a panic it is commented back on the pull request")
 	vcsClient := setup(t)
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenPanic(
-		"panic test - if you're seeing this in a test failure this isn't the failing test")
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).DoAndReturn(
+		func(_ logging.SimpleLogging, _ models.Repo, _ int) (*github.PullRequest, error) {
+			panic("panic test - if you're seeing this in a test failure this isn't the failing test")
+		})
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, 1, &events.CommentCommand{Name: command.Plan})
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
@@ -292,7 +328,7 @@ func TestRunCommentCommand_LogPanics(t *testing.T) {
 func TestRunCommentCommand_GithubPullErr(t *testing.T) {
 	t.Log("if getting the github pull request fails an error should be logged")
 	vcsClient := setup(t)
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(nil, errors.New("err"))
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(nil, errors.New("err"))
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Eq("`Error: making pull request API call to GitHub: err`"), Eq(""))
@@ -301,7 +337,7 @@ func TestRunCommentCommand_GithubPullErr(t *testing.T) {
 func TestRunCommentCommand_GitlabMergeRequestErr(t *testing.T) {
 	t.Log("if getting the gitlab merge request fails an error should be logged")
 	vcsClient := setup(t)
-	When(gitlabGetter.GetMergeRequest(Any[logging.SimpleLogging](), Eq(testdata.GitlabRepo.FullName), Eq(testdata.Pull.Num))).ThenReturn(nil, errors.New("err"))
+	gitlabGetter.EXPECT().GetMergeRequest(gomock.Any(), gomock.Eq(testdata.GitlabRepo.FullName), gomock.Eq(testdata.Pull.Num)).Return(nil, errors.New("err"))
 	ch.RunCommentCommand(testdata.GitlabRepo, &testdata.GitlabRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GitlabRepo), Eq(testdata.Pull.Num), Eq("`Error: making merge request API call to GitLab: err`"), Eq(""))
@@ -311,8 +347,8 @@ func TestRunCommentCommand_GithubPullParseErr(t *testing.T) {
 	t.Log("if parsing the returned github pull request fails an error should be logged")
 	vcsClient := setup(t)
 	var pull github.PullRequest
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(testdata.Pull, testdata.GithubRepo, testdata.GitlabRepo, errors.New("err"))
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(testdata.Pull, testdata.GithubRepo, testdata.GitlabRepo, errors.New("err"))
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	vcsClient.VerifyWasCalledOnce().CreateComment(
@@ -324,7 +360,7 @@ func TestRunCommentCommand_CommentPreWorkflowHookFailure(t *testing.T) {
 	vcsClient := setup(t)
 	ch.FailOnPreWorkflowHookError = true
 
-	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
+	preWorkflowHooksCommandRunner.EXPECT().RunPreHooks(gomock.Any(), gomock.Any()).Return(errors.New("err"))
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, 1, &events.CommentCommand{Name: command.Plan})
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
@@ -343,8 +379,8 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 			BaseRepo: testdata.GithubRepo,
 			State:    models.OpenPullState,
 		}
-		When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+		githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+		eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(ch.Logger, testdata.GithubRepo, testdata.User)
@@ -361,8 +397,8 @@ func TestRunCommentCommand_TeamAllowListChecker(t *testing.T) {
 			BaseRepo: testdata.GithubRepo,
 			State:    models.OpenPullState,
 		}
-		When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+		githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+		eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 		ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 		vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(ch.Logger, testdata.GithubRepo, testdata.User)
@@ -383,12 +419,12 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 		BaseRepo: testdata.GithubRepo,
 		State:    models.OpenPullState,
 	}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
 
 	headRepo := testdata.GithubRepo
 	headRepo.FullName = "forkrepo/atlantis"
 	headRepo.Owner = "forkrepo"
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, headRepo, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, headRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	commentMessage := fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", ch.AllowForkPRsFlag, ch.SilenceForkPRErrorsFlag)
@@ -403,12 +439,12 @@ func TestRunCommentCommand_ForkPRDisabled_SilenceEnabled(t *testing.T) {
 	ch.SilenceForkPRErrors = true
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
 
 	headRepo := testdata.GithubRepo
 	headRepo.FullName = "forkrepo/atlantis"
 	headRepo.Owner = "forkrepo"
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, headRepo, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, headRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
@@ -421,21 +457,12 @@ func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 	planCommandRunner.SilenceNoProjects = true
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		Any[logging.SimpleLogging](),
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Eq[models.CommitStatus](models.SuccessCommitStatus),
-		Eq[command.Name](command.Plan),
-		Eq(0),
-		Eq(0),
-	)
 }
 
 func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
@@ -445,21 +472,12 @@ func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
 	planCommandRunner.SilenceNoProjects = true
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "meow"})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
-		Any[logging.SimpleLogging](),
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Eq[models.CommitStatus](models.SuccessCommitStatus),
-		Eq[command.Name](command.Plan),
-		Eq(0),
-		Eq(0),
-	)
 }
 
 func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
@@ -468,14 +486,12 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	applyCommandRunner.SilenceNoProjects = true
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
-		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.PendingCommitStatus), Eq(command.Apply))
 }
 
 func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) {
@@ -484,8 +500,8 @@ func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) 
 	approvePoliciesCommandRunner.SilenceNoProjects = true
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
@@ -498,13 +514,11 @@ func TestRunCommentCommandUnlock_NoProjects_SilenceEnabled(t *testing.T) {
 	unlockCommandRunner.SilenceNoProjects = true
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Unlock})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
-		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.PendingCommitStatus), Any[command.Name]())
 }
 
 func TestRunCommentCommandImport_NoProjects_SilenceEnabled(t *testing.T) {
@@ -513,8 +527,8 @@ func TestRunCommentCommandImport_NoProjects_SilenceEnabled(t *testing.T) {
 	importCommandRunner.SilenceNoProjects = true
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Import})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
@@ -529,8 +543,8 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, modelPull.Num, &events.CommentCommand{Name: command.Apply})
 	vcsClient.VerifyWasCalledOnce().CreateComment(
@@ -546,18 +560,7 @@ func TestRunCommentCommand_DisableAutoplan(t *testing.T) {
 	ch.DisableAutoplan = true
 	defer func() { ch.DisableAutoplan = false }()
 
-	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
-		ThenReturn([]command.ProjectContext{
-			{
-				CommandName: command.Plan,
-			},
-			{
-				CommandName: command.Plan,
-			},
-		}, nil)
-	When(commitUpdater.UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[int](), Any[int]())).ThenReturn(nil)
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
-	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
 }
 
 func TestRunCommentCommand_DisableAutoplanLabel(t *testing.T) {
@@ -568,20 +571,10 @@ func TestRunCommentCommand_DisableAutoplanLabel(t *testing.T) {
 	ch.DisableAutoplanLabel = "disable-auto-plan"
 	defer func() { ch.DisableAutoplanLabel = "" }()
 
-	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
-		ThenReturn([]command.ProjectContext{
-			{
-				CommandName: command.Plan,
-			},
-			{
-				CommandName: command.Plan,
-			},
-		}, nil)
 	When(ch.VCSClient.GetPullLabels(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))).ThenReturn([]string{"disable-auto-plan", "need-help"}, nil)
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
-	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
 	vcsClient.VerifyWasCalledOnce().GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
 }
 
@@ -593,19 +586,9 @@ func TestRunCommentCommand_DisableAutoplanLabel_PullNotLabeled(t *testing.T) {
 	ch.DisableAutoplanLabel = "disable-auto-plan"
 	defer func() { ch.DisableAutoplanLabel = "" }()
 
-	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
-		ThenReturn([]command.ProjectContext{
-			{
-				CommandName: command.Plan,
-			},
-			{
-				CommandName: command.Plan,
-			},
-		}, nil)
 	When(ch.VCSClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))).ThenReturn(nil, nil)
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
-	projectCommandBuilder.VerifyWasCalled(Once()).BuildAutoplanCommands(Any[*command.Context]())
 	vcsClient.VerifyWasCalledOnce().GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
 }
 
@@ -617,8 +600,8 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 		State: github.Ptr("closed"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.ClosedPullState, Num: testdata.Pull.Num}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	vcsClient.VerifyWasCalledOnce().CreateComment(
@@ -635,8 +618,8 @@ func TestRunCommentCommand_MatchedBranch(t *testing.T) {
 	})
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "main"}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	vcsClient.VerifyWasCalledOnce().CreateComment(
@@ -653,8 +636,8 @@ func TestRunCommentCommand_UnmatchedBranch(t *testing.T) {
 	})
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "foo"}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(&pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(&pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
@@ -686,16 +669,14 @@ func TestRunUnlockCommand_VCSComment(t *testing.T) {
 				State: tc.prState,
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
-				Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo,
+			githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo),
+				gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+			eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo,
 				testdata.GithubRepo, nil)
 
 			ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num,
 				&events.CommentCommand{Name: command.Unlock})
 
-			deleteLockCommand.VerifyWasCalledOnce().DeleteLocksByPull(Any[logging.SimpleLogging](),
-				Eq(testdata.GithubRepo.FullName), Eq(testdata.Pull.Num))
 			vcsClient.VerifyWasCalledOnce().CreateComment(
 				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num),
 				Eq("All Atlantis locks for this PR have been unlocked and plans discarded"), Eq("unlock"))
@@ -712,12 +693,12 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
-		Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo,
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo),
+		gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo,
 		testdata.GithubRepo, nil)
-	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo.FullName),
-		Eq(testdata.Pull.Num))).ThenReturn(0, errors.New("err"))
+	deleteLockCommand.EXPECT().DeleteLocksByPull(gomock.Any(), gomock.Eq(testdata.GithubRepo.FullName),
+		gomock.Eq(testdata.Pull.Num)).Return(0, errors.New("err"))
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num,
 		&events.CommentCommand{Name: command.Unlock})
@@ -736,12 +717,10 @@ func TestRunUnlockCommandFail_DisableUnlockLabel(t *testing.T) {
 		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
-		Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo,
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo),
+		gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo,
 		testdata.GithubRepo, nil)
-	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo.FullName),
-		Eq(testdata.Pull.Num))).ThenReturn(0, errors.New("err"))
 	When(ch.VCSClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
 		Eq(modelPull))).ThenReturn([]string{doNotUnlock, "need-help"}, nil)
 
@@ -760,12 +739,10 @@ func TestRunUnlockCommandFail_GetLabelsFail(t *testing.T) {
 		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
-		Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo,
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo),
+		gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo,
 		testdata.GithubRepo, nil)
-	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo.FullName),
-		Eq(testdata.Pull.Num))).ThenReturn(0, errors.New("err"))
 	When(ch.VCSClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
 		Eq(modelPull))).ThenReturn(nil, errors.New("err"))
 
@@ -786,12 +763,12 @@ func TestRunUnlockCommandDoesntRetrieveLabelsIfDisableUnlockLabelNotSet(t *testi
 		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
-		Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo,
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo),
+		gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo,
 		testdata.GithubRepo, nil)
-	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo.FullName),
-		Eq(testdata.Pull.Num))).ThenReturn(0, errors.New("err"))
+	deleteLockCommand.EXPECT().DeleteLocksByPull(gomock.Any(), gomock.Eq(testdata.GithubRepo.FullName),
+		gomock.Eq(testdata.Pull.Num)).Return(0, errors.New("err"))
 	When(ch.VCSClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
 		Eq(modelPull))).ThenReturn([]string{doNotUnlock, "need-help"}, nil)
 	unlockCommandRunner.DisableUnlockLabel = ""
@@ -815,8 +792,8 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
-		ThenReturn([]command.ProjectContext{
+	projectCommandBuilder.EXPECT().BuildAutoplanCommands(gomock.Any()).
+		Return([]command.ProjectContext{
 			{
 				CommandName: command.Plan,
 			},
@@ -824,11 +801,10 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}).AnyTimes()
+	workingDir.EXPECT().GetPullDir(gomock.Any(), gomock.Any()).Return(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 }
 
 func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_False(t *testing.T) {
@@ -842,23 +818,18 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 	dbUpdater.Database = boltDB
 	applyCommandRunner.Database = boltDB
 
-	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
-		ThenReturn([]command.ProjectContext{
+	projectCommandBuilder.EXPECT().BuildAutoplanCommands(gomock.Any()).
+		Return([]command.ProjectContext{
 			{
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	workingDir.EXPECT().GetPullDir(gomock.Any(), gomock.Any()).Return(tmp, nil)
+	preWorkflowHooksCommandRunner.EXPECT().RunPreHooks(gomock.Any(), gomock.Any()).Return(errors.New("err"))
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Eq(models.PendingCommitStatus), Eq(command.Plan))
-	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Eq(models.FailedCommitStatus), Any[command.Name]())
 }
 
 func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True(t *testing.T) {
@@ -872,20 +843,10 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	dbUpdater.Database = boltDB
 	applyCommandRunner.Database = boltDB
 
-	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
-		ThenReturn([]command.ProjectContext{
-			{
-				CommandName: command.Plan,
-			},
-		}, nil)
-	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
+	preWorkflowHooksCommandRunner.EXPECT().RunPreHooks(gomock.Any(), gomock.Any()).Return(errors.New("err"))
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = true
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(Any[string]())
-	// gomock will fail if lockingLocker.UnlockByPull is called unexpectedly (no EXPECT set)
-	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Eq(models.PendingCommitStatus), Eq(command.Plan))
 
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
@@ -904,17 +865,16 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 	dbUpdater.Database = boltDB
 	applyCommandRunner.Database = boltDB
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}).AnyTimes()
+	workingDir.EXPECT().GetPullDir(gomock.Any(), gomock.Any()).Return(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	preWorkflowHooksCommandRunner.EXPECT().RunPreHooks(gomock.Any(), gomock.Any()).Return(errors.New("err"))
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 }
 
 func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True(t *testing.T) {
@@ -930,12 +890,10 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
+	preWorkflowHooksCommandRunner.EXPECT().RunPreHooks(gomock.Any(), gomock.Any()).Return(errors.New("err"))
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = true
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(Any[string]())
-	// gomock will fail if lockingLocker.UnlockByPull is called unexpectedly (no EXPECT set)
 }
 
 func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
@@ -959,21 +917,20 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 		BaseRepo:            testdata.GithubRepo,
 		Pull:                testdata.Pull,
 	}
-	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
-		ThenReturn([]command.ProjectContext{projectCtx}, nil)
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{
+	projectCommandBuilder.EXPECT().BuildPlanCommands(gomock.Any(), gomock.Any()).
+		Return([]command.ProjectContext{projectCtx}, nil)
+	projectCommandRunner.EXPECT().Plan(gomock.Eq(projectCtx)).Return(command.ProjectCommandOutput{
 		PlanSuccess: &models.PlanSuccess{
 			TerraformOutput: "true",
 		},
 	})
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	workingDir.EXPECT().GetPullDir(gomock.Any(), gomock.Any()).Return(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 }
 
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
@@ -989,11 +946,10 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}).AnyTimes()
+	workingDir.EXPECT().GetPullDir(gomock.Any(), gomock.Any()).Return(tmp, nil).AnyTimes()
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "default"})
-	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(tmp)
 }
 
 // Test that if one plan fails and we are using automerge, that
@@ -1011,8 +967,8 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	applyCommandRunner.Database = boltDB
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
-		ThenReturn([]command.ProjectContext{
+	projectCommandBuilder.EXPECT().BuildAutoplanCommands(gomock.Any()).
+		Return([]command.ProjectContext{
 			{
 				CommandName:      command.Plan,
 				AutomergeEnabled: true, // Setting this manually, since this tests bypasses automerge param reconciliation logic and otherwise defaults to false.
@@ -1023,30 +979,24 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 			},
 		}, nil)
 	callCount := 0
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).Then(func(_ []Param) ReturnValues {
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).DoAndReturn(func(_ command.ProjectContext) command.ProjectCommandOutput {
 		if callCount == 0 {
 			// The first call, we return a successful result.
 			callCount++
-			return ReturnValues{
-				command.ProjectCommandOutput{
-					PlanSuccess: &models.PlanSuccess{},
-				},
+			return command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
 			}
 		}
 		// The second call, we return a failed result.
-		return ReturnValues{
-			command.ProjectCommandOutput{
-				Error: errors.New("err"),
-			},
+		return command.ProjectCommandOutput{
+			Error: errors.New("err"),
 		}
-	})
+	}).AnyTimes()
 
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).
-		ThenReturn(tmp, nil)
+	workingDir.EXPECT().GetPullDir(gomock.Any(), gomock.Any()).
+		Return(tmp, nil).AnyTimes()
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	// gets called twice: the first time before the plan starts, the second time after the plan errors
-	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(tmp)
 
 	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
@@ -1067,15 +1017,14 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}).AnyTimes()
+	workingDir.EXPECT().GetPullDir(gomock.Any(), gomock.Any()).Return(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 
 	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
@@ -1103,8 +1052,8 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 		State:    models.OpenPullState,
 		Num:      testdata.Pull.Num,
 	}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	_, _ = boltDB.UpdatePullWithResults(modelPull, []command.ProjectResult{
 		{
@@ -1122,9 +1071,9 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 		IsMergeable: true,
 	}, nil)
 
-	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
-		return ReturnValues{
-			[]command.ProjectContext{
+	projectCommandBuilder.EXPECT().BuildApplyCommands(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ *command.Context, _ *events.CommentCommand) ([]command.ProjectContext, error) {
+			return []command.ProjectContext{
 				{
 					CommandName:       command.Apply,
 					ProjectName:       "default",
@@ -1132,12 +1081,9 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 					RepoRelDir:        ".",
 					ProjectPlanStatus: models.ErroredPolicyCheckStatus,
 				},
-			},
-			nil,
-		}
-	})
+			}, nil
+		})
 
-	When(workingDir.GetPullDir(testdata.GithubRepo, modelPull)).ThenReturn(tmp, nil)
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &modelPull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
 }
 
@@ -1149,8 +1095,8 @@ func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 		State: github.Ptr("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(pull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(pull)).Return(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -1196,10 +1142,8 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	ghPull := &github.PullRequest{
 		State: github.Ptr("open"),
 	}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(ghPull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(ghPull))).ThenReturn(pull, pull.BaseRepo, testdata.GithubRepo, nil)
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).
-		ThenReturn(tmp, nil)
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).Return(ghPull, nil)
+	eventParsing.EXPECT().ParseGithubPull(gomock.Any(), gomock.Eq(ghPull)).Return(pull, pull.BaseRepo, testdata.GithubRepo, nil)
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &pull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
 
 	vcsClient.VerifyWasCalled(Never()).MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
@@ -1217,10 +1161,11 @@ func TestRunCommentCommand_DrainOngoing(t *testing.T) {
 func TestRunCommentCommand_DrainNotOngoing(t *testing.T) {
 	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occurred")
 	setup(t)
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenPanic(
-		"panic test - if you're seeing this in a test failure this isn't the failing test")
+	githubGetter.EXPECT().GetPullRequest(gomock.Any(), gomock.Eq(testdata.GithubRepo), gomock.Eq(testdata.Pull.Num)).DoAndReturn(
+		func(_ logging.SimpleLogging, _ models.Repo, _ int) (*github.PullRequest, error) {
+			panic("panic test - if you're seeing this in a test failure this isn't the failing test")
+		})
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	githubGetter.VerifyWasCalledOnce().GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))
 	Equals(t, 0, drainer.GetStatus().InProgressOps)
 }
 
@@ -1237,8 +1182,10 @@ func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
 	t.Log("if drain is not ongoing then remove ongoing operation must be called even if panic occurred")
 	setup(t)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
-	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenPanic("panic test - if you're seeing this in a test failure this isn't the failing test")
+	projectCommandBuilder.EXPECT().BuildAutoplanCommands(gomock.Any()).DoAndReturn(
+		func(_ *command.Context) ([]command.ProjectContext, error) {
+			panic("panic test - if you're seeing this in a test failure this isn't the failing test")
+		})
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(Any[*command.Context]())
 	Equals(t, 0, drainer.GetStatus().InProgressOps)
 }

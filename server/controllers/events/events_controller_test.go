@@ -25,8 +25,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v83/github"
 	. "github.com/petergtz/pegomock/v4"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
@@ -39,6 +37,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
+	"go.uber.org/mock/gomock"
 )
 
 const githubHeader = "X-Github-Event"
@@ -190,7 +189,7 @@ func TestPost_GithubInvalidComment(t *testing.T) {
 	req.Header.Set(githubHeader, "issue_comment")
 	event := `{"action": "created"}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(models.Repo{}, models.User{}, 1, errors.New("err"))
+	p.EXPECT().ParseGithubIssueCommentEvent(gomock.Any(), gomock.Any()).Return(models.Repo{}, models.User{}, 1, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusBadRequest, "parsing event")
@@ -198,11 +197,12 @@ func TestPost_GithubInvalidComment(t *testing.T) {
 
 func TestPost_GitlabCommentInvalidCommand(t *testing.T) {
 	t.Log("when the event is a gitlab comment with an invalid command we ignore it")
-	e, _, gl, _, _, _, _, _, cp := setup(t)
+	e, _, gl, _, p, _, _, _, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
-	When(cp.Parse("", models.Gitlab)).ThenReturn(events.CommentParseResult{Ignore: true})
+	p.EXPECT().ParseGitlabMergeRequestCommentEvent(gomock.Any()).Return(models.Repo{}, models.Repo{}, 0, models.User{}, nil).AnyTimes()
+	cp.EXPECT().Parse("", models.Gitlab).Return(events.CommentParseResult{Ignore: true})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Ignoring non-command comment: \"\"")
@@ -215,8 +215,8 @@ func TestPost_GithubCommentInvalidCommand(t *testing.T) {
 	req.Header.Set(githubHeader, "issue_comment")
 	event := `{"action": "created"}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(models.Repo{}, models.User{}, 1, nil)
-	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{Ignore: true})
+	p.EXPECT().ParseGithubIssueCommentEvent(gomock.Any(), gomock.Any()).Return(models.Repo{}, models.User{}, 1, nil)
+	cp.EXPECT().Parse("", models.Github).Return(events.CommentParseResult{Ignore: true})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Ignoring non-command comment: \"\"")
@@ -362,11 +362,12 @@ func TestPost_GithubCommentNotAllowlistedWithSilenceErrors(t *testing.T) {
 
 func TestPost_GitlabCommentResponse(t *testing.T) {
 	// When the event is a gitlab comment that warrants a comment response we comment back.
-	e, _, gl, _, _, _, _, vcsClient, cp := setup(t)
+	e, _, gl, _, p, _, _, vcsClient, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
-	When(cp.Parse("", models.Gitlab)).ThenReturn(events.CommentParseResult{CommentResponse: "a comment"})
+	p.EXPECT().ParseGitlabMergeRequestCommentEvent(gomock.Any()).Return(models.Repo{}, models.Repo{}, 0, models.User{}, nil).AnyTimes()
+	cp.EXPECT().Parse("", models.Gitlab).Return(events.CommentParseResult{CommentResponse: "a comment"})
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(0), Eq("a comment"), Eq(""))
@@ -382,8 +383,8 @@ func TestPost_GithubCommentResponse(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	baseRepo := models.Repo{}
 	user := models.User{}
-	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
-	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{CommentResponse: "a comment"})
+	p.EXPECT().ParseGithubIssueCommentEvent(gomock.Any(), gomock.Any()).Return(baseRepo, user, 1, nil)
+	cp.EXPECT().Parse("", models.Github).Return(events.CommentParseResult{CommentResponse: "a comment"})
 	w := httptest.NewRecorder()
 
 	e.Post(w, req)
@@ -393,17 +394,17 @@ func TestPost_GithubCommentResponse(t *testing.T) {
 
 func TestPost_GitlabCommentSuccess(t *testing.T) {
 	t.Log("when the event is a gitlab comment with a valid command we call the command handler")
-	e, _, gl, _, _, cr, _, _, cp := setup(t)
+	e, _, gl, _, p, cr, _, _, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
 	cmd := events.CommentCommand{}
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
-	When(cp.Parse(Any[string](), Eq(models.Gitlab))).ThenReturn(events.CommentParseResult{Command: &cmd})
+	p.EXPECT().ParseGitlabMergeRequestCommentEvent(gomock.Any()).Return(models.Repo{}, models.Repo{}, 0, models.User{}, nil).AnyTimes()
+	cp.EXPECT().Parse(gomock.Any(), gomock.Eq(models.Gitlab)).Return(events.CommentParseResult{Command: &cmd})
+	cr.EXPECT().RunCommentCommand(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
-
-	cr.VerifyWasCalledOnce().RunCommentCommand(models.Repo{}, &models.Repo{}, nil, models.User{}, 0, &cmd)
 }
 
 func TestPost_GithubCommentSuccess(t *testing.T) {
@@ -416,18 +417,17 @@ func TestPost_GithubCommentSuccess(t *testing.T) {
 	baseRepo := models.Repo{}
 	user := models.User{}
 	cmd := events.CommentCommand{}
-	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
-	When(cp.Parse("", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
+	p.EXPECT().ParseGithubIssueCommentEvent(gomock.Any(), gomock.Any()).Return(baseRepo, user, 1, nil)
+	cp.EXPECT().Parse("", models.Github).Return(events.CommentParseResult{Command: &cmd})
+	cr.EXPECT().RunCommentCommand(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
-
-	cr.VerifyWasCalledOnce().RunCommentCommand(baseRepo, nil, nil, user, 1, &cmd)
 }
 
 func TestPost_GithubCommentReaction(t *testing.T) {
 	t.Log("when the event is a github comment with a valid command we call the ReactToComment handler")
-	e, v, _, _, p, _, _, vcsClient, cp := setup(t)
+	e, v, _, _, p, cr, _, vcsClient, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(githubHeader, "issue_comment")
 	testComment := "atlantis plan"
@@ -436,8 +436,9 @@ func TestPost_GithubCommentReaction(t *testing.T) {
 	baseRepo := models.Repo{}
 	user := models.User{}
 	cmd := events.CommentCommand{Name: command.Plan}
-	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
-	When(cp.Parse(testComment, models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
+	p.EXPECT().ParseGithubIssueCommentEvent(gomock.Any(), gomock.Any()).Return(baseRepo, user, 1, nil)
+	cp.EXPECT().Parse(testComment, models.Github).Return(events.CommentParseResult{Command: &cmd})
+	cr.EXPECT().RunCommentCommand(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
@@ -447,12 +448,14 @@ func TestPost_GithubCommentReaction(t *testing.T) {
 
 func TestPost_GilabCommentReaction(t *testing.T) {
 	t.Log("when the event is a gitlab comment with a valid command we call the ReactToComment handler")
-	e, _, gl, _, _, _, _, vcsClient, cp := setup(t)
+	e, _, gl, _, p, cr, _, vcsClient, cp := setup(t)
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req.Header.Set(gitlabHeader, "value")
 	cmd := events.CommentCommand{}
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeCommentEvent{}, nil)
-	When(cp.Parse(Any[string](), Eq(models.Gitlab))).ThenReturn(events.CommentParseResult{Command: &cmd})
+	p.EXPECT().ParseGitlabMergeRequestCommentEvent(gomock.Any()).Return(models.Repo{}, models.Repo{}, 0, models.User{}, nil).AnyTimes()
+	cp.EXPECT().Parse(gomock.Any(), gomock.Eq(models.Gitlab)).Return(events.CommentParseResult{Command: &cmd})
+	cr.EXPECT().RunCommentCommand(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Processing...")
@@ -467,7 +470,7 @@ func TestPost_GithubPullRequestInvalid(t *testing.T) {
 
 	event := `{"action": "closed"}`
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
-	When(p.ParseGithubPullEvent(Any[logging.SimpleLogging](), Any[*github.PullRequestEvent]())).ThenReturn(models.PullRequest{}, models.OpenedPullEvent, models.Repo{}, models.Repo{}, models.User{}, errors.New("err"))
+	p.EXPECT().ParseGithubPullEvent(gomock.Any(), gomock.Any()).Return(models.PullRequest{}, models.OpenedPullEvent, models.Repo{}, models.Repo{}, models.User{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusBadRequest, "parsing pull data: err")
@@ -481,7 +484,7 @@ func TestPost_GitlabMergeRequestInvalid(t *testing.T) {
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeEvent{}, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeRequestEvent(gitlab.MergeEvent{})).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, errors.New("err"))
+	p.EXPECT().ParseGitlabMergeRequestEvent(gitlab.MergeEvent{}).Return(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusBadRequest, "Error parsing webhook: err")
@@ -489,7 +492,8 @@ func TestPost_GitlabMergeRequestInvalid(t *testing.T) {
 
 func TestPost_GithubPullRequestNotAllowlisted(t *testing.T) {
 	t.Log("when the event is a github pull request to a non-allowlisted repo we return a 400")
-	e, v, _, _, _, _, _, _, _ := setup(t)
+	e, v, _, _, p, _, _, _, _ := setup(t)
+	p.EXPECT().ParseGithubPullEvent(gomock.Any(), gomock.Any()).Return(models.PullRequest{}, models.OpenedPullEvent, models.Repo{}, models.Repo{}, models.User{}, nil).AnyTimes()
 	var err error
 	e.RepoAllowlistChecker, err = events.NewRepoAllowlistChecker("github.com/nevermatch")
 	Ok(t, err)
@@ -515,7 +519,7 @@ func TestPost_GitlabMergeRequestNotAllowlisted(t *testing.T) {
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeEvent{}, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeRequestEvent(gitlab.MergeEvent{})).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	p.EXPECT().ParseGitlabMergeRequestEvent(gitlab.MergeEvent{}).Return(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 
 	w := httptest.NewRecorder()
 	e.Post(w, req)
@@ -736,13 +740,14 @@ func TestPost_AzureDevopsPullRequestWebhookTestIgnoreEvent(t *testing.T) {
 
 func TestPost_AzureDevopsPullRequestCommentPassingIgnores(t *testing.T) {
 	t.Log("when the event should not be ignored it should pass through all ignore statements without error")
-	e, _, _, ado, _, _, _, _, cp := setup(t)
+	e, _, _, ado, _, cr, _, _, cp := setup(t)
+	cr.EXPECT().RunCommentCommand(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	testComment := "atlantis plan"
 	repo := models.Repo{}
 	cmd := events.CommentCommand{Name: command.Plan}
-	When(e.Parser.ParseAzureDevopsRepo(Any[*azuredevops.GitRepository]())).ThenReturn(repo, nil)
-	When(cp.Parse(testComment, models.AzureDevops)).ThenReturn(events.CommentParseResult{Command: &cmd})
+	e.Parser.(*emocks.MockEventParsing).EXPECT().ParseAzureDevopsRepo(gomock.Any()).Return(repo, nil)
+	cp.EXPECT().Parse(testComment, models.AzureDevops).Return(events.CommentParseResult{Command: &cmd})
 	payload := fmt.Sprintf(`{
 		"subscriptionId": "11111111-1111-1111-1111-111111111111",
 		"notificationId": 1,
@@ -787,8 +792,8 @@ func TestPost_GithubPullRequestClosedErrCleaningPull(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
 	pull := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGithubPullEvent(Any[logging.SimpleLogging](), Any[*github.PullRequestEvent]())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
-	When(c.CleanUpPull(Any[logging.SimpleLogging](), repo, pull)).ThenReturn(errors.New("cleanup err"))
+	p.EXPECT().ParseGithubPullEvent(gomock.Any(), gomock.Any()).Return(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	c.EXPECT().CleanUpPull(gomock.Any(), repo, pull).Return(errors.New("cleanup err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusInternalServerError, "Error cleaning pull request: cleanup err")
@@ -805,8 +810,8 @@ func TestPost_GitlabMergeRequestClosedErrCleaningPull(t *testing.T) {
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(event, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeRequestEvent(event)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
-	When(c.CleanUpPull(Any[logging.SimpleLogging](), repo, pullRequest)).ThenReturn(errors.New("err"))
+	p.EXPECT().ParseGitlabMergeRequestEvent(event).Return(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	c.EXPECT().CleanUpPull(gomock.Any(), repo, pullRequest).Return(errors.New("err"))
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusInternalServerError, "Error cleaning pull request: err")
@@ -823,8 +828,8 @@ func TestPost_GithubClosedPullRequestSuccess(t *testing.T) {
 	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 	repo := models.Repo{}
 	pull := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGithubPullEvent(Any[logging.SimpleLogging](), Any[*github.PullRequestEvent]())).ThenReturn(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
-	When(c.CleanUpPull(Any[logging.SimpleLogging](), repo, pull)).ThenReturn(nil)
+	p.EXPECT().ParseGithubPullEvent(gomock.Any(), gomock.Any()).Return(pull, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	c.EXPECT().CleanUpPull(gomock.Any(), repo, pull).Return(nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Pull request cleaned successfully")
@@ -839,7 +844,7 @@ func TestPost_GitlabMergeRequestSuccess(t *testing.T) {
 	When(gl.ParseAndValidate(req, secret)).ThenReturn(gitlab.MergeEvent{}, nil)
 	repo := models.Repo{}
 	pullRequest := models.PullRequest{State: models.ClosedPullState}
-	When(p.ParseGitlabMergeRequestEvent(gitlab.MergeEvent{})).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+	p.EXPECT().ParseGitlabMergeRequestEvent(gitlab.MergeEvent{}).Return(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 	w := httptest.NewRecorder()
 	e.Post(w, req)
 	ResponseContains(t, w, http.StatusOK, "Pull request cleaned successfully")
@@ -864,7 +869,8 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.header, func(t *testing.T) {
 			RegisterMockTestingT(t)
-			pullCleaner := emocks.NewMockPullCleaner()
+			gmockCtrl := gomock.NewController(t)
+			pullCleaner := emocks.NewMockPullCleaner(gmockCtrl)
 			allowlist, err := events.NewRepoAllowlistChecker("*")
 			Ok(t, err)
 			logger := logging.NewNoopLogger(t)
@@ -894,13 +900,6 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			req.Header.Set("X-Event-Key", c.header)
 			req.Header.Set("X-Request-ID", "request-id")
 
-			// Send the request.
-			w := httptest.NewRecorder()
-			ec.Post(w, req)
-
-			// Make our assertions.
-			ResponseContains(t, w, 200, "Pull request cleaned successfully")
-
 			expRepo := models.Repo{
 				FullName:          "project/repository",
 				Owner:             "project",
@@ -912,7 +911,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 					Type:     models.BitbucketServer,
 				},
 			}
-			pullCleaner.VerifyWasCalledOnce().CleanUpPull(
+			pullCleaner.EXPECT().CleanUpPull(
 				logger,
 				expRepo, models.PullRequest{
 					Num:        10,
@@ -923,7 +922,14 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 					Author:     "admin",
 					State:      models.OpenPullState,
 					BaseRepo:   expRepo,
-				})
+				}).Return(nil)
+
+			// Send the request.
+			w := httptest.NewRecorder()
+			ec.Post(w, req)
+
+			// Make our assertions.
+			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 		})
 	}
 }
@@ -971,33 +977,35 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 				When(gl.ParseAndValidate(req, secret)).ThenReturn(event, nil)
 				repo = models.Repo{}
 				pullRequest = models.PullRequest{State: models.ClosedPullState}
-				When(p.ParseGitlabMergeRequestEvent(event)).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+				p.EXPECT().ParseGitlabMergeRequestEvent(event).Return(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 			case models.Github:
 				req.Header.Set(githubHeader, "pull_request")
 				event := fmt.Sprintf(`{"action": "%s"}`, c.Action)
 				When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
 				repo = models.Repo{}
 				pullRequest = models.PullRequest{State: models.ClosedPullState}
-				When(p.ParseGithubPullEvent(Any[logging.SimpleLogging](), Any[*github.PullRequestEvent]())).ThenReturn(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
+				p.EXPECT().ParseGithubPullEvent(gomock.Any(), gomock.Any()).Return(pullRequest, models.OpenedPullEvent, repo, repo, models.User{}, nil)
 			}
+
+			cr.EXPECT().RunAutoplanCommand(models.Repo{}, models.Repo{}, models.PullRequest{State: models.ClosedPullState}, models.User{})
 
 			w := httptest.NewRecorder()
 			e.Post(w, req)
 			ResponseContains(t, w, http.StatusOK, "Processing...")
-			cr.VerifyWasCalledOnce().RunAutoplanCommand(models.Repo{}, models.Repo{}, models.PullRequest{State: models.ClosedPullState}, models.User{})
 		})
 	}
 }
 
 func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *mocks.MockAzureDevopsRequestValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	v := mocks.NewMockGithubRequestValidator()
 	gl := mocks.NewMockGitlabRequestParserValidator()
 	ado := mocks.NewMockAzureDevopsRequestValidator()
-	p := emocks.NewMockEventParsing()
-	cp := emocks.NewMockCommentParsing()
-	cr := emocks.NewMockCommandRunner()
-	c := emocks.NewMockPullCleaner()
+	p := emocks.NewMockEventParsing(gmockCtrl)
+	cp := emocks.NewMockCommentParsing(gmockCtrl)
+	cr := emocks.NewMockCommandRunner(gmockCtrl)
+	c := emocks.NewMockPullCleaner(gmockCtrl)
 	vcsmock := vcsmocks.NewMockClient()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
 	Ok(t, err)
