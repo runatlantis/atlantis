@@ -101,12 +101,6 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	if p.DiscardApprovalOnPlan {
-		if err := p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
-			ctx.Log.Err("failed to remove approvals: %s", err)
-		}
-	}
-
 	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
@@ -139,6 +133,12 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
 		return
+	}
+
+	if p.DiscardApprovalOnPlan {
+		if err := p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
+			ctx.Log.Err("failed to remove approvals: %s", err)
+		}
 	}
 
 	// discard previous plans that might not be relevant anymore
