@@ -117,8 +117,7 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		code = http.StatusInternalServerError
 	}
 
-	// TODO: make a better response
-	response, err := json.Marshal(result)
+	response, err := json.Marshal(toAPIResult(result))
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
@@ -159,7 +158,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		code = http.StatusInternalServerError
 	}
 
-	response, err := json.Marshal(result)
+	response, err := json.Marshal(toAPIResult(result))
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
@@ -181,6 +180,67 @@ type LockDetail struct {
 
 type ListLocksResult struct {
 	Locks []LockDetail
+}
+
+// APIProjectResult is the API response version of command.ProjectResult
+// with Error as a string for proper JSON serialization.
+type APIProjectResult struct {
+	Error              string                     `json:"Error,omitempty"`
+	Failure            string                     `json:"Failure,omitempty"`
+	PlanSuccess        *models.PlanSuccess        `json:"PlanSuccess,omitempty"`
+	PolicyCheckResults *models.PolicyCheckResults `json:"PolicyCheckResults,omitempty"`
+	ApplySuccess       string                     `json:"ApplySuccess,omitempty"`
+	VersionSuccess     string                     `json:"VersionSuccess,omitempty"`
+	ImportSuccess      *models.ImportSuccess      `json:"ImportSuccess,omitempty"`
+	StateRmSuccess     *models.StateRmSuccess     `json:"StateRmSuccess,omitempty"`
+	Command            string                     `json:"Command"`
+	SubCommand         string                     `json:"SubCommand,omitempty"`
+	RepoRelDir         string                     `json:"RepoRelDir"`
+	Workspace          string                     `json:"Workspace"`
+	ProjectName        string                     `json:"ProjectName,omitempty"`
+}
+
+// APIResult is the API response version of command.Result
+// with Error fields as strings for proper JSON serialization.
+type APIResult struct {
+	Error          string             `json:"Error,omitempty"`
+	Failure        string             `json:"Failure,omitempty"`
+	ProjectResults []APIProjectResult `json:"ProjectResults"`
+	PlansDeleted   bool               `json:"PlansDeleted"`
+}
+
+// toAPIResult converts a command.Result to an APIResult for JSON serialization.
+// This ensures that error values are properly serialized as strings.
+func toAPIResult(result *command.Result) APIResult {
+	apiResult := APIResult{
+		Failure:        result.Failure,
+		PlansDeleted:   result.PlansDeleted,
+		ProjectResults: make([]APIProjectResult, 0, len(result.ProjectResults)),
+	}
+	if result.Error != nil {
+		apiResult.Error = result.Error.Error()
+	}
+	for _, pr := range result.ProjectResults {
+		apiPr := APIProjectResult{
+			Failure:            pr.Failure,
+			PlanSuccess:        pr.PlanSuccess,
+			PolicyCheckResults: pr.PolicyCheckResults,
+			ApplySuccess:       pr.ApplySuccess,
+			VersionSuccess:     pr.VersionSuccess,
+			ImportSuccess:      pr.ImportSuccess,
+			StateRmSuccess:     pr.StateRmSuccess,
+			Command:            pr.Command.String(),
+			SubCommand:         pr.SubCommand,
+			RepoRelDir:         pr.RepoRelDir,
+			Workspace:          pr.Workspace,
+			ProjectName:        pr.ProjectName,
+		}
+		if pr.Error != nil {
+			apiPr.Error = pr.Error.Error()
+		}
+		apiResult.ProjectResults = append(apiResult.ProjectResults, apiPr)
+	}
+	return apiResult
 }
 
 func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
