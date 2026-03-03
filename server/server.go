@@ -410,9 +410,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			Slack: webhooks.NewSlackClient(userConfig.SlackToken),
 			Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
 		},
+		userConfig.AllowLocalWebhooks,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing webhooks: %w", err)
+	}
+
+	// Log warning if insecure webhook mode is enabled
+	if userConfig.AllowLocalWebhooks {
+		logger.Warn("allow-local-webhooks is enabled - webhook URL validation is relaxed. This should ONLY be used for local development and testing, NEVER in production as it exposes the system to SSRF attacks.")
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient, giteaClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}

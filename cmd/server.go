@@ -158,6 +158,7 @@ const (
 	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
 	TFETokenFlag                     = "tfe-token"
 	WriteGitCredsFlag                = "write-git-creds" // nolint: gosec
+	AllowLocalWebhooksFlag           = "allow-local-webhooks"
 	WebhookHttpHeaders               = "webhook-http-headers"
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
@@ -620,6 +621,12 @@ var boolFlags = map[string]boolFlag{
 	WriteGitCredsFlag: {
 		description: "Write out a .git-credentials file with the provider user and token to allow cloning private modules over HTTPS or SSH." +
 			" This writes secrets to disk and should only be enabled in a secure environment.",
+		defaultValue: false,
+	},
+	AllowLocalWebhooksFlag: {
+		description: "Allow webhook URLs with HTTP scheme and private/local IPs." +
+			" WARNING: This should ONLY be used for local development and testing." +
+			" Enabling this in production exposes the system to SSRF attacks.",
 		defaultValue: false,
 	},
 	SkipCloneNoChanges: {
