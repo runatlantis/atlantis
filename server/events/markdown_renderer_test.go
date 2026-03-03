@@ -442,7 +442,7 @@ policy set: policy2: passed.
 $$$
 * :heavy_check_mark: To **approve** this project, comment:
   $$$shell
-  
+
   $$$
 * :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
@@ -525,7 +525,7 @@ policy set: policy1: requires: 1 approval(s), have: 0.
 $$$
 * :heavy_check_mark: To **approve** this project, comment:
   $$$shell
-  
+
   $$$
 * :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
@@ -1102,7 +1102,7 @@ policy set: policy1: requires: 1 approval(s), have: 0.
 $$$
 * :heavy_check_mark: To **approve** this project, comment:
   $$$shell
-  
+
   $$$
 * :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
@@ -1368,7 +1368,7 @@ policy set: policy2: passed.
 $$$
 * :heavy_check_mark: To **approve** this project, comment:
   $$$shell
-  
+
   $$$
 * :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
@@ -1451,7 +1451,7 @@ policy set: policy1: requires: 1 approval(s), have: 0.
 $$$
 * :heavy_check_mark: To **approve** this project, comment:
   $$$shell
-  
+
   $$$
 * :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
@@ -1606,7 +1606,7 @@ policy set: policy1: requires: 1 approval(s), have: 0.
 $$$
 * :heavy_check_mark: To **approve** this project, comment:
   $$$shell
-  
+
   $$$
 * :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To re-run policies **plan** this project again by commenting:
@@ -1633,6 +1633,376 @@ $$$
 * :repeat: To re-run policies **plan** this project again by commenting:
   $$$shell
   atlantis plan
+  $$$
+`,
+		},
+	}
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		true,       // quietPolicyChecks
+	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info(logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			res := command.Result{
+				ProjectResults: c.ProjectResults,
+			}
+			for _, verbose := range []bool{true, false} {
+				t.Run(c.Description, func(t *testing.T) {
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						SubName: c.SubCommand,
+						Verbose: verbose,
+					}
+					s := r.Render(ctx, res, cmd)
+					if !verbose {
+						Equals(t, normalize(c.Expected), normalize(s))
+					} else {
+						log := fmt.Sprintf("[INFO] %s", logText)
+						Equals(t, normalize(c.Expected+
+							fmt.Sprintf("<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log)), normalize(s))
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestRenderProjectResultsWithQuietPolicyChecksShowsWarnings(t *testing.T) {
+	cases := []struct {
+		Description    string
+		Command        command.Name
+		SubCommand     string
+		ProjectResults []command.ProjectResult
+		VCSHost        models.VCSHostType
+		Expected       string
+	}{
+		{
+			"successful policy check with warnings should be shown when quiet policy checks enabled",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "5 tests, 4 passed, 1 warning, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+						},
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+5 tests, 4 passed, 1 warning, 0 failures, 0 exceptions
+$$$
+
+
+* :arrow_forward: To **apply** this plan, comment:
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"successful policy check without warnings should be hidden when quiet policy checks enabled",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "5 tests, 5 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+						},
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "5 tests, 5 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							},
+							LockURL:   "lock-url2",
+							RePlanCmd: "atlantis plan -d path2 -w workspace",
+							ApplyCmd:  "atlantis apply -d path2 -w workspace",
+						},
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for 2 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. project: $projectname$ dir: $path2$ workspace: $workspace$
+---
+
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"multiple projects - one with warnings shown, one without warnings hidden",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							},
+							LockURL:   "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 3 passed, 1 warning, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							},
+							LockURL:   "lock-url2",
+							ApplyCmd:  "atlantis apply -d path2 -w workspace",
+							RePlanCmd: "atlantis plan -d path2 -w workspace",
+						},
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for 2 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. project: $projectname$ dir: $path2$ workspace: $workspace$
+---
+
+### 2. project: $projectname$ dir: $path2$ workspace: $workspace$
+#### Policy Set: $policy1$
+$$$diff
+4 tests, 3 passed, 1 warning, 0 failures, 0 exceptions
+$$$
+
+
+* :arrow_forward: To **apply** this plan, comment:
+  $$$shell
+  atlantis apply -d path2 -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url2)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path2 -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"WARN prefix should be shown when quiet policy checks enabled",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "WARN - some warning message about the policy",
+									Passed:        true,
+								},
+							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+						},
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+WARN - some warning message about the policy
+$$$
+
+
+* :arrow_forward: To **apply** this plan, comment:
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"JSON format warnings should be shown when quiet policy checks enabled",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  `{"warnings": ["some warning message"]}`,
+									Passed:        true,
+								},
+							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+						},
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+{"warnings": ["some warning message"]}
+$$$
+
+
+* :arrow_forward: To **apply** this plan, comment:
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
   $$$
 `,
 		},

@@ -582,7 +582,7 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {
-		description:  "Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings.",
+		description:  "Exclude policy check comments from pull requests unless there's a failure or warning from conftest.",
 		defaultValue: false,
 	},
 	RedisTLSEnabled: {
