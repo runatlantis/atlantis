@@ -1051,6 +1051,25 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
+func TestRunAutoplanCommand_DiscardApprovals(t *testing.T) {
+	vcsClient := setup(t, func(testConfig *TestConfig) {
+		testConfig.discardApprovalOnPlan = true
+	})
+
+	tmp := t.TempDir()
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
+	Ok(t, err)
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
+
+	testdata.Pull.BaseRepo = testdata.GithubRepo
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
+	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+}
+
 func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	vcsClient := setup(t, func(testConfig *TestConfig) {
 		testConfig.discardApprovalOnPlan = true
