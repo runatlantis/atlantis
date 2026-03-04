@@ -439,3 +439,100 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 		})
 	}
 }
+
+func TestApprovalCount_ValidateApplyProject(t *testing.T) {
+	repoDir := "repoDir"
+	tests := []struct {
+		name        string
+		ctx         command.ProjectContext
+		wantFailure string
+		wantErr     assert.ErrorAssertionFunc
+	}{
+		{
+			name: "pass approved:1 with 1 approval",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{"approved:1"},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: true, NumApprovals: 1},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "pass approved:2 with 2 approvals",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{"approved:2"},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: true, NumApprovals: 2},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "pass approved:2 with 3 approvals",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{"approved:2"},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: true, NumApprovals: 3},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "fail approved:2 with 1 approval",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{"approved:2"},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: true, NumApprovals: 1},
+				},
+			},
+			wantFailure: "Pull request requires 2 approval(s) but only has 1 before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "fail approved:3 with 0 approvals",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{"approved:3"},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: false, NumApprovals: 0},
+				},
+			},
+			wantFailure: "Pull request must be approved according to the project's approval rules before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "fail invalid approved format",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{"approved:abc"},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: true, NumApprovals: 1},
+				},
+			},
+			wantFailure: "Invalid approval requirement format: approved:abc",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "fail approved:0",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{"approved:0"},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: true, NumApprovals: 1},
+				},
+			},
+			wantFailure: "Invalid approval requirement format: approved:0",
+			wantErr:     assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			workingDir := mocks.NewMockWorkingDir()
+			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
+			gotFailure, err := a.ValidateApplyProject(repoDir, tt.ctx)
+			if !tt.wantErr(t, err, fmt.Sprintf("ValidateApplyProject(%v, %v)", repoDir, tt.ctx)) {
+				return
+			}
+			assert.Equalf(t, tt.wantFailure, gotFailure, "ValidateApplyProject(%v, %v)", repoDir, tt.ctx)
+		})
+	}
+}

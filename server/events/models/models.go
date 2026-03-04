@@ -148,6 +148,7 @@ type ApprovalStatus struct {
 	IsApproved bool
 	ApprovedBy string
 	Date       time.Time
+	NumApprovals int
 }
 
 type MergeableStatus struct {

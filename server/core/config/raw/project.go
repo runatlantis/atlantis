@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -22,6 +23,7 @@ const (
 	ApprovedRequirement   = "approved"
 	MergeableRequirement  = "mergeable"
 	UnDivergedRequirement = "undiverged"
+	ApprovedRequirementPrefix = "approved:"
 )
 
 type Project struct {
@@ -206,8 +208,8 @@ func validProjectName(name string) bool {
 func validPlanReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
-		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
-			return fmt.Errorf("%q is not a valid plan_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
+		if !isValidRequirement(r) {
+			return fmt.Errorf("%q is not a valid plan_requirement, only %q, %q, %q and %q are supported", r, ApprovedRequirement, ApprovedRequirementPrefix+"N", MergeableRequirement, UnDivergedRequirement)
 		}
 	}
 	return nil
@@ -216,8 +218,8 @@ func validPlanReq(value any) error {
 func validApplyReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
-		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
-			return fmt.Errorf("%q is not a valid apply_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
+		if !isValidRequirement(r) {
+			return fmt.Errorf("%q is not a valid apply_requirement, only %q, %q, %q and %q are supported", r, ApprovedRequirement, ApprovedRequirementPrefix+"N", MergeableRequirement, UnDivergedRequirement)
 		}
 	}
 	return nil
@@ -226,11 +228,25 @@ func validApplyReq(value any) error {
 func validImportReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
-		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
-			return fmt.Errorf("%q is not a valid import_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
+		if !isValidRequirement(r) {
+			return fmt.Errorf("%q is not a valid import_requirement, only %q, %q, %q and %q are supported", r, ApprovedRequirement, ApprovedRequirementPrefix+"N", MergeableRequirement, UnDivergedRequirement)
 		}
 	}
 	return nil
+}
+
+func isValidRequirement(r string) bool {
+	if r == ApprovedRequirement || r == MergeableRequirement || r == UnDivergedRequirement {
+		return true
+	}
+	// Check if it's approved:N format
+	if strings.HasPrefix(r, ApprovedRequirementPrefix) {
+		numStr := strings.TrimPrefix(r, ApprovedRequirementPrefix)
+		if num, err := strconv.Atoi(numStr); err == nil && num > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func validDistribution(value any) error {
