@@ -112,31 +112,32 @@ type UserConfig struct {
 	SilenceVCSStatusNoPlans bool `mapstructure:"silence-vcs-status-no-plans"`
 	// SilenceVCSStatusNoProjects is whether autoplan should set commit status if no projects
 	// are found.
-	SilenceVCSStatusNoProjects bool            `mapstructure:"silence-vcs-status-no-projects"`
-	SilenceAllowlistErrors     bool            `mapstructure:"silence-allowlist-errors"`
-	SkipCloneNoChanges         bool            `mapstructure:"skip-clone-no-changes"`
-	SlackToken                 string          `mapstructure:"slack-token"`
-	SSLCertFile                string          `mapstructure:"ssl-cert-file"`
-	SSLKeyFile                 string          `mapstructure:"ssl-key-file"`
-	RestrictFileList           bool            `mapstructure:"restrict-file-list"`
-	TFDistribution             string          `mapstructure:"tf-distribution"` // deprecated in favor of DefaultTFDistribution
-	TFDownload                 bool            `mapstructure:"tf-download"`
-	TFDownloadURL              string          `mapstructure:"tf-download-url"`
-	TFEHostname                string          `mapstructure:"tfe-hostname"`
-	TFELocalExecutionMode      bool            `mapstructure:"tfe-local-execution-mode"`
-	TFEToken                   string          `mapstructure:"tfe-token"`
-	VarFileAllowlist           string          `mapstructure:"var-file-allowlist"`
-	VCSStatusName              string          `mapstructure:"vcs-status-name"`
-	DefaultTFDistribution      string          `mapstructure:"default-tf-distribution"`
-	DefaultTFVersion           string          `mapstructure:"default-tf-version"`
-	Webhooks                   []WebhookConfig `mapstructure:"webhooks" flag:"false"`
-	WebhookHttpHeaders         string          `mapstructure:"webhook-http-headers"`
-	WebBasicAuth               bool            `mapstructure:"web-basic-auth"`
-	WebUsername                string          `mapstructure:"web-username"`
-	WebPassword                string          `mapstructure:"web-password"`
-	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
-	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
-	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
+	SilenceVCSStatusNoProjects     bool            `mapstructure:"silence-vcs-status-no-projects"`
+	SilenceAllowlistErrors         bool            `mapstructure:"silence-allowlist-errors"`
+	SkipCloneNoChanges             bool            `mapstructure:"skip-clone-no-changes"`
+	SkipWorkingDirDeletionOnUnlock bool            `mapstructure:"skip-working-dir-deletion-on-unlock"`
+	SlackToken                     string          `mapstructure:"slack-token"`
+	SSLCertFile                    string          `mapstructure:"ssl-cert-file"`
+	SSLKeyFile                     string          `mapstructure:"ssl-key-file"`
+	RestrictFileList               bool            `mapstructure:"restrict-file-list"`
+	TFDistribution                 string          `mapstructure:"tf-distribution"` // deprecated in favor of DefaultTFDistribution
+	TFDownload                     bool            `mapstructure:"tf-download"`
+	TFDownloadURL                  string          `mapstructure:"tf-download-url"`
+	TFEHostname                    string          `mapstructure:"tfe-hostname"`
+	TFELocalExecutionMode          bool            `mapstructure:"tfe-local-execution-mode"`
+	TFEToken                       string          `mapstructure:"tfe-token"`
+	VarFileAllowlist               string          `mapstructure:"var-file-allowlist"`
+	VCSStatusName                  string          `mapstructure:"vcs-status-name"`
+	DefaultTFDistribution          string          `mapstructure:"default-tf-distribution"`
+	DefaultTFVersion               string          `mapstructure:"default-tf-version"`
+	Webhooks                       []WebhookConfig `mapstructure:"webhooks" flag:"false"`
+	WebhookHttpHeaders             string          `mapstructure:"webhook-http-headers"`
+	WebBasicAuth                   bool            `mapstructure:"web-basic-auth"`
+	WebUsername                    string          `mapstructure:"web-username"`
+	WebPassword                    string          `mapstructure:"web-password"`
+	WriteGitCreds                  bool            `mapstructure:"write-git-creds"`
+	WebsocketCheckOrigin           bool            `mapstructure:"websocket-check-origin"`
+	UseTFPluginCache               bool            `mapstructure:"use-tf-plugin-cache"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName
