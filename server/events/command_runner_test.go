@@ -1071,6 +1071,12 @@ func TestRunAutoplanCommand_DiscardApprovals(t *testing.T) {
 				CommandName: command.Plan,
 			},
 		}, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{},
+		})
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).
+		ThenReturn(tmp, nil)
 
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
