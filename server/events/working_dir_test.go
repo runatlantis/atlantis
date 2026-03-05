@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -820,6 +822,57 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	wd.CheckoutMerge = false
 	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default")
 	Equals(t, hasDiverged, false)
+}
+
+func TestHasDiverged_ConcurrentCalls(t *testing.T) {
+	remoteRepo := initRepo(t)
+
+	dataDir := t.TempDir()
+	clonedRepo := filepath.Join(dataDir, "repos/0/default")
+
+	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, dataDir, "git", "clone", remoteRepo, clonedRepo)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", remoteRepo),
+		GpgNoSigningEnabled:         true,
+	}
+
+	loops := 100
+	hasDivergedPerLoop := 2
+	var wg sync.WaitGroup
+	wg.Add(loops * hasDivergedPerLoop)
+
+	var sawWarn atomic.Bool
+
+	checkHasDiverged := func() {
+		defer wg.Done()
+		// Each goroutine gets its own logger to avoid data races on the
+		// shared bytes.Buffer backing logger history.
+		logger := logging.NewNoopLogger(t).WithHistory()
+		wd.HasDiverged(logger, clonedRepo)
+		if strings.Contains(logger.GetHistory(), "[WARN]") {
+			sawWarn.Store(true)
+		}
+	}
+
+	runCmd(t, clonedRepo, "touch", "local-file")
+	runCmd(t, clonedRepo, "git", "add", "local-file")
+	runCmd(t, clonedRepo, "git", "commit", "-m", "Adding local file")
+
+	for i := range loops {
+		go checkHasDiverged()
+		go checkHasDiverged()
+		remoteFile := fmt.Sprintf("remote-file-%d.txt", i)
+		runCmd(t, remoteRepo, "touch", remoteFile)
+		runCmd(t, remoteRepo, "git", "add", remoteFile)
+		runCmd(t, remoteRepo, "git", "commit", "-m", "Adding remote file")
+	}
+
+	wg.Wait()
+	Assert(t, !sawWarn.Load(), "warning occurred while checking HasDiverged")
 }
 
 func initRepo(t *testing.T) string {
