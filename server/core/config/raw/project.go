@@ -96,6 +96,18 @@ func (p Project) Validate() error {
 		return nil
 	}
 
+	validWorkspace := func(value any) error {
+		strPtr := value.(*string)
+		if strPtr == nil || *strPtr == "" {
+			return nil
+		}
+		ws := *strPtr
+		if strings.Contains(ws, "..") || strings.HasPrefix(ws, "/") {
+			return errors.New("cannot contain '..' or begin with '/'")
+		}
+		return nil
+	}
+
 	// Validate that name doesn't contain glob patterns - glob expansion only works for 'dir'
 	if p.Name != nil && ContainsGlobPattern(*p.Name) {
 		return errors.New("name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field")
@@ -109,6 +121,7 @@ func (p Project) Validate() error {
 
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Dir, validation.Required, validation.By(validDir)),
+		validation.Field(&p.Workspace, validation.By(validWorkspace)),
 		validation.Field(&p.PlanRequirements, validation.By(validPlanReq)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&p.ImportRequirements, validation.By(validImportReq)),

@@ -418,6 +418,30 @@ func TestProject_Validate(t *testing.T) {
 			},
 			expErr: "",
 		},
+		{
+			description: "workspace with ..",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("../evil"),
+			},
+			expErr: "workspace: cannot contain '..' or begin with '/'.",
+		},
+		{
+			description: "workspace beginning with /",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("/etc"),
+			},
+			expErr: "workspace: cannot contain '..' or begin with '/'.",
+		},
+		{
+			description: "valid workspace",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("my-workspace"),
+			},
+			expErr: "",
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {
