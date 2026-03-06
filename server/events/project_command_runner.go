@@ -514,8 +514,12 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		} else {
 			// Using a policy tool other than Conftest, manually building result struct
 			policySetName := "Custom"
+			policyItemRegex := ctx.PolicySets.PolicyItemRegex
+			approveCount := 1
 			if index < len(inputPolicySets) {
 				policySetName = inputPolicySets[index].Name
+				policyItemRegex = inputPolicySets[index].PolicyItemRegex
+				approveCount = inputPolicySets[index].ApproveCount
 			}
 
 			// Handle empty output: treat as failure since it likely indicates misconfiguration
@@ -537,14 +541,18 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 				policyOutput = output
 			}
 
-			policySetResults = append(policySetResults,
-				*models.NewPolicySetResult(
-					policySetName,
-					policyOutput,
-					passed,
-					1,
-					ctx.PolicySets.PolicyItemRegex,
-				))
+			result, regexErr := models.NewPolicySetResult(
+				policySetName,
+				policyOutput,
+				passed,
+				approveCount,
+				policyItemRegex,
+			)
+			if regexErr != nil {
+				ctx.Log.Err("invalid policy_item_regex for policy set %q: %v", policySetName, regexErr)
+				continue
+			}
+			policySetResults = append(policySetResults, *result)
 			preConftestOutput = append(preConftestOutput, "")
 		}
 	}

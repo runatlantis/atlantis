@@ -16,8 +16,10 @@ const (
 )
 
 // DefaultPolicyItemRegex matches all lines in the policy output.
-// This is conservative, as it requires the entire output to match in order to preserve approvals.
-// If all failures stayed the same, but one dropped off, then the approval would be lost.
+// An approval carries over when every currently extracted item was present at
+// approval time (i.e. current items are a subset of the approved items).
+// With this default, any new or changed line invalidates the approval, but
+// removing a line (e.g. fixing a failure) preserves it.
 // Override this value for more specific matching.
 const DefaultPolicyItemRegex = `.*`
 
