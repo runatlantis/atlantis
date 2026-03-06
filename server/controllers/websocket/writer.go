@@ -12,20 +12,10 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-func NewWriter(log logging.SimpleLogging, checkOrigin bool) *Writer {
-	upgrader := websocket.Upgrader{
-		CheckOrigin: checkOriginFunc(checkOrigin),
-	}
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-	return &Writer{
-		upgrader: upgrader,
-		log:      log,
-	}
-}
-
 type Writer struct {
-	upgrader websocket.Upgrader
-	log      logging.SimpleLogging
+	upgrader     websocket.Upgrader
+	log          logging.SimpleLogging
+	messageDelay time.Duration
 }
 
 func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan string) error {
@@ -48,14 +38,16 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 	}()
 
 	// Block on reading our input channel.
-	// Add small delay between messages to work around GCP HTTP(S) LB
-	// buffering issues with rapid WebSocket frames.
+	// If configured, add a small delay between messages to work around
+	// buffering issues with HTTP(S) load balancers (e.g. GCP ALB).
 	for msg := range input {
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte("\r"+msg+"\n")); err != nil {
 			w.log.Warn("Failed to write ws message: %s", err)
 			return err
 		}
-		time.Sleep(time.Millisecond)
+		if w.messageDelay > 0 {
+			time.Sleep(w.messageDelay)
+		}
 	}
 
 	return nil

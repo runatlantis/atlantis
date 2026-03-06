@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -136,6 +137,7 @@ type UserConfig struct {
 	WebPassword                string          `mapstructure:"web-password"`
 	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
+	WebsocketMessageDelay      time.Duration   `mapstructure:"websocket-message-delay"`
 	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
 }
 
