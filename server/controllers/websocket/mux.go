@@ -76,10 +76,8 @@ func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 	// TODO: make buffer size configurable
 	buffer := make(chan string, 1000)
 
-	// Register synchronously to ensure all buffered data is written to channel
-	// before Write starts reading. This prevents race condition where Write
-	// might miss data if Register closes the channel too quickly.
-	m.registry.Register(key, buffer)
+	// spinning up a goroutine for this since we are attempting to block on the read side.
+	go m.registry.Register(key, buffer)
 
 	defer m.registry.Deregister(key, buffer)
 
