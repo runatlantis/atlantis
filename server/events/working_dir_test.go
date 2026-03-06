@@ -858,6 +858,9 @@ func TestHasDiverged_ConcurrentCalls(t *testing.T) {
 		}
 	}
 
+	runCmd(t, clonedRepo, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, clonedRepo, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, clonedRepo, "git", "config", "--local", "commit.gpgsign", "false")
 	runCmd(t, clonedRepo, "touch", "local-file")
 	runCmd(t, clonedRepo, "git", "add", "local-file")
 	runCmd(t, clonedRepo, "git", "commit", "-m", "Adding local file")
