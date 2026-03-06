@@ -163,15 +163,17 @@ func TestRun(t *testing.T) {
 	workdir := t.TempDir()
 
 	policySet1 := valid.PolicySet{
-		Source: valid.LocalPolicySet,
-		Path:   policySetPath1,
-		Name:   policySetName1,
+		Source:          valid.LocalPolicySet,
+		Path:            policySetPath1,
+		Name:            policySetName1,
+		PolicyItemRegex: valid.DefaultPolicyItemRegex,
 	}
 
 	policySet2 := valid.PolicySet{
-		Source: valid.LocalPolicySet,
-		Path:   policySetPath2,
-		Name:   policySetName2,
+		Source:          valid.LocalPolicySet,
+		Path:            policySetPath2,
+		Name:            policySetName2,
+		PolicyItemRegex: valid.DefaultPolicyItemRegex,
 	}
 
 	ctx := command.ProjectContext{

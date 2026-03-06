@@ -23,6 +23,7 @@ func (p PolicySets) Validate() error {
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Version, validation.By(VersionValidator)),
 		validation.Field(&p.PolicySets, validation.Required.Error("cannot be empty; Declare policies that you would like to enforce")),
+		validation.Field(&p.PolicyItemRegex, validation.By(RegexValidator)),
 	)
 }
 
@@ -105,6 +106,7 @@ func (p PolicySet) Validate() error {
 		validation.Field(&p.ApproveCount),
 		validation.Field(&p.Path, validation.Required.Error("is required")),
 		validation.Field(&p.Source, validation.In(valid.LocalPolicySet, valid.GithubPolicySet).Error("only 'local' and 'github' source types are supported")),
+		validation.Field(&p.PolicyItemRegex, validation.By(RegexValidator)),
 	)
 }
 

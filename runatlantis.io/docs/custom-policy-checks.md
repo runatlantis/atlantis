@@ -4,6 +4,10 @@ If you want to run custom policy tools or scripts instead of the built-in Confte
 
 This option can be configured either at the server-level in a [repos.yaml config file](server-configuration.md) or at the repo-level in an [atlantis.yaml file](repo-level-atlantis-yaml.md).
 
+::: tip
+Custom policy checks fully support [sticky policy approvals](policy-checking.md#sticky-policy-approvals). When `sticky_policy_approvals` is enabled, approvals survive re-plans as long as the current policy output items (as matched by `policy_item_regex`) are covered by the previously approved snapshot. Adding or changing items invalidates approvals, but removing items (e.g. fixing violations) preserves them. This is particularly useful with custom tools whose output format may differ from Conftest -- use `policy_item_regex` to target the meaningful failure lines in your tool's output.
+:::
+
 ## Server-side config example
 
 Set the `policy_check` and `custom_policy_check` options to true, and run the custom tool in the policy check steps as seen below.

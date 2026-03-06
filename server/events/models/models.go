@@ -391,8 +391,11 @@ type PlanSuccess struct {
 	MergedAgain bool
 }
 
-func NewPolicySetResult(policySetName string, policyOutput string, passed bool, reqApprovalCount int, policyItemRegex string) *PolicySetResult {
-	re := regexp.MustCompile(policyItemRegex)
+func NewPolicySetResult(policySetName string, policyOutput string, passed bool, reqApprovalCount int, policyItemRegex string) (*PolicySetResult, error) {
+	re, err := regexp.Compile(policyItemRegex)
+	if err != nil {
+		return nil, fmt.Errorf("compiling policy_item_regex %q for policy set %q: %w", policyItemRegex, policySetName, err)
+	}
 	matches := re.FindAllStringSubmatch(policyOutput, -1)
 	hashes := []string{}
 	for _, match := range matches {
@@ -404,7 +407,7 @@ func NewPolicySetResult(policySetName string, policyOutput string, passed bool, 
 		Passed:           passed,
 		ReqApprovalCount: reqApprovalCount,
 		Hashes:           hashes,
-	}
+	}, nil
 }
 
 type PolicySetResult struct {
@@ -460,8 +463,8 @@ func (pss *PolicySetStatus) GetCurApprovals() int {
 
 func (pss *PolicySetStatus) OwnerHasFullyApproved(owner string) bool {
 	for _, approval := range pss.Approvals {
-		if approval.Approver == owner {
-			return ApprovalCoversAllHashes(approval.Hashes, pss.Hashes)
+		if approval.Approver == owner && ApprovalCoversAllHashes(approval.Hashes, pss.Hashes) {
+			return true
 		}
 	}
 	return false
@@ -613,14 +616,17 @@ func (p *PolicySetResult) GetCurApprovals() int {
 	return n
 }
 
-func (p *PolicySetResult) PolicySetHashes(PolicyItemRegex string) []string {
+func (p *PolicySetResult) PolicySetHashes(policyItemRegex string) ([]string, error) {
+	re, err := regexp.Compile(policyItemRegex)
+	if err != nil {
+		return nil, fmt.Errorf("compiling policy_item_regex %q: %w", policyItemRegex, err)
+	}
 	hashes := []string{}
-	re := regexp.MustCompile(PolicyItemRegex)
 	matches := re.FindAllStringSubmatch(p.PolicyOutput, -1)
 	for _, match := range matches {
 		hashes = append(hashes, match[0])
 	}
-	return hashes
+	return hashes, nil
 }
 
 type VersionSuccess struct {
