@@ -201,8 +201,16 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 			// temp dir.
 			Equals(t, c.ExpDescription, desc)
 			expOut := strings.ReplaceAll(c.ExpOut, "$DIR", tmpDir)
+			lines := strings.Split(expOut, "\n")
+			for i, line := range lines {
+				if i == len(lines)-1 && line == "" {
+					continue
+				}
+				projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
+					Any[models.WorkflowHookCommandContext](), Eq(line), Eq(false))
+			}
 			projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
-				Any[models.WorkflowHookCommandContext](), Eq(expOut), Eq(false))
+				Any[models.WorkflowHookCommandContext](), Eq(""), Eq(true))
 		})
 	}
 }

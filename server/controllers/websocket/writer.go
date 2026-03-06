@@ -39,7 +39,8 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 
 	// Block on reading our input channel.
 	// If configured, add a small delay between messages to work around
-	// buffering issues with HTTP(S) load balancers (e.g. GCP ALB).
+	// buffering issues with Layer 7 load balancers (e.g. GCP HTTP(S) Load
+	// Balancer, AWS Application Load Balancer).
 	for msg := range input {
 		if err := conn.WriteMessage(websocket.BinaryMessage, []byte("\r"+msg+"\n")); err != nil {
 			w.log.Warn("Failed to write ws message: %s", err)
