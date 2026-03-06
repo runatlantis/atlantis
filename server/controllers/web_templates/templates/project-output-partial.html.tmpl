@@ -1,0 +1,108 @@
+<!-- Stats row - out-of-band swap -->
+<div class="run-stats-row" id="output-stats" hx-swap-oob="true">
+  <div class="run-stat">
+    <span class="run-stat-label">Workspace</span>
+    <span class="run-stat-value"><span class="badge">{{ .Workspace }}</span></span>
+  </div>
+  <div class="run-stat">
+    <span class="run-stat-label">Command</span>
+    <span class="run-stat-value">{{ .CommandName }}</span>
+  </div>
+  <div class="run-stat">
+    <span class="run-stat-label">Triggered By</span>
+    <span class="run-stat-value">{{ if .TriggeredBy }}{{ .TriggeredBy }}{{ else }}-{{ end }}</span>
+  </div>
+  <div class="run-stat">
+    <span class="run-stat-label">Duration</span>
+    <span class="run-stat-value">{{ if .Duration }}{{ .Duration }}{{ else }}-{{ end }}</span>
+  </div>
+  <div class="run-stat">
+    <span class="run-stat-label">Changes</span>
+    <span class="run-stat-value resource-changes">
+      {{ if gt .AddCount 0 }}<span class="text-success">+{{ .AddCount }}</span>{{ end }}
+      {{ if gt .ChangeCount 0 }}<span class="text-warning">~{{ .ChangeCount }}</span>{{ end }}
+      {{ if gt .DestroyCount 0 }}<span class="text-danger">-{{ .DestroyCount }}</span>{{ end }}
+      {{ if gt .ImportCount 0 }}<span class="text-success">{{ .ImportCount }} import</span>{{ end }}
+      {{ if and (eq .AddCount 0) (eq .ChangeCount 0) (eq .DestroyCount 0) (eq .ImportCount 0) }}<span class="text-muted">No changes</span>{{ end }}
+    </span>
+  </div>
+  <div class="run-stat">
+    <span class="run-stat-label">Policy</span>
+    <span class="run-stat-value">
+      {{ if .HasPolicyCheck }}
+        {{ if .PolicyPassed }}
+        <i data-lucide="shield-check" class="icon-sm text-success" title="Policy passed"></i>
+        {{ else }}
+        <i data-lucide="shield-x" class="icon-sm text-danger" title="Policy failed"></i>
+        {{ end }}
+      {{ else }}
+        <i data-lucide="shield" class="icon-sm text-muted" title="No policy check"></i>
+      {{ end }}
+    </span>
+  </div>
+</div>
+
+<!-- Error section - out-of-band swap -->
+<div id="output-error" hx-swap-oob="true">
+{{ if .Error }}
+<div class="output-section output-section--error" x-data="{ expanded: true }">
+  <button
+    class="output-section-header output-section-header--clickable"
+    @click="expanded = !expanded"
+    :aria-expanded="expanded"
+  >
+    <span class="output-section-title">
+      <i data-lucide="chevron-right" class="icon-sm collapse-chevron" :class="{ 'collapse-chevron--open': expanded }"></i>
+      <i data-lucide="alert-triangle" class="icon-sm text-danger"></i>
+      <span>Error</span>
+    </span>
+  </button>
+  <div class="output-section-content" x-show="expanded">
+    <pre class="alert-pre">{{ .Error }}</pre>
+  </div>
+</div>
+{{ end }}
+</div>
+
+<!-- Policy section - out-of-band swap -->
+<div id="output-policy" hx-swap-oob="true">
+{{ if .PolicyOutput }}
+<div class="output-section" x-data="{ expanded: true }">
+  <button
+    class="output-section-header output-section-header--clickable"
+    @click="expanded = !expanded"
+    :aria-expanded="expanded"
+  >
+    <span class="output-section-title">
+      <i data-lucide="chevron-right" class="icon-sm collapse-chevron" :class="{ 'collapse-chevron--open': expanded }"></i>
+      <i data-lucide="shield" class="icon-sm"></i>
+      <span>Policy Check Output</span>
+    </span>
+    <span class="status-badge status-badge--{{ if .PolicyPassed }}success{{ else }}failed{{ end }}">
+      {{ if .PolicyPassed }}<i data-lucide="check-circle" class="icon-xs"></i> Passed{{ else }}<i data-lucide="x-circle" class="icon-xs"></i> Failed{{ end }}
+    </span>
+  </button>
+  <div class="output-section-content" x-show="expanded">
+    <pre class="policy-output">{{ .PolicyOutput }}</pre>
+  </div>
+</div>
+{{ end }}
+</div>
+
+<!-- Output content - main swap target -->
+{{ if .Output }}
+<div id="output-terminal" class="output-terminal"></div>
+<div id="output-data" hidden>{{ .OutputScriptData }}</div>
+{{ else if eq .Status "pending" }}
+<div class="output-pending-state">
+  <i data-lucide="loader-2" class="output-pending-spinner"></i>
+  <h3>Command is still running...</h3>
+  <p><a href="">Refresh</a> to check for updates.</p>
+</div>
+{{ else }}
+<div class="empty-state" style="padding: 40px;">
+  <i data-lucide="file-x" class="empty-state-icon"></i>
+  <h3>No Output Available</h3>
+  <p>Output may not have been captured for this command.</p>
+</div>
+{{ end }}

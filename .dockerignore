@@ -1,6 +1,7 @@
 *
 !cmd/
 !scripts/download-release.sh
+!scripts/seed-db/
 !server/
 !testdrive/
 !main.go

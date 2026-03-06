@@ -33,6 +33,8 @@ type JobIDInfo struct {
 	Time           time.Time
 	TimeFormatted  string
 	JobStep        string
+	CompletedAt    time.Time // Zero value if still running
+	TriggeredBy    string    // Username who triggered the job
 }
 
 type PullInfoWithJobIDs struct {
@@ -45,6 +47,7 @@ type JobInfo struct {
 	HeadCommit     string
 	JobDescription string
 	JobStep        string
+	TriggeredBy    string // Username who triggered the job
 }
 
 type ProjectCmdOutputLine struct {
@@ -79,11 +82,11 @@ type ProjectCommandOutputHandler interface {
 
 	SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool)
 
-	// Register registers a channel and blocks until it is caught up. Callers should call this asynchronously when attempting
-	// to read the channel in the same goroutine
-	Register(jobID string, receiver chan string)
+	// Register registers a channel for live output and returns any buffered lines.
+	// The caller should write the returned lines to the client before reading from the channel.
+	// If complete is true, the job is already done and the channel will not receive further lines.
+	Register(jobID string, receiver chan string) (buffered []string, complete bool)
 
-	// Deregister removes a channel from successive updates and closes it.
 	Deregister(jobID string, receiver chan string)
 
 	IsKeyExists(key string) bool
@@ -96,6 +99,12 @@ type ProjectCommandOutputHandler interface {
 
 	// Returns a map from Pull Requests to Jobs
 	GetPullToJobMapping() []PullInfoWithJobIDs
+
+	// GetProjectOutputBuffer returns the output buffer for a job (for persistence)
+	GetProjectOutputBuffer(jobID string) OutputBuffer
+
+	// GetJobInfo returns the job info for a job ID (for persistence timing)
+	GetJobInfo(jobID string) *JobIDInfo
 }
 
 func NewAsyncProjectCommandOutputHandler(
@@ -154,7 +163,8 @@ func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg 
 				Path:         ctx.RepoRelDir,
 				Workspace:    ctx.Workspace,
 			},
-			JobStep: ctx.CommandName.String(),
+			JobStep:     ctx.CommandName.String(),
+			TriggeredBy: ctx.User.Username,
 		},
 		Line:              msg,
 		OperationComplete: operationComplete,
@@ -179,8 +189,8 @@ func (p *AsyncProjectCommandOutputHandler) SendWorkflowHook(ctx models.WorkflowH
 	}
 }
 
-func (p *AsyncProjectCommandOutputHandler) Register(jobID string, receiver chan string) {
-	p.addChan(receiver, jobID)
+func (p *AsyncProjectCommandOutputHandler) Register(jobID string, receiver chan string) ([]string, bool) {
+	return p.addChan(receiver, jobID)
 }
 
 func (p *AsyncProjectCommandOutputHandler) Handle() {
@@ -190,18 +200,23 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 			continue
 		}
 
-		// Add job to pullToJob mapping
+		// Add job to pullToJob mapping (only on first message per job
+		// to preserve the original start time for duration tracking)
 		if _, ok := p.pullToJobMapping.Load(msg.JobInfo.PullInfo); !ok {
 			p.pullToJobMapping.Store(msg.JobInfo.PullInfo, &sync.Map{})
 		}
 		value, _ := p.pullToJobMapping.Load(msg.JobInfo.PullInfo)
 		jobMapping := value.(*sync.Map)
-		jobMapping.Store(msg.JobID, JobIDInfo{
-			JobID:          msg.JobID,
-			JobDescription: msg.JobInfo.JobDescription,
-			Time:           time.Now(),
-			JobStep:        msg.JobInfo.JobStep,
-		})
+		if _, exists := jobMapping.Load(msg.JobID); !exists {
+			jobMapping.Store(msg.JobID, JobIDInfo{
+				JobID:          msg.JobID,
+				JobIDUrl:       "/jobs/" + msg.JobID,
+				JobDescription: msg.JobInfo.JobDescription,
+				Time:           time.Now(),
+				JobStep:        msg.JobInfo.JobStep,
+				TriggeredBy:    msg.JobInfo.TriggeredBy,
+			})
+		}
 
 		// Forward new message to all receiver channels and output buffer
 		p.writeLogLine(msg.JobID, msg.Line)
@@ -222,6 +237,9 @@ func (p *AsyncProjectCommandOutputHandler) completeJob(jobID string) {
 		p.projectOutputBuffers[jobID] = outputBuffer
 	}
 
+	// Update completion time in job mapping
+	p.setJobCompletionTime(jobID)
+
 	// Close active receiver channels
 	if openChannels, ok := p.receiverBuffers[jobID]; ok {
 		for ch := range openChannels {
@@ -231,44 +249,41 @@ func (p *AsyncProjectCommandOutputHandler) completeJob(jobID string) {
 
 }
 
-func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string) {
+func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string) ([]string, bool) {
+	// Hold both locks to prevent race with completeJob/writeLogLine.
+	// Lock ordering: projectOutputBuffersLock -> receiverBuffersLock
+	// (matches completeJob ordering).
 	p.projectOutputBuffersLock.RLock()
+	p.receiverBuffersLock.Lock()
+
 	outputBuffer := p.projectOutputBuffers[jobID]
+
+	// Snapshot the buffer under locks so the caller can write backfill
+	// directly to the HTTP response without holding any locks.
+	bufferedLines := make([]string, len(outputBuffer.Buffer))
+	copy(bufferedLines, outputBuffer.Buffer)
+	isComplete := outputBuffer.OperationComplete
+
+	if isComplete {
+		// Job already done — close immediately, don't register.
+		close(ch)
+	} else {
+		// Register so future lines are forwarded to this channel.
+		if p.receiverBuffers[jobID] == nil {
+			p.receiverBuffers[jobID] = map[chan string]bool{}
+		}
+		p.receiverBuffers[jobID][ch] = true
+	}
+
+	p.receiverBuffersLock.Unlock()
 	p.projectOutputBuffersLock.RUnlock()
 
-	for _, line := range outputBuffer.Buffer {
-		ch <- line
-	}
-
-	// No need register receiver since all the logs have been streamed
-	if outputBuffer.OperationComplete {
-		close(ch)
-		return
-	}
-
-	// add the channel to our registry after we backfill the contents of the buffer,
-	// to prevent new messages coming in interleaving with this backfill.
-	p.receiverBuffersLock.Lock()
-	if p.receiverBuffers[jobID] == nil {
-		p.receiverBuffers[jobID] = map[chan string]bool{}
-	}
-	p.receiverBuffers[jobID][ch] = true
-	p.receiverBuffersLock.Unlock()
+	return bufferedLines, isComplete
 }
 
-// Add log line to buffer and send to all current channels
+// Add log line to buffer and send to all current channels.
+// Lock ordering: projectOutputBuffersLock -> receiverBuffersLock
 func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line string) {
-	p.receiverBuffersLock.Lock()
-	for ch := range p.receiverBuffers[jobID] {
-		select {
-		case ch <- line:
-		default:
-			// Delete buffered channel if it's blocking.
-			delete(p.receiverBuffers[jobID], ch)
-		}
-	}
-	p.receiverBuffersLock.Unlock()
-
 	p.projectOutputBuffersLock.Lock()
 	if _, ok := p.projectOutputBuffers[jobID]; !ok {
 		p.projectOutputBuffers[jobID] = OutputBuffer{
@@ -278,11 +293,21 @@ func (p *AsyncProjectCommandOutputHandler) writeLogLine(jobID string, line strin
 	outputBuffer := p.projectOutputBuffers[jobID]
 	outputBuffer.Buffer = append(outputBuffer.Buffer, line)
 	p.projectOutputBuffers[jobID] = outputBuffer
-
 	p.projectOutputBuffersLock.Unlock()
+
+	p.receiverBuffersLock.Lock()
+	for ch := range p.receiverBuffers[jobID] {
+		select {
+		case ch <- line:
+		default:
+			close(ch)
+			delete(p.receiverBuffers[jobID], ch)
+			p.logger.Warn("Buffer full, closing connection for job %s", jobID)
+		}
+	}
+	p.receiverBuffersLock.Unlock()
 }
 
-// Remove channel, so client no longer receives Terraform output
 func (p *AsyncProjectCommandOutputHandler) Deregister(jobID string, ch chan string) {
 	p.logger.Debug("Removing channel for %s", jobID)
 	p.receiverBuffersLock.Lock()
@@ -334,6 +359,104 @@ func (p *AsyncProjectCommandOutputHandler) CleanUp(pullInfo PullInfo) {
 	}
 }
 
+// InitTestJob initializes an empty buffer for a test job (for testing)
+func (p *AsyncProjectCommandOutputHandler) InitTestJob(jobID string) {
+	p.projectOutputBuffersLock.Lock()
+	if _, ok := p.projectOutputBuffers[jobID]; !ok {
+		p.projectOutputBuffers[jobID] = OutputBuffer{
+			Buffer: []string{},
+		}
+	}
+	p.projectOutputBuffersLock.Unlock()
+}
+
+// SendTestLine sends a line directly to a job's buffer (for testing)
+func (p *AsyncProjectCommandOutputHandler) SendTestLine(jobID string, line string) {
+	p.InitTestJob(jobID)
+	p.writeLogLine(jobID, line)
+}
+
+// MarkComplete marks a job as complete (for testing)
+func (p *AsyncProjectCommandOutputHandler) MarkComplete(jobID string) {
+	p.projectOutputBuffersLock.Lock()
+	if outputBuffer, ok := p.projectOutputBuffers[jobID]; ok {
+		outputBuffer.OperationComplete = true
+		p.projectOutputBuffers[jobID] = outputBuffer
+	}
+	p.projectOutputBuffersLock.Unlock()
+
+	// Update completion time in job mapping
+	p.setJobCompletionTime(jobID)
+
+	// Close active receiver channels
+	p.receiverBuffersLock.Lock()
+	if openChannels, ok := p.receiverBuffers[jobID]; ok {
+		for ch := range openChannels {
+			close(ch)
+		}
+		delete(p.receiverBuffers, jobID)
+	}
+	p.receiverBuffersLock.Unlock()
+}
+
+// setJobCompletionTime updates the CompletedAt field for a job in the pull mapping
+func (p *AsyncProjectCommandOutputHandler) setJobCompletionTime(jobID string) {
+	completionTime := time.Now()
+	p.pullToJobMapping.Range(func(key, value any) bool {
+		jobIDSyncMap := value.(*sync.Map)
+		if jobInfoValue, ok := jobIDSyncMap.Load(jobID); ok {
+			jobInfo := jobInfoValue.(JobIDInfo)
+			jobInfo.CompletedAt = completionTime
+			jobIDSyncMap.Store(jobID, jobInfo)
+			return false // Found, stop iterating
+		}
+		return true // Continue looking
+	})
+}
+
+// GetJobInfo returns the job info for a job ID
+func (p *AsyncProjectCommandOutputHandler) GetJobInfo(jobID string) *JobIDInfo {
+	var result *JobIDInfo
+	p.pullToJobMapping.Range(func(key, value any) bool {
+		jobIDSyncMap := value.(*sync.Map)
+		if jobInfoValue, ok := jobIDSyncMap.Load(jobID); ok {
+			jobInfo := jobInfoValue.(JobIDInfo)
+			result = &jobInfo
+			return false // Found, stop iterating
+		}
+		return true // Continue looking
+	})
+	return result
+}
+
+// RegisterTestJob initializes a test job with PR association for dev mode testing.
+// This makes the job appear in the jobs list page.
+func (p *AsyncProjectCommandOutputHandler) RegisterTestJob(jobID string, pullInfo PullInfo, jobStep string) {
+	// Initialize output buffer
+	p.projectOutputBuffersLock.Lock()
+	if _, ok := p.projectOutputBuffers[jobID]; !ok {
+		p.projectOutputBuffers[jobID] = OutputBuffer{
+			Buffer: []string{},
+		}
+	}
+	p.projectOutputBuffersLock.Unlock()
+
+	// Register in pullToJobMapping so it appears on jobs list
+	if _, ok := p.pullToJobMapping.Load(pullInfo); !ok {
+		p.pullToJobMapping.Store(pullInfo, &sync.Map{})
+	}
+	value, _ := p.pullToJobMapping.Load(pullInfo)
+	jobMapping := value.(*sync.Map)
+	jobMapping.Store(jobID, JobIDInfo{
+		JobID:          jobID,
+		JobIDUrl:       "/jobs/" + jobID,
+		JobDescription: "Test job",
+		Time:           time.Now(),
+		TimeFormatted:  time.Now().Format("Jan 2, 2006 3:04 PM"),
+		JobStep:        jobStep,
+	})
+}
+
 // NoopProjectOutputHandler is a mock that doesn't do anything
 type NoopProjectOutputHandler struct{}
 
@@ -343,7 +466,9 @@ func (p *NoopProjectOutputHandler) Send(_ command.ProjectContext, _ string, _ bo
 func (p *NoopProjectOutputHandler) SendWorkflowHook(_ models.WorkflowHookCommandContext, _ string, _ bool) {
 }
 
-func (p *NoopProjectOutputHandler) Register(_ string, _ chan string) {}
+func (p *NoopProjectOutputHandler) Register(_ string, _ chan string) ([]string, bool) {
+	return nil, false
+}
 
 func (p *NoopProjectOutputHandler) Deregister(_ string, _ chan string) {}
 
@@ -359,4 +484,12 @@ func (p *NoopProjectOutputHandler) IsKeyExists(_ string) bool {
 
 func (p *NoopProjectOutputHandler) GetPullToJobMapping() []PullInfoWithJobIDs {
 	return []PullInfoWithJobIDs{}
+}
+
+func (p *NoopProjectOutputHandler) GetProjectOutputBuffer(_ string) OutputBuffer {
+	return OutputBuffer{}
+}
+
+func (p *NoopProjectOutputHandler) GetJobInfo(_ string) *JobIDInfo {
+	return nil
 }
