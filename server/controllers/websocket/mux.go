@@ -6,6 +6,7 @@ package websocket
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -42,14 +43,15 @@ func checkOriginFunc(checkOrigin bool) func(r *http.Request) bool {
 	}
 }
 
-func NewMultiplexor(log logging.SimpleLogging, keyGenerator PartitionKeyGenerator, registry PartitionRegistry, checkOrigin bool) *Multiplexor {
+func NewMultiplexor(log logging.SimpleLogging, keyGenerator PartitionKeyGenerator, registry PartitionRegistry, checkOrigin bool, messageDelay time.Duration) *Multiplexor {
 	upgrader := websocket.Upgrader{
 		CheckOrigin: checkOriginFunc(checkOrigin),
 	}
 	return &Multiplexor{
 		writer: &Writer{
-			upgrader: upgrader,
-			log:      log,
+			upgrader:     upgrader,
+			log:          log,
+			messageDelay: messageDelay,
 		},
 		keyGenerator: keyGenerator,
 		registry:     registry,
@@ -76,6 +78,7 @@ func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 
 	// spinning up a goroutine for this since we are attempting to block on the read side.
 	go m.registry.Register(key, buffer)
+
 	defer m.registry.Deregister(key, buffer)
 
 	err = m.writer.Write(w, r, buffer)
