@@ -496,10 +496,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
-		logger.Info("Utilizing Redis DB")
 		var clusterAddrs []string
 		if userConfig.RedisClusterAddresses != "" {
 			clusterAddrs = strings.Split(userConfig.RedisClusterAddresses, ",")
+		}
+		switch {
+		case len(clusterAddrs) > 0:
+			logger.Info(fmt.Sprintf("Utilizing Redis DB in cluster mode, addresses: %s", userConfig.RedisClusterAddresses))
+		default:
+			logger.Info(fmt.Sprintf("Utilizing Redis DB in single-node mode, host: %s, port: %d", userConfig.RedisHost, userConfig.RedisPort))
 		}
 		database, err = redis.NewWithConfig(redis.Config{
 			Hostname:           userConfig.RedisHost,
