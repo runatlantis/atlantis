@@ -576,6 +576,13 @@ func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectS
 	}
 }
 
+// Ping checks the database connection health.
+func (b *BoltDB) Ping() error {
+	return b.db.View(func(tx *bolt.Tx) error {
+		return nil
+	})
+}
+
 func (b *BoltDB) Close() error {
 	return b.db.Close()
 }

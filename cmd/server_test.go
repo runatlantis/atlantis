@@ -132,6 +132,8 @@ var testFlags = map[string]any{
 	RedisPort:                        6379,
 	RedisTLSEnabled:                  false,
 	RedisDB:                          0,
+	RedisUsername:                    "",
+	RedisClusterAddresses:            "",
 	RepoAllowlistFlag:                "github.com/runatlantis/atlantis",
 	RepoConfigFlag:                   "",
 	RepoConfigJSONFlag:               "",

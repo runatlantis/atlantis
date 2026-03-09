@@ -134,6 +134,8 @@ const (
 	RedisPort                        = "redis-port"
 	RedisTLSEnabled                  = "redis-tls-enabled"
 	RedisInsecureSkipVerify          = "redis-insecure-skip-verify"
+	RedisUsername                    = "redis-username"
+	RedisClusterAddresses            = "redis-cluster-addresses"
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
@@ -419,6 +421,13 @@ var stringFlags = map[string]stringFlag{
 	},
 	RedisPassword: {
 		description: "The Redis Password for when using a Locking DB type of 'redis'.",
+	},
+	RedisUsername: {
+		description: "The Redis Username for when using a Locking DB type of 'redis'.",
+	},
+	RedisClusterAddresses: {
+		description: "Comma-delimited list of Redis cluster node addresses in the format 'host:port'. " +
+			"When set, Atlantis uses Redis Cluster mode instead of single-node mode.",
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
