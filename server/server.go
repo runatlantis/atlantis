@@ -498,11 +498,18 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	case "redis":
 		var clusterAddrs []string
 		if userConfig.RedisClusterAddresses != "" {
-			clusterAddrs = strings.Split(userConfig.RedisClusterAddresses, ",")
+			rawClusterAddrs := strings.Split(userConfig.RedisClusterAddresses, ",")
+			for _, addr := range rawClusterAddrs {
+				trimmed := strings.TrimSpace(addr)
+				if trimmed == "" {
+					continue
+				}
+				clusterAddrs = append(clusterAddrs, trimmed)
+			}
 		}
 		switch {
 		case len(clusterAddrs) > 0:
-			logger.Info(fmt.Sprintf("Utilizing Redis DB in cluster mode, addresses: %s", userConfig.RedisClusterAddresses))
+			logger.Info("Utilizing Redis DB in cluster mode, addresses: " + strings.Join(clusterAddrs, ", "))
 		default:
 			logger.Info(fmt.Sprintf("Utilizing Redis DB in single-node mode, host: %s, port: %d", userConfig.RedisHost, userConfig.RedisPort))
 		}

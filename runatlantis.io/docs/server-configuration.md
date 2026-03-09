@@ -1015,7 +1015,7 @@ The locking database type to use for storing plan and apply locks. Defaults to `
 Notes:
 
 - If set to `boltdb`, only one process may have access to the boltdb instance.
-- If set to `redis`, then `--redis-host`, `--redis-port`, and `--redis-password` must be set for single-node mode, or `--redis-cluster-addresses` for Redis Cluster mode.
+- If set to `redis`, use `--redis-host` and `--redis-port` for single-node mode, or `--redis-cluster-addresses` for Redis Cluster mode. Use `--redis-password` and (optionally) `--redis-username` only if your Redis deployment requires authentication.
 
 ### `--log-level` <Badge text="v0.1.3+" type="info"/>
 

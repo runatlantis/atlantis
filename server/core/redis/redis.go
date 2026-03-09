@@ -72,13 +72,15 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 	}
 
 	// Determine which Redis client to use based on configuration
+	var connDesc string
 	switch {
 	case len(cfg.ClusterAddresses) > 0:
 		// Filter out empty addresses
 		var addrs []string
 		for _, addr := range cfg.ClusterAddresses {
-			if addr != "" {
-				addrs = append(addrs, addr)
+			trimmed := strings.TrimSpace(addr)
+			if trimmed != "" {
+				addrs = append(addrs, trimmed)
 			}
 		}
 		if len(addrs) == 0 {
@@ -90,6 +92,7 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 			Password:  cfg.Password,
 			TLSConfig: tlsConfig,
 		})
+		connDesc = fmt.Sprintf("cluster nodes %s", strings.Join(addrs, ", "))
 	default:
 		address := fmt.Sprintf("%s:%d", cfg.Hostname, cfg.Port)
 		rdb = redis.NewClient(&redis.Options{
@@ -99,12 +102,13 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 			DB:        cfg.DB,
 			TLSConfig: tlsConfig,
 		})
+		connDesc = address
 	}
 
 	// Check if connection is valid
 	err := rdb.Ping(ctx).Err()
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to redis: %w", err)
+		return nil, fmt.Errorf("failed to connect to redis at %s: %w", connDesc, err)
 	}
 
 	// Migrate old lock keys to new format
@@ -140,8 +144,12 @@ func migrateOldLockKeys(rdb redis.Cmdable) error {
 				return errors.Wrap(err, "failed to deserialize current lock")
 			}
 			newKey := fmt.Sprintf("pr/%s", models.GenerateLockKey(currLock.Project, currLock.Workspace))
-			rdb.Set(ctx, newKey, oldValue, 0)
-			rdb.Del(ctx, oldKey)
+			if err := rdb.Set(ctx, newKey, oldValue, 0).Err(); err != nil {
+				return errors.Wrapf(err, "failed to set new lock key %s", newKey)
+			}
+			if err := rdb.Del(ctx, oldKey).Err(); err != nil {
+				return errors.Wrapf(err, "failed to delete old lock key %s", oldKey)
+			}
 		}
 	}
 	if err := iter.Err(); err != nil {
@@ -541,17 +549,16 @@ func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.Project
 
 // Ping checks the Redis connection health.
 func (r *RedisDB) Ping() error {
-	return r.client.Ping(ctx).Err()
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return r.client.Ping(pingCtx).Err()
 }
 
 func (r *RedisDB) Close() error {
-	// Handle Close for different client types
-	switch c := r.client.(type) {
-	case *redis.Client:
-		return c.Close()
-	case *redis.ClusterClient:
-		return c.Close()
-	default:
-		return nil
+	// Prefer a narrower interface and return an explicit error for unsupported client types.
+	if closer, ok := r.client.(interface{ Close() error }); ok {
+		return closer.Close()
 	}
+
+	return fmt.Errorf("redis: unsupported client type %T does not implement Close() error", r.client)
 }
