@@ -860,7 +860,23 @@ func (s *ServerCmd) preRun() error {
 	return nil
 }
 
+// sanitizeKubernetesServiceLinks detects Kubernetes service link environment
+// variables that collide with Atlantis's ATLANTIS_ env prefix and resets them
+// to their defaults. Kubernetes auto-creates env vars like
+// ATLANTIS_REDIS_PORT=tcp://10.x.x.x:6379 for services in the same namespace,
+// which viper picks up and fails to parse as integers.
+func (s *ServerCmd) sanitizeKubernetesServiceLinks() {
+	for name, f := range intFlags {
+		val := s.Viper.GetString(name)
+		if strings.HasPrefix(val, "tcp://") || strings.HasPrefix(val, "udp://") {
+			s.Viper.Set(name, f.defaultValue)
+		}
+	}
+}
+
 func (s *ServerCmd) run() error {
+	s.sanitizeKubernetesServiceLinks()
+
 	var userConfig server.UserConfig
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
