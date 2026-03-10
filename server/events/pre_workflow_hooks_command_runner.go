@@ -93,6 +93,27 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 		return err
 	}
 
+	// Read the extra modified files written by the hook to OUTPUT_MODIFIED_FILES_FILE.
+	// Each non-empty line is treated as a repo-relative file path that should be
+	// considered modified when determining which projects to plan.
+	outputModifiedFilesFilePath := filepath.Join(repoDir, "OUTPUT_MODIFIED_FILES_FILE")
+	if _, statErr := os.Stat(outputModifiedFilesFilePath); statErr == nil {
+		content, readErr := os.ReadFile(outputModifiedFilesFilePath)
+		if readErr != nil {
+			ctx.Log.Warn("unable to read OUTPUT_MODIFIED_FILES_FILE: %s", readErr)
+		} else {
+			for _, line := range strings.Split(string(content), "\n") {
+				line = strings.TrimSpace(line)
+				if line != "" {
+					ctx.ExtraModifiedFiles = append(ctx.ExtraModifiedFiles, line)
+				}
+			}
+			if len(ctx.ExtraModifiedFiles) > 0 {
+				ctx.Log.Info("pre-workflow hook set %d extra modified files: %v", len(ctx.ExtraModifiedFiles), ctx.ExtraModifiedFiles)
+			}
+		}
+	}
+
 	ctx.Log.Info("Pre-workflow hooks completed successfully")
 
 	return nil

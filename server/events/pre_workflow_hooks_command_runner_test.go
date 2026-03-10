@@ -5,6 +5,8 @@ package events_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
@@ -547,6 +549,144 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		Ok(t, err)
 		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
 			Eq(testHookWithPlanApplyCommands.RunCommand), Any[string](), Any[string](), Eq(repoDir))
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
+}
+
+func TestRunPreHooks_OutputModifiedFilesFile(t *testing.T) {
+	log := logging.NewNoopLogger(t)
+
+	var newPull = testdata.Pull
+	newPull.BaseRepo = testdata.GithubRepo
+
+	testHook := valid.WorkflowHook{
+		StepName:   "test",
+		RunCommand: "some command",
+	}
+
+	globalCfg := valid.GlobalCfg{
+		Repos: []valid.Repo{
+			{
+				ID: testdata.GithubRepo.ID(),
+				PreWorkflowHooks: []*valid.WorkflowHook{
+					&testHook,
+				},
+			},
+		},
+	}
+
+	planCmd := &events.CommentCommand{
+		Name: command.Plan,
+	}
+
+	t.Run("extra modified files populated from OUTPUT_MODIFIED_FILES_FILE", func(t *testing.T) {
+		preWorkflowHooksSetup(t)
+
+		// Use a real temp directory so the file can be written and read.
+		repoDir := t.TempDir()
+
+		ctx := &command.Context{
+			Pull:     newPull,
+			HeadRepo: testdata.GithubRepo,
+			User:     testdata.User,
+			Log:      log,
+		}
+
+		var unlockCalled = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		preWh.GlobalCfg = globalCfg
+
+		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
+			events.DefaultRepoRelDir, "", command.Plan)).ThenReturn(unlockFn, nil)
+		When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
+
+		// Simulate the hook writing to OUTPUT_MODIFIED_FILES_FILE
+		outputModifiedFilesFilePath := filepath.Join(repoDir, "OUTPUT_MODIFIED_FILES_FILE")
+		err := os.WriteFile(outputModifiedFilesFilePath, []byte("components/s3/ue1-dev\ncomponents/s3/ue1-prod\n"), 0600)
+		Ok(t, err)
+
+		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
+			Any[string](), Any[string](), Eq(repoDir))).ThenReturn("", "", nil)
+
+		err = preWh.RunPreHooks(ctx, planCmd)
+
+		Ok(t, err)
+		Equals(t, []string{"components/s3/ue1-dev", "components/s3/ue1-prod"}, ctx.ExtraModifiedFiles)
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
+
+	t.Run("no extra modified files when OUTPUT_MODIFIED_FILES_FILE absent", func(t *testing.T) {
+		preWorkflowHooksSetup(t)
+
+		repoDir := t.TempDir()
+
+		ctx := &command.Context{
+			Pull:     newPull,
+			HeadRepo: testdata.GithubRepo,
+			User:     testdata.User,
+			Log:      log,
+		}
+
+		var unlockCalled = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		preWh.GlobalCfg = globalCfg
+
+		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
+			events.DefaultRepoRelDir, "", command.Plan)).ThenReturn(unlockFn, nil)
+		When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
+		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
+			Any[string](), Any[string](), Eq(repoDir))).ThenReturn("", "", nil)
+
+		err := preWh.RunPreHooks(ctx, planCmd)
+
+		Ok(t, err)
+		Assert(t, len(ctx.ExtraModifiedFiles) == 0, "extra modified files should be empty")
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
+
+	t.Run("blank lines in OUTPUT_MODIFIED_FILES_FILE are ignored", func(t *testing.T) {
+		preWorkflowHooksSetup(t)
+
+		repoDir := t.TempDir()
+
+		ctx := &command.Context{
+			Pull:     newPull,
+			HeadRepo: testdata.GithubRepo,
+			User:     testdata.User,
+			Log:      log,
+		}
+
+		var unlockCalled = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		preWh.GlobalCfg = globalCfg
+
+		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
+			events.DefaultRepoRelDir, "", command.Plan)).ThenReturn(unlockFn, nil)
+		When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
+
+		outputModifiedFilesFilePath := filepath.Join(repoDir, "OUTPUT_MODIFIED_FILES_FILE")
+		err := os.WriteFile(outputModifiedFilesFilePath, []byte("\ncomponents/s3/ue1-dev\n\n"), 0600)
+		Ok(t, err)
+
+		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
+			Any[string](), Any[string](), Eq(repoDir))).ThenReturn("", "", nil)
+
+		err = preWh.RunPreHooks(ctx, planCmd)
+
+		Ok(t, err)
+		Equals(t, []string{"components/s3/ue1-dev"}, ctx.ExtraModifiedFiles)
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 }

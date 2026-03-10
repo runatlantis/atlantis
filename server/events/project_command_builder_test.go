@@ -2205,3 +2205,95 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 		})
 	}
 }
+
+func TestDefaultProjectCommandBuilder_BuildAutoplanCommands_ExtraModifiedFiles(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	RegisterMockTestingT(t)
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	// Directory structure with two projects
+	tmpDir := DirStructure(t, map[string]any{
+		"project1": map[string]any{
+			"main.tf": nil,
+		},
+		"project2": map[string]any{
+			"main.tf": nil,
+		},
+	})
+
+	// Only project1/main.tf is actually modified in the PR
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+		Any[models.PullRequest]())).ThenReturn([]string{"project1/main.tf"}, nil)
+
+	atlantisYAML := `
+version: 3
+projects:
+- dir: project1
+  autoplan:
+    when_modified: ["**/*.tf"]
+- dir: project2
+  autoplan:
+    when_modified: ["**/*.tf"]
+`
+	err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(atlantisYAML), 0600)
+	Ok(t, err)
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		defaultUserConfig.EnableRegExpCmd,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	// Without ExtraModifiedFiles, only project1 should be planned
+	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
+		PullRequestStatus: models.PullReqStatus{
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
+		},
+		Log:   logger,
+		Scope: scope,
+	})
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+
+	// With ExtraModifiedFiles pointing at project2, both projects should be planned
+	ctxs, err = builder.BuildAutoplanCommands(&command.Context{
+		PullRequestStatus: models.PullReqStatus{
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
+		},
+		Log:                logger,
+		Scope:              scope,
+		ExtraModifiedFiles: []string{"project2/main.tf"},
+	})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+
+	sort.Slice(ctxs, func(i, j int) bool { return ctxs[i].RepoRelDir < ctxs[j].RepoRelDir })
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+}
