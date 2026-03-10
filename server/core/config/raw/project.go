@@ -102,8 +102,8 @@ func (p Project) Validate() error {
 			return nil
 		}
 		ws := *strPtr
-		if strings.Contains(ws, "..") || strings.HasPrefix(ws, "/") {
-			return errors.New("cannot contain '..' or begin with '/'")
+		if strings.Contains(ws, "..") || strings.ContainsAny(ws, "/\\") {
+			return errors.New("cannot contain '..', '/', or '\\'")
 		}
 		return nil
 	}
