@@ -93,7 +93,7 @@ jobs:
     - name: Set up QEMU
       uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       with:
-        image: tonistiigi/binfmt:latest
+        image: tonistiigi/binfmt:qemu-v10.2.1@sha256:d3b963f787999e6c0219a48dba02978769286ff61a5f4d26245cb6a6e5567ea3
         platforms: arm64,arm
 
     - name: Set up Docker Buildx
