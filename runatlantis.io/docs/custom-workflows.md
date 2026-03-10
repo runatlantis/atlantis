@@ -748,7 +748,7 @@ Full:
 | multienv.command   | string                | none    | yes      | Name of the custom script to run                                                    |
 | multienv.shell     | string                | "sh"    | no       | Name of the shell to use for command execution                                      |
 | multienv.shellArgs | string or []string    | "-c"    | no       | Command line arguments to be passed to the shell. Cannot be set without `shell`     |
-| multienv.output    | string                | "show"  | no       | Setting output to "hide" will suppress the message obout added environment variables |
+| multienv.output    | string                | "show"  | no       | Setting output to "hide" will suppress the message about added environment variables |
 
 The output of the command execution must have the following format:
 `EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3`
