@@ -25,6 +25,7 @@ type DefaultPreWorkflowHookRunner struct {
 
 func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext, command string, shell string, shellArgs string, path string) (string, string, error) {
 	outputFilePath := filepath.Join(path, "OUTPUT_STATUS_FILE")
+	outputModifiedFilesFilePath := filepath.Join(path, "OUTPUT_MODIFIED_FILES_FILE")
 
 	shellArgsSlice := append(strings.Split(shellArgs, " "), command)
 	cmd := exec.Command(shell, shellArgsSlice...) // #nosec
@@ -42,11 +43,12 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		"HEAD_REPO_NAME":     ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":    ctx.HeadRepo.Owner,
 		"PULL_AUTHOR":        ctx.Pull.Author,
-		"PULL_NUM":           fmt.Sprintf("%d", ctx.Pull.Num),
-		"PULL_URL":           ctx.Pull.URL,
-		"USER_NAME":          ctx.User.Username,
-		"OUTPUT_STATUS_FILE": outputFilePath,
-		"COMMAND_NAME":       ctx.CommandName,
+		"PULL_NUM":                     fmt.Sprintf("%d", ctx.Pull.Num),
+		"PULL_URL":                     ctx.Pull.URL,
+		"USER_NAME":                    ctx.User.Username,
+		"OUTPUT_STATUS_FILE":           outputFilePath,
+		"OUTPUT_MODIFIED_FILES_FILE":   outputModifiedFilesFilePath,
+		"COMMAND_NAME":                 ctx.CommandName,
 	}
 
 	finalEnvVars := baseEnvVars
