@@ -1,0 +1,7 @@
+[default.extend-words]
+# HashiCorp is a proper company name; the "Hashi" prefix is intentional
+hashi = "hashi"
+# "ue" is used as a workspace-name prefix in documentation examples (short for us-east)
+ue = "ue"
+# ACI = Azure Container Instances
+aci = "aci"
