@@ -23,7 +23,7 @@ by at least one person other than the author.
 
 #### Usage
 
-The `approved` requirement by:
+Set the `approved` requirement by:
 
 1. Creating a `repos.yaml` file with the `apply_requirements` key:
 
@@ -239,7 +239,7 @@ having that apply requirement set.
 
 If you only want some projects/repos to have apply requirements, then you must
 
-1. Specifying which repos have which requirements via the `repos.yaml` file.
+1. Specify which repos have which requirements via the `repos.yaml` file.
 
    ```yaml
    repos:
