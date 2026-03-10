@@ -909,4 +909,17 @@ func TestFileWorkspace_PathTraversal(t *testing.T) {
 		Assert(t, err != nil, "expected error for path traversal in project path")
 		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
 	})
+
+	t.Run("MergeAgain rejects traversal in repo name", func(t *testing.T) {
+		// MergeAgain calls cloneDir(p.BaseRepo, ...) which validates the path.
+		// CheckoutMerge must be true for MergeAgain to proceed past the early return.
+		wdMerge := &events.FileWorkspace{
+			DataDir:             dataDir,
+			GpgNoSigningEnabled: true,
+			CheckoutMerge:       true,
+		}
+		_, err := wdMerge.MergeAgain(logger, maliciousRepo, pull, "default")
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
 }

@@ -424,7 +424,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:       String("."),
 				Workspace: String("../evil"),
 			},
-			expErr: "workspace: cannot contain '..' or begin with '/'.",
+			expErr: "workspace: cannot contain '..', '/', or '\\'.",
 		},
 		{
 			description: "workspace beginning with /",
@@ -432,7 +432,23 @@ func TestProject_Validate(t *testing.T) {
 				Dir:       String("."),
 				Workspace: String("/etc"),
 			},
-			expErr: "workspace: cannot contain '..' or begin with '/'.",
+			expErr: "workspace: cannot contain '..', '/', or '\\'.",
+		},
+		{
+			description: "workspace with embedded /",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("sub/dir"),
+			},
+			expErr: "workspace: cannot contain '..', '/', or '\\'.",
+		},
+		{
+			description: "workspace with backslash",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("sub\\dir"),
+			},
+			expErr: "workspace: cannot contain '..', '/', or '\\'.",
 		},
 		{
 			description: "valid workspace",
