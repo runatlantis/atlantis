@@ -40,7 +40,7 @@ type Client struct {
 	database db.Database
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_locker.go Locker
+//go:generate mockgen -package mocks -destination mocks/mock_locker.go . Locker
 
 type Locker interface {
 	TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error)

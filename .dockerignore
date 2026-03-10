@@ -8,3 +8,4 @@
 !go.sum
 !docker-entrypoint.sh
 !atlantis
+!.clusterfuzzlite/
