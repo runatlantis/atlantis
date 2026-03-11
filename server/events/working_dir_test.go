@@ -865,7 +865,7 @@ func TestHasDiverged_ConcurrentCalls(t *testing.T) {
 	runCmd(t, clonedRepo, "git", "add", "local-file")
 	runCmd(t, clonedRepo, "git", "commit", "-m", "Adding local file")
 
-	for i := range loops {
+	for i := 0; i < loops; i++ {
 		go checkHasDiverged()
 		go checkHasDiverged()
 		remoteFile := fmt.Sprintf("remote-file-%d.txt", i)

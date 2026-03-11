@@ -32,7 +32,7 @@ const workingDirPrefix = "repos"
 
 const prSourceRemote = "source"
 
-// gitLocks holds per-clone-dir locks: "repo-lock/<cloneDir>" -> *sync.RWMutex (read for steps, write for clone/reset/merge), "fetch-lock/<cloneDir>" -> *sync.Mutex (serialize fetch).
+// gitLocks holds per-clone-dir locks: "repo-lock/<cloneDir>" -> *sync.RWMutex (read for steps, write for clone/reset/merge), "ref-lock/<cloneDir>" -> *sync.Mutex (serialize fetch).
 var gitLocks sync.Map
 var recheckRequiredMap sync.Map
 
@@ -256,7 +256,7 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	return w.hasDiverged(logger, cloneDir)
 }
 
-// hasDivergedWithFetchAndStatus runs fetch and git status to detect divergence. Caller must hold
+// hasDiverged runs fetch and git status to detect divergence. Caller must hold
 // gitRefLock(cloneDir); if not already holding the repo write lock (e.g. from recheckDiverged),
 // caller must also hold gitReadLock(cloneDir).
 func (w *FileWorkspace) hasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
@@ -590,8 +590,8 @@ func (w *FileWorkspace) GitReadLock(r models.Repo, p models.PullRequest, workspa
 	return w.gitReadLock(w.cloneDir(r, p, workspace))
 }
 
-// gitReadLockByDir acquires the same read lock as GitReadLock but by workspace dir path.
-// Used when only the path is available (e.g. runGitFetch).
+// gitReadLock acquires the same shared lock as GitReadLock but by workspace dir path.
+// Used when only the workspace directory path is available.
 func (w *FileWorkspace) gitReadLock(workspaceDir string) func() {
 	key := fmt.Sprintf("repo-lock/%s", workspaceDir)
 	value, _ := gitLocks.LoadOrStore(key, new(sync.RWMutex))
@@ -602,7 +602,7 @@ func (w *FileWorkspace) gitReadLock(workspaceDir string) func() {
 
 // gitRefLock acquires an exclusive lock for ref update operations.
 // It is separate from the repo read lock to allow for concurrent repo read operations
-// and not introduce uneccessary latency.
+// and not introduce unnecessary latency.
 func (w *FileWorkspace) gitRefLock(workspaceDir string) func() {
 	key := fmt.Sprintf("ref-lock/%s", workspaceDir)
 	value, _ := gitLocks.LoadOrStore(key, new(sync.Mutex))
