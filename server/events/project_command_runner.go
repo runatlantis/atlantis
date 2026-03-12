@@ -319,6 +319,8 @@ func errorWithStepOutput(err error, outputs []string) error {
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
+	AtlantisVersion           string
+	VCSStatusName             string
 	VcsClient                 vcs.Client
 	Locker                    ProjectLocker
 	LockURLGenerator          LockURLGenerator
@@ -1098,7 +1100,28 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 	unlock := p.WorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	defer unlock()
 
-	envs := make(map[string]string)
+	// Truncate the verbose atlantis version (ex: 'dev (commit: none) (build date: unknown)' -> 'dev').
+	atlantisVersion, _, _ := strings.Cut(p.AtlantisVersion, " ")
+
+	vcsStatusName := p.VCSStatusName
+	if vcsStatusName == "" {
+		vcsStatusName = "atlantis"
+	}
+
+	envs := map[string]string{
+		"TF_APPEND_USER_AGENT": fmt.Sprintf(
+			"%s/%s (%s; %s; %s; %s; %s; +%s)",
+			vcsStatusName,
+			atlantisVersion,
+			ctx.User.Username,
+			ctx.CommandName,
+			ctx.RepoRelDir,
+			ctx.Workspace,
+			ctx.Pull.HeadCommit,
+			ctx.Pull.URL,
+		),
+	}
+
 	for _, step := range steps {
 		var out string
 		var err error
