@@ -108,6 +108,10 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ExpOut:  "args=-target=resource1,-target=resource2\n",
 		},
 		{
+			Command: "echo tf_append_user_agent=$TF_APPEND_USER_AGENT",
+			ExpOut:  "tf_append_user_agent=passthrough\n",
+		},
+		{
 			Command: `echo mySecret: \"foo\"`,
 			ExpOut:  "mySecret: \"<redacted>\"\n",
 			PostProcessOutput: []valid.PostProcessRunOutputOption{
@@ -186,7 +190,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 					EscapedCommentArgs:    []string{"-target=resource1", "-target=resource2"},
 					CustomPolicyCheck:     customPolicyCheck,
 				}
-				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, c.PostProcessOutput, c.PostProcessFilterRegexes)
+				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"TF_APPEND_USER_AGENT": "passthrough"}, true, c.PostProcessOutput, c.PostProcessFilterRegexes)
 				if c.ExpErr != "" {
 					ErrContains(t, c.ExpErr, err)
 					return
