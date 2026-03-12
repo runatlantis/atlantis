@@ -26,6 +26,25 @@ func NewMockWorkingDir(options ...pegomock.Option) *MockWorkingDir {
 func (mock *MockWorkingDir) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockWorkingDir) FailHandler() pegomock.FailHandler      { return mock.fail }
 
+func (mock *MockWorkingDir) CloneBaseBranch(logger logging.SimpleLogging, p models.PullRequest, workspace string) (string, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+	}
+	_params := []pegomock.Param{logger, p, workspace}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("CloneBaseBranch", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 string
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(string)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
 func (mock *MockWorkingDir) Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
@@ -216,6 +235,47 @@ type VerifierMockWorkingDir struct {
 	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
+}
+
+func (verifier *VerifierMockWorkingDir) CloneBaseBranch(logger logging.SimpleLogging, p models.PullRequest, workspace string) *MockWorkingDir_CloneBaseBranch_OngoingVerification {
+	_params := []pegomock.Param{logger, p, workspace}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CloneBaseBranch", _params, verifier.timeout)
+	return &MockWorkingDir_CloneBaseBranch_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDir_CloneBaseBranch_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDir_CloneBaseBranch_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.PullRequest, string) {
+	logger, p, workspace := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], p[len(p)-1], workspace[len(workspace)-1]
+}
+
+func (c *MockWorkingDir_CloneBaseBranch_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.PullRequest, _param2 []string) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(logging.SimpleLogging)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]models.PullRequest, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(models.PullRequest)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(string)
+			}
+		}
+	}
+	return
 }
 
 func (verifier *VerifierMockWorkingDir) Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) *MockWorkingDir_Clone_OngoingVerification {

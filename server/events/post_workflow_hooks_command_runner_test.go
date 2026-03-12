@@ -654,27 +654,23 @@ func TestRunPostHooks_Clone(t *testing.T) {
 
 		postWh.GlobalCfg = globalCfg
 
-		// Mock the working directory operations for closed MR
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, closedPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
 
-		// Mock GetWorkingDir to return an error (directory doesn't exist)
-		When(postWhWorkingDir.GetWorkingDir(Eq(testdata.GithubRepo), Eq(closedPull), Eq(events.DefaultWorkspace))).
-			ThenReturn("", errors.New("directory not found"))
+		repoDir := "/tmp/test-clone-dir"
+		When(postWhWorkingDir.CloneBaseBranch(Any[logging.SimpleLogging](), Eq(closedPull), Eq(events.DefaultWorkspace))).
+			ThenReturn(repoDir, nil)
 
-		// Mock GetPullDir to return a valid directory
-		When(postWhWorkingDir.GetPullDir(Eq(testdata.GithubRepo), Eq(closedPull))).
-			ThenReturn("/tmp/test-pull-dir", nil)
-
-		// Mock the post-workflow hook runner
 		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](),
-			Eq(testHook.RunCommand), Any[string](), Any[string](), Any[string]())).ThenReturn(result, runtimeDesc, nil)
+			Eq(testHook.RunCommand), Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
 
 		err := postWh.RunPostHooks(ctx, planCmd)
 
 		Ok(t, err)
+		postWhWorkingDir.VerifyWasCalledOnce().CloneBaseBranch(Any[logging.SimpleLogging](), Eq(closedPull), Eq(events.DefaultWorkspace))
+		postWhWorkingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
 		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
-			Eq(testHook.RunCommand), Any[string](), Any[string](), Any[string]())
+			Eq(testHook.RunCommand), Any[string](), Any[string](), Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 }
