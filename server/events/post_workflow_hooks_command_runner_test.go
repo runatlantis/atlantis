@@ -655,7 +655,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		postWh.GlobalCfg = globalCfg
 
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, closedPull.Num, events.DefaultWorkspace,
-			events.DefaultRepoRelDir)).ThenReturn(unlockFn, nil)
+			events.DefaultRepoRelDir, "", command.Plan)).ThenReturn(unlockFn, nil)
 
 		repoDir := "/tmp/test-clone-dir"
 		When(postWhWorkingDir.CloneBaseBranch(Any[logging.SimpleLogging](), Eq(closedPull), Eq(events.DefaultWorkspace))).
