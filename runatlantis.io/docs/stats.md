@@ -2,6 +2,8 @@
 
 Atlantis exposes a set of metrics for each of its operations including errors, successes, and latencies.
 
+Metrics are reported in seconds.
+
 ::: warning NOTE
 Currently Statsd and Prometheus is supported. See configuration below for details.
 :::
