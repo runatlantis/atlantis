@@ -104,6 +104,7 @@ const (
 	GHOrganizationFlag               = "gh-org"
 	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
 	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
+	GHChecksEnabledFlag              = "gh-checks-enabled"
 	GiteaBaseURLFlag                 = "gitea-base-url"
 	GiteaTokenFlag                   = "gitea-token"
 	GiteaUserFlag                    = "gitea-user"
@@ -550,6 +551,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	GHAllowMergeableBypassApply: {
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
+		defaultValue: false,
+	},
+	GHChecksEnabledFlag: {
+		description:  "[EXPERIMENTAL] Use the GitHub Checks API for plan/apply status instead of (only) PR comments. When enabled, plan check runs include the full Terraform plan output and an 'Apply' button. Requires a GitHub App (not a personal access token).",
 		defaultValue: false,
 	},
 	GitlabStatusRetryEnabledFlag: {

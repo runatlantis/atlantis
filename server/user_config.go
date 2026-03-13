@@ -52,57 +52,62 @@ type UserConfig struct {
 	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
 	ExecutableName              string `mapstructure:"executable-name"`
 	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
-	FailOnPreWorkflowHookError      bool   `mapstructure:"fail-on-pre-workflow-hook-error"`
-	HideUnchangedPlanComments       bool   `mapstructure:"hide-unchanged-plan-comments"`
-	GithubAllowMergeableBypassApply bool   `mapstructure:"gh-allow-mergeable-bypass-apply"`
-	GithubHostname                  string `mapstructure:"gh-hostname"`
-	GithubToken                     string `mapstructure:"gh-token"`
-	GithubTokenFile                 string `mapstructure:"gh-token-file"`
-	GithubUser                      string `mapstructure:"gh-user"`
-	GithubWebhookSecret             string `mapstructure:"gh-webhook-secret"`
-	GithubOrg                       string `mapstructure:"gh-org"`
-	GithubAppID                     int64  `mapstructure:"gh-app-id"`
-	GithubAppKey                    string `mapstructure:"gh-app-key"`
-	GithubAppKeyFile                string `mapstructure:"gh-app-key-file"`
-	GithubAppSlug                   string `mapstructure:"gh-app-slug"`
-	GithubAppInstallationID         int64  `mapstructure:"gh-app-installation-id"`
-	GithubTeamAllowlist             string `mapstructure:"gh-team-allowlist"`
-	GiteaBaseURL                    string `mapstructure:"gitea-base-url"`
-	GiteaToken                      string `mapstructure:"gitea-token"`
-	GiteaUser                       string `mapstructure:"gitea-user"`
-	GiteaWebhookSecret              string `mapstructure:"gitea-webhook-secret"`
-	GiteaPageSize                   int    `mapstructure:"gitea-page-size"`
-	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
-	GitlabGroupAllowlist            string `mapstructure:"gitlab-group-allowlist"`
-	GitlabToken                     string `mapstructure:"gitlab-token"`
-	GitlabUser                      string `mapstructure:"gitlab-user"`
-	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
-	GitlabStatusRetryEnabled        bool   `mapstructure:"gitlab-status-retry-enabled"`
-	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
-	APISecret                       string `mapstructure:"api-secret"`
-	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
-	LockingDBType                   string `mapstructure:"locking-db-type"`
-	LogLevel                        string `mapstructure:"log-level"`
-	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
-	MaxCommentsPerCommand           int    `mapstructure:"max-comments-per-command"`
-	IgnoreVCSStatusNames            string `mapstructure:"ignore-vcs-status-names"`
-	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
-	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
-	ParallelApply                   bool   `mapstructure:"parallel-apply"`
-	PendingApplyStatus              bool   `mapstructure:"pending-apply-status"`
-	StatsNamespace                  string `mapstructure:"stats-namespace"`
-	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
-	Port                            int    `mapstructure:"port"`
-	QuietPolicyChecks               bool   `mapstructure:"quiet-policy-checks"`
-	RedisDB                         int    `mapstructure:"redis-db"`
-	RedisHost                       string `mapstructure:"redis-host"`
-	RedisPassword                   string `mapstructure:"redis-password"`
-	RedisPort                       int    `mapstructure:"redis-port"`
-	RedisTLSEnabled                 bool   `mapstructure:"redis-tls-enabled"`
-	RedisInsecureSkipVerify         bool   `mapstructure:"redis-insecure-skip-verify"`
-	RepoConfig                      string `mapstructure:"repo-config"`
-	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
-	RepoAllowlist                   string `mapstructure:"repo-allowlist"`
+	FailOnPreWorkflowHookError      bool `mapstructure:"fail-on-pre-workflow-hook-error"`
+	HideUnchangedPlanComments       bool `mapstructure:"hide-unchanged-plan-comments"`
+	GithubAllowMergeableBypassApply bool `mapstructure:"gh-allow-mergeable-bypass-apply"`
+	// GithubChecksEnabled enables the experimental GitHub Checks API integration.
+	// When true, Atlantis uses the Checks API for plan/apply status instead of only
+	// PR comments. Plan check runs include the full plan output and an "Apply" button.
+	// Requires a GitHub App (not a personal access token). Defaults to false.
+	GithubChecksEnabled          bool   `mapstructure:"gh-checks-enabled"`
+	GithubHostname               string `mapstructure:"gh-hostname"`
+	GithubToken                  string `mapstructure:"gh-token"`
+	GithubTokenFile              string `mapstructure:"gh-token-file"`
+	GithubUser                   string `mapstructure:"gh-user"`
+	GithubWebhookSecret          string `mapstructure:"gh-webhook-secret"`
+	GithubOrg                    string `mapstructure:"gh-org"`
+	GithubAppID                  int64  `mapstructure:"gh-app-id"`
+	GithubAppKey                 string `mapstructure:"gh-app-key"`
+	GithubAppKeyFile             string `mapstructure:"gh-app-key-file"`
+	GithubAppSlug                string `mapstructure:"gh-app-slug"`
+	GithubAppInstallationID      int64  `mapstructure:"gh-app-installation-id"`
+	GithubTeamAllowlist          string `mapstructure:"gh-team-allowlist"`
+	GiteaBaseURL                 string `mapstructure:"gitea-base-url"`
+	GiteaToken                   string `mapstructure:"gitea-token"`
+	GiteaUser                    string `mapstructure:"gitea-user"`
+	GiteaWebhookSecret           string `mapstructure:"gitea-webhook-secret"`
+	GiteaPageSize                int    `mapstructure:"gitea-page-size"`
+	GitlabHostname               string `mapstructure:"gitlab-hostname"`
+	GitlabGroupAllowlist         string `mapstructure:"gitlab-group-allowlist"`
+	GitlabToken                  string `mapstructure:"gitlab-token"`
+	GitlabUser                   string `mapstructure:"gitlab-user"`
+	GitlabWebhookSecret          string `mapstructure:"gitlab-webhook-secret"`
+	GitlabStatusRetryEnabled     bool   `mapstructure:"gitlab-status-retry-enabled"`
+	IncludeGitUntrackedFiles     bool   `mapstructure:"include-git-untracked-files"`
+	APISecret                    string `mapstructure:"api-secret"`
+	HidePrevPlanComments         bool   `mapstructure:"hide-prev-plan-comments"`
+	LockingDBType                string `mapstructure:"locking-db-type"`
+	LogLevel                     string `mapstructure:"log-level"`
+	MarkdownTemplateOverridesDir string `mapstructure:"markdown-template-overrides-dir"`
+	MaxCommentsPerCommand        int    `mapstructure:"max-comments-per-command"`
+	IgnoreVCSStatusNames         string `mapstructure:"ignore-vcs-status-names"`
+	ParallelPoolSize             int    `mapstructure:"parallel-pool-size"`
+	ParallelPlan                 bool   `mapstructure:"parallel-plan"`
+	ParallelApply                bool   `mapstructure:"parallel-apply"`
+	PendingApplyStatus           bool   `mapstructure:"pending-apply-status"`
+	StatsNamespace               string `mapstructure:"stats-namespace"`
+	PlanDrafts                   bool   `mapstructure:"allow-draft-prs"`
+	Port                         int    `mapstructure:"port"`
+	QuietPolicyChecks            bool   `mapstructure:"quiet-policy-checks"`
+	RedisDB                      int    `mapstructure:"redis-db"`
+	RedisHost                    string `mapstructure:"redis-host"`
+	RedisPassword                string `mapstructure:"redis-password"`
+	RedisPort                    int    `mapstructure:"redis-port"`
+	RedisTLSEnabled              bool   `mapstructure:"redis-tls-enabled"`
+	RedisInsecureSkipVerify      bool   `mapstructure:"redis-insecure-skip-verify"`
+	RepoConfig                   string `mapstructure:"repo-config"`
+	RepoConfigJSON               string `mapstructure:"repo-config-json"`
+	RepoAllowlist                string `mapstructure:"repo-allowlist"`
 
 	// SilenceNoProjects is whether Atlantis should respond to a PR if no projects are found.
 	SilenceNoProjects   bool `mapstructure:"silence-no-projects"`
