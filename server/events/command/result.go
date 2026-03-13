@@ -3,6 +3,8 @@
 
 package command
 
+import "encoding/json"
+
 // Result is the result of running a Command.
 type Result struct {
 	Error          error
@@ -26,4 +28,21 @@ func (c Result) HasErrors() bool {
 		}
 	}
 	return false
+}
+
+// MarshalJSON implements custom JSON marshaling to properly serialize the Error field.
+func (c Result) MarshalJSON() ([]byte, error) {
+	type Alias Result
+	var errMsg *string
+	if c.Error != nil {
+		msg := c.Error.Error()
+		errMsg = &msg
+	}
+	return json.Marshal(&struct {
+		Error *string `json:"Error"`
+		*Alias
+	}{
+		Error: errMsg,
+		Alias: (*Alias)(&c),
+	})
 }
