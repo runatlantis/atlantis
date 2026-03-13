@@ -139,6 +139,89 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			ctx:     command.ProjectContext{},
 			wantErr: assert.NoError,
 		},
+		// Non-PR API workflow tests - verifies PR-specific requirements are skipped
+		// when API=true and Pull.Num=0 (e.g., drift detection)
+		{
+			name: "API call without PR skips approved requirement",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: 0},
+				ApplyRequirements: []string{raw.ApprovedRequirement},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "API call without PR skips mergeable requirement",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: 0},
+				ApplyRequirements: []string{raw.MergeableRequirement},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "API call with PR still enforces approved requirement",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: 123},
+				ApplyRequirements: []string{raw.ApprovedRequirement},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
+				},
+			},
+			wantFailure: "Pull request must be approved according to the project's approval rules before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "API call without PR still enforces undiverged requirement",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: 0},
+				ApplyRequirements: []string{raw.UnDivergedRequirement},
+			},
+			setup: func(workingDir *mocks.MockWorkingDir) {
+				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
+			},
+			wantFailure: "Default branch must be rebased onto pull request before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "API call without PR still enforces policies_passed requirement",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: 0},
+				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
+				ProjectPlanStatus: models.ErroredPolicyCheckStatus,
+				ProjectPolicyStatus: []models.PolicySetStatus{
+					{
+						PolicySetName: "policy1",
+						Passed:        false,
+						Approvals:     0,
+					},
+				},
+				PolicySets: valid.PolicySets{
+					PolicySets: []valid.PolicySet{
+						{
+							Name:         "policy1",
+							ApproveCount: 1,
+						},
+					},
+				},
+			},
+			wantFailure: "All policies must pass for project before running apply.",
+			wantErr:     assert.NoError,
+		},
 		{
 			name: "pass full requirements",
 			ctx: command.ProjectContext{
