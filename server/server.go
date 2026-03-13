@@ -573,19 +573,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Database:         database,
 	}
 
-	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
-		statsScope,
-		logger,
-		&events.PullClosedExecutor{
-			Locker:                   lockingClient,
-			WorkingDir:               workingDir,
-			Database:                 database,
-			PullClosedTemplate:       &events.PullClosedEventTemplate{},
-			LogStreamResourceCleaner: projectCmdOutputHandler,
-			VCSClient:                vcsClient,
-		},
-	)
-
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
@@ -666,6 +653,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	default:
 		planStore = &runtime.LocalPlanStore{}
 	}
+
+	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
+		statsScope,
+		logger,
+		&events.PullClosedExecutor{
+			Locker:                   lockingClient,
+			WorkingDir:               workingDir,
+			Database:                 database,
+			PullClosedTemplate:       &events.PullClosedEventTemplate{},
+			LogStreamResourceCleaner: projectCmdOutputHandler,
+			VCSClient:                vcsClient,
+			PlanStore:                planStore,
+		},
+	)
 
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
