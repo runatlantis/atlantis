@@ -153,7 +153,7 @@ RUN ./download-release.sh \
 
 # Stage 2 - Alpine
 # Creating the individual distro builds using targets
-FROM alpine:${ALPINE_TAG} AS alpine
+FROM alpine:${ALPINE_TAG} AS alpine-base
 
 EXPOSE ${ATLANTIS_PORT:-4141}
 
@@ -168,9 +168,6 @@ RUN addgroup atlantis && \
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
@@ -215,6 +212,17 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
+
+FROM alpine-base as alpine
+# copy terraform binaries
+COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
+
+FROM alpine-base as alpine-slim-terraform
+COPY --from=deps /usr/local/bin/terraform/terraform /usr/local/bin/terraform
+
+FROM alpine-base as alpine-slim-tofu
+COPY --from=deps /usr/local/bin/tofu/tofu /usr/local/bin/tofu
 
 # Stage 2 - Debian
 FROM debian-base AS debian
