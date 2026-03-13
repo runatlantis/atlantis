@@ -17,6 +17,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -278,6 +279,7 @@ terraform {
 				userConfig.AutoDiscoverMode,
 				scope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -644,6 +646,7 @@ projects:
 					c.AutoDiscoverModeUserCfg,
 					scope,
 					terraformClient,
+					&runtime.LocalPlanStore{},
 				)
 
 				var actCtxs []command.ProjectContext
@@ -832,6 +835,7 @@ projects:
 				userConfig.AutoDiscoverMode,
 				scope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -1197,6 +1201,7 @@ projects:
 				userConfig.AutoDiscoverMode,
 				scope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -1295,6 +1300,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		userConfig.AutoDiscoverMode,
 		scope,
 		terraformClient,
+		&runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -1381,6 +1387,7 @@ projects:
 		userConfig.AutoDiscoverMode,
 		scope,
 		terraformClient,
+		&runtime.LocalPlanStore{},
 	)
 
 	ctx := &command.Context{
@@ -1469,6 +1476,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				userConfig.AutoDiscoverMode,
 				scope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -1631,6 +1639,7 @@ projects:
 				userConfig.AutoDiscoverMode,
 				scope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -1772,6 +1781,7 @@ projects:
 			userConfig.AutoDiscoverMode,
 			scope,
 			terraformClient,
+			&runtime.LocalPlanStore{},
 		)
 
 		var actCtxs []command.ProjectContext
@@ -1856,6 +1866,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		userConfig.AutoDiscoverMode,
 		scope,
 		terraformClient,
+		&runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -1944,6 +1955,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		userConfig.AutoDiscoverMode,
 		scope,
 		terraformClient,
+		&runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildVersionCommands(
@@ -2074,6 +2086,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				userConfig.AutoDiscoverMode,
 				scope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -2185,6 +2198,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				userConfig.AutoDiscoverMode,
 				scope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext

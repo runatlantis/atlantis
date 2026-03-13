@@ -92,6 +92,13 @@ type UserConfig struct {
 	PendingApplyStatus              bool   `mapstructure:"pending-apply-status"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
+    PlanStore                       string `mapstructure:"plan-store"`
+	PlanStoreS3Bucket               string `mapstructure:"plan-store-s3-bucket"`
+	PlanStoreS3Endpoint             string `mapstructure:"plan-store-s3-endpoint"`
+	PlanStoreS3ForcePathStyle       bool   `mapstructure:"plan-store-s3-force-path-style"`
+	PlanStoreS3Prefix               string `mapstructure:"plan-store-s3-prefix"`
+	PlanStoreS3Profile              string `mapstructure:"plan-store-s3-profile"`
+	PlanStoreS3Region               string `mapstructure:"plan-store-s3-region"`
 	Port                            int    `mapstructure:"port"`
 	QuietPolicyChecks               bool   `mapstructure:"quiet-policy-checks"`
 	RedisDB                         int    `mapstructure:"redis-db"`

@@ -18,6 +18,11 @@ type PlanStore interface {
 	Load(ctx command.ProjectContext, planPath string) error
 	// Remove deletes a plan file (local + external) after apply/import/state-rm.
 	Remove(ctx command.ProjectContext, planPath string) error
+	// RestorePlans discovers and downloads all plans for a pull request into
+	// pullDir. Only used by the "apply all" path (buildAllProjectCommandsByPlan)
+	// where the set of planned projects is unknown. The single-project apply
+	// path does not call this — it uses Load with an already-known key.
+	RestorePlans(pullDir, owner, repo string, pullNum int) error
 }
 
 // LocalPlanStore implements PlanStore using the local filesystem.
@@ -34,4 +39,8 @@ func (s *LocalPlanStore) Load(_ command.ProjectContext, _ string) error {
 
 func (s *LocalPlanStore) Remove(_ command.ProjectContext, planPath string) error {
 	return utils.RemoveIgnoreNonExistent(planPath)
+}
+
+func (s *LocalPlanStore) RestorePlans(_, _, _ string, _ int) error {
+	return nil // no-op: plans are already on the local filesystem
 }
