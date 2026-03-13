@@ -18,7 +18,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
+	"sort"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -839,6 +841,35 @@ func (s *ServerCmd) Init() *cobra.Command {
 	return c
 }
 
+// buildKnownKeys returns the set of config keys that are recognized by
+// Atlantis, derived from the mapstructure tags on server.UserConfig plus the
+// "config" meta-key.
+func buildKnownKeys() map[string]struct{} {
+	keys := make(map[string]struct{})
+	t := reflect.TypeFor[server.UserConfig]()
+	for i := 0; i < t.NumField(); i++ {
+		if tag := t.Field(i).Tag.Get("mapstructure"); tag != "" {
+			keys[tag] = struct{}{}
+		}
+	}
+	keys[ConfigFlag] = struct{}{}
+	return keys
+}
+
+// findUnknownKeys returns config keys present in viper that do not correspond
+// to any known Atlantis server flag. The result is sorted alphabetically.
+func findUnknownKeys(v *viper.Viper) []string {
+	known := buildKnownKeys()
+	var unknown []string
+	for _, key := range v.AllKeys() {
+		if _, ok := known[key]; !ok {
+			unknown = append(unknown, key)
+		}
+	}
+	sort.Strings(unknown)
+	return unknown
+}
+
 func (s *ServerCmd) preRun() error {
 	// If passed a config file then try and load it.
 	configFile := s.Viper.GetString(ConfigFlag)
@@ -852,6 +883,11 @@ func (s *ServerCmd) preRun() error {
 }
 
 func (s *ServerCmd) run() error {
+	if unknowns := findUnknownKeys(s.Viper); len(unknowns) > 0 {
+		s.Logger.Warn("unknown keys in config (will be ignored): %s",
+			strings.Join(unknowns, ", "))
+	}
+
 	var userConfig server.UserConfig
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
