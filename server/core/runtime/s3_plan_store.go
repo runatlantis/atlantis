@@ -22,6 +22,7 @@ import (
 
 // S3Client is the subset of the S3 API used by S3PlanStore, extracted for testability.
 type S3Client interface {
+	HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options)) (*s3.HeadBucketOutput, error)
 	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
 	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
@@ -75,6 +76,13 @@ func NewS3PlanStore(cfg S3PlanStoreConfig, logger logging.SimpleLogging) (*S3Pla
 	}
 
 	client := s3.NewFromConfig(awsCfg, s3Opts...)
+
+	if _, err := client.HeadBucket(context.Background(), &s3.HeadBucketInput{
+		Bucket: aws.String(cfg.Bucket),
+	}); err != nil {
+		return nil, fmt.Errorf("validating S3 plan store bucket %q: %w", cfg.Bucket, err)
+	}
+
 	return NewS3PlanStoreWithClient(client, cfg.Bucket, cfg.Prefix, logger), nil
 }
 

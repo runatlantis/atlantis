@@ -33,11 +33,18 @@ type mockS3Client struct {
 	deleteInput *s3.DeleteObjectInput
 	deleteErr   error
 
+	// For HeadBucket startup validation
+	headBucketErr error
+
 	// For ListObjectsV2 / RestorePlans testing
 	listOutput *s3.ListObjectsV2Output
 	listErr    error
 	// getObjects maps S3 key to body content for multi-key GetObject calls
 	getObjects map[string][]byte
+}
+
+func (m *mockS3Client) HeadBucket(_ context.Context, _ *s3.HeadBucketInput, _ ...func(*s3.Options)) (*s3.HeadBucketOutput, error) {
+	return &s3.HeadBucketOutput{}, m.headBucketErr
 }
 
 func (m *mockS3Client) PutObject(_ context.Context, input *s3.PutObjectInput, _ ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
