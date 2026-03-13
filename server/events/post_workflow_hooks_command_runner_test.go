@@ -620,4 +620,57 @@ func TestRunPostHooks_Clone(t *testing.T) {
 			Eq(testHookWithPlanApplyCommands.RunCommand), Any[string](), Any[string](), Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
+
+	t.Run("Closed MR uses base branch clone instead of merge strategy", func(t *testing.T) {
+		postWorkflowHooksSetup(t)
+
+		var unlockCalled = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		// Create a closed MR
+		closedPull := testdata.Pull
+		closedPull.State = models.ClosedPullState
+		closedPull.BaseRepo = testdata.GithubRepo
+
+		ctx := &command.Context{
+			Pull:     closedPull,
+			HeadRepo: testdata.GithubRepo,
+			User:     testdata.User,
+			Log:      log,
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: testdata.GithubRepo.ID(),
+					PostWorkflowHooks: []*valid.WorkflowHook{
+						&testHook,
+					},
+				},
+			},
+		}
+
+		postWh.GlobalCfg = globalCfg
+
+		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, closedPull.Num, events.DefaultWorkspace,
+			events.DefaultRepoRelDir, "", command.Plan)).ThenReturn(unlockFn, nil)
+
+		repoDir := "/tmp/test-clone-dir"
+		When(postWhWorkingDir.CloneBaseBranch(Any[logging.SimpleLogging](), Eq(closedPull), Eq(events.DefaultWorkspace))).
+			ThenReturn(repoDir, nil)
+
+		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](),
+			Eq(testHook.RunCommand), Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
+
+		err := postWh.RunPostHooks(ctx, planCmd)
+
+		Ok(t, err)
+		postWhWorkingDir.VerifyWasCalledOnce().CloneBaseBranch(Any[logging.SimpleLogging](), Eq(closedPull), Eq(events.DefaultWorkspace))
+		postWhWorkingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
+			Eq(testHook.RunCommand), Any[string](), Any[string](), Eq(repoDir))
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
 }
