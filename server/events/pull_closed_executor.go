@@ -98,6 +98,14 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 			}
 			p.LogStreamResourceCleaner.CleanUp(jobContext)
 		}
+
+		// Clean up log streams associated with the pull request workflow.
+		jobContext := jobs.PullInfo{
+			PullNum:      pull.Num,
+			Repo:         pull.BaseRepo.Name,
+			RepoFullName: pull.BaseRepo.FullName,
+		}
+		p.LogStreamResourceCleaner.CleanUp(jobContext)
 	}
 
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
