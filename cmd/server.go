@@ -134,6 +134,8 @@ const (
 	RedisPort                        = "redis-port"
 	RedisTLSEnabled                  = "redis-tls-enabled"
 	RedisInsecureSkipVerify          = "redis-insecure-skip-verify"
+	RedisUsername                    = "redis-username"
+	RedisClusterAddresses            = "redis-cluster-addresses"
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
@@ -419,6 +421,13 @@ var stringFlags = map[string]stringFlag{
 	},
 	RedisPassword: {
 		description: "The Redis Password for when using a Locking DB type of 'redis'.",
+	},
+	RedisUsername: {
+		description: "The Redis Username for when using a Locking DB type of 'redis'.",
+	},
+	RedisClusterAddresses: {
+		description: "Comma-delimited list of Redis cluster node addresses in the format 'host:port'. " +
+			"When set, Atlantis uses Redis Cluster mode instead of single-node mode.",
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
@@ -851,7 +860,23 @@ func (s *ServerCmd) preRun() error {
 	return nil
 }
 
+// sanitizeKubernetesServiceLinks detects Kubernetes service link environment
+// variables that collide with Atlantis's ATLANTIS_ env prefix and resets them
+// to their defaults. Kubernetes auto-creates env vars like
+// ATLANTIS_REDIS_PORT=tcp://10.x.x.x:6379 for services in the same namespace,
+// which viper picks up and fails to parse as integers.
+func (s *ServerCmd) sanitizeKubernetesServiceLinks() {
+	for name, f := range intFlags {
+		val := s.Viper.GetString(name)
+		if strings.HasPrefix(val, "tcp://") || strings.HasPrefix(val, "udp://") {
+			s.Viper.Set(name, f.defaultValue)
+		}
+	}
+}
+
 func (s *ServerCmd) run() error {
+	s.sanitizeKubernetesServiceLinks()
+
 	var userConfig server.UserConfig
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err

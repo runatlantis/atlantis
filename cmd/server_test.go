@@ -132,6 +132,8 @@ var testFlags = map[string]any{
 	RedisPort:                        6379,
 	RedisTLSEnabled:                  false,
 	RedisDB:                          0,
+	RedisUsername:                    "",
+	RedisClusterAddresses:            "",
 	RepoAllowlistFlag:                "github.com/runatlantis/atlantis",
 	RepoConfigFlag:                   "",
 	RepoConfigJSONFlag:               "",
@@ -1209,4 +1211,37 @@ func TestExecute_GiteaBaseURLPort(t *testing.T) {
 	}, t)
 	Ok(t, c.Execute())
 	Equals(t, "http://mydomain.com:7990", passedConfig.GiteaBaseURL)
+}
+
+func TestSanitizeKubernetesServiceLinks(t *testing.T) {
+	t.Log("Kubernetes service link env vars should be sanitized to defaults")
+	// Simulate Kubernetes injecting ATLANTIS_REDIS_PORT=tcp://10.x.x.x:6379
+	envKey := "ATLANTIS_REDIS_PORT"
+	os.Setenv(envKey, "tcp://10.96.0.15:6379") // nolint: errcheck
+	defer os.Unsetenv(envKey)
+
+	c := setupWithDefaults(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, DefaultRedisPort, passedConfig.RedisPort)
+}
+
+func TestSanitizeKubernetesServiceLinks_UDPIgnored(t *testing.T) {
+	t.Log("UDP service link env vars should also be sanitized")
+	envKey := "ATLANTIS_REDIS_PORT"
+	os.Setenv(envKey, "udp://10.96.0.15:6379") // nolint: errcheck
+	defer os.Unsetenv(envKey)
+
+	c := setupWithDefaults(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, DefaultRedisPort, passedConfig.RedisPort)
 }
