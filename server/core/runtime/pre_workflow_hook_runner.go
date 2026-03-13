@@ -57,9 +57,17 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 	cmd.Env = finalEnvVars
 	out, err := cmd.CombinedOutput()
 
-	outString := strings.ReplaceAll(string(out), "\n", "\r\n")
-	wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
-	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+	// Send output line by line for better compatibility with load balancers.
+	// Large single messages can cause issues with Layer 7 LB buffering.
+	lines := strings.Split(string(out), "\n")
+	for i, line := range lines {
+		// Skip the last empty line from Split (artifact of trailing newline)
+		if i == len(lines)-1 && line == "" {
+			continue
+		}
+		wh.OutputHandler.SendWorkflowHook(ctx, line, false)
+	}
+	wh.OutputHandler.SendWorkflowHook(ctx, "", true)
 
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, shell+" "+shellArgs+" "+command, path, out)

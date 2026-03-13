@@ -947,6 +947,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		controllers.JobIDKeyGenerator{},
 		projectCmdOutputHandler,
 		userConfig.WebsocketCheckOrigin,
+		userConfig.WebsocketMessageDelay,
 	)
 
 	jobsController := &controllers.JobsController{
