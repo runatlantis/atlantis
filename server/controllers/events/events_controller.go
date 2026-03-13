@@ -344,7 +344,7 @@ func (e *VCSEventsController) handleGiteaPost(w http.ResponseWriter, r *http.Req
 	switch eventType {
 	case "pull_request_comment":
 		e.HandleGiteaPullRequestCommentEvent(w, body, reqID)
-	case "pull_request":
+	case "pull_request", "pull_request_sync":
 		logger.Debug("Handling as pull_request")
 		e.handleGiteaPullRequestEvent(logger, w, body, reqID)
 	// Add other case handlers as necessary
