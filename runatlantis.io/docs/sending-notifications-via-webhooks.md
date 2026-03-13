@@ -114,7 +114,7 @@ Example payload:
 
 For this you'll need to:
 
-* Create a Bot user in Slack
+* Create a Slack App to funcation as a Bot user in Slack
 * Configure Atlantis to send notifications to Slack.
 
 ### Configuring Slack for Atlantis
