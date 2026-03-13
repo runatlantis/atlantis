@@ -13,10 +13,8 @@
 **Build:** `make build-service` → creates `./atlantis` binary (~51MB, 30-60s first run, 10s subsequent). Clean: `make clean`
 
 **Test:** `make test` (unit, ~60s) • `make test-all` (includes integration, ~5min) • `make docker/test-all` (CI environment)
-⚠️ **Known failing test:** `TestNewServer_GitHubUser` in server/server_test.go - pre-existing, ignore it
 
 **Lint/Format:** `make check-fmt` (ALWAYS works) • `make fmt` (auto-format)
-⚠️ **Known issue:** `make lint` and `make check-lint` fail with Go 1.25+ version mismatch. Use `make check-fmt` locally, CI handles linting.
 
 **Mocks:** `make go-generate` (regenerate after interface changes) • `make regen-mocks` (delete & regenerate all)
 

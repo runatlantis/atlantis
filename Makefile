@@ -7,7 +7,7 @@ IMAGE_NAME := runatlantis/atlantis
 .DEFAULT_GOAL := help
 
 # renovate: datasource=github-releases depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION := v1.64.4
+GOLANGCI_LINT_VERSION := v2.7.2
 
 .PHONY: help
 help: ## List targets & descriptions
