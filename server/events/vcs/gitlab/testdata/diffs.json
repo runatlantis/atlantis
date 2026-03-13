@@ -1,0 +1,13 @@
+[
+  {
+    "old_path": "somefile.yaml",
+    "new_path": "somefile.yaml",
+    "a_mode": "100644",
+    "b_mode": "100644",
+    "diff": "--- a/somefile.yaml\n+++ b/somefile.yaml\n@@ -1 +1 @@\n-gud\n+good",
+    "new_file": false,
+    "renamed_file": false,
+    "deleted_file": false,
+    "generated_file": false
+  }
+]
