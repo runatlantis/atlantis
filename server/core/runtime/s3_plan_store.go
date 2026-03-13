@@ -106,10 +106,19 @@ func (s *S3PlanStore) Save(ctx command.ProjectContext, planPath string) error {
 	}
 	defer f.Close()
 
+	metadata := map[string]string{}
+	if ctx.Pull.HeadCommit != "" {
+		metadata["head-commit"] = ctx.Pull.HeadCommit
+	}
+	if ctx.User.Username != "" {
+		metadata["planned-by"] = ctx.User.Username
+	}
+
 	_, err = s.client.PutObject(context.Background(), &s3.PutObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-		Body:   f,
+		Bucket:   aws.String(s.bucket),
+		Key:      aws.String(key),
+		Body:     f,
+		Metadata: metadata,
 	})
 	if err != nil {
 		return fmt.Errorf("uploading plan to S3 (key=%s): %w", key, err)
@@ -131,6 +140,19 @@ func (s *S3PlanStore) Load(ctx command.ProjectContext, planPath string) error {
 		return fmt.Errorf("downloading plan from S3 (key=%s): %w", key, err)
 	}
 	defer resp.Body.Close()
+
+	// Reject stale plans: the plan must have been created at the same commit
+	// the PR currently points to. This prevents applying outdated plans after
+	// new commits are pushed (e.g. across pod restarts).
+	// Note: S3 normalizes user-defined metadata keys to title case in responses,
+	// so "head-commit" (as written in Save) becomes "Head-Commit" here.
+	planCommit := resp.Metadata["Head-Commit"]
+	if planCommit == "" {
+		return fmt.Errorf("plan in S3 has no head-commit metadata (key=%s) — run plan again", key)
+	}
+	if ctx.Pull.HeadCommit != "" && planCommit != ctx.Pull.HeadCommit {
+		return fmt.Errorf("plan was created at commit %.8s but PR is now at %.8s — run plan again", planCommit, ctx.Pull.HeadCommit)
+	}
 
 	if err := os.MkdirAll(filepath.Dir(planPath), 0o700); err != nil {
 		return fmt.Errorf("creating parent directories for plan file: %w", err)

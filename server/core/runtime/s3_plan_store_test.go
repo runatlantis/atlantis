@@ -29,6 +29,7 @@ type mockS3Client struct {
 	putBody     []byte
 	putErr      error
 	getBody     []byte
+	getMetadata map[string]string
 	getErr      error
 	deleteInput *s3.DeleteObjectInput
 	deleteErr   error
@@ -73,7 +74,8 @@ func (m *mockS3Client) GetObject(_ context.Context, input *s3.GetObjectInput, _ 
 		return nil, errors.New("no such key: " + key)
 	}
 	return &s3.GetObjectOutput{
-		Body: io.NopCloser(bytes.NewReader(m.getBody)),
+		Body:     io.NopCloser(bytes.NewReader(m.getBody)),
+		Metadata: m.getMetadata,
 	}, nil
 }
 
@@ -144,6 +146,7 @@ func TestSave_Success(t *testing.T) {
 	mock := &mockS3Client{}
 	store := runtime.NewS3PlanStoreWithClient(mock, "my-bucket", "pfx", logging.NewNoopLogger(t))
 	ctx := testProjectContext()
+	ctx.Pull.HeadCommit = "abc123def456"
 
 	planDir := t.TempDir()
 	planPath := filepath.Join(planDir, "test.tfplan")
@@ -155,6 +158,7 @@ func TestSave_Success(t *testing.T) {
 	assert.Equal(t, "my-bucket", *mock.putInput.Bucket)
 	assert.Equal(t, "pfx/acme/infra/42/default/modules/vpc/test.tfplan", *mock.putInput.Key)
 	assert.Equal(t, []byte("plan-content"), mock.putBody)
+	assert.Equal(t, "abc123def456", mock.putInput.Metadata["head-commit"])
 }
 
 func TestSave_S3Error(t *testing.T) {
@@ -180,9 +184,13 @@ func TestSave_FileOpenError(t *testing.T) {
 
 func TestLoad_Success(t *testing.T) {
 	planContent := []byte("downloaded-plan-data")
-	mock := &mockS3Client{getBody: planContent}
+	mock := &mockS3Client{
+		getBody:     planContent,
+		getMetadata: map[string]string{"Head-Commit": "abc123"},
+	}
 	store := runtime.NewS3PlanStoreWithClient(mock, "bucket", "pfx", logging.NewNoopLogger(t))
 	ctx := testProjectContext()
+	ctx.Pull.HeadCommit = "abc123"
 
 	planDir := t.TempDir()
 	planPath := filepath.Join(planDir, "subdir", "test.tfplan")
@@ -193,6 +201,32 @@ func TestLoad_Success(t *testing.T) {
 	got, err := os.ReadFile(planPath)
 	require.NoError(t, err)
 	assert.Equal(t, planContent, got)
+}
+
+func TestLoad_StalePlanRejected(t *testing.T) {
+	mock := &mockS3Client{
+		getBody:     []byte("old-plan"),
+		getMetadata: map[string]string{"Head-Commit": "oldcommit"},
+	}
+	store := runtime.NewS3PlanStoreWithClient(mock, "bucket", "", logging.NewNoopLogger(t))
+	ctx := testProjectContext()
+	ctx.Pull.HeadCommit = "newcommit"
+
+	err := store.Load(ctx, filepath.Join(t.TempDir(), "plan.tfplan"))
+	assert.ErrorContains(t, err, "plan was created at commit oldcommi but PR is now at newcommi")
+}
+
+func TestLoad_MissingMetadataRejected(t *testing.T) {
+	mock := &mockS3Client{
+		getBody:     []byte("plan-data"),
+		getMetadata: map[string]string{},
+	}
+	store := runtime.NewS3PlanStoreWithClient(mock, "bucket", "", logging.NewNoopLogger(t))
+	ctx := testProjectContext()
+	ctx.Pull.HeadCommit = "abc123"
+
+	err := store.Load(ctx, filepath.Join(t.TempDir(), "plan.tfplan"))
+	assert.ErrorContains(t, err, "no head-commit metadata")
 }
 
 func TestLoad_S3Error(t *testing.T) {
