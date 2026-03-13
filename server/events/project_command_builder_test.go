@@ -24,6 +24,7 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 var defaultUserConfig = struct {
@@ -241,10 +242,11 @@ terraform {
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
 			tmpDir := DirStructure(t, c.TestDirStructure)
-			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, nil)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+				gomock.Any()).Return(tmpDir, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(ChangedFiles(c.TestDirStructure, ""), nil)
@@ -599,14 +601,15 @@ projects:
 		for _, cmdName := range []command.Name{command.Plan, command.Apply} {
 			t.Run(c.Description+"_"+cmdName.String(), func(t *testing.T) {
 				RegisterMockTestingT(t)
+				ctrl := gomock.NewController(t)
 				tmpDir := DirStructure(t, map[string]any{
 					"main.tf": nil,
 				})
 
-				workingDir := mocks.NewMockWorkingDir()
-				When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-					Any[string]())).ThenReturn(tmpDir, nil)
-				When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+				workingDir := mocks.NewMockWorkingDir(ctrl)
+				workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any()).Return(tmpDir, nil).AnyTimes()
+				workingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(tmpDir, nil).AnyTimes()
 				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 					Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
@@ -789,12 +792,13 @@ projects:
 	for _, c := range cases {
 		t.Run(c.Description+"_"+command.Plan.String(), func(t *testing.T) {
 			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
 			tmpDir := DirStructure(t, c.DirectoryStructure)
 
-			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, nil)
-			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+				gomock.Any()).Return(tmpDir, nil).AnyTimes()
+			workingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(tmpDir, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
@@ -1154,12 +1158,13 @@ projects:
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
 			tmpDir := DirStructure(t, c.DirStructure)
 
-			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, nil)
-			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+				gomock.Any()).Return(tmpDir, nil).AnyTimes()
+			workingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(tmpDir, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
@@ -1231,6 +1236,7 @@ projects:
 // In this case we should apply all outstanding plans.
 func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 	tmpDir := DirStructure(t, map[string]any{
 		"workspace1": map[string]any{
 			"project1": map[string]any{
@@ -1258,11 +1264,16 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
 	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
 
-	workingDir := mocks.NewMockWorkingDir()
-	When(workingDir.GetPullDir(
-		Any[models.Repo](),
-		Any[models.PullRequest]())).
-		ThenReturn(tmpDir, nil)
+	workingDir := mocks.NewMockWorkingDir(ctrl)
+	workingDir.EXPECT().GetPullDir(
+		gomock.Any(),
+		gomock.Any()).
+		Return(tmpDir, nil).AnyTimes()
+	workingDir.EXPECT().GetWorkingDir(
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any()).
+		Return(tmpDir, nil).AnyTimes()
 
 	logger := logging.NewNoopLogger(t)
 	userConfig := defaultUserConfig
@@ -1326,7 +1337,8 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 // allow plans for other workspace names.
 func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
 	RegisterMockTestingT(t)
-	workingDir := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	workingDir := mocks.NewMockWorkingDir(ctrl)
 
 	tmpDir := DirStructure(t, map[string]any{
 		"pulldir": map[string]any{
@@ -1345,9 +1357,9 @@ projects:
 	err := os.WriteFile(filepath.Join(repoDir, valid.DefaultAtlantisFile), []byte(yamlCfg), 0600)
 	Ok(t, err)
 
-	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Any[string]())).ThenReturn(repoDir, nil)
-	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+	workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+		gomock.Any()).Return(repoDir, nil).AnyTimes()
+	workingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(repoDir, nil).AnyTimes()
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowAllRepoSettings: true,
@@ -1428,14 +1440,15 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 	for _, c := range cases {
 		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
 			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
 			tmpDir := DirStructure(t, map[string]any{
 				"main.tf": nil,
 			})
 
-			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, nil)
-			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+				gomock.Any()).Return(tmpDir, nil).AnyTimes()
+			workingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(tmpDir, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
@@ -1582,16 +1595,17 @@ projects:
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
 
 			tmpDir := DirStructure(t, testCase.DirStructure)
 
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(testCase.ModifiedFiles, nil)
-			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, nil)
-			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+				gomock.Any()).Return(tmpDir, nil).AnyTimes()
+			workingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(tmpDir, nil).AnyTimes()
 
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowAllRepoSettings: true,
@@ -1662,6 +1676,7 @@ projects:
 // Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 	cases := []struct {
+		Description              string
 		AtlantisYAML             string
 		IsFork                   bool
 		ExpectedCtxs             int
@@ -1671,6 +1686,7 @@ func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 		IncludeGitUntrackedFiles bool
 	}{
 		{
+			Description: "skip clone when no changes and not forked",
 			AtlantisYAML: `
 version: 3
 projects:
@@ -1682,6 +1698,7 @@ projects:
 			IncludeGitUntrackedFiles: false,
 		},
 		{
+			Description: "clone when include git untracked files",
 			AtlantisYAML: `
 version: 3
 projects:
@@ -1693,6 +1710,7 @@ projects:
 			IncludeGitUntrackedFiles: true,
 		},
 		{
+			Description: "skip clone when forked",
 			AtlantisYAML: `
 version: 3
 projects:
@@ -1704,6 +1722,7 @@ projects:
 			ModifiedFiles:           []string{"dir2/main.tf"},
 		},
 		{
+			Description: "clone when parallel plan",
 			AtlantisYAML: `
 version: 3
 parallel_plan: true`,
@@ -1714,6 +1733,7 @@ parallel_plan: true`,
 			IncludeGitUntrackedFiles: false,
 		},
 		{
+			Description: "clone when autodiscover enabled",
 			AtlantisYAML: `
 version: 3
 autodiscover:
@@ -1732,84 +1752,93 @@ projects:
 	userConfig.SkipCloneNoChanges = true
 
 	for _, c := range cases {
-		RegisterMockTestingT(t)
-		vcsClient := vcsmocks.NewMockClient()
-		When(vcsClient.GetModifiedFiles(
-			Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
-		When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(true)
-		When(vcsClient.GetFileContent(
-			Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
-		workingDir := mocks.NewMockWorkingDir()
+		t.Run(c.Description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
+			When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(true)
+			When(vcsClient.GetFileContent(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
+			// Set up Clone expectation with the expected number of calls
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(),
+				gomock.Any(), gomock.Any()).Return("", nil).Times(c.ExpectedClones)
+			workingDir.EXPECT().GetGitUntrackedFiles(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return([]string{}, nil).AnyTimes()
 
-		logger := logging.NewNoopLogger(t)
+			logger := logging.NewNoopLogger(t)
 
-		globalCfgArgs := valid.GlobalCfgArgs{
-			AllowAllRepoSettings: true,
-		}
-		scope := metricstest.NewLoggingScope(t, logger, "atlantis")
-		terraformClient := tfclientmocks.NewMockClient()
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowAllRepoSettings: true,
+			}
+			scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+			terraformClient := tfclientmocks.NewMockClient()
 
-		builder := events.NewProjectCommandBuilder(
-			false,
-			&config.ParserValidator{},
-			&events.DefaultProjectFinder{},
-			vcsClient,
-			workingDir,
-			events.NewDefaultWorkingDirLocker(),
-			valid.NewGlobalCfgFromArgs(globalCfgArgs),
-			&events.DefaultPendingPlanFinder{},
-			&events.CommentParser{ExecutableName: "atlantis"},
-			userConfig.SkipCloneNoChanges,
-			userConfig.EnableRegExpCmd,
-			userConfig.EnableAutoMerge,
-			userConfig.EnableParallelPlan,
-			userConfig.EnableParallelApply,
-			userConfig.AutoDetectModuleFiles,
-			userConfig.AutoplanFileList,
-			userConfig.RestrictFileList,
-			userConfig.SilenceNoProjects,
-			c.IncludeGitUntrackedFiles,
-			userConfig.AutoDiscoverMode,
-			scope,
-			terraformClient,
-		)
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{ExecutableName: "atlantis"},
+				userConfig.SkipCloneNoChanges,
+				userConfig.EnableRegExpCmd,
+				userConfig.EnableAutoMerge,
+				userConfig.EnableParallelPlan,
+				userConfig.EnableParallelApply,
+				userConfig.AutoDetectModuleFiles,
+				userConfig.AutoplanFileList,
+				userConfig.RestrictFileList,
+				userConfig.SilenceNoProjects,
+				c.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
+				scope,
+				terraformClient,
+			)
 
-		var actCtxs []command.ProjectContext
-		var err error
+			var actCtxs []command.ProjectContext
+			var err error
 
-		baseRepo := models.Repo{Owner: "owner"}
-		headRepo := baseRepo
-		if c.IsFork {
-			headRepo.Owner = "repoForker"
-		}
+			baseRepo := models.Repo{Owner: "owner"}
+			headRepo := baseRepo
+			if c.IsFork {
+				headRepo.Owner = "repoForker"
+			}
 
-		actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
-			HeadRepo: headRepo,
-			Pull: models.PullRequest{
-				BaseRepo: baseRepo,
-			},
-			User:  models.User{},
-			Log:   logger,
-			Scope: scope,
-			PullRequestStatus: models.PullReqStatus{
-				MergeableStatus: models.MergeableStatus{IsMergeable: true},
-			},
+			actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
+				HeadRepo: headRepo,
+				Pull: models.PullRequest{
+					BaseRepo: baseRepo,
+				},
+				User:  models.User{},
+				Log:   logger,
+				Scope: scope,
+				PullRequestStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
+				},
+			})
+
+			Ok(t, err)
+			Equals(t, c.ExpectedCtxs, len(actCtxs))
+			// Verify GetFileContent was called the expected number of times and with the right repo
+			if c.ExpectedGetFileContents > 0 {
+				res := vcsClient.VerifyWasCalled(Times(c.ExpectedGetFileContents)).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())
+				_, actRepo, _, _ := res.GetCapturedArguments()
+				Equals(t, headRepo, actRepo)
+			} else {
+				vcsClient.VerifyWasCalled(Times(0)).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())
+			}
 		})
-
-		Ok(t, err)
-		Equals(t, c.ExpectedCtxs, len(actCtxs))
-		workingDir.VerifyWasCalled(Times(c.ExpectedClones)).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
-			Any[models.PullRequest](), Any[string]())
-		res := vcsClient.VerifyWasCalled(Times(c.ExpectedGetFileContents)).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())
-		if c.ExpectedGetFileContents > 0 {
-			_, actRepo, _, _ := res.GetCapturedArguments()
-			Equals(t, headRepo, actRepo)
-		}
 	}
 }
 
 func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanCommand(t *testing.T) {
 	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 	tmpDir := DirStructure(t, map[string]any{
 		"main.tf": nil,
 	})
@@ -1818,9 +1847,9 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
-	workingDir := mocks.NewMockWorkingDir()
-	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Any[string]())).ThenReturn(tmpDir, nil)
+	workingDir := mocks.NewMockWorkingDir(ctrl)
+	workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+		gomock.Any()).Return(tmpDir, nil).AnyTimes()
 	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 		Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
@@ -1879,6 +1908,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 // Test building version command for multiple projects
 func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 	tmpDir := DirStructure(t, map[string]any{
 		"workspace1": map[string]any{
 			"project1": map[string]any{
@@ -1906,11 +1936,12 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
 	runCmd(t, filepath.Join(tmpDir, "workspace2"), "git", "init")
 
-	workingDir := mocks.NewMockWorkingDir()
-	When(workingDir.GetPullDir(
-		Any[models.Repo](),
-		Any[models.PullRequest]())).
-		ThenReturn(tmpDir, nil)
+	workingDir := mocks.NewMockWorkingDir(ctrl)
+	workingDir.EXPECT().GetPullDir(
+		gomock.Any(),
+		gomock.Any()).
+		Return(tmpDir, nil).AnyTimes()
+	workingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(tmpDir, nil).AnyTimes()
 
 	logger := logging.NewNoopLogger(t)
 	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
@@ -2033,14 +2064,15 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 	for _, c := range cases {
 		t.Run(c.Description+"_"+command.Plan.String(), func(t *testing.T) {
 			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
 			tmpDir := DirStructure(t, c.DirectoryStructure)
 
-			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, nil)
-			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
-			When(workingDir.GetGitUntrackedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(c.UntrackedFiles, nil)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+				gomock.Any()).Return(tmpDir, nil).AnyTimes()
+			workingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(tmpDir, nil).AnyTimes()
+			workingDir.EXPECT().GetGitUntrackedFiles(gomock.Any(), gomock.Any(), gomock.Any(),
+				gomock.Any()).Return(c.UntrackedFiles, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
@@ -2144,14 +2176,15 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 	for _, c := range cases {
 		t.Run(c.Description+"_"+command.Plan.String(), func(t *testing.T) {
 			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
 			tmpDir := DirStructure(t, c.DirectoryStructure)
 
-			workingDir := mocks.NewMockWorkingDir()
-			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, nil)
-			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
-			When(workingDir.GetGitUntrackedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(c.UntrackedFiles, nil)
+			workingDir := mocks.NewMockWorkingDir(ctrl)
+			workingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+				gomock.Any()).Return(tmpDir, nil).AnyTimes()
+			workingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(tmpDir, nil).AnyTimes()
+			workingDir.EXPECT().GetGitUntrackedFiles(gomock.Any(), gomock.Any(), gomock.Any(),
+				gomock.Any()).Return(c.UntrackedFiles, nil).AnyTimes()
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
