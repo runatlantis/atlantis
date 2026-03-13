@@ -16,7 +16,6 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/utils"
 )
 
 // ApplyStepRunner runs `terraform apply`.
@@ -26,6 +25,7 @@ type ApplyStepRunner struct {
 	DefaultTFVersion      *version.Version       `validate:"required"`
 	CommitStatusUpdater   StatusUpdater          `validate:"required"`
 	AsyncTFExec           AsyncTFExec            `validate:"required"`
+	PlanStore             PlanStore              `validate:"required"`
 }
 
 func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
@@ -34,6 +34,9 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 	}
 
 	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	if loadErr := a.PlanStore.Load(ctx, planPath); loadErr != nil {
+		return "", fmt.Errorf("loading plan: %w", loadErr)
+	}
 	contents, err := os.ReadFile(planPath)
 	if os.IsNotExist(err) {
 		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelDir, ctx.Workspace)
@@ -70,7 +73,7 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 	// If the apply was successful, delete the plan.
 	if err == nil {
 		ctx.Log.Info("apply successful, deleting planfile")
-		if removeErr := utils.RemoveIgnoreNonExistent(planPath); removeErr != nil {
+		if removeErr := a.PlanStore.Remove(ctx, planPath); removeErr != nil {
 			ctx.Log.Warn("failed to delete planfile after successful apply: %s", removeErr)
 		}
 	}

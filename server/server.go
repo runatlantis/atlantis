@@ -573,19 +573,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Database:         database,
 	}
 
-	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
-		statsScope,
-		logger,
-		&events.PullClosedExecutor{
-			Locker:                   lockingClient,
-			WorkingDir:               workingDir,
-			Database:                 database,
-			PullClosedTemplate:       &events.PullClosedEventTemplate{},
-			LogStreamResourceCleaner: projectCmdOutputHandler,
-			VCSClient:                vcsClient,
-		},
-	)
-
 	eventParser := &events.EventParser{
 		GithubUser:         userConfig.GithubUser,
 		GithubToken:        userConfig.GithubToken,
@@ -648,6 +635,39 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
 	}
+	var planStore runtime.PlanStore
+	switch userConfig.PlanStore {
+	case "s3":
+		logger.Info("initializing S3 plan store (bucket=%s, region=%s)", userConfig.PlanStoreS3Bucket, userConfig.PlanStoreS3Region)
+		planStore, err = runtime.NewS3PlanStore(runtime.S3PlanStoreConfig{
+			Bucket:         userConfig.PlanStoreS3Bucket,
+			Region:         userConfig.PlanStoreS3Region,
+			Prefix:         userConfig.PlanStoreS3Prefix,
+			Endpoint:       userConfig.PlanStoreS3Endpoint,
+			ForcePathStyle: userConfig.PlanStoreS3ForcePathStyle,
+			Profile:        userConfig.PlanStoreS3Profile,
+		}, logger)
+		if err != nil {
+			return nil, fmt.Errorf("initializing S3 plan store: %w", err)
+		}
+	default:
+		planStore = &runtime.LocalPlanStore{}
+	}
+
+	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
+		statsScope,
+		logger,
+		&events.PullClosedExecutor{
+			Locker:                   lockingClient,
+			WorkingDir:               workingDir,
+			Database:                 database,
+			PullClosedTemplate:       &events.PullClosedEventTemplate{},
+			LogStreamResourceCleaner: projectCmdOutputHandler,
+			VCSClient:                vcsClient,
+			PlanStore:                planStore,
+		},
+	)
+
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
 		policyChecksEnabled,
@@ -672,6 +692,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AutoDiscoverModeFlag,
 		statsScope,
 		terraformClient,
+		planStore,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)
@@ -706,7 +727,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			DefaultTFDistribution: defaultTfDistribution,
 			DefaultTFVersion:      defaultTfVersion,
 		},
-		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, commitStatusUpdater, terraformClient),
+		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, commitStatusUpdater, terraformClient, planStore),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckStepRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
@@ -715,6 +736,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			DefaultTFVersion:      defaultTfVersion,
 			CommitStatusUpdater:   commitStatusUpdater,
 			AsyncTFExec:           terraformClient,
+			PlanStore:             planStore,
 		},
 		RunStepRunner: runStepRunner,
 		EnvStepRunner: &runtime.EnvStepRunner{
@@ -728,8 +750,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			DefaultTFDistribution: defaultTfDistribution,
 			DefaultTFVersion:      defaultTfVersion,
 		},
-		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
-		StateRmStepRunner:         runtime.NewStateRmStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
+		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, planStore),
+		StateRmStepRunner:         runtime.NewStateRmStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, planStore),
 		WorkingDir:                workingDir,
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,
