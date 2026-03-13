@@ -71,6 +71,20 @@ func (mr *MockDatabaseMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockDatabase)(nil).Close))
 }
 
+// DeleteProjectOutputsByPull mocks base method.
+func (m *MockDatabase) DeleteProjectOutputsByPull(repoFullName string, pullNum int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteProjectOutputsByPull", repoFullName, pullNum)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteProjectOutputsByPull indicates an expected call of DeleteProjectOutputsByPull.
+func (mr *MockDatabaseMockRecorder) DeleteProjectOutputsByPull(repoFullName, pullNum any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteProjectOutputsByPull", reflect.TypeOf((*MockDatabase)(nil).DeleteProjectOutputsByPull), repoFullName, pullNum)
+}
+
 // DeletePullStatus mocks base method.
 func (m *MockDatabase) DeletePullStatus(pull models.PullRequest) error {
 	m.ctrl.T.Helper()
@@ -83,6 +97,21 @@ func (m *MockDatabase) DeletePullStatus(pull models.PullRequest) error {
 func (mr *MockDatabaseMockRecorder) DeletePullStatus(pull any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePullStatus", reflect.TypeOf((*MockDatabase)(nil).DeletePullStatus), pull)
+}
+
+// GetActivePullRequests mocks base method.
+func (m *MockDatabase) GetActivePullRequests() ([]models.PullRequest, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetActivePullRequests")
+	ret0, _ := ret[0].([]models.PullRequest)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetActivePullRequests indicates an expected call of GetActivePullRequests.
+func (mr *MockDatabaseMockRecorder) GetActivePullRequests() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActivePullRequests", reflect.TypeOf((*MockDatabase)(nil).GetActivePullRequests))
 }
 
 // GetLock mocks base method.
@@ -98,6 +127,66 @@ func (m *MockDatabase) GetLock(project models.Project, workspace string) (*model
 func (mr *MockDatabaseMockRecorder) GetLock(project, workspace any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLock", reflect.TypeOf((*MockDatabase)(nil).GetLock), project, workspace)
+}
+
+// GetProjectOutputByJobID mocks base method.
+func (m *MockDatabase) GetProjectOutputByJobID(jobID string) (*models.ProjectOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectOutputByJobID", jobID)
+	ret0, _ := ret[0].(*models.ProjectOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectOutputByJobID indicates an expected call of GetProjectOutputByJobID.
+func (mr *MockDatabaseMockRecorder) GetProjectOutputByJobID(jobID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectOutputByJobID", reflect.TypeOf((*MockDatabase)(nil).GetProjectOutputByJobID), jobID)
+}
+
+// GetProjectOutputHistory mocks base method.
+func (m *MockDatabase) GetProjectOutputHistory(repoFullName string, pullNum int, path, workspace, projectName string) ([]models.ProjectOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectOutputHistory", repoFullName, pullNum, path, workspace, projectName)
+	ret0, _ := ret[0].([]models.ProjectOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectOutputHistory indicates an expected call of GetProjectOutputHistory.
+func (mr *MockDatabaseMockRecorder) GetProjectOutputHistory(repoFullName, pullNum, path, workspace, projectName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectOutputHistory", reflect.TypeOf((*MockDatabase)(nil).GetProjectOutputHistory), repoFullName, pullNum, path, workspace, projectName)
+}
+
+// GetProjectOutputRun mocks base method.
+func (m *MockDatabase) GetProjectOutputRun(repoFullName string, pullNum int, path, workspace, projectName, arg5 string, runTimestamp int64) (*models.ProjectOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectOutputRun", repoFullName, pullNum, path, workspace, projectName, arg5, runTimestamp)
+	ret0, _ := ret[0].(*models.ProjectOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectOutputRun indicates an expected call of GetProjectOutputRun.
+func (mr *MockDatabaseMockRecorder) GetProjectOutputRun(repoFullName, pullNum, path, workspace, projectName, arg5, runTimestamp any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectOutputRun", reflect.TypeOf((*MockDatabase)(nil).GetProjectOutputRun), repoFullName, pullNum, path, workspace, projectName, arg5, runTimestamp)
+}
+
+// GetProjectOutputsByPull mocks base method.
+func (m *MockDatabase) GetProjectOutputsByPull(repoFullName string, pullNum int) ([]models.ProjectOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectOutputsByPull", repoFullName, pullNum)
+	ret0, _ := ret[0].([]models.ProjectOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectOutputsByPull indicates an expected call of GetProjectOutputsByPull.
+func (mr *MockDatabaseMockRecorder) GetProjectOutputsByPull(repoFullName, pullNum any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectOutputsByPull", reflect.TypeOf((*MockDatabase)(nil).GetProjectOutputsByPull), repoFullName, pullNum)
 }
 
 // GetPullStatus mocks base method.
@@ -143,6 +232,34 @@ func (m *MockDatabase) LockCommand(cmdName command.Name, lockTime time.Time) (*c
 func (mr *MockDatabaseMockRecorder) LockCommand(cmdName, lockTime any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockCommand", reflect.TypeOf((*MockDatabase)(nil).LockCommand), cmdName, lockTime)
+}
+
+// MarkInterruptedOutputs mocks base method.
+func (m *MockDatabase) MarkInterruptedOutputs() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkInterruptedOutputs")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkInterruptedOutputs indicates an expected call of MarkInterruptedOutputs.
+func (mr *MockDatabaseMockRecorder) MarkInterruptedOutputs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkInterruptedOutputs", reflect.TypeOf((*MockDatabase)(nil).MarkInterruptedOutputs))
+}
+
+// SaveProjectOutput mocks base method.
+func (m *MockDatabase) SaveProjectOutput(output models.ProjectOutput) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveProjectOutput", output)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SaveProjectOutput indicates an expected call of SaveProjectOutput.
+func (mr *MockDatabaseMockRecorder) SaveProjectOutput(output any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveProjectOutput", reflect.TypeOf((*MockDatabase)(nil).SaveProjectOutput), output)
 }
 
 // TryLock mocks base method.
