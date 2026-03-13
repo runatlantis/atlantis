@@ -1,0 +1,24 @@
+repos:
+  - id: /.*/
+    custom_policy_check: true
+
+policies:
+  owners:
+    users:
+      - runatlantis
+  policy_sets:
+    - name: security_policy
+      approve_count: 1
+    - name: compliance_policy
+      approve_count: 1
+    - name: another_policy
+      approve_count: 1
+
+workflows:
+  default:
+    policy_check:
+      steps:
+        - show
+        - run: echo "Security check - 0 failures, 1 passed"
+        - run: echo "Compliance check - 0 failures, 1 passed"
+        - run: echo "Another check - 1 failures, 0 passed"
