@@ -246,6 +246,50 @@ func (s *S3PlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) err
 	return nil
 }
 
+// DeleteForPull removes all plan objects stored under the pull request prefix in S3.
+func (s *S3PlanStore) DeleteForPull(owner, repo string, pullNum int) error {
+	prefixParts := []string{}
+	if s.prefix != "" {
+		prefixParts = append(prefixParts, s.prefix)
+	}
+	prefixParts = append(prefixParts, owner, repo, strconv.Itoa(pullNum))
+	listPrefix := strings.Join(prefixParts, "/") + "/"
+
+	var deleted int
+	var continuationToken *string
+	for {
+		resp, err := s.client.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
+			Bucket:            aws.String(s.bucket),
+			Prefix:            aws.String(listPrefix),
+			ContinuationToken: continuationToken,
+		})
+		if err != nil {
+			return fmt.Errorf("listing plans for deletion (prefix=%s): %w", listPrefix, err)
+		}
+
+		for _, obj := range resp.Contents {
+			key := aws.ToString(obj.Key)
+			if _, err := s.client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
+				Bucket: aws.String(s.bucket),
+				Key:    aws.String(key),
+			}); err != nil {
+				return fmt.Errorf("deleting plan from S3 (key=%s): %w", key, err)
+			}
+			deleted++
+		}
+
+		if !aws.ToBool(resp.IsTruncated) {
+			break
+		}
+		continuationToken = resp.NextContinuationToken
+	}
+
+	if deleted > 0 {
+		s.logger.Info("deleted %d plan(s) from S3 for %s/%s#%d", deleted, owner, repo, pullNum)
+	}
+	return nil
+}
+
 // s3Key builds a deterministic S3 object key from the ProjectContext and plan filename.
 // Format: <prefix>/<owner>/<repo>/<pullNum>/<workspace>/<repoRelDir>/<planfilename>
 func (s *S3PlanStore) s3Key(ctx command.ProjectContext, planPath string) string {

@@ -23,6 +23,9 @@ type PlanStore interface {
 	// where the set of planned projects is unknown. The single-project apply
 	// path does not call this — it uses Load with an already-known key.
 	RestorePlans(pullDir, owner, repo string, pullNum int) error
+	// DeleteForPull removes all stored plan files for a pull request.
+	// Called during PR close/merge cleanup.
+	DeleteForPull(owner, repo string, pullNum int) error
 }
 
 // LocalPlanStore implements PlanStore using the local filesystem.
@@ -43,4 +46,8 @@ func (s *LocalPlanStore) Remove(_ command.ProjectContext, planPath string) error
 
 func (s *LocalPlanStore) RestorePlans(_, _, _ string, _ int) error {
 	return nil // no-op: plans are already on the local filesystem
+}
+
+func (s *LocalPlanStore) DeleteForPull(_, _ string, _ int) error {
+	return nil // no-op: working dir deletion handles local files
 }

@@ -32,6 +32,8 @@ type mockS3Client struct {
 	getErr      error
 	deleteInput *s3.DeleteObjectInput
 	deleteErr   error
+	// deletedKeys tracks all keys passed to DeleteObject
+	deletedKeys []string
 
 	// For HeadBucket startup validation
 	headBucketErr error
@@ -77,6 +79,7 @@ func (m *mockS3Client) GetObject(_ context.Context, input *s3.GetObjectInput, _ 
 
 func (m *mockS3Client) DeleteObject(_ context.Context, input *s3.DeleteObjectInput, _ ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
 	m.deleteInput = input
+	m.deletedKeys = append(m.deletedKeys, aws.ToString(input.Key))
 	return &s3.DeleteObjectOutput{}, m.deleteErr
 }
 
@@ -308,4 +311,60 @@ func TestRestorePlans_WithoutPrefix(t *testing.T) {
 	got, err := os.ReadFile(filepath.Join(pullDir, "default", "plan.tfplan"))
 	require.NoError(t, err)
 	assert.Equal(t, []byte("plan-data"), got)
+}
+
+func TestDeleteForPull_Success(t *testing.T) {
+	mock := &mockS3Client{
+		listOutput: &s3.ListObjectsV2Output{
+			Contents: []s3types.Object{
+				{Key: aws.String("pfx/acme/infra/42/default/modules/vpc/plan.tfplan")},
+				{Key: aws.String("pfx/acme/infra/42/staging/modules/rds/plan.tfplan")},
+			},
+		},
+	}
+	store := runtime.NewS3PlanStoreWithClient(mock, "bucket", "pfx", logging.NewNoopLogger(t))
+
+	err := store.DeleteForPull("acme", "infra", 42)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{
+		"pfx/acme/infra/42/default/modules/vpc/plan.tfplan",
+		"pfx/acme/infra/42/staging/modules/rds/plan.tfplan",
+	}, mock.deletedKeys)
+}
+
+func TestDeleteForPull_NoObjects(t *testing.T) {
+	mock := &mockS3Client{
+		listOutput: &s3.ListObjectsV2Output{
+			Contents: []s3types.Object{},
+		},
+	}
+	store := runtime.NewS3PlanStoreWithClient(mock, "bucket", "pfx", logging.NewNoopLogger(t))
+
+	err := store.DeleteForPull("acme", "infra", 42)
+	require.NoError(t, err)
+	assert.Empty(t, mock.deletedKeys)
+}
+
+func TestDeleteForPull_ListError(t *testing.T) {
+	mock := &mockS3Client{listErr: errors.New("access denied")}
+	store := runtime.NewS3PlanStoreWithClient(mock, "bucket", "pfx", logging.NewNoopLogger(t))
+
+	err := store.DeleteForPull("acme", "infra", 42)
+	assert.ErrorContains(t, err, "access denied")
+}
+
+func TestDeleteForPull_DeleteError(t *testing.T) {
+	mock := &mockS3Client{
+		listOutput: &s3.ListObjectsV2Output{
+			Contents: []s3types.Object{
+				{Key: aws.String("pfx/acme/infra/42/default/plan.tfplan")},
+			},
+		},
+		deleteErr: errors.New("forbidden"),
+	}
+	store := runtime.NewS3PlanStoreWithClient(mock, "bucket", "pfx", logging.NewNoopLogger(t))
+
+	err := store.DeleteForPull("acme", "infra", 42)
+	assert.ErrorContains(t, err, "forbidden")
 }
