@@ -33,7 +33,7 @@ type WorkingDirLocker interface {
 	// It returns a function that should be used to unlock the workspace and
 	// an error if the workspace is already locked. The error is expected to
 	// be printed to the pull request.
-	TryLock(repoFullName string, pullNum int, workspace string, path string, cmdName command.Name) (func(), error)
+	TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) (func(), error)
 	// UnlockByPull unlocks all workspaces for a specific pull request
 	UnlockByPull(repoFullName string, pullNum int)
 }
@@ -52,18 +52,18 @@ func NewDefaultWorkingDirLocker() *DefaultWorkingDirLocker {
 	return &DefaultWorkingDirLocker{locks: make(map[string]command.Name)}
 }
 
-func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, cmdName command.Name) (func(), error) {
+func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) (func(), error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path)
+	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path, projectName)
 	if currentLock, exists := d.locks[workspaceKey]; exists {
 		return func() {}, fmt.Errorf("cannot run %q: the %s workspace at path %s is currently locked for this pull request by %q.\n"+
 			"Wait until the previous command is complete and try again", cmdName, workspace, path, currentLock)
 	}
 	d.locks[workspaceKey] = cmdName
 	return func() {
-		d.unlock(repoFullName, pullNum, workspace, path)
+		d.unlock(repoFullName, pullNum, workspace, path, projectName)
 	}, nil
 }
 
@@ -82,14 +82,14 @@ func (d *DefaultWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int)
 }
 
 // Unlock unlocks the workspace for this pull.
-func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, workspace string, path string) {
+func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, workspace string, path string, projectName string) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path)
+	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path, projectName)
 	delete(d.locks, workspaceKey)
 }
 
-func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace string, path string) string {
-	return fmt.Sprintf("%s/%d/%s/%s", repo, pull, workspace, path)
+func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace string, path string, projectName string) string {
+	return strings.TrimRight(fmt.Sprintf("%s/%d/%s/%s/%s", repo, pull, workspace, path, projectName), "/")
 }

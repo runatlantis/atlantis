@@ -2,6 +2,12 @@
 
 Aside from interacting via pull request comments, Atlantis could respond to a limited number of API endpoints.
 
+:::warning ALPHA API - SUBJECT TO CHANGE
+The API endpoints documented on this page are currently in **alpha state** and are **not considered stable**. The request and response schemas may change at any time without prior notice or deprecation period.
+
+If you build integrations against these endpoints, when upgrading Atlantis you should review the release notes carefully and be prepared to update your code.
+:::
+
 ## Main Endpoints
 
 The API endpoints in this section are disabled by default, since these API endpoints could change the infrastructure directly.
