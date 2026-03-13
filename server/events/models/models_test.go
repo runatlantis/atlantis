@@ -107,6 +107,19 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 			"/b",
 			`invalid repo format "/b", owner "" or repo "b" was empty`,
 		},
+		{
+			"owner../repo",
+			`invalid repo format "owner../repo", owner or repo cannot contain '..'`,
+		},
+		{
+			"owner/..repo",
+			`invalid repo format "owner/..repo", owner or repo cannot contain '..'`,
+		},
+		// Trailing ".." in repo name
+		{
+			"owner/repo..",
+			`invalid repo format "owner/repo..", owner or repo cannot contain '..'`,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.repoFullName, func(t *testing.T) {
@@ -115,6 +128,15 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 			ErrEquals(t, c.expErr, err)
 		})
 	}
+
+	// GitLab allows subgroups (slashes in owner), so the ".." check fires for
+	// a path like "group/subgroup/../../../etc/repo" where the owner contains "..".
+	t.Run("gitlab subgroup owner with ..", func(t *testing.T) {
+		repoFullName := "group/subgroup/../../etc/repo"
+		cloneURL := fmt.Sprintf("https://gitlab.com/%s.git", repoFullName)
+		_, err := models.NewRepo(models.Gitlab, repoFullName, cloneURL, "u", "p")
+		ErrEquals(t, `invalid repo format "group/subgroup/../../etc/repo", owner or repo cannot contain '..'`, err)
+	})
 }
 
 // If the clone url doesn't end with .git, and VCS is not Azure DevOps, it is appended
