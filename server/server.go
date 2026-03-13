@@ -648,6 +648,25 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
 	}
+	var planStore runtime.PlanStore
+	switch userConfig.PlanStore {
+	case "s3":
+		logger.Info("initializing S3 plan store (bucket=%s, region=%s)", userConfig.PlanStoreS3Bucket, userConfig.PlanStoreS3Region)
+		planStore, err = runtime.NewS3PlanStore(runtime.S3PlanStoreConfig{
+			Bucket:         userConfig.PlanStoreS3Bucket,
+			Region:         userConfig.PlanStoreS3Region,
+			Prefix:         userConfig.PlanStoreS3Prefix,
+			Endpoint:       userConfig.PlanStoreS3Endpoint,
+			ForcePathStyle: userConfig.PlanStoreS3ForcePathStyle,
+			Profile:        userConfig.PlanStoreS3Profile,
+		}, logger)
+		if err != nil {
+			return nil, fmt.Errorf("initializing S3 plan store: %w", err)
+		}
+	default:
+		planStore = &runtime.LocalPlanStore{}
+	}
+
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
 		policyChecksEnabled,
@@ -672,9 +691,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AutoDiscoverModeFlag,
 		statsScope,
 		terraformClient,
+		planStore,
 	)
-
-	planStore := &runtime.LocalPlanStore{}
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)
 

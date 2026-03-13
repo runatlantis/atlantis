@@ -1453,6 +1453,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		"auto",
 		statsScope,
 		terraformClient,
+		&runtime.LocalPlanStore{},
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion)
