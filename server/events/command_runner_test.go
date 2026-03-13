@@ -181,6 +181,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
 		testConfig.PendingApplyStatus,
+		events.NewDefaultWorkingDirLocker(),
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -1241,4 +1242,75 @@ func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(Any[*command.Context]())
 	Equals(t, 0, drainer.GetStatus().InProgressOps)
+}
+
+// TestConcurrentCommandEarlyExit is an end-to-end style test that verifies the
+// full command pipeline protects against concurrent commands on the same pull
+// request.  It uses real (non-mock) working-dir lockers so that lock state is
+// actually shared between runners.
+func TestConcurrentCommandEarlyExit(t *testing.T) {
+	t.Run("second generic plan is rejected when first plan holds a workspace lock", func(t *testing.T) {
+		RegisterMockTestingT(t)
+
+		tmp := t.TempDir()
+		db, err := boltdb.New(tmp)
+		t.Cleanup(func() { db.Close() })
+		Ok(t, err)
+
+		vcsClient := setup(t, func(tc *TestConfig) {
+			tc.database = db
+		})
+
+		var pull github.PullRequest
+		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+		When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+		When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+		projectContexts := []command.ProjectContext{{CommandName: command.Plan, RepoRelDir: "mydir"}}
+		cmd := &events.CommentCommand{Name: command.Plan}
+		When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).ThenReturn(projectContexts, nil)
+
+		// Build a locker that already has a lock simulating an in-progress run.
+		locker := events.NewDefaultWorkingDirLocker()
+		unlock, lockErr := locker.TryLock(testdata.GithubRepo.FullName, modelPull.Num, "default", "mydir", "", command.Plan)
+		Ok(t, lockErr)
+		defer unlock()
+
+		// Wire a new plan runner that uses this locker.
+		planCommandRunner = events.NewPlanCommandRunner(
+			false, false,
+			vcsClient,
+			pendingPlanFinder,
+			workingDir,
+			commitUpdater,
+			projectCommandBuilder,
+			projectCommandRunner,
+			cancellationTracker,
+			dbUpdater,
+			pullUpdater,
+			policyCheckCommandRunner,
+			autoMerger,
+			1,
+			false,
+			db,
+			lockingLocker,
+			false,
+			pullReqStatusFetcher,
+			false,
+			locker,
+		)
+		ch.CommentCommandRunnerByCmd[command.Plan] = planCommandRunner
+
+		ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, cmd)
+
+		// The underlying project runner must NOT have been called.
+		projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+
+		// A comment must have been posted with the concurrent-run error.
+		_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+			Any[logging.SimpleLogging](), Any[models.Repo](), AnyInt(), AnyString(), AnyString(),
+		).GetCapturedArguments()
+		Assert(t, strings.Contains(comment, "already running"),
+			fmt.Sprintf("expected comment to mention concurrent run, got: %q", comment))
+	})
 }
