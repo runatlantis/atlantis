@@ -139,6 +139,7 @@ type projectResultTmplData struct {
 	Rendered     string
 	NoChanges    bool
 	IsSuccessful bool
+	HasWarnings  bool
 }
 
 // Initialize templates
@@ -273,6 +274,7 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 			} else {
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("policyCheckResultsUnwrapped"), policyCheckResults)
 			}
+			resultData.HasWarnings = result.PolicyCheckResults.HasWarnings()
 			if result.Error == nil && result.Failure == "" {
 				numPolicyCheckSuccesses++
 			}
