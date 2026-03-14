@@ -227,12 +227,18 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 			passed = false
 		}
 
-		policySetResults = append(policySetResults, models.PolicySetResult{
-			PolicySetName: policySet.Name,
-			PolicyOutput:  cmdOutput,
-			Passed:        passed,
-			ReqApprovals:  policySet.ApproveCount,
-		})
+		result, regexErr := models.NewPolicySetResult(
+			policySet.Name,
+			cmdOutput,
+			passed,
+			policySet.ApproveCount,
+			policySet.PolicyItemRegex,
+		)
+		if regexErr != nil {
+			ctx.Log.Err("invalid policy_item_regex for policy set %q: %v", policySet.Name, regexErr)
+			continue
+		}
+		policySetResults = append(policySetResults, *result)
 	}
 
 	if policySetResults == nil {
