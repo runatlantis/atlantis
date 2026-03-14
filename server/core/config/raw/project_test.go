@@ -132,7 +132,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:              String("."),
 				PlanRequirements: []string{"unsupported"},
 			},
-			expErr: "plan_requirements: \"unsupported\" is not a valid plan_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.",
+			expErr: "plan_requirements: \"unsupported\" is not a valid plan_requirement, only \"approved\", \"mergeable\", \"undiverged\" and \"undiverged_when_modified\" are supported.",
 		},
 		{
 			description: "plan reqs with undiverged, mergeable and approved requirements",
@@ -172,7 +172,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:               String("."),
 				ApplyRequirements: []string{"unsupported"},
 			},
-			expErr: "apply_requirements: \"unsupported\" is not a valid apply_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.",
+			expErr: "apply_requirements: \"unsupported\" is not a valid apply_requirement, only \"approved\", \"mergeable\", \"undiverged\" and \"undiverged_when_modified\" are supported.",
 		},
 		{
 			description: "apply reqs with approved requirement",
@@ -231,12 +231,44 @@ func TestProject_Validate(t *testing.T) {
 			expErr: "",
 		},
 		{
+			description: "plan reqs with both undiverged and undiverged_when_modified (mutually exclusive)",
+			input: raw.Project{
+				Dir:              String("."),
+				PlanRequirements: []string{"undiverged", "undiverged_when_modified"},
+			},
+			expErr: "plan_requirements: plan_requirements cannot contain both \"undiverged\" and \"undiverged_when_modified\" as they are mutually exclusive. Use \"undiverged\" to block on any main branch changes, or \"undiverged_when_modified\" to block only when specific patterns are affected.",
+		},
+		{
+			description: "apply reqs with both undiverged and undiverged_when_modified (mutually exclusive)",
+			input: raw.Project{
+				Dir:               String("."),
+				ApplyRequirements: []string{"undiverged", "undiverged_when_modified"},
+			},
+			expErr: "apply_requirements: apply_requirements cannot contain both \"undiverged\" and \"undiverged_when_modified\" as they are mutually exclusive. Use \"undiverged\" to block on any main branch changes, or \"undiverged_when_modified\" to block only when specific patterns are affected.",
+		},
+		{
+			description: "apply reqs with undiverged_when_modified only",
+			input: raw.Project{
+				Dir:               String("."),
+				ApplyRequirements: []string{"undiverged_when_modified"},
+			},
+			expErr: "",
+		},
+		{
+			description: "import reqs with both undiverged and undiverged_when_modified (mutually exclusive)",
+			input: raw.Project{
+				Dir:                String("."),
+				ImportRequirements: []string{"undiverged", "undiverged_when_modified"},
+			},
+			expErr: "import_requirements: import_requirements cannot contain both \"undiverged\" and \"undiverged_when_modified\" as they are mutually exclusive. Use \"undiverged\" to block on any main branch changes, or \"undiverged_when_modified\" to block only when specific patterns are affected.",
+		},
+		{
 			description: "import reqs with unsupported",
 			input: raw.Project{
 				Dir:                String("."),
 				ImportRequirements: []string{"unsupported"},
 			},
-			expErr: "import_requirements: \"unsupported\" is not a valid import_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.",
+			expErr: "import_requirements: \"unsupported\" is not a valid import_requirement, only \"approved\", \"mergeable\", \"undiverged\" and \"undiverged_when_modified\" are supported.",
 		},
 		{
 			description: "import reqs with undiverged, mergeable and approved requirements",

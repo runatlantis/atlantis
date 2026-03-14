@@ -8,6 +8,7 @@ commands can be run:
 * [Approved](#approved) – requires pull requests to be approved by at least one user other than the author
 * [Mergeable](#mergeable) – requires pull requests to be able to be merged
 * [UnDiverged](#undiverged) - requires pull requests to be ahead of the base branch
+* [UnDiverged When Modified](#undiverged_when_modified) - requires pull requests to be ahead of the base branch for files matching `when_modified` patterns for a project's autoplan config
 
 ## What Happens If The Requirement Is Not Met?
 
@@ -225,6 +226,81 @@ if there are no changes to the source branch. `undiverged` enforces that Atlanti
 with remote so that the state of the source during the `apply` is identical to that if you were to merge the PR at that
 time. In the case of a transient error, Atlantis assumes divergence for safety and errors.
 
+### UnDiverged When Modified
+
+Prevent applies if there are any changes on the base branch **for files matching the project's `autoplan.when_modified` patterns** since the most recent plan.
+This is a more targeted version of `undiverged` that only checks divergence for the specific files/directories your project monitors.
+Applies to `merge` checkout strategy only which you need to set via `--checkout-strategy` flag.
+
+:::tip Tip
+Choose either `undiverged_when_modified` or `undiverged` based on your needs (you cannot use both):
+
+* **`undiverged`**: Checks all files (more conservative, can have false positives in monorepos)
+* **`undiverged_when_modified`**: Only checks `when_modified` patterns (better for monorepos with targeted autoplan)
+
+:::
+
+#### Usage
+
+You can set the `undiverged_when_modified` requirement by:
+
+1. Creating a `repos.yaml` file with `plan_requirements`, `apply_requirements` and `import_requirements` keys:
+
+   ```yaml
+   repos:
+   - id: /.*/
+     plan_requirements: [undiverged_when_modified]
+     apply_requirements: [undiverged_when_modified]
+     import_requirements: [undiverged_when_modified]
+   ```
+
+1. Or by allowing an `atlantis.yaml` file to specify the `plan_requirements`, `apply_requirements` and `import_requirements` keys in your `repos.yaml` config:
+
+    **repos.yaml**
+
+    ```yaml
+    repos:
+    - id: /.*/
+      allowed_overrides: [plan_requirements, apply_requirements, import_requirements]
+    ```
+
+    **atlantis.yaml**
+
+    ```yaml
+    version: 3
+    projects:
+    - dir: .
+      plan_requirements: [undiverged_when_modified]
+      apply_requirements: [undiverged_when_modified]
+      import_requirements: [undiverged_when_modified]
+    ```
+
+#### Meaning
+
+Similar to `undiverged`, but instead of checking if **any** files have changed on the base branch, it only checks if files
+matching the project's `when_modified` patterns have changed. This is useful when you have multiple projects in a monorepo
+and you only want to block applies if the base branch has changes to **files that affect the specific project**.
+
+**How it works:**
+
+1. If the project has no `when_modified` patterns, or is auto-discovered, it falls back to the regular `undiverged` check
+2. For each pattern in `when_modified`, Atlantis checks if the base branch has commits for those files that aren't in the PR's history
+3. If the base branch has new commits matching any pattern, the requirement fails
+
+**Example scenario:**
+
+```text
+monorepo/
+  project1/        # Has when_modified: ["project1/**"]
+  project2/        # Has when_modified: ["project2/**"]
+  shared/          # Included in both projects
+```
+
+* PR modifies `project1/main.tf`
+* After PR created, someone merges changes to `project2/main.tf`
+* With `undiverged`: Would **fail** (base branch changed)
+* With `undiverged_when_modified`: Would **pass** (base branch didn't change project1 files)
+
 ## Setting Command Requirements
 
 As mentioned above, you can set command requirements via flags, in `repos.yaml`, or in `atlantis.yaml` if `repos.yaml`
@@ -298,7 +374,16 @@ If you only want some projects/repos to have apply requirements, then you must
 
 ### Multiple Requirements
 
-You can set any or all of `approved`, `mergeable`, and `undiverged` requirements.
+You can set any or all of `approved`, `mergeable`, `undiverged`, and `undiverged_when_modified` requirements.
+
+::: warning
+`undiverged` and `undiverged_when_modified` are **mutually exclusive**. Atlantis will reject configurations that specify both:
+
+* Use `undiverged` to check if **any** files on the base branch have changed
+* Use `undiverged_when_modified` to check only files matching your project's `when_modified` patterns
+
+If you specify both in your configuration, you will receive a validation error.
+:::
 
 ## Who Can Apply?
 

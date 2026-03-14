@@ -42,13 +42,13 @@ repos:
   repo_config_file: path/to/atlantis.yaml
 
   # plan_requirements sets the Plan Requirements for all repos that match.
-  plan_requirements: [approved, mergeable, undiverged]
+  plan_requirements: [approved, mergeable, undiverged, undiverged_when_modified]
 
   # apply_requirements sets the Apply Requirements for all repos that match.
-  apply_requirements: [approved, mergeable, undiverged]
+  apply_requirements: [approved, mergeable, undiverged, undiverged_when_modified]
 
   # import_requirements sets the Import Requirements for all repos that match.
-  import_requirements: [approved, mergeable, undiverged]
+  import_requirements: [approved, mergeable, undiverged, undiverged_when_modified]
 
   # workflow sets the workflow for all repos that match.
   # This workflow must be defined in the workflows section.
@@ -535,9 +535,9 @@ If you set a workflow with the key `default`, it will override this.
 | branch                        | string                  | none            | no       | An regex matching pull requests by base branch (the branch the pull request is getting merged into). By default, all branches are matched                                                                                                                                                                 |
 | repo_config_file              | string                  | none            | no       | Repo config file path in this repo. By default, use `atlantis.yaml` which is located on repository root. When multiple atlantis servers work with the same repo, please set different file names.                                                                                                         |
 | workflow                      | string                  | none            | no       | A custom workflow.                                                                                                                                                                                                                                                                                        |
-| plan_requirements             | []string                | none            | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.                                                                   |
-| apply_requirements            | []string                | none            | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.                                                                  |
-| import_requirements           | []string                | none            | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.                                                                 |
+| plan_requirements             | []string                | none            | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, `undiverged`, and `undiverged_when_modified`. See [Command Requirements](command-requirements.md) for more details.                                                                   |
+| apply_requirements            | []string                | none            | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, `undiverged`, and `undiverged_when_modified`. See [Command Requirements](command-requirements.md) for more details.                                                                  |
+| import_requirements           | []string                | none            | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, `undiverged`, and `undiverged_when_modified`. See [Command Requirements](command-requirements.md) for more details.                                                                 |
 | allowed_overrides             | []string                | none            | no       | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge`,`repo_locking`, `repo_locks`, and `custom_policy_check`                                                                                  |
 | allowed_workflows             | []string                | none            | no       | A list of workflows that `atlantis.yaml` files can select from.                                                                                                                                                                                                                                           |
 | allow_custom_workflows        | bool                    | false           | no       | Whether or not to allow [Custom Workflows](custom-workflows.md).                                                                                                                                                                                                                                        |
