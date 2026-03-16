@@ -1328,6 +1328,127 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	Equals(t, "workspace2", ctxs[3].Workspace)
 }
 
+// Test that when GetPullDir returns os.ErrNotExist with an external PlanStore,
+// the builder re-clones and calls RestorePlans before discovering plans.
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	// The directory that will exist after "re-clone".
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"project1": map[string]any{
+				"main.tf":          nil,
+				"default.tfplan":   nil,
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	// First GetPullDir call: directory missing (pod restart).
+	// Second GetPullDir call: directory exists after re-clone.
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn("", os.ErrNotExist).
+		ThenReturn(tmpDir, nil)
+
+	When(workingDir.Clone(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(tmpDir, nil)
+
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfgArgs := valid.GlobalCfgArgs{}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	restoreCalled := false
+	planStore := &mockExternalPlanStore{
+		restoreFn: func(pullDir, owner, repo string, pullNum int) error {
+			restoreCalled = true
+			return nil
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Assert(t, restoreCalled, "expected RestorePlans to be called")
+	Equals(t, 1, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+
+	// Verify Clone was called (re-clone after missing pull dir).
+	workingDir.VerifyWasCalledOnce().Clone(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())
+}
+
+// mockExternalPlanStore is a non-LocalPlanStore implementation for testing the
+// external plan store recovery path.
+type mockExternalPlanStore struct {
+	restoreFn func(pullDir, owner, repo string, pullNum int) error
+}
+
+func (m *mockExternalPlanStore) Save(_ command.ProjectContext, _ string) error   { return nil }
+func (m *mockExternalPlanStore) Load(_ command.ProjectContext, _ string) error   { return nil }
+func (m *mockExternalPlanStore) Remove(_ command.ProjectContext, _ string) error { return nil }
+func (m *mockExternalPlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) error {
+	if m.restoreFn != nil {
+		return m.restoreFn(pullDir, owner, repo, pullNum)
+	}
+	return nil
+}
+func (m *mockExternalPlanStore) DeleteForPull(_, _ string, _ int) error { return nil }
+
 // Test that if a directory has a list of workspaces configured then we don't
 // allow plans for other workspace names.
 func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
