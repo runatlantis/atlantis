@@ -35,19 +35,20 @@ import (
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 // Test that it runs the expected plan steps.
 func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockInit := mocks.NewMockStepRunner()
-	mockPlan := mocks.NewMockStepRunner()
-	mockApply := mocks.NewMockStepRunner()
-	mockRun := mocks.NewMockCustomStepRunner()
+	ctrl := gomock.NewController(t)
+	mockInit := mocks.NewMockStepRunner(ctrl)
+	mockPlan := mocks.NewMockStepRunner(ctrl)
+	mockApply := mocks.NewMockStepRunner(ctrl)
+	mockRun := mocks.NewMockCustomStepRunner(ctrl)
 	realEnv := runtime.EnvStepRunner{}
-	mockWorkingDir := mocks.NewMockWorkingDir()
-	mockLocker := mocks.NewMockProjectLocker()
-	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
+	mockLocker := mocks.NewMockProjectLocker(ctrl)
+	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler(ctrl)
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:                    mockLocker,
@@ -65,10 +66,12 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	}
 
 	repoDir := t.TempDir()
-	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Any[string]())).ThenReturn(repoDir, nil)
-	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
-		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	mockWorkingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+		gomock.Any()).Return(repoDir, nil).AnyTimes()
+	mockWorkingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(repoDir, nil).AnyTimes()
+	mockWorkingDir.EXPECT().MergeAgain(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil).AnyTimes()
+	mockLocker.EXPECT().TryLock(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+		gomock.Any(), gomock.Any()).Return(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil).AnyTimes()
 
 	expEnvs := map[string]string{
 		"name": "value",
@@ -100,33 +103,21 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	}
 
 	// Each step will output its step name.
-	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
-	When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
-	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-	When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)).ThenReturn("run", nil)
+	mockInit.EXPECT().Run(ctx, nil, repoDir, expEnvs).Return("init", nil).Times(1)
+	mockPlan.EXPECT().Run(ctx, nil, repoDir, expEnvs).Return("plan", nil).Times(1)
+	mockApply.EXPECT().Run(ctx, nil, repoDir, expEnvs).Return("apply", nil).Times(1)
+	mockRun.EXPECT().Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil).Return("run", nil).Times(1)
+	// Allow the command requirement handler to be called
+	mockCommandRequirementHandler.EXPECT().ValidatePlanProject(gomock.Any(), gomock.Any()).Return("", nil).AnyTimes()
 	res := runner.Plan(ctx)
 
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
 	t.Logf("output is %s", res.PlanSuccess.TerraformOutput)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
-	expSteps := []string{"run", "apply", "plan", "init", "env"}
-	for _, step := range expSteps {
-		switch step {
-		case "init":
-			mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-		case "plan":
-			mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-		case "apply":
-			mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-		case "run":
-			mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)
-		}
-	}
 }
 
 func TestProjectOutputWrapper(t *testing.T) {
-	RegisterMockTestingT(t)
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
@@ -179,12 +170,13 @@ func TestProjectOutputWrapper(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
 			var prjResult command.ProjectCommandOutput
 			var expCommitStatus models.CommitStatus
 
-			mockJobURLSetter := mocks.NewMockJobURLSetter()
-			mockJobMessageSender := mocks.NewMockJobMessageSender()
-			mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
+			mockJobURLSetter := mocks.NewMockJobURLSetter(ctrl)
+			mockJobMessageSender := mocks.NewMockJobMessageSender(ctrl)
+			mockProjectCommandRunner := mocks.NewMockProjectCommandRunner(ctrl)
 
 			runner := &events.ProjectOutputWrapper{
 				JobURLSetter:         mockJobURLSetter,
@@ -210,24 +202,20 @@ func TestProjectOutputWrapper(t *testing.T) {
 				expCommitStatus = models.FailedCommitStatus
 			}
 
-			When(mockProjectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(prjResult)
-			When(mockProjectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(prjResult)
+			// Expect pending status first, then final status
+			mockJobURLSetter.EXPECT().SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus, nil).Return(nil).Times(1)
+			mockJobURLSetter.EXPECT().SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult).Return(nil).Times(1)
+
+			// Allow Send to be called any number of times
+			mockJobMessageSender.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 			switch c.CommandName {
 			case command.Plan:
+				mockProjectCommandRunner.EXPECT().Plan(ctx).Return(prjResult).Times(1)
 				runner.Plan(ctx)
 			case command.Apply:
+				mockProjectCommandRunner.EXPECT().Apply(ctx).Return(prjResult).Times(1)
 				runner.Apply(ctx)
-			}
-
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus, nil)
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
-
-			switch c.CommandName {
-			case command.Plan:
-				mockProjectCommandRunner.VerifyWasCalledOnce().Plan(ctx)
-			case command.Apply:
-				mockProjectCommandRunner.VerifyWasCalledOnce().Apply(ctx)
 			}
 		})
 	}
@@ -236,21 +224,22 @@ func TestProjectOutputWrapper(t *testing.T) {
 // Test what happens if there's no working dir. This signals that the project
 // was never planned.
 func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir: mockWorkingDir,
 	}
 	ctx := command.ProjectContext{}
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn("", os.ErrNotExist)
+	mockWorkingDir.EXPECT().GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace).Return("", os.ErrNotExist)
 
 	res := runner.Apply(ctx)
-	ErrEquals(t, "project has not been cloned–did you run plan?", res.Error)
+	ErrEquals(t, "project has not been cloned\u2013did you run plan?", res.Error)
 }
 
 // Test that if approval is required and the PR isn't approved we give an error.
 func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
@@ -262,7 +251,7 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 		ApplyRequirements: []string{"approved"},
 	}
 	tmp := t.TempDir()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	mockWorkingDir.EXPECT().GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace).Return(tmp, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Pull request must be approved according to the project's approval rules before running apply.", res.Failure)
@@ -270,8 +259,8 @@ func TestDefaultProjectCommandRunner_ApplyNotApproved(t *testing.T) {
 
 // Test that if mergeable is required and the PR isn't mergeable we give an error.
 func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
@@ -286,7 +275,7 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 		ApplyRequirements: []string{"mergeable"},
 	}
 	tmp := t.TempDir()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
+	mockWorkingDir.EXPECT().GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace).Return(tmp, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Pull request must be mergeable before running apply.", res.Failure)
@@ -294,8 +283,8 @@ func TestDefaultProjectCommandRunner_ApplyNotMergeable(t *testing.T) {
 
 // Test that if undiverged is required and the PR is diverged we give an error.
 func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockWorkingDir := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
 	runner := &events.DefaultProjectCommandRunner{
 		WorkingDir:       mockWorkingDir,
 		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
@@ -309,8 +298,8 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 		ApplyRequirements: []string{"undiverged"},
 	}
 	tmp := t.TempDir()
-	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
-	When(mockWorkingDir.HasDiverged(ctx.Log, tmp)).ThenReturn(true)
+	mockWorkingDir.EXPECT().GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace).Return(tmp, nil)
+	mockWorkingDir.EXPECT().HasDiverged(ctx.Log, tmp).Return(true)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
@@ -397,15 +386,15 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			continue
 		}
 		t.Run(c.description, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			mockInit := mocks.NewMockStepRunner()
-			mockPlan := mocks.NewMockStepRunner()
-			mockApply := mocks.NewMockStepRunner()
-			mockRun := mocks.NewMockCustomStepRunner()
-			mockEnv := mocks.NewMockEnvStepRunner()
-			mockWorkingDir := mocks.NewMockWorkingDir()
-			mockLocker := mocks.NewMockProjectLocker()
-			mockSender := mocks.NewMockWebhooksSender()
+			ctrl := gomock.NewController(t)
+			mockInit := mocks.NewMockStepRunner(ctrl)
+			mockPlan := mocks.NewMockStepRunner(ctrl)
+			mockApply := mocks.NewMockStepRunner(ctrl)
+			mockRun := mocks.NewMockCustomStepRunner(ctrl)
+			mockEnv := mocks.NewMockEnvStepRunner(ctrl)
+			mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
+			mockLocker := mocks.NewMockProjectLocker(ctrl)
+			mockSender := mocks.NewMockWebhooksSender(ctrl)
 			applyReqHandler := &events.DefaultCommandRequirementHandler{
 				WorkingDir: mockWorkingDir,
 			}
@@ -424,22 +413,22 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				CommandRequirementHandler: applyReqHandler,
 			}
 			repoDir := t.TempDir()
-			When(mockWorkingDir.GetWorkingDir(
-				Any[models.Repo](),
-				Any[models.PullRequest](),
-				Any[string](),
-			)).ThenReturn(repoDir, nil)
-			When(mockLocker.TryLock(
-				Any[logging.SimpleLogging](),
-				Any[models.PullRequest](),
-				Any[models.User](),
-				Any[string](),
-				Any[models.Project](),
-				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			mockWorkingDir.EXPECT().GetWorkingDir(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(repoDir, nil).AnyTimes()
+			mockLocker.EXPECT().TryLock(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(&events.TryLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
-			}, nil)
+			}, nil).AnyTimes()
 
 			ctx := command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
@@ -457,41 +446,28 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 			expEnvs := map[string]string{
 				"key": "value",
 			}
-			When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
-			When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
-			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
-			When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)).ThenReturn("run", nil)
-			When(mockEnv.Run(ctx, nil, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
+			mockInit.EXPECT().Run(ctx, nil, repoDir, expEnvs).Return("init", nil).Times(1)
+			mockPlan.EXPECT().Run(ctx, nil, repoDir, expEnvs).Return("plan", nil).Times(1)
+			mockApply.EXPECT().Run(ctx, nil, repoDir, expEnvs).Return("apply", nil).Times(1)
+			mockRun.EXPECT().Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil).Return("run", nil).Times(1)
+			mockEnv.EXPECT().Run(ctx, nil, "", "value", repoDir, map[string]string{}).Return("value", nil).Times(1)
+			// Allow webhook sender to be called
+			mockSender.EXPECT().Send(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 			res := runner.Apply(ctx)
 			Equals(t, c.expOut, res.ApplySuccess)
 			Equals(t, c.expFailure, res.Failure)
-
-			for _, step := range c.expSteps {
-				switch step {
-				case "init":
-					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-				case "plan":
-					mockPlan.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-				case "apply":
-					mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-				case "run":
-					mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)
-				case "env":
-					mockEnv.VerifyWasCalledOnce().Run(ctx, nil, "", "value", repoDir, expEnvs)
-				}
-			}
 		})
 	}
 }
 
 // Test that it runs the expected apply steps.
 func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
-	RegisterMockTestingT(t)
-	mockApply := mocks.NewMockStepRunner()
-	mockWorkingDir := mocks.NewMockWorkingDir()
-	mockLocker := mocks.NewMockProjectLocker()
-	mockSender := mocks.NewMockWebhooksSender()
+	ctrl := gomock.NewController(t)
+	mockApply := mocks.NewMockStepRunner(ctrl)
+	mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
+	mockLocker := mocks.NewMockProjectLocker(ctrl)
+	mockSender := mocks.NewMockWebhooksSender(ctrl)
 	applyReqHandler := &events.DefaultCommandRequirementHandler{
 		WorkingDir: mockWorkingDir,
 	}
@@ -506,22 +482,22 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		Webhooks:                  mockSender,
 	}
 	repoDir := t.TempDir()
-	When(mockWorkingDir.GetWorkingDir(
-		Any[models.Repo](),
-		Any[models.PullRequest](),
-		Any[string](),
-	)).ThenReturn(repoDir, nil)
-	When(mockLocker.TryLock(
-		Any[logging.SimpleLogging](),
-		Any[models.PullRequest](),
-		Any[models.User](),
-		Any[string](),
-		Any[models.Project](),
-		AnyBool(),
-	)).ThenReturn(&events.TryLockResponse{
+	mockWorkingDir.EXPECT().GetWorkingDir(
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+	).Return(repoDir, nil).AnyTimes()
+	mockLocker.EXPECT().TryLock(
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+		gomock.Any(),
+	).Return(&events.TryLockResponse{
 		LockAcquired: true,
 		LockKey:      "lock-key",
-	}, nil)
+	}, nil).AnyTimes()
 
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
@@ -535,18 +511,19 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		RepoRelDir:        ".",
 	}
 	expEnvs := map[string]string{}
-	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", fmt.Errorf("something went wrong"))
+	mockApply.EXPECT().Run(ctx, nil, repoDir, expEnvs).Return("apply", fmt.Errorf("something went wrong")).Times(1)
+	// Allow webhook sender to be called
+	mockSender.EXPECT().Send(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	res := runner.Apply(ctx)
 	Assert(t, res.ApplySuccess == "", "exp apply failure")
-
-	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
 }
 
 // Test run and env steps. We don't use mocks for this test since we're
 // not running any Terraform.
 func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
 	tfClient := tfclientmocks.NewMockClient()
 	tfDistribution := terraform.NewDistributionTerraformWithDownloader(tmocks.NewMockDownloader())
 	tfVersion, err := version.NewVersion("0.12.0")
@@ -561,9 +538,9 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	env := runtime.EnvStepRunner{
 		RunStepRunner: &run,
 	}
-	mockWorkingDir := mocks.NewMockWorkingDir()
-	mockLocker := mocks.NewMockProjectLocker()
-	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
+	mockLocker := mocks.NewMockProjectLocker(ctrl)
+	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler(ctrl)
 
 	runner := events.DefaultProjectCommandRunner{
 		Locker:                    mockLocker,
@@ -577,10 +554,14 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	}
 
 	repoDir := t.TempDir()
-	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Any[string]())).ThenReturn(repoDir, nil)
-	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
-		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	mockWorkingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+		gomock.Any()).Return(repoDir, nil).AnyTimes()
+	mockWorkingDir.EXPECT().GetWorkingDir(gomock.Any(), gomock.Any(), gomock.Any()).Return(repoDir, nil).AnyTimes()
+	mockWorkingDir.EXPECT().MergeAgain(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil).AnyTimes()
+	mockLocker.EXPECT().TryLock(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+		gomock.Any(), gomock.Any()).Return(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil).AnyTimes()
+	// Allow the command requirement handler to be called
+	mockCommandRequirementHandler.EXPECT().ValidatePlanProject(gomock.Any(), gomock.Any()).Return("", nil).AnyTimes()
 
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
@@ -651,20 +632,20 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 				},
 			},
 			setup: func(repoDir string, ctx command.ProjectContext, mockLocker *mocks.MockProjectLocker, mockInit *mocks.MockStepRunner, mockImport *mocks.MockStepRunner) {
-				When(mockLocker.TryLock(
-					Any[logging.SimpleLogging](),
-					Any[models.PullRequest](),
-					Any[models.User](),
-					Any[string](),
-					Any[models.Project](),
-					AnyBool(),
-				)).ThenReturn(&events.TryLockResponse{
+				mockLocker.EXPECT().TryLock(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(&events.TryLockResponse{
 					LockAcquired: true,
 					LockKey:      "lock-key",
-				}, nil)
+				}, nil).AnyTimes()
 
-				When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
-				When(mockImport.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("import", nil)
+				mockInit.EXPECT().Run(ctx, nil, repoDir, expEnvs).Return("init", nil).Times(1)
+				mockImport.EXPECT().Run(ctx, nil, repoDir, expEnvs).Return("import", nil).Times(1)
 			},
 			expSteps: []string{"import"},
 			expOut: &models.ImportSuccess{
@@ -687,13 +668,13 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			mockInit := mocks.NewMockStepRunner()
-			mockImport := mocks.NewMockStepRunner()
-			mockStateRm := mocks.NewMockStepRunner()
-			mockWorkingDir := mocks.NewMockWorkingDir()
-			mockLocker := mocks.NewMockProjectLocker()
-			mockSender := mocks.NewMockWebhooksSender()
+			ctrl := gomock.NewController(t)
+			mockInit := mocks.NewMockStepRunner(ctrl)
+			mockImport := mocks.NewMockStepRunner(ctrl)
+			mockStateRm := mocks.NewMockStepRunner(ctrl)
+			mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
+			mockLocker := mocks.NewMockProjectLocker(ctrl)
+			mockSender := mocks.NewMockWebhooksSender(ctrl)
 			applyReqHandler := &events.DefaultCommandRequirementHandler{
 				WorkingDir: mockWorkingDir,
 			}
@@ -719,8 +700,8 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 				RePlanCmd:          "atlantis plan -d . -- addr id",
 			}
 			repoDir := t.TempDir()
-			When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(repoDir, nil)
+			mockWorkingDir.EXPECT().Clone(gomock.Any(), gomock.Any(), gomock.Any(),
+				gomock.Any()).Return(repoDir, nil).AnyTimes()
 			if c.setup != nil {
 				c.setup(repoDir, ctx, mockLocker, mockInit, mockImport)
 			}
@@ -728,15 +709,6 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			res := runner.Import(ctx)
 			Equals(t, c.expOut, res.ImportSuccess)
 			Equals(t, c.expFailure, res.Failure)
-
-			for _, step := range c.expSteps {
-				switch step {
-				case "init":
-					mockInit.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-				case "import":
-					mockImport.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
-				}
-			}
 		})
 	}
 }
@@ -751,8 +723,6 @@ func (m mockURLGenerator) GenerateLockURL(lockID string) string {
 // This is a regression test for https://github.com/runatlantis/atlantis/pull/5331
 // where custom policy sets defaulting to "Custom" allowed any user to approve policies.
 func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
-	RegisterMockTestingT(t)
-
 	cases := []struct {
 		description       string
 		customPolicyCheck bool
@@ -874,9 +844,10 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			mockPolicyCheck := mocks.NewMockStepRunner()
-			mockWorkingDir := mocks.NewMockWorkingDir()
-			mockLocker := mocks.NewMockProjectLocker()
+			ctrl := gomock.NewController(t)
+			mockPolicyCheck := mocks.NewMockStepRunner(ctrl)
+			mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
+			mockLocker := mocks.NewMockProjectLocker(ctrl)
 
 			runner := events.DefaultProjectCommandRunner{
 				Locker:                mockLocker,
@@ -887,23 +858,23 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
 			}
 
 			repoDir := t.TempDir()
-			When(mockWorkingDir.GetWorkingDir(
-				Any[models.Repo](),
-				Any[models.PullRequest](),
-				Any[string](),
-			)).ThenReturn(repoDir, nil)
+			mockWorkingDir.EXPECT().GetWorkingDir(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(repoDir, nil).AnyTimes()
 
-			When(mockLocker.TryLock(
-				Any[logging.SimpleLogging](),
-				Any[models.PullRequest](),
-				Any[models.User](),
-				Any[string](),
-				Any[models.Project](),
-				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			mockLocker.EXPECT().TryLock(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(&events.TryLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
-			}, nil)
+			}, nil).AnyTimes()
 
 			// Setup policy check steps - one step per policy output
 			var steps []valid.Step
@@ -914,14 +885,14 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
 			}
 
 			// Setup mock to return outputs in sequence
-			// Note: pegomock will return these in order for successive calls
+			// Note: gomock will return these in order for successive calls
 			for _, output := range c.policyOutputs {
-				When(mockPolicyCheck.Run(
-					Any[command.ProjectContext](),
-					Any[[]string](),
-					Any[string](),
-					Any[map[string]string](),
-				)).ThenReturn(output, nil)
+				mockPolicyCheck.EXPECT().Run(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).Return(output, nil).Times(1)
 			}
 
 			ctx := command.ProjectContext{
@@ -956,8 +927,6 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
 // This test reproduces the bug where policySetResults remains nil when the outputs
 // array is empty, which would incorrectly trigger the nil check error.
 func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *testing.T) {
-	RegisterMockTestingT(t)
-
 	cases := []struct {
 		description       string
 		customPolicyCheck bool
@@ -1002,9 +971,10 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *test
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			mockPolicyCheck := mocks.NewMockStepRunner()
-			mockWorkingDir := mocks.NewMockWorkingDir()
-			mockLocker := mocks.NewMockProjectLocker()
+			ctrl := gomock.NewController(t)
+			mockPolicyCheck := mocks.NewMockStepRunner(ctrl)
+			mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
+			mockLocker := mocks.NewMockProjectLocker(ctrl)
 
 			runner := events.DefaultProjectCommandRunner{
 				Locker:                mockLocker,
@@ -1015,24 +985,24 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *test
 			}
 
 			repoDir := t.TempDir()
-			When(mockWorkingDir.GetWorkingDir(
-				Any[models.Repo](),
-				Any[models.PullRequest](),
-				Any[string](),
-			)).ThenReturn(repoDir, nil)
+			mockWorkingDir.EXPECT().GetWorkingDir(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(repoDir, nil).AnyTimes()
 
-			When(mockLocker.TryLock(
-				Any[logging.SimpleLogging](),
-				Any[models.PullRequest](),
-				Any[models.User](),
-				Any[string](),
-				Any[models.Project](),
-				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			mockLocker.EXPECT().TryLock(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(&events.TryLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
 				UnlockFn:     func() error { return nil },
-			}, nil)
+			}, nil).AnyTimes()
 
 			ctx := command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
@@ -1064,8 +1034,6 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *test
 
 // Test custom policy check failure detection logic (regex and FAIL prefix).
 func TestDefaultProjectCommandRunner_CustomPolicyCheckFailureDetection(t *testing.T) {
-	RegisterMockTestingT(t)
-
 	cases := []struct {
 		description    string
 		policyOutput   string
@@ -1166,9 +1134,10 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckFailureDetection(t *testin
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			mockPolicyCheck := mocks.NewMockStepRunner()
-			mockWorkingDir := mocks.NewMockWorkingDir()
-			mockLocker := mocks.NewMockProjectLocker()
+			ctrl := gomock.NewController(t)
+			mockPolicyCheck := mocks.NewMockStepRunner(ctrl)
+			mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
+			mockLocker := mocks.NewMockProjectLocker(ctrl)
 
 			runner := events.DefaultProjectCommandRunner{
 				Locker:                mockLocker,
@@ -1179,23 +1148,23 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckFailureDetection(t *testin
 			}
 
 			repoDir := t.TempDir()
-			When(mockWorkingDir.GetWorkingDir(
-				Any[models.Repo](),
-				Any[models.PullRequest](),
-				Any[string](),
-			)).ThenReturn(repoDir, nil)
+			mockWorkingDir.EXPECT().GetWorkingDir(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(repoDir, nil).AnyTimes()
 
-			When(mockLocker.TryLock(
-				Any[logging.SimpleLogging](),
-				Any[models.PullRequest](),
-				Any[models.User](),
-				Any[string](),
-				Any[models.Project](),
-				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			mockLocker.EXPECT().TryLock(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(&events.TryLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
-			}, nil)
+			}, nil).AnyTimes()
 
 			// Setup policy check step
 			steps := []valid.Step{
@@ -1205,12 +1174,12 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckFailureDetection(t *testin
 			}
 
 			// Setup mock to return the test output
-			When(mockPolicyCheck.Run(
-				Any[command.ProjectContext](),
-				Any[[]string](),
-				Any[string](),
-				Any[map[string]string](),
-			)).ThenReturn(c.policyOutput, nil)
+			mockPolicyCheck.EXPECT().Run(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(c.policyOutput, nil).Times(1)
 
 			ctx := command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
@@ -1729,15 +1698,16 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			RegisterMockTestingT(t)
+			ctrl := gomock.NewController(t)
 			mockVcsClient := vcsmocks.NewMockClient()
-			mockInit := mocks.NewMockStepRunner()
-			mockPlan := mocks.NewMockStepRunner()
-			mockApply := mocks.NewMockStepRunner()
-			mockRun := mocks.NewMockCustomStepRunner()
-			mockEnv := mocks.NewMockEnvStepRunner()
-			mockWorkingDir := mocks.NewMockWorkingDir()
-			mockLocker := mocks.NewMockProjectLocker()
-			mockSender := mocks.NewMockWebhooksSender()
+			mockInit := mocks.NewMockStepRunner(ctrl)
+			mockPlan := mocks.NewMockStepRunner(ctrl)
+			mockApply := mocks.NewMockStepRunner(ctrl)
+			mockRun := mocks.NewMockCustomStepRunner(ctrl)
+			mockEnv := mocks.NewMockEnvStepRunner(ctrl)
+			mockWorkingDir := mocks.NewMockWorkingDir(ctrl)
+			mockLocker := mocks.NewMockProjectLocker(ctrl)
+			mockSender := mocks.NewMockWebhooksSender(ctrl)
 
 			runner := events.DefaultProjectCommandRunner{
 				Locker:           mockLocker,
@@ -1753,22 +1723,22 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
 			}
 			repoDir := t.TempDir()
-			When(mockWorkingDir.GetWorkingDir(
-				Any[models.Repo](),
-				Any[models.PullRequest](),
-				Any[string](),
-			)).ThenReturn(repoDir, nil)
-			When(mockLocker.TryLock(
-				Any[logging.SimpleLogging](),
-				Any[models.PullRequest](),
-				Any[models.User](),
-				Any[string](),
-				Any[models.Project](),
-				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			mockWorkingDir.EXPECT().GetWorkingDir(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(repoDir, nil).AnyTimes()
+			mockLocker.EXPECT().TryLock(
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+				gomock.Any(),
+			).Return(&events.TryLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
-			}, nil)
+			}, nil).AnyTimes()
 
 			var projPolicyStatus []models.PolicySetStatus
 			if c.policySetStatus == nil {
@@ -1798,7 +1768,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			res := runner.ApprovePolicies(ctx)
 			Equals(t, c.expOut, res.PolicyCheckResults.PolicySetResults)
 			Equals(t, c.expFailure, res.Failure)
-			if c.hasErr == true {
+			if c.hasErr {
 				Assert(t, res.Error != nil, "expecting error.")
 			} else {
 				Assert(t, res.Error == nil, "not expecting error.")
