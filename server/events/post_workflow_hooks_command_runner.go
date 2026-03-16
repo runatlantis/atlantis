@@ -62,7 +62,18 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	// check if the MR is closed (merged). if so, we need to handle the case where
+	// the source branch might have been deleted
+	var repoDir string
+	if ctx.Pull.State == models.ClosedPullState {
+		ctx.Log.Info("mr is closed (merged), using base branch for post-workflow hooks")
+		// for closed MRs, we'll clone the base repo and checkout the base branch
+		// instead of trying to merge the head branch which might be deleted
+		repoDir, err = w.cloneForClosedMR(ctx)
+	} else {
+		repoDir, err = w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -88,11 +99,18 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 		postWorkflowHooks, repoDir)
 
 	if err != nil {
-		ctx.Log.Err("Error running post-workflow hooks %s.", err)
+		ctx.Log.Err("running post-workflow hooks: %s", err)
 		return err
 	}
 
 	return nil
+}
+
+// cloneForClosedMR clones the repository for a closed MR by checking out only
+// the base branch, avoiding the merge strategy that would try to fetch the
+// (potentially deleted) head branch.
+func (w *DefaultPostWorkflowHooksCommandRunner) cloneForClosedMR(ctx *command.Context) (string, error) {
+	return w.WorkingDir.CloneBaseBranch(ctx.Log, ctx.Pull, DefaultWorkspace)
 }
 
 func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(

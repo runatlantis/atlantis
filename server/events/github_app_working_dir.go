@@ -33,6 +33,17 @@ func (g *GithubAppWorkingDir) MergeAgain(logger logging.SimpleLogging, headRepo 
 	return g.WorkingDir.MergeAgain(logger, headRepo, p, workspace)
 }
 
+func (g *GithubAppWorkingDir) CloneBaseBranch(logger logging.SimpleLogging, p models.PullRequest, workspace string) (string, error) {
+	g.fixBaseRepoURL(&p)
+	return g.WorkingDir.CloneBaseBranch(logger, p, workspace)
+}
+
+func (g *GithubAppWorkingDir) fixBaseRepoURL(p *models.PullRequest) {
+	replacement := "://"
+	p.BaseRepo.CloneURL = strings.Replace(p.BaseRepo.CloneURL, "://:@", replacement, 1)
+	p.BaseRepo.SanitizedCloneURL = strings.Replace(p.BaseRepo.SanitizedCloneURL, redactedReplacement, replacement, 1)
+}
+
 func (g *GithubAppWorkingDir) fixReposURL(p *models.PullRequest, headRepo *models.Repo) {
 	// Realistically, this is a super brittle way of supporting clones using gh app installation tokens
 	// This URL should be built during Repo creation and the struct should be immutable going forward.
@@ -46,5 +57,4 @@ func (g *GithubAppWorkingDir) fixReposURL(p *models.PullRequest, headRepo *model
 	p.BaseRepo.SanitizedCloneURL = strings.Replace(p.BaseRepo.SanitizedCloneURL, redactedReplacement, replacement, 1)
 	headRepo.CloneURL = strings.Replace(headRepo.CloneURL, "://:@", replacement, 1)
 	headRepo.SanitizedCloneURL = strings.Replace(p.BaseRepo.SanitizedCloneURL, redactedReplacement, replacement, 1)
-
 }

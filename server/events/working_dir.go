@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -58,6 +59,10 @@ type WorkingDir interface {
 	DeletePlan(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string, path string, projectName string) error
 	// GetGitUntrackedFiles returns a list of Git untracked files in the working dir.
 	GetGitUntrackedFiles(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) ([]string, error)
+	// CloneBaseBranch performs a shallow clone of the base branch only, without
+	// any merge with a head branch. Used for closed/merged PRs where the head
+	// branch may no longer exist.
+	CloneBaseBranch(logger logging.SimpleLogging, p models.PullRequest, workspace string) (string, error)
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -519,6 +524,38 @@ func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace 
 func (w *FileWorkspace) sanitizeGitCredentials(s string, base models.Repo, head models.Repo) string {
 	baseReplaced := strings.ReplaceAll(s, base.CloneURL, base.SanitizedCloneURL)
 	return strings.ReplaceAll(baseReplaced, head.CloneURL, head.SanitizedCloneURL)
+}
+
+// CloneBaseBranch performs a shallow clone of the base branch only, without any
+// merge with a head branch. If the workspace directory already exists it is reused.
+func (w *FileWorkspace) CloneBaseBranch(logger logging.SimpleLogging, p models.PullRequest, workspace string) (string, error) {
+	cloneDir := filepath.Clean(w.cloneDir(p.BaseRepo, p, workspace))
+	safeDir := filepath.Clean(w.DataDir)
+	if !strings.HasPrefix(cloneDir, safeDir+string(filepath.Separator)) {
+		return "", fmt.Errorf("clone directory %q is outside data directory %q", cloneDir, safeDir)
+	}
+
+	if _, err := os.Stat(cloneDir); err == nil {
+		logger.Debug("clone directory '%s' already exists, reusing for base branch clone", cloneDir)
+		return cloneDir, nil
+	}
+
+	logger.Info("creating dir '%s' for base branch clone", cloneDir)
+	if err := os.MkdirAll(cloneDir, 0700); err != nil { // #nosec G301 -- directory must be accessible by git subprocess
+		return "", errors.Wrap(err, "creating workspace directory")
+	}
+
+	baseCloneURL := p.BaseRepo.CloneURL
+	if w.TestingOverrideBaseCloneURL != "" {
+		baseCloneURL = w.TestingOverrideBaseCloneURL
+	}
+
+	c := wrappedGitContext{cloneDir, p.BaseRepo, p}
+	if err := w.wrappedGit(logger, c, "clone", "--depth=1", "--branch", p.BaseBranch, "--single-branch", baseCloneURL, cloneDir); err != nil {
+		return "", err
+	}
+
+	return cloneDir, nil
 }
 
 // Set the flag that indicates we need to check for upstream changes (if using merge checkout strategy)

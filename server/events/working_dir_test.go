@@ -822,6 +822,56 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	Equals(t, hasDiverged, false)
 }
 
+func TestCloneBaseBranch_NoneExisting(t *testing.T) {
+	repoDir := initRepo(t)
+	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	dataDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		TestingOverrideBaseCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	cloneDir, err := wd.CloneBaseBranch(logger, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		BaseBranch: "main",
+	}, "default")
+	Ok(t, err)
+
+	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
+	Equals(t, expCommit, actCommit)
+}
+
+func TestCloneBaseBranch_ExistingDirReused(t *testing.T) {
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+
+	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, dataDir, "mv", repoDir, "repos/0/default")
+	runCmd(t, dataDir, "touch", "repos/0/default/proof")
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		TestingOverrideBaseCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	cloneDir, err := wd.CloneBaseBranch(logger, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		BaseBranch: "main",
+	}, "default")
+	Ok(t, err)
+
+	// proof file still exists, confirming directory was reused not re-cloned
+	_, err = os.Stat(filepath.Join(cloneDir, "proof"))
+	Ok(t, err)
+}
+
 func initRepo(t *testing.T) string {
 	repoDir := t.TempDir()
 	runCmd(t, repoDir, "git", "init", "--initial-branch=main")
