@@ -9,8 +9,8 @@ import (
 )
 
 // PlanStore abstracts plan file persistence.
-// In Phase 1, LocalPlanStore wraps current filesystem behavior (Save/Load are no-ops).
-// In Phase 2, S3PlanStore will upload after plan and download before apply.
+// LocalPlanStore wraps current filesystem behavior (Save/Load are no-ops).
+// S3PlanStore uploads after plan and downloads before apply.
 type PlanStore interface {
 	// Save persists a plan file after terraform writes it to planPath.
 	Save(ctx command.ProjectContext, planPath string) error

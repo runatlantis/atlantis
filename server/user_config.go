@@ -92,7 +92,7 @@ type UserConfig struct {
 	PendingApplyStatus              bool   `mapstructure:"pending-apply-status"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
-    PlanStore                       string `mapstructure:"plan-store"`
+	PlanStore                       string `mapstructure:"plan-store"`
 	PlanStoreS3Bucket               string `mapstructure:"plan-store-s3-bucket"`
 	PlanStoreS3Endpoint             string `mapstructure:"plan-store-s3-endpoint"`
 	PlanStoreS3ForcePathStyle       bool   `mapstructure:"plan-store-s3-force-path-style"`

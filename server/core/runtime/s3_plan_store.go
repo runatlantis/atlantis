@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -56,7 +57,10 @@ func NewS3PlanStore(cfg S3PlanStoreConfig, logger logging.SimpleLogging) (*S3Pla
 		opts = append(opts, awsconfig.WithSharedConfigProfile(cfg.Profile))
 	}
 
-	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), opts...)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("loading AWS config: %w", err)
 	}
@@ -77,7 +81,7 @@ func NewS3PlanStore(cfg S3PlanStoreConfig, logger logging.SimpleLogging) (*S3Pla
 
 	client := s3.NewFromConfig(awsCfg, s3Opts...)
 
-	if _, err := client.HeadBucket(context.Background(), &s3.HeadBucketInput{
+	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(cfg.Bucket),
 	}); err != nil {
 		return nil, fmt.Errorf("validating S3 plan store bucket %q: %w", cfg.Bucket, err)
@@ -144,9 +148,16 @@ func (s *S3PlanStore) Load(ctx command.ProjectContext, planPath string) error {
 	// Reject stale plans: the plan must have been created at the same commit
 	// the PR currently points to. This prevents applying outdated plans after
 	// new commits are pushed (e.g. across pod restarts).
-	// Note: S3 normalizes user-defined metadata keys to title case in responses,
-	// so "head-commit" (as written in Save) becomes "Head-Commit" here.
-	planCommit := resp.Metadata["Head-Commit"]
+	// Note: different S3/S3-compatible implementations may return user-defined
+	// metadata keys with different casing, so we look up "head-commit"
+	// case-insensitively.
+	var planCommit string
+	for k, v := range resp.Metadata {
+		if strings.EqualFold(k, "head-commit") {
+			planCommit = v
+			break
+		}
+	}
 	if planCommit == "" {
 		return fmt.Errorf("plan in S3 has no head-commit metadata (key=%s) — run plan again", key)
 	}
@@ -176,15 +187,15 @@ func (s *S3PlanStore) Load(ctx command.ProjectContext, planPath string) error {
 func (s *S3PlanStore) Remove(ctx command.ProjectContext, planPath string) error {
 	key := s.s3Key(ctx, planPath)
 
-	_, err := s.client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
+	if _, err := s.client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
-	})
-	if err != nil {
-		return fmt.Errorf("deleting plan from S3 (key=%s): %w", key, err)
+	}); err != nil {
+		s.logger.Warn("failed to delete plan from S3 (key=%s): %v", key, err)
+	} else {
+		s.logger.Debug("deleted plan from s3://%s/%s", s.bucket, key)
 	}
 
-	s.logger.Debug("deleted plan from s3://%s/%s", s.bucket, key)
 	return utils.RemoveIgnoreNonExistent(planPath)
 }
 
@@ -227,6 +238,14 @@ func (s *S3PlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) err
 
 			// Strip the prefix up to and including <pullNum>/ to get the relative path.
 			relPath := strings.TrimPrefix(key, listPrefix)
+			relPath = filepath.Clean(relPath)
+			if relPath == "." || relPath == string(os.PathSeparator) {
+				s.logger.Info("skipping S3 object with empty relative path (key=%s, prefix=%s)", key, listPrefix)
+				continue
+			}
+			if filepath.IsAbs(relPath) || relPath == ".." || strings.HasPrefix(relPath, ".."+string(os.PathSeparator)) {
+				return fmt.Errorf("refusing to restore plan outside pull dir (key=%s, relPath=%s)", key, relPath)
+			}
 			localPath := filepath.Join(pullDir, relPath)
 
 			if err := os.MkdirAll(filepath.Dir(localPath), 0o700); err != nil {
@@ -295,7 +314,8 @@ func (s *S3PlanStore) DeleteForPull(owner, repo string, pullNum int) error {
 				Bucket: aws.String(s.bucket),
 				Key:    aws.String(key),
 			}); err != nil {
-				return fmt.Errorf("deleting plan from S3 (key=%s): %w", key, err)
+				s.logger.Warn("failed to delete plan from S3 (key=%s): %v", key, err)
+				continue
 			}
 			deleted++
 		}
