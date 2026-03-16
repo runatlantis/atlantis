@@ -1108,6 +1108,21 @@ Defaults to `false`.
 
 Only supported on GitLab
 
+### `--plan-timeout`
+
+```bash
+atlantis server --plan-timeout=15m
+# or
+ATLANTIS_PLAN_TIMEOUT=15m
+```
+
+Duration after which a plan is considered stale and will be discarded on apply.
+Uses Go duration format (e.g. `15m`, `1h`, `2h30m`).
+When apply is run after the timeout has elapsed, the plan file is deleted, the lock is released,
+and the user is asked to re-plan.
+
+If empty or zero, plans never expire. Defaults to empty (no timeout).
+
 ### `--port` <Badge text="v0.1.3+" type="info"/>
 
 ```bash

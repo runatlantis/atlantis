@@ -125,6 +125,7 @@ var testFlags = map[string]any{
 	ParallelPlanFlag:                 true,
 	ParallelApplyFlag:                true,
 	PendingApplyStatusFlag:           false,
+	PlanTimeoutFlag:                  "15m",
 	QuietPolicyChecks:                false,
 	RedisHost:                        "",
 	RedisInsecureSkipVerify:          false,
