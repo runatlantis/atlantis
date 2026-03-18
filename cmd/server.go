@@ -119,6 +119,7 @@ const (
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
+	LocalGitCacheFlag                = "local-git-cache"
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
@@ -653,6 +654,10 @@ var boolFlags = map[string]boolFlag{
 	UseTFPluginCache: {
 		description:  "Enable the use of the Terraform plugin cache",
 		defaultValue: true,
+	},
+	LocalGitCacheFlag: {
+		description:  "Enable local git caching using git clone --reference. Reduces disk space and network usage by sharing objects between workspaces.",
+		defaultValue: false,
 	},
 }
 var intFlags = map[string]intFlag{
