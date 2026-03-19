@@ -831,7 +831,11 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.ProjectContext, absPath string) ([]string, error) {
 	var outputs []string
 
-	// Truncate the verbose atlantis version (ex: 'dev (commit: none) (build date: unknown)' -> 'dev').
+	// Hold a read lock for the whole step run so clone/reset/merge cannot run in this dir until we're done.
+	unlock := p.WorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
+	defer unlock()
+  
+  	// Truncate the verbose atlantis version (ex: 'dev (commit: none) (build date: unknown)' -> 'dev').
 	atlantisVersion, _, _ := strings.Cut(p.AtlantisVersion, " ")
 
 	vcsStatusName := p.VCSStatusName
