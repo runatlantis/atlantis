@@ -66,27 +66,24 @@ func newGithubAppClient(appIDStr, ownerName, repoName string) *GithubClient {
 		log.Fatalf("ATLANTIS_GH_APP_KEY cannot be empty when ATLANTIS_GH_APP_ID is set")
 	}
 
-	// Create an app-level transport to discover the installation ID
+	// Create an app-level transport to look up the installation for this repo
 	appTransport, err := ghinstallation.NewAppsTransport(http.DefaultTransport, appID, []byte(appKey))
 	if err != nil {
-		log.Fatalf("failed to create GitHub App transport: %v", err)
+		log.Fatalf("creating GitHub App transport: %v", err)
 	}
 
 	appClient := github.NewClient(&http.Client{Transport: appTransport})
 	ctx := context.Background()
 
-	installations, _, err := appClient.Apps.ListInstallations(ctx, nil)
+	installation, _, err := appClient.Apps.FindRepositoryInstallation(ctx, ownerName, repoName)
 	if err != nil {
-		log.Fatalf("failed to list GitHub App installations: %v", err)
-	}
-	if len(installations) == 0 {
-		log.Fatalf("no installations found for GitHub App %d", appID)
+		log.Fatalf("getting GitHub App installation for %s/%s: %v", ownerName, repoName, err)
 	}
 
-	installationID := installations[0].GetID()
+	installationID := installation.GetID()
 	itr, err := ghinstallation.New(http.DefaultTransport, appID, installationID, []byte(appKey))
 	if err != nil {
-		log.Fatalf("failed to create GitHub App installation transport: %v", err)
+		log.Fatalf("creating GitHub App installation transport: %v", err)
 	}
 
 	ghClient := github.NewClient(&http.Client{Transport: itr})
@@ -139,7 +136,7 @@ func (g GithubClient) Clone(cloneDir string) error {
 		// GitHub App auth: get a fresh installation token for git clone
 		token, err := g.transport.Token(context.Background())
 		if err != nil {
-			return fmt.Errorf("failed to get installation token for clone: %v", err)
+			return fmt.Errorf("getting installation token for clone: %w", err)
 		}
 		repoURL = fmt.Sprintf("https://x-access-token:%s@github.com/%s/%s.git", token, g.ownerName, g.repoName)
 	} else {
