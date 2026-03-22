@@ -166,7 +166,11 @@ jobs:
       - name: Setup gitconfig
         run: |
           git config --global user.email "maintainers@runatlantis.io"
-          git config --global user.name "atlantis[bot]"
+          if [ -n "${ATLANTIS_GH_APP_SLUG:-}" ]; then
+            git config --global user.name "${ATLANTIS_GH_APP_SLUG}[bot]"
+          else
+            git config --global user.name "atlantis[bot]"
+          fi
 
       - run: |
           make build-service
