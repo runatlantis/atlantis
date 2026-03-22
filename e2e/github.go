@@ -17,10 +17,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v83/github"
 )
 
@@ -30,18 +33,11 @@ type GithubClient struct {
 	ownerName string
 	repoName  string
 	token     string
+	// transport is set when using GitHub App auth; nil for PAT auth.
+	transport *ghinstallation.Transport
 }
 
 func NewGithubClient() *GithubClient {
-
-	githubUsername := os.Getenv("ATLANTIS_GH_USER")
-	if githubUsername == "" {
-		log.Fatalf("ATLANTIS_GH_USER cannot be empty")
-	}
-	githubToken := os.Getenv("ATLANTIS_GH_TOKEN")
-	if githubToken == "" {
-		log.Fatalf("ATLANTIS_GH_TOKEN cannot be empty")
-	}
 	ownerName := os.Getenv("GITHUB_REPO_OWNER_NAME")
 	if ownerName == "" {
 		ownerName = "runatlantis"
@@ -51,7 +47,77 @@ func NewGithubClient() *GithubClient {
 		repoName = "atlantis-tests"
 	}
 
-	// create github client
+	// Try GitHub App auth first
+	if appIDStr := os.Getenv("ATLANTIS_GH_APP_ID"); appIDStr != "" {
+		return newGithubAppClient(appIDStr, ownerName, repoName)
+	}
+
+	// Fall back to PAT auth
+	return newGithubPATClient(ownerName, repoName)
+}
+
+func newGithubAppClient(appIDStr, ownerName, repoName string) *GithubClient {
+	appID, err := strconv.ParseInt(strings.TrimSpace(appIDStr), 10, 64)
+	if err != nil {
+		log.Fatalf("ATLANTIS_GH_APP_ID is not a valid integer: %v", err)
+	}
+	appKey := os.Getenv("ATLANTIS_GH_APP_KEY")
+	if appKey == "" {
+		log.Fatalf("ATLANTIS_GH_APP_KEY cannot be empty when ATLANTIS_GH_APP_ID is set")
+	}
+
+	// Create an app-level transport to discover the installation ID
+	appTransport, err := ghinstallation.NewAppsTransport(http.DefaultTransport, appID, []byte(appKey))
+	if err != nil {
+		log.Fatalf("failed to create GitHub App transport: %v", err)
+	}
+
+	appClient := github.NewClient(&http.Client{Transport: appTransport})
+	ctx := context.Background()
+
+	installations, _, err := appClient.Apps.ListInstallations(ctx, nil)
+	if err != nil {
+		log.Fatalf("failed to list GitHub App installations: %v", err)
+	}
+	if len(installations) == 0 {
+		log.Fatalf("no installations found for GitHub App %d", appID)
+	}
+
+	installationID := installations[0].GetID()
+	itr, err := ghinstallation.New(http.DefaultTransport, appID, installationID, []byte(appKey))
+	if err != nil {
+		log.Fatalf("failed to create GitHub App installation transport: %v", err)
+	}
+
+	ghClient := github.NewClient(&http.Client{Transport: itr})
+
+	// Derive bot username from app slug
+	username := ""
+	if slug := os.Getenv("ATLANTIS_GH_APP_SLUG"); slug != "" {
+		username = fmt.Sprintf("%s[bot]", slug)
+	}
+
+	log.Printf("using GitHub App auth (app ID: %d, installation ID: %d, user: %s)", appID, installationID, username)
+
+	return &GithubClient{
+		client:    ghClient,
+		username:  username,
+		ownerName: ownerName,
+		repoName:  repoName,
+		transport: itr,
+	}
+}
+
+func newGithubPATClient(ownerName, repoName string) *GithubClient {
+	githubUsername := os.Getenv("ATLANTIS_GH_USER")
+	if githubUsername == "" {
+		log.Fatalf("ATLANTIS_GH_USER cannot be empty")
+	}
+	githubToken := os.Getenv("ATLANTIS_GH_TOKEN")
+	if githubToken == "" {
+		log.Fatalf("ATLANTIS_GH_TOKEN cannot be empty")
+	}
+
 	tp := github.BasicAuthTransport{
 		Username: strings.TrimSpace(githubUsername),
 		Password: strings.TrimSpace(githubToken),
@@ -65,14 +131,22 @@ func NewGithubClient() *GithubClient {
 		repoName:  repoName,
 		token:     githubToken,
 	}
-
 }
 
 func (g GithubClient) Clone(cloneDir string) error {
+	var repoURL string
+	if g.transport != nil {
+		// GitHub App auth: get a fresh installation token for git clone
+		token, err := g.transport.Token(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to get installation token for clone: %v", err)
+		}
+		repoURL = fmt.Sprintf("https://x-access-token:%s@github.com/%s/%s.git", token, g.ownerName, g.repoName)
+	} else {
+		repoURL = fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", g.username, g.token, g.ownerName, g.repoName)
+	}
 
-	repoURL := fmt.Sprintf("https://%s:%s@github.com/%s/%s.git", g.username, g.token, g.ownerName, g.repoName)
 	cloneCmd := exec.Command("git", "clone", repoURL, cloneDir)
-	// git clone the repo
 	log.Printf("git cloning into %q", cloneDir)
 	if output, err := cloneCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to clone repository: %v: %s", err, string(output))

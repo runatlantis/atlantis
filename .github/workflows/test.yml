@@ -134,8 +134,9 @@ jobs:
     # dont run e2e tests on forked PRs
     if: github.event.pull_request.head.repo.fork == false
     env:
-      ATLANTIS_GH_USER: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
-      ATLANTIS_GH_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
+      ATLANTIS_GH_APP_ID: ${{ secrets.ATLANTISBOT_GH_APP_ID }}
+      ATLANTIS_GH_APP_KEY: ${{ secrets.ATLANTISBOT_GH_APP_KEY }}
+      ATLANTIS_GH_APP_SLUG: ${{ secrets.ATLANTISBOT_GH_APP_SLUG }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
@@ -165,7 +166,7 @@ jobs:
       - name: Setup gitconfig
         run: |
           git config --global user.email "maintainers@runatlantis.io"
-          git config --global user.name "atlantisbot"
+          git config --global user.name "atlantis[bot]"
 
       - run: |
           make build-service
