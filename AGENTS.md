@@ -45,6 +45,9 @@
 **Replicate CI locally:** `make test-all && make check-fmt` OR use Docker: `docker run --rm -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:latest sh -c "cd /atlantis && make test-all"`
 
 **E2E tests:** Complex setup (ngrok + credentials). CI handles it. Local optional. See `./scripts/e2e.sh` for details.
+- **GitHub E2E auth:** Supports two modes — GitHub App (preferred) via `ATLANTIS_GH_APP_ID` + `ATLANTIS_GH_APP_KEY` + `ATLANTIS_GH_APP_SLUG`, or PAT via `ATLANTIS_GH_USER` + `ATLANTIS_GH_TOKEN`. App auth avoids org 2FA restrictions.
+- **E2E test code:** `e2e/` has its own `go.mod` (separate module from root). Build: `cd e2e && make build`. Run: `make run`.
+- **Atlantis server in E2E:** Started by `scripts/e2e.sh` — reads GitHub auth from env vars automatically (viper). No explicit flags needed.
 
 ## Development Workflows
 
@@ -63,6 +66,7 @@
 3. **E2E tests skip on forks:** Expected (no secrets). Maintainers run them.
 4. **Website needs npm install first:** Always run `npm install` before `npm run website:*` commands.
 5. **docker-compose needs atlantis.env:** Create file per CONTRIBUTING.md template for local webhook testing.
+6. **E2E GitHub tests require GitHub App secrets:** CI needs `ATLANTISBOT_GH_APP_ID`, `ATLANTISBOT_GH_APP_KEY`, `ATLANTISBOT_GH_APP_SLUG` secrets configured. PAT auth (`ATLANTISBOT_GITHUB_USERNAME`/`ATLANTISBOT_GITHUB_TOKEN`) is deprecated due to org 2FA requirements (#6311).
 
 ## Code Style
 
