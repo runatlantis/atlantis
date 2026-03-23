@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v83/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/events"

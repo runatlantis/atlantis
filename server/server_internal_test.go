@@ -19,11 +19,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/db/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 )
 
 func TestServer_CloseDatabase(t *testing.T) {
@@ -67,9 +67,11 @@ func TestServer_CloseDatabase(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				var database db.Database
 				if tt.closeFn != nil {
-					m := mocks.NewMockDatabase(WithT(t))
-					When(m.Close()).Then(func([]Param) ReturnValues {
-						return []ReturnValue{tt.closeFn()}
+					ctrl := gomock.NewController(t)
+					m := mocks.NewMockDatabase(ctrl)
+					closeFn := tt.closeFn
+					m.EXPECT().Close().DoAndReturn(func() error {
+						return closeFn()
 					})
 					database = m
 				}
