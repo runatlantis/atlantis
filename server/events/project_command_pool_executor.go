@@ -43,14 +43,23 @@ func runProjectCmdsParallel(
 	mux := &sync.Mutex{}
 
 	wg := sizedwaitgroup.New(poolSize)
-	cancelled := false
+	cancelledAt := -1
 
-	for _, pCmd := range cmds {
+	for i, pCmd := range cmds {
 		if cancellationTracker != nil && cancellationTracker.IsCancelled(pull) {
-			cancelled = true
+			cancelledAt = i
 			break
 		}
+
 		wg.Add()
+
+		if cancellationTracker != nil && cancellationTracker.IsCancelled(pull) {
+			// because wg.Add() is a blocking call, we check for cancellation again after it returns
+			// to avoid waiting for another goroutine to finish before we can exit early.
+			wg.Done()
+			cancelledAt = i
+			break
+		}
 
 		execute := func(cmd command.ProjectContext) {
 			defer wg.Done()
@@ -65,8 +74,8 @@ func runProjectCmdsParallel(
 
 	wg.Wait()
 
-	if cancelled {
-		for _, pCmd := range cmds[len(results):] {
+	if cancelledAt != -1 {
+		for _, pCmd := range cmds[cancelledAt:] {
 			results = append(results, command.ProjectResult{
 				Command: pCmd.CommandName,
 				ProjectCommandOutput: command.ProjectCommandOutput{
