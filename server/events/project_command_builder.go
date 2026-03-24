@@ -385,7 +385,7 @@ func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Cont
 // Global config ignore_paths takes precedence when explicitly set; otherwise falls through to repo config.
 func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
 	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if fromGlobalAutoDiscover != nil && len(fromGlobalAutoDiscover.IgnorePaths) > 0 {
+	if fromGlobalAutoDiscover != nil && fromGlobalAutoDiscover.IgnorePaths != nil {
 		return fromGlobalAutoDiscover.IsPathIgnored(path)
 	}
 	if repoCfg.AutoDiscover != nil {
@@ -832,11 +832,17 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		}
 	}
 
-	// Filter out plans in paths matching autodiscover.ignore_paths
+	// Filter out plans in paths matching autodiscover.ignore_paths.
+	// Match plan-path behavior: only filter auto-discovered projects,
+	// not plans that correspond to explicitly configured project dirs.
+	configuredProjDirs := make(map[string]bool)
+	for _, configProj := range repoCfg.Projects {
+		configuredProjDirs[filepath.Clean(configProj.Dir)] = true
+	}
 	var filteredPlans []PendingPlan
 	for _, plan := range plans {
 		path := filepath.Clean(plan.RepoRelDir)
-		if p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) {
+		if !configuredProjDirs[path] && p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) {
 			ctx.Log.Debug("ignoring plan in '%s' due to autodiscover.ignore_paths", plan.RepoRelDir)
 			continue
 		}
