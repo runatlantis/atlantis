@@ -56,6 +56,8 @@ func runProjectCmdsParallel(
 		if cancellationTracker != nil && cancellationTracker.IsCancelled(pull) {
 			// because wg.Add() is a blocking call, we check for cancellation again after it returns
 			// to avoid waiting for another goroutine to finish before we can exit early.
+			// see used syncwaitgroup package:
+			// https://github.com/remeh/sizedwaitgroup/blob/b77873a44db20b1b82a5d60e698ceea3270d09d0/sizedwaitgroup.go#L50
 			wg.Done()
 			cancelledAt = i
 			break
