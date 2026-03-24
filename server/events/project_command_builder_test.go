@@ -1322,6 +1322,216 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	Equals(t, "workspace2", ctxs[3].Workspace)
 }
 
+// Test that autodiscover.ignore_paths is respected during multi-apply.
+// Plans in ignored paths (e.g. .terraform/modules/) should not be applied.
+func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			"project2": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			".terraform": map[string]any{
+				"modules": map[string]any{
+					"some_module": map[string]any{
+						"test-deployment": map[string]any{
+							"main.tf":        nil,
+							"default.tfplan": nil,
+						},
+					},
+				},
+			},
+		},
+	})
+	// Initialize git repo so .tfplan files get picked up as untracked.
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	// Set ignore_paths on the global config's AutoDiscover so that
+	// isAutoDiscoverPathIgnored filters .terraform paths.
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{".terraform/**"},
+	}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "default", ctxs[1].Workspace)
+}
+
+// Test that autodiscover.ignore_paths set in repo-level atlantis.yaml (not
+// global config) is respected during multi-apply.
+func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePathsRepoCfg(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - ".terraform/**"
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			"project2": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			".terraform": map[string]any{
+				"modules": map[string]any{
+					"some_module": map[string]any{
+						"test-deployment": map[string]any{
+							"main.tf":        nil,
+							"default.tfplan": nil,
+						},
+					},
+				},
+			},
+		},
+	})
+	// Initialize git repo so .tfplan files get picked up as untracked.
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	// No global-level ignore_paths — only the repo atlantis.yaml has it.
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "default", ctxs[1].Workspace)
+}
+
 // Test that if a directory has a list of workspaces configured then we don't
 // allow plans for other workspace names.
 func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
