@@ -64,7 +64,7 @@ func TestRunProjectCmdsParallel_CancelledBeforeExecution(t *testing.T) {
 }
 
 // TestRunProjectCmdsParallel_CancelledWhileExceedingPoolSize verifies the bug fix for
-// https://github.com/runatlantis/atlantis/issues/5813:
+// https://github.com/runatlantis/atlantis/pull/5813#issuecomment-3893031969:
 // When the number of commands exceeds the pool size, commands queued behind a full pool
 // must be cancelled rather than left waiting indefinitely.
 //
