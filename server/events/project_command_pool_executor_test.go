@@ -240,16 +240,16 @@ func TestRunProjectCmdsWithCancellationTracker_CancelBetweenGroups(t *testing.T)
 
 	p1Result := findResult(result, "p1")
 	require.NotNil(t, p1Result)
-	assert.NoError(t, p1Result.Error)
+	require.NoError(t, p1Result.Error)
 
 	p2Result := findResult(result, "p2")
 	require.NotNil(t, p2Result)
-	assert.Error(t, p2Result.Error)
+	require.Error(t, p2Result.Error)
 	assert.Contains(t, p2Result.Error.Error(), "cancelled")
 
 	p3Result := findResult(result, "p3")
 	require.NotNil(t, p3Result)
-	assert.Error(t, p3Result.Error)
+	require.Error(t, p3Result.Error)
 	assert.Contains(t, p3Result.Error.Error(), "cancelled")
 }
 
