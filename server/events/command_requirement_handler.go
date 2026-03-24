@@ -72,7 +72,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 				return fmt.Sprintf("Pull request must be mergeable before running %s%s.", cmd, suffix), nil
 			}
 		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
+			if a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull) {
 				return fmt.Sprintf("Default branch must be rebased onto pull request before running %s.", cmd), nil
 			}
 		}
