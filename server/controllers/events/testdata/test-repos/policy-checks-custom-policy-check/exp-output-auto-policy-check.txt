@@ -12,6 +12,12 @@ Compliance check - 0 failures, 1 passed
 
 ```
 
+#### Policy Set: `another_policy`
+```diff
+Another check - 0 failures, 1 passed
+
+```
+
 
 * :arrow_forward: To **apply** this plan, comment:
   ```shell

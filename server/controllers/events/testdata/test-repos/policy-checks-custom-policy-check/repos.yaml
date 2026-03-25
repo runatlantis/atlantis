@@ -21,4 +21,4 @@ workflows:
         - show
         - run: echo "Security check - 0 failures, 1 passed"
         - run: echo "Compliance check - 0 failures, 1 passed"
-        - run: echo "Another check - 1 failures, 0 passed"
+        - run: echo "Another check - 0 failures, 1 passed"
