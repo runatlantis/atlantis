@@ -229,7 +229,7 @@ type DefaultProjectCommandBuilder struct {
 	GlobalCfg valid.GlobalCfg
 	// Finds unapplied plans.
 	PendingPlanFinder *DefaultPendingPlanFinder
-	// Persists plan files to external storage (S3) so they survive pod restarts.
+	// Persists plan files to external storage (S3) so they survive container restarts.
 	PlanStore runtime.PlanStore
 	// Builds project command contexts for Atlantis commands.
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
@@ -810,8 +810,8 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		if _, isLocal := p.PlanStore.(*runtime.LocalPlanStore); isLocal {
 			return nil, err
 		}
-		// External plan store: working directory lost (e.g. pod restart with
-		// emptyDir). Re-clone and restore plan files from the external store.
+		// External plan store: working directory lost (e.g. container restart
+		// with emptyDir). Re-clone and restore plan files from the external store.
 		ctx.Log.Info("pull directory missing, re-cloning repo for apply")
 		if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace); cloneErr != nil {
 			return nil, fmt.Errorf("re-cloning repo for apply: %w", cloneErr)
@@ -881,8 +881,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		if _, isLocal := p.PlanStore.(*runtime.LocalPlanStore); isLocal {
 			return projCtx, errors.New("no working directory found–did you run plan?")
 		}
-		// External plan store: working directory lost (e.g. pod restart with
-		// emptyDir). Re-clone; the plan file will be loaded from the external
+		// External plan store: working directory lost (e.g. container restart
+		// with emptyDir). Re-clone; the plan file will be loaded from the external
 		// store during the apply step.
 		ctx.Log.Info("working directory missing, re-cloning repo for apply")
 		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)

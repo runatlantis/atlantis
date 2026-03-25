@@ -147,7 +147,7 @@ func (s *S3PlanStore) Load(ctx command.ProjectContext, planPath string) error {
 
 	// Reject stale plans: the plan must have been created at the same commit
 	// the PR currently points to. This prevents applying outdated plans after
-	// new commits are pushed (e.g. across pod restarts).
+	// new commits are pushed (e.g. across container restarts).
 	// Note: different S3/S3-compatible implementations may return user-defined
 	// metadata keys with different casing, so we look up "head-commit"
 	// case-insensitively.

@@ -46,11 +46,33 @@ var NonOverridableApplyReqs = []string{PoliciesPassedCommandReq}
 
 // GlobalCfg is the final parsed version of server-side repo config.
 type GlobalCfg struct {
-	Repos      []Repo
-	Workflows  map[string]Workflow
-	PolicySets PolicySets
-	Metrics    Metrics
-	TeamAuthz  TeamAuthz
+	Repos          []Repo
+	Workflows      map[string]Workflow
+	PolicySets     PolicySets
+	Metrics        Metrics
+	TeamAuthz      TeamAuthz
+	ExternalStores ExternalStores
+}
+
+// ExternalStores holds configuration for external storage backends.
+type ExternalStores struct {
+	PlanStore PlanStoreConfig
+}
+
+// PlanStoreConfig holds the type and backend-specific config for plan storage.
+type PlanStoreConfig struct {
+	Type string
+	S3   S3StoreConfig
+}
+
+// S3StoreConfig holds S3-specific configuration for the plan store.
+type S3StoreConfig struct {
+	Bucket         string
+	Region         string
+	Prefix         string
+	Endpoint       string
+	ForcePathStyle bool
+	Profile        string
 }
 
 type Metrics struct {

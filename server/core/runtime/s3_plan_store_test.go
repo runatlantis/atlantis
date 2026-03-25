@@ -262,8 +262,9 @@ func TestRemove_S3Error(t *testing.T) {
 	store := runtime.NewS3PlanStoreWithClient(mock, "bucket", "", logging.NewNoopLogger(t))
 	ctx := testProjectContext()
 
+	// S3 delete errors are logged but not returned (soft-fail).
 	err := store.Remove(ctx, "/tmp/whatever.tfplan")
-	assert.ErrorContains(t, err, "forbidden")
+	assert.NoError(t, err)
 }
 
 func TestRemove_LocalFileAlreadyGone(t *testing.T) {
@@ -399,6 +400,7 @@ func TestDeleteForPull_DeleteError(t *testing.T) {
 	}
 	store := runtime.NewS3PlanStoreWithClient(mock, "bucket", "pfx", logging.NewNoopLogger(t))
 
+	// S3 delete errors during cleanup are logged but not returned (soft-fail).
 	err := store.DeleteForPull("acme", "infra", 42)
-	assert.ErrorContains(t, err, "forbidden")
+	assert.NoError(t, err)
 }

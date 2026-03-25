@@ -1345,7 +1345,7 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery(t *testing.T) {
 	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
 
 	workingDir := mocks.NewMockWorkingDir()
-	// First GetPullDir call: directory missing (pod restart).
+	// First GetPullDir call: directory missing (container restart).
 	// Second GetPullDir call: directory exists after re-clone.
 	When(workingDir.GetPullDir(
 		Any[models.Repo](),

@@ -127,13 +127,7 @@ const (
 	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
-	PlanStoreFlag                    = "plan-store"
-	PlanStoreS3BucketFlag            = "plan-store-s3-bucket"
-	PlanStoreS3EndpointFlag          = "plan-store-s3-endpoint"
-	PlanStoreS3ForcePathStyleFlag    = "plan-store-s3-force-path-style"
-	PlanStoreS3PrefixFlag            = "plan-store-s3-prefix"
-	PlanStoreS3ProfileFlag           = "plan-store-s3-profile"
-	PlanStoreS3RegionFlag            = "plan-store-s3-region"
+	EnableExternalStoresFlag         = "enable-external-stores"
 	PortFlag                         = "port"
 	RedisDB                          = "redis-db"
 	RedisHost                        = "redis-host"
@@ -195,7 +189,6 @@ const (
 	DefaultMaxCommentsPerCommand        = 100
 	DefaultParallelPoolSize             = 15
 	DefaultStatsNamespace               = "atlantis"
-	DefaultPlanStore                    = "local"
 	DefaultPort                         = 4141
 	DefaultRedisDB                      = 0
 	DefaultRedisPort                    = 6379
@@ -422,25 +415,6 @@ var stringFlags = map[string]stringFlag{
 		description:  "Namespace for aggregating stats.",
 		defaultValue: DefaultStatsNamespace,
 	},
-	PlanStoreFlag: {
-		description:  "Plan file storage backend. Supports 'local' (default) or 's3'.",
-		defaultValue: DefaultPlanStore,
-	},
-	PlanStoreS3BucketFlag: {
-		description: "S3 bucket name for storing plan files. Required when --plan-store=s3.",
-	},
-	PlanStoreS3EndpointFlag: {
-		description: "Custom S3 endpoint URL (for S3-compatible stores like MinIO).",
-	},
-	PlanStoreS3PrefixFlag: {
-		description: "Key prefix for plan files in S3 (e.g. 'atlantis/plans').",
-	},
-	PlanStoreS3ProfileFlag: {
-		description: "AWS profile to use for S3 plan store authentication.",
-	},
-	PlanStoreS3RegionFlag: {
-		description: "AWS region for the S3 plan store bucket. Required when --plan-store=s3.",
-	},
 	RedisHost: {
 		description: "The Redis Hostname for when using a Locking DB type of 'redis'.",
 	},
@@ -608,8 +582,8 @@ var boolFlags = map[string]boolFlag{
 		description:  "Set apply job status as pending when there are planned changes that haven't been applied yet. Currently only supported for GitLab.",
 		defaultValue: false,
 	},
-	PlanStoreS3ForcePathStyleFlag: {
-		description:  "Use S3 path-style addressing (required for MinIO and some S3-compatible stores).",
+	EnableExternalStoresFlag: {
+		description:  "Enable external storage backends configured in the server-side repo config (external_stores block).",
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {
@@ -1119,20 +1093,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		if strings.Contains(token, "\n") {
 			s.Logger.Warn("--%s contains a newline which is usually unintentional", name)
 		}
-	}
-
-	switch userConfig.PlanStore {
-	case "local", "":
-		// ok
-	case "s3":
-		if userConfig.PlanStoreS3Bucket == "" {
-			return fmt.Errorf("--%s is required when --%s=s3", PlanStoreS3BucketFlag, PlanStoreFlag)
-		}
-		if userConfig.PlanStoreS3Region == "" {
-			return fmt.Errorf("--%s is required when --%s=s3", PlanStoreS3RegionFlag, PlanStoreFlag)
-		}
-	default:
-		return fmt.Errorf("invalid --%s value %q: must be 'local' or 's3'", PlanStoreFlag, userConfig.PlanStore)
 	}
 
 	if userConfig.TFEHostname != DefaultTFEHostname && userConfig.TFEToken == "" {
