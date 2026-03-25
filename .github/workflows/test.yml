@@ -59,7 +59,7 @@ jobs:
     runs-on: ubuntu-24.04
     # Use latest testing environment for automatic updates
     # Previous: ghcr.io/runatlantis/testing-env:latest@sha256:725981e9090c977f8055f5ec5ba7a63430a8f0337ab955978e6b8cc2cd0236c3
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:770aa1715a16437bb581f0f94c447fab1fdb39d07537e44600c386ec509ba600
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:c51a1356302175673aa881237b5628054ce84a0ef5ebb0ccd231decaa68e70f3
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
@@ -134,8 +134,9 @@ jobs:
     # dont run e2e tests on forked PRs
     if: github.event.pull_request.head.repo.fork == false
     env:
-      ATLANTIS_GH_USER: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
-      ATLANTIS_GH_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
+      ATLANTIS_GH_APP_ID: ${{ secrets.ATLANTISBOT_GH_APP_ID }}
+      ATLANTIS_GH_APP_KEY: ${{ secrets.ATLANTISBOT_GH_APP_KEY }}
+      ATLANTIS_GH_APP_SLUG: ${{ secrets.ATLANTISBOT_GH_APP_SLUG }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
@@ -165,7 +166,11 @@ jobs:
       - name: Setup gitconfig
         run: |
           git config --global user.email "maintainers@runatlantis.io"
-          git config --global user.name "atlantisbot"
+          if [ -n "${ATLANTIS_GH_APP_SLUG:-}" ]; then
+            git config --global user.name "${ATLANTIS_GH_APP_SLUG}[bot]"
+          else
+            git config --global user.name "atlantis[bot]"
+          fi
 
       - run: |
           make build-service
