@@ -244,7 +244,6 @@ monorepo/
 * After PR created, someone merges changes to `project2/main.tf`
 * The `undiverged` requirement for project1 **passes** because the base branch change only affected `project2/`
 
-
 ## Setting Command Requirements
 
 As mentioned above, you can set command requirements via flags, in `repos.yaml`, or in `atlantis.yaml` if `repos.yaml`
