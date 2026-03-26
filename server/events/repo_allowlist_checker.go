@@ -33,7 +33,7 @@ type RepoAllowlistChecker struct {
 func NewRepoAllowlistChecker(allowlist string) (*RepoAllowlistChecker, error) {
 	includeRules := make([]string, 0)
 	omitRules := make([]string, 0)
-	for _, rule := range strings.Split(allowlist, ",") {
+	for rule := range strings.SplitSeq(allowlist, ",") {
 		if strings.Contains(rule, "://") {
 			return nil, fmt.Errorf("allowlist %q contained ://", rule)
 		}

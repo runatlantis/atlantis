@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v83/github"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -1035,7 +1035,7 @@ func TestBitbucketShaCacheExpires(t *testing.T) {
 	Equals(t, models.OtherPullEvent, act)
 	// But after 300 times, the cache should expire
 	// this is so we don't have ever increasing memory usage
-	for i := 0; i < 302; i++ {
+	for i := range 302 {
 		parser.GetBitbucketCloudPullEventType("pullrequest:updated", "fakeSha", fmt.Sprintf("https://github.com/fakeorg/fakerepo/pull/%d", i))
 	}
 	// and now SHA will seen as a change again

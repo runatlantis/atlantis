@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -87,19 +88,19 @@ type Step struct {
 	// Map will be set in case #3 above.
 	Map map[string]map[string][]string
 	// CommandMap will be set in case #2 above.
-	CommandMap map[string]map[string]interface{}
+	CommandMap map[string]map[string]any
 }
 
-func (s *Step) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (s *Step) UnmarshalYAML(unmarshal func(any) error) error {
 	return s.unmarshalGeneric(unmarshal)
 }
 
-func (s Step) MarshalYAML() (interface{}, error) {
+func (s Step) MarshalYAML() (any, error) {
 	return s.marshalGeneric()
 }
 
 func (s *Step) UnmarshalJSON(data []byte) error {
-	return s.unmarshalGeneric(func(i interface{}) error {
+	return s.unmarshalGeneric(func(i any) error {
 		return json.Unmarshal(data, i)
 	})
 }
@@ -125,7 +126,7 @@ func (s Step) validStepName(stepName string) bool {
 }
 
 func (s Step) Validate() error {
-	validStep := func(value interface{}) error {
+	validStep := func(value any) error {
 		str := *value.(*string)
 		if !s.validStepName(str) {
 			return fmt.Errorf("%q is not a valid step type, maybe you omitted the 'run' key", str)
@@ -133,7 +134,7 @@ func (s Step) Validate() error {
 		return nil
 	}
 
-	extraArgs := func(value interface{}) error {
+	extraArgs := func(value any) error {
 		elem := value.(map[string]map[string][]string)
 		var keys []string
 		for k := range elem {
@@ -172,8 +173,8 @@ func (s Step) Validate() error {
 		return nil
 	}
 
-	envOrRunOrMultiEnvStep := func(value interface{}) error {
-		elem := value.(map[string]map[string]interface{})
+	envOrRunOrMultiEnvStep := func(value any) error {
+		elem := value.(map[string]map[string]any)
 		var keys []string
 		for k := range elem {
 			keys = append(keys, k)
@@ -196,10 +197,8 @@ func (s Step) Validate() error {
 		for k := range args {
 			argKeys = append(argKeys, k)
 		}
-		argMap := make(map[string]interface{})
-		for k, v := range args {
-			argMap[k] = v
-		}
+		argMap := make(map[string]any)
+		maps.Copy(argMap, args)
 		// Sort so tests can be deterministic.
 		sort.Strings(argKeys)
 
@@ -216,7 +215,7 @@ func (s Step) Validate() error {
 		switch t := argMap[ShellArgsArgKey].(type) {
 		case nil:
 		case string:
-		case []interface{}:
+		case []any:
 			for _, e := range t {
 				if _, ok := e.(string); !ok {
 					return fmt.Errorf("%q step %q option must contain only strings, found %v",
@@ -363,7 +362,7 @@ func (s Step) Validate() error {
 		return nil
 	}
 
-	runOrMultiEnvStep := func(value interface{}) error {
+	runOrMultiEnvStep := func(value any) error {
 		elem := value.(map[string]string)
 		var keys []string
 		for k := range elem {
@@ -473,7 +472,7 @@ func (s Step) ToValid() valid.Step {
 			case nil:
 			case string:
 				step.RunShell.ShellArgs = strings.Split(t, " ")
-			case []interface{}:
+			case []any:
 				step.RunShell.ShellArgs = []string{}
 				for _, e := range t {
 					step.RunShell.ShellArgs = append(step.RunShell.ShellArgs, e.(string))
@@ -519,7 +518,7 @@ func (s Step) ToValid() valid.Step {
 // 3. a custom run step: " - run: my custom command"
 // It takes a parameter unmarshal that is a function that tries to unmarshal
 // the current element into a given object.
-func (s *Step) unmarshalGeneric(unmarshal func(interface{}) error) error {
+func (s *Step) unmarshalGeneric(unmarshal func(any) error) error {
 
 	// First try to unmarshal as a single string, ex.
 	// steps:
@@ -566,7 +565,7 @@ func (s *Step) unmarshalGeneric(unmarshal func(interface{}) error) error {
 	//       command: echo ${test_value::7}
 	//       shell: bash
 	//       shellArgs: ["--verbose", "-c"]
-	var commandStep map[string]map[string]interface{}
+	var commandStep map[string]map[string]any
 	err = unmarshal(&commandStep)
 	if err == nil {
 		s.CommandMap = commandStep
@@ -576,7 +575,7 @@ func (s *Step) unmarshalGeneric(unmarshal func(interface{}) error) error {
 	return err
 }
 
-func (s Step) marshalGeneric() (interface{}, error) {
+func (s Step) marshalGeneric() (any, error) {
 	if len(s.StringVal) != 0 {
 		return s.StringVal, nil
 	} else if len(s.Map) != 0 {

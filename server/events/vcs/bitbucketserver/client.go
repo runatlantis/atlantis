@@ -79,7 +79,7 @@ func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 		b.BaseURL, projectKey, repo.Name, pull.Num)
 	// We'll only loop 1000 times as a safety measure.
 	maxLoops := 1000
-	for i := 0; i < maxLoops; i++ {
+	for range maxLoops {
 		resp, err := b.makeRequest("GET", fmt.Sprintf("%s?start=%d", baseURL, nextPageStart), nil)
 		if err != nil {
 			return nil, err
@@ -136,10 +136,8 @@ func (b *Client) GetProjectKey(repoName string, cloneURL string) (string, error)
 
 // CreateComment creates a comment on the merge request. It will write multiple
 // comments if a single comment is too long.
-func (b *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, _ string) error {
-	sepEnd := "\n```\n**Warning**: Output length greater than max comment size. Continued in next comment."
-	sepStart := "Continued from previous comment.\n```diff\n"
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, 0, "")
+func (b *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
+	comments := common.SplitComment(logger, comment, maxCommentLength, 0, command)
 	for _, c := range comments {
 		if err := b.postComment(repo, pullNum, c); err != nil {
 			return err

@@ -131,7 +131,7 @@ Webhooks are installed at the [team project](https://docs.microsoft.com/en-us/az
 * Under "Trigger on this type of event", select **Pull request created**
   * Optionally, select a repository under **Filters** to restrict the scope of this webhook subscription to a specific repository
 * Click **Next**
-* Set **URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. Note that SSL, or `https://$URL/events`, is required if you set a Basic username and password for the webhook). **Be sure to add `/events`**
+* Set **URL** to `http://$URL/events` where `$URL` is where Atlantis is hosted. Note that SSL, or `https://$URL/events`, is required if you set a Basic username and password for the webhook. **Be sure to add `/events`**
 * It is strongly recommended to set a Basic Username and Password for all webhooks
 * Leave all three drop-down menus for `...to send` set to **All**
 * Resource version should be set to **1.0** for `Pull request created` and `Pull request updated` event types and **2.0** for `Pull request commented on`

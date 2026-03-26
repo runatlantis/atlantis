@@ -32,7 +32,7 @@ repos:
   # Repo ID's are of the form {VCS hostname}/{org}/{repo name}, ex.
   # github.com/runatlantis/atlantis.
 - id: /.*/
-  # branch is an regex matching pull requests by base branch
+  # branch is a regex matching pull requests by base branch
   # (the branch the pull request is getting merged into).
   # By default, all branches are matched
   branch: /.*/
@@ -93,7 +93,7 @@ repos:
   post_workflow_hooks:
     - run: my-post-workflow-hook-command arg1
 
-  # policy_check defines if policy checking should be enable on this repository.
+  # policy_check defines if policy checking should be enabled on this repository.
   policy_check: false
 
   # autodiscover defines how atlantis should automatically discover projects in this repository.
@@ -185,7 +185,7 @@ repos:
 
 See [Command Requirements](command-requirements.md) for more details.
 
-### Repos Can Set Their Own Apply an applicable subcommand
+### Repos Can Set Their Own Apply Requirements
 
 If you want all (or specific) repos to be able to override the default apply requirements, use
 the `allowed_overrides` key.

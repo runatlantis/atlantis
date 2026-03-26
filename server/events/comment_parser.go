@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -188,7 +189,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		vcsUser = e.AzureDevopsUser
 	}
 	executableNames := []string{"run", e.ExecutableName, "@" + vcsUser}
-	if !e.stringInSlice(executableName, executableNames) {
+	if !slices.Contains(executableNames, executableName) {
 		return CommentParseResult{Ignore: true}
 	}
 
@@ -212,7 +213,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	cmd := strings.ToLower(args[1])
 
 	// Help output.
-	if e.stringInSlice(cmd, []string{"help", "-h", "--help"}) {
+	if slices.Contains([]string{"help", "-h", "--help"}, cmd) {
 		return CommentParseResult{CommentResponse: e.HelpComment()}
 	}
 
@@ -269,6 +270,10 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	case command.Unlock.String():
 		name = command.Unlock
 		flagSet = pflag.NewFlagSet(command.Unlock.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
+	case command.Cancel.String():
+		name = command.Cancel
+		flagSet = pflag.NewFlagSet(command.Cancel.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
 	case command.Version.String():
 		name = command.Version
@@ -512,15 +517,6 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 // containsGlobPattern returns true if the string contains glob pattern characters.
 func containsGlobPattern(s string) bool {
 	return strings.ContainsAny(s, "*?[")
-}
-
-func (e *CommentParser) stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
 }
 
 func (e *CommentParser) isAllowedCommand(cmd string) bool {

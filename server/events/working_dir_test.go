@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -527,6 +529,55 @@ func TestClone_ReCloneOnBaseChange(t *testing.T) {
 	Equals(t, expCommit, actCommit)
 }
 
+// Test that if the repo is already cloned but is at the wrong commit, but the base has changed
+// we need to reclone
+func TestClone_ReCloneOnErrorAttemptingReuse(t *testing.T) {
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+
+	// Copy the repo to our data dir.
+	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, dataDir, "git", "clone", repoDir, "repos/0/default")
+
+	// Now add a commit to the repo, so the one in the data dir is out of date.
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "newfile")
+	runCmd(t, repoDir, "git", "add", "newfile")
+	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
+	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Now intentionally break the remote so it's unable to fetch
+	runCmd(t, dataDir, "rm", "repos/0/default/.git/HEAD")
+
+	// Pretend that terraform has created a plan file, we'll check for it later
+	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
+	assert.NoFileExists(t, planFile)
+	_, err := os.Create(planFile)
+	Assert(t, err == nil, "creating plan file: %v", err)
+	assert.FileExists(t, planFile)
+
+	logger := logging.NewNoopLogger(t)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		HeadCommit: expCommit,
+		BaseBranch: "main",
+	}, "default")
+	Ok(t, err)
+	assert.NoFileExists(t, planFile, "Plan file should been wiped out by the reclone")
+
+	// Use rev-parse to verify at correct commit.
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
+	Equals(t, expCommit, actCommit)
+}
+
 func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 	repoDir := initRepo(t)
 	dataDir := t.TempDir()
@@ -771,6 +822,60 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	wd.CheckoutMerge = false
 	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default")
 	Equals(t, hasDiverged, false)
+}
+
+func TestHasDiverged_ConcurrentCalls(t *testing.T) {
+	remoteRepo := initRepo(t)
+
+	dataDir := t.TempDir()
+	clonedRepo := filepath.Join(dataDir, "repos/0/default")
+
+	runCmd(t, dataDir, "mkdir", "-p", "repos/0/")
+	runCmd(t, dataDir, "git", "clone", remoteRepo, clonedRepo)
+
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", remoteRepo),
+		GpgNoSigningEnabled:         true,
+	}
+
+	loops := 100
+	hasDivergedPerLoop := 2
+	var wg sync.WaitGroup
+	wg.Add(loops * hasDivergedPerLoop)
+
+	var sawWarn atomic.Bool
+
+	checkHasDiverged := func() {
+		defer wg.Done()
+		// Each goroutine gets its own logger to avoid data races on the
+		// shared bytes.Buffer backing logger history.
+		logger := logging.NewNoopLogger(t).WithHistory()
+		wd.HasDiverged(logger, clonedRepo)
+		if strings.Contains(logger.GetHistory(), "[WARN]") {
+			sawWarn.Store(true)
+		}
+	}
+
+	runCmd(t, clonedRepo, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, clonedRepo, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, clonedRepo, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, clonedRepo, "touch", "local-file")
+	runCmd(t, clonedRepo, "git", "add", "local-file")
+	runCmd(t, clonedRepo, "git", "commit", "-m", "Adding local file")
+
+	for i := range loops {
+		go checkHasDiverged()
+		go checkHasDiverged()
+		remoteFile := fmt.Sprintf("remote-file-%d.txt", i)
+		runCmd(t, remoteRepo, "touch", remoteFile)
+		runCmd(t, remoteRepo, "git", "add", remoteFile)
+		runCmd(t, remoteRepo, "git", "commit", "-m", "Adding remote file")
+	}
+
+	wg.Wait()
+	Assert(t, !sawWarn.Load(), "warning occurred while checking HasDiverged")
 }
 
 func initRepo(t *testing.T) string {

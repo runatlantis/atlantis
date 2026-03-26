@@ -6,7 +6,7 @@ for using this step include:
 - Denying usage of a list of modules
 - Asserting attributes of a resource at creation time
 - Catching unintentional resource deletions
-- Preventing security risks (ie. exposing secure ports to the public)
+- Preventing security risks (i.e. exposing secure ports to the public)
 
 ## How it works?
 
@@ -40,6 +40,27 @@ Enable the workflow using the following server configuration flag `--enable-poli
 
 ::: warning
 All repositories will have policy checking enabled.
+:::
+
+::: warning NOTE
+If you are using the [`--gh-team-allowlist`](server-configuration.md#gh-team-allowlist) flag to restrict which teams can run commands, you **must** also allowlist the `policy_check` command for policy checks to work on manual `atlantis plan` commands.
+
+For example:
+
+```bash
+atlantis server --gh-team-allowlist="*:plan,*:policy_check,*:unlock,myteam:apply"
+```
+
+Alternatively, you can use `allowed_overrides: [policy_check]` in your [server-side repo config](server-side-repo-config.md).
+
+**Why is this needed?**
+
+- `policy_check` is an internal command that runs automatically after `plan`
+- When using team allowlists, Atlantis checks if the user is authorized to run `policy_check`
+- Autoplans bypass this check (they don't have a user), which is why they work without this configuration
+- Without allowlisting `policy_check`, manual `atlantis plan` commands will plan successfully but skip policy checks
+
+See [Repo and Project Permissions](repo-and-project-permissions.md#server-option-gh-team-allowlist) for more information about team allowlists.
 :::
 
 ### Step 2: Define the policy configuration

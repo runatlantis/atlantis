@@ -7,13 +7,15 @@ package boltdb
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	bolt "go.etcd.io/bbolt"
@@ -64,6 +66,59 @@ func New(dataDir string) (*BoltDB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("starting BoltDB: %w", err)
 	}
+
+	// Migrate old lock keys to new format.
+	// Old format: {repoFullName}/{path}/{workspace}
+	// New format: {repoFullName}/{path}/{workspace}/{projectName}
+	// We scan all keys and for those that don't match the new format,
+	// we read their value, create a new key with the new format and
+	// delete the old key.
+	err = db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(locksBucketName))
+
+		// Phase 1: Collect keys that need migration
+		type migration struct {
+			oldKey   []byte
+			newKey   string
+			oldValue []byte
+		}
+		var migrations []migration
+
+		if err := bucket.ForEach(func(oldKey, oldValue []byte) error {
+			_, err := locking.IsCurrentLocking(string(oldKey))
+			if err != nil {
+				var currLock models.ProjectLock
+				if err := json.Unmarshal(oldValue, &currLock); err != nil {
+					return errors.Wrap(err, "failed to deserialize current lock")
+				}
+				newKey := models.GenerateLockKey(currLock.Project, currLock.Workspace)
+				migrations = append(migrations, migration{
+					oldKey:   append([]byte(nil), oldKey...),
+					newKey:   newKey,
+					oldValue: append([]byte(nil), oldValue...),
+				})
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+
+		for _, m := range migrations {
+			if err := bucket.Put([]byte(m.newKey), m.oldValue); err != nil {
+				return err
+			}
+			if err := bucket.Delete(m.oldKey); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("warning: failed to migrate BoltDB lock keys: %v", err)
+	}
+
 	return &BoltDB{
 		db:                    db,
 		locksBucketName:       []byte(locksBucketName),
@@ -478,7 +533,7 @@ func (b *BoltDB) pullKey(pull models.PullRequest) ([]byte, error) {
 		return nil, fmt.Errorf("repo name %q contains illegal string %q", hostname, pullKeySeparator)
 	}
 
-	return []byte(fmt.Sprintf("%s::%s::%d", hostname, repo, pull.Num)),
+	return fmt.Appendf(nil, "%s::%s::%d", hostname, repo, pull.Num),
 		nil
 }
 

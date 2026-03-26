@@ -115,17 +115,12 @@ func (g *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 // If comment length is greater than the max comment length we split into
 // multiple comments.
 func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error { //nolint: revive
-	sepEnd := "\n```\n</details>" +
-		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
-	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
-		"```diff\n"
-
 	// maxCommentLength is the maximum number of chars allowed in a single comment
 	// This length was copied from the Github client - haven't found documentation
 	// or tested limit in Azure DevOps.
 	const maxCommentLength = 150000
 
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, 0, "")
+	comments := common.SplitComment(logger, comment, maxCommentLength, 0, command)
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	for i := range comments {
@@ -236,7 +231,7 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 
 		// Ignore the Atlantis status, even if its set as a blocker.
 		// This status should not be considered when evaluating if the pull request can be applied.
-		settings := (policyEvaluation.Configuration.Settings).(map[string]interface{})
+		settings := (policyEvaluation.Configuration.Settings).(map[string]any)
 		if genre, ok := settings["statusGenre"]; ok && genre == "Atlantis Bot/atlantis" {
 			if name, ok := settings["statusName"]; ok && name == "apply" {
 				continue

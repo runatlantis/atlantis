@@ -629,12 +629,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -845,12 +845,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -1008,9 +1008,9 @@ repos:
 				},
 				Pull:               pull,
 				ProjectName:        "",
-				PlanRequirements:   []string{"policies_passed"},
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{"policies_passed"},
-				ImportRequirements: []string{"policies_passed"},
+				ImportRequirements: []string{},
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
 				User:               models.User{},
@@ -1071,9 +1071,9 @@ workflows:
 				},
 				Pull:               pull,
 				ProjectName:        "",
-				PlanRequirements:   []string{"policies_passed"},
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{"policies_passed"},
-				ImportRequirements: []string{"policies_passed"},
+				ImportRequirements: []string{},
 				RepoConfigVersion:  3,
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
@@ -1091,12 +1091,12 @@ workflows:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -1245,12 +1245,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -1464,14 +1464,14 @@ autodiscover:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			})

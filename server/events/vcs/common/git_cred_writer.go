@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/logging"
@@ -85,12 +86,7 @@ func fileHasLine(line string, filename string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("reading %s: %w", filename, err)
 	}
-	for _, l := range strings.Split(string(currContents), "\n") {
-		if l == line {
-			return true, nil
-		}
-	}
-	return false, nil
+	return slices.Contains(strings.Split(string(currContents), "\n"), line), nil
 }
 
 func fileAppend(line string, filename string) error {
@@ -133,8 +129,7 @@ func fileHasGHToken(user, host, filename string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	prevLines := strings.Split(string(currContents), "\n")
-	for _, l := range prevLines {
+	for l := range strings.SplitSeq(string(currContents), "\n") {
 		if strings.HasPrefix(l, "https://"+user) && strings.HasSuffix(l, host) {
 			return true, nil
 		}

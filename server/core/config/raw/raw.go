@@ -14,7 +14,7 @@ import (
 
 // VersionValidator helper function to validate binary version.
 // Function implements ozzo-validation::Rule.Validate interface.
-func VersionValidator(value interface{}) error {
+func VersionValidator(value any) error {
 	strPtr := value.(*string)
 	if strPtr == nil {
 		return nil

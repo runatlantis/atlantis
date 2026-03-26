@@ -6,6 +6,7 @@ package common
 import (
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -53,7 +54,7 @@ func DeDuplicateExtraArgs(commandArgs []string, extraArgs []string) []string {
 	}
 	// add any extra args that are not overrides
 	for _, extraArg := range extraArgs {
-		if !stringInSlice(usedExtraArgs, extraArg) {
+		if !slices.Contains(usedExtraArgs, extraArg) {
 			finalArgs = append(finalArgs, extraArg)
 		}
 	}
@@ -82,13 +83,4 @@ func IsFileTracked(cloneDir string, filename string) (bool, error) {
 	}
 	return len(output) > 0, nil
 
-}
-
-func stringInSlice(stringSlice []string, target string) bool {
-	for _, value := range stringSlice {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }

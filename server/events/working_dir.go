@@ -32,7 +32,8 @@ const workingDirPrefix = "repos"
 
 const prSourceRemote = "source"
 
-var cloneLocks sync.Map
+// gitLocks holds per-clone-dir locks: "repo-lock/<cloneDir>" -> *sync.RWMutex (read for steps, write for clone/reset/merge), "ref-lock/<cloneDir>" -> *sync.Mutex (serialize fetch).
+var gitLocks sync.Map
 var recheckRequiredMap sync.Map
 
 //go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
@@ -58,6 +59,8 @@ type WorkingDir interface {
 	DeletePlan(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string, path string, projectName string) error
 	// GetGitUntrackedFiles returns a list of Git untracked files in the working dir.
 	GetGitUntrackedFiles(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) ([]string, error)
+	// GitReadLock acquires a shared lock so clone/reset/merge cannot run while the caller is using the working dir (e.g. running plan/apply). Call the returned function when done.
+	GitReadLock(r models.Repo, p models.PullRequest, workspace string) func()
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -98,36 +101,52 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 
 	// Unconditionally wait for the clone lock here, if anyone else is doing any clone
 	// operation in this directory, we wait for it to finish before we check anything.
-	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
-	mutex := value.(*sync.Mutex)
-	mutex.Lock()
-	defer mutex.Unlock()
+	gitWriteUnlockFn := w.gitWriteLock(cloneDir)
+	defer gitWriteUnlockFn()
 
 	c := wrappedGitContext{cloneDir, headRepo, p}
-	// If the directory already exists, check if it's at the right commit.
-	// If so, then we do nothing.
-	if _, err := os.Stat(cloneDir); err == nil {
-		logger.Debug("clone directory '%s' already exists, checking if it's at the right commit", cloneDir)
-
-		isUpToDate, err := w.isBranchAtTargetRef(logger, c, p.HeadCommit)
-		if err != nil {
-			logger.Warn("will re-clone repo, could not determine if was at correct commit: %v", err)
-			return cloneDir, w.forceClone(logger, c)
-		}
-		if isUpToDate {
-			logger.Info("repo is at correct commit %q so will not re-clone", p.HeadCommit)
-			return cloneDir, nil
-		}
-		if !w.remoteHasBranch(logger, c, p.BaseBranch) {
-			logger.Info("repo appears to have changed base branch, must reclone")
-			return cloneDir, w.forceClone(logger, c)
-		}
-		logger.Info("repo was already cloned but branch is not at correct commit, updating to %q", p.HeadCommit)
-		return cloneDir, w.updateToRef(logger, c, p.HeadCommit)
+	ok, err := w.attemptReuseCloneDir(logger, c, cloneDir)
+	if ok && err == nil {
+		return cloneDir, nil
 	}
-
-	// Otherwise we clone the repo.
+	if err != nil {
+		logger.Err("An error occurred attempting to reuse the clone dir, falling back to forced clone. This is likely a bug please report: %v", err)
+	}
 	return cloneDir, w.forceClone(logger, c)
+}
+
+// attemptReuseCloneDir tries to reuse an existing cloneDir.
+//
+// It returns:
+// - (true, nil) → reuse succeeded; caller should use this cloneDir directly
+// - (false, nil) → reuse was not possible for an expected reason; caller should force clone
+// - (false, err) → an unexpected error occurred; caller should log the error and force clone
+// Locks are acquired by the caller.
+func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wrappedGitContext, cloneDir string) (bool, error) {
+	// If the directory doesn't exist yet, surely we can't reuse it
+	if _, err := os.Stat(cloneDir); err != nil {
+		return false, nil
+	}
+	logger.Debug("clone directory '%s' already exists, checking if it's at the right commit", cloneDir)
+
+	isUpToDate, err := w.isBranchAtTargetRef(logger, c, c.pr.HeadCommit)
+	if err != nil {
+		return false, err
+	}
+	if isUpToDate {
+		logger.Info("repo is at correct commit %q so will not re-clone", c.pr.HeadCommit)
+		return true, nil
+	}
+	if !w.remoteHasBranch(logger, c, c.pr.BaseBranch) {
+		logger.Info("repo appears to have changed base branch, must reclone")
+		return false, nil
+	}
+	logger.Info("repo was already cloned but branch is not at correct commit, updating to %q", c.pr.HeadCommit)
+	err = w.updateToRef(logger, c, c.pr.HeadCommit)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // MergeAgain merges again with upstream if we are using the merge checkout strategy,
@@ -151,10 +170,8 @@ func (w *FileWorkspace) MergeAgain(
 
 	// Unconditionally wait for the clone lock here, if anyone else is doing any clone
 	// operation in this directory, we wait for it to finish before we check anything.
-	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
-	mutex := value.(*sync.Mutex)
-	mutex.Lock()
-	defer mutex.Unlock()
+	gitWriteUnlockFn := w.gitWriteLock(cloneDir)
+	defer gitWriteUnlockFn()
 
 	if _, exists := recheckRequiredMap.Load(cloneDir); !exists {
 		logger.Debug("Skipping upstream check. Some other thread has done this for us")
@@ -164,7 +181,7 @@ func (w *FileWorkspace) MergeAgain(
 
 	c := wrappedGitContext{cloneDir, headRepo, p}
 	if w.recheckDiverged(logger, p, headRepo, cloneDir) {
-		logger.Info("base branch has been updated, using merge strategy and will merge again")
+		logger.Info("base branch may have been updated, using merge strategy and will merge again")
 		return true, w.mergeAgain(logger, c)
 	}
 	return false, nil
@@ -175,8 +192,9 @@ func (w *FileWorkspace) MergeAgain(
 // This matters in the case of the merge checkout strategy because after
 // cloning the repo and doing the merge, it's possible main was updated
 // and we have to perform a new merge.
-// If there are any errors we return false since we prefer things to succeed
-// vs. stopping the plan/apply.
+// If there are any errors we return true since we prefer to assume divergence
+// for safety.
+// Locks are acquired by the caller.
 func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that main has diverged if we're using
@@ -210,11 +228,14 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Warn("getting remote update failed: %s", string(output))
-			return false
+			return true
 		}
 	}
 
-	return w.HasDiverged(logger, cloneDir)
+	// We already hold the write lock; take ref lock so fetch is serialized with other HasDiverged callers.
+	unlockRef := w.gitRefLock(cloneDir)
+	defer unlockRef()
+	return w.hasDiverged(logger, cloneDir)
 }
 
 func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
@@ -224,12 +245,28 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 		return false
 	}
 
-	statusFetchCmd := exec.Command("git", "fetch")
-	statusFetchCmd.Dir = cloneDir
-	outputStatusFetch, err := statusFetchCmd.CombinedOutput()
+	// Hold ref lock and repo read lock for the full duration (fetch + status) so we don't race with
+	// clone/reset/merge. recheckDiverged does not take the read lock because it already holds the write lock.
+	unlockGitRefLock := w.gitRefLock(cloneDir)
+	defer unlockGitRefLock()
+
+	unlockGitReadLock := w.gitReadLock(cloneDir)
+	defer unlockGitReadLock()
+
+	return w.hasDiverged(logger, cloneDir)
+}
+
+// hasDiverged runs fetch and git status to detect divergence. Caller must hold
+// gitRefLock(cloneDir); if not already holding the repo write lock (e.g. from recheckDiverged),
+// caller must also hold gitReadLock(cloneDir).
+func (w *FileWorkspace) hasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
+	logger.Debug("runGitFetch: running git fetch in %s", cloneDir)
+	cmd := exec.Command("git", "fetch")
+	cmd.Dir = cloneDir
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Warn("fetching repo has failed: %s", string(outputStatusFetch))
-		return false
+		logger.Warn("HasDiverged: fetching repo has failed: %s", string(output))
+		return true
 	}
 
 	// Check if remote main branch has diverged.
@@ -238,10 +275,9 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
 	if err != nil {
 		logger.Warn("getting repo status has failed: %s", string(outputStatusUno))
-		return false
+		return true
 	}
-	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
-	return hasDiverged
+	return strings.Contains(string(outputStatusUno), "have diverged")
 }
 
 func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {
@@ -256,6 +292,7 @@ func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedG
 	return true
 }
 
+// Locks are acquired by the caller.
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
 	// We use both `<prSourceRemote>` and `origin` remotes, update them both
@@ -414,6 +451,7 @@ func (w *FileWorkspace) wrappedGit(logger logging.SimpleLogging, c wrappedGitCon
 }
 
 // Merge the PR into the base branch.
+// Locks are acquired by the caller.
 func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappedGitContext) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", c.pr.HeadBranch)
 	fetchRemote := prSourceRemote
@@ -534,4 +572,41 @@ func (w *FileWorkspace) GetGitUntrackedFiles(logger logging.SimpleLogging, r mod
 	untrackedFiles := strings.Split(string(output), "\n")[:]
 	logger.Debug("Untracked files: '%s'", strings.Join(untrackedFiles, ","))
 	return untrackedFiles, nil
+}
+
+// gitWriteLock acquires an exclusive lock for clone/reset/merge in the given clone dir.
+// Callers must call the returned function to release the lock.
+func (w *FileWorkspace) gitWriteLock(cloneDir string) func() {
+	key := fmt.Sprintf("repo-lock/%s", cloneDir)
+	value, _ := gitLocks.LoadOrStore(key, new(sync.RWMutex))
+	mu := value.(*sync.RWMutex)
+	mu.Lock()
+	return func() { mu.Unlock() }
+}
+
+// GitReadLock acquires a shared lock so that clone/reset/merge (write lock) cannot run
+// while steps are using the working dir. Call the returned function when steps are done.
+func (w *FileWorkspace) GitReadLock(r models.Repo, p models.PullRequest, workspace string) func() {
+	return w.gitReadLock(w.cloneDir(r, p, workspace))
+}
+
+// gitReadLock acquires the same shared lock as GitReadLock but by workspace dir path.
+// Used when only the workspace directory path is available.
+func (w *FileWorkspace) gitReadLock(workspaceDir string) func() {
+	key := fmt.Sprintf("repo-lock/%s", workspaceDir)
+	value, _ := gitLocks.LoadOrStore(key, new(sync.RWMutex))
+	mu := value.(*sync.RWMutex)
+	mu.RLock()
+	return func() { mu.RUnlock() }
+}
+
+// gitRefLock acquires an exclusive lock for ref update operations.
+// It is separate from the repo read lock to allow for concurrent repo read operations
+// and not introduce unnecessary latency.
+func (w *FileWorkspace) gitRefLock(workspaceDir string) func() {
+	key := fmt.Sprintf("ref-lock/%s", workspaceDir)
+	value, _ := gitLocks.LoadOrStore(key, new(sync.Mutex))
+	mu := value.(*sync.Mutex)
+	mu.Lock()
+	return func() { mu.Unlock() }
 }

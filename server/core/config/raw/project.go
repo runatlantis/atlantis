@@ -47,7 +47,7 @@ type Project struct {
 }
 
 func (p Project) Validate() error {
-	validDir := func(value interface{}) error {
+	validDir := func(value any) error {
 		dir := *value.(*string)
 		if strings.Contains(dir, "..") {
 			return errors.New("cannot contain '..'")
@@ -61,7 +61,7 @@ func (p Project) Validate() error {
 		return nil
 	}
 
-	validName := func(value interface{}) error {
+	validName := func(value any) error {
 		strPtr := value.(*string)
 		if strPtr == nil {
 			return nil
@@ -75,7 +75,7 @@ func (p Project) Validate() error {
 		return nil
 	}
 
-	branchValid := func(value interface{}) error {
+	branchValid := func(value any) error {
 		strPtr := value.(*string)
 		if strPtr == nil {
 			return nil
@@ -92,7 +92,7 @@ func (p Project) Validate() error {
 		return nil
 	}
 
-	DependsOn := func(value interface{}) error {
+	DependsOn := func(value any) error {
 		return nil
 	}
 
@@ -203,7 +203,7 @@ func validProjectName(name string) bool {
 	return nameWithoutSlashes == url.QueryEscape(nameWithoutSlashes)
 }
 
-func validPlanReq(value interface{}) error {
+func validPlanReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
@@ -213,7 +213,7 @@ func validPlanReq(value interface{}) error {
 	return nil
 }
 
-func validApplyReq(value interface{}) error {
+func validApplyReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
@@ -223,7 +223,7 @@ func validApplyReq(value interface{}) error {
 	return nil
 }
 
-func validImportReq(value interface{}) error {
+func validImportReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
@@ -233,7 +233,7 @@ func validImportReq(value interface{}) error {
 	return nil
 }
 
-func validDistribution(value interface{}) error {
+func validDistribution(value any) error {
 	distribution := value.(*string)
 	if distribution != nil && *distribution != "terraform" && *distribution != "opentofu" {
 		return fmt.Errorf("'%s' is not a valid terraform_distribution, only '%s' and '%s' are supported", *distribution, "terraform", "opentofu")

@@ -4,12 +4,11 @@
 package events
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	logging "github.com/runatlantis/atlantis/server/logging"
+	"reflect"
+	"time"
 )
 
 type MockWorkingDir struct {
@@ -180,6 +179,22 @@ func (mock *MockWorkingDir) MergeAgain(logger logging.SimpleLogging, headRepo mo
 		}
 	}
 	return _ret0, _ret1
+}
+
+func (mock *MockWorkingDir) GitReadLock(r models.Repo, p models.PullRequest, workspace string) func() {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+	}
+	_params := []pegomock.Param{r, p, workspace}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GitReadLock", _params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem()})
+	var _ret0 func()
+	if len(_result) != 0 && _result[0] != nil {
+		_ret0 = _result[0].(func())
+	}
+	if _ret0 == nil {
+		_ret0 = func() {}
+	}
+	return _ret0
 }
 
 func (mock *MockWorkingDir) VerifyWasCalledOnce() *VerifierMockWorkingDir {

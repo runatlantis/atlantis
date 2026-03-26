@@ -156,7 +156,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func (g *GithubAppController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...interface{}) {
+func (g *GithubAppController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	g.Logger.Log(lvl, response)
 	w.WriteHeader(code)

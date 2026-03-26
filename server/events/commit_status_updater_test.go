@@ -193,7 +193,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 	cases := []struct {
 		status     models.CommitStatus
 		cmd        command.Name
-		result     *command.ProjectResult
+		result     *command.ProjectCommandOutput
 		expDescrip string
 	}{
 		{
@@ -209,7 +209,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 		{
 			status: models.SuccessCommitStatus,
 			cmd:    command.Plan,
-			result: &command.ProjectResult{
+			result: &command.ProjectCommandOutput{
 				PlanSuccess: &models.PlanSuccess{
 					TerraformOutput: "aaa\nNote: Objects have changed outside of Terraform\nbbb\nPlan: 1 to add, 2 to change, 3 to destroy.\nbbb",
 				},
@@ -229,7 +229,7 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 		{
 			status: models.SuccessCommitStatus,
 			cmd:    command.Apply,
-			result: &command.ProjectResult{
+			result: &command.ProjectCommandOutput{
 				ApplySuccess: "success",
 			},
 			expDescrip: "Apply succeeded.",

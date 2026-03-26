@@ -65,7 +65,7 @@ func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
 	// We'll only loop 1000 times as a safety measure.
 	maxLoops := 1000
-	for i := 0; i < maxLoops; i++ {
+	for range maxLoops {
 		resp, err := b.makeRequest("GET", nextPageURL, nil)
 		if err != nil {
 			return nil, err
@@ -243,7 +243,7 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
 	// We'll only loop 1000 times as a safety measure.
 	maxLoops := 1000
-	for i := 0; i < maxLoops; i++ {
+	for range maxLoops {
 		resp, err := b.makeRequest("GET", nextPageURL, nil)
 		if err != nil {
 			return models.MergeableStatus{}, err
