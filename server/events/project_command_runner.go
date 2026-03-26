@@ -553,7 +553,6 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 				continue
 			}
 			policySetResults = append(policySetResults, *result)
-			preConftestOutput = append(preConftestOutput, "")
 		}
 	}
 
