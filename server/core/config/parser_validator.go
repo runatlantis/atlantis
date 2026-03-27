@@ -258,7 +258,7 @@ func (p *ParserValidator) applyLegacyShellParsing(cfg *valid.RepoCfg) error {
 
 // expandProjectGlobs expands projects with glob patterns in their dir field
 // into multiple projects, one for each matching directory that contains
-// Terraform files (.tf).
+// files matching the project's glob_file_match patterns (default: "*.tf").
 func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.Project) ([]raw.Project, error) {
 	var expandedProjects []raw.Project
 
@@ -276,7 +276,7 @@ func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.P
 			return nil, fmt.Errorf("error expanding glob pattern %q: %w", *project.Dir, err)
 		}
 
-		// Filter matches to only include directories with Terraform files
+		// Filter matches to only include directories with matching files
 		for _, match := range matches {
 			// Check if it's a directory
 			info, err := os.Stat(match)
@@ -284,12 +284,12 @@ func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.P
 				continue
 			}
 
-			// Check if the directory contains any .tf files
-			hasTerraformFiles, err := p.dirContainsTerraformFiles(match)
+			// Check if the directory contains any files matching the patterns
+			hasMatchingFiles, err := p.dirContainsMatchingFiles(match, project.GlobFileMatch)
 			if err != nil {
-				return nil, fmt.Errorf("error checking for Terraform files in %q: %w", match, err)
+				return nil, fmt.Errorf("error checking for matching files in %q: %w", match, err)
 			}
-			if !hasTerraformFiles {
+			if !hasMatchingFiles {
 				continue
 			}
 
@@ -309,15 +309,28 @@ func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.P
 	return expandedProjects, nil
 }
 
-// dirContainsTerraformFiles returns true if the directory contains at least one .tf file.
-func (p *ParserValidator) dirContainsTerraformFiles(dir string) (bool, error) {
+// dirContainsMatchingFiles returns true if the directory contains at least one file
+// matching any of the given patterns. If patterns is nil, defaults to ["*.tf"].
+func (p *ParserValidator) dirContainsMatchingFiles(dir string, patterns []string) (bool, error) {
+	if patterns == nil {
+		patterns = []string{"*.tf"}
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return false, err
 	}
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".tf") {
-			return true, nil
+		if entry.IsDir() {
+			continue
+		}
+		for _, pattern := range patterns {
+			matched, err := filepath.Match(pattern, entry.Name())
+			if err != nil {
+				return false, fmt.Errorf("invalid pattern %q: %w", pattern, err)
+			}
+			if matched {
+				return true, nil
+			}
 		}
 	}
 	return false, nil
@@ -347,6 +360,8 @@ func (p *ParserValidator) copyProjectWithDir(original raw.Project, newDir string
 		PolicyCheck:               original.PolicyCheck,
 		CustomPolicyCheck:         original.CustomPolicyCheck,
 		SilencePRComments:         original.SilencePRComments,
+		// GlobFileMatch is intentionally not copied: it is consumed during glob expansion
+		// and the expanded projects have literal dir paths, so the field no longer applies.
 	}
 
 	// Note: We intentionally do NOT copy the Name field.
