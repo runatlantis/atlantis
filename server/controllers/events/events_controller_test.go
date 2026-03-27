@@ -989,6 +989,122 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 	}
 }
 
+func TestPost_GithubMultiLineComment(t *testing.T) {
+	t.Log("when the comment has multiple atlantis plan commands, a single merged command is dispatched")
+	e, v, _, _, p, cr, _, _, cp := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "issue_comment")
+	// JSON \n becomes a real newline in the parsed comment body.
+	event := `{"action": "created", "comment": {"body": "atlantis plan -d project-a\natlantis plan -d project-b", "id": 1}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+	baseRepo := models.Repo{}
+	user := models.User{}
+	cmdA := events.CommentCommand{Name: command.Plan, RepoRelDir: "project-a"}
+	cmdB := events.CommentCommand{Name: command.Plan, RepoRelDir: "project-b"}
+	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
+	When(cp.Parse("atlantis plan -d project-a", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmdA})
+	When(cp.Parse("atlantis plan -d project-b", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmdB})
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, "Processing...")
+
+	// Single merged command dispatched with SubCommands.
+	cr.VerifyWasCalledOnce().RunCommentCommand(
+		Any[models.Repo](), Any[*models.Repo](), Any[*models.PullRequest](),
+		Any[models.User](), Any[int](), Any[*events.CommentCommand]())
+}
+
+func TestPost_GithubMultiLineMixedCommandsRejected(t *testing.T) {
+	t.Log("when the comment mixes plan and apply commands, an error is returned")
+	e, v, _, _, p, _, _, vcsClient, cp := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "issue_comment")
+	event := `{"action": "created", "comment": {"body": "atlantis plan -d project-a\natlantis apply -d project-b", "id": 1}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+	baseRepo := models.Repo{}
+	user := models.User{}
+	cmdPlan := events.CommentCommand{Name: command.Plan, RepoRelDir: "project-a"}
+	cmdApply := events.CommentCommand{Name: command.Apply, RepoRelDir: "project-b"}
+	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
+	When(cp.Parse("atlantis plan -d project-a", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmdPlan})
+	When(cp.Parse("atlantis apply -d project-b", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmdApply})
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, "Commenting back on pull request")
+
+	vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(baseRepo), Eq(1),
+		Any[string](), Eq(""))
+}
+
+func TestPost_GithubMultiLineNonCommandLinesSkipped(t *testing.T) {
+	t.Log("when multi-line comment has non-command lines mixed in, they are skipped")
+	e, v, _, _, p, cr, _, _, cp := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "issue_comment")
+	event := `{"action": "created", "comment": {"body": "here is my plan:\natlantis plan -d project-a\nsome other text\natlantis plan -d project-b", "id": 1}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+	baseRepo := models.Repo{}
+	user := models.User{}
+	cmdA := events.CommentCommand{Name: command.Plan, RepoRelDir: "project-a"}
+	cmdB := events.CommentCommand{Name: command.Plan, RepoRelDir: "project-b"}
+	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
+	When(cp.Parse("here is my plan:", models.Github)).ThenReturn(events.CommentParseResult{Ignore: true})
+	When(cp.Parse("atlantis plan -d project-a", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmdA})
+	When(cp.Parse("some other text", models.Github)).ThenReturn(events.CommentParseResult{Ignore: true})
+	When(cp.Parse("atlantis plan -d project-b", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmdB})
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, "Processing...")
+
+	cr.VerifyWasCalledOnce().RunCommentCommand(
+		Any[models.Repo](), Any[*models.Repo](), Any[*models.PullRequest](),
+		Any[models.User](), Any[int](), Any[*events.CommentCommand]())
+}
+
+func TestPost_GithubMultiLineWithBlankLines(t *testing.T) {
+	t.Log("blank lines in multi-line comments are filtered out")
+	e, v, _, _, p, cr, _, _, cp := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "issue_comment")
+	event := `{"action": "created", "comment": {"body": "atlantis plan -d project-a\n\n\natlantis plan -d project-b\n", "id": 1}}`
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+	baseRepo := models.Repo{}
+	user := models.User{}
+	cmdA := events.CommentCommand{Name: command.Plan, RepoRelDir: "project-a"}
+	cmdB := events.CommentCommand{Name: command.Plan, RepoRelDir: "project-b"}
+	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
+	When(cp.Parse("atlantis plan -d project-a", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmdA})
+	When(cp.Parse("atlantis plan -d project-b", models.Github)).ThenReturn(events.CommentParseResult{Command: &cmdB})
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, "Processing...")
+
+	cr.VerifyWasCalledOnce().RunCommentCommand(
+		Any[models.Repo](), Any[*models.Repo](), Any[*models.PullRequest](),
+		Any[models.User](), Any[int](), Any[*events.CommentCommand]())
+}
+
+func TestPost_GithubSingleLineUnchanged(t *testing.T) {
+	t.Log("single line comments still go through the existing single-command flow")
+	e, v, _, _, p, cr, _, _, cp := setup(t)
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "issue_comment")
+	testComment := "atlantis plan -d project-a"
+	event := fmt.Sprintf(`{"action": "created", "comment": {"body": "%v", "id": 1}}`, testComment)
+	When(v.Validate(req, secret)).ThenReturn([]byte(event), nil)
+	baseRepo := models.Repo{}
+	user := models.User{}
+	cmd := events.CommentCommand{Name: command.Plan, RepoRelDir: "project-a"}
+	When(p.ParseGithubIssueCommentEvent(Any[logging.SimpleLogging](), Any[*github.IssueCommentEvent]())).ThenReturn(baseRepo, user, 1, nil)
+	When(cp.Parse(testComment, models.Github)).ThenReturn(events.CommentParseResult{Command: &cmd})
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, "Processing...")
+
+	cr.VerifyWasCalledOnce().RunCommentCommand(baseRepo, nil, nil, user, 1, &cmd)
+}
+
 func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *mocks.MockAzureDevopsRequestValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {
 	RegisterMockTestingT(t)
 	v := mocks.NewMockGithubRequestValidator()

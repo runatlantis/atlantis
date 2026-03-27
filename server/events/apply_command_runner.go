@@ -115,8 +115,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
 	}
 
-	var projectCmds []command.ProjectContext
-	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
+	projectCmds, err := cmd.BuildProjectCmds(ctx, a.prjCmdBuilder.BuildApplyCommands)
 	if err != nil {
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)

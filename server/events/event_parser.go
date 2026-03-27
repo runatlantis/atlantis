@@ -144,13 +144,34 @@ type CommentCommand struct {
 	PolicySet string
 	// ClearPolicyApproval is true if approvals should be cleared out for specified policies.
 	ClearPolicyApproval bool
+	// SubCommands holds individual commands when multiple commands are batched
+	// from a multi-line comment. When set, the plan/apply runners build project
+	// commands for each sub-command and aggregate results into a single comment.
+	SubCommands []*CommentCommand
 }
 
 // IsForSpecificProject returns true if the command is for a specific dir, workspace
 // or project name. Otherwise it's a command like "atlantis plan" or "atlantis
 // apply".
 func (c CommentCommand) IsForSpecificProject() bool {
-	return c.RepoRelDir != "" || c.Workspace != "" || c.ProjectName != ""
+	return c.RepoRelDir != "" || c.Workspace != "" || c.ProjectName != "" || len(c.SubCommands) > 0
+}
+
+// BuildProjectCmds builds project commands, iterating over SubCommands when
+// present or delegating directly to the builder for a single command.
+func (c *CommentCommand) BuildProjectCmds(ctx *command.Context, build func(*command.Context, *CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, error) {
+	if len(c.SubCommands) == 0 {
+		return build(ctx, c)
+	}
+	var all []command.ProjectContext
+	for _, sub := range c.SubCommands {
+		cmds, err := build(ctx, sub)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, cmds...)
+	}
+	return all, nil
 }
 
 // Dir returns the dir of this command.
