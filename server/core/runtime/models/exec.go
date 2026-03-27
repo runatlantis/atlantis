@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 )
 
 //go:generate pegomock generate --package mocks -o mocks/mock_exec.go Exec
@@ -28,7 +27,9 @@ func (e LocalExec) LookPath(file string) (string, error) {
 // for more complex usecases we can add a Command function to this method which will
 // allow us to edit a Cmd directly.
 func (e LocalExec) CombinedOutput(args []string, envs map[string]string, workdir string) (string, error) {
-	formattedArgs := strings.Join(args, " ")
+	if len(args) == 0 {
+		return "", fmt.Errorf("no command specified")
+	}
 
 	envVars := []string{}
 	for key, val := range envs {
@@ -39,9 +40,9 @@ func (e LocalExec) CombinedOutput(args []string, envs map[string]string, workdir
 	// can happen once at the beginning
 	envVars = append(envVars, os.Environ()...)
 
-	// honestly not entirely sure why we're using sh -c but it's used
-	// for the terraform binary so copying it for now
-	cmd := exec.Command("sh", "-c", formattedArgs)
+	// args[0] is the executable path resolved from the version cache or LookPath,
+	// and subsequent args are controlled by server configuration (not user input).
+	cmd := exec.Command(args[0], args[1:]...) // #nosec G204 -- executable and args are server-controlled
 	cmd.Env = envVars
 	cmd.Dir = workdir
 
