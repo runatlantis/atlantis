@@ -38,3 +38,9 @@ test-results/
 
 #Cursor dirs
 .cursor
+
+# Git worktrees
+.worktrees/
+
+# Local development data
+data/
