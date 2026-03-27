@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -289,6 +290,65 @@ func TestParseAtlantisURL(t *testing.T) {
 			} else {
 				Ok(t, err)
 				Equals(t, c.ExpURL, act.String())
+			}
+		})
+	}
+}
+
+func TestParsePlanTimeout(t *testing.T) {
+	cases := []struct {
+		description     string
+		timeout         string
+		expectError     string
+		expectZero      bool
+		expectPositive  bool
+	}{
+		{
+			description:    "valid duration 15m",
+			timeout:        "15m",
+			expectPositive: true,
+		},
+		{
+			description:    "valid duration 1h",
+			timeout:        "1h",
+			expectPositive: true,
+		},
+		{
+			description:    "valid duration 2h30m",
+			timeout:        "2h30m",
+			expectPositive: true,
+		},
+		{
+			description: "empty means no timeout",
+			timeout:     "",
+			expectZero:  true,
+		},
+		{
+			description: "invalid duration string",
+			timeout:     "abc",
+			expectError: "invalid duration",
+		},
+		{
+			description: "negative duration",
+			timeout:     "-5m",
+			expectError: "negative",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			timeout, err := server.ParsePlanTimeout(c.timeout)
+			if c.expectError != "" {
+				Assert(t, err != nil, "expected error for timeout %q", c.timeout)
+				Assert(t, strings.Contains(err.Error(), c.expectError),
+					"expected error containing %q, got: %v", c.expectError, err)
+			} else {
+				Ok(t, err)
+				if c.expectZero {
+					Equals(t, time.Duration(0), timeout)
+				}
+				if c.expectPositive {
+					Assert(t, timeout > 0, "expected positive duration, got %s", timeout)
+				}
 			}
 		})
 	}

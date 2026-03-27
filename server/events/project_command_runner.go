@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
@@ -245,6 +246,7 @@ type DefaultProjectCommandRunner struct {
 	WorkingDirLocker          WorkingDirLocker
 	CommandRequirementHandler CommandRequirementHandler
 	CancellationTracker       CancellationTracker
+	PlanTimeout               time.Duration
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -685,6 +687,19 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", lockAttempt.LockFailureReason, nil
 	}
 	ctx.Log.Debug("acquired lock for project")
+
+	if p.PlanTimeout > 0 && !lockAttempt.LockTime.IsZero() && time.Since(lockAttempt.LockTime) > p.PlanTimeout {
+		ctx.Log.Info("plan has expired (created %s ago, timeout %s), discarding", time.Since(lockAttempt.LockTime).Round(time.Second), p.PlanTimeout)
+		planFile := filepath.Join(absPath, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+		if removeErr := os.Remove(planFile); removeErr != nil && !os.IsNotExist(removeErr) {
+			ctx.Log.Err("failed to remove expired plan file: %v", removeErr)
+		}
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("failed to release lock for expired plan: %v", unlockErr)
+		}
+		return "", fmt.Sprintf("The plan has expired (created %s ago, timeout is %s). Please run `atlantis plan` again.",
+			time.Since(lockAttempt.LockTime).Round(time.Second), p.PlanTimeout), nil
+	}
 
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Apply)
