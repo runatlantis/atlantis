@@ -74,6 +74,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/gitlab"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
+	atlantisoidc "github.com/runatlantis/atlantis/server/oidc"
 )
 
 const (
@@ -129,6 +130,8 @@ type Server struct {
 	WebAuthentication              bool
 	WebUsername                    string
 	WebPassword                    string
+	WebOIDCAuth                   atlantisoidc.OIDCAuthProvider
+	OIDCController                *controllers.OIDCController
 	ProjectCmdOutputHandler        jobs.ProjectCommandOutputHandler
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
@@ -1045,9 +1048,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebAuthentication:              userConfig.WebBasicAuth,
 		WebUsername:                    userConfig.WebUsername,
 		WebPassword:                    userConfig.WebPassword,
+		WebOIDCAuth:                   atlantisoidc.OIDCAuthProvider(userConfig.WebOIDCAuth),
 		ScheduledExecutorService:       scheduledExecutorService,
 		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
 		database:                       database,
+	}
+
+	// Initialize OIDC authentication if configured.
+	if userConfig.WebOIDCAuth != "" {
+		oidcController, oidcErr := initOIDC(userConfig, parsedURL, logger)
+		if oidcErr != nil {
+			return nil, fmt.Errorf("initializing OIDC: %w", oidcErr)
+		}
+		server.OIDCController = oidcController
 	}
 
 	validate := validator.New(validator.WithRequiredStructEnabled())
@@ -1058,6 +1071,56 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	} else {
 		return server, nil
 	}
+}
+
+// initOIDC creates and returns an OIDCController from the user configuration.
+func initOIDC(userConfig UserConfig, atlantisURL *url.URL, logger logging.SimpleLogging) (*controllers.OIDCController, error) {
+	scopes := strings.Split(userConfig.WebOIDCScopes, ",")
+
+	// Derive redirect URL from Atlantis URL.
+	redirectURL := strings.TrimRight(atlantisURL.String(), "/") + "/auth/callback"
+
+	var azureWI *atlantisoidc.AzureWorkloadIdentity
+	if userConfig.WebOIDCAzureUseWorkloadIdentity {
+		var wiErr error
+		azureWI, wiErr = atlantisoidc.NewAzureWorkloadIdentity(logger)
+		if wiErr != nil {
+			return nil, fmt.Errorf("Azure workload identity: %w", wiErr)
+		}
+		logger.Info("Azure workload identity enabled for OIDC")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	provider, err := atlantisoidc.NewProvider(
+		ctx,
+		userConfig.WebOIDCIssuerURL,
+		userConfig.WebOIDCClientID,
+		userConfig.WebOIDCClientSecret,
+		redirectURL,
+		scopes,
+		azureWI,
+		logger,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	secureCookies := atlantisURL.Scheme == "https"
+	sessionMgr := atlantisoidc.NewSessionManager(
+		[]byte(userConfig.WebOIDCCookieSecret),
+		secureCookies,
+		atlantisURL.Path,
+		logger,
+	)
+
+	return &controllers.OIDCController{
+		Provider:       provider,
+		SessionManager: sessionMgr,
+		Logger:         logger,
+		BasePath:       atlantisURL.Path,
+	}, nil
 }
 
 // Start creates the routes and starts serving traffic.
@@ -1079,6 +1142,13 @@ func (s *Server) Start() error {
 		Queries(LockViewRouteIDQueryParam, fmt.Sprintf("{%s}", LockViewRouteIDQueryParam)).Name(LockViewRouteName)
 	s.Router.HandleFunc("/jobs/{job-id}", s.JobsController.GetProjectJobs).Methods("GET").Name(ProjectJobsViewRouteName)
 	s.Router.HandleFunc("/jobs/{job-id}/ws", s.JobsController.GetProjectJobsWS).Methods("GET")
+
+	// OIDC authentication routes.
+	if s.OIDCController != nil {
+		s.Router.HandleFunc("/auth/login", s.OIDCController.Login).Methods("GET")
+		s.Router.HandleFunc("/auth/callback", s.OIDCController.Callback).Methods("GET")
+		s.Router.HandleFunc("/auth/logout", s.OIDCController.Logout).Methods("GET")
+	}
 
 	r, ok := s.StatsReporter.(prometheus.Reporter)
 	if ok {
@@ -1199,7 +1269,7 @@ func (s *Server) closeDatabase(timeout time.Duration) error {
 }
 
 // Index is the / route.
-func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	locks, err := s.Locker.List()
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -1241,12 +1311,23 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 
+	// Extract user email from OIDC session if available.
+	oidcEnabled := s.OIDCController != nil
+	var userEmail string
+	if oidcEnabled && s.OIDCController.SessionManager != nil {
+		if email, sessionErr := s.OIDCController.SessionManager.GetSession(r); sessionErr == nil {
+			userEmail = email
+		}
+	}
+
 	err = s.IndexTemplate.Execute(w, web_templates.IndexData{
 		Locks:            lockResults,
 		PullToJobMapping: preparePullToJobMappings(s),
 		ApplyLock:        applyLockData,
 		AtlantisVersion:  s.AtlantisVersion,
 		CleanedBasePath:  s.AtlantisURL.Path,
+		OIDCEnabled:      oidcEnabled,
+		UserEmail:        userEmail,
 	})
 	if err != nil {
 		s.Logger.Err(err.Error())

@@ -1521,6 +1521,76 @@ ATLANTIS_WEB_BASIC_AUTH=true
 
 Enable Basic Authentication on the Atlantis web service.
 
+### `--web-oidc-auth`
+
+```bash
+atlantis server --web-oidc-auth="entraid"
+# or
+ATLANTIS_WEB_OIDC_AUTH="entraid"
+```
+
+OIDC auth provider for the web UI. Set to `entraid` to enable Entra ID (Azure AD) authentication. Can coexist with basic auth. Empty means disabled.
+
+### `--web-oidc-azure-use-workload-identity`
+
+```bash
+atlantis server --web-oidc-azure-use-workload-identity
+# or
+ATLANTIS_WEB_OIDC_AZURE_USE_WORKLOAD_IDENTITY=true
+```
+
+Use Azure workload identity (federated service account token) as `client_assertion` for OIDC token exchange instead of a client secret. Requires `--web-oidc-auth=entraid`. The pod must have the `azure.workload.identity/use=true` label and the service account must be annotated with `azure.workload.identity/client-id`.
+
+### `--web-oidc-client-id`
+
+```bash
+atlantis server --web-oidc-client-id="00000000-0000-0000-0000-000000000000"
+# or
+ATLANTIS_WEB_OIDC_CLIENT_ID="00000000-0000-0000-0000-000000000000"
+```
+
+OIDC application (client) ID. Required when `--web-oidc-auth` is set.
+
+### `--web-oidc-client-secret`
+
+```bash
+atlantis server --web-oidc-client-secret="your-secret"
+# or
+ATLANTIS_WEB_OIDC_CLIENT_SECRET="your-secret"
+```
+
+OIDC client secret. Not needed when using Azure workload identity.
+
+### `--web-oidc-cookie-secret`
+
+```bash
+atlantis server --web-oidc-cookie-secret="your-32-char-secret-key-here!!!"
+# or
+ATLANTIS_WEB_OIDC_COOKIE_SECRET="your-32-char-secret-key-here!!!"
+```
+
+Secret key for signing OIDC session cookies (32+ characters recommended). Auto-generated if not set (sessions will not survive restarts).
+
+### `--web-oidc-issuer-url`
+
+```bash
+atlantis server --web-oidc-issuer-url="https://login.microsoftonline.com/{tenant-id}/v2.0"
+# or
+ATLANTIS_WEB_OIDC_ISSUER_URL="https://login.microsoftonline.com/{tenant-id}/v2.0"
+```
+
+OIDC issuer URL for discovery. Required when `--web-oidc-auth` is set.
+
+### `--web-oidc-scopes`
+
+```bash
+atlantis server --web-oidc-scopes="openid,profile,email"
+# or
+ATLANTIS_WEB_OIDC_SCOPES="openid,profile,email"
+```
+
+Comma-separated OIDC scopes to request. Defaults to `openid,profile,email`.
+
 ### `--web-password` <Badge text="v0.1.0+" type="info"/>
 
 ```bash

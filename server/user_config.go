@@ -131,12 +131,19 @@ type UserConfig struct {
 	DefaultTFVersion           string          `mapstructure:"default-tf-version"`
 	Webhooks                   []WebhookConfig `mapstructure:"webhooks" flag:"false"`
 	WebhookHttpHeaders         string          `mapstructure:"webhook-http-headers"`
-	WebBasicAuth               bool            `mapstructure:"web-basic-auth"`
-	WebUsername                string          `mapstructure:"web-username"`
-	WebPassword                string          `mapstructure:"web-password"`
-	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
-	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
-	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
+	WebBasicAuth                       bool   `mapstructure:"web-basic-auth"`
+	WebUsername                        string `mapstructure:"web-username"`
+	WebPassword                        string `mapstructure:"web-password"`
+	WebOIDCAuth                        string `mapstructure:"web-oidc-auth"`
+	WebOIDCIssuerURL                   string `mapstructure:"web-oidc-issuer-url"`
+	WebOIDCClientID                    string `mapstructure:"web-oidc-client-id"`
+	WebOIDCClientSecret                string `mapstructure:"web-oidc-client-secret"`
+	WebOIDCScopes                      string `mapstructure:"web-oidc-scopes"`
+	WebOIDCCookieSecret                string `mapstructure:"web-oidc-cookie-secret"`
+	WebOIDCAzureUseWorkloadIdentity    bool   `mapstructure:"web-oidc-azure-use-workload-identity"`
+	WriteGitCreds                      bool   `mapstructure:"write-git-creds"`
+	WebsocketCheckOrigin               bool   `mapstructure:"websocket-check-origin"`
+	UseTFPluginCache                   bool   `mapstructure:"use-tf-plugin-cache"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName

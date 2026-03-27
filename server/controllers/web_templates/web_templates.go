@@ -34,6 +34,7 @@ var templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesF
 var templateFileNames = map[string]string{
 	"index":              "index.html.tmpl",
 	"lock":               "lock.html.tmpl",
+	"login":              "login.html.tmpl",
 	"project-jobs":       "project-jobs.html.tmpl",
 	"project-jobs-error": "project-jobs-error.html.tmpl",
 	"github-app":         "github-app.html.tmpl",
@@ -78,6 +79,10 @@ type IndexData struct {
 	// not using a path-based proxy, this will be an empty string. Never ends
 	// in a '/' (hence "cleaned").
 	CleanedBasePath string
+	// OIDCEnabled is true when OIDC authentication is configured.
+	OIDCEnabled bool
+	// UserEmail is the authenticated user's email (from OIDC), if available.
+	UserEmail string
 }
 
 var IndexTemplate = templates.Lookup(templateFileNames["index"])
