@@ -5,7 +5,6 @@ package runtime_test
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 
@@ -208,16 +207,18 @@ func TestDefaultExternalTeamAllowlistRunner_Run(t *testing.T) {
 		ctx := baseCtx
 		ctx.Workspace = ""
 
-		out, err := runner.Run(ctx, "sh", "-c", "echo workspace_is_${WORKSPACE}empty")
+		// Use ${WORKSPACE+set} to verify WORKSPACE is actually set (even if empty),
+		// not just absent from the environment
+		out, err := runner.Run(ctx, "sh", "-c", "echo workspace_is_${WORKSPACE+set}")
 		Ok(t, err)
-		Equals(t, "workspace_is_empty", out)
+		Equals(t, "workspace_is_set", out)
 	})
 
 	// Verify env var is not leaked from previous test
 	t.Run("does not leak env between runs", func(t *testing.T) {
 		runner := runtime.DefaultExternalTeamAllowlistRunner{}
-		// Ensure ATLANTIS_TEST_INHERIT_ENV is not set in this subtest
-		os.Unsetenv("ATLANTIS_TEST_INHERIT_ENV")
+		// t.Setenv in "inherits OS environment" subtest auto-restores on cleanup,
+		// so ATLANTIS_TEST_INHERIT_ENV should not be set here.
 
 		out, err := runner.Run(baseCtx, "sh", "-c", "echo val_is_${ATLANTIS_TEST_INHERIT_ENV}end")
 		Ok(t, err)
