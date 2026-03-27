@@ -376,6 +376,23 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
+### `--blocked-extra-args`
+
+```bash
+atlantis server --blocked-extra-args="-chdir,--chdir,-plugin-dir,--plugin-dir"
+# or
+ATLANTIS_BLOCKED_EXTRA_ARGS='-chdir,--chdir,-plugin-dir,--plugin-dir'
+```
+
+Comma-separated list of Terraform CLI flag prefixes that are not allowed in comment extra args (the flags after `--`).
+Defaults to `-chdir,--chdir,-plugin-dir,--plugin-dir`.
+
+Notes:
+
+- These flags are blocked to prevent security issues such as working-directory traversal (`-chdir`) or loading malicious providers (`-plugin-dir`).
+- Setting this flag **replaces** the default list entirely. To extend the defaults, include them along with your custom flags, e.g. `-chdir,--chdir,-plugin-dir,--plugin-dir,-my-flag`.
+- Accepts a comma separated list, ex. `-flag1,-flag2`.
+
 ### `--checkout-depth` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
