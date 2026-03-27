@@ -377,6 +377,7 @@ func (g *Client) getPRReviews(repo models.Repo, pull models.PullRequest) (Github
 // PullIsApproved returns true if the pull request was approved.
 func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	logger.Debug("Checking if GitHub pull request %d is approved", pull.Num)
+	approvedBy := make(map[string]time.Time)
 	nextPage := 0
 	for {
 		opts := github.ListOptions{
@@ -393,18 +394,43 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 			return approvalStatus, fmt.Errorf("getting reviews: %w", err)
 		}
 		for _, review := range pageReviews {
-			if review != nil && review.GetState() == "APPROVED" {
-				return models.ApprovalStatus{
-					IsApproved: true,
-					ApprovedBy: *review.User.Login,
-					Date:       review.SubmittedAt.Time,
-				}, nil
+			if review != nil && review.User != nil && review.User.Login != nil && review.SubmittedAt != nil {
+				// Skip reviews from the pull request author
+				if *review.User.Login == pull.Author {
+					continue
+				}
+
+				if review.GetState() == "APPROVED" {
+					approvedBy[*review.User.Login] = review.SubmittedAt.Time
+				} else if review.GetState() == "CHANGES_REQUESTED" || review.GetState() == "DISMISSED" {
+					// Remove approval if user later requested changes or review was dismissed
+					delete(approvedBy, *review.User.Login)
+				}
 			}
 		}
 		if resp.NextPage == 0 {
 			break
 		}
 		nextPage = resp.NextPage
+	}
+
+	numApprovals := len(approvedBy)
+	if numApprovals > 0 {
+		// Find the most recent approval
+		var latestApprover string
+		var latestDate time.Time
+		for approver, date := range approvedBy {
+			if latestDate.IsZero() || date.After(latestDate) {
+				latestApprover = approver
+				latestDate = date
+			}
+		}
+		return models.ApprovalStatus{
+			IsApproved: true,
+			ApprovedBy: latestApprover,
+			Date:       latestDate,
+			NumApprovals: numApprovals,
+		}, nil
 	}
 	return approvalStatus, nil
 }

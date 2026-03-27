@@ -187,12 +187,17 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	if err := validator.New().Struct(pullResp); err != nil {
 		return approvalStatus, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
+	numApprovals := 0
 	for _, reviewer := range pullResp.Reviewers {
 		if *reviewer.Approved {
-			return models.ApprovalStatus{
-				IsApproved: true,
-			}, nil
+			numApprovals++
 		}
+	}
+	if numApprovals > 0 {
+		return models.ApprovalStatus{
+			IsApproved: true,
+			NumApprovals: numApprovals,
+		}, nil
 	}
 	return approvalStatus, nil
 }
