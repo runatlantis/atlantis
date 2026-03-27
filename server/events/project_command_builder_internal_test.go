@@ -1387,7 +1387,7 @@ autodiscover:
   mode: disabled
 `,
 			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
-			expLen:        1,
+			expLen:        3,
 		},
 		"autodiscover respects ignore_paths in repo config": {
 			globalCfg: `
