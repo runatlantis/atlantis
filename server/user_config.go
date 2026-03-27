@@ -21,6 +21,7 @@ type UserConfig struct {
 	AtlantisURL                 string `mapstructure:"atlantis-url"`
 	AutoDiscoverModeFlag        string `mapstructure:"autodiscover-mode"`
 	Automerge                   bool   `mapstructure:"automerge"`
+	AutomergeMethod             string `mapstructure:"automerge-method"`
 	AutoplanFileList            string `mapstructure:"autoplan-file-list"`
 	AutoplanModules             bool   `mapstructure:"autoplan-modules"`
 	AutoplanModulesFromProjects string `mapstructure:"autoplan-modules-from-projects"`
