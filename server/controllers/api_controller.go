@@ -4,19 +4,23 @@
 package controllers
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/runatlantis/atlantis/server/core/drift"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
 )
@@ -25,7 +29,9 @@ const atlantisTokenHeader = "X-Atlantis-Token"
 
 type APIController struct {
 	APISecret                      []byte
-	Locker                         locking.Locker                   `validate:"required"`
+	Locker                         locking.Locker `validate:"required"`
+	DriftStorage                   drift.Storage
+	RemediationService             drift.RemediationService
 	Logger                         logging.SimpleLogging            `validate:"required"`
 	Parser                         events.EventParsing              `validate:"required"`
 	ProjectCommandBuilder          events.ProjectCommandBuilder     `validate:"required"`
@@ -40,8 +46,24 @@ type APIController struct {
 	WorkingDir                     events.WorkingDir                     `validate:"required"`
 	WorkingDirLocker               events.WorkingDirLocker               `validate:"required"`
 	CommitStatusUpdater            events.CommitStatusUpdater            `validate:"required"`
+	// DriftWebhookSender sends webhook notifications when drift is detected.
+	// Nil when no drift webhooks are configured.
+	DriftWebhookSender *webhooks.DriftWebhookSender
 	// SilenceVCSStatusNoProjects is whether API should set commit status if no projects are found
 	SilenceVCSStatusNoProjects bool
+
+	// apiMiddleware provides common authentication and response utilities.
+	// Initialized lazily via getAPIMiddleware() with sync.Once for thread safety.
+	apiMiddleware     *APIMiddleware
+	apiMiddlewareOnce sync.Once
+}
+
+// getAPIMiddleware returns the APIMiddleware, initializing it lazily with sync.Once.
+func (a *APIController) getAPIMiddleware() *APIMiddleware {
+	a.apiMiddlewareOnce.Do(func() {
+		a.apiMiddleware = NewAPIMiddleware(a.APISecret, a.Logger)
+	})
+	return a.apiMiddleware
 }
 
 type APIRequest struct {
@@ -54,6 +76,11 @@ type APIRequest struct {
 		Directory string
 		Workspace string
 	}
+	// DiscoverProjects enables auto-discovery when no projects or paths
+	// are specified. This triggers BuildPlanCommands with an empty
+	// CommentCommand so atlantis.yaml (or repo config) is used to find
+	// all projects. Only drift detection and remediation set this.
+	DiscoverProjects bool `json:"-"`
 }
 
 func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
@@ -73,6 +100,14 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 		})
 	}
 
+	// When no specific projects or paths are provided and DiscoverProjects
+	// is set, use an empty CommentCommand to trigger auto-discovery.
+	if len(cc) == 0 && a.DiscoverProjects {
+		cc = append(cc, &events.CommentCommand{
+			Name: cmdName,
+		})
+	}
+
 	cmds := make([]command.ProjectContext, 0)
 	for _, commentCommand := range cc {
 		projectCmds, err := cmdBuilder(ctx, commentCommand)
@@ -85,6 +120,8 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 	return cmds, cc, nil
 }
 
+// apiReportError is deprecated - use APIResponder methods instead.
+// Kept for backwards compatibility during migration.
 func (a *APIController) apiReportError(w http.ResponseWriter, code int, err error) {
 	response, _ := json.Marshal(map[string]string{
 		"error": err.Error(),
@@ -92,59 +129,78 @@ func (a *APIController) apiReportError(w http.ResponseWriter, code int, err erro
 	a.respond(w, logging.Warn, code, "%s", string(response))
 }
 
+// apiHandleParseError maps HTTP status codes from apiParseAndValidate to API responses.
+func (a *APIController) apiHandleParseError(w http.ResponseWriter, r *http.Request, responder *APIResponder, code int, err error) {
+	switch code {
+	case http.StatusBadRequest:
+		// Validation or parsing errors
+		responder.ValidationFailed(w, r, err.Error())
+	case http.StatusUnauthorized:
+		responder.Unauthorized(w, r, err.Error())
+	case http.StatusForbidden:
+		responder.Forbidden(w, r, err.Error())
+	case http.StatusServiceUnavailable:
+		responder.ServiceUnavailable(w, r, err.Error())
+	default:
+		responder.InternalError(w, r, err)
+	}
+}
+
 func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
 	request, ctx, code, err := a.apiParseAndValidate(r)
 	if err != nil {
-		a.apiReportError(w, code, err)
+		a.apiHandleParseError(w, r, responder, code, err)
 		return
 	}
 
 	err = a.apiSetup(ctx, command.Plan)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 
 	result, err := a.apiPlan(request, ctx)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
-	if result.HasErrors() {
-		code = http.StatusInternalServerError
-	}
 
-	// TODO: make a better response
-	response, err := json.Marshal(result)
-	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+	// Convert to API response format
+	apiResult := NewCommandResultAPI(result, command.Plan.String())
+
+	if result.HasErrors() {
+		responder.Error(w, r, http.StatusInternalServerError,
+			NewAPIError(ErrCodeInternal, "plan had errors").WithDetails(apiResult))
 		return
 	}
-	a.respond(w, logging.Warn, code, "%s", string(response))
+
+	responder.Success(w, r, http.StatusOK, apiResult)
 }
 
 func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
 	request, ctx, code, err := a.apiParseAndValidate(r)
 	if err != nil {
-		a.apiReportError(w, code, err)
+		a.apiHandleParseError(w, r, responder, code, err)
 		return
 	}
 
 	err = a.apiSetup(ctx, command.Apply)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 
 	// We must first make the plan for all projects
 	_, err = a.apiPlan(request, ctx)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
@@ -152,21 +208,24 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	// We can now prepare and run the apply step
 	result, err := a.apiApply(request, ctx)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
-	}
-	if result.HasErrors() {
-		code = http.StatusInternalServerError
 	}
 
-	response, err := json.Marshal(result)
-	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+	// Convert to API response format
+	apiResult := NewCommandResultAPI(result, command.Apply.String())
+
+	if result.HasErrors() {
+		responder.Error(w, r, http.StatusInternalServerError,
+			NewAPIError(ErrCodeInternal, "apply had errors").WithDetails(apiResult))
 		return
 	}
-	a.respond(w, logging.Warn, code, "%s", string(response))
+
+	responder.Success(w, r, http.StatusOK, apiResult)
 }
 
+// LockDetail is deprecated - use LockDetailAPI instead.
+// Kept for backwards compatibility during migration.
 type LockDetail struct {
 	Name            string
 	ProjectName     string
@@ -179,41 +238,69 @@ type LockDetail struct {
 	Time            time.Time
 }
 
+// ListLocksResult is deprecated - use ListLocksResultAPI instead.
+// Kept for backwards compatibility during migration.
 type ListLocksResult struct {
 	Locks []LockDetail
 }
 
 func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
 
 	locks, err := a.Locker.List()
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
 
-	result := ListLocksResult{}
-	for name, lock := range locks {
-		lockDetail := LockDetail{
-			name,
-			lock.Project.ProjectName,
-			lock.Project.RepoFullName,
-			lock.Project.Path,
-			lock.Pull.Num,
-			lock.Pull.URL,
-			lock.User.Username,
-			lock.Workspace,
-			lock.Time,
-		}
-		result.Locks = append(result.Locks, lockDetail)
+	// Convert to API response format
+	apiResult := NewListLocksResultAPI(locks)
+
+	responder.Success(w, r, http.StatusOK, apiResult)
+}
+
+// DriftStatus returns the drift status for a repository.
+// This is a non-authenticated endpoint that returns cached drift detection results.
+// Query parameters:
+//   - repository: required, the full repository name (owner/repo)
+//   - project: optional, filter by project name
+//   - workspace: optional, filter by workspace
+func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
+
+	// Check if drift storage is configured
+	if a.DriftStorage == nil {
+		responder.ServiceUnavailable(w, r, "drift detection is not enabled")
+		return
 	}
 
-	response, err := json.Marshal(result)
+	// Get query parameters
+	repository := r.URL.Query().Get("repository")
+	if repository == "" {
+		responder.ValidationFailed(w, r, "missing required parameter",
+			ValidationError{Field: "repository", Message: "repository parameter is required"})
+		return
+	}
+
+	opts := drift.GetOptions{
+		ProjectName: r.URL.Query().Get("project"),
+		Workspace:   r.URL.Query().Get("workspace"),
+	}
+
+	// Retrieve drift results from storage
+	drifts, err := a.DriftStorage.Get(repository, opts)
 	if err != nil {
-		a.apiReportError(w, http.StatusInternalServerError, err)
+		responder.InternalError(w, r, err)
 		return
 	}
-	a.respond(w, logging.Warn, http.StatusOK, "%s", string(response))
+
+	// Build response using API DTO
+	internalResult := models.NewDriftStatusResponse(repository, drifts)
+	apiResult := NewDriftStatusAPI(internalResult)
+
+	responder.Success(w, r, http.StatusOK, apiResult)
 }
 
 func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) error {
@@ -335,12 +422,12 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 
 func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *command.Context, int, error) {
 	if len(a.APISecret) == 0 {
-		return nil, nil, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled")
+		return nil, nil, http.StatusServiceUnavailable, fmt.Errorf("ignoring request since API is disabled")
 	}
 
-	// Validate the secret token
+	// Validate the secret token using constant-time comparison to prevent timing attacks
 	secret := r.Header.Get(atlantisTokenHeader)
-	if secret != string(a.APISecret) {
+	if subtle.ConstantTimeCompare([]byte(secret), a.APISecret) != 1 {
 		return nil, nil, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader)
 	}
 
@@ -396,4 +483,588 @@ func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, res
 	a.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)
 	fmt.Fprintln(w, response)
+}
+
+// Remediate handles POST /api/drift/remediate requests.
+// It executes drift remediation (plan or apply) for the specified projects.
+// This is an authenticated endpoint that requires the API secret.
+func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
+
+	// Authenticate
+	if !middleware.RequireAuth(w, r) {
+		return
+	}
+
+	// Check if remediation service is configured
+	if a.RemediationService == nil {
+		responder.ServiceUnavailable(w, r, "drift remediation is not enabled")
+		return
+	}
+
+	// Parse the JSON payload
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		responder.ValidationFailed(w, r, "failed to read request body")
+		return
+	}
+
+	var request models.RemediationRequest
+	if err = json.Unmarshal(bytes, &request); err != nil {
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse JSON: %v", err))
+		return
+	}
+
+	// Validate required fields using the model's Validate method
+	if validationErrors := request.Validate(); len(validationErrors) > 0 {
+		fields := make([]ValidationError, 0, len(validationErrors))
+		for _, fe := range validationErrors {
+			fields = append(fields, ValidationError{Field: fe.Field, Message: fe.Message})
+		}
+		responder.ValidationFailed(w, r, "validation failed", fields...)
+		return
+	}
+
+	// Apply default values
+	request.ApplyDefaults()
+
+	// Check if the repo is allowlisted
+	VCSHostType, err := models.NewVCSHostType(request.Type)
+	if err != nil {
+		responder.ValidationFailed(w, r, "invalid VCS type",
+			ValidationError{Field: "type", Message: err.Error()})
+		return
+	}
+	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, request.Repository)
+	if err != nil {
+		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
+		return
+	}
+
+	baseRepo, err := a.Parser.ParseAPIPlanRequest(VCSHostType, request.Repository, cloneURL)
+	if err != nil {
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse repository: %v", err))
+		return
+	}
+
+	if !a.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		responder.Forbidden(w, r, "repository is not in the allowlist")
+		return
+	}
+
+	// Create executor that bridges to existing plan/apply infrastructure
+	executor := &apiRemediationExecutor{
+		controller: a,
+		baseRepo:   baseRepo,
+		logger:     a.Logger,
+	}
+
+	// Execute remediation
+	result, err := a.RemediationService.Remediate(request, executor)
+	if err != nil {
+		responder.InternalError(w, r, err)
+		return
+	}
+
+	// Convert to API DTO and return
+	apiResult := NewRemediationResultAPI(result)
+
+	code := http.StatusOK
+	if result.Status == models.RemediationStatusFailed {
+		code = http.StatusInternalServerError
+	} else if result.Status == models.RemediationStatusPartial {
+		code = http.StatusMultiStatus // 207 - some projects succeeded, some failed
+	}
+	responder.Success(w, r, code, apiResult)
+}
+
+// apiRemediationExecutor implements drift.RemediationExecutor using the API controller's
+// existing plan/apply infrastructure.
+type apiRemediationExecutor struct {
+	controller *APIController
+	baseRepo   models.Repo
+	logger     logging.SimpleLogging
+}
+
+// ExecutePlan runs a plan for the given project using the API infrastructure.
+func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectName, path, workspace string) (string, *models.DriftSummary, error) {
+	// Create a minimal API request for the plan
+	request := &APIRequest{
+		Repository:       repository,
+		Ref:              ref,
+		Type:             vcsType,
+		DiscoverProjects: true,
+	}
+
+	if projectName != "" {
+		request.Projects = []string{projectName}
+	} else if path != "" || workspace != "" {
+		request.Paths = []struct {
+			Directory string
+			Workspace string
+		}{{Directory: path, Workspace: workspace}}
+	}
+
+	// Build the command context
+	ctx := &command.Context{
+		HeadRepo: e.baseRepo,
+		Pull: models.PullRequest{
+			Num:        0, // Non-PR workflow
+			BaseBranch: ref,
+			HeadBranch: ref,
+			HeadCommit: ref,
+			BaseRepo:   e.baseRepo,
+		},
+		Scope: e.controller.Scope,
+		Log:   e.logger,
+		API:   true,
+	}
+
+	// Setup working directory
+	if err := e.controller.apiSetup(ctx, command.Plan); err != nil {
+		return "", nil, fmt.Errorf("setup failed: %w", err)
+	}
+
+	// Run pre-workflow hooks before project discovery
+	preHookCmd := &events.CommentCommand{Name: command.Plan}
+	if err := e.controller.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, preHookCmd); err != nil {
+		if e.controller.FailOnPreWorkflowHookError {
+			return "", nil, fmt.Errorf("pre-workflow hook failed: %w", err)
+		}
+		e.logger.Warn("pre-workflow hook error (continuing): %v", err)
+	}
+
+	// Execute plan
+	result, err := e.controller.apiPlan(request, ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	defer e.controller.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+
+	// Extract output and drift summary
+	var output strings.Builder
+	var driftSummary *models.DriftSummary
+
+	for _, pr := range result.ProjectResults {
+		if pr.Error != nil {
+			output.WriteString(fmt.Sprintf("Error: %v\n", pr.Error))
+		} else if pr.Failure != "" {
+			output.WriteString(fmt.Sprintf("Failure: %s\n", pr.Failure))
+		} else if pr.PlanSuccess != nil {
+			output.WriteString(pr.PlanSuccess.TerraformOutput)
+			// Parse drift from plan output
+			summary := models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
+			driftSummary = &summary
+		}
+	}
+
+	if result.HasErrors() {
+		return output.String(), driftSummary, fmt.Errorf("plan had errors")
+	}
+
+	return output.String(), driftSummary, nil
+}
+
+// ExecuteApply runs an apply for the given project using the API infrastructure.
+func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectName, path, workspace string) (string, error) {
+	// Create a minimal API request for the apply
+	request := &APIRequest{
+		Repository:       repository,
+		Ref:              ref,
+		Type:             vcsType,
+		DiscoverProjects: true,
+	}
+
+	if projectName != "" {
+		request.Projects = []string{projectName}
+	} else if path != "" || workspace != "" {
+		request.Paths = []struct {
+			Directory string
+			Workspace string
+		}{{Directory: path, Workspace: workspace}}
+	}
+
+	// Build the command context
+	ctx := &command.Context{
+		HeadRepo: e.baseRepo,
+		Pull: models.PullRequest{
+			Num:        0, // Non-PR workflow
+			BaseBranch: ref,
+			HeadBranch: ref,
+			HeadCommit: ref,
+			BaseRepo:   e.baseRepo,
+		},
+		Scope: e.controller.Scope,
+		Log:   e.logger,
+		API:   true,
+	}
+
+	// Setup working directory
+	if err := e.controller.apiSetup(ctx, command.Apply); err != nil {
+		return "", fmt.Errorf("setup failed: %w", err)
+	}
+
+	// Run pre-workflow hooks before project discovery
+	preHookCmd := &events.CommentCommand{Name: command.Apply}
+	if err := e.controller.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, preHookCmd); err != nil {
+		if e.controller.FailOnPreWorkflowHookError {
+			return "", fmt.Errorf("pre-workflow hook failed: %w", err)
+		}
+		e.logger.Warn("pre-workflow hook error (continuing): %v", err)
+	}
+
+	// First run plan (required before apply)
+	_, err := e.controller.apiPlan(request, ctx)
+	if err != nil {
+		return "", fmt.Errorf("plan failed: %w", err)
+	}
+	defer e.controller.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+
+	// Execute apply
+	result, err := e.controller.apiApply(request, ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Extract output
+	var output strings.Builder
+	for _, pr := range result.ProjectResults {
+		if pr.Error != nil {
+			output.WriteString(fmt.Sprintf("Error: %v\n", pr.Error))
+		} else if pr.Failure != "" {
+			output.WriteString(fmt.Sprintf("Failure: %s\n", pr.Failure))
+		} else if pr.ApplySuccess != "" {
+			output.WriteString(pr.ApplySuccess)
+		}
+	}
+
+	if result.HasErrors() {
+		return output.String(), fmt.Errorf("apply had errors")
+	}
+
+	return output.String(), nil
+}
+
+// GetRemediationResult handles GET /api/drift/remediate/{id} requests.
+// It retrieves a specific remediation result by ID.
+// This is an authenticated endpoint that requires the API secret.
+func (a *APIController) GetRemediationResult(w http.ResponseWriter, r *http.Request) {
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
+
+	// Authenticate
+	if !middleware.RequireAuth(w, r) {
+		return
+	}
+
+	// Check if remediation service is configured
+	if a.RemediationService == nil {
+		responder.ServiceUnavailable(w, r, "drift remediation is not enabled")
+		return
+	}
+
+	// Get the ID from query parameter (or path, depending on router)
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		// Try to extract from path for routers that support path parameters
+		// Path format: /api/drift/remediate/{id}
+		path := r.URL.Path
+		if pathID, found := strings.CutPrefix(path, "/api/drift/remediate/"); found {
+			id = pathID
+		}
+	}
+
+	if id == "" {
+		responder.ValidationFailed(w, r, "missing required parameter",
+			ValidationError{Field: "id", Message: "id parameter is required"})
+		return
+	}
+
+	// Get the result
+	result, err := a.RemediationService.GetResult(id)
+	if err != nil {
+		responder.NotFound(w, r, fmt.Sprintf("remediation result not found: %v", err))
+		return
+	}
+
+	// Convert to API DTO and return
+	apiResult := NewRemediationResultAPI(result)
+	responder.Success(w, r, http.StatusOK, apiResult)
+}
+
+// ListRemediationResults handles GET /api/drift/remediate requests.
+// It lists remediation results for a repository.
+// Query parameters:
+//   - repository: required, the full repository name (owner/repo)
+//   - limit: optional, maximum number of results to return (default: 10)
+//
+// This is an authenticated endpoint that requires the API secret.
+func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Request) {
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
+
+	// Authenticate
+	if !middleware.RequireAuth(w, r) {
+		return
+	}
+
+	// Check if remediation service is configured
+	if a.RemediationService == nil {
+		responder.ServiceUnavailable(w, r, "drift remediation is not enabled")
+		return
+	}
+
+	// Get query parameters
+	repository := r.URL.Query().Get("repository")
+	if repository == "" {
+		responder.ValidationFailed(w, r, "missing required parameter",
+			ValidationError{Field: "repository", Message: "repository parameter is required"})
+		return
+	}
+
+	// Parse limit (default: 10)
+	limit := 10
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
+			responder.ValidationFailed(w, r, "invalid limit parameter",
+				ValidationError{Field: "limit", Message: "must be a positive integer"})
+			return
+		}
+		if limit <= 0 {
+			limit = 10
+		}
+		if limit > 100 {
+			limit = 100
+		}
+	}
+
+	// Get results
+	results, err := a.RemediationService.ListResults(repository, limit)
+	if err != nil {
+		responder.InternalError(w, r, err)
+		return
+	}
+
+	// Convert to API DTOs
+	apiResults := make([]RemediationResultAPI, 0, len(results))
+	for _, r := range results {
+		apiResults = append(apiResults, NewRemediationResultAPI(r))
+	}
+
+	// Build response using DTO
+	response := RemediationListAPI{
+		Repository: repository,
+		Count:      len(apiResults),
+		Results:    apiResults,
+	}
+
+	responder.Success(w, r, http.StatusOK, response)
+}
+
+// DetectDrift handles POST /api/drift/detect requests.
+// It triggers drift detection by running plans for the specified projects.
+// This is an authenticated endpoint that requires the API secret.
+func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
+	middleware := a.getAPIMiddleware()
+	responder := middleware.Responder
+
+	// Authenticate
+	if !middleware.RequireAuth(w, r) {
+		return
+	}
+
+	// Check if drift storage is configured
+	if a.DriftStorage == nil {
+		responder.ServiceUnavailable(w, r, "drift detection is not enabled")
+		return
+	}
+
+	// Parse the JSON payload
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		responder.ValidationFailed(w, r, "failed to read request body")
+		return
+	}
+
+	var request models.DriftDetectionRequest
+	if err = json.Unmarshal(bytes, &request); err != nil {
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse JSON: %v", err))
+		return
+	}
+
+	// Validate required fields using the model's Validate method
+	if validationErrors := request.Validate(); len(validationErrors) > 0 {
+		fields := make([]ValidationError, 0, len(validationErrors))
+		for _, fe := range validationErrors {
+			fields = append(fields, ValidationError{Field: fe.Field, Message: fe.Message})
+		}
+		responder.ValidationFailed(w, r, "validation failed", fields...)
+		return
+	}
+
+	// Check if the repo is allowlisted
+	VCSHostType, err := models.NewVCSHostType(request.Type)
+	if err != nil {
+		responder.ValidationFailed(w, r, "invalid VCS type",
+			ValidationError{Field: "type", Message: err.Error()})
+		return
+	}
+	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, request.Repository)
+	if err != nil {
+		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
+		return
+	}
+
+	baseRepo, err := a.Parser.ParseAPIPlanRequest(VCSHostType, request.Repository, cloneURL)
+	if err != nil {
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse repository: %v", err))
+		return
+	}
+
+	if !a.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		responder.Forbidden(w, r, "repository is not in the allowlist")
+		return
+	}
+
+	// Build API request for plan
+	apiRequest := &APIRequest{
+		Repository:       request.Repository,
+		Ref:              request.Ref,
+		Type:             request.Type,
+		DiscoverProjects: true, // Enable auto-discovery when no projects/paths specified
+	}
+
+	if len(request.Projects) > 0 {
+		apiRequest.Projects = request.Projects
+	}
+	if len(request.Paths) > 0 {
+		for _, p := range request.Paths {
+			apiRequest.Paths = append(apiRequest.Paths, struct {
+				Directory string
+				Workspace string
+			}{Directory: p.Directory, Workspace: p.Workspace})
+		}
+	}
+
+	// Build the command context
+	ctx := &command.Context{
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        0, // Non-PR workflow
+			BaseBranch: request.Ref,
+			HeadBranch: request.Ref,
+			HeadCommit: request.Ref,
+			BaseRepo:   baseRepo,
+		},
+		Scope: a.Scope,
+		Log:   a.Logger,
+		API:   true,
+	}
+
+	// Setup working directory
+	if err := a.apiSetup(ctx, command.Plan); err != nil {
+		responder.InternalError(w, r, fmt.Errorf("setup failed: %w", err))
+		return
+	}
+
+	// Run pre-workflow hooks before project discovery so hooks can
+	// dynamically generate atlantis.yaml or other config files.
+	preHookCmd := &events.CommentCommand{Name: command.Plan}
+	if err := a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, preHookCmd); err != nil {
+		if a.FailOnPreWorkflowHookError {
+			responder.InternalError(w, r, fmt.Errorf("pre-workflow hook failed: %w", err))
+			return
+		}
+		a.Logger.Warn("pre-workflow hook error (continuing): %v", err)
+	}
+
+	result, err := a.apiPlan(apiRequest, ctx)
+	if err != nil {
+		responder.InternalError(w, r, err)
+		return
+	}
+	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+
+	// Process results and store drift data
+	detectionResult := models.NewDriftDetectionResult(request.Repository)
+
+	for _, pr := range result.ProjectResults {
+		projectDrift := models.ProjectDrift{
+			ProjectName: pr.ProjectName,
+			Path:        pr.RepoRelDir,
+			Workspace:   pr.Workspace,
+			Ref:         request.Ref,
+			DetectionID: detectionResult.ID,
+			LastChecked: time.Now(),
+		}
+
+		if pr.Error != nil {
+			projectDrift.Error = pr.Error.Error()
+			projectDrift.Drift = models.DriftSummary{
+				HasDrift: false,
+			}
+		} else if pr.Failure != "" {
+			projectDrift.Error = pr.Failure
+			projectDrift.Drift = models.DriftSummary{
+				HasDrift: false,
+			}
+		} else if pr.PlanSuccess != nil {
+			projectDrift.Drift = models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
+		}
+
+		// Store drift data
+		if err := a.DriftStorage.Store(request.Repository, projectDrift); err != nil {
+			a.Logger.Warn("failed to store drift data: %v", err)
+		}
+
+		detectionResult.AddProject(projectDrift)
+	}
+
+	// Send drift webhook notifications if drift was detected
+	if a.DriftWebhookSender != nil && detectionResult.ProjectsWithDrift > 0 {
+		webhookResult := convertToDriftWebhookResult(detectionResult)
+		if err := a.DriftWebhookSender.Send(a.Logger, webhookResult); err != nil {
+			a.Logger.Warn("failed to send drift webhook: %v", err)
+		}
+	}
+
+	// Convert to API DTO and return
+	apiResult := NewDriftDetectionResultAPI(detectionResult)
+
+	code := http.StatusOK
+	if result.HasErrors() {
+		code = http.StatusMultiStatus // 207 - some projects may have failed
+	}
+	responder.Success(w, r, code, apiResult)
+}
+
+// convertToDriftWebhookResult converts a DriftDetectionResult to a webhook DriftResult.
+func convertToDriftWebhookResult(dr *models.DriftDetectionResult) webhooks.DriftResult {
+	projects := make([]webhooks.DriftProjectResult, 0, len(dr.Projects))
+	for _, p := range dr.Projects {
+		projects = append(projects, webhooks.DriftProjectResult{
+			ProjectName: p.ProjectName,
+			Path:        p.Path,
+			Workspace:   p.Workspace,
+			HasDrift:    p.Drift.HasDrift,
+			ToAdd:       p.Drift.ToAdd,
+			ToChange:    p.Drift.ToChange,
+			ToDestroy:   p.Drift.ToDestroy,
+			Summary:     p.Drift.Summary,
+			Error:       p.Error,
+		})
+	}
+	var ref string
+	if len(dr.Projects) > 0 {
+		ref = dr.Projects[0].Ref
+	}
+	return webhooks.DriftResult{
+		Repository:        dr.Repository,
+		Ref:               ref,
+		DetectionID:       dr.ID,
+		ProjectsWithDrift: dr.ProjectsWithDrift,
+		TotalProjects:     dr.TotalProjects,
+		Projects:          projects,
+	}
 }
