@@ -6,6 +6,8 @@
 
 **Key Info:** ~35MB repo, server + CLI app, E2E tests with Playwright, integration tests with Terraform
 
+> **AI Usage Policy:** Before contributing with AI assistance, read the [AI_USAGE_POLICY.md](AI_USAGE_POLICY.md).
+
 ## Build & Test (Always from repo root)
 
 **Prerequisites:** Go 1.25.4 (from go.mod, not .tool-versions) • Node 20+ & npm 10+ (website) • Docker • Terraform 1.11.1+ (integration tests)
