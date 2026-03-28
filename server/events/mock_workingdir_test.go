@@ -147,11 +147,11 @@ func (mock *MockWorkingDir) GetWorkingDir(r models.Repo, p models.PullRequest, w
 	return _ret0, _ret1
 }
 
-func (mock *MockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
+func (mock *MockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
 	}
-	_params := []pegomock.Param{logger, cloneDir}
+	_params := []pegomock.Param{logger, cloneDir, projectPath, autoplanWhenModified, pullRequest}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("HasDiverged", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
 	var _ret0 bool
 	if len(_result) != 0 {
@@ -551,8 +551,8 @@ func (c *MockWorkingDir_GetWorkingDir_OngoingVerification) GetAllCapturedArgumen
 	return
 }
 
-func (verifier *VerifierMockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir string) *MockWorkingDir_HasDiverged_OngoingVerification {
-	_params := []pegomock.Param{logger, cloneDir}
+func (verifier *VerifierMockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) *MockWorkingDir_HasDiverged_OngoingVerification {
+	_params := []pegomock.Param{logger, cloneDir, projectPath, autoplanWhenModified, pullRequest}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "HasDiverged", _params, verifier.timeout)
 	return &MockWorkingDir_HasDiverged_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -562,12 +562,12 @@ type MockWorkingDir_HasDiverged_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string) {
-	logger, cloneDir := c.GetAllCapturedArguments()
-	return logger[len(logger)-1], cloneDir[len(cloneDir)-1]
+func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string, string, []string, models.PullRequest) {
+	logger, cloneDir, projectPath, autoplanWhenModified, pullRequest := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], cloneDir[len(cloneDir)-1], projectPath[len(projectPath)-1], autoplanWhenModified[len(autoplanWhenModified)-1], pullRequest[len(pullRequest)-1]
 }
 
-func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string) {
+func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string, _param2 []string, _param3 [][]string, _param4 []models.PullRequest) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -580,6 +580,24 @@ func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetAllCapturedArguments
 			_param1 = make([]string, len(c.methodInvocations))
 			for u, param := range _params[1] {
 				_param1[u] = param.(string)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(string)
+			}
+		}
+		if len(_params) > 3 {
+			_param3 = make([][]string, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.([]string)
+			}
+		}
+		if len(_params) > 4 {
+			_param4 = make([]models.PullRequest, len(c.methodInvocations))
+			for u, param := range _params[4] {
+				_param4[u] = param.(models.PullRequest)
 			}
 		}
 	}
