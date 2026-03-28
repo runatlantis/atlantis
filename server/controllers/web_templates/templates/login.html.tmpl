@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>atlantis - Sign In</title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/custom.css">
+  <link rel="icon" type="image/png" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
+</head>
+<body>
+<div class="container">
+  <section class="header">
+    <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
+    <p class="title-heading">atlantis</p>
+  </section>
+  <section>
+    <div class="twelve columns" style="text-align: center; margin-top: 2rem;">
+      <p>Authentication is required to access the Atlantis web UI.</p>
+      <a class="button button-primary" href="{{ .CleanedBasePath }}/auth/login">Sign in with {{ .ProviderName }}</a>
+    </div>
+  </section>
+</div>
+<footer>
+{{ .AtlantisVersion }}
+</footer>
+</body>
+</html>

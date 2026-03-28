@@ -29,6 +29,12 @@
   <section class="header">
     <a title="atlantis" href="{{ .CleanedBasePath }}/"><img class="hero" src="{{ .CleanedBasePath }}/static/images/atlantis-icon_512.png"/></a>
     <p class="title-heading">atlantis</p>
+    {{ if .OIDCEnabled }}
+    <div style="text-align: right; font-size: 0.85em;">
+      {{ if .UserEmail }}<span>{{ .UserEmail }}</span> | {{ end }}
+      <a href="{{ .CleanedBasePath }}/auth/logout">Sign out</a>
+    </div>
+    {{ end }}
     <p class="js-discard-success"><strong>Plan discarded and unlocked!</strong></p>
   </section>
   <section>

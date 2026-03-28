@@ -29,6 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/oidc"
 )
 
 // checkout strategies
@@ -159,10 +160,17 @@ const (
 	TFETokenFlag                     = "tfe-token"
 	WriteGitCredsFlag                = "write-git-creds" // nolint: gosec
 	WebhookHttpHeaders               = "webhook-http-headers"
-	WebBasicAuthFlag                 = "web-basic-auth"
-	WebUsernameFlag                  = "web-username"
-	WebPasswordFlag                  = "web-password"
-	WebsocketCheckOrigin             = "websocket-check-origin"
+	WebBasicAuthFlag                        = "web-basic-auth"
+	WebUsernameFlag                         = "web-username"
+	WebPasswordFlag                         = "web-password"
+	WebOIDCAuthFlag                         = "web-oidc-auth"
+	WebOIDCIssuerURLFlag                    = "web-oidc-issuer-url"
+	WebOIDCClientIDFlag                     = "web-oidc-client-id"
+	WebOIDCClientSecretFlag                 = "web-oidc-client-secret" // nolint: gosec
+	WebOIDCScopesFlag                       = "web-oidc-scopes"
+	WebOIDCCookieSecretFlag                 = "web-oidc-cookie-secret" // nolint: gosec
+	WebOIDCAzureUseWorkloadIdentityFlag     = "web-oidc-azure-use-workload-identity"
+	WebsocketCheckOrigin                    = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser                  = ""
@@ -201,6 +209,7 @@ const (
 	DefaultWebBasicAuth                 = false
 	DefaultWebUsername                  = "atlantis"
 	DefaultWebPassword                  = "atlantis"
+	DefaultWebOIDCScopes                = "openid,profile,email"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -494,6 +503,30 @@ var stringFlags = map[string]stringFlag{
 		description:  "Password used for Web Basic Authentication on Atlantis HTTP Middleware",
 		defaultValue: DefaultWebPassword,
 	},
+	WebOIDCAuthFlag: {
+		description: "OIDC auth provider for the web UI. Set to 'entraid' to enable Entra ID authentication. " +
+			"Can coexist with basic auth. Empty means disabled.",
+	},
+	WebOIDCIssuerURLFlag: {
+		description: "OIDC issuer URL for discovery (e.g. https://login.microsoftonline.com/{tenant-id}/v2.0). " +
+			"Required when --" + WebOIDCAuthFlag + " is set.",
+	},
+	WebOIDCClientIDFlag: {
+		description: "OIDC application (client) ID. Required when --" + WebOIDCAuthFlag + " is set.",
+	},
+	WebOIDCClientSecretFlag: {
+		description: "OIDC client secret. Not needed when using Azure workload identity. " +
+			"Can also be specified via the ATLANTIS_WEB_OIDC_CLIENT_SECRET environment variable.",
+	},
+	WebOIDCScopesFlag: {
+		description:  "Comma-separated OIDC scopes to request.",
+		defaultValue: DefaultWebOIDCScopes,
+	},
+	WebOIDCCookieSecretFlag: {
+		description: "Secret key for signing OIDC session cookies (32+ characters recommended). " +
+			"Auto-generated if not set (sessions will not survive restarts). " +
+			"Can also be specified via the ATLANTIS_WEB_OIDC_COOKIE_SECRET environment variable.",
+	},
 }
 
 var boolFlags = map[string]boolFlag{
@@ -640,6 +673,11 @@ var boolFlags = map[string]boolFlag{
 	},
 	RestrictFileList: {
 		description:  "Block plan requests from projects outside the files modified in the pull request.",
+		defaultValue: false,
+	},
+	WebOIDCAzureUseWorkloadIdentityFlag: {
+		description: "Use Azure workload identity (federated service account token) as client_assertion " +
+			"for OIDC token exchange instead of a client secret. Requires --" + WebOIDCAuthFlag + "=entraid.",
 		defaultValue: false,
 	},
 	WebsocketCheckOrigin: {
@@ -989,6 +1027,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.WebPassword == "" {
 		c.WebPassword = DefaultWebPassword
 	}
+	if c.WebOIDCScopes == "" {
+		c.WebOIDCScopes = DefaultWebOIDCScopes
+	}
 	if c.AutoDiscoverModeFlag == "" {
 		c.AutoDiscoverModeFlag = DefaultAutoDiscoverMode
 	}
@@ -1105,6 +1146,33 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {
 		return fmt.Errorf("invalid --%s: %w", WebhookHttpHeaders, err)
+	}
+
+	// Validate OIDC configuration.
+	if userConfig.WebOIDCAuth != "" {
+		if !oidc.IsValidOIDCAuthProvider(userConfig.WebOIDCAuth) {
+			return fmt.Errorf("invalid --%s: must be one of %v, got %q", WebOIDCAuthFlag, oidc.ValidOIDCAuthProviders, userConfig.WebOIDCAuth)
+		}
+		if userConfig.WebOIDCIssuerURL == "" {
+			return fmt.Errorf("--%s is required when --%s is set", WebOIDCIssuerURLFlag, WebOIDCAuthFlag)
+		}
+		u, err := url.Parse(userConfig.WebOIDCIssuerURL)
+		if err != nil {
+			return fmt.Errorf("invalid --%s: %w", WebOIDCIssuerURLFlag, err)
+		}
+		if u.Scheme == "" || u.Host == "" {
+			return fmt.Errorf("invalid --%s: must include scheme and host, got %q", WebOIDCIssuerURLFlag, userConfig.WebOIDCIssuerURL)
+		}
+		if u.Scheme != "https" {
+			return fmt.Errorf("invalid --%s: scheme must be https, got %q", WebOIDCIssuerURLFlag, u.Scheme)
+		}
+		if userConfig.WebOIDCClientID == "" {
+			return fmt.Errorf("--%s is required when --%s is set", WebOIDCClientIDFlag, WebOIDCAuthFlag)
+		}
+		if userConfig.WebOIDCClientSecret == "" && !userConfig.WebOIDCAzureUseWorkloadIdentity {
+			return fmt.Errorf("either --%s or --%s must be set when --%s is set",
+				WebOIDCClientSecretFlag, WebOIDCAzureUseWorkloadIdentityFlag, WebOIDCAuthFlag)
+		}
 	}
 
 	return nil
