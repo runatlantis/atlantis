@@ -561,6 +561,16 @@ Enable Atlantis to format Terraform plan output into a markdown-diff friendly fo
 
 Useful to enable for use with GitHub.
 
+### `--enable-external-stores`
+
+```bash
+atlantis server --enable-external-stores
+# or
+ATLANTIS_ENABLE_EXTERNAL_STORES=true
+```
+
+Enable external storage backends configured in the server-side repo config (`external_stores` block). When set, Atlantis reads the `external_stores` section from the repo config YAML to initialize backends such as S3 for plan file persistence.
+
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
 ```bash

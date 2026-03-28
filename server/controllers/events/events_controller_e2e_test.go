@@ -1470,6 +1470,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		"auto",
 		statsScope,
 		terraformClient,
+		&runtime.LocalPlanStore{},
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion)
@@ -1507,14 +1508,16 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			defaultTFVersion,
 			statusUpdater,
 			asyncTfExec,
+			&runtime.LocalPlanStore{},
 		),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
+			PlanStore:         &runtime.LocalPlanStore{},
 		},
-		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
-		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
+		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion, &runtime.LocalPlanStore{}),
+		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion, &runtime.LocalPlanStore{}),
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFDistribution:   defaultTFDistribution,
