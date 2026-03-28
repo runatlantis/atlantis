@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -160,6 +161,7 @@ var testFlags = map[string]any{
 	WebPasswordFlag:                  "atlantis",
 	WebUsernameFlag:                  "atlantis",
 	WebsocketCheckOrigin:             false,
+	WebsocketMessageDelayFlag:        time.Millisecond,
 	WriteGitCredsFlag:                true,
 	DisableAutoplanFlag:              true,
 	DisableAutoplanLabelFlag:         "no-auto-plan",
@@ -220,6 +222,10 @@ func TestExecute_Defaults(t *testing.T) {
 		Equals(t, cfg.defaultValue, configVal(t, passedConfig, flag))
 	}
 	for flag, cfg := range intFlags {
+		t.Log(flag)
+		Equals(t, cfg.defaultValue, configVal(t, passedConfig, flag))
+	}
+	for flag, cfg := range durationFlags {
 		t.Log(flag)
 		Equals(t, cfg.defaultValue, configVal(t, passedConfig, flag))
 	}
