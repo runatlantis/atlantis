@@ -3,7 +3,7 @@
 {{ $disableApplyAll := .DisableApplyAll -}}
 {{ $quietPolicyChecks := .QuietPolicyChecks -}}
 {{ range $i, $result := .Results -}}
-{{ if (and $quietPolicyChecks $result.IsSuccessful) }}{{continue}}{{end -}}
+{{ if (and $quietPolicyChecks $result.IsSuccessful (not $result.HasWarnings)) }}{{continue}}{{end -}}
 ### {{ add $i 1 }}. {{ if $result.ProjectName }}project: `{{ $result.ProjectName }}` {{ end }}dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
 {{ $result.Rendered }}
 
