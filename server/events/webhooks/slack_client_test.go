@@ -166,6 +166,7 @@ func setup(t *testing.T) {
 			Num:        1,
 			URL:        "url",
 			BaseBranch: "main",
+			HeadBranch: "feature-branch",
 		},
 		User: models.User{
 			Username: "lkysow",
