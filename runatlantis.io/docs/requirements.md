@@ -14,6 +14,16 @@ Atlantis integrates with the following Git hosts:
 * Bitbucket Server aka Stash
 * Azure DevOps
 
+### GitLab Version
+
+Atlantis works with all actively-supported GitLab versions. However, GitLab
+15.6 introduced the `detailed_merge_status` field which gives more accurate
+mergeability information. On GitLab instances older than 15.6, Atlantis falls
+back to the legacy `merge_status` field for the
+[`mergeable` apply requirement](apply-requirements.md), which may report a
+merge request as mergeable even when it requires a rebase (e.g., it returns
+`can_be_merged` instead of `need_rebase`).
+
 ## Terraform State
 
 Atlantis supports all backend types **except for local state**. We don't support local state
