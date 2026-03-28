@@ -23,7 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_template_writer.go TemplateWriter
+//go:generate pegomock generate github.com/runatlantis/atlantis/server/controllers/web_templates --package mocks -o mocks/mock_template_writer.go TemplateWriter
 
 //go:embed templates/*
 var templatesFS embed.FS
