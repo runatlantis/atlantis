@@ -474,7 +474,8 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	ctx.Log.Debug("%d files were modified in this pull request. Modified files: %v", len(modifiedFiles), modifiedFiles)
 
 	// If we're not including git untracked files, we can skip the clone if there are no modified files.
-	if !p.IncludeGitUntrackedFiles {
+	// We also cannot skip the clone if a pre-workflow hook specified extra modified files.
+	if !p.IncludeGitUntrackedFiles && len(ctx.ExtraModifiedFiles) == 0 {
 		shouldSkipClone, err := p.shouldSkipClone(ctx, modifiedFiles)
 		if err != nil {
 			return nil, err
@@ -507,6 +508,13 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			return nil, err
 		}
 		modifiedFiles = append(modifiedFiles, untrackedFiles...)
+	}
+
+	// Append any extra modified files specified by pre-workflow hooks.
+	// These are treated as if they were modified in the pull request.
+	if len(ctx.ExtraModifiedFiles) > 0 {
+		ctx.Log.Debug("appending %d extra modified files from pre-workflow hooks: %v", len(ctx.ExtraModifiedFiles), ctx.ExtraModifiedFiles)
+		modifiedFiles = append(modifiedFiles, ctx.ExtraModifiedFiles...)
 	}
 
 	// Parse config file if it exists.

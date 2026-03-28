@@ -55,4 +55,11 @@ type Context struct {
 
 	// Set true if there were any errors during the command execution
 	CommandHasErrors bool
+
+	// ExtraModifiedFiles is a list of additional file paths (relative to the
+	// repo root) that should be treated as modified when determining which
+	// projects to plan/apply. This can be populated by pre-workflow hooks
+	// using the OUTPUT_MODIFIED_FILES_FILE environment variable to dynamically
+	// trigger plans for projects affected by uncommitted changes.
+	ExtraModifiedFiles []string
 }
