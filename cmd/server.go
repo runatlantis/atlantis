@@ -143,6 +143,7 @@ const (
 	SilenceVCSStatusNoProjectsFlag   = "silence-vcs-status-no-projects"
 	SilenceAllowlistErrorsFlag       = "silence-allowlist-errors"
 	SkipCloneNoChanges               = "skip-clone-no-changes"
+	SkipWorkingDirDeletionOnUnlock   = "skip-working-dir-deletion-on-unlock"
 	SlackTokenFlag                   = "slack-token"
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
@@ -624,6 +625,12 @@ var boolFlags = map[string]boolFlag{
 	},
 	SkipCloneNoChanges: {
 		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
+		defaultValue: false,
+	},
+	SkipWorkingDirDeletionOnUnlock: {
+		description: "Skip deleting the working directory when running `atlantis unlock`. " +
+			"By default, unlocking a project will delete its working directory in addition to removing the lock. " +
+			"Set this to true to preserve working directories on unlock, only deleting plan files.",
 		defaultValue: false,
 	},
 	TFDownloadFlag: {
