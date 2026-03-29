@@ -6,6 +6,9 @@ on:
       - v*.*.*
   workflow_dispatch:
 
+permissions:
+  contents: write  # for goreleaser to create releases and upload release assets
+
 jobs:
   goreleaser:
     runs-on: ubuntu-24.04
@@ -24,7 +27,7 @@ jobs:
         go-version-file: go.mod
 
     - name: Run GoReleaser for stable release
-      uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+      uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
       if: (!contains(github.ref, 'pre'))
       with:
         # You can pass flags to goreleaser via GORELEASER_ARGS
@@ -45,4 +48,4 @@ jobs:
           -f target_commitish=main \
           -q .body > tmp-CHANGELOG.md
       env:
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
