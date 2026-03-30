@@ -66,9 +66,10 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 }
 
 func TestDefaultProjectLocker_TryLockWhenLockedCustomExecutableName(t *testing.T) {
+	ctrl := gomock.NewController(t)
 	var githubClient *github.Client
 	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
-	mockLocker := mocks.NewMockLocker()
+	mockLocker := mocks.NewMockLocker(ctrl)
 	customExecutableName := "atlantis-my-custom-name"
 	locker := events.DefaultProjectLocker{
 		Locker:         mockLocker,
@@ -83,7 +84,7 @@ func TestDefaultProjectLocker_TryLockWhenLockedCustomExecutableName(t *testing.T
 	lockingPull := models.PullRequest{
 		Num: 2,
 	}
-	When(mockLocker.TryLock(expProject, expWorkspace, expPull, expUser)).ThenReturn(
+	mockLocker.EXPECT().TryLock(expProject, expWorkspace, expPull, expUser).Return(
 		locking.TryLockResponse{
 			LockAcquired: false,
 			CurrLock: models.ProjectLock{
