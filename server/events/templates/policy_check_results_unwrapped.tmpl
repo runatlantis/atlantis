@@ -26,6 +26,11 @@
   ```shell
   {{ .ApprovePoliciesCmd }}
   ```
+{{- range .PolicySetResults -}}
+{{- if and (not .Passed) (ne .CurApprovals .ReqApprovals) (or .OwnerUsers .OwnerTeams) }}
+* **{{ .PolicySetName }}** approval required from:{{ if .OwnerTeams }} teams: `{{ join "`, `" .OwnerTeams }}`{{ end }}{{ if .OwnerUsers }} users: `{{ join "`, `" .OwnerUsers }}`{{ end }}
+{{- end -}}
+{{- end }}
 {{- end }}
 * :put_litter_in_its_place: To **delete** this plan and lock, click [here]({{ .LockURL }})
 * :repeat: To re-run policies **plan** this project again by commenting:

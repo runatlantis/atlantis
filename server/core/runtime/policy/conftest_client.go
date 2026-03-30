@@ -232,6 +232,8 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 			PolicyOutput:  cmdOutput,
 			Passed:        passed,
 			ReqApprovals:  policySet.ApproveCount,
+			OwnerUsers:    ctx.PolicySets.Owners.MergedWith(policySet.Owners).Users,
+			OwnerTeams:    ctx.PolicySets.Owners.MergedWith(policySet.Owners).Teams,
 		})
 	}
 
