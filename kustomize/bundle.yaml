@@ -23,7 +23,7 @@ spec:
       containers:
       - name: atlantis
         # NOTE: Update this version tag when upgrading Atlantis.
-        image: ghcr.io/runatlantis/atlantis:v0.40.0
+        image: ghcr.io/runatlantis/atlantis:v0.41.0
         env:
         - name: ATLANTIS_DATA_DIR
           value: /atlantis
