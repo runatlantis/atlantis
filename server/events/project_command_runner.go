@@ -528,7 +528,6 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			}
 
 			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: policySetName, PolicyOutput: policyOutput, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
-			preConftestOutput = append(preConftestOutput, "")
 		}
 	}
 
@@ -562,7 +561,9 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		// Custom policy check with no configured policy sets and no results - this is OK
 	}
 
-	if len(outputs) > 0 {
+	// For custom policy checks, all outputs are mapped to policy sets, so there's no post-conftest output.
+	// For non-custom (conftest) policy checks, capture any outputs after the JSON result.
+	if len(outputs) > 0 && !ctx.CustomPolicyCheck {
 		postConftestOutput = outputs[(index + 1):]
 	}
 
@@ -828,6 +829,10 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.ProjectContext, absPath string) ([]string, error) {
 	var outputs []string
+
+	// Hold a read lock for the whole step run so clone/reset/merge cannot run in this dir until we're done.
+	unlock := p.WorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
+	defer unlock()
 
 	envs := make(map[string]string)
 	for _, step := range steps {

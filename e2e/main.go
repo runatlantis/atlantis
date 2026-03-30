@@ -37,7 +37,7 @@ type Project struct {
 
 func getVCSClient() (VCSClient, error) {
 
-	if os.Getenv("ATLANTIS_GH_USER") != "" {
+	if os.Getenv("ATLANTIS_GH_USER") != "" || os.Getenv("ATLANTIS_GH_APP_ID") != "" {
 		log.Print("Running tests for github")
 		return NewGithubClient(), nil
 	}
