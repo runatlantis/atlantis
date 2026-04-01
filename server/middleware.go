@@ -18,56 +18,104 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/oidc"
 	"github.com/urfave/negroni/v3"
 )
 
 // NewRequestLogger creates a RequestLogger.
 func NewRequestLogger(s *Server) *RequestLogger {
-	return &RequestLogger{
-		s.Logger,
-		s.WebAuthentication,
-		s.WebUsername,
-		s.WebPassword,
+	rl := &RequestLogger{
+		Logger:            s.Logger,
+		WebAuthentication: s.WebAuthentication,
+		WebUsername:        s.WebUsername,
+		WebPassword:        s.WebPassword,
 	}
+	if s.OIDCController != nil {
+		rl.WebOIDCAuth = s.WebOIDCAuth
+		rl.OIDCSessionManager = s.OIDCController.SessionManager
+	}
+	return rl
 }
 
-// RequestLogger logs requests and their response codes.
-// as well as handle the basicauth on the requests
+// RequestLogger logs requests and their response codes,
+// as well as handling authentication on the requests.
 type RequestLogger struct {
-	logger            logging.SimpleLogging
-	WebAuthentication bool
-	WebUsername       string
-	WebPassword       string
+	Logger             logging.SimpleLogging
+	WebAuthentication  bool
+	WebUsername        string
+	WebPassword        string
+	WebOIDCAuth       oidc.OIDCAuthProvider
+	OIDCSessionManager *oidc.SessionManager
 }
 
-// ServeHTTP implements the middleware function. It logs all requests at DEBUG level.
+// isExemptPath returns true if the request path should bypass authentication.
+func isExemptPath(path string) bool {
+	return path == "/events" ||
+		path == "/healthz" ||
+		path == "/status" ||
+		strings.HasPrefix(path, "/api/") ||
+		strings.HasPrefix(path, "/auth/")
+}
+
+// authEnabled returns true if any authentication method is configured.
+func (l *RequestLogger) authEnabled() bool {
+	return l.WebAuthentication || l.WebOIDCAuth != ""
+}
+
+// ServeHTTP implements the middleware function. It logs all requests at DEBUG
+// level and enforces authentication when configured.
 func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	l.logger.Debug("%s %s – from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
+	l.Logger.Debug("%s %s – from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
+
 	allowed := false
-	if !l.WebAuthentication ||
-		r.URL.Path == "/events" ||
-		r.URL.Path == "/healthz" ||
-		r.URL.Path == "/status" ||
-		strings.HasPrefix(r.URL.Path, "/api/") {
+
+	hadBasicAuth := false
+
+	if !l.authEnabled() || isExemptPath(r.URL.Path) {
 		allowed = true
 	} else {
-		user, pass, ok := r.BasicAuth()
-		if ok {
-			r.SetBasicAuth(user, pass)
-			if user == l.WebUsername && pass == l.WebPassword {
-				l.logger.Debug("[VALID] log in: >> url: %s", r.URL.RequestURI())
+		// Try basic auth first if enabled.
+		if l.WebAuthentication {
+			user, pass, ok := r.BasicAuth()
+			if ok {
+				hadBasicAuth = true
+				if user == l.WebUsername && pass == l.WebPassword {
+					l.Logger.Debug("[VALID] basic auth log in: >> url: %s", r.URL.RequestURI())
+					allowed = true
+				} else {
+					l.Logger.Info("[INVALID] basic auth log in attempt: >> url: %s", r.URL.RequestURI())
+				}
+			}
+		}
+
+		// Try OIDC session cookie if basic auth didn't succeed.
+		if !allowed && l.WebOIDCAuth != "" && l.OIDCSessionManager != nil {
+			if _, err := l.OIDCSessionManager.GetSession(r); err == nil {
+				l.Logger.Debug("[VALID] OIDC session >> url %q", r.URL.RequestURI())
 				allowed = true
-			} else {
-				allowed = false
-				l.logger.Info("[INVALID] log in attempt: >> url: %s", r.URL.RequestURI())
 			}
 		}
 	}
+
 	if !allowed {
-		rw.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
-		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
+		l.handleUnauthorized(rw, r, hadBasicAuth)
 	} else {
 		next(rw, r)
 	}
-	l.logger.Debug("%s %s – respond HTTP %d", r.Method, r.URL.RequestURI(), rw.(negroni.ResponseWriter).Status())
+	l.Logger.Debug("%s %s – respond HTTP %d", r.Method, r.URL.RequestURI(), rw.(negroni.ResponseWriter).Status())
+}
+
+// handleUnauthorized sends the appropriate response for unauthenticated
+// requests depending on which auth methods are configured.
+func (l *RequestLogger) handleUnauthorized(rw http.ResponseWriter, r *http.Request, hadBasicAuth bool) {
+	// If OIDC is enabled and the request doesn't have basic auth credentials,
+	// redirect to the login page instead of returning a 401.
+	if l.WebOIDCAuth != "" && !hadBasicAuth {
+		http.Redirect(rw, r, "auth/login", http.StatusFound)
+		return
+	}
+
+	// Fall back to basic auth challenge.
+	rw.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+	http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 }
