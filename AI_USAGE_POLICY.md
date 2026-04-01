@@ -20,7 +20,7 @@ Current AI tools are useful as coding assistants — but not as autonomous contr
 
 4. Pull requests that include AI-generated code should only target issues that have been accepted (i.e., not labeled as "triage" or "needs-discussion").
 
-5. Contributors SHOULD disclose any substantial use of AI. Disclosure SHOULD take the form of a trailer line within the commit attributing the AI tool used. Acceptable formats include:
+5. Contributors MUST disclose any substantial use of AI. Disclosure MUST take the form of a trailer line within the commit attributing the AI tool used. Acceptable formats include:
 
    * `Assisted-by: Claude <noreply@anthropic.com>`
    * `Co-authored-by: Claude <noreply@anthropic.com>`
