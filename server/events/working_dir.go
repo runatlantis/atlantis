@@ -302,7 +302,13 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 
 	// For branch strategy it's easy: just *go to* the ref we're supposed to be at.
 	if !w.CheckoutMerge {
-		return w.wrappedGit(logger, c, "reset", "--hard", targetRef)
+		if err := w.wrappedGit(logger, c, "reset", "--hard", targetRef); err != nil {
+			return err
+		}
+		// Plan files are untracked, so git reset --hard does not remove them.
+		// Delete them now so a subsequent bare `atlantis apply` cannot pick up
+		// stale plans generated for a previous commit.
+		return w.wrappedGit(logger, c, "clean", "-f", "-e", ".terragrunt-cache", "*.tfplan")
 	}
 
 	// For merge strategy, we have to "redo" the merge
@@ -327,7 +333,10 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 		return fmt.Errorf("post-merge verification failed: HEAD^2 != %s", targetRef)
 	}
 
-	return nil
+	// Plan files are untracked, so git reset --hard does not remove them.
+	// Delete them now so a subsequent bare `atlantis apply` cannot pick up
+	// stale plans generated for a previous commit.
+	return w.wrappedGit(logger, c, "clean", "-f", "-e", ".terragrunt-cache", "*.tfplan")
 }
 
 // isBranchAtTargetRef confirm
