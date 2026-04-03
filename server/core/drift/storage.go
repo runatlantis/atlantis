@@ -44,8 +44,10 @@ type GetOptions struct {
 }
 
 // driftKey creates a unique key for a project drift entry.
+// Includes the git ref so the same project on different branches
+// does not overwrite each other's drift data.
 func driftKey(drift models.ProjectDrift) string {
-	return drift.ProjectName + ":" + drift.Path + ":" + drift.Workspace
+	return drift.ProjectName + ":" + drift.Path + ":" + drift.Workspace + ":" + drift.Ref
 }
 
 // InMemoryStorage is an in-memory implementation of drift Storage.
