@@ -369,6 +369,7 @@ See also [policy checking](policy-checking.md).
 In addition to pull request comments, Atlantis supports API-based workflows for plan, apply, and drift detection. These endpoints allow external tools and automation to interact with Atlantis programmatically.
 
 Key capabilities:
+
 * **Plan and Apply** without a pull request (`POST /api/plan`, `POST /api/apply`)
 * **Drift Detection** to identify infrastructure changes outside of Terraform (`POST /api/drift/detect`)
 * **Drift Status** to view cached drift results (`GET /api/drift/status`)
