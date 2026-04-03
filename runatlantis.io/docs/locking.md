@@ -69,3 +69,7 @@ locking built in to those commands by Terraform isn't affected.
 In more detail, Terraform state locking locks the state while you run `terraform apply`
 so that multiple applies can't run concurrently. Atlantis's locking is at a higher
 level because it prevents multiple pull requests from working on the same state.
+
+## Locking and Drift Detection
+
+When drift detection or remediation runs via the [API](api-endpoints.md) with `PR: 0` (non-PR workflow), Atlantis still acquires and releases working directory locks to prevent concurrent operations on the same project. However, since these operations are not associated with a pull request, they do not create PR-level locks visible in the Locks UI. The working directory lock is released automatically after each drift detection or remediation operation completes.
