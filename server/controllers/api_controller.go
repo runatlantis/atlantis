@@ -139,15 +139,6 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 	return cmds, keptCommentCommands, nil
 }
 
-// apiReportError is deprecated - use APIResponder methods instead.
-// Kept for backwards compatibility during migration.
-func (a *APIController) apiReportError(w http.ResponseWriter, code int, err error) {
-	response, _ := json.Marshal(map[string]string{
-		"error": err.Error(),
-	})
-	a.respond(w, logging.Warn, code, "%s", string(response))
-}
-
 // apiHandleParseError maps HTTP status codes from apiParseAndValidate to API responses.
 func (a *APIController) apiHandleParseError(w http.ResponseWriter, r *http.Request, responder *APIResponder, code int, err error) {
 	switch code {
@@ -538,13 +529,6 @@ func (a *APIController) populatePullRequestStatus(ctx *command.Context) {
 	ctx.PullRequestStatus = status
 }
 
-func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {
-	response := fmt.Sprintf(format, args...)
-	a.Logger.Log(lvl, response)
-	w.WriteHeader(responseCode)
-	fmt.Fprintln(w, response)
-}
-
 // Remediate handles POST /api/drift/remediate requests.
 // It executes drift remediation (plan or apply) for the specified projects.
 // This is an authenticated endpoint that requires the API secret.
@@ -631,9 +615,10 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 	apiResult := NewRemediationResultAPI(result)
 
 	code := http.StatusOK
-	if result.Status == models.RemediationStatusFailed {
+	switch result.Status {
+	case models.RemediationStatusFailed:
 		code = http.StatusInternalServerError
-	} else if result.Status == models.RemediationStatusPartial {
+	case models.RemediationStatusPartial:
 		code = http.StatusMultiStatus // 207 - some projects succeeded, some failed
 	}
 	responder.Success(w, r, code, apiResult)
