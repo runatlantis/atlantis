@@ -17,9 +17,9 @@ type DriftResult struct {
 	Repository        string               `json:"repository"`
 	Ref               string               `json:"ref"`
 	DetectionID       string               `json:"detection_id"`
-	ProjectsWithDrift int                   `json:"projects_with_drift"`
-	TotalProjects     int                   `json:"total_projects"`
-	Projects          []DriftProjectResult  `json:"projects"`
+	ProjectsWithDrift int                  `json:"projects_with_drift"`
+	TotalProjects     int                  `json:"total_projects"`
+	Projects          []DriftProjectResult `json:"projects"`
 }
 
 // DriftProjectResult describes drift for a single project.

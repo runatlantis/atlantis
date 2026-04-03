@@ -717,8 +717,9 @@ func parseAPIError(t *testing.T, body []byte) *controllers.APIError {
 
 func TestAPIController_DriftStatus(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	driftStorage := driftmocks.NewMockStorage()
 	checkTime := time.Now()
@@ -759,8 +760,9 @@ func TestAPIController_DriftStatus(t *testing.T) {
 
 func TestAPIController_DriftStatus_NoStorage(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	// Controller without drift storage
 	ac := controllers.APIController{
@@ -782,8 +784,9 @@ func TestAPIController_DriftStatus_NoStorage(t *testing.T) {
 
 func TestAPIController_DriftStatus_MissingRepository(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 	driftStorage := driftmocks.NewMockStorage()
 
 	ac := controllers.APIController{
@@ -805,8 +808,9 @@ func TestAPIController_DriftStatus_MissingRepository(t *testing.T) {
 
 func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 	driftStorage := driftmocks.NewMockStorage()
 
 	checkTime := time.Now()
@@ -843,8 +847,9 @@ func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 
 func TestAPIController_DriftStatus_Empty(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 	driftStorage := driftmocks.NewMockStorage()
 
 	When(driftStorage.Get(Eq("owner/repo"), Any[drift.GetOptions]())).ThenReturn([]models.ProjectDrift{}, nil)
@@ -871,8 +876,9 @@ func TestAPIController_DriftStatus_Empty(t *testing.T) {
 
 func TestAPIController_Remediate(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 	parser := NewMockEventParsing()
 	vcsClient := NewMockClient()
 	repoAllowlistChecker, _ := events.NewRepoAllowlistChecker("*")
@@ -936,8 +942,9 @@ func TestAPIController_Remediate(t *testing.T) {
 
 func TestAPIController_Remediate_NoService(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	ac := controllers.APIController{
 		APISecret:          []byte(atlantisToken),
@@ -966,8 +973,9 @@ func TestAPIController_Remediate_NoService(t *testing.T) {
 
 func TestAPIController_Remediate_Unauthorized(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 	remediationService := driftmocks.NewMockRemediationService()
 
 	ac := controllers.APIController{
@@ -997,8 +1005,9 @@ func TestAPIController_Remediate_Unauthorized(t *testing.T) {
 
 func TestAPIController_Remediate_MissingRepository(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 	remediationService := driftmocks.NewMockRemediationService()
 
 	ac := controllers.APIController{
@@ -1027,8 +1036,9 @@ func TestAPIController_Remediate_MissingRepository(t *testing.T) {
 
 func TestAPIController_Remediate_APIDisabled(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	ac := controllers.APIController{
 		APISecret: nil, // API disabled
@@ -1058,8 +1068,9 @@ func TestAPIController_Remediate_APIDisabled(t *testing.T) {
 
 func TestAPIController_GetRemediationResult(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	remediationService := driftmocks.NewMockRemediationService()
 	mockResult := &models.RemediationResult{
@@ -1103,8 +1114,9 @@ func TestAPIController_GetRemediationResult(t *testing.T) {
 
 func TestAPIController_GetRemediationResult_NotFound(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	remediationService := driftmocks.NewMockRemediationService()
 	When(remediationService.GetResult(Eq("nonexistent-id"))).ThenReturn(nil, fmt.Errorf("remediation result not found: nonexistent-id"))
@@ -1130,8 +1142,9 @@ func TestAPIController_GetRemediationResult_NotFound(t *testing.T) {
 
 func TestAPIController_GetRemediationResult_MissingID(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	remediationService := driftmocks.NewMockRemediationService()
 
@@ -1156,8 +1169,9 @@ func TestAPIController_GetRemediationResult_MissingID(t *testing.T) {
 
 func TestAPIController_GetRemediationResult_NoService(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	ac := controllers.APIController{
 		APISecret:          []byte(atlantisToken),
@@ -1182,8 +1196,9 @@ func TestAPIController_GetRemediationResult_NoService(t *testing.T) {
 
 func TestAPIController_ListRemediationResults(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	remediationService := driftmocks.NewMockRemediationService()
 	mockResults := []*models.RemediationResult{
@@ -1232,8 +1247,9 @@ func TestAPIController_ListRemediationResults(t *testing.T) {
 
 func TestAPIController_ListRemediationResults_WithLimit(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	remediationService := driftmocks.NewMockRemediationService()
 	mockResults := []*models.RemediationResult{
@@ -1262,8 +1278,9 @@ func TestAPIController_ListRemediationResults_WithLimit(t *testing.T) {
 
 func TestAPIController_ListRemediationResults_MissingRepository(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	remediationService := driftmocks.NewMockRemediationService()
 
@@ -1288,8 +1305,9 @@ func TestAPIController_ListRemediationResults_MissingRepository(t *testing.T) {
 
 func TestAPIController_ListRemediationResults_Empty(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	remediationService := driftmocks.NewMockRemediationService()
 	When(remediationService.ListResults(Eq("owner/repo"), Eq(10))).ThenReturn([]*models.RemediationResult{}, nil)
@@ -1347,8 +1365,9 @@ func TestAPIController_DetectDrift(t *testing.T) {
 
 func TestAPIController_DetectDrift_NoStorage(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 
 	ac := controllers.APIController{
 		APISecret:    []byte(atlantisToken),
@@ -1377,8 +1396,9 @@ func TestAPIController_DetectDrift_NoStorage(t *testing.T) {
 
 func TestAPIController_DetectDrift_MissingRepository(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 	driftStorage := driftmocks.NewMockStorage()
 
 	ac := controllers.APIController{
@@ -1408,8 +1428,9 @@ func TestAPIController_DetectDrift_MissingRepository(t *testing.T) {
 
 func TestAPIController_DetectDrift_Unauthorized(t *testing.T) {
 	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker()
+	locker := NewMockLocker(gmockCtrl)
 	driftStorage := driftmocks.NewMockStorage()
 
 	ac := controllers.APIController{

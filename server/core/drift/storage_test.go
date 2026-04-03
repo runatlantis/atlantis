@@ -262,6 +262,33 @@ func TestInMemoryStorage_GetAll(t *testing.T) {
 	Assert(t, len(results["owner/repo2"]) == 1, "should have 1 project in repo2")
 }
 
+func TestInMemoryStorage_StoreDifferentRefs(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+
+	// Store drift for same project on different refs
+	storage.Store("owner/repo", models.ProjectDrift{ //nolint:errcheck
+		ProjectName: "project1",
+		Path:        "path1",
+		Workspace:   "default",
+		Ref:         "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 1},
+		LastChecked: time.Now(),
+	})
+	storage.Store("owner/repo", models.ProjectDrift{ //nolint:errcheck
+		ProjectName: "project1",
+		Path:        "path1",
+		Workspace:   "default",
+		Ref:         "develop",
+		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 5},
+		LastChecked: time.Now(),
+	})
+
+	// Both entries should exist (different refs should not overwrite)
+	results, err := storage.Get("owner/repo", drift.GetOptions{})
+	Ok(t, err)
+	Equals(t, 2, len(results))
+}
+
 func TestInMemoryStorage_GetAllEmpty(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 
