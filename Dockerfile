@@ -208,6 +208,16 @@ RUN apk add --no-cache \
         gcompat=${GCOMPAT_VERSION} \
         coreutils-env=${COREUTILS_ENV_VERSION}
 
+# Remove any file capabilities from the image filesystem so runtime cap-drop ALL
+# matches policy and scanners expecting no fcaps on disk.
+# renovate: datasource=repology depName=alpine_3_23/libcap versioning=loose
+ENV LIBCAP_VERSION="2.77-r0"
+RUN apk add --no-cache libcap=${LIBCAP_VERSION} && \
+    getcap -r / 2>/dev/null | awk '{ print $1 }' | sort -u | while read -r f; do \
+        [ -n "$f" ] && setcap -r "$f" 2>/dev/null || true; \
+    done && \
+    apk del libcap
+
 ARG DEFAULT_CONFTEST_VERSION
 ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
@@ -242,6 +252,20 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 ARG DEFAULT_CONFTEST_VERSION
 ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
+
+# Remove any file capabilities from the image filesystem so runtime cap-drop ALL
+# matches policy and scanners expecting no fcaps on disk.
+# renovate: datasource=repology depName=debian_12/libcap2-bin versioning=loose
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libcap2-bin=${DEBIAN_LIBCAP2_BIN_VERSION} && \
+    getcap -r / 2>/dev/null | awk '{ print $1 }' | sort -u | while read -r f; do \
+        [ -n "$f" ] && setcap -r "$f" 2>/dev/null || true; \
+    done && \
+    apt-get purge -y libcap2-bin && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
