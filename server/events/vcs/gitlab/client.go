@@ -25,7 +25,6 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/jpillora/backoff"
-	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -337,8 +336,11 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 
 	for _, status := range statuses {
-		// Ignore any commit statuses with 'atlantis/apply' as prefix
-		if strings.HasPrefix(status.Name, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+		// Ignore any Atlantis-owned commit statuses to prevent self-blocking.
+		// Without this, Atlantis's own plan/policy_check/workflow hook statuses
+		// in pending/running/failed state would cause it to consider the MR
+		// unmergeable, blocking apply operations.
+		if strings.HasPrefix(status.Name, vcsstatusname+"/") {
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
