@@ -1178,3 +1178,53 @@ func (g *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, p
 
 	return labels, nil
 }
+
+// CreateCheckRun creates a new GitHub check run and returns its ID.
+// This is used by the experimental GitHub Checks API integration.
+func (g *Client) CreateCheckRun(logger logging.SimpleLogging, repo models.Repo, opts github.CreateCheckRunOptions) (int64, error) {
+	logger.Debug("Creating GitHub check run %q for repo %v/%v", opts.Name, repo.Owner, repo.Name)
+	checkRun, resp, err := g.client.Checks.CreateCheckRun(g.ctx, repo.Owner, repo.Name, opts)
+	if resp != nil {
+		logger.Debug("POST /repos/%v/%v/check-runs returned: %v", repo.Owner, repo.Name, resp.StatusCode)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("creating check run: %w", err)
+	}
+	return checkRun.GetID(), nil
+}
+
+// UpdateCheckRun updates an existing GitHub check run by ID.
+// This is used by the experimental GitHub Checks API integration.
+func (g *Client) UpdateCheckRun(logger logging.SimpleLogging, repo models.Repo, checkRunID int64, opts github.UpdateCheckRunOptions) error {
+	logger.Debug("Updating GitHub check run %d for repo %v/%v", checkRunID, repo.Owner, repo.Name)
+	_, resp, err := g.client.Checks.UpdateCheckRun(g.ctx, repo.Owner, repo.Name, checkRunID, opts)
+	if resp != nil {
+		logger.Debug("PATCH /repos/%v/%v/check-runs/%d returned: %v", repo.Owner, repo.Name, checkRunID, resp.StatusCode)
+	}
+	if err != nil {
+		return fmt.Errorf("updating check run: %w", err)
+	}
+	return nil
+}
+
+// FindCheckRunID searches for a check run matching name for the given commit ref.
+// Returns the check run ID or 0 if not found.
+// This is used by the experimental GitHub Checks API integration.
+func (g *Client) FindCheckRunID(logger logging.SimpleLogging, repo models.Repo, ref, name string) (int64, error) {
+	logger.Debug("Finding GitHub check run %q for ref %v in repo %v/%v", name, ref, repo.Owner, repo.Name)
+	opts := &github.ListCheckRunsOptions{
+		CheckName: github.Ptr(name),
+		Filter:    github.Ptr("latest"),
+	}
+	result, resp, err := g.client.Checks.ListCheckRunsForRef(g.ctx, repo.Owner, repo.Name, ref, opts)
+	if resp != nil {
+		logger.Debug("GET /repos/%v/%v/commits/%v/check-runs returned: %v", repo.Owner, repo.Name, ref, resp.StatusCode)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("listing check runs for ref: %w", err)
+	}
+	if result.GetTotal() > 0 && len(result.CheckRuns) > 0 {
+		return result.CheckRuns[0].GetID(), nil
+	}
+	return 0, nil
+}

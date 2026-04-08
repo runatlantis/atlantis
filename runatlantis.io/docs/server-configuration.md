@@ -711,6 +711,22 @@ ATLANTIS_GH_APP_SLUG="myappslug"
 
 A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`. You need to obtain this value from your GitHub app, one way is to go to your App settings and open "Public page" from the left sidebar. Your `--gh-app-slug` value will be the last part of the URL, e.g `https://github.com/apps/<slug>`.
 
+### `--gh-checks-enabled` <Badge text="v0.35.0+" type="warn"/>
+
+:::warning Experimental
+This feature is experimental. It requires a [GitHub App](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/about-creating-github-apps) (not a personal access token) and defaults to `false`.
+:::
+
+```bash
+atlantis server --gh-checks-enabled
+# or
+ATLANTIS_GH_CHECKS_ENABLED=true
+```
+
+When set, Atlantis uses the [GitHub Checks API](https://docs.github.com/en/rest/checks) instead of commit statuses for plan and apply status updates. Plan check runs display the full Terraform plan output and include an **Apply** action button for plans with resource changes — clicking it triggers the apply directly from the GitHub Checks UI.
+
+Requires a GitHub App with `checks: write` permission.
+
 ### `--gh-hostname` <Badge text="v0.1.3+" type="info"/>
 
 ```bash

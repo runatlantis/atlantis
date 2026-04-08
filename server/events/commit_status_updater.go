@@ -36,6 +36,8 @@ type CommitStatusUpdater interface {
 	// UpdateCombinedCount updates the combined status to reflect the
 	// numSuccess out of numTotal.
 	UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error
+	// UpdateProject updates the status of a specific project's command run.
+	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectCommandOutput) error
 
 	UpdatePreWorkflowHook(logger logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
 	UpdatePostWorkflowHook(logger logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
