@@ -42,6 +42,7 @@ import (
 const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
 const azuredevopsHeader = "Request-Id"
+const azuredevopsServerHeader = "X-VSS-ActivityId"
 
 const giteaHeader = "X-Gitea-Event"
 const giteaEventTypeHeader = "X-Gitea-Event-Type"
@@ -151,7 +152,7 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.handleBitbucketServerPost(w, r)
 			return
 		}
-	} else if r.Header.Get(azuredevopsHeader) != "" {
+	} else if r.Header.Get(azuredevopsHeader) != "" || r.Header.Get(azuredevopsServerHeader) != "" {
 		if !e.supportsHost(models.AzureDevops) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support AzureDevops")
 			return
@@ -297,7 +298,13 @@ func (e *VCSEventsController) handleAzureDevopsPost(w http.ResponseWriter, r *ht
 	}
 	e.Logger.Debug("request valid")
 
-	azuredevopsReqID := "Request-Id=" + r.Header.Get("Request-Id")
+	header := azuredevopsHeader
+	reqID := r.Header.Get(azuredevopsHeader)
+	if reqID == "" {
+		header = azuredevopsServerHeader
+		reqID = r.Header.Get(azuredevopsServerHeader)
+	}
+	azuredevopsReqID := fmt.Sprintf("%s=%s", header, reqID)
 	event, err := azuredevops.ParseWebHook(payload)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing webhook: %v %s", err, azuredevopsReqID)
