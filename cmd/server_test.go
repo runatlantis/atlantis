@@ -851,6 +851,39 @@ func TestExecute_RelativeDataDir(t *testing.T) {
 	Equals(t, expectedAbsolutePath, passedConfig.DataDir)
 }
 
+func TestExecute_DataDirEnvironmentVariableDefault(t *testing.T) {
+	t.Log("When ATLANTIS_DATA_DIR env var is not set, it should use the default value")
+
+	// Create a new viper instance that simulates environment variable reading
+	vipr := viper.New()
+	vipr.SetEnvPrefix("ATLANTIS")
+	vipr.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	vipr.AutomaticEnv()
+
+	// Set required flags
+	vipr.Set(GHUserFlag, "user")
+	vipr.Set(GHTokenFlag, "token")
+	vipr.Set(RepoAllowlistFlag, "*")
+
+	// Do NOT set DataDirFlag - this simulates the env var not being set
+
+	c := &ServerCmd{
+		ServerCreator: &ServerCreatorMock{},
+		Viper:         vipr,
+		SilenceOutput: true,
+		Logger:        logging.NewNoopLogger(t),
+	}
+
+	cmd := c.Init()
+	err := cmd.Execute()
+	Ok(t, err)
+
+	// DataDir should be set to the default value
+	home, err := homedir.Dir()
+	Ok(t, err)
+	Equals(t, home+"/.atlantis", passedConfig.DataDir)
+}
+
 func TestExecute_GithubUser(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
 	c := setup(map[string]any{
