@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -24,10 +25,11 @@ type Client struct {
 	Client   *azuredevops.Client
 	ctx      context.Context
 	UserName string
+	config   Config
 }
 
 // NewClient returns a valid Azure DevOps client.
-func New(hostname string, userName string, token string) (*Client, error) {
+func New(hostname string, userName string, token string, config Config) (*Client, error) {
 	tp := azuredevops.BasicAuthTransport{
 		Username: "",
 		Password: strings.TrimSpace(token),
@@ -52,6 +54,7 @@ func New(hostname string, userName string, token string) (*Client, error) {
 		Client:   adClient,
 		UserName: userName,
 		ctx:      context.Background(),
+		config:   config,
 	}
 
 	return client, nil
@@ -190,7 +193,14 @@ func (g *Client) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, 
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) { //nolint: revive
+// The vcsstatusname parameter specifies the VCS status name prefix (e.g., "atlantis").
+// The ignoreVCSStatusNames parameter specifies additional status names to ignore when
+// evaluating mergeability.
+//
+// When AllowMergeableBypassApply is enabled in the client config, the apply status check
+// (with genre "Atlantis Bot/{vcsstatusname}" and name "apply") will be ignored, allowing
+// the PR to be considered mergeable even if the apply check is failing.
+func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
@@ -202,18 +212,21 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	if *adPull.MergeStatus != azuredevops.MergeSucceeded.String() {
 		return models.MergeableStatus{
 			IsMergeable: false,
+			Reason:      fmt.Sprintf("PR has merge status: %s", *adPull.MergeStatus),
 		}, nil
 	}
 
 	if *adPull.IsDraft {
 		return models.MergeableStatus{
 			IsMergeable: false,
+			Reason:      "PR is a draft",
 		}, nil
 	}
 
 	if *adPull.Status != azuredevops.PullActive.String() {
 		return models.MergeableStatus{
 			IsMergeable: false,
+			Reason:      fmt.Sprintf("PR has status: %s", *adPull.Status),
 		}, nil
 	}
 
@@ -224,23 +237,49 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		return models.MergeableStatus{}, fmt.Errorf("getting policy evaluations: %w", err)
 	}
 
+	// Build the expected genre for apply status based on vcsstatusname.
+	// Azure DevOps status context format: genre="Atlantis Bot/{vcsstatusname}", name="apply"
+	applyStatusGenre := fmt.Sprintf("Atlantis Bot/%s", vcsstatusname)
+
 	for _, policyEvaluation := range policyEvaluations {
 		if !*policyEvaluation.Configuration.IsEnabled || *policyEvaluation.Configuration.IsDeleted {
 			continue
 		}
 
-		// Ignore the Atlantis status, even if its set as a blocker.
-		// This status should not be considered when evaluating if the pull request can be applied.
-		settings := (policyEvaluation.Configuration.Settings).(map[string]any)
-		if genre, ok := settings["statusGenre"]; ok && genre == "Atlantis Bot/atlantis" {
-			if name, ok := settings["statusName"]; ok && name == "apply" {
-				continue
+		// Skip non-blocking policies - they don't affect mergeability.
+		if !*policyEvaluation.Configuration.IsBlocking {
+			continue
+		}
+
+		// Check if this is a status policy that should be ignored.
+		settings, ok := (policyEvaluation.Configuration.Settings).(map[string]any)
+		if ok {
+			genre, hasGenre := settings["statusGenre"].(string)
+			name, hasName := settings["statusName"].(string)
+
+			if hasGenre && hasName {
+				// Check if this status should be bypassed when AllowMergeableBypassApply is enabled.
+				// This allows PRs to be mergeable even when the apply status check is failing.
+				if g.config.AllowMergeableBypassApply && genre == applyStatusGenre && name == "apply" {
+					logger.Debug("AllowMergeableBypassApply enabled - bypassing apply status policy (genre=%s, name=%s)", genre, name)
+					continue
+				}
+
+				// Check if this status is in the ignore list.
+				// The genre format is "Atlantis Bot/{vcsstatusname}", so we extract the vcsstatusname
+				// and check if it matches any entry in ignoreVCSStatusNames.
+				if shouldIgnoreStatus(genre, ignoreVCSStatusNames) {
+					logger.Debug("Ignoring status policy as it matches ignoreVCSStatusNames (genre=%s, name=%s)", genre, name)
+					continue
+				}
 			}
 		}
 
-		if *policyEvaluation.Configuration.IsBlocking && *policyEvaluation.Status != azuredevops.PolicyEvaluationApproved {
+		// If the policy is blocking and not approved, the PR is not mergeable.
+		if *policyEvaluation.Status != azuredevops.PolicyEvaluationApproved {
 			return models.MergeableStatus{
 				IsMergeable: false,
+				Reason:      fmt.Sprintf("blocking policy not approved: %s", getPolicyDisplayName(policyEvaluation)),
 			}, nil
 		}
 	}
@@ -248,6 +287,62 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	return models.MergeableStatus{
 		IsMergeable: true,
 	}, nil
+}
+
+// shouldIgnoreStatus checks if the given status should be ignored based on the
+// ignoreVCSStatusNames list.
+//
+// The genre format is "Atlantis Bot/{vcsstatusname}" where vcsstatusname is the
+// service identifier (e.g., "atlantis", "status1"). This function extracts the
+// vcsstatusname and checks if it's in the ignore list.
+//
+// This matches GitHub's behavior where --ignore-vcs-status-names=status1 would
+// ignore all checks from that service (status1/plan, status1/apply, etc.).
+func shouldIgnoreStatus(genre string, ignoreVCSStatusNames []string) bool {
+	// Extract the vcsstatusname from the genre.
+	// Genre format: "Atlantis Bot/{vcsstatusname}"
+	const prefix = "Atlantis Bot/"
+	if !strings.HasPrefix(genre, prefix) {
+		return false
+	}
+
+	vcsStatusName := strings.TrimPrefix(genre, prefix)
+	if vcsStatusName == "" {
+		return false
+	}
+
+	for _, ignoreName := range ignoreVCSStatusNames {
+		if ignoreName != "" && vcsStatusName == ignoreName {
+			return true
+		}
+	}
+	return false
+}
+
+// getPolicyDisplayName returns a human-readable name for a policy evaluation.
+func getPolicyDisplayName(policyEvaluation *azuredevops.PolicyEvaluationRecord) string {
+	if policyEvaluation.Configuration == nil {
+		return "unknown policy"
+	}
+
+	settings, ok := (policyEvaluation.Configuration.Settings).(map[string]any)
+	if !ok {
+		return "unknown policy"
+	}
+
+	// For status policies, return the status name.
+	if genre, hasGenre := settings["statusGenre"].(string); hasGenre {
+		if name, hasName := settings["statusName"].(string); hasName {
+			return fmt.Sprintf("%s/%s", genre, name)
+		}
+	}
+
+	// For other policies, try to get the display name from the type.
+	if policyEvaluation.Configuration.Type != nil && policyEvaluation.Configuration.Type.DisplayName != nil {
+		return *policyEvaluation.Configuration.Type.DisplayName
+	}
+
+	return "unknown policy"
 }
 
 // GetPullRequest returns the pull request.
@@ -415,9 +510,342 @@ func SplitAzureDevopsRepoFullName(repoFullName string) (owner string, project st
 	return repoFullName[:lastSlashIdx], "", repoFullName[lastSlashIdx+1:]
 }
 
-// GetTeamNamesForUser returns the names of the teams or groups that the user belongs to (in the organization the repository belongs to).
-func (g *Client) GetTeamNamesForUser(_ logging.SimpleLogging, _ models.Repo, _ models.User) ([]string, error) { //nolint: revive
-	return nil, nil
+// GetTeamNamesForUser returns the names of the security groups (including AAD groups)
+// that the user belongs to in Azure DevOps. This is used for group-based authorization checks.
+//
+// The function works by:
+// 1. Finding the user in Azure DevOps Graph API using their principal name (email)
+// 2. Getting all group memberships for that user
+// 3. Returning the display names of all groups
+//
+// Note: This requires the configured Azure DevOps token to have permissions to read
+// the Graph API (vso.graph scope). The Graph API is hosted at vssps.dev.azure.com.
+func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.Repo, user models.User) ([]string, error) {
+	owner, _, _ := SplitAzureDevopsRepoFullName(repo.FullName)
+
+	// Step 1: Find the user in the Graph API
+	userDescriptor, err := g.getUserDescriptor(owner, user.Username)
+	if err != nil {
+		return nil, fmt.Errorf("getting user descriptor: %w", err)
+	}
+
+	if userDescriptor == "" {
+		logger.Debug("User %s not found in Azure DevOps Graph", user.Username)
+		return nil, nil
+	}
+
+	logger.Debug("Found user %s with descriptor %s", user.Username, userDescriptor)
+
+	// Step 2: Get all group memberships for the user
+	memberships, err := g.getUserGroupMemberships(owner, userDescriptor)
+	if err != nil {
+		return nil, fmt.Errorf("getting user memberships: %w", err)
+	}
+
+	// Step 3: Get group details for each membership
+	var groupNames []string
+	for _, membership := range memberships {
+		if membership.ContainerDescriptor == nil {
+			continue
+		}
+
+		groupName, err := g.getGroupDisplayName(owner, *membership.ContainerDescriptor)
+		if err != nil {
+			logger.Debug("Failed to get group name for descriptor %s: %v", *membership.ContainerDescriptor, err)
+			continue
+		}
+
+		if groupName != "" {
+			groupNames = append(groupNames, groupName)
+			logger.Debug("User %s is a member of group %s", user.Username, groupName)
+		}
+	}
+
+	return groupNames, nil
+}
+
+// GraphUser represents a user in the Azure DevOps Graph API.
+type GraphUser struct {
+	SubjectKind    *string `json:"subjectKind,omitempty"`
+	Domain         *string `json:"domain,omitempty"`
+	PrincipalName  *string `json:"principalName,omitempty"`
+	MailAddress    *string `json:"mailAddress,omitempty"`
+	Origin         *string `json:"origin,omitempty"`
+	OriginID       *string `json:"originId,omitempty"`
+	DisplayName    *string `json:"displayName,omitempty"`
+	Links          any     `json:"_links,omitempty"`
+	URL            *string `json:"url,omitempty"`
+	Descriptor     *string `json:"descriptor,omitempty"`
+	MetaType       *string `json:"metaType,omitempty"`
+	DirectoryAlias *string `json:"directoryAlias,omitempty"`
+}
+
+// graphUsersResponse represents the response from the Graph users API.
+type graphUsersResponse struct {
+	Count int         `json:"count"`
+	Value []GraphUser `json:"value"`
+}
+
+// GraphMembership represents a membership relationship in the Azure DevOps Graph API.
+type GraphMembership struct {
+	ContainerDescriptor *string `json:"containerDescriptor,omitempty"`
+	MemberDescriptor    *string `json:"memberDescriptor,omitempty"`
+}
+
+// graphMembershipsResponse represents the response from the Graph memberships API.
+type graphMembershipsResponse struct {
+	Count int               `json:"count"`
+	Value []GraphMembership `json:"value"`
+}
+
+// GraphGroup represents a group in the Azure DevOps Graph API.
+type GraphGroup struct {
+	SubjectKind   *string `json:"subjectKind,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	Domain        *string `json:"domain,omitempty"`
+	PrincipalName *string `json:"principalName,omitempty"`
+	MailAddress   *string `json:"mailAddress,omitempty"`
+	Origin        *string `json:"origin,omitempty"`
+	OriginID      *string `json:"originId,omitempty"`
+	DisplayName   *string `json:"displayName,omitempty"`
+	Links         any     `json:"_links,omitempty"`
+	URL           *string `json:"url,omitempty"`
+	Descriptor    *string `json:"descriptor,omitempty"`
+}
+
+// getUserDescriptor finds a user in Azure DevOps Graph API and returns their descriptor.
+// The Graph API is hosted at vssps.dev.azure.com (different from the main API).
+// API: GET https://vssps.dev.azure.com/{organization}/_apis/graph/users
+func (g *Client) getUserDescriptor(organization, principalName string) (string, error) {
+	// The Graph API uses a different base URL: vssps.dev.azure.com
+	// We need to construct the URL based on the current base URL
+	graphBaseURL := g.getGraphAPIBaseURL()
+
+	urlStr := fmt.Sprintf("%s%s/_apis/graph/users?subjectTypes=aad,msa&api-version=7.1-preview.1",
+		graphBaseURL,
+		url.PathEscape(organization))
+
+	req, err := g.Client.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+
+	var response graphUsersResponse
+	_, err = g.Client.Execute(g.ctx, req, &response)
+	if err != nil {
+		return "", fmt.Errorf("executing request: %w", err)
+	}
+
+	// Search for the user by principal name (email) or mail address
+	for _, user := range response.Value {
+		if user.Descriptor == nil {
+			continue
+		}
+
+		// Match by principal name, mail address, or display name
+		if (user.PrincipalName != nil && strings.EqualFold(*user.PrincipalName, principalName)) ||
+			(user.MailAddress != nil && strings.EqualFold(*user.MailAddress, principalName)) ||
+			(user.DisplayName != nil && strings.EqualFold(*user.DisplayName, principalName)) {
+			return *user.Descriptor, nil
+		}
+	}
+
+	return "", nil
+}
+
+// getUserGroupMemberships returns all group memberships for a user.
+// API: GET https://vssps.dev.azure.com/{organization}/_apis/graph/memberships/{subjectDescriptor}?direction=up
+func (g *Client) getUserGroupMemberships(organization, userDescriptor string) ([]GraphMembership, error) {
+	graphBaseURL := g.getGraphAPIBaseURL()
+
+	urlStr := fmt.Sprintf("%s%s/_apis/graph/memberships/%s?direction=up&api-version=7.1-preview.1",
+		graphBaseURL,
+		url.PathEscape(organization),
+		url.PathEscape(userDescriptor))
+
+	req, err := g.Client.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	var response graphMembershipsResponse
+	_, err = g.Client.Execute(g.ctx, req, &response)
+	if err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+
+	return response.Value, nil
+}
+
+// getGroupDisplayName returns the display name of a group given its descriptor.
+// API: GET https://vssps.dev.azure.com/{organization}/_apis/graph/groups/{groupDescriptor}
+func (g *Client) getGroupDisplayName(organization, groupDescriptor string) (string, error) {
+	graphBaseURL := g.getGraphAPIBaseURL()
+
+	urlStr := fmt.Sprintf("%s%s/_apis/graph/groups/%s?api-version=7.1-preview.1",
+		graphBaseURL,
+		url.PathEscape(organization),
+		url.PathEscape(groupDescriptor))
+
+	req, err := g.Client.NewRequest("GET", urlStr, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+
+	var group GraphGroup
+	_, err = g.Client.Execute(g.ctx, req, &group)
+	if err != nil {
+		return "", fmt.Errorf("executing request: %w", err)
+	}
+
+	if group.DisplayName != nil {
+		return *group.DisplayName, nil
+	}
+
+	return "", nil
+}
+
+// getGraphAPIBaseURL returns the base URL for the Azure DevOps Graph API.
+// The Graph API is hosted at vssps.dev.azure.com instead of dev.azure.com.
+func (g *Client) getGraphAPIBaseURL() string {
+	// Default Graph API URL
+	graphBaseURL := "https://vssps.dev.azure.com/"
+
+	// If using a custom hostname (on-premises), adjust accordingly
+	currentBase := g.Client.BaseURL.String()
+	if strings.Contains(currentBase, "dev.azure.com") {
+		graphBaseURL = "https://vssps.dev.azure.com/"
+	} else if strings.Contains(currentBase, "visualstudio.com") {
+		// For legacy visualstudio.com URLs
+		graphBaseURL = "https://vssps.visualstudio.com/"
+	}
+	// For on-premises Azure DevOps Server, the Graph API might be at the same host
+	// This would need to be tested/configured for specific deployments
+
+	return graphBaseURL
+}
+
+// ValidateBypassMerge checks if a user is allowed to perform a bypass merge and
+// returns an audit message to be added as a PR comment.
+//
+// This method implements the vcs.BypassMergeChecker interface.
+//
+// When AllowMergeableBypassApply is enabled and BypassMergeRequirementTeams is configured,
+// only users who are members of at least one of the specified teams can perform bypass merges.
+// If BypassMergeRequirementTeams is empty, any user can perform bypass merges.
+//
+// The audit message includes information about:
+// - Who performed the bypass merge
+// - Which policies were bypassed
+// - When the bypass occurred
+func (g *Client) ValidateBypassMerge(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, user models.User, vcsstatusname string) (allowed bool, auditMessage string, err error) {
+	// If bypass is not enabled, nothing to validate
+	if !g.config.AllowMergeableBypassApply {
+		return true, "", nil
+	}
+
+	// Check if bypass was actually used (apply status is failing)
+	bypassUsed, err := g.isApplyStatusFailing(logger, repo, pull, vcsstatusname)
+	if err != nil {
+		logger.Debug("Error checking apply status: %v", err)
+		// If we can't check, assume bypass wasn't used
+		return true, "", nil
+	}
+
+	if !bypassUsed {
+		// Apply status is passing, no bypass needed
+		return true, "", nil
+	}
+
+	// Bypass was used - check team permissions if configured
+	if len(g.config.BypassMergeRequirementTeams) > 0 {
+		// Get user's teams
+		userTeams, err := g.GetTeamNamesForUser(logger, repo, user)
+		if err != nil {
+			return false, "", fmt.Errorf("failed to get user teams: %w", err)
+		}
+
+		// Check if user is in any of the allowed teams
+		userAllowed := false
+		for _, allowedTeam := range g.config.BypassMergeRequirementTeams {
+			if slices.Contains(userTeams, allowedTeam) {
+				userAllowed = true
+				break
+			}
+		}
+
+		if !userAllowed {
+			logger.Info("User %s is not in any of the bypass merge teams: %v (user teams: %v)",
+				user.Username, g.config.BypassMergeRequirementTeams, userTeams)
+			return false, "", nil
+		}
+
+		logger.Info("User %s is authorized to perform bypass merge (member of allowed team)", user.Username)
+	}
+
+	// Generate audit message
+	auditMessage = g.generateBypassAuditMessage(user, vcsstatusname)
+
+	return true, auditMessage, nil
+}
+
+// isApplyStatusFailing checks if the apply status check is failing for the given PR.
+func (g *Client) isApplyStatusFailing(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
+
+	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
+	adPull, _, err := g.Client.PullRequests.GetWithRepo(g.ctx, owner, project, repoName, pull.Num, &opts)
+	if err != nil {
+		return false, fmt.Errorf("getting pull request: %w", err)
+	}
+
+	projectID := *adPull.Repository.Project.ID
+	artifactID := g.Client.PolicyEvaluations.GetPullRequestArtifactID(projectID, pull.Num)
+	policyEvaluations, _, err := g.Client.PolicyEvaluations.List(g.ctx, owner, project, artifactID, &azuredevops.PolicyEvaluationsListOptions{})
+	if err != nil {
+		return false, fmt.Errorf("getting policy evaluations: %w", err)
+	}
+
+	// Build the expected genre for apply status
+	applyStatusGenre := fmt.Sprintf("Atlantis Bot/%s", vcsstatusname)
+
+	for _, policyEvaluation := range policyEvaluations {
+		if !*policyEvaluation.Configuration.IsEnabled || *policyEvaluation.Configuration.IsDeleted {
+			continue
+		}
+
+		settings, ok := (policyEvaluation.Configuration.Settings).(map[string]any)
+		if !ok {
+			continue
+		}
+
+		genre, hasGenre := settings["statusGenre"].(string)
+		name, hasName := settings["statusName"].(string)
+
+		if hasGenre && hasName && genre == applyStatusGenre && name == "apply" {
+			// Found the apply status - check if it's failing
+			if *policyEvaluation.Status != azuredevops.PolicyEvaluationApproved {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// generateBypassAuditMessage creates an audit message for a bypass merge.
+func (g *Client) generateBypassAuditMessage(user models.User, vcsstatusname string) string {
+	return fmt.Sprintf(`:warning: **Bypass Merge Audit**
+
+This pull request was merged with the **%s/apply** status check bypassed.
+
+| Field | Value |
+|-------|-------|
+| **User** | @%s |
+| **Bypassed Check** | %s/apply |
+
+:information_source: This merge was authorized because the user is a member of an allowed bypass team.`,
+		vcsstatusname, user.Username, vcsstatusname)
 }
 
 func (g *Client) SupportsSingleFileDownload(repo models.Repo) bool { //nolint: revive
