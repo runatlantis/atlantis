@@ -83,6 +83,8 @@ type ProjectContext struct {
 
 	// Pull is the pull request we're responding to.
 	Pull models.PullRequest
+	// API is true if this command was triggered via API endpoint rather than PR comment.
+	API bool
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
 	// no name this will be an empty string.
 	ProjectName string
