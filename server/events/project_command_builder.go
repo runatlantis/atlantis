@@ -373,24 +373,32 @@ func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, mod
 
 // autoDiscoverModeEnabled determines whether to use autodiscover
 func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Context, repoCfg valid.RepoCfg) bool {
-	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
-	globalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if globalAutoDiscover != nil {
-		defaultAutoDiscoverMode = globalAutoDiscover.Mode
+	// 1. If global defines autodiscover, evaluate it directly
+	if global := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID()); global != nil {
+		return repoCfg.AutoDiscoverEnabled(global.Mode)
 	}
-	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
+
+	// 2. Otherwise if repo defines it, evaluate that
+	if repoCfg.AutoDiscover != nil {
+		return repoCfg.AutoDiscoverEnabled(repoCfg.AutoDiscover.Mode)
+	}
+
+	// 3. Otherwise use CLI/default
+	return repoCfg.AutoDiscoverEnabled(valid.AutoDiscoverMode(p.AutoDiscoverMode))
 }
 
 // isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery
 func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
+	// 1. If global defines autodiscover, evaluate that
 	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
 	if fromGlobalAutoDiscover != nil {
 		return fromGlobalAutoDiscover.IsPathIgnored(path)
 	}
+	// 2. Otherwise, if repo defines, evaluate that
 	if repoCfg.AutoDiscover != nil {
 		return repoCfg.AutoDiscover.IsPathIgnored(path)
 	}
-
+	// The CLI default for auto discover is to not ignore any paths
 	return false
 }
 
