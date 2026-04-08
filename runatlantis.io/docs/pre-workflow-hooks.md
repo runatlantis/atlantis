@@ -58,6 +58,37 @@ repos:
           description: Generating configs
 ```
 
+### Dynamic Autoplan with Uncommitted Files
+
+Some workflows (e.g. [Atmos](https://atmos.tools)) generate Terraform variable files
+from higher-level stack YAML configuration. When the stack YAML changes, the affected
+`tfvars` files are regenerated but are not committed — Atlantis would therefore not
+detect them as modified files and would not trigger a plan.
+
+To handle this, a pre-workflow hook can write extra file paths to the
+`OUTPUT_MODIFIED_FILES_FILE`. Atlantis will append those paths to the list of modified
+files before performing project discovery. This allows a custom script to determine
+which projects are affected by uncommitted changes and trigger plans for only those
+projects.
+
+```yaml
+repos:
+    - id: /.*/
+      pre_workflow_hooks:
+        - run: |
+            # Run a tool that computes affected stacks and writes their tfvars
+            # paths (relative to the repo root) to OUTPUT_MODIFIED_FILES_FILE,
+            # one path per line. Atlantis will treat those files as modified.
+            atmos describe affected --output-path "$OUTPUT_MODIFIED_FILES_FILE"
+          description: Compute affected stacks
+          commands: plan
+```
+
+The `OUTPUT_MODIFIED_FILES_FILE` is evaluated **after** all pre-workflow hooks have
+run. Each non-empty line of the file is treated as a repo-relative file path. This
+works together with each project's `autoplan.when_modified` patterns, so only the
+projects whose patterns match the extra paths will be planned.
+
 ## Customizing the Shell
 
 By default, the command will be run using the 'sh' shell with an argument of '-c'. This
@@ -114,4 +145,8 @@ command](custom-workflows.md#custom-run-command).
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
   * `COMMAND_NAME` - The name of the command that is being executed, i.e. `plan`, `apply` etc.
   * `OUTPUT_STATUS_FILE` - An output file to customize the success or failure status. ex. `echo 'failure' > $OUTPUT_STATUS_FILE`.
+  * `OUTPUT_MODIFIED_FILES_FILE` - An output file to specify extra modified file paths (relative to the repo root) that
+      Atlantis should treat as modified when determining which projects to plan. Write one file path per line.
+      This is useful for dynamically triggering plans for projects affected by uncommitted changes (e.g. generated
+      `tfvars` files). ex. `echo 'components/s3/ue1-dev/terraform.tfvars' >> $OUTPUT_MODIFIED_FILES_FILE`.
 :::
