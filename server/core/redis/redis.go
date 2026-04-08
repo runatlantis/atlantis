@@ -9,6 +9,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,7 +29,10 @@ type RedisDB struct { // nolint: revive
 }
 
 const (
-	pullKeySeparator = "::"
+	pullKeySeparator       = "::"
+	projectOutputKeyPrefix = "output/"
+	pullOutputIndexPrefix  = "pull-outputs/"
+	jobIDIndexPrefix       = "job-id-index/"
 )
 
 func New(hostname string, port int, password string, tlsEnabled bool, insecureSkipVerify bool, db int) (*RedisDB, error) {
@@ -473,6 +478,336 @@ func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.Project
 		PolicyStatus: p.PolicyStatus(),
 		Status:       p.PlanStatus(),
 	}
+}
+
+func (r *RedisDB) projectOutputKey(key string) string {
+	return projectOutputKeyPrefix + key
+}
+
+func (r *RedisDB) pullOutputIndexKey(repoFullName string, pullNum int) string {
+	return fmt.Sprintf("%s%s::%d", pullOutputIndexPrefix, repoFullName, pullNum)
+}
+
+func (r *RedisDB) jobIDIndexKey(jobID string) string {
+	return jobIDIndexPrefix + jobID
+}
+
+// MarkInterruptedOutputs transitions all project outputs with RunningOutputStatus
+// to InterruptedOutputStatus. This is called on server startup to mark any jobs
+// that were in progress when the server was killed.
+func (r *RedisDB) MarkInterruptedOutputs() error {
+	// Scan all pull output index keys to find outputs still in "running" status
+	iter := r.client.Scan(ctx, 0, pullOutputIndexPrefix+"*", 0).Iterator()
+	for iter.Next(ctx) {
+		indexKey := iter.Val()
+		keys, err := r.client.SMembers(ctx, indexKey).Result()
+		if err != nil {
+			continue
+		}
+		for _, key := range keys {
+			output, err := r.getProjectOutputByKey(key)
+			if err != nil || output == nil {
+				continue
+			}
+			if output.Status == models.RunningOutputStatus {
+				output.Status = models.InterruptedOutputStatus
+				bytes, err := json.Marshal(output)
+				if err != nil {
+					continue
+				}
+				r.client.Set(ctx, key, bytes, 0)
+			}
+		}
+	}
+	return iter.Err()
+}
+
+// SaveProjectOutput saves a project output to Redis atomically.
+// If the output has a JobID that already exists in the job-id-index,
+// the existing record is updated (upsert) rather than creating a new one.
+func (r *RedisDB) SaveProjectOutput(output models.ProjectOutput) error {
+	// Check if we should upsert an existing record by job ID
+	key := r.projectOutputKey(output.Key())
+	if output.JobID != "" {
+		existingKey, err := r.client.Get(ctx, r.jobIDIndexKey(output.JobID)).Result()
+		if err == nil && existingKey != "" {
+			key = existingKey
+		}
+	}
+
+	bytes, err := json.Marshal(output)
+	if err != nil {
+		return fmt.Errorf("marshaling project output: %w", err)
+	}
+
+	// Use transaction to ensure atomicity of save + index updates
+	indexKey := r.pullOutputIndexKey(output.RepoFullName, output.PullNum)
+	pipe := r.client.TxPipeline()
+	pipe.Set(ctx, key, bytes, 0)
+	pipe.SAdd(ctx, indexKey, key)
+
+	// Also save the job ID index for O(1) lookups by job ID
+	if output.JobID != "" {
+		pipe.Set(ctx, r.jobIDIndexKey(output.JobID), key, 0)
+	}
+
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+// GetProjectOutputRun retrieves a specific project output run.
+func (r *RedisDB) GetProjectOutputRun(repoFullName string, pullNum int, path string, workspace string, projectName string, command string, runTimestamp int64) (*models.ProjectOutput, error) {
+	key := fmt.Sprintf("%s::%d::%s::%s::%s::%s::%d", repoFullName, pullNum, path, workspace, projectName, command, runTimestamp)
+	return r.getProjectOutputByKey(r.projectOutputKey(key))
+}
+
+func (r *RedisDB) getProjectOutputByKey(key string) (*models.ProjectOutput, error) {
+	bytes, err := r.client.Get(ctx, key).Bytes()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var output models.ProjectOutput
+	if err := json.Unmarshal(bytes, &output); err != nil {
+		return nil, err
+	}
+	return &output, nil
+}
+
+// GetProjectOutputHistory retrieves all runs for a project, sorted by timestamp descending.
+func (r *RedisDB) GetProjectOutputHistory(repoFullName string, pullNum int, path string, workspace string, projectName string) ([]models.ProjectOutput, error) {
+	pattern := fmt.Sprintf("%s::%d::%s::%s::%s::*", repoFullName, pullNum, path, workspace, projectName)
+	return r.getProjectOutputsByPattern(r.projectOutputKey(pattern), true)
+}
+
+func (r *RedisDB) getProjectOutputsByPattern(pattern string, sortDescending bool) ([]models.ProjectOutput, error) {
+	var outputs []models.ProjectOutput
+
+	iter := r.client.Scan(ctx, 0, pattern, 0).Iterator()
+	for iter.Next(ctx) {
+		bytes, err := r.client.Get(ctx, iter.Val()).Bytes()
+		if err != nil {
+			continue
+		}
+
+		var output models.ProjectOutput
+		if err := json.Unmarshal(bytes, &output); err != nil {
+			continue
+		}
+		outputs = append(outputs, output)
+	}
+
+	if err := iter.Err(); err != nil {
+		return nil, err
+	}
+
+	if outputs == nil {
+		outputs = []models.ProjectOutput{}
+	}
+
+	if sortDescending {
+		sort.Slice(outputs, func(i, j int) bool {
+			return outputs[i].RunTimestamp > outputs[j].RunTimestamp
+		})
+	}
+
+	return outputs, nil
+}
+
+// GetProjectOutputsByPull retrieves the latest output per project for a pull request.
+// Uses the pull-level index set (SMEMBERS) instead of SCAN for O(n) key lookup
+// instead of iterating over the entire keyspace.
+func (r *RedisDB) GetProjectOutputsByPull(repoFullName string, pullNum int) ([]models.ProjectOutput, error) {
+	indexKey := r.pullOutputIndexKey(repoFullName, pullNum)
+	keys, err := r.client.SMembers(ctx, indexKey).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	// Separate policy_check records from non-policy records.
+	// Errors from individual key lookups are intentionally skipped — index sets
+	// may contain stale references to expired or deleted keys.
+	latestByProject := make(map[string]models.ProjectOutput)
+	policyByProject := make(map[string]models.ProjectOutput)
+
+	for _, key := range keys {
+		output, err := r.getProjectOutputByKey(key)
+		if err != nil || output == nil {
+			continue
+		}
+		projectKey := output.ProjectKey()
+		if output.CommandName == "policy_check" {
+			// Keep the latest policy_check per project for merging
+			if existing, ok := policyByProject[projectKey]; !ok || output.RunTimestamp > existing.RunTimestamp {
+				policyByProject[projectKey] = *output
+			}
+		} else {
+			// Keep the latest non-policy record per project
+			if existing, ok := latestByProject[projectKey]; !ok || output.RunTimestamp > existing.RunTimestamp {
+				latestByProject[projectKey] = *output
+			}
+		}
+	}
+
+	// Merge policy data into the latest non-policy record for each project
+	for projectKey, pc := range policyByProject {
+		if latest, ok := latestByProject[projectKey]; ok {
+			latest.PolicyOutput = pc.PolicyOutput
+			latest.PolicyPassed = pc.PolicyPassed
+			latestByProject[projectKey] = latest
+		}
+	}
+
+	outputs := make([]models.ProjectOutput, 0, len(latestByProject))
+	for _, output := range latestByProject {
+		outputs = append(outputs, output)
+	}
+
+	return outputs, nil
+}
+
+// DeleteProjectOutputsByPull deletes all project outputs for a pull request
+// atomically using a Redis pipeline, including job-id-index entries.
+func (r *RedisDB) DeleteProjectOutputsByPull(repoFullName string, pullNum int) error {
+	indexKey := r.pullOutputIndexKey(repoFullName, pullNum)
+
+	keys, err := r.client.SMembers(ctx, indexKey).Result()
+	if err != nil {
+		return err
+	}
+
+	// Collect job-id-index keys to clean up.
+	// Errors from individual key lookups are intentionally skipped — index sets
+	// may contain stale references to expired or deleted keys.
+	var jobIDIndexKeys []string
+	for _, key := range keys {
+		output, err := r.getProjectOutputByKey(key)
+		if err == nil && output != nil && output.JobID != "" {
+			jobIDIndexKeys = append(jobIDIndexKeys, r.jobIDIndexKey(output.JobID))
+		}
+	}
+
+	pipe := r.client.Pipeline()
+	if len(keys) > 0 {
+		pipe.Del(ctx, keys...)
+	}
+	for _, jk := range jobIDIndexKeys {
+		pipe.Del(ctx, jk)
+	}
+	pipe.Del(ctx, indexKey)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+// GetProjectOutputByJobID retrieves a project output by its job ID.
+// Uses an index for O(1) lookups, with fallback to full scan for backwards compatibility.
+func (r *RedisDB) GetProjectOutputByJobID(jobID string) (*models.ProjectOutput, error) {
+	// First, try to use the job ID index for O(1) lookup
+	outputKey, err := r.client.Get(ctx, r.jobIDIndexKey(jobID)).Result()
+	if err == nil && outputKey != "" {
+		output, err := r.getProjectOutputByKey(outputKey)
+		if err != nil {
+			return nil, err
+		}
+		if output != nil {
+			return output, nil
+		}
+	} else if err != nil && err != redis.Nil {
+		return nil, err
+	}
+
+	// Fallback to full scan for backwards compatibility with existing data
+	// that doesn't have an index entry yet
+	pattern := r.projectOutputKey("*")
+	iter := r.client.Scan(ctx, 0, pattern, 0).Iterator()
+	for iter.Next(ctx) {
+		bytes, err := r.client.Get(ctx, iter.Val()).Bytes()
+		if err != nil {
+			continue
+		}
+
+		var output models.ProjectOutput
+		if err := json.Unmarshal(bytes, &output); err != nil {
+			continue
+		}
+		if output.JobID == jobID {
+			return &output, nil
+		}
+	}
+	return nil, iter.Err()
+}
+
+// GetActivePullRequests returns all pull requests that have stored project outputs.
+func (r *RedisDB) GetActivePullRequests() ([]models.PullRequest, error) {
+	// Scan for all pull index keys (avoids blocking KEYS command)
+	var keys []string
+	iter := r.client.Scan(ctx, 0, pullOutputIndexPrefix+"*", 0).Iterator()
+	for iter.Next(ctx) {
+		keys = append(keys, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
+		return nil, err
+	}
+
+	pullSet := make(map[string]models.PullRequest)
+	for _, indexKey := range keys {
+		// Parse the key to extract repo and pull number
+		// Format: pull-outputs/{repo}::{pullNum}
+		suffix := strings.TrimPrefix(indexKey, pullOutputIndexPrefix)
+		parts := strings.SplitN(suffix, "::", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		repoFullName := parts[0]
+		pullNum, err := strconv.Atoi(parts[1])
+		if err != nil {
+			continue
+		}
+
+		pullKey := fmt.Sprintf("%s::%d", repoFullName, pullNum)
+		if _, exists := pullSet[pullKey]; !exists {
+			pullSet[pullKey] = models.PullRequest{
+				Num: pullNum,
+				BaseRepo: models.Repo{
+					FullName: repoFullName,
+				},
+			}
+		}
+
+		// Try to get URL and Title from one of the outputs
+		outputKeys, err := r.client.SMembers(ctx, indexKey).Result()
+		if err != nil || len(outputKeys) == 0 {
+			continue
+		}
+
+		// Check first output for URL/Title
+		for _, outputKey := range outputKeys {
+			output, err := r.getProjectOutputByKey(outputKey)
+			if err != nil || output == nil {
+				continue
+			}
+			if output.PullURL != "" || output.PullTitle != "" {
+				existing := pullSet[pullKey]
+				if output.PullURL != "" {
+					existing.URL = output.PullURL
+				}
+				if output.PullTitle != "" {
+					existing.Title = output.PullTitle
+				}
+				pullSet[pullKey] = existing
+				break // Found URL/Title, no need to check more outputs
+			}
+		}
+	}
+
+	pulls := make([]models.PullRequest, 0, len(pullSet))
+	for _, pr := range pullSet {
+		pulls = append(pulls, pr)
+	}
+	return pulls, nil
 }
 
 func (r *RedisDB) Close() error {

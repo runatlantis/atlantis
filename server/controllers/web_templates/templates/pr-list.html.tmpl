@@ -1,0 +1,217 @@
+{{ define "title" }}Pull Requests - Atlantis{{ end }}
+
+{{ define "content" }}
+<div class="page-container" x-data="prListState()">
+  <div class="page-header">
+    <h1>Pull Requests</h1>
+  </div>
+
+  {{ if gt .TotalCount 0 }}
+  <!-- PR data container for HTMX swap -->
+  <div id="pr-data-container"
+       hx-get="{{ .CleanedBasePath }}/prs/partial"
+       hx-trigger="every 30s"
+       hx-swap="innerHTML"
+       style="display: none;">
+    <div id="pr-data" hidden>{{ .ScriptData }}</div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button
+        type="button"
+        class="filter-toggle"
+        :class="{ 'filter-toggle--active': statusFilters.passed }"
+        @click="toggleStatusFilter('passed')"
+        :aria-pressed="statusFilters.passed ? 'true' : 'false'"
+      >
+        <i data-lucide="check-circle" class="icon-xs"></i> Passed
+      </button>
+      <button
+        type="button"
+        class="filter-toggle"
+        :class="{ 'filter-toggle--active': statusFilters.failed }"
+        @click="toggleStatusFilter('failed')"
+        :aria-pressed="statusFilters.failed ? 'true' : 'false'"
+      >
+        <i data-lucide="x-circle" class="icon-xs"></i> Failed
+      </button>
+      <button
+        type="button"
+        class="filter-toggle"
+        :class="{ 'filter-toggle--active': statusFilters.pending }"
+        @click="toggleStatusFilter('pending')"
+        :aria-pressed="statusFilters.pending ? 'true' : 'false'"
+      >
+        <i data-lucide="clock" class="icon-xs"></i> Pending
+      </button>
+
+      <span class="toolbar-divider"></span>
+
+      <button type="button" class="group-control-btn" @click="expandAll()" title="Expand all groups">
+        <i data-lucide="chevrons-down" class="icon-xs"></i>
+        <span class="group-control-label">Expand</span>
+      </button>
+      <button type="button" class="group-control-btn" @click="collapseAll()" title="Collapse all groups">
+        <i data-lucide="chevrons-up" class="icon-xs"></i>
+        <span class="group-control-label">Collapse</span>
+      </button>
+    </div>
+    <div class="toolbar-right">
+      {{ if gt (len .Repositories) 1 }}
+      <select class="repo-select" x-model="selectedRepo" @change="applyFilters()">
+        <option value="">All Repositories</option>
+        {{ range .Repositories }}
+        <option value="{{ . }}">{{ . }}</option>
+        {{ end }}
+      </select>
+      {{ end }}
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Search by repo or PR #"
+        x-model="searchQuery"
+        @input="applyFilters()"
+      >
+    </div>
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table data-table--grouped data-table--fixed">
+      <thead>
+        <tr>
+          <th style="width: 32px;"></th>
+          <th>PR</th>
+          <th style="width: 150px;">Status</th>
+          <th style="width: 70px;">Projects</th>
+          <th style="width: 100px;">Changes</th>
+          <th style="width: 120px;">Last Activity</th>
+          <th style="width: 32px;"></th>
+        </tr>
+      </thead>
+
+      <template x-for="group in groupedItems" :key="'a-' + group.key">
+        <tbody class="repo-group">
+          <tr class="repo-group-header repo-group-header--hybrid"
+              :class="'repo-group-header--' + getGroupStatus(group)"
+              @click="toggleGroup(group.key)"
+              tabindex="0"
+              :aria-expanded="isExpanded(group.key)">
+            <td class="repo-group-chevron-cell-hybrid">
+              <i :data-lucide="isExpanded(group.key) ? 'chevron-down' : 'chevron-right'" class="icon-sm repo-group-chevron"></i>
+            </td>
+            <td colspan="6" class="repo-group-info-hybrid">
+              <span class="status-dot" :class="'status-dot--' + getGroupStatus(group)"></span>
+              <span class="repo-group-name" x-text="group.displayName"></span>
+              <span class="repo-group-count-minimal" x-text="'(' + group.prs.length + ')'"></span>
+            </td>
+          </tr>
+
+          <template x-if="isExpanded(group.key)">
+            <template x-for="pr in group.prs" :key="'a-' + pr.pullNum">
+              <tr class="data-table-row repo-group-row" @click="navigateToPR(pr)" tabindex="0">
+                <td></td>
+                <td>
+                  <span class="pr-info">
+                    <span class="text-link" x-text="'#' + pr.pullNum"></span>
+                    <span class="pr-title" x-text="pr.title || 'Pull Request #' + pr.pullNum"></span>
+                    <template x-if="pr.errorMessage">
+                      <span class="pr-error-hint" :title="pr.errorMessage">
+                        <i data-lucide="alert-circle" class="icon-sm text-danger"></i>
+                      </span>
+                    </template>
+                  </span>
+                </td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="status-badge" :class="'status-badge--' + pr.status">
+                      <template x-if="pr.status === 'passed'"><span><i data-lucide="check-circle" class="icon-xs"></i> Passed</span></template>
+                      <template x-if="pr.status === 'failed'"><span><i data-lucide="x-circle" class="icon-xs"></i> Failed</span></template>
+                      <template x-if="pr.status === 'pending'"><span><i data-lucide="clock" class="icon-xs"></i> Pending</span></template>
+                      <template x-if="pr.status === 'mixed'"><span><i data-lucide="minus-circle" class="icon-xs"></i> <span x-text="pr.successCount + '/' + pr.projectCount"></span></span></template>
+                      <template x-if="pr.status === 'error'"><span><i data-lucide="alert-circle" class="icon-xs"></i> Error</span></template>
+                    </span>
+                    <template x-if="pr.activeJobCount > 0">
+                      <a :href="pr.jobsUrl" class="job-indicator" :title="pr.activeJobCount + ' active job' + (pr.activeJobCount !== 1 ? 's' : '')" @click.stop>
+                        <i data-lucide="terminal" class="icon-xs"></i>
+                        <span x-text="pr.activeJobCount"></span>
+                      </a>
+                    </template>
+                  </div>
+                </td>
+                <td x-text="pr.projectCount"></td>
+                <td class="resource-changes">
+                  <template x-if="pr.addCount > 0">
+                    <span class="resource-add">+<span x-text="pr.addCount"></span></span>
+                  </template>
+                  <template x-if="pr.changeCount > 0">
+                    <span class="resource-change">~<span x-text="pr.changeCount"></span></span>
+                  </template>
+                  <template x-if="pr.destroyCount > 0">
+                    <span class="resource-destroy">-<span x-text="pr.destroyCount"></span></span>
+                  </template>
+                  <template x-if="pr.addCount === 0 && pr.changeCount === 0 && pr.destroyCount === 0">
+                    <span class="text-muted">—</span>
+                  </template>
+                </td>
+                <td class="text-muted" x-text="pr.lastActivity"></td>
+                <td class="row-action-hint">
+                  <i data-lucide="chevron-right" class="icon-sm"></i>
+                </td>
+              </tr>
+            </template>
+          </template>
+        </tbody>
+      </template>
+    </table>
+  </div>
+  {{ else }}
+  <div class="empty-state">
+    <i data-lucide="inbox" class="empty-state-icon"></i>
+    <h3>No Active Pull Requests</h3>
+    <p>When Atlantis runs plans on open PRs, they will appear here.</p>
+  </div>
+  {{ end }}
+
+  <p class="page-footer-info">
+    Auto-refreshes every 30 seconds
+  </p>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script>
+  function prListState() {
+    return {
+      // Inherit shared grouped table behavior
+      ...createGroupedTableState({
+        dataElementId: 'pr-data',
+        htmxContainerId: 'pr-data-container',
+        itemsKey: 'prs',
+        searchFields: ['repo', 'pullNum', 'title'],
+        expandAllOnInit: true,
+        hasStatusFilters: true,
+        groupKeyField: 'groupKey',
+        groupDisplayField: 'groupDisplayName'
+      }),
+
+      // ========== PR-specific methods ==========
+
+      // Determine overall status for a group header
+      getGroupStatus(group) {
+        if (group.prs.some(pr => pr.status === 'error')) return 'error';
+        if (group.prs.some(pr => pr.status === 'failed')) return 'failed';
+        if (group.prs.some(pr => pr.status === 'pending')) return 'pending';
+        return 'passed';
+      },
+
+      // Navigation
+      navigateToPR(pr) {
+        window.location.href = pr.url;
+      }
+    };
+  }
+</script>
+{{ end }}
+
+{{ template "layout" . }}

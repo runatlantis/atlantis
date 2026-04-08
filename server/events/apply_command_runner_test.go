@@ -19,6 +19,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestApplyCommandRunner_IsLocked(t *testing.T) {
@@ -194,6 +195,13 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				return ReturnValues{[]command.ProjectContext{}, nil}
 			})
 
+			// Set up gomock expectations for projectCommandRunner.Apply when projects are matched
+			if c.Matched {
+				projectCommandRunner.EXPECT().Apply(gomock.Any()).Return(command.ProjectCommandOutput{
+					ApplySuccess: "Great success!",
+				}).AnyTimes()
+			}
+
 			applyCommandRunner.Run(ctx, cmd)
 
 			timesComment := 1
@@ -236,7 +244,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 		Description           string
 		ProjectContexts       []command.ProjectContext
 		ProjectCommandOutputs []command.ProjectCommandOutput
-		RunnerInvokeMatch     []*EqMatcher
+		RunnerInvokeTimes     []int // number of times Apply should be called (1=once, 0=never)
 		ExpComment            string
 		ApplyFailed           bool
 	}{
@@ -264,11 +272,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					Error: errors.New("shabang"),
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			ApplyFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			ApplyFailed:       true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
@@ -296,12 +301,9 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Never(),
-			},
-			ApplyFailed: true,
-			ExpComment:  "Ran Apply for project: `First` dir: `` workspace: ``\n\n**Apply Error**\n```\nshabang\n```",
+			RunnerInvokeTimes: []int{1, 0},
+			ApplyFailed:       true,
+			ExpComment:        "Ran Apply for project: `First` dir: `` workspace: ``\n\n**Apply Error**\n```\nshabang\n```",
 		},
 		{
 			Description: "When both in a group of two succeeds, the following two will run",
@@ -342,13 +344,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-				Never(),
-				Never(),
-			},
-			ApplyFailed: true,
+			RunnerInvokeTimes: []int{1, 1, 0, 0},
+			ApplyFailed:       true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
@@ -391,13 +388,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-				Once(),
-				Once(),
-			},
-			ApplyFailed: true,
+			RunnerInvokeTimes: []int{1, 1, 1, 1},
+			ApplyFailed:       true,
 			ExpComment: "Ran Apply for 4 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n1. project: `Third` dir: `` workspace: ``\n1. project: `Fourth` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 3. project: `Third` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### 4. project: `Fourth` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n4 projects, 3 successful, 0 failed, 1 errored",
 		},
@@ -423,11 +415,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			ApplyFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			ApplyFailed:       true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
@@ -451,11 +440,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			ApplyFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			ApplyFailed:       true,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n**Apply Error**\n```\nshabang\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 1 successful, 0 failed, 1 errored",
 		},
@@ -479,11 +465,8 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 					ApplySuccess: "Great success!",
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			ApplyFailed: false,
+			RunnerInvokeTimes: []int{1, 1},
+			ApplyFailed:       false,
 			ExpComment: "Ran Apply for 2 projects:\n\n" +
 				"1. project: `First` dir: `` workspace: ``\n1. project: `Second` dir: `` workspace: ``\n---\n\n### 1. project: `First` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### 2. project: `Second` dir: `` workspace: ``\n```diff\nGreat success!\n```\n\n---\n### Apply Summary\n\n2 projects, 2 successful, 0 failed, 0 errored",
 		},
@@ -515,15 +498,17 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
+			// Create a map from project name to expected output
+			outputByProject := make(map[string]command.ProjectCommandOutput)
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Apply(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutputs[i])
+				outputByProject[c.ProjectContexts[i].ProjectName] = c.ProjectCommandOutputs[i]
 			}
+			// Set up gomock expectation with dynamic return based on project name
+			projectCommandRunner.EXPECT().Apply(gomock.Any()).DoAndReturn(func(ctx command.ProjectContext) command.ProjectCommandOutput {
+				return outputByProject[ctx.ProjectName]
+			}).AnyTimes()
 
 			applyCommandRunner.Run(ctx, cmd)
-
-			for i := range c.ProjectContexts {
-				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Apply(c.ProjectContexts[i])
-			}
 
 			require.Equal(t, c.ApplyFailed, ctx.CommandHasErrors)
 

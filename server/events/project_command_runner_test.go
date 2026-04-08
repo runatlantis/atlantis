@@ -35,6 +35,7 @@ import (
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 // Test that it runs the expected plan steps.
@@ -179,12 +180,13 @@ func TestProjectOutputWrapper(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
 			var prjResult command.ProjectCommandOutput
 			var expCommitStatus models.CommitStatus
 
 			mockJobURLSetter := mocks.NewMockJobURLSetter()
 			mockJobMessageSender := mocks.NewMockJobMessageSender()
-			mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
+			mockProjectCommandRunner := mocks.NewMockProjectCommandRunner(ctrl)
 
 			runner := &events.ProjectOutputWrapper{
 				JobURLSetter:         mockJobURLSetter,
@@ -210,8 +212,12 @@ func TestProjectOutputWrapper(t *testing.T) {
 				expCommitStatus = models.FailedCommitStatus
 			}
 
-			When(mockProjectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(prjResult)
-			When(mockProjectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(prjResult)
+			switch c.CommandName {
+			case command.Plan:
+				mockProjectCommandRunner.EXPECT().Plan(gomock.Any()).Return(prjResult)
+			case command.Apply:
+				mockProjectCommandRunner.EXPECT().Apply(gomock.Any()).Return(prjResult)
+			}
 
 			switch c.CommandName {
 			case command.Plan:
@@ -222,13 +228,6 @@ func TestProjectOutputWrapper(t *testing.T) {
 
 			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus, nil)
 			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
-
-			switch c.CommandName {
-			case command.Plan:
-				mockProjectCommandRunner.VerifyWasCalledOnce().Plan(ctx)
-			case command.Apply:
-				mockProjectCommandRunner.VerifyWasCalledOnce().Apply(ctx)
-			}
 		})
 	}
 }

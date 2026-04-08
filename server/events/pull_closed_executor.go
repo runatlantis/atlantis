@@ -100,6 +100,16 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		}
 	}
 
+	// Clean up pre/post workflow hook jobs which use PullInfo without project-specific fields
+	if p.LogStreamResourceCleaner != nil {
+		hookJobContext := jobs.PullInfo{
+			PullNum:      pull.Num,
+			Repo:         pull.BaseRepo.Name,
+			RepoFullName: pull.BaseRepo.FullName,
+		}
+		p.LogStreamResourceCleaner.CleanUp(hookJobContext)
+	}
+
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
 		return fmt.Errorf("cleaning workspace: %w", err)
 	}
@@ -115,6 +125,11 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// Delete pull from DB.
 	if err := p.Database.DeletePullStatus(pull); err != nil {
 		logger.Err("deleting pull from db: %s", err)
+	}
+
+	// Delete project outputs for this pull request.
+	if err := p.Database.DeleteProjectOutputsByPull(repo.FullName, pull.Num); err != nil {
+		logger.Warn("failed to delete project outputs for %s #%d: %v", repo.FullName, pull.Num, err)
 	}
 
 	// Clear any operations to avoid unbounded growth.

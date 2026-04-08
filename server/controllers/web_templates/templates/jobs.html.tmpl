@@ -1,0 +1,149 @@
+{{ define "title" }}Jobs - Atlantis{{ end }}
+
+{{ define "content" }}
+<div class="page-container" x-data="jobsState()">
+  <div class="page-header">
+    <h1>Jobs</h1>
+  </div>
+
+  {{ if gt .TotalCount 0 }}
+  <!-- Jobs data container for HTMX swap -->
+  <div id="jobs-data-container"
+       hx-get="{{ .CleanedBasePath }}/jobs/partial"
+       hx-trigger="every 30s"
+       hx-swap="innerHTML"
+       style="display: none;">
+    <div id="jobs-data" hidden>{{ .ScriptData }}</div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button type="button" class="group-control-btn" @click="expandAll()" title="Expand all groups">
+        <i data-lucide="chevrons-down" class="icon-xs"></i>
+        <span class="group-control-label">Expand</span>
+      </button>
+      <button type="button" class="group-control-btn" @click="collapseAll()" title="Collapse all groups">
+        <i data-lucide="chevrons-up" class="icon-xs"></i>
+        <span class="group-control-label">Collapse</span>
+      </button>
+    </div>
+    <div class="toolbar-right">
+      {{ if gt (len .Repositories) 1 }}
+      <select class="repo-select" x-model="selectedRepo" @change="applyFilters()">
+        <option value="">All Repositories</option>
+        {{ range .Repositories }}
+        <option value="{{ . }}">{{ . }}</option>
+        {{ end }}
+      </select>
+      {{ end }}
+      <input
+        type="text"
+        class="search-input"
+        placeholder="Search jobs..."
+        x-model="searchQuery"
+        @input="applyFilters()"
+      >
+    </div>
+  </div>
+
+  <div class="data-table-container">
+    <table class="data-table data-table--grouped data-table--fixed">
+      <thead>
+        <tr>
+          <th style="width: 32px;"></th>
+          <th>Project / Workspace</th>
+          <th style="width: 80px;">Step</th>
+          <th style="width: 120px;">Triggered By</th>
+          <th style="width: 100px;">Started</th>
+          <th style="width: 32px;"></th>
+        </tr>
+      </thead>
+
+      <template x-for="group in groupedItems" :key="group.key">
+        <tbody class="repo-group">
+          <tr class="repo-group-header repo-group-header--hybrid"
+              @click="toggleGroup(group.key)"
+              tabindex="0"
+              :aria-expanded="isExpanded(group.key)">
+            <td class="repo-group-chevron-cell-hybrid">
+              <i :data-lucide="isExpanded(group.key) ? 'chevron-down' : 'chevron-right'" class="icon-sm repo-group-chevron"></i>
+            </td>
+            <td colspan="5" class="repo-group-info-hybrid">
+              <span class="repo-group-name" x-text="group.displayName"></span>
+              <span class="repo-group-count-minimal" x-text="'(' + group.jobs.length + ')'"></span>
+            </td>
+          </tr>
+
+          <template x-if="isExpanded(group.key)">
+            <template x-for="job in group.jobs" :key="job.jobId">
+              <tr class="data-table-row repo-group-row data-table-row--clickable" @click="navigateToJob(job)" tabindex="0">
+                <td></td>
+                <td>
+                  <div class="mono" x-text="job.path || '-'"></div>
+                  <div style="margin-top: 4px;"><span class="badge" x-text="job.workspace || 'default'"></span></div>
+                </td>
+                <td x-text="job.step"></td>
+                <td x-text="job.triggeredBy || '-'"></td>
+                <td class="text-muted" x-text="formatRelativeTime(job.startedAtUnix)"></td>
+                <td class="row-action-hint">
+                  <i data-lucide="chevron-right" class="icon-sm"></i>
+                </td>
+              </tr>
+            </template>
+          </template>
+        </tbody>
+      </template>
+
+      <!-- Empty state when filters hide all groups -->
+      <template x-if="groupedItems.length === 0 && allItems.length > 0">
+        <tbody>
+          <tr>
+            <td colspan="6" class="text-center text-muted" style="padding: 40px;">
+              No jobs match the current filters
+            </td>
+          </tr>
+        </tbody>
+      </template>
+    </table>
+  </div>
+  {{ else }}
+  <div class="empty-state">
+    <i data-lucide="terminal" class="empty-state-icon"></i>
+    <h3>No Active Jobs</h3>
+    <p>When Atlantis runs terraform commands, active jobs will appear here.</p>
+  </div>
+  {{ end }}
+
+  <p class="page-footer-info">
+    Auto-refreshes every 30 seconds
+  </p>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script>
+  function jobsState() {
+    return {
+      // Inherit shared grouped table behavior
+      ...createGroupedTableState({
+        dataElementId: 'jobs-data',
+        htmxContainerId: 'jobs-data-container',
+        itemsKey: 'jobs',
+        searchFields: ['repo', 'pullNum', 'path', 'workspace', 'step', 'triggeredBy'],
+        expandAllOnInit: true,
+        groupKeyField: 'groupKey',
+        groupDisplayField: 'groupDisplayName'
+      }),
+
+      // ========== Jobs-specific methods ==========
+
+      // Navigation
+      navigateToJob(job) {
+        window.location.href = job.jobUrl;
+      }
+    };
+  }
+</script>
+{{ end }}
+
+{{ template "layout" . }}

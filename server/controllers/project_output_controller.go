@@ -1,0 +1,466 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package controllers
+
+import (
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/controllers/web_templates"
+	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/jobs"
+	"github.com/runatlantis/atlantis/server/logging"
+)
+
+// ProjectOutputController handles web page requests for project output views
+type ProjectOutputController struct {
+	db                           db.Database
+	projectOutputTemplate        web_templates.TemplateWriter
+	projectOutputPartialTemplate web_templates.TemplateWriter
+	atlantisVersion              string
+	cleanedBasePath              string
+	applyLockChecker             func() bool
+	outputHandler                jobs.ProjectCommandOutputHandler
+	logger                       logging.SimpleLogging
+}
+
+// NewProjectOutputController creates a new ProjectOutputController
+func NewProjectOutputController(
+	database db.Database,
+	projectOutputTemplate web_templates.TemplateWriter,
+	projectOutputPartialTemplate web_templates.TemplateWriter,
+	atlantisVersion string,
+	cleanedBasePath string,
+	applyLockChecker func() bool,
+	outputHandler jobs.ProjectCommandOutputHandler,
+	logger logging.SimpleLogging,
+) *ProjectOutputController {
+	return &ProjectOutputController{
+		db:                           database,
+		projectOutputTemplate:        projectOutputTemplate,
+		projectOutputPartialTemplate: projectOutputPartialTemplate,
+		atlantisVersion:              atlantisVersion,
+		cleanedBasePath:              cleanedBasePath,
+		applyLockChecker:             applyLockChecker,
+		outputHandler:                outputHandler,
+		logger:                       logger,
+	}
+}
+
+// findActiveJob checks if there's a running job for this project
+func (c *ProjectOutputController) findActiveJob(repoFullName string, pullNum int, path, workspace string) *jobs.JobIDInfo {
+	if c.outputHandler == nil {
+		return nil
+	}
+	pullMappings := c.outputHandler.GetPullToJobMapping()
+	for _, pm := range pullMappings {
+		if pm.Pull.RepoFullName == repoFullName &&
+			pm.Pull.PullNum == pullNum &&
+			pm.Pull.Path == path &&
+			pm.Pull.Workspace == workspace {
+			// Return first active (not completed) job
+			for _, job := range pm.JobIDInfos {
+				if job.CompletedAt.IsZero() {
+					return &job
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// ProjectOutput renders the project output page
+func (c *ProjectOutputController) ProjectOutput(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	owner := vars["owner"]
+	repo := vars["repo"]
+	repoFullName := owner + "/" + repo
+	pullNumStr := vars["pull_num"]
+	path := vars["path"]
+	workspace := r.URL.Query().Get("workspace")
+	projectName := r.URL.Query().Get("project")
+	runParam := r.URL.Query().Get("run")
+
+	if workspace == "" {
+		workspace = "default"
+	}
+
+	pullNum, err := strconv.Atoi(pullNumStr)
+	if err != nil {
+		http.Error(w, "invalid pull number", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch history for this project
+	history, err := c.db.GetProjectOutputHistory(repoFullName, pullNum, path, workspace, projectName)
+	if err != nil {
+		if c.logger != nil {
+			c.logger.Err("error fetching project history: %s", err)
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Filter out policy_check records, merging their data into plan records
+	history = filterPolicyChecks(history)
+
+	if len(history) == 0 {
+		http.Error(w, "project output not found", http.StatusNotFound)
+		return
+	}
+
+	// Determine which run to display
+	var output *models.ProjectOutput
+	var isHistorical bool
+
+	if runParam != "" {
+		// Parse run timestamp and find specific run
+		runTimestamp, err := strconv.ParseInt(runParam, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid run parameter", http.StatusBadRequest)
+			return
+		}
+
+		// Find the run in history
+		for i := range history {
+			if history[i].RunTimestamp == runTimestamp {
+				output = &history[i]
+				isHistorical = (i != 0) // Not the latest
+				break
+			}
+		}
+
+		if output == nil {
+			http.Error(w, "run not found", http.StatusNotFound)
+			return
+		}
+	} else {
+		// Show latest (first in sorted history)
+		output = &history[0]
+		isHistorical = false
+	}
+
+	data := c.buildProjectOutputData(output, owner, repo, history, isHistorical)
+
+	renderTemplate(w, c.projectOutputTemplate, data, c.logger)
+}
+
+// ProjectOutputPartial returns just the output content for HTMX swaps
+func (c *ProjectOutputController) ProjectOutputPartial(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	owner := vars["owner"]
+	repo := vars["repo"]
+	repoFullName := owner + "/" + repo
+	pullNumStr := vars["pull_num"]
+	path := vars["path"]
+	workspace := r.URL.Query().Get("workspace")
+	projectName := r.URL.Query().Get("project")
+	runParam := r.URL.Query().Get("run")
+
+	if workspace == "" {
+		workspace = "default"
+	}
+
+	pullNum, err := strconv.Atoi(pullNumStr)
+	if err != nil {
+		http.Error(w, "invalid pull number", http.StatusBadRequest)
+		return
+	}
+
+	if runParam == "" {
+		http.Error(w, "run parameter required", http.StatusBadRequest)
+		return
+	}
+
+	runTimestamp, err := strconv.ParseInt(runParam, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid run parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Find the run - we need to search history since we don't know the command
+	history, err := c.db.GetProjectOutputHistory(repoFullName, pullNum, path, workspace, projectName)
+	if err != nil {
+		if c.logger != nil {
+			c.logger.Err("error fetching project history for partial: %s", err)
+		}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Filter out policy_check records, merging their data into plan records
+	history = filterPolicyChecks(history)
+
+	var output *models.ProjectOutput
+	for i := range history {
+		if history[i].RunTimestamp == runTimestamp {
+			output = &history[i]
+			break
+		}
+	}
+
+	if output == nil {
+		http.Error(w, "run not found", http.StatusNotFound)
+		return
+	}
+
+	// Build minimal data for partial
+	status, _, statusLabel := c.mapStatus(output.Status, output.CommandName)
+	var duration string
+	if !output.StartedAt.IsZero() && !output.CompletedAt.IsZero() {
+		duration = FormatDuration(output.CompletedAt.Sub(output.StartedAt))
+	}
+
+	data := web_templates.ProjectOutputData{
+		Status:         status,
+		StatusLabel:    statusLabel,
+		CommandName:    output.CommandName,
+		TriggeredBy:    output.TriggeredBy,
+		Duration:       duration,
+		Workspace:      output.Workspace,
+		AddCount:       output.ResourceStats.Add,
+		ChangeCount:    output.ResourceStats.Change,
+		DestroyCount:   output.ResourceStats.Destroy,
+		ImportCount:    output.ResourceStats.Import,
+		Output:         output.Output,
+		Error:          output.Error,
+		RunTimestamp:   output.RunTimestamp,
+		PolicyPassed:   output.PolicyPassed,
+		HasPolicyCheck: output.CommandName == "policy_check" || output.PolicyOutput != "",
+		PolicyOutput:   output.PolicyOutput,
+	}
+	data.OutputScriptData = web_templates.MustEncodeScriptData(map[string]string{
+		"output": output.Output,
+		"error":  output.Error,
+	})
+
+	renderTemplate(w, c.projectOutputPartialTemplate, data, c.logger)
+}
+
+func (c *ProjectOutputController) buildProjectOutputData(output *models.ProjectOutput, owner, repo string, history []models.ProjectOutput, isHistorical bool) web_templates.ProjectOutputData {
+	status, statusIcon, statusLabel := c.mapStatus(output.Status, output.CommandName)
+
+	// Get latest run status (first in history, which is sorted by timestamp desc)
+	var latestStatus, latestStatusLabel string
+	if len(history) > 0 {
+		latestStatus, _, latestStatusLabel = c.mapStatus(history[0].Status, history[0].CommandName)
+	} else {
+		latestStatus, latestStatusLabel = status, statusLabel
+	}
+
+	var duration string
+	if !output.StartedAt.IsZero() && !output.CompletedAt.IsZero() {
+		duration = FormatDuration(output.CompletedAt.Sub(output.StartedAt))
+	}
+
+	// Build PR URL from stored data, with GitHub URL as fallback.
+	// Validate scheme to prevent javascript: URL injection from stored data.
+	pullURL := output.PullURL
+	if pullURL == "" || (!strings.HasPrefix(pullURL, "https://") && !strings.HasPrefix(pullURL, "http://")) {
+		pullURL = fmt.Sprintf("https://github.com/%s/%s/pull/%d", owner, repo, output.PullNum)
+	}
+
+	// Build history items
+	historyItems := make([]web_templates.ProjectOutputHistoryItem, len(history))
+	for i, h := range history {
+		_, _, hStatusLabel := c.mapStatus(h.Status, h.CommandName)
+		var hDuration string
+		if !h.StartedAt.IsZero() && !h.CompletedAt.IsZero() {
+			hDuration = FormatDuration(h.CompletedAt.Sub(h.StartedAt))
+		}
+
+		historyItems[i] = web_templates.ProjectOutputHistoryItem{
+			RunTimestamp:    h.RunTimestamp,
+			RunTimestampFmt: formatTime(h.CompletedAt),
+			CommandName:     h.CommandName,
+			Status:          c.mapStatusClass(h.Status, h.CommandName),
+			StatusLabel:     hStatusLabel,
+			TriggeredBy:     h.TriggeredBy,
+			Duration:        hDuration,
+			IsCurrent:       h.RunTimestamp == output.RunTimestamp,
+		}
+	}
+
+	// Check for active job
+	var activeJob *web_templates.ProjectOutputActiveJob
+	if job := c.findActiveJob(output.RepoFullName, output.PullNum, output.Path, output.Workspace); job != nil {
+		activeJob = &web_templates.ProjectOutputActiveJob{
+			JobID:     job.JobID,
+			JobStep:   job.JobStep,
+			StartedAt: job.TimeFormatted,
+			StreamURL: c.cleanedBasePath + "/jobs/" + job.JobID + "/stream",
+		}
+	}
+
+	return web_templates.ProjectOutputData{
+		LayoutData: web_templates.LayoutData{
+			AtlantisVersion: c.atlantisVersion,
+			CleanedBasePath: c.cleanedBasePath,
+			ActiveNav:       "prs",
+			ApplyLockActive: c.applyLockChecker(),
+		},
+
+		// Navigation
+		RepoFullName: output.RepoFullName,
+		RepoOwner:    owner,
+		RepoName:     repo,
+		PullNum:      output.PullNum,
+		PullURL:      pullURL,
+
+		// Project identification
+		ProjectName: output.ProjectName,
+		Path:        output.Path,
+		Workspace:   output.Workspace,
+
+		// Status
+		Status:            status,
+		StatusIcon:        statusIcon,
+		StatusLabel:       statusLabel,
+		LatestStatus:      latestStatus,
+		LatestStatusLabel: latestStatusLabel,
+
+		// Resource changes
+		AddCount:     output.ResourceStats.Add,
+		ChangeCount:  output.ResourceStats.Change,
+		DestroyCount: output.ResourceStats.Destroy,
+		ImportCount:  output.ResourceStats.Import,
+
+		// Metadata
+		CommandName: output.CommandName,
+		TriggeredBy: output.TriggeredBy,
+		StartedAt:   formatTime(output.StartedAt),
+		CompletedAt: formatTime(output.CompletedAt),
+		Duration:    duration,
+
+		// Output
+		Output: output.Output,
+
+		// Policy
+		PolicyPassed:   output.PolicyPassed,
+		HasPolicyCheck: output.CommandName == "policy_check" || output.PolicyOutput != "",
+		PolicyOutput:   output.PolicyOutput,
+
+		// Error
+		Error: output.Error,
+
+		// History
+		RunTimestamp:    output.RunTimestamp,
+		RunTimestampFmt: formatTime(output.CompletedAt),
+		History:         historyItems,
+		IsHistorical:    isHistorical,
+
+		// Live job
+		ActiveJob: activeJob,
+
+		// Pre-encoded script data
+		OutputScriptData: web_templates.MustEncodeScriptData(map[string]string{
+			"output": output.Output,
+			"error":  output.Error,
+		}),
+	}
+}
+
+func (c *ProjectOutputController) mapStatusClass(status models.ProjectOutputStatus, commandName string) string {
+	statusClass, _ := DetermineProjectStatus(commandName, status)
+	return statusClass
+}
+
+func (c *ProjectOutputController) mapStatus(status models.ProjectOutputStatus, commandName string) (statusStr, icon, label string) {
+	statusClass, statusLabel := DetermineProjectStatus(commandName, status)
+
+	// Map status class to icon
+	switch statusClass {
+	case "success":
+		icon = "✓"
+	case "applied":
+		icon = "✓✓"
+	case "failed":
+		icon = "✗"
+	case "pending":
+		icon = "⏳"
+	default:
+		icon = "?"
+	}
+
+	return statusClass, icon, statusLabel
+}
+
+func formatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("Jan 2, 2006 3:04 PM")
+}
+
+// filterPolicyChecks removes policy_check records from history and merges their
+// PolicyOutput/PolicyPassed data into the nearest preceding non-policy_check record
+// for the same project. History must be sorted DESC by timestamp.
+func filterPolicyChecks(history []models.ProjectOutput) []models.ProjectOutput {
+	// Separate policy checks from non-policy records
+	var filtered []models.ProjectOutput
+	var policyChecks []models.ProjectOutput
+
+	for _, h := range history {
+		if h.CommandName == "policy_check" {
+			policyChecks = append(policyChecks, h)
+		} else {
+			filtered = append(filtered, h)
+		}
+	}
+
+	if len(policyChecks) == 0 {
+		return history
+	}
+
+	// For each policy_check, find the nearest preceding (older) non-policy record
+	// with the same project key and merge policy data into it.
+	// History is DESC so "preceding" means later index (higher index = older).
+	for _, pc := range policyChecks {
+		pcProjectKey := pc.ProjectKey()
+		merged := false
+		for i := range filtered {
+			if filtered[i].ProjectKey() == pcProjectKey && filtered[i].RunTimestamp <= pc.RunTimestamp {
+				filtered[i].PolicyOutput = pc.PolicyOutput
+				filtered[i].PolicyPassed = pc.PolicyPassed
+				merged = true
+				break
+			}
+		}
+		// If no older record found, try to merge into any record with same project key
+		if !merged {
+			for i := range filtered {
+				if filtered[i].ProjectKey() == pcProjectKey {
+					filtered[i].PolicyOutput = pc.PolicyOutput
+					filtered[i].PolicyPassed = pc.PolicyPassed
+					break
+				}
+			}
+		}
+	}
+
+	return filtered
+}
+
+// FormatDuration formats a duration as a human-readable string
+func FormatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+
+	if d < time.Hour {
+		minutes := int(d.Minutes())
+		seconds := int(d.Seconds()) % 60
+		return fmt.Sprintf("%dm %ds", minutes, seconds)
+	}
+
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	seconds := int(d.Seconds()) % 60
+	return fmt.Sprintf("%dh %dm %ds", hours, minutes, seconds)
+}

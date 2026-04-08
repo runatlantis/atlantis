@@ -146,6 +146,7 @@ const (
 	SlackTokenFlag                   = "slack-token"
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
+	SSEMaxConnectionsFlag            = "sse-max-connections"
 	RestrictFileList                 = "restrict-file-list"
 	TFDistributionFlag               = "tf-distribution" // deprecated for DefaultTFDistributionFlag
 	TFDownloadFlag                   = "tf-download"
@@ -162,7 +163,6 @@ const (
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
-	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser                  = ""
@@ -189,6 +189,7 @@ const (
 	DefaultParallelPoolSize             = 15
 	DefaultStatsNamespace               = "atlantis"
 	DefaultPort                         = 4141
+	DefaultSSEMaxConnections            = 100
 	DefaultRedisDB                      = 0
 	DefaultRedisPort                    = 6379
 	DefaultRedisTLSEnabled              = false
@@ -642,10 +643,6 @@ var boolFlags = map[string]boolFlag{
 		description:  "Block plan requests from projects outside the files modified in the pull request.",
 		defaultValue: false,
 	},
-	WebsocketCheckOrigin: {
-		description:  "Enable websocket origin check",
-		defaultValue: false,
-	},
 	HideUnchangedPlanComments: {
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
@@ -685,6 +682,10 @@ var intFlags = map[string]intFlag{
 	RedisPort: {
 		description:  "The Redis Port for when using a Locking DB type of 'redis'.",
 		defaultValue: DefaultRedisPort,
+	},
+	SSEMaxConnectionsFlag: {
+		description:  "Maximum number of concurrent SSE streaming connections for job output.",
+		defaultValue: DefaultSSEMaxConnections,
 	},
 }
 
@@ -958,6 +959,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.Port == 0 {
 		c.Port = DefaultPort
+	}
+	if !v.IsSet(SSEMaxConnectionsFlag) {
+		c.SSEMaxConnections = DefaultSSEMaxConnections
 	}
 	if c.RedisDB == 0 {
 		c.RedisDB = DefaultRedisDB

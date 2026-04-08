@@ -117,7 +117,10 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	gitlabGetter = mocks.NewMockGitlabMergeRequestGetter()
 	azuredevopsGetter = mocks.NewMockAzureDevopsPullGetter()
 	logger := logging.NewNoopLogger(t)
-	projectCommandRunner = mocks.NewMockProjectCommandRunner()
+	ctrl := gomock.NewController(t)
+	projectCommandRunner = mocks.NewMockProjectCommandRunner(ctrl)
+	// Tests must set up their own expectations for Plan/Apply calls
+	// OR they can rely on other mocks in this package that set up default expectations
 	workingDir = mocks.NewMockWorkingDir()
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
@@ -126,9 +129,8 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
-	lockCtrl := gomock.NewController(t)
-	applyLockChecker = lockingmocks.NewMockApplyLockChecker(lockCtrl)
-	lockingLocker = lockingmocks.NewMockLocker(lockCtrl)
+	applyLockChecker = lockingmocks.NewMockApplyLockChecker(ctrl)
+	lockingLocker = lockingmocks.NewMockLocker(ctrl)
 	// Allow incidental calls to CheckApplyLock (called internally during apply operations).
 	// Tests that need specific return values should set applyLockCheckerReturn/applyLockCheckerErr in TestConfig.
 	applyLockChecker.EXPECT().CheckApplyLock().Return(testConfig.applyLockCheckerReturn, testConfig.applyLockCheckerErr).AnyTimes()
@@ -603,6 +605,7 @@ func TestRunCommentCommand_DisableAutoplanLabel_PullNotLabeled(t *testing.T) {
 			},
 		}, nil)
 	When(ch.VCSClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))).ThenReturn(nil, nil)
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan output"}}).AnyTimes()
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 	projectCommandBuilder.VerifyWasCalled(Once()).BuildAutoplanCommands(Any[*command.Context]())
@@ -824,7 +827,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan output"}}).AnyTimes()
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
@@ -848,7 +851,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan output"}}).AnyTimes()
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
 	testdata.Pull.BaseRepo = testdata.GithubRepo
@@ -904,7 +907,7 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 	dbUpdater.Database = boltDB
 	applyCommandRunner.Database = boltDB
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan output"}}).AnyTimes()
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
@@ -961,11 +964,11 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	}
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		ThenReturn([]command.ProjectContext{projectCtx}, nil)
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{
+	projectCommandRunner.EXPECT().Plan(gomock.Eq(projectCtx)).Return(command.ProjectCommandOutput{
 		PlanSuccess: &models.PlanSuccess{
 			TerraformOutput: "true",
 		},
-	})
+	}).AnyTimes()
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
@@ -989,7 +992,7 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan output"}}).AnyTimes()
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "default"})
@@ -1023,23 +1026,19 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 			},
 		}, nil)
 	callCount := 0
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).Then(func(_ []Param) ReturnValues {
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).DoAndReturn(func(_ command.ProjectContext) command.ProjectCommandOutput {
 		if callCount == 0 {
 			// The first call, we return a successful result.
 			callCount++
-			return ReturnValues{
-				command.ProjectCommandOutput{
-					PlanSuccess: &models.PlanSuccess{},
-				},
+			return command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
 			}
 		}
 		// The second call, we return a failed result.
-		return ReturnValues{
-			command.ProjectCommandOutput{
-				Error: errors.New("err"),
-			},
+		return command.ProjectCommandOutput{
+			Error: errors.New("err"),
 		}
-	})
+	}).Times(2)
 
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).
 		ThenReturn(tmp, nil)
@@ -1067,7 +1066,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan output"}}).AnyTimes()
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
@@ -1136,6 +1135,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 			nil,
 		}
 	})
+	projectCommandRunner.EXPECT().Apply(gomock.Any()).Return(command.ProjectCommandOutput{ApplySuccess: "Apply success"}).AnyTimes()
 
 	When(workingDir.GetPullDir(testdata.GithubRepo, modelPull)).ThenReturn(tmp, nil)
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &modelPull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
