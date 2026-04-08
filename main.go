@@ -60,8 +60,10 @@ func main() {
 	}
 	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
 	testdrive := &cmd.TestdriveCmd{}
+	local := &cmd.LocalCmd{Logger: logger}
 	cmd.RootCmd.AddCommand(server.Init())
 	cmd.RootCmd.AddCommand(version.Init())
 	cmd.RootCmd.AddCommand(testdrive.Init())
+	cmd.RootCmd.AddCommand(local.Init())
 	cmd.Execute()
 }
