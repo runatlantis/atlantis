@@ -580,6 +580,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		&events.PullClosedExecutor{
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
+			WorkingDirLocker:         workingDirLocker,
 			Database:                 database,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
@@ -795,6 +796,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
 		userConfig.PendingApplyStatus,
+		workingDirLocker,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
