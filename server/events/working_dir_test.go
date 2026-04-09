@@ -476,7 +476,7 @@ func TestClone_ResetOnWrongCommit(t *testing.T) {
 		BaseBranch: "main",
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
@@ -641,7 +641,7 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 		Num:        1,
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2"))
