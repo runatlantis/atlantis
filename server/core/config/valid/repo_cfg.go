@@ -23,6 +23,7 @@ type RepoCfg struct {
 	Workflows                 map[string]Workflow
 	PolicySets                PolicySets
 	Automerge                 *bool
+	AutomergeMethod           string
 	AutoDiscover              *AutoDiscover
 	ParallelApply             *bool
 	ParallelPlan              *bool
