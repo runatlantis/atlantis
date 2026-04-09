@@ -661,6 +661,7 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 	}
 
 	requiredChecksSet := make(map[githubv4.String]any)
+	maxRequiredApprovals := 0
 
 pagination:
 	for {
@@ -671,13 +672,6 @@ pagination:
 		}
 
 		reviewDecision = query.Repository.PullRequest.ReviewDecision
-
-		approvedReviewCount := 0
-		for _, review := range query.Repository.PullRequest.LatestOpinionatedReviews.Nodes {
-			if review.State == "APPROVED" {
-				approvedReviewCount++
-			}
-		}
 
 		for _, rule := range query.Repository.PullRequest.BaseRef.BranchProtectionRule.RequiredStatusChecks {
 			requiredChecksSet[rule.Context] = struct{}{}
@@ -698,8 +692,8 @@ pagination:
 				}
 			case "PULL_REQUEST":
 				required := int(rule.Parameters.PullRequestParameters.RequiredApprovingReviewCount)
-				if required > 0 && approvedReviewCount < required {
-					pendingRequiredReviewerApproval = true
+				if required > maxRequiredApprovals {
+					maxRequiredApprovals = required
 				}
 			default:
 				continue
@@ -738,6 +732,19 @@ pagination:
 
 	if err != nil {
 		return "", nil, nil, nil, nil, false, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
+	}
+
+	// latestOpinionatedReviews is not paginated, so compute the approved count once after the loop.
+	if maxRequiredApprovals > 0 {
+		approvedReviewCount := 0
+		for _, review := range query.Repository.PullRequest.LatestOpinionatedReviews.Nodes {
+			if review.State == "APPROVED" {
+				approvedReviewCount++
+			}
+		}
+		if approvedReviewCount < maxRequiredApprovals {
+			pendingRequiredReviewerApproval = true
+		}
 	}
 
 	for context := range requiredChecksSet {
