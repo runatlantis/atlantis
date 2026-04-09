@@ -127,7 +127,7 @@ func TestCheckUserPermissions(t *testing.T) {
 			TeamAllowlistChecker: &command.DefaultTeamAllowlistChecker{},
 		}
 		user := models.User{Username: "alice", Teams: []string{"some-team"}}
-		ok, err := cr.checkUserPermissions(repo, user, "plan")
+		ok, err := cr.checkUserPermissions(repo, &user, "plan")
 		Ok(t, err)
 		Assert(t, ok, "expected allowed when no rules")
 	})
@@ -140,7 +140,7 @@ func TestCheckUserPermissions(t *testing.T) {
 			VCSClient:            &vcs.NotConfiguredVCSClient{}, // does not implement childTeamFetcher
 		}
 		user := models.User{Username: "alice", Teams: []string{"dev-team"}}
-		ok, err := cr.checkUserPermissions(repo, user, "plan")
+		ok, err := cr.checkUserPermissions(repo, &user, "plan")
 		Ok(t, err)
 		Assert(t, ok, "expected direct member to be allowed")
 	})
@@ -153,7 +153,7 @@ func TestCheckUserPermissions(t *testing.T) {
 			VCSClient:            &vcs.NotConfiguredVCSClient{}, // does not implement childTeamFetcher
 		}
 		user := models.User{Username: "alice", Teams: []string{"other-team"}}
-		ok, err := cr.checkUserPermissions(repo, user, "plan")
+		ok, err := cr.checkUserPermissions(repo, &user, "plan")
 		Ok(t, err)
 		Assert(t, !ok, "expected non-member to be rejected when no hierarchy support")
 	})
@@ -219,11 +219,32 @@ func TestCheckUserPermissions(t *testing.T) {
 				},
 			}
 			user := models.User{Username: "testuser", Teams: tc.userTeams}
-			ok, checkErr := cr.checkUserPermissions(repo, user, tc.cmdName)
+			ok, checkErr := cr.checkUserPermissions(repo, &user, tc.cmdName)
 			Ok(t, checkErr)
 			Equals(t, tc.expectAllow, ok)
 		})
 	}
+
+	t.Run("slow path: matched parent team is appended to user.Teams", func(t *testing.T) {
+		checker, err := command.NewTeamAllowlistChecker("parent-team:plan")
+		Ok(t, err)
+		cr := &DefaultCommandRunner{
+			Logger:               logger,
+			TeamAllowlistChecker: checker,
+			VCSClient: &childTeamVCSClient{
+				mockChildTeamFetcher: mockChildTeamFetcher{
+					children: map[string][]string{"parent-team": {"child-team"}},
+				},
+			},
+		}
+		user := models.User{Username: "alice", Teams: []string{"child-team"}}
+		ok, checkErr := cr.checkUserPermissions(repo, &user, "plan")
+		Ok(t, checkErr)
+		Assert(t, ok, "expected child team member to be allowed")
+		// The matched parent team should be appended so per-project allowlist checks pass.
+		Assert(t, len(user.Teams) == 2, "expected user.Teams to contain both child-team and parent-team")
+		Equals(t, "parent-team", user.Teams[1])
+	})
 }
 
 func TestApplyUpdateCommitStatus(t *testing.T) {

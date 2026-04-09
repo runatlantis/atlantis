@@ -166,7 +166,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 			return
 		}
 
-		ok, err := c.checkUserPermissions(baseRepo, user, "plan")
+		ok, err := c.checkUserPermissions(baseRepo, &user, "plan")
 		if err != nil {
 			log.Err("Unable to check user permissions: %s", err)
 			return
@@ -296,7 +296,10 @@ func fetchDescendantTeams(fetcher childTeamFetcher, logger logging.SimpleLogging
 // It first checks direct team membership against the allowlist. If that fails and the
 // VCS client supports team hierarchy (childTeamFetcher), it expands each allowlisted team
 // to include all its descendant teams (up to 20 levels deep) and re-checks.
-func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmdName string) (bool, error) {
+// When a match is found via hierarchy, the matched allowlisted parent team is appended to
+// user.Teams so that subsequent per-project allowlist checks (which use direct membership
+// only) also pass.
+func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *models.User, cmdName string) (bool, error) {
 	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
 		// allowlist restriction is not enabled
 		return true, nil
@@ -306,7 +309,7 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 		CommandName: cmdName,
 		Log:         c.Logger,
 		Pull:        models.PullRequest{},
-		User:        user,
+		User:        *user,
 		Verbose:     false,
 		API:         false,
 	}
@@ -340,6 +343,10 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 		for _, userTeam := range user.Teams {
 			for _, desc := range descendants {
 				if strings.EqualFold(userTeam, desc) {
+					// Add the matched allowlisted parent team to user.Teams so that
+					// per-project allowlist filters (which check direct membership)
+					// also pass for this user.
+					user.Teams = append(user.Teams, allowedTeam)
 					return true, nil
 				}
 			}
@@ -390,7 +397,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			return
 		}
 
-		ok, err := c.checkUserPermissions(baseRepo, user, cmd.Name.String())
+		ok, err := c.checkUserPermissions(baseRepo, &user, cmd.Name.String())
 		if err != nil {
 			c.Logger.Err("Unable to check user permissions: %s", err)
 			return
