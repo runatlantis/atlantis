@@ -19,17 +19,46 @@
 package models
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
 	paths "path"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/logging"
 )
+
+// HashPolicyItem returns the SHA-256 hex digest of a policy output item.
+func HashPolicyItem(item string) string {
+	h := sha256.Sum256([]byte(item))
+	return hex.EncodeToString(h[:])
+}
+
+// policyItemHashes returns deduplicated SHA-256 hex digests of substrings
+// matched by re in policyOutput, in first-seen order. If the regex produces
+// no matches (including when policyOutput is empty), the raw policyOutput
+// itself is hashed so there is always at least one hash.
+func policyItemHashes(policyOutput string, re *regexp.Regexp) []string {
+	matches := re.FindAllString(policyOutput, -1)
+	hashes := make([]string, 0, len(matches))
+	for _, m := range matches {
+		h := HashPolicyItem(m)
+		if slices.Contains(hashes, h) {
+			continue
+		}
+		hashes = append(hashes, h)
+	}
+	if len(hashes) == 0 {
+		hashes = append(hashes, HashPolicyItem(policyOutput))
+	}
+	return hashes
+}
 
 type PullReqStatus struct {
 	ApprovalStatus  ApprovalStatus
@@ -391,19 +420,81 @@ type PlanSuccess struct {
 	MergedAgain bool
 }
 
-type PolicySetResult struct {
-	PolicySetName string
-	PolicyOutput  string
-	Passed        bool
-	ReqApprovals  int
-	CurApprovals  int
+func NewPolicySetResult(policySetName string, policyOutput string, passed bool, reqApprovalCount int, policyItemRegex string) (*PolicySetResult, error) {
+	re, err := regexp.Compile(policyItemRegex)
+	if err != nil {
+		return nil, fmt.Errorf("compiling policy_item_regex %q for policy set %q: %w", policyItemRegex, policySetName, err)
+	}
+	hashes := policyItemHashes(policyOutput, re)
+	return &PolicySetResult{
+		PolicySetName:    policySetName,
+		PolicyOutput:     policyOutput,
+		Passed:           passed,
+		ReqApprovalCount: reqApprovalCount,
+		Hashes:           hashes,
+		PolicyItemRegex:  policyItemRegex,
+	}, nil
 }
 
-// PolicySetApproval tracks the number of approvals a given policy set has.
+type PolicySetResult struct {
+	PolicySetName    string
+	PolicyOutput     string
+	Passed           bool
+	ReqApprovalCount int
+	Approvals        []PolicySetApproval
+	Hashes           []string
+	PolicyItemRegex  string
+}
+
+type PolicySetApproval struct {
+	Approver string
+	Hashes   []string
+}
+
+// ApprovalCoversAllHashes reports whether approvalHashes contains every element of required.
+func ApprovalCoversAllHashes(approvalHashes, required []string) bool {
+	if len(required) == 0 {
+		return true
+	}
+	set := make(map[string]struct{}, len(approvalHashes))
+	for _, h := range approvalHashes {
+		set[h] = struct{}{}
+	}
+	for _, h := range required {
+		if _, ok := set[h]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// PolicySetStatus tracks the approval state for a given policy set.
 type PolicySetStatus struct {
-	PolicySetName string
-	Passed        bool
-	Approvals     int
+	PolicySetName   string
+	Passed          bool
+	Approvals       []PolicySetApproval
+	Hashes          []string
+	PolicyItemRegex string
+}
+
+// GetCurApprovals returns the number of approvals that cover all hashes in this policy set.
+func (pss *PolicySetStatus) GetCurApprovals() int {
+	n := 0
+	for _, approval := range pss.Approvals {
+		if ApprovalCoversAllHashes(approval.Hashes, pss.Hashes) {
+			n++
+		}
+	}
+	return n
+}
+
+func (pss *PolicySetStatus) OwnerHasFullyApproved(owner string) bool {
+	for _, approval := range pss.Approvals {
+		if approval.Approver == owner && ApprovalCoversAllHashes(approval.Hashes, pss.Hashes) {
+			return true
+		}
+	}
+	return false
 }
 
 // Summary regexes
@@ -519,7 +610,7 @@ func (p *PolicyCheckResults) Summary() string {
 func (p *PolicyCheckResults) PolicyCleared() bool {
 	passing := true
 	for _, policySetResult := range p.PolicySetResults {
-		if !policySetResult.Passed && (policySetResult.CurApprovals != policySetResult.ReqApprovals) {
+		if !policySetResult.Passed && (policySetResult.GetCurApprovals() < policySetResult.ReqApprovalCount) {
 			passing = false
 		}
 	}
@@ -532,13 +623,47 @@ func (p *PolicyCheckResults) PolicySummary() string {
 	for _, policySetResult := range p.PolicySetResults {
 		if policySetResult.Passed {
 			summary = append(summary, fmt.Sprintf("policy set: %s: passed.", policySetResult.PolicySetName))
-		} else if policySetResult.CurApprovals == policySetResult.ReqApprovals {
+		} else if policySetResult.GetCurApprovals() >= policySetResult.ReqApprovalCount {
 			summary = append(summary, fmt.Sprintf("policy set: %s: approved.", policySetResult.PolicySetName))
 		} else {
-			summary = append(summary, fmt.Sprintf("policy set: %s: requires: %d approval(s), have: %d.", policySetResult.PolicySetName, policySetResult.ReqApprovals, policySetResult.CurApprovals))
+			summary = append(summary, fmt.Sprintf("policy set: %s: requires: %d approval(s), have: %d.", policySetResult.PolicySetName, policySetResult.ReqApprovalCount, policySetResult.GetCurApprovals()))
 		}
 	}
 	return strings.Join(summary, "\n")
+}
+
+// GetCurApprovals returns the number of approvals that cover all hashes in this policy set result.
+func (p *PolicySetResult) GetCurApprovals() int {
+	n := 0
+	for _, approval := range p.Approvals {
+		if ApprovalCoversAllHashes(approval.Hashes, p.Hashes) {
+			n++
+		}
+	}
+	return n
+}
+
+// ApprovedHashes returns the deduplicated union of hashes across all approvals.
+func (p *PolicySetResult) ApprovedHashes() []string {
+	seen := make(map[string]struct{})
+	var result []string
+	for _, approval := range p.Approvals {
+		for _, h := range approval.Hashes {
+			if _, ok := seen[h]; !ok {
+				seen[h] = struct{}{}
+				result = append(result, h)
+			}
+		}
+	}
+	return result
+}
+
+func (p *PolicySetResult) PolicySetHashes(policyItemRegex string) ([]string, error) {
+	re, err := regexp.Compile(policyItemRegex)
+	if err != nil {
+		return nil, fmt.Errorf("compiling policy_item_regex %q: %w", policyItemRegex, err)
+	}
+	return policyItemHashes(p.PolicyOutput, re), nil
 }
 
 type VersionSuccess struct {
@@ -569,7 +694,7 @@ type ProjectStatus struct {
 	Workspace   string
 	RepoRelDir  string
 	ProjectName string
-	// PolicySetApprovals tracks the approval status of every PolicySet for a Project.
+	// PolicyStatus tracks the policy check status for each policy set.
 	PolicyStatus []PolicySetStatus
 	// Status is the status of where this project is at in the planning cycle.
 	Status ProjectPlanStatus
@@ -598,11 +723,11 @@ const (
 	// DiscardedPlanStatus means that there was an unapplied plan that was
 	// discarded due to a project being unlocked
 	DiscardedPlanStatus
-	// ErroredPolicyCheckStatus means that there was an unapplied plan that was
-	// discarded due to a project being unlocked
+	// ErroredPolicyCheckStatus means that the policy check errored or has
+	// failing policies.
 	ErroredPolicyCheckStatus
-	// PassedPolicyCheckStatus means that there was an unapplied plan that was
-	// discarded due to a project being unlocked
+	// PassedPolicyCheckStatus means that all policy checks passed or were
+	// approved.
 	PassedPolicyCheckStatus
 )
 

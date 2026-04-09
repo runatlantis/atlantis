@@ -20,14 +20,14 @@ Any failures need to either be addressed in a successive commit, or approved by 
 
 ![Policy Check Approval](./images/policy-check-approval.png)
 
-Policy approvals may be cleared either by re-planing, or by issuing the following command:
+Policy approvals may be cleared either by re-planning, or by issuing the following command:
 
 ```shell
 atlantis approve_policies --clear-policy-approval
 ```
 
 ::: warning
-Any plans following the approval will discard any policy approval and prompt again for it.
+By default, any plans following the approval will discard all policy approvals and prompt again for them. To change this behavior, see [Sticky Policy Approvals](#sticky-policy-approvals).
 :::
 
 ## Getting Started
@@ -92,7 +92,9 @@ policies:
 - `source` - Tells atlantis where to fetch the policies from. Currently you can only host policies locally by using `local`.
 - `owners` - Defines the users/teams which are able to approve a specific policy set.
 - `approve_count` - Defines the number of approvals needed to bypass policy checks. Defaults to the top-level policies configuration, if not specified.
-- `prevent_self_approve` - Defines whether the PR author can approve policies
+- `prevent_self_approve` - Defines whether the PR author can approve policies.
+- `sticky_policy_approvals` - When `true`, approvals survive re-plans as long as no new policy output items (as matched by `policy_item_regex`) are introduced. See [Sticky Policy Approvals](#sticky-policy-approvals).
+- `policy_item_regex` - Regex used to extract comparable items from policy output for sticky approval tracking. See [Sticky Policy Approvals](#sticky-policy-approvals).
 
 By default conftest is configured to only run the `main` package. If you wish to run specific/multiple policies consider passing `--namespace` or `--all-namespaces` to conftest with [`extra_args`](custom-workflows.md#adding-extra-arguments-to-terraform-commands) via a custom workflow as shown in the below example.
 
@@ -207,15 +209,123 @@ When the policy check workflow runs, a file is created in the working directory 
 ```json
 [
   {
-    "PolicySetName":  "policy1",
-    "PolicyOutput": "",
-    "Passed":         false,
-    "ReqApprovals":   1,
-    "CurApprovals":   0
+    "PolicySetName": "policy1",
+    "PolicyOutput": "FAIL - plan.json - main - WARNING: resource creation is prohibited.\n\n1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions\n",
+    "Passed": false,
+    "ReqApprovalCount": 1,
+    "Approvals": null,
+    "Hashes": ["ae6b7acaaedaf6fcd3d1823643dbf2ef1aa25374a99b44b1923d8227cc9707e3"],
+    "PolicyItemRegex": "(?s).+"
   }
 ]
-
 ```
+
+| Field              | Type                | Description                                                                 |
+|--------------------|---------------------|-----------------------------------------------------------------------------|
+| `PolicySetName`    | string              | Name of the policy set.                                                     |
+| `PolicyOutput`     | string              | Raw output from the policy check.                                           |
+| `Passed`           | bool                | Whether the policy check passed.                                            |
+| `ReqApprovalCount` | int                 | Number of approvals required to bypass the failing policy.                  |
+| `Approvals`        | []PolicySetApproval | List of approvals, each with an `Approver` username and `Hashes` snapshot.  |
+| `Hashes`           | []string            | SHA-256 hex digests of items extracted from the policy output using `policy_item_regex`. |
+| `PolicyItemRegex`  | string              | The regex used to extract items from the policy output for hashing.         |
+
+## Sticky Policy Approvals
+
+By default, when a plan is re-run, all prior policy approvals are discarded. This means that after every `atlantis plan`, policy owners must re-approve even if nothing about the policy failures changed.
+
+**Sticky policy approvals** allow approvals to survive re-plans, as long as no new items appear in the policy output (matched via `policy_item_regex`). This is useful in workflows where plans are frequently re-run (e.g., due to base branch updates) but the policy violations remain the same or are being resolved.
+
+### How it works
+
+When sticky approvals are enabled, Atlantis extracts items from policy output using `policy_item_regex` and hashes them. Each approval records a snapshot of these hashes. On re-plan, approvals are carried forward only if their recorded hashes still cover the current output. Adding or changing items invalidates approvals; removing items (e.g., fixing a violation) preserves them.
+
+### Enabling sticky approvals
+
+Enable at the top level to apply to all policy sets:
+
+```yaml
+policies:
+  owners:
+    users:
+      - policyowner
+  sticky_policy_approvals: true
+  policy_sets:
+    - name: security-policy
+      path: /policies/security
+      source: local
+```
+
+Or enable per policy set:
+
+```yaml
+policies:
+  owners:
+    users:
+      - policyowner
+  policy_sets:
+    - name: security-policy
+      path: /policies/security
+      source: local
+      sticky_policy_approvals: true
+    - name: cost-policy
+      path: /policies/cost
+      source: local
+      # This policy set uses default (non-sticky) behavior
+```
+
+A per-policy-set `sticky_policy_approvals` value overrides the top-level setting. This lets you enable sticky approvals globally but opt specific policy sets out (or vice versa).
+
+### Customizing the policy item regex
+
+The `policy_item_regex` controls which parts of the policy output are used as the "identity" for sticky approval tracking. The default is `(?s).+`, which matches the entire output as a single item. This means any change to the output invalidates the approval — an all-or-nothing approach.
+
+For granular per-item tracking, override the regex to match individual items. For example, `.+` (without `(?s)`) matches each non-empty line as a separate item:
+
+```yaml
+policies:
+  owners:
+    users:
+      - policyowner
+  sticky_policy_approvals: true
+  policy_item_regex: ".+"
+  policy_sets:
+    - name: security-policy
+      path: /policies/security
+      source: local
+```
+
+With `.+`, each line is tracked independently. Approvals remain valid as long as every current line was present at approval time. Fixing a violation (removing a line) preserves existing approvals; adding or changing one invalidates them.
+
+For text output, use `(?m)^FAIL.*` to track only lines starting with `FAIL`:
+
+```yaml
+policy_item_regex: "(?m)^FAIL.*"
+```
+
+::: tip
+Use the `(?m)` flag prefix to enable multiline matching, so `^` and `$` match the start and end of each line rather than just the start and end of the entire string.
+:::
+
+A per-policy-set `policy_item_regex` can override the top-level default:
+
+```yaml
+policies:
+  owners:
+    users:
+      - policyowner
+  sticky_policy_approvals: true
+  policy_item_regex: "(?m)^FAIL.*"
+  policy_sets:
+    - name: security-policy
+      path: /policies/security
+      source: local
+      policy_item_regex: ".+"
+```
+
+### Duplicate approval prevention
+
+When sticky approvals are used with `approve_count > 1`, the same user cannot provide multiple approvals for the same policy set with the same hashes. If a user has already fully approved a policy set and the extracted items haven't changed, subsequent approval attempts by the same user will produce an error asking for a different policy owner to approve.
 
 ## Running policy check only on some repositories
 

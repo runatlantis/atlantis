@@ -16,6 +16,7 @@ import (
 	models_mocks "github.com/runatlantis/atlantis/server/core/runtime/models/mocks"
 	conftest_mocks "github.com/runatlantis/atlantis/server/core/runtime/policy/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -163,23 +164,23 @@ func TestRun(t *testing.T) {
 	workdir := t.TempDir()
 
 	policySet1 := valid.PolicySet{
-		Source: valid.LocalPolicySet,
-		Path:   policySetPath1,
-		Name:   policySetName1,
+		Source:          valid.LocalPolicySet,
+		Path:            policySetPath1,
+		Name:            policySetName1,
+		PolicyItemRegex: valid.DefaultPolicyItemRegex,
 	}
 
 	policySet2 := valid.PolicySet{
-		Source: valid.LocalPolicySet,
-		Path:   policySetPath2,
-		Name:   policySetName2,
+		Source:          valid.LocalPolicySet,
+		Path:            policySetPath2,
+		Name:            policySetName2,
+		PolicyItemRegex: valid.DefaultPolicyItemRegex,
 	}
 
 	ctx := command.ProjectContext{
 		PolicySets: valid.PolicySets{
-			PolicySets: []valid.PolicySet{
-				policySet1,
-				policySet2,
-			},
+			PolicySets:      []valid.PolicySet{policySet1, policySet2},
+			PolicyItemRegex: valid.DefaultPolicyItemRegex,
 		},
 		ProjectName: "testproj",
 		Workspace:   "default",
@@ -190,7 +191,8 @@ func TestRun(t *testing.T) {
 		var extraArgs []string
 
 		expectedOutput := "Success"
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"Success","Passed":true,"ReqApprovals":0,"CurApprovals":0},{"PolicySetName":"policy2","PolicyOutput":"Success","Passed":true,"ReqApprovals":0,"CurApprovals":0}]`
+		h := models.HashPolicyItem("Success")
+		expectedResult := fmt.Sprintf(`[{"PolicySetName":"policy1","PolicyOutput":"Success","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":["%s"],"PolicyItemRegex":"(?s).+"},{"PolicySetName":"policy2","PolicyOutput":"Success","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":["%s"],"PolicyItemRegex":"(?s).+"}]`, h, h)
 
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
@@ -202,8 +204,6 @@ func TestRun(t *testing.T) {
 		When(mockExec.CombinedOutput(expectedArgsPolicy2, envs, workdir)).ThenReturn(expectedOutput, nil)
 
 		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
-
-		fmt.Println(result)
 
 		Ok(t, errors.Unwrap(err))
 
@@ -215,10 +215,11 @@ func TestRun(t *testing.T) {
 		extraArgs := []string{"--all-namespaces"}
 
 		expectedOutput := "Success"
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"","Passed":true,"ReqApprovals":0,"CurApprovals":0},{"PolicySetName":"policy2","PolicyOutput":"","Passed":true,"ReqApprovals":0,"CurApprovals":0}]`
+		h := models.HashPolicyItem("Success")
+		expectedResult := fmt.Sprintf(`[{"PolicySetName":"policy1","PolicyOutput":"Success","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":["%s"],"PolicyItemRegex":"(?s).+"},{"PolicySetName":"policy2","PolicyOutput":"Success","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":["%s"],"PolicyItemRegex":"(?s).+"}]`, h, h)
 
-		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
-		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
+		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color", "--all-namespaces"}
+		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color", "--all-namespaces"}
 
 		When(mockResolver.Resolve(policySet1)).ThenReturn(localPolicySetPath1, nil)
 		When(mockResolver.Resolve(policySet2)).ThenReturn(localPolicySetPath2, nil)
@@ -227,8 +228,6 @@ func TestRun(t *testing.T) {
 		When(mockExec.CombinedOutput(expectedArgsPolicy2, envs, workdir)).ThenReturn(expectedOutput, nil)
 
 		result, err := subject.Run(ctx, executablePath, envs, workdir, extraArgs)
-
-		fmt.Println(result)
 
 		Ok(t, errors.Unwrap(err))
 
@@ -240,7 +239,7 @@ func TestRun(t *testing.T) {
 		var extraArgs []string
 
 		expectedOutput := "Success"
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"Success","Passed":true,"ReqApprovals":0,"CurApprovals":0}]`
+		expectedResult := fmt.Sprintf(`[{"PolicySetName":"policy1","PolicyOutput":"Success","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":["%s"],"PolicyItemRegex":"(?s).+"}]`, models.HashPolicyItem("Success"))
 
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
@@ -283,7 +282,10 @@ func TestRun(t *testing.T) {
 
 		expectedOutputPolicy1 := fmt.Sprintf("FAIL - %s - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions", filepath.Join(workdir, "testproj-default.json"))
 		expectedOutputPolicy2 := "Success"
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovals":0,"CurApprovals":0},{"PolicySetName":"policy2","PolicyOutput":"Success","Passed":true,"ReqApprovals":0,"CurApprovals":0}]`
+		sanitizedPolicy1 := "FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"
+		hFail := models.HashPolicyItem(sanitizedPolicy1)
+		hSuccess := models.HashPolicyItem("Success")
+		expectedResult := fmt.Sprintf(`[{"PolicySetName":"policy1","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovalCount":0,"Approvals":null,"Hashes":["%s"],"PolicyItemRegex":"(?s).+"},{"PolicySetName":"policy2","PolicyOutput":"Success","Passed":true,"ReqApprovalCount":0,"Approvals":null,"Hashes":["%s"],"PolicyItemRegex":"(?s).+"}]`, hFail, hSuccess)
 
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
@@ -305,7 +307,9 @@ func TestRun(t *testing.T) {
 		var extraArgs []string
 
 		expectedOutput := fmt.Sprintf("FAIL - %s - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions", filepath.Join(workdir, "testproj-default.json"))
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovals":0,"CurApprovals":0},{"PolicySetName":"policy2","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovals":0,"CurApprovals":0}]`
+		sanitizedOutput := "FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"
+		hBoth := models.HashPolicyItem(sanitizedOutput)
+		expectedResult := fmt.Sprintf(`[{"PolicySetName":"policy1","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovalCount":0,"Approvals":null,"Hashes":["%s"],"PolicyItemRegex":"(?s).+"},{"PolicySetName":"policy2","PolicyOutput":"FAIL - <redacted plan file> - failure\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions","Passed":false,"ReqApprovalCount":0,"Approvals":null,"Hashes":["%s"],"PolicyItemRegex":"(?s).+"}]`, hBoth, hBoth)
 
 		expectedArgsPolicy1 := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 		expectedArgsPolicy2 := []string{executablePath, "test", "-p", localPolicySetPath2, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
@@ -326,9 +330,9 @@ func TestRun(t *testing.T) {
 	t.Run("parse error should fail policy", func(t *testing.T) {
 		var extraArgs []string
 
-		// Simulate a Rego parse error output
 		parseErrorOutput := "Error: running test: load: loading policies: load: 2 errors occurred during loading:"
-		expectedResult := `[{"PolicySetName":"policy1","PolicyOutput":"Error: running test: load: loading policies: load: 2 errors occurred during loading:","Passed":false,"ReqApprovals":0,"CurApprovals":0}]`
+		hParseErr := models.HashPolicyItem(parseErrorOutput)
+		expectedResult := fmt.Sprintf(`[{"PolicySetName":"policy1","PolicyOutput":"%s","Passed":false,"ReqApprovalCount":0,"Approvals":null,"Hashes":["%s"],"PolicyItemRegex":"(?s).+"}]`, parseErrorOutput, hParseErr)
 
 		expectedArgsPolicy := []string{executablePath, "test", "-p", localPolicySetPath1, filepath.Join(workdir, "testproj-default.json"), "--no-color"}
 
@@ -337,7 +341,8 @@ func TestRun(t *testing.T) {
 
 		ctxSinglePolicy := command.ProjectContext{
 			PolicySets: valid.PolicySets{
-				PolicySets: []valid.PolicySet{policySet1},
+				PolicySets:      []valid.PolicySet{policySet1},
+				PolicyItemRegex: valid.DefaultPolicyItemRegex,
 			},
 			ProjectName: "testproj",
 			Workspace:   "default",

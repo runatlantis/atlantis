@@ -393,6 +393,23 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 			for _, r := range newResults {
 				statuses = append(statuses, b.projectResultToProject(r))
 			}
+			// Preserve policy status from the previous commit so approvals
+			// survive between the plan DB write and the subsequent policy
+			// check DB write. doPolicyCheck applies sticky filtering and
+			// overwrites these when it writes its own results.
+			if currStatus != nil {
+				for i := range statuses {
+					for _, old := range currStatus.Projects {
+						if statuses[i].Workspace == old.Workspace &&
+							statuses[i].RepoRelDir == old.RepoRelDir &&
+							statuses[i].ProjectName == old.ProjectName &&
+							len(old.PolicyStatus) > 0 {
+							statuses[i].PolicyStatus = old.PolicyStatus
+							break
+						}
+					}
+				}
+			}
 			newStatus = models.PullStatus{
 				Pull:     pull,
 				Projects: statuses,

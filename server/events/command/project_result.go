@@ -47,9 +47,11 @@ func (p ProjectResult) PolicyStatus() []models.PolicySetStatus {
 	if p.PolicyCheckResults != nil {
 		for _, policySet := range p.PolicyCheckResults.PolicySetResults {
 			policyStatus := models.PolicySetStatus{
-				PolicySetName: policySet.PolicySetName,
-				Passed:        policySet.Passed,
-				Approvals:     policySet.CurApprovals,
+				PolicySetName:   policySet.PolicySetName,
+				Passed:          policySet.Passed,
+				Approvals:       policySet.Approvals,
+				Hashes:          policySet.Hashes,
+				PolicyItemRegex: policySet.PolicyItemRegex,
 			}
 			policyStatuses = append(policyStatuses, policyStatus)
 		}
