@@ -1,6 +1,8 @@
-# Contributing <!-- omit in toc -->
+# Contributing Guide
 
-# Table of Contents <!-- omit in toc -->
+Welcome to Atlantis! We're excited that you're interested in contributing. This guide will help you get started.
+
+## Table of Contents
 - [Reporting Issues](#reporting-issues)
 - [Reporting Security Issues](#reporting-security-issues)
 - [Creating a Pull Request](#creating-a-pull-request)
@@ -17,19 +19,16 @@
     - [Errors](#errors)
     - [Testing](#testing)
     - [Mocks](#mocks)
-- [Backporting Fixes](#backporting-fixes)
-  - [Manual Backporting Fixes](#manual-backporting-fixes)
-- [Creating a New Release](#creating-a-new-release)
 
-# Reporting Issues
+## Reporting Issues
 * When reporting issues, please include the output of `atlantis version`.
 * Also include the steps required to reproduce the problem if possible and applicable. This information will help us review and fix your issue faster.
 * When sending lengthy log-files, consider posting them as a gist (https://gist.github.com). Don't forget to remove sensitive data from your logfiles before posting (you can replace those parts with "REDACTED").
 
-# Reporting Security Issues
+## Reporting Security Issues
 We take security issues seriously. Please report a security vulnerability to the maintainers using [private vulnerability reporting](https://github.com/runatlantis/atlantis/security/advisories/new).
 
-# Creating a Pull Request
+## Creating a Pull Request
 * Fork the [Atlantis repo](https://github.com/runatlantis/atlantis)
 * Create a new branch, commit your changes
   * Make sure to sign your commits, for example by adding `-s` when committing, see more [here](https://probot.github.io/apps/dco/).
@@ -39,14 +38,14 @@ We take security issues seriously. Please report a security vulnerability to the
 
 If you have any questions about the contribution process, see [Atlantis Contributors on Slack](https://cloud-native.slack.com/archives/C07T45G27EZ).
 
-# Developing
+## Developing
 
-## Updating The Website
+### Updating The Website
 * To view the generated website locally, run `npm website:dev` and then
 open your browser to http://localhost:8080.
 * The website will be regenerated when your pull request is merged to main.
 
-## Running Atlantis Locally
+### Running Atlantis Locally
 * Clone the repo from https://github.com/runatlantis/atlantis/
 * Compile Atlantis:
     ```sh
@@ -58,7 +57,7 @@ open your browser to http://localhost:8080.
     ```
     If you get an error like `command not found: atlantis`, ensure that `$GOPATH/bin` is in your `$PATH`.
 
-## Running Atlantis With Local Changes
+### Running Atlantis With Local Changes
 Docker compose is set up to start an atlantis container and ngrok container in the same network in order to expose the atlantis instance to the internet.  In order to do this, create a file in the repository called `atlantis.env` and add the required env vars for the atlantis server configuration.
 
 e.g.
@@ -81,7 +80,7 @@ docker-compose up --detach
 docker-compose logs --follow
 ```
 
-### Rebuilding
+#### Rebuilding
 If the ngrok container is restarted, the url will change which is a hassle. Fortunately, when we make a code change, we can rebuild and restart the atlantis container easily without disrupting ngrok.
 
 e.g.
@@ -91,10 +90,10 @@ make build-service
 docker-compose up --detach --build
 ```
 
-## Running Tests Locally
+### Running Tests Locally
 `make test`. If you want to run the integration tests that actually run real `terraform` commands, run `make test-all`.
 
-## Running Tests In Docker
+### Running Tests In Docker
 ```sh
 docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis ghcr.io/runatlantis/testing-env:latest make test
 ```
@@ -105,7 +104,7 @@ Or to run the integration tests
 docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis ghcr.io/runatlantis/testing-env:latest make test-all
 ```
 
-## Calling Your Local Atlantis From GitHub
+### Calling Your Local Atlantis From GitHub
 - Create a test terraform repository in your GitHub.
 - Create a personal access token for Atlantis. See [Create a GitHub token](https://github.com/runatlantis/atlantis/tree/main/runatlantis.io/docs/access-credentials.md#generating-an-access-token).
 - Start Atlantis in server mode using that token:
@@ -120,9 +119,9 @@ ngrok http 4141
 - Create a Webhook in your repo and use the `https` url that `ngrok` printed out after running `ngrok http 4141`. Be sure to append `/events` so your webhook url looks something like `https://efce3bcd.ngrok.io/events`. See [Add GitHub Webhook](https://github.com/runatlantis/atlantis/blob/main/runatlantis.io/docs/configuring-webhooks.md#configuring-webhooks).
 - Create a pull request and type `atlantis help`. You should see the request in the `ngrok` and Atlantis logs and you should also see Atlantis comment back.
 
-## Code Style
+### Code Style
 
-### Logging
+#### Logging
 - `ctx.Log` should be available in most methods. If not, pass it down.
 - levels:
     - debug is for developers of atlantis
@@ -134,7 +133,7 @@ ngrok http 4141
 - **NEVER** use colons "`:`" in a log since that's used to separate error descriptions and causes
   - if you need to have a break in your log, either use `-` or `,` ex. `failed to clean directory, continuing regardless`
 
-### Errors
+#### Errors
 - **ALWAYS** use lowercase unless the word requires it
 - **ALWAYS** use `fmt.Errorf("additional context: %w", err)"` instead of `fmt.Errorf("additional context: %s", err)`
 because it is less likely to result in mistakes and gives us the ability to trace calls
@@ -150,12 +149,12 @@ Error: setting up workspace: running git clone: no executable "git"
 ```
 This is easier to read and more consistent
 
-### Testing
+#### Testing
 - place tests under `{package under test}_test` to enforce testing the external interfaces
 - if you need to test internally i.e. access non-exported stuff, call the file `{file under test}_internal_test.go`
 - use our testing utility for easier-to-read assertions: `import . "github.com/runatlantis/atlantis/testing"` and then use `Assert()`, `Equals()` and `Ok()`
 
-### Mocks
+#### Mocks
 We use [pegomock](https://github.com/petergtz/pegomock) for mocking. If you're
 modifying any interfaces that are mocked, you'll need to regen the mocks for that
 interface.
