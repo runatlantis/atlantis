@@ -96,6 +96,27 @@ Atlantis will automatically run `terraform plan`
 which can run arbitrary code if given a malicious Terraform configuration.
 :::
 
+### `--allow-local-webhooks` <Badge text="v0.35.0+" type="info"/>
+
+```bash
+atlantis server --allow-local-webhooks
+# or
+ATLANTIS_ALLOW_LOCAL_WEBHOOKS=true
+```
+
+Allows webhook URLs to use HTTP scheme and private/local IP addresses (localhost, 127.0.0.1, 10.x.x.x, 192.168.x.x, 172.16-31.x.x).
+
+::: danger WARNING
+This flag should **ONLY** be used for local development and testing. **NEVER** enable this in production environments as it exposes your system to SSRF (Server-Side Request Forgery) attacks.
+:::
+
+When this flag is enabled:
+- Webhooks can use HTTP instead of HTTPS
+- Webhooks can target localhost and private IP addresses
+- A warning will be logged at server startup
+
+See [Sending Notifications via Webhooks](sending-notifications-via-webhooks.md#local-development-and-testing) for more information.
+
 ### `--api-secret` <Badge text="v0.22.2+" type="info"/>
 
 ```bash
