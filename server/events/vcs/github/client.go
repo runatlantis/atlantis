@@ -591,13 +591,19 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 	requiredWorkflows []WorkflowFileReference,
 	checkRuns []CheckRun,
 	statusContexts []StatusContext,
+	pendingRequiredReviewerApproval bool,
 	err error,
 ) {
 	var query struct {
 		Repository struct {
 			PullRequest struct {
-				ReviewDecision githubv4.String
-				BaseRef        struct {
+				ReviewDecision           githubv4.String
+				LatestOpinionatedReviews struct {
+					Nodes []struct {
+						State githubv4.String
+					}
+				} `graphql:"latestOpinionatedReviews(first: 100)"`
+				BaseRef struct {
 					BranchProtectionRule struct {
 						RequiredStatusChecks []struct {
 							Context githubv4.String
@@ -619,6 +625,9 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 								WorkflowsParameters struct {
 									Workflows []WorkflowFileReference
 								} `graphql:"... on WorkflowsParameters"`
+								PullRequestParameters struct {
+									RequiredApprovingReviewCount githubv4.Int
+								} `graphql:"... on PullRequestParameters"`
 							}
 						}
 					} `graphql:"rules(first: 100, after: $ruleCursor)"`
@@ -663,6 +672,13 @@ pagination:
 
 		reviewDecision = query.Repository.PullRequest.ReviewDecision
 
+		approvedReviewCount := 0
+		for _, review := range query.Repository.PullRequest.LatestOpinionatedReviews.Nodes {
+			if review.State == "APPROVED" {
+				approvedReviewCount++
+			}
+		}
+
 		for _, rule := range query.Repository.PullRequest.BaseRef.BranchProtectionRule.RequiredStatusChecks {
 			requiredChecksSet[rule.Context] = struct{}{}
 		}
@@ -679,6 +695,11 @@ pagination:
 			case "WORKFLOWS":
 				for _, workflow := range rule.Parameters.WorkflowsParameters.Workflows {
 					requiredWorkflows = append(requiredWorkflows, workflow.Copy())
+				}
+			case "PULL_REQUEST":
+				required := int(rule.Parameters.PullRequestParameters.RequiredApprovingReviewCount)
+				if required > 0 && approvedReviewCount < required {
+					pendingRequiredReviewerApproval = true
 				}
 			default:
 				continue
@@ -716,14 +737,14 @@ pagination:
 	}
 
 	if err != nil {
-		return "", nil, nil, nil, nil, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
+		return "", nil, nil, nil, nil, false, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
 	}
 
 	for context := range requiredChecksSet {
 		requiredChecks = append(requiredChecks, context)
 	}
 
-	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, nil
+	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, pendingRequiredReviewerApproval, nil
 }
 
 func CheckSuitePassed(checkSuite CheckSuite) bool {
@@ -805,17 +826,22 @@ func (g *Client) IsMergeableMinusApply(logger logging.SimpleLogging, repo models
 	if pull.Number == nil {
 		return false, errors.New("pull request number is nil")
 	}
-	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, err := g.GetPullRequestMergeabilityInfo(repo, pull)
+	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, pendingRequiredReviewerApproval, err := g.GetPullRequestMergeabilityInfo(repo, pull)
 	if err != nil {
 		return false, err
 	}
 
 	notMergeablePrefix := fmt.Sprintf("Pull Request %s/%s:%s is not mergeable", repo.Owner, repo.Name, strconv.Itoa(*pull.Number))
 
-	// Review decision takes CODEOWNERS into account
-	// Empty review decision means review is not required
+	// reviewDecision covers CODEOWNERS and classic branch protection review requirements.
+	// Empty/null means GitHub rulesets may be enforcing reviews via required_reviewers
+	// instead — check that separately via pendingRequiredReviewerApproval.
 	if reviewDecision != "APPROVED" && len(reviewDecision) != 0 {
 		logger.Debug("%s: Review Decision: %s", notMergeablePrefix, reviewDecision)
+		return false, nil
+	}
+	if pendingRequiredReviewerApproval {
+		logger.Debug("%s: Pending required reviewer approval from ruleset", notMergeablePrefix)
 		return false, nil
 	}
 
