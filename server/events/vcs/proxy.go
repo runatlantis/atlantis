@@ -116,3 +116,15 @@ func (d *ClientProxy) GetCloneURL(logger logging.SimpleLogging, VCSHostType mode
 func (d *ClientProxy) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	return d.clients[repo.VCSHost.Type].GetPullLabels(logger, repo, pull)
 }
+
+// GetChildTeams delegates to the underlying VCS client if it supports fetching child teams
+// (e.g. GitHub). Returns nil, nil for VCS providers that don't support team hierarchies.
+func (d *ClientProxy) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error) {
+	type childTeamFetcher interface {
+		GetChildTeams(logging.SimpleLogging, models.Repo, string) ([]string, error)
+	}
+	if fetcher, ok := d.clients[repo.VCSHost.Type].(childTeamFetcher); ok {
+		return fetcher.GetChildTeams(logger, repo, teamSlug)
+	}
+	return nil, nil
+}
