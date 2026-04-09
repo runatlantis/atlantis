@@ -384,13 +384,13 @@ func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Cont
 // isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery
 func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
 	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if fromGlobalAutoDiscover != nil {
+	// Only use global config's IgnorePaths if they are explicitly set; otherwise fall through to repo-level.
+	if fromGlobalAutoDiscover != nil && fromGlobalAutoDiscover.IgnorePaths != nil {
 		return fromGlobalAutoDiscover.IsPathIgnored(path)
 	}
 	if repoCfg.AutoDiscover != nil {
 		return repoCfg.AutoDiscover.IsPathIgnored(path)
 	}
-
 	return false
 }
 
@@ -447,12 +447,26 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 		}
 		ctx.Log.Info("automatically determined that there were %d additional projects modified in this pull request: %s",
 			len(modifiedProjects), modifiedProjects)
+		// Determine the workspace to use for autodiscovered projects. Global config takes precedence
+		// over repo-level config; both are only consulted when explicitly set (non-empty).
+		configuredWorkspace := ""
+		fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
+		if fromGlobalAutoDiscover != nil && fromGlobalAutoDiscover.Workspace != "" {
+			configuredWorkspace = fromGlobalAutoDiscover.Workspace
+		} else if repoCfg.AutoDiscover != nil && repoCfg.AutoDiscover.Workspace != "" {
+			configuredWorkspace = repoCfg.AutoDiscover.Workspace
+		}
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: '%s'", mp.Path)
 			absProjectDir := filepath.Join(repoDir, mp.Path)
-			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir)
-			if err != nil {
-				return nil, fmt.Errorf("looking for Terraform Cloud workspace from configuration in '%s': %w", absProjectDir, err)
+			var pWorkspace string
+			if configuredWorkspace != "" {
+				pWorkspace = configuredWorkspace
+			} else {
+				pWorkspace, err = p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir)
+				if err != nil {
+					return nil, fmt.Errorf("looking for Terraform Cloud workspace from configuration in '%s': %w", absProjectDir, err)
+				}
 			}
 
 			pCfg := p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp.Path, pWorkspace)

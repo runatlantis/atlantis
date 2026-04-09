@@ -1117,6 +1117,30 @@ projects:
 				},
 			},
 		},
+		"autodiscover workspace set in autodiscover config": {
+			DirStructure: map[string]any{
+				"project1": map[string]any{
+					"main.tf": nil,
+				},
+				"project2": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `version: 3
+autodiscover:
+  mode: enabled
+  workspace: qa
+  ignore_paths:
+  - project2`,
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			Exp: []expCtxFields{
+				{
+					ProjectName: "",
+					RepoRelDir:  "project1",
+					Workspace:   "qa",
+				},
+			},
+		},
 		"autodiscover enabled but project excluded by empty when_modified": {
 			DirStructure: map[string]any{
 				"project1": map[string]any{

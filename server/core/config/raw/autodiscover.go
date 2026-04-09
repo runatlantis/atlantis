@@ -18,6 +18,7 @@ var DefaultAutoDiscoverMode = valid.AutoDiscoverAutoMode
 type AutoDiscover struct {
 	Mode        *valid.AutoDiscoverMode `yaml:"mode,omitempty"`
 	IgnorePaths []string                `yaml:"ignore_paths,omitempty"`
+	Workspace   string                  `yaml:"workspace,omitempty"`
 }
 
 func (a AutoDiscover) ToValid() *valid.AutoDiscover {
@@ -30,6 +31,7 @@ func (a AutoDiscover) ToValid() *valid.AutoDiscover {
 	}
 
 	v.IgnorePaths = a.IgnorePaths
+	v.Workspace = a.Workspace
 
 	return &v
 }
