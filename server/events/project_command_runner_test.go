@@ -70,10 +70,6 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
 		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
-	expEnvs := map[string]string{
-		"name": "value",
-	}
-
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
 		Steps: []valid.Step{
@@ -97,6 +93,11 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		},
 		Workspace:  "default",
 		RepoRelDir: ".",
+	}
+
+	expEnvs := map[string]string{
+		"name":                 "value",
+		"TF_APPEND_USER_AGENT": fmt.Sprintf("atlantis/ (; %s; .; default; ; +)", ctx.CommandName),
 	}
 
 	// Each step will output its step name.
@@ -454,14 +455,19 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 					MergeableStatus: models.MergeableStatus{IsMergeable: false},
 				},
 			}
+			tfAppendUA := fmt.Sprintf("atlantis/ (; %s; .; default; ; +)", ctx.CommandName)
 			expEnvs := map[string]string{
-				"key": "value",
+				"key":                  "value",
+				"TF_APPEND_USER_AGENT": tfAppendUA,
+			}
+			envStepEnvs := map[string]string{
+				"TF_APPEND_USER_AGENT": tfAppendUA,
 			}
 			When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 			When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 			When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
 			When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)).ThenReturn("run", nil)
-			When(mockEnv.Run(ctx, nil, "", "value", repoDir, make(map[string]string))).ThenReturn("value", nil)
+			When(mockEnv.Run(ctx, nil, "", "value", repoDir, envStepEnvs)).ThenReturn("value", nil)
 
 			res := runner.Apply(ctx)
 			Equals(t, c.expOut, res.ApplySuccess)
@@ -534,7 +540,9 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		ApplyRequirements: []string{},
 		RepoRelDir:        ".",
 	}
-	expEnvs := map[string]string{}
+	expEnvs := map[string]string{
+		"TF_APPEND_USER_AGENT": fmt.Sprintf("atlantis/ (; %s; .; default; ; +)", ctx.CommandName),
+	}
 	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", fmt.Errorf("something went wrong"))
 
 	res := runner.Apply(ctx)
@@ -629,7 +637,9 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 
 // Test that it runs the expected import steps.
 func TestDefaultProjectCommandRunner_Import(t *testing.T) {
-	expEnvs := map[string]string{}
+	expEnvs := map[string]string{
+		"TF_APPEND_USER_AGENT": "atlantis/ (; apply; .; default; ; +)",
+	}
 	cases := []struct {
 		description   string
 		steps         []valid.Step

@@ -665,6 +665,11 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
   * `ATLANTIS_PR_APPROVED` - "true" if the PR is approved
   * `ATLANTIS_PR_MERGEABLE` - "true" if the PR is mergeable
+  * `TF_APPEND_USER_AGENT` - Most Terraform providers inject this environment variable into the `User-Agent` header when performing HTTP requests.
+      The default value contains the [`--vcs-status-name`](/docs/server-configuration.html#vcs-status-name) (defaults to `atlantis`), the Atlantis version, user who executed the Atlantis command, the command name, directory, workspace, HEAD commit SHA, and the PR URL.
+      Example: `atlantis/1.2.3 (user; apply; default; project1; f3bbbd66a63d4bf1747940578ec3d0103530e21d; +https://github.com/runatlantis/atlantis/pull/5588)`.
+      This makes it easier to correlate actions in provider audit logs (ex: AWS CloudTrail) with the related PR/commit that caused the resource to be accessed/modified.
+      If you wish to override this environment variable to be a different format or include other fields (ex: the PR Author), you can add a custom `env` step as shown in [#2651](https://github.com/runatlantis/atlantis/issues/2651).
 
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
