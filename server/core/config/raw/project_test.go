@@ -36,6 +36,18 @@ func TestProject_UnmarshalYAML(t *testing.T) {
 			},
 		},
 		{
+			description: "glob_file_match field parsed",
+			input: `
+dir: mydir
+glob_file_match:
+- "terragrunt.hcl"
+- "*.tf"`,
+			exp: raw.Project{
+				Dir:           String("mydir"),
+				GlobFileMatch: []string{"terragrunt.hcl", "*.tf"},
+			},
+		},
+		{
 			description: "all fields set including mergeable apply requirement",
 			input: `
 name: myname
@@ -417,6 +429,62 @@ func TestProject_Validate(t *testing.T) {
 				Name: String("networking"),
 			},
 			expErr: "",
+		},
+		// glob_file_match tests
+		{
+			description: "valid glob_file_match patterns",
+			input: raw.Project{
+				Dir:           String("modules/*"),
+				GlobFileMatch: []string{"terragrunt.hcl", "*.tf"},
+			},
+			expErr: "",
+		},
+		{
+			description: "glob_file_match with empty string pattern",
+			input: raw.Project{
+				Dir:           String("modules/*"),
+				GlobFileMatch: []string{""},
+			},
+			expErr: "glob_file_match: glob_file_match patterns cannot be empty strings.",
+		},
+		{
+			description: "glob_file_match with invalid pattern syntax",
+			input: raw.Project{
+				Dir:           String("modules/*"),
+				GlobFileMatch: []string{"[invalid"},
+			},
+			expErr: "glob_file_match: invalid glob_file_match pattern \"[invalid\": syntax error in pattern.",
+		},
+		{
+			description: "explicit empty glob_file_match list should fail",
+			input: raw.Project{
+				Dir:           String("modules/*"),
+				GlobFileMatch: []string{},
+			},
+			expErr: "glob_file_match: glob_file_match cannot be an empty list; omit the field to use the default (*.tf).",
+		},
+		{
+			description: "explicit empty glob_file_match on non-glob dir should fail with cross-field error",
+			input: raw.Project{
+				Dir:           String("modules/networking"),
+				GlobFileMatch: []string{},
+			},
+			expErr: "glob_file_match: can only be used when 'dir' contains a glob pattern",
+		},
+		{
+			description: "glob_file_match on non-glob dir should fail",
+			input: raw.Project{
+				Dir:           String("modules/networking"),
+				GlobFileMatch: []string{"terragrunt.hcl"},
+			},
+			expErr: "glob_file_match: can only be used when 'dir' contains a glob pattern",
+		},
+		{
+			description: "glob_file_match with nil dir should fail",
+			input: raw.Project{
+				GlobFileMatch: []string{"terragrunt.hcl"},
+			},
+			expErr: "glob_file_match: can only be used when 'dir' contains a glob pattern",
 		},
 	}
 	validation.ErrorTag = "yaml"

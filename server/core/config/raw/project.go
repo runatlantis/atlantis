@@ -44,6 +44,7 @@ type Project struct {
 	PolicyCheck               *bool      `yaml:"policy_check,omitempty"`
 	CustomPolicyCheck         *bool      `yaml:"custom_policy_check,omitempty"`
 	SilencePRComments         []string   `yaml:"silence_pr_comments,omitempty"`
+	GlobFileMatch             []string   `yaml:"glob_file_match,omitempty"`
 }
 
 func (p Project) Validate() error {
@@ -96,6 +97,40 @@ func (p Project) Validate() error {
 		return nil
 	}
 
+	validGlobFileMatch := func(value any) error {
+		patterns, ok := value.([]string)
+		if !ok {
+			return errors.New("glob_file_match must be a list of patterns")
+		}
+		if patterns == nil {
+			// Field was omitted in YAML; nil is fine — dirContainsMatchingFiles defaults to ["*.tf"].
+			return nil
+		}
+		if len(patterns) == 0 {
+			// Explicit `glob_file_match: []` is rejected to avoid silent "match nothing" behaviour.
+			return errors.New("glob_file_match cannot be an empty list; omit the field to use the default (*.tf)")
+		}
+		for _, pattern := range patterns {
+			if pattern == "" {
+				return errors.New("glob_file_match patterns cannot be empty strings")
+			}
+			if _, err := filepath.Match(pattern, ""); err != nil {
+				return fmt.Errorf("invalid glob_file_match pattern %q: %w", pattern, err)
+			}
+			// glob_file_match patterns are matched against entry.Name(), which is a base filename
+			// only. Disallow any path separators to avoid patterns that can never match, such as
+			// "subdir/*.tf" or "**/*.tf".
+			if strings.Contains(pattern, "/") {
+				return fmt.Errorf("invalid glob_file_match pattern %q: must be a basename pattern without path separators", pattern)
+			}
+			sep := string(filepath.Separator)
+			if sep != "/" && strings.Contains(pattern, sep) {
+				return fmt.Errorf("invalid glob_file_match pattern %q: must be a basename pattern without path separators", pattern)
+			}
+		}
+		return nil
+	}
+
 	// Validate that name doesn't contain glob patterns - glob expansion only works for 'dir'
 	if p.Name != nil && ContainsGlobPattern(*p.Name) {
 		return errors.New("name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field")
@@ -105,6 +140,13 @@ func (p Project) Validate() error {
 	// because glob patterns expand to multiple projects which can't share the same name
 	if p.Name != nil && p.Dir != nil && ContainsGlobPattern(*p.Dir) {
 		return errors.New("name: cannot be used with glob patterns in 'dir'; glob patterns expand to multiple projects which cannot share the same name")
+	}
+
+	// Cross-field validation: glob_file_match only applies during glob expansion,
+	// so it has no effect when dir is a literal path. Check for non-nil (not just
+	// non-empty) so an explicit `glob_file_match: []` also triggers this error.
+	if p.GlobFileMatch != nil && (p.Dir == nil || !ContainsGlobPattern(*p.Dir)) {
+		return errors.New("glob_file_match: can only be used when 'dir' contains a glob pattern")
 	}
 
 	return validation.ValidateStruct(&p,
@@ -117,6 +159,7 @@ func (p Project) Validate() error {
 		validation.Field(&p.DependsOn, validation.By(DependsOn)),
 		validation.Field(&p.Name, validation.By(validName)),
 		validation.Field(&p.Branch, validation.By(branchValid)),
+		validation.Field(&p.GlobFileMatch, validation.By(validGlobFileMatch)),
 	)
 }
 
