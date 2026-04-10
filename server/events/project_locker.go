@@ -15,6 +15,7 @@ package events
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -57,6 +58,9 @@ type TryLockResponse struct {
 	UnlockFn func() error
 	// LockKey is the key for the lock if the lock was acquired.
 	LockKey string
+	// LockTime is when the lock was originally created. Used for plan
+	// expiration checks.
+	LockTime time.Time
 }
 
 // TryLock implements ProjectLocker.TryLock.
@@ -92,6 +96,7 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 			_, err := p.Locker.Unlock(lockAttempt.LockKey)
 			return err
 		},
-		LockKey: lockAttempt.LockKey,
+		LockKey:  lockAttempt.LockKey,
+		LockTime: lockAttempt.CurrLock.Time,
 	}, nil
 }
