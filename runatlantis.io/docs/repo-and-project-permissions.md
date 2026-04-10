@@ -159,6 +159,9 @@ The following environment variables are also passed to the command when checking
 | `PULL_AUTHOR`        | Username of the pull request author, ex. `acme-user`.                                                                                                                                                                                 |
 | `REPO_ROOT`          | The absolute path to the root of the cloned repository.                                                                                                                                                                               |
 | `REPO_REL_PATH`      | Path to the project relative to `REPO_ROOT`                                                                                                                                                                                           |
+| `WORKSPACE`          | The Terraform workspace used for this project, ex. `default`                                                                                                                                                                          |
+| `API`                | `true` if invoked by API endpoints                                                                                                                                                                                                    |
+| `VERBOSE`            | `true` when the user would like verbose output                                                                                                                                                                                        |
 
 ### External Command Result Handling
 

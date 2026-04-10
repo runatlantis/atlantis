@@ -672,8 +672,8 @@ type TeamAllowlistCheckerContext struct {
 	// Verbose is true when the user would like verbose output.
 	Verbose bool
 
-	// Workspace is the Terraform workspace this project is in. It will always
-	// be set.
+	// Workspace is the Terraform workspace this project is in. It will be set
+	// when project context is available; empty for pre-project permission checks.
 	Workspace string
 
 	// API is true if plan/apply by API endpoints
