@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
@@ -163,6 +164,7 @@ const (
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
 	WebsocketCheckOrigin             = "websocket-check-origin"
+	WebsocketMessageDelayFlag        = "websocket-message-delay"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
 	DefaultADBasicUser                  = ""
@@ -702,8 +704,21 @@ var int64Flags = map[string]int64Flag{
 	},
 }
 
+var durationFlags = map[string]durationFlag{
+	WebsocketMessageDelayFlag: {
+		description:  "Optional delay between WebSocket messages. Can be used to work around buffering issues with HTTP(S) load balancers (e.g. \"1ms\"). Defaults to no delay.",
+		defaultValue: 0,
+	},
+}
+
 // ValidLogLevels are the valid log levels that can be set
 var ValidLogLevels = []string{"debug", "info", "warn", "error"}
+
+type durationFlag struct {
+	description  string
+	defaultValue time.Duration
+	hidden       bool
+}
 
 type stringFlag struct {
 	description  string
@@ -830,6 +845,15 @@ func (s *ServerCmd) Init() *cobra.Command {
 	// Set bool flags.
 	for name, f := range boolFlags {
 		c.Flags().Bool(name, f.defaultValue, f.description+"\n")
+		if f.hidden {
+			c.Flags().MarkHidden(name) // nolint: errcheck
+		}
+		s.Viper.BindPFlag(name, c.Flags().Lookup(name)) // nolint: errcheck
+	}
+
+	// Set duration flags.
+	for name, f := range durationFlags {
+		c.Flags().Duration(name, f.defaultValue, f.description+"\n")
 		if f.hidden {
 			c.Flags().MarkHidden(name) // nolint: errcheck
 		}
