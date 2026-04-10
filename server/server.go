@@ -496,8 +496,33 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
-		logger.Info("Utilizing Redis DB")
-		database, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
+		var clusterAddrs []string
+		if userConfig.RedisClusterAddresses != "" {
+			rawClusterAddrs := strings.Split(userConfig.RedisClusterAddresses, ",")
+			for _, addr := range rawClusterAddrs {
+				trimmed := strings.TrimSpace(addr)
+				if trimmed == "" {
+					continue
+				}
+				clusterAddrs = append(clusterAddrs, trimmed)
+			}
+		}
+		switch {
+		case len(clusterAddrs) > 0:
+			logger.Info("Utilizing Redis DB in cluster mode, addresses: " + strings.Join(clusterAddrs, ", "))
+		default:
+			logger.Info(fmt.Sprintf("Utilizing Redis DB in single-node mode, host: %s, port: %d", userConfig.RedisHost, userConfig.RedisPort))
+		}
+		database, err = redis.NewWithConfig(redis.Config{
+			Hostname:           userConfig.RedisHost,
+			Port:               userConfig.RedisPort,
+			Password:           userConfig.RedisPassword,
+			Username:           userConfig.RedisUsername,
+			TLSEnabled:         userConfig.RedisTLSEnabled,
+			InsecureSkipVerify: userConfig.RedisInsecureSkipVerify,
+			DB:                 userConfig.RedisDB,
+			ClusterAddresses:   clusterAddrs,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -1297,9 +1322,15 @@ func mkSubDir(parentDir string, subDir string) (string, error) {
 	return fullDir, nil
 }
 
-// Healthz returns the health check response. It always returns a 200 currently.
+// Healthz returns the health check response. It checks the database connection
+// and returns 503 if the database is unreachable.
 func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	if err := s.database.Ping(); err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte(fmt.Sprintf(`{"status":"error","error":%q}`, err.Error()))) // nolint: errcheck
+		return
+	}
 	w.Write(healthzData) // nolint: errcheck
 }
 

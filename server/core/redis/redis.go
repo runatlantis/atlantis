@@ -21,47 +21,115 @@ import (
 
 var ctx = context.Background()
 
-// Redis is a database using Redis 6
+// RedisDB is a database using Redis 6+
 type RedisDB struct { // nolint: revive
-	client *redis.Client
+	client redis.Cmdable
 }
 
 const (
 	pullKeySeparator = "::"
 )
 
+// Config holds configuration for Redis connections.
+type Config struct {
+	Hostname           string
+	Port               int
+	Password           string
+	Username           string
+	TLSEnabled         bool
+	InsecureSkipVerify bool
+	DB                 int
+	// ClusterAddresses is a list of cluster node addresses. When set, cluster mode is used.
+	ClusterAddresses []string
+}
+
+// New creates a new RedisDB for client interactions with redis.
+// Deprecated: Use NewWithConfig for new code.
 func New(hostname string, port int, password string, tlsEnabled bool, insecureSkipVerify bool, db int) (*RedisDB, error) {
-	var rdb *redis.Client
+	return NewWithConfig(Config{
+		Hostname:           hostname,
+		Port:               port,
+		Password:           password,
+		TLSEnabled:         tlsEnabled,
+		InsecureSkipVerify: insecureSkipVerify,
+		DB:                 db,
+	})
+}
+
+// NewWithConfig creates a new RedisDB based on the provided configuration.
+// It automatically selects the appropriate Redis client type:
+// - If ClusterAddresses is set, uses Redis Cluster mode
+// - Otherwise, uses single-node mode
+func NewWithConfig(cfg Config) (*RedisDB, error) {
+	var rdb redis.Cmdable
 
 	var tlsConfig *tls.Config
-	if tlsEnabled {
+	if cfg.TLSEnabled {
 		tlsConfig = &tls.Config{
 			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: insecureSkipVerify, //nolint:gosec // In some cases, users may want to use this at their own caution
+			InsecureSkipVerify: cfg.InsecureSkipVerify, //nolint:gosec // In some cases, users may want to use this at their own caution
 		}
 	}
 
-	rdb = redis.NewClient(&redis.Options{
-		Addr:      fmt.Sprintf("%s:%d", hostname, port),
-		Password:  password,
-		DB:        db,
-		TLSConfig: tlsConfig,
-	})
+	// Determine which Redis client to use based on configuration
+	var connDesc string
+	switch {
+	case len(cfg.ClusterAddresses) > 0:
+		// Filter out empty addresses
+		var addrs []string
+		for _, addr := range cfg.ClusterAddresses {
+			trimmed := strings.TrimSpace(addr)
+			if trimmed != "" {
+				addrs = append(addrs, trimmed)
+			}
+		}
+		if len(addrs) == 0 {
+			return nil, errors.New("redis cluster addresses provided but all are empty")
+		}
+		rdb = redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:     addrs,
+			Username:  cfg.Username,
+			Password:  cfg.Password,
+			TLSConfig: tlsConfig,
+		})
+		connDesc = fmt.Sprintf("cluster nodes %s", strings.Join(addrs, ", "))
+	default:
+		address := fmt.Sprintf("%s:%d", cfg.Hostname, cfg.Port)
+		rdb = redis.NewClient(&redis.Options{
+			Addr:      address,
+			Username:  cfg.Username,
+			Password:  cfg.Password,
+			DB:        cfg.DB,
+			TLSConfig: tlsConfig,
+		})
+		connDesc = address
+	}
 
 	// Check if connection is valid
 	err := rdb.Ping(ctx).Err()
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to redis instance at %s:%d: %w", hostname, port, err)
+		return nil, fmt.Errorf("failed to connect to redis at %s: %w", connDesc, err)
 	}
 
-	// Migrate old lock keys to new format.
-	// Old format: pr/{repoFullName}/{path}/{workspace}
-	// New format: pr/{repoFullName}/{path}/{workspace}/{projectName}
-	// We scan all keys and for those that don't match the new format,
-	// we read their value, create a new key with the new format and
-	// delete the old key.
-	allKeys := rdb.Keys(ctx, "pr/*")
-	for _, oldKey := range allKeys.Val() {
+	// Migrate old lock keys to new format
+	if err := migrateOldLockKeys(rdb); err != nil {
+		return nil, err
+	}
+
+	return &RedisDB{
+		client: rdb,
+	}, nil
+}
+
+// migrateOldLockKeys migrates old lock key format to new format.
+// Old format: pr/{repoFullName}/{path}/{workspace}
+// New format: pr/{repoFullName}/{path}/{workspace}/{projectName}
+// Uses Scan instead of Keys for compatibility with Redis Cluster (Scan fans out
+// across all nodes via go-redis ClusterClient, whereas Keys does not).
+func migrateOldLockKeys(rdb redis.Cmdable) error {
+	iter := rdb.Scan(ctx, 0, "pr/*", 0).Iterator()
+	for iter.Next(ctx) {
+		oldKey := iter.Val()
 		// Remove the "pr/" prefix to validate the key format
 		keyWithoutPrefix := strings.TrimPrefix(oldKey, "pr/")
 
@@ -70,20 +138,24 @@ func New(hostname string, port int, password string, tlsEnabled bool, insecureSk
 			var currLock models.ProjectLock
 			oldValue, err := rdb.Get(ctx, oldKey).Result()
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to get current lock")
+				return errors.Wrap(err, "failed to get current lock")
 			}
 			if err := json.Unmarshal([]byte(oldValue), &currLock); err != nil {
-				return nil, errors.Wrap(err, "failed to deserialize current lock")
+				return errors.Wrap(err, "failed to deserialize current lock")
 			}
 			newKey := fmt.Sprintf("pr/%s", models.GenerateLockKey(currLock.Project, currLock.Workspace))
-			rdb.Set(ctx, newKey, oldValue, 0)
-			rdb.Del(ctx, oldKey)
+			if err := rdb.Set(ctx, newKey, oldValue, 0).Err(); err != nil {
+				return errors.Wrapf(err, "failed to set new lock key %s", newKey)
+			}
+			if err := rdb.Del(ctx, oldKey).Err(); err != nil {
+				return errors.Wrapf(err, "failed to delete old lock key %s", oldKey)
+			}
 		}
 	}
-
-	return &RedisDB{
-		client: rdb,
-	}, nil
+	if err := iter.Err(); err != nil {
+		return fmt.Errorf("failed scanning for old lock keys: %w", err)
+	}
+	return nil
 }
 
 // NewWithClient is used for testing.
@@ -475,6 +547,18 @@ func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.Project
 	}
 }
 
+// Ping checks the Redis connection health.
+func (r *RedisDB) Ping() error {
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return r.client.Ping(pingCtx).Err()
+}
+
 func (r *RedisDB) Close() error {
-	return r.client.Close()
+	// Prefer a narrower interface and return an explicit error for unsupported client types.
+	if closer, ok := r.client.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+
+	return fmt.Errorf("redis: unsupported client type %T does not implement Close() error", r.client)
 }
