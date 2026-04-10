@@ -619,3 +619,132 @@ var adMergeSuccess = `{
 	}
 }
 `
+
+func TestAzureDevopsClient_PullIsApproved_ApprovalCount(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description     string
+		reviewers       []struct{ vote int; uniqueName string }
+		expApproved     bool
+		expNumApprovals int
+	}{
+		{
+			"no approvals",
+			[]struct{ vote int; uniqueName string }{},
+			false,
+			0,
+		},
+		{
+			"single approval",
+			[]struct{ vote int; uniqueName string }{{azuredevops.VoteApproved, "reviewer1@example.com"}},
+			true,
+			1,
+		},
+		{
+			"multiple approvals",
+			[]struct{ vote int; uniqueName string }{
+				{azuredevops.VoteApproved, "reviewer1@example.com"},
+				{azuredevops.VoteApprovedWithSuggestions, "reviewer2@example.com"},
+			},
+			true,
+			2,
+		},
+		{
+			"author approval excluded",
+			[]struct{ vote int; uniqueName string }{
+				{azuredevops.VoteApproved, "atlantis.author@example.com"},
+				{azuredevops.VoteApproved, "reviewer1@example.com"},
+			},
+			true,
+			1,
+		},
+	}
+
+	jsBytes, err := os.ReadFile("testdata/pr.json")
+	Ok(t, err)
+	json := string(jsBytes)
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			response := json
+			// Build reviewers array
+			if len(c.reviewers) == 0 {
+				response = strings.Replace(response, `"reviewers": [
+        {
+            "reviewerUrl": "https://example:8080/tfs/_apis/git/repositories/8010495e-1002-438d-acbf-aaf245dac7c2/pullRequests/22/reviewers/8010495e-1002-438d-acbf-aaf245dac7c2",
+            "vote": 0,
+            "id": "8010495e-1002-438d-acbf-aaf245dac7c2",
+            "displayName": "Atlantis Reviewer",
+            "uniqueName": "atlantis.reviewer@example.com",
+            "url": "https://owner:8080/tfs/_apis/Identities/8010495e-1002-438d-acbf-aaf245dac7c2",
+            "imageUrl": "https://owner:8080/tfs/_api/_common/identityImage?id=8010495e-1002-438d-acbf-aaf245dac7c2"
+        }
+    ]`, `"reviewers": []`, 1)
+			} else {
+				var reviewersJSON strings.Builder
+				for i, r := range c.reviewers {
+					if i > 0 {
+						reviewersJSON.WriteString(",\n        ")
+					}
+					reviewersJSON.WriteString(fmt.Sprintf(`{
+            "reviewerUrl": "https://example:8080/tfs/_apis/git/repositories/8010495e-1002-438d-acbf-aaf245dac7c2/pullRequests/22/reviewers/8010495e-1002-438d-acbf-aaf245dac7c%d",
+            "vote": %d,
+            "id": "8010495e-1002-438d-acbf-aaf245dac7c%d",
+            "displayName": "Reviewer %d",
+            "uniqueName": "%s",
+            "url": "https://owner:8080/tfs/_apis/Identities/8010495e-1002-438d-acbf-aaf245dac7c%d",
+            "imageUrl": "https://owner:8080/tfs/_api/_common/identityImage?id=8010495e-1002-438d-acbf-aaf245dac7c%d"
+        }`, i, r.vote, i, i, r.uniqueName, i, i))
+				}
+				response = strings.Replace(response, `"reviewers": [
+        {
+            "reviewerUrl": "https://example:8080/tfs/_apis/git/repositories/8010495e-1002-438d-acbf-aaf245dac7c2/pullRequests/22/reviewers/8010495e-1002-438d-acbf-aaf245dac7c2",
+            "vote": 0,
+            "id": "8010495e-1002-438d-acbf-aaf245dac7c2",
+            "displayName": "Atlantis Reviewer",
+            "uniqueName": "atlantis.reviewer@example.com",
+            "url": "https://owner:8080/tfs/_apis/Identities/8010495e-1002-438d-acbf-aaf245dac7c2",
+            "imageUrl": "https://owner:8080/tfs/_api/_common/identityImage?id=8010495e-1002-438d-acbf-aaf245dac7c2"
+        }
+    ]`, fmt.Sprintf(`"reviewers": [
+        %s
+    ]`, reviewersJSON.String()), 1)
+			}
+
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/owner/project/_apis/git/repositories/repo/pullrequests/1?api-version=5.1-preview.1&includeWorkItemRefs=true":
+						w.Write([]byte(response)) // nolint: errcheck
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+
+			client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
+			Ok(t, err)
+			defer common.DisableSSLVerification()()
+
+			approvalStatus, err := client.PullIsApproved(
+				logger,
+				models.Repo{
+					FullName: "owner/project/repo",
+					Owner:    "owner",
+					Name:     "repo",
+					VCSHost: models.VCSHost{
+						Type:     models.AzureDevops,
+						Hostname: "dev.azure.com",
+					},
+				}, models.PullRequest{
+					Num: 1,
+				})
+			Ok(t, err)
+			Equals(t, c.expApproved, approvalStatus.IsApproved)
+			Equals(t, c.expNumApprovals, approvalStatus.NumApprovals)
+		})
+	}
+}
