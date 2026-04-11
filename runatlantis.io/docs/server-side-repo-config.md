@@ -100,6 +100,8 @@ repos:
   # If any part of this setting is set here, it overrides the entire setting in the repo config.
   autodiscover:
     mode: auto
+    # Optionally set a workspace for all autodiscovered projects
+    workspace: ""
     # Optionally ignore some paths for autodiscovery by a glob path
     ignore_paths:
       - foo/*
@@ -546,7 +548,7 @@ If you set a workflow with the key `default`, it will override this.
 | repo_locks                    | [RepoLocks](#repolocks) | `mode: on_plan` | no       | Whether or not repository locks are enabled for this project on plan or apply. See [RepoLocks](#repolocks) for more details.                                                                                                                                                                              |
 | policy_check                  | bool                    | false           | no       | Whether or not to run policy checks on this repository.                                                                                                                                                                                                                                                   |
 | custom_policy_check           | bool                    | false           | no       | Whether or not to enable custom policy check tools outside of Conftest on this repository.                                                                                                                                                                                                                |
-| autodiscover                  | AutoDiscover            | none            | no       | Auto discover settings for this repo                                                                                                                                                                                                                                                                      |
+| autodiscover                  | [AutoDiscover](#autodiscover) | none     | no       | Auto discover settings for this repo. See [AutoDiscover](#autodiscover) for more details.                                                                                                                                                                                                                 |
 | silence_pr_comments           | []string                | none            | no       | Silence PR comments from defined stages while preserving PR status checks. Useful in large environments with many Atlantis instances and/or projects, when the comments are too big and too many, therefore it is preferable to rely solely on PR status checks. Supported values are: `plan`, `apply`.   |
 
 :::tip Notes
@@ -583,6 +585,21 @@ If you set a workflow with the key `default`, it will override this.
   * `allow_custom_workflows` is set from the `id: /.*/` config and isn't unset
     by the `id: github.com/owner/repo` config because it didn't define that key.
 :::
+
+### AutoDiscover
+
+```yaml
+mode: auto
+workspace: ""
+ignore_paths:
+  - some/path/**
+```
+
+| Key          | Type            | Default  | Required | Description                                                                                                                                                                                                           |
+|--------------|-----------------|----------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| mode         | string          | `"auto"` | no       | When `auto`, projects are discovered only if the repo has no `projects` configured. When `enabled`, discovery always runs. When `disabled`, discovery never runs.                                                     |
+| workspace    | string          | `""`     | no       | Workspace to use for all autodiscovered projects. When set, this overrides workspace detection from `terraform { cloud { workspaces { name = "..." } } }` blocks. Useful when running one Atlantis instance per workspace. |
+| ignore_paths | array\[string\] | `[]`     | no       | List of path globs (as defined [here](https://pkg.go.dev/github.com/bmatcuk/doublestar/v4)) to exclude from autodiscovery.                                                                                            |
 
 ### RepoLocks
 

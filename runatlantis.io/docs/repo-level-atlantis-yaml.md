@@ -57,6 +57,7 @@ version: 3 # Available since v0.1.0
 automerge: true # Available since v0.15.0
 autodiscover: # Available since v0.18.0
   mode: auto
+  workspace: default
   ignore_paths:
   - some/path
 delete_source_branch_on_merge: true # Available since v0.15.0
@@ -417,6 +418,16 @@ autodiscover:
 ```
 
 Autodiscover can also be configured to skip over directories that match a path glob (as defined [here](https://pkg.go.dev/github.com/bmatcuk/doublestar/v4))
+
+```yaml
+autodiscover:
+   mode: "enabled"
+   workspace: qa
+   ignore_paths:
+      - terraform/aws-test/**
+```
+
+Use `workspace` to set the Terraform workspace for all autodiscovered projects. This is useful when running separate Atlantis instances per workspace on a shared repository. The configured workspace takes precedence over any workspace detected from `terraform { cloud { workspaces { name = "..." } } }` blocks in Terraform code.
 
 ### Custom Backend Config
 
