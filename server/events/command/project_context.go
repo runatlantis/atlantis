@@ -137,6 +137,12 @@ type ProjectContext struct {
 
 	// TeamAllowlistChecker is used to check authorization on a project-level
 	TeamAllowlistChecker TeamAllowlistChecker
+
+	// API indicates this command was triggered via the API endpoint rather than
+	// a PR comment. When true and Pull.Num == 0, PR-specific requirements like
+	// approved and mergeable are skipped since they have no meaning outside a PR context.
+	// This enables drift detection and other non-PR workflows via the API.
+	API bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

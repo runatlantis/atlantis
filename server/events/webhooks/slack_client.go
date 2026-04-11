@@ -31,6 +31,7 @@ type SlackClient interface {
 	AuthTest() error
 	TokenIsSet() bool
 	PostMessage(channel string, applyResult ApplyResult) error
+	PostDriftMessage(channel string, driftResult DriftResult) error
 }
 
 //go:generate pegomock generate --package mocks -o mocks/mock_underlying_slack_client.go UnderlyingSlackClient
@@ -73,6 +74,56 @@ func (d *DefaultSlackClient) PostMessage(channel string, applyResult ApplyResult
 		slack.MsgOptionAttachments(attachments[0]),
 	)
 	return err
+}
+
+func (d *DefaultSlackClient) PostDriftMessage(channel string, driftResult DriftResult) error {
+	attachment := d.createDriftAttachment(driftResult)
+	_, _, err := d.Slack.PostMessage(
+		channel,
+		slack.MsgOptionAsUser(true),
+		slack.MsgOptionText("", false),
+		slack.MsgOptionAttachments(attachment),
+	)
+	return err
+}
+
+func (d *DefaultSlackClient) createDriftAttachment(result DriftResult) slack.Attachment {
+	var colour string
+	var text string
+	if result.ProjectsWithDrift > 0 {
+		colour = slackFailureColour
+		text = fmt.Sprintf("Drift detected in %s", result.Repository)
+	} else {
+		colour = slackSuccessColour
+		text = fmt.Sprintf("No drift in %s", result.Repository)
+	}
+
+	return slack.Attachment{
+		Color: colour,
+		Text:  text,
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Repository",
+				Value: result.Repository,
+				Short: true,
+			},
+			{
+				Title: "Ref",
+				Value: result.Ref,
+				Short: true,
+			},
+			{
+				Title: "Projects with drift",
+				Value: fmt.Sprintf("%d / %d", result.ProjectsWithDrift, result.TotalProjects),
+				Short: true,
+			},
+			{
+				Title: "Detection ID",
+				Value: result.DetectionID,
+				Short: true,
+			},
+		},
+	}
 }
 
 func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.Attachment {

@@ -28,6 +28,8 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/controllers"
+	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -290,6 +292,51 @@ func TestParseAtlantisURL(t *testing.T) {
 				Ok(t, err)
 				Equals(t, c.ExpURL, act.String())
 			}
+		})
+	}
+}
+
+func TestSetupRoutes_APIRoutesRegistered(t *testing.T) {
+	t.Log("All API routes should be registered after SetupRoutes()")
+
+	s := server.Server{
+		Router:              mux.NewRouter(),
+		APIController:       &controllers.APIController{},
+		StatusController:    &controllers.StatusController{},
+		LocksController:     &controllers.LocksController{},
+		GithubAppController: &controllers.GithubAppController{},
+		JobsController:      &controllers.JobsController{},
+		VCSEventsController: &events_controllers.VCSEventsController{},
+		Logger:              logging.NewNoopLogger(t),
+	}
+
+	s.SetupRoutes()
+
+	cases := []struct {
+		method string
+		path   string
+	}{
+		// Core API endpoints
+		{"POST", "/api/plan"},
+		{"POST", "/api/apply"},
+		{"GET", "/api/locks"},
+		// Drift detection endpoints
+		{"GET", "/api/drift/status"},
+		{"POST", "/api/drift/detect"},
+		// Remediation endpoints
+		{"GET", "/api/drift/remediate/some-id"},
+		{"GET", "/api/drift/remediate"},
+		{"POST", "/api/drift/remediate"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.method+" "+c.path, func(t *testing.T) {
+			req, err := http.NewRequest(c.method, c.path, nil)
+			Ok(t, err)
+
+			var match mux.RouteMatch
+			Assert(t, s.Router.Match(req, &match),
+				"route %s %s should be registered but was not found", c.method, c.path)
 		})
 	}
 }
