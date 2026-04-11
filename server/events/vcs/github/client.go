@@ -1097,6 +1097,51 @@ func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.R
 	return teamNames, nil
 }
 
+// GetChildTeams returns the slugs of the direct child teams of the given team.
+// Use this with fetchDescendantTeams in the command runner to expand an allowlisted team
+// to all its descendants, supporting GitHub team hierarchy.
+// https://docs.github.com/en/graphql/reference/objects#team
+func (g *Client) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error) {
+	logger.Debug("Getting child teams for GitHub team '%s'", teamSlug)
+	orgName := repo.Owner
+	variables := map[string]any{
+		"orgName":     githubv4.String(orgName),
+		"teamSlug":    githubv4.String(teamSlug),
+		"childCursor": (*githubv4.String)(nil),
+	}
+	var q struct {
+		Organization struct {
+			Team struct {
+				ChildTeams struct {
+					Nodes []struct {
+						Slug string
+					}
+					PageInfo struct {
+						EndCursor   githubv4.String
+						HasNextPage bool
+					}
+				} `graphql:"childTeams(first: 100, after: $childCursor)"`
+			} `graphql:"team(slug: $teamSlug)"`
+		} `graphql:"organization(login: $orgName)"`
+	}
+	var childSlugs []string
+	ctx := context.Background()
+	for {
+		err := g.v4Client.Query(ctx, &q, variables)
+		if err != nil {
+			return nil, err
+		}
+		for _, node := range q.Organization.Team.ChildTeams.Nodes {
+			childSlugs = append(childSlugs, node.Slug)
+		}
+		if !q.Organization.Team.ChildTeams.PageInfo.HasNextPage {
+			break
+		}
+		variables["childCursor"] = githubv4.NewString(q.Organization.Team.ChildTeams.PageInfo.EndCursor)
+	}
+	return childSlugs, nil
+}
+
 // ExchangeCode returns a newly created app's info
 func (g *Client) ExchangeCode(logger logging.SimpleLogging, code string) (*GithubAppTemporarySecrets, error) {
 	logger.Debug("Exchanging code for app secrets")

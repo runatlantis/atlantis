@@ -50,6 +50,18 @@ type InstrumentedGithubClient struct {
 	Logger            logging.SimpleLogging
 }
 
+// GetChildTeams delegates to the underlying GitHub client so that *InstrumentedGithubClient
+// satisfies the childTeamFetcher interface used by the command runner for team hierarchy checks.
+func (c *InstrumentedGithubClient) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error) {
+	type childTeamFetcher interface {
+		GetChildTeams(logging.SimpleLogging, models.Repo, string) ([]string, error)
+	}
+	if fetcher, ok := c.InstrumentedClient.Client.(childTeamFetcher); ok {
+		return fetcher.GetChildTeams(logger, repo, teamSlug)
+	}
+	return nil, nil
+}
+
 func (c *InstrumentedGithubClient) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error) {
 	scope := c.StatsScope.SubScope("get_pull_request")
 	scope = common.SetGitScopeTags(scope, repo.FullName, pullNum)

@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/google/go-github/v83/github"
@@ -165,7 +166,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 			return
 		}
 
-		ok, err := c.checkUserPermissions(baseRepo, user, "plan")
+		ok, err := c.checkUserPermissions(baseRepo, &user, "plan")
 		if err != nil {
 			log.Err("Unable to check user permissions: %s", err)
 			return
@@ -262,8 +263,43 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 	}
 }
 
-// checkUserPermissions checks if the user has permissions to execute the command
-func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmdName string) (bool, error) {
+// childTeamFetcher is implemented by VCS clients that support GitHub-style team hierarchies.
+// GetChildTeams returns the direct child team slugs for a given team slug.
+type childTeamFetcher interface {
+	GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error)
+}
+
+// fetchDescendantTeams recursively fetches all descendant team slugs for the given team,
+// up to maxDepth levels deep. This prevents infinite loops in circular-hierarchy edge cases.
+func fetchDescendantTeams(fetcher childTeamFetcher, logger logging.SimpleLogging, repo models.Repo, teamSlug string, maxDepth int) ([]string, error) {
+	if maxDepth <= 0 {
+		return nil, nil
+	}
+	children, err := fetcher.GetChildTeams(logger, repo, teamSlug)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]string, len(children))
+	copy(result, children)
+	for _, child := range children {
+		grandchildren, err := fetchDescendantTeams(fetcher, logger, repo, child, maxDepth-1)
+		if err != nil {
+			logger.Warn("Could not fetch child teams for '%s': %s", child, err)
+			continue
+		}
+		result = append(result, grandchildren...)
+	}
+	return result, nil
+}
+
+// checkUserPermissions checks if the user has permissions to execute the command.
+// It first checks direct team membership against the allowlist. If that fails and the
+// VCS client supports team hierarchy (childTeamFetcher), it expands each allowlisted team
+// to include all its descendant teams (up to 20 levels deep) and re-checks.
+// When a match is found via hierarchy, the matched allowlisted parent team is appended to
+// user.Teams so that subsequent per-project allowlist checks (which use direct membership
+// only) also pass.
+func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *models.User, cmdName string) (bool, error) {
 	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
 		// allowlist restriction is not enabled
 		return true, nil
@@ -273,15 +309,50 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 		CommandName: cmdName,
 		Log:         c.Logger,
 		Pull:        models.PullRequest{},
-		User:        user,
+		User:        *user,
 		Verbose:     false,
 		API:         false,
 	}
-	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmdName)
+
+	// Fast path: user is a direct member of an allowlisted team.
+	if c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmdName) {
+		return true, nil
+	}
+
+	// Slow path: check if the user belongs to a child team of any allowlisted team.
+	// Only available when the VCS client supports fetching child teams (e.g. GitHub).
+	fetcher, ok := c.VCSClient.(childTeamFetcher)
 	if !ok {
 		return false, nil
 	}
-	return true, nil
+
+	const maxHierarchyDepth = 20
+	for _, allowedTeam := range c.TeamAllowlistChecker.AllTeams() {
+		if allowedTeam == "*" {
+			continue
+		}
+		// Only expand teams that actually grant permission for this command.
+		if !c.TeamAllowlistChecker.IsCommandAllowedForTeam(ctx, allowedTeam, cmdName) {
+			continue
+		}
+		descendants, err := fetchDescendantTeams(fetcher, c.Logger, repo, allowedTeam, maxHierarchyDepth)
+		if err != nil {
+			c.Logger.Warn("Could not fetch child teams for '%s': %s", allowedTeam, err)
+			continue
+		}
+		for _, userTeam := range user.Teams {
+			for _, desc := range descendants {
+				if strings.EqualFold(userTeam, desc) {
+					// Add the matched allowlisted parent team to user.Teams so that
+					// per-project allowlist filters (which check direct membership)
+					// also pass for this user.
+					user.Teams = append(user.Teams, allowedTeam)
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
 }
 
 // checkVarFilesInPlanCommandAllowlisted checks if paths in a 'plan' command are allowlisted.
@@ -326,7 +397,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			return
 		}
 
-		ok, err := c.checkUserPermissions(baseRepo, user, cmd.Name.String())
+		ok, err := c.checkUserPermissions(baseRepo, &user, cmd.Name.String())
 		if err != nil {
 			c.Logger.Err("Unable to check user permissions: %s", err)
 			return

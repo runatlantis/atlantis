@@ -1589,6 +1589,54 @@ func TestClient_GetTeamNamesForUser(t *testing.T) {
 	Equals(t, []string{"frontend-developers", "employees"}, teams)
 }
 
+// TestClient_GetChildTeams verifies that direct child teams of a given team are returned.
+func TestClient_GetChildTeams(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	// Mocked GraphQL response: "parent-team" has two direct children.
+	resp := `{
+		"data":{
+		  "organization": {
+			"team": {
+				"childTeams": {
+					"nodes": [
+						{"slug": "child-team-a"},
+						{"slug": "child-team-b"}
+					],
+					"pageInfo": {
+						"endCursor": "Y3Vyc29yOnYyOpHOAFMoLQ==",
+						"hasNextPage": false
+					}
+				}
+			}
+		}
+	  }
+	}`
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/graphql":
+				w.Write([]byte(resp)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	children, err := client.GetChildTeams(
+		logger,
+		models.Repo{Owner: "testrepo"},
+		"parent-team",
+	)
+	Ok(t, err)
+	Equals(t, []string{"child-team-a", "child-team-b"}, children)
+}
+
 func TestClient_DiscardReviews(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	type ResponseDef struct {
