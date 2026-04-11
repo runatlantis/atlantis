@@ -381,10 +381,11 @@ func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Cont
 	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
 }
 
-// isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery
+// isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery.
+// Global config ignore_paths takes precedence when explicitly set; otherwise falls through to repo config.
 func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
 	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if fromGlobalAutoDiscover != nil {
+	if fromGlobalAutoDiscover != nil && fromGlobalAutoDiscover.IgnorePaths != nil {
 		return fromGlobalAutoDiscover.IsPathIgnored(path)
 	}
 	if repoCfg.AutoDiscover != nil {
@@ -811,6 +812,43 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	if err != nil {
 		return nil, err
 	}
+
+	// Parse config file to check autodiscover.ignore_paths.
+	// During plan, getMergedProjectCfgs calls isAutoDiscoverPathIgnored to
+	// filter ignored paths, but PendingPlanFinder only filters
+	// .terragrunt-cache. Apply the same ignore_paths filtering here so
+	// apply doesn't pick up .tfplan files in paths that should be ignored
+	// (e.g. .terraform/modules/).
+	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(defaultRepoDir, repoCfgFile)
+	if err != nil {
+		return nil, fmt.Errorf("looking for '%s' file in '%s': %w", repoCfgFile, defaultRepoDir, err)
+	}
+	var repoCfg valid.RepoCfg
+	if hasRepoCfg {
+		repoCfg, err = p.ParserValidator.ParseRepoCfg(defaultRepoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+		if err != nil {
+			return nil, fmt.Errorf("parsing %s: %w", repoCfgFile, err)
+		}
+	}
+
+	// Filter out plans in paths matching autodiscover.ignore_paths.
+	// Match plan-path behavior: only filter auto-discovered projects,
+	// not plans that correspond to explicitly configured project dirs.
+	configuredProjDirs := make(map[string]bool)
+	for _, configProj := range repoCfg.Projects {
+		configuredProjDirs[filepath.Clean(configProj.Dir)] = true
+	}
+	var filteredPlans []PendingPlan
+	for _, plan := range plans {
+		path := filepath.Clean(plan.RepoRelDir)
+		if !configuredProjDirs[path] && p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) {
+			ctx.Log.Debug("ignoring plan in '%s' due to autodiscover.ignore_paths", plan.RepoRelDir)
+			continue
+		}
+		filteredPlans = append(filteredPlans, plan)
+	}
+	plans = filteredPlans
 
 	var cmds []command.ProjectContext
 	for _, plan := range plans {
