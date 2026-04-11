@@ -98,13 +98,26 @@ type FileWorkspace struct {
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
 	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
+	c := wrappedGitContext{cloneDir, headRepo, p}
 
-	// Unconditionally wait for the clone lock here, if anyone else is doing any clone
-	// operation in this directory, we wait for it to finish before we check anything.
+	// Fast path: if the directory already exists and is at the right commit,
+	// verify under a READ lock so we don't block concurrent plan operations.
+	// isBranchAtTargetRef only runs "git rev-parse" which is read-only.
+	if _, err := os.Stat(cloneDir); err == nil {
+		gitReadUnlockFn := w.gitReadLock(cloneDir)
+		isUpToDate, err := w.isBranchAtTargetRef(logger, c, p.HeadCommit)
+		gitReadUnlockFn()
+		if err == nil && isUpToDate {
+			logger.Info("repo is at correct commit %q so will not re-clone (fast path)", p.HeadCommit)
+			return cloneDir, nil
+		}
+	}
+
+	// Slow path: directory doesn't exist, is at wrong commit, or check failed.
+	// Acquire write lock for clone/update operations.
 	gitWriteUnlockFn := w.gitWriteLock(cloneDir)
 	defer gitWriteUnlockFn()
 
-	c := wrappedGitContext{cloneDir, headRepo, p}
 	ok, err := w.attemptReuseCloneDir(logger, c, cloneDir)
 	if ok && err == nil {
 		return cloneDir, nil
