@@ -53,6 +53,7 @@ type APIRequest struct {
 	Paths      []struct {
 		Directory string
 		Workspace string
+		ExtraArgs []string
 	}
 }
 
@@ -70,6 +71,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 			Name:       cmdName,
 			RepoRelDir: strings.TrimRight(path.Directory, "/"),
 			Workspace:  path.Workspace,
+			Flags:      path.ExtraArgs,
 		})
 	}
 
