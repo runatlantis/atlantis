@@ -111,9 +111,9 @@ func TestFetchDescendantTeams(t *testing.T) {
 		}
 		result, err := fetchDescendantTeams(fetcher, logger, repo, "parent", 20)
 		Ok(t, err)
-		// child-a is present (direct child), its subtree is skipped on error.
-		// child-b and grandchild-b are also present.
-		Equals(t, 3, len(result))
+		// child-a is included (direct child of parent); its subtree is skipped on error.
+		// child-b and grandchild-b are also traversed successfully.
+		Equals(t, []string{"child-a", "child-b", "grandchild-b"}, result)
 	})
 }
 
