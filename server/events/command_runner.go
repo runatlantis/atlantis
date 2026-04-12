@@ -263,10 +263,15 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 	}
 }
 
+// childTeamFetcher is satisfied by VCS clients that support GitHub-style team hierarchies.
+type childTeamFetcher interface {
+	GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error)
+}
+
 // fetchDescendantTeams fetches all descendant team slugs for the given team up to maxDepth
 // levels deep using an iterative BFS with a visited set to avoid duplicate API calls and
 // handle any cycles in unexpected hierarchy configurations.
-func fetchDescendantTeams(fetcher vcs.Client, logger logging.SimpleLogging, repo models.Repo, teamSlug string, maxDepth int) ([]string, error) {
+func fetchDescendantTeams(fetcher childTeamFetcher, logger logging.SimpleLogging, repo models.Repo, teamSlug string, maxDepth int) ([]string, error) {
 	if maxDepth <= 0 {
 		return nil, nil
 	}
@@ -280,9 +285,8 @@ func fetchDescendantTeams(fetcher vcs.Client, logger logging.SimpleLogging, repo
 	queue := []queueItem{{slug: teamSlug, depth: 0}}
 	var result []string
 
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
+	for i := 0; i < len(queue); i++ {
+		current := queue[i]
 
 		if current.depth >= maxDepth {
 			continue
@@ -338,6 +342,11 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *mode
 	}
 
 	// Slow path: check if the user belongs to a descendant team of any allowlisted team.
+	fetcher, ok := c.VCSClient.(childTeamFetcher)
+	if !ok {
+		return false, nil
+	}
+
 	const maxHierarchyDepth = 20
 	for _, allowedTeam := range c.TeamAllowlistChecker.AllTeams() {
 		if allowedTeam == "*" {
@@ -347,7 +356,7 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *mode
 		if !c.TeamAllowlistChecker.IsCommandAllowedForTeam(ctx, allowedTeam, cmdName) {
 			continue
 		}
-		descendants, err := fetchDescendantTeams(c.VCSClient, c.Logger, repo, allowedTeam, maxHierarchyDepth)
+		descendants, err := fetchDescendantTeams(fetcher, c.Logger, repo, allowedTeam, maxHierarchyDepth)
 		if err != nil {
 			c.Logger.Warn("Could not fetch child teams for '%s': %s", allowedTeam, err)
 			continue

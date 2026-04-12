@@ -30,8 +30,8 @@ func (m *mockChildTeamFetcher) GetChildTeams(_ logging.SimpleLogging, _ models.R
 }
 
 // childTeamVCSClient combines vcs.NotConfiguredVCSClient (satisfying vcs.Client)
-// with a mockChildTeamFetcher (satisfying childTeamFetcher), allowing the slow
-// path in checkUserPermissions to be exercised without a real VCS connection.
+// with a mockChildTeamFetcher, overriding GetChildTeams so the slow path in
+// checkUserPermissions can be exercised without a real VCS connection.
 type childTeamVCSClient struct {
 	vcs.NotConfiguredVCSClient
 	mockChildTeamFetcher
@@ -137,7 +137,7 @@ func TestCheckUserPermissions(t *testing.T) {
 		cr := &DefaultCommandRunner{
 			Logger:               logger,
 			TeamAllowlistChecker: checker,
-			VCSClient:            &vcs.NotConfiguredVCSClient{}, // does not implement childTeamFetcher
+			VCSClient:            &vcs.NotConfiguredVCSClient{}, // GetChildTeams returns nil (no hierarchy support)
 		}
 		user := models.User{Username: "alice", Teams: []string{"dev-team"}}
 		ok, err := cr.checkUserPermissions(repo, &user, "plan")
@@ -150,7 +150,7 @@ func TestCheckUserPermissions(t *testing.T) {
 		cr := &DefaultCommandRunner{
 			Logger:               logger,
 			TeamAllowlistChecker: checker,
-			VCSClient:            &vcs.NotConfiguredVCSClient{}, // does not implement childTeamFetcher
+			VCSClient:            &vcs.NotConfiguredVCSClient{}, // GetChildTeams returns nil (no hierarchy support)
 		}
 		user := models.User{Username: "alice", Teams: []string{"other-team"}}
 		ok, err := cr.checkUserPermissions(repo, &user, "plan")
