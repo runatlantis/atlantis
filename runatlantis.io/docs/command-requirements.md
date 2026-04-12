@@ -7,7 +7,7 @@ commands can be run:
 
 * [Approved](#approved) – requires pull requests to be approved by at least one user other than the author
 * [Mergeable](#mergeable) – requires pull requests to be able to be merged
-* [UnDiverged](#undiverged) - requires pull requests to be ahead of the base branch
+* [UnDiverged](#undiverged) - requires project files in pull requests to be ahead of the base branch
 
 ## What Happens If The Requirement Is Not Met?
 
@@ -224,6 +224,25 @@ source and destination branch. The local destination branch can become out of da
 if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of main is up to date
 with remote so that the state of the source during the `apply` is identical to that if you were to merge the PR at that
 time. In the case of a transient error, Atlantis assumes divergence for safety and errors.
+
+When a project has `autoplan.when_modified` patterns configured, the `undiverged` requirement automatically uses those
+patterns to perform a **targeted** divergence check. Instead of failing when **any** file on the base branch has changed,
+it only fails when files matching the project's `when_modified` patterns have changed. This is especially useful in
+monorepos where unrelated changes to other projects should not block your applies.
+
+If no `when_modified` patterns are configured (e.g. auto-discovered projects), `undiverged` falls back to checking all files.
+
+**Example scenario:**
+
+```text
+monorepo/
+  project1/        # Has when_modified: ["project1/**"]
+  project2/        # Has when_modified: ["project2/**"]
+```
+
+* PR modifies `project1/main.tf`
+* After PR created, someone merges changes to `project2/main.tf`
+* The `undiverged` requirement for project1 **passes** because the base branch change only affected `project2/`
 
 ## Setting Command Requirements
 
