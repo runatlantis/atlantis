@@ -136,7 +136,7 @@ func TestNewWebhooksManager_UnsupportedKind(t *testing.T) {
 	configs[0].Kind = unsupportedKind
 	_, err := webhooks.NewMultiWebhookSender(configs, clients)
 	Assert(t, err != nil, "expected error")
-	Equals(t, "\"kind: badkind\" not supported. Only \"kind: slack\" and \"kind: http\" are supported right now", err.Error())
+	Equals(t, "\"kind: badkind\" not supported. Only \"kind: slack\", \"kind: http\", and \"kind: msteams\" are supported right now", err.Error())
 }
 
 func TestNewWebhooksManager_NoConfigSuccess(t *testing.T) {
@@ -216,4 +216,40 @@ func TestSend_MultipleSuccess(t *testing.T) {
 	for _, s := range senders {
 		s.VerifyWasCalledOnce().Send(logger, result)
 	}
+}
+
+func TestNewMultiWebhookSender_MSTeams(t *testing.T) {
+	t.Log("Should be able to create a MS Teams webhook")
+	configs := []webhooks.Config{
+		{
+			Event:          "apply",
+			WorkspaceRegex: ".*",
+			BranchRegex:    ".*",
+			Kind:           "msteams",
+			URL:            "https://outlook.office.com/webhook/test",
+		},
+	}
+	clients := webhooks.Clients{
+		MSTeams: webhooks.NewMSTeamsClient(),
+	}
+	m, err := webhooks.NewMultiWebhookSender(configs, clients)
+	Ok(t, err)
+	Equals(t, 1, len(m.Webhooks))
+}
+
+func TestNewMultiWebhookSender_MSTeamsNoURL(t *testing.T) {
+	t.Log("Should return error if no URL is specified for MS Teams webhook")
+	configs := []webhooks.Config{
+		{
+			Event:          "apply",
+			WorkspaceRegex: ".*",
+			BranchRegex:    ".*",
+			Kind:           "msteams",
+		},
+	}
+	clients := webhooks.Clients{
+		MSTeams: webhooks.NewMSTeamsClient(),
+	}
+	_, err := webhooks.NewMultiWebhookSender(configs, clients)
+	ErrContains(t, "must specify \"url\" if using a webhook of \"kind: msteams\"", err)
 }

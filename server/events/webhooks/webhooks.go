@@ -25,6 +25,7 @@ import (
 
 const SlackKind = "slack"
 const HttpKind = "http"
+const MSTeamsKind = "msteams"
 const ApplyEvent = "apply"
 
 //go:generate pegomock generate --package mocks -o mocks/mock_sender.go Sender
@@ -61,8 +62,9 @@ type Config struct {
 }
 
 type Clients struct {
-	Slack SlackClient
-	Http  *HttpClient
+	Slack   SlackClient
+	Http    *HttpClient
+	MSTeams MSTeamsClient
 }
 
 func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSender, error) {
@@ -106,8 +108,17 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 				URL:            c.URL,
 			}
 			webhooks = append(webhooks, httpWebhook)
+		case MSTeamsKind:
+			if c.URL == "" {
+				return nil, errors.New("must specify \"url\" if using a webhook of \"kind: msteams\"")
+			}
+			teamsWebhook, err := NewMSTeams(wr, br, c.URL, clients.MSTeams)
+			if err != nil {
+				return nil, err
+			}
+			webhooks = append(webhooks, teamsWebhook)
 		default:
-			return nil, fmt.Errorf("\"kind: %s\" not supported. Only \"kind: %s\" and \"kind: %s\" are supported right now", c.Kind, SlackKind, HttpKind)
+			return nil, fmt.Errorf("\"kind: %s\" not supported. Only \"kind: %s\", \"kind: %s\", and \"kind: %s\" are supported right now", c.Kind, SlackKind, HttpKind, MSTeamsKind)
 		}
 	}
 
