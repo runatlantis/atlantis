@@ -14,9 +14,9 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-// mockChildTeamFetcher is a test double for childTeamFetcher.
-// It maps team slug -> list of direct child slugs, and returns an error for
-// any slug present in errOn.
+// mockChildTeamFetcher is a test double for the childTeamFetcher interface
+// used by fetchDescendantTeams. It maps team slug -> list of direct child
+// slugs, and returns an error for any slug present in errOn.
 type mockChildTeamFetcher struct {
 	children map[string][]string
 	errOn    map[string]bool

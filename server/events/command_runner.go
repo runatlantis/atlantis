@@ -263,7 +263,10 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 	}
 }
 
-// childTeamFetcher is satisfied by VCS clients that support GitHub-style team hierarchies.
+// childTeamFetcher is a narrow interface used by fetchDescendantTeams so that
+// callers (and tests) only need to provide GetChildTeams rather than the full
+// vcs.Client. In production the vcs.Client is passed directly since it
+// includes GetChildTeams; non-GitHub providers return nil, nil.
 type childTeamFetcher interface {
 	GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error)
 }
@@ -315,9 +318,11 @@ func fetchDescendantTeams(fetcher childTeamFetcher, logger logging.SimpleLogging
 }
 
 // checkUserPermissions checks if the user has permissions to execute the command.
-// It first checks direct team membership against the allowlist. If that fails and the
-// VCS client supports team hierarchy (childTeamFetcher), it expands each allowlisted team
-// to include all its descendant teams (up to 20 levels deep) and re-checks.
+// It first checks direct team membership against the allowlist. If that fails,
+// it expands each allowlisted team to include all its descendant teams (up to
+// 20 levels deep) via GetChildTeams on the VCS client and re-checks.
+// Non-GitHub VCS providers return nil from GetChildTeams, so the expansion
+// loop is effectively a no-op for them.
 // When a match is found via hierarchy, the matched allowlisted parent team is appended to
 // user.Teams so that subsequent per-project allowlist checks (which use direct membership
 // only) also pass.
@@ -342,11 +347,6 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *mode
 	}
 
 	// Slow path: check if the user belongs to a descendant team of any allowlisted team.
-	fetcher, ok := c.VCSClient.(childTeamFetcher)
-	if !ok {
-		return false, nil
-	}
-
 	const maxHierarchyDepth = 20
 	for _, allowedTeam := range c.TeamAllowlistChecker.AllTeams() {
 		if allowedTeam == "*" {
@@ -356,7 +356,7 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *mode
 		if !c.TeamAllowlistChecker.IsCommandAllowedForTeam(ctx, allowedTeam, cmdName) {
 			continue
 		}
-		descendants, err := fetchDescendantTeams(fetcher, c.Logger, repo, allowedTeam, maxHierarchyDepth)
+		descendants, err := fetchDescendantTeams(c.VCSClient, c.Logger, repo, allowedTeam, maxHierarchyDepth)
 		if err != nil {
 			c.Logger.Warn("Could not fetch child teams for '%s': %s", allowedTeam, err)
 			continue
