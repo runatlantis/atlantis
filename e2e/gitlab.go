@@ -126,22 +126,25 @@ func (g GitlabClient) CreatePullRequest(ctx context.Context, title, branchName s
 }
 
 func (g GitlabClient) GetAtlantisStatus(ctx context.Context, branchName string) (string, error) {
-
-	pipelineInfos, _, err := g.client.MergeRequests.ListMergeRequestPipelines(g.projectId, g.branchToMR[branchName])
-	if err != nil {
-		return "", err
-	}
-	// Possible todo: determine which status in the pipeline we care about?
-	if len(pipelineInfos) != 1 {
-		return "", fmt.Errorf("unexpected pipelines: %d", len(pipelineInfos))
-	}
-	pipelineInfo := pipelineInfos[0]
-	pipeline, _, err := g.client.Pipelines.GetPipeline(g.projectId, pipelineInfo.ID)
+	mr, _, err := g.client.MergeRequests.GetMergeRequest(g.projectId, g.branchToMR[branchName], nil)
 	if err != nil {
 		return "", err
 	}
 
-	return pipeline.Status, nil
+	// By default (all=false) GitLab returns only the latest status per name+ref
+	// combination, so statuses[0] is the most recent "atlantis/plan" status.
+	statuses, _, err := g.client.Commits.GetCommitStatuses(g.projectId, mr.SHA, &gitlab.GetCommitStatusesOptions{
+		Name: gitlab.Ptr("atlantis/plan"),
+	})
+	if err != nil {
+		return "", err
+	}
+	// Return "" while Atlantis hasn't processed the webhook yet; the caller
+	// treats an empty string as "not started" and continues polling.
+	if len(statuses) == 0 {
+		return "", nil
+	}
+	return statuses[0].Status, nil
 }
 
 func (g GitlabClient) ClosePullRequest(ctx context.Context, pullRequestNumber int) error {
@@ -166,9 +169,9 @@ func (g GitlabClient) DeleteBranch(ctx context.Context, branchName string) error
 }
 
 func (g GitlabClient) IsAtlantisInProgress(state string) bool {
-	// From https://docs.gitlab.com/api/pipelines/
-	// created, waiting_for_resource, preparing, pending, running, success, failed, canceled, skipped, manual, scheduled
-	for _, s := range []string{"success", "failed", "canceled", "skipped"} {
+	// From https://docs.gitlab.com/ee/api/commits.html#list-the-statuses-of-a-commit
+	// GitLab commit status states: pending, running, success, failed, canceled
+	for _, s := range []string{"success", "failed", "canceled"} {
 		if state == s {
 			return false
 		}
