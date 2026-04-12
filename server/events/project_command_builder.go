@@ -15,6 +15,7 @@ import (
 	tally "github.com/uber-go/tally/v4"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -62,6 +63,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
+	planStore runtime.PlanStore,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -93,6 +95,7 @@ func NewInstrumentedProjectCommandBuilder(
 			AutoDiscoverMode,
 			scope,
 			terraformClient,
+			planStore,
 		),
 		Logger: logger,
 		scope:  scope,
@@ -122,6 +125,7 @@ func NewProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
+	planStore runtime.PlanStore,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
 		ParserValidator:          parserValidator,
@@ -131,6 +135,7 @@ func NewProjectCommandBuilder(
 		WorkingDirLocker:         workingDirLocker,
 		GlobalCfg:                globalCfg,
 		PendingPlanFinder:        pendingPlanFinder,
+		PlanStore:                planStore,
 		SkipCloneNoChanges:       skipCloneNoChanges,
 		EnableRegExpCmd:          EnableRegExpCmd,
 		EnableAutoMerge:          EnableAutoMerge,
@@ -224,6 +229,8 @@ type DefaultProjectCommandBuilder struct {
 	GlobalCfg valid.GlobalCfg
 	// Finds unapplied plans.
 	PendingPlanFinder *DefaultPendingPlanFinder
+	// Persists plan files to external storage (S3) so they survive container restarts.
+	PlanStore runtime.PlanStore
 	// Builds project command contexts for Atlantis commands.
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	// User config option: Skip cloning the repo during autoplan if there are no changes to Terraform projects.
@@ -797,7 +804,25 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *command.Context, commentCmd *CommentCommand) ([]command.ProjectContext, error) {
 	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
-		return nil, err
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		if _, isLocal := p.PlanStore.(*runtime.LocalPlanStore); isLocal {
+			return nil, err
+		}
+		// External plan store: working directory lost (e.g. container restart
+		// with emptyDir). Re-clone and restore plan files from the external store.
+		ctx.Log.Info("pull directory missing, re-cloning repo for apply")
+		if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace); cloneErr != nil {
+			return nil, fmt.Errorf("re-cloning repo for apply: %w", cloneErr)
+		}
+		pullDir, err = p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+		if err != nil {
+			return nil, err
+		}
+		if restoreErr := p.PlanStore.RestorePlans(pullDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
+			return nil, fmt.Errorf("restoring plans from external store: %w", restoreErr)
+		}
 	}
 
 	plans, err := p.PendingPlanFinder.Find(pullDir)
@@ -853,7 +878,17 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
 	if errors.Is(err, os.ErrNotExist) {
-		return projCtx, errors.New("no working directory found–did you run plan?")
+		if _, isLocal := p.PlanStore.(*runtime.LocalPlanStore); isLocal {
+			return projCtx, errors.New("no working directory found–did you run plan?")
+		}
+		// External plan store: working directory lost (e.g. container restart
+		// with emptyDir). Re-clone; the plan file will be loaded from the external
+		// store during the apply step.
+		ctx.Log.Info("working directory missing, re-cloning repo for apply")
+		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+		if err != nil {
+			return projCtx, fmt.Errorf("re-cloning repo for apply: %w", err)
+		}
 	} else if err != nil {
 		return projCtx, err
 	}
