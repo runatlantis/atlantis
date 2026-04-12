@@ -979,8 +979,8 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
 							},
 						},
 					},
@@ -996,8 +996,8 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
 							},
 						},
 					},
@@ -1016,9 +1016,9 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
-								CurApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
+								Approvals:        make([]models.PolicySetApproval, 1),
 							},
 						},
 					},
@@ -1042,7 +1042,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     1,
+						Approvals:     make([]models.PolicySetApproval, 1),
 					},
 				},
 			},
@@ -1054,12 +1054,94 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     0,
+						Approvals:     nil,
 					},
 				},
 			},
 		}, updateStatus.Projects)
 	}
+}
+
+// Test that policy approvals are preserved when HeadCommit changes,
+// so sticky approvals can survive across code pushes.
+func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	// Write initial policy check results with an approval at commit A.
+	_, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.PolicyCheck,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Failure: "policy failure",
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{
+						{
+							PolicySetName:    "policy1",
+							ReqApprovalCount: 1,
+							Hashes:           []string{"h1", "h2"},
+							Approvals: []models.PolicySetApproval{
+								{Approver: "boss", Hashes: []string{"h1", "h2"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	Ok(t, err)
+
+	// Push new commit B with a plan result (no PolicyCheckResults).
+	pull.HeadCommit = "sha-B"
+	status, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "plan output",
+				},
+			},
+		},
+	})
+	Ok(t, err)
+
+	// The policy approvals from commit A should be preserved.
+	Equals(t, 1, len(status.Projects))
+	Equals(t, "mydir", status.Projects[0].RepoRelDir)
+	Assert(t, len(status.Projects[0].PolicyStatus) > 0, "expected policy status to be preserved across commit change")
+	Equals(t, "policy1", status.Projects[0].PolicyStatus[0].PolicySetName)
+	Equals(t, 1, len(status.Projects[0].PolicyStatus[0].Approvals))
+	Equals(t, "boss", status.Projects[0].PolicyStatus[0].Approvals[0].Approver)
+
+	// Verify via GetPullStatus too.
+	getStatus, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, 1, len(getStatus.Projects[0].PolicyStatus[0].Approvals))
 }
 
 func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {

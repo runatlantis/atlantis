@@ -1,11 +1,6 @@
 Ran Policy Check for dir: `.` workspace: `default`
 
 **Policy Check Failed**: Some policy sets did not pass.
-```diff
-pre-conftest output
-
-```
-
 #### Policy Set: `test_policy`
 ```diff
 FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
@@ -14,12 +9,6 @@ FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibit
 
 ```
 
-
-```diff
-[{"PolicySetName":"test_policy","PolicyOutput":"FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.\n\n1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions\n","Passed":false,"ReqApprovalCount":1,"Approvals":null,"Hashes":["3834cfbccac1a4264575f3bc9e594df53cbd9cc5bf19a04379b6b29541c0f319"],"PolicyItemRegex":"(?s).+"}]
-post-conftest output
-
-```
 
 #### Policy Approval Status:
 ```

@@ -596,12 +596,14 @@ mode: on_apply
 
 ### Policies
 
-| Key                    | Type            | Default | Required  | Description                                              |
-|------------------------|-----------------|---------|-----------|----------------------------------------------------------|
-| conftest_version       | string          | none    | no        | conftest version to run all policy sets                  |
-| owners                 | Owners(#Owners) | none    | yes       | owners that can approve failing policies                 |
-| approve_count          | int             | 1       | no        | number of approvals required to bypass failing policies. |
-| policy_sets            | []PolicySet     | none    | yes       | set of policies to run on a plan output                  |
+| Key                      | Type            | Default | Required | Description                                                                                                                                       |
+|--------------------------|-----------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| conftest_version         | string          | none    | no       | conftest version to run all policy sets                                                                                                           |
+| owners                   | Owners(#Owners) | none    | yes      | owners that can approve failing policies                                                                                                          |
+| approve_count            | int             | 1       | no       | number of approvals required to bypass failing policies.                                                                                          |
+| sticky_policy_approvals  | bool            | false   | no       | when true, policy approvals survive re-plans as long as no new policy output items (per `policy_item_regex`) are introduced. See [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals). |
+| policy_item_regex        | string          | `(?s).+`| no       | regex to extract comparable items from policy output for sticky approval tracking. Default matches entire output as one item. See [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals). |
+| policy_sets              | []PolicySet     | none    | yes      | set of policies to run on a plan output                                                                                                           |
 
 ### Owners
 
@@ -612,12 +614,16 @@ mode: on_apply
 
 ### PolicySet
 
-| Key                  | Type   | Default | Required | Description                                                                                                   |
-| ------               | ------ | ------- | -------- | --------------------------------------------------------------------------------------------------------------|
-| name                 | string | none    | yes      | unique name for the policy set                                                                                |
-| path                 | string | none    | yes      | path to the rego policies directory                                                                           |
-| source               | string | none    | yes      | only `local` is supported at this time                                                                        |
-| prevent_self_approve | bool   | false   | no       | Whether or not the author of PR can approve policies. Defaults to `false` (the author must also be in owners) |
+| Key                      | Type   | Default   | Required | Description                                                                                                                                               |
+|--------------------------|--------|-----------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| name                     | string | none      | yes      | unique name for the policy set                                                                                                                            |
+| path                     | string | none      | yes      | path to the rego policies directory                                                                                                                       |
+| source                   | string | none      | yes      | only `local` is supported at this time                                                                                                                    |
+| owners                   | Owners | none      | no       | owners that can approve this specific policy set (merged with top-level owners)                                                                           |
+| approve_count            | int    | inherited | no       | number of approvals required. Defaults to the top-level `approve_count` value                                                                             |
+| prevent_self_approve     | bool   | false     | no       | whether the PR author can approve policies. Defaults to `false` (the author must also be in owners)                                                       |
+| sticky_policy_approvals  | bool   | inherited | no       | overrides the top-level `sticky_policy_approvals` for this policy set. See [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals).         |
+| policy_item_regex        | string | inherited | no       | overrides the top-level `policy_item_regex` for this policy set. See [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals).               |
 
 ### Metrics
 

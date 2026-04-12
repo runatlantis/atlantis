@@ -502,9 +502,9 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 			description: "single policy set, not passed",
 			policysetResults: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					Passed:        false,
-					ReqApprovals:  1,
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 1,
 				},
 			},
 			policyClearedExp: false,
@@ -514,9 +514,9 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 			description: "single policy set, passed",
 			policysetResults: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					Passed:        true,
-					ReqApprovals:  1,
+					PolicySetName:    "policy1",
+					Passed:           true,
+					ReqApprovalCount: 1,
 				},
 			},
 			policyClearedExp: true,
@@ -526,10 +526,10 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 			description: "single policy set, fully approved",
 			policysetResults: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					Passed:        false,
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 1,
+					Approvals:        make([]models.PolicySetApproval, 1),
 				},
 			},
 			policyClearedExp: true,
@@ -539,22 +539,20 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 			description: "multiple policy sets, different states.",
 			policysetResults: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					Passed:        false,
-					ReqApprovals:  2,
-					CurApprovals:  0,
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 2,
 				},
 				{
-					PolicySetName: "policy2",
-					Passed:        false,
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy2",
+					Passed:           false,
+					ReqApprovalCount: 1,
+					Approvals:        make([]models.PolicySetApproval, 1),
 				},
 				{
-					PolicySetName: "policy3",
-					Passed:        true,
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy3",
+					Passed:           true,
+					ReqApprovalCount: 1,
 				},
 			},
 			policyClearedExp: false,
@@ -566,22 +564,21 @@ policy set: policy3: passed.`,
 			description: "multiple policy sets, all cleared.",
 			policysetResults: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					Passed:        false,
-					ReqApprovals:  2,
-					CurApprovals:  2,
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 2,
+					Approvals:        make([]models.PolicySetApproval, 2),
 				},
 				{
-					PolicySetName: "policy2",
-					Passed:        false,
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy2",
+					Passed:           false,
+					ReqApprovalCount: 1,
+					Approvals:        make([]models.PolicySetApproval, 1),
 				},
 				{
-					PolicySetName: "policy3",
-					Passed:        true,
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy3",
+					Passed:           true,
+					ReqApprovalCount: 1,
 				},
 			},
 			policyClearedExp: true,
@@ -597,6 +594,476 @@ policy set: policy3: passed.`,
 			}
 			Equals(t, summary.policyClearedExp, pcs.PolicyCleared())
 			Equals(t, summary.policySummaryExp, pcs.PolicySummary())
+		})
+	}
+}
+
+func TestApprovalCoversAllHashes(t *testing.T) {
+	cases := []struct {
+		description    string
+		approvalHashes []string
+		required       []string
+		expected       bool
+	}{
+		{
+			description:    "empty required always covered",
+			approvalHashes: nil,
+			required:       nil,
+			expected:       true,
+		},
+		{
+			description:    "empty required with non-empty approval",
+			approvalHashes: []string{"a", "b"},
+			required:       nil,
+			expected:       true,
+		},
+		{
+			description:    "exact match",
+			approvalHashes: []string{"hash1", "hash2"},
+			required:       []string{"hash1", "hash2"},
+			expected:       true,
+		},
+		{
+			description:    "superset covers required",
+			approvalHashes: []string{"hash1", "hash2", "hash3"},
+			required:       []string{"hash1", "hash2"},
+			expected:       true,
+		},
+		{
+			description:    "missing hash fails",
+			approvalHashes: []string{"hash1"},
+			required:       []string{"hash1", "hash2"},
+			expected:       false,
+		},
+		{
+			description:    "empty approval with non-empty required fails",
+			approvalHashes: nil,
+			required:       []string{"hash1"},
+			expected:       false,
+		},
+		{
+			description:    "completely disjoint fails",
+			approvalHashes: []string{"a", "b"},
+			required:       []string{"c", "d"},
+			expected:       false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.expected, models.ApprovalCoversAllHashes(c.approvalHashes, c.required))
+		})
+	}
+}
+
+func TestPolicySetStatus_GetCurApprovals(t *testing.T) {
+	cases := []struct {
+		description string
+		status      models.PolicySetStatus
+		expected    int
+	}{
+		{
+			description: "nil approvals returns 0",
+			status:      models.PolicySetStatus{Hashes: []string{"h1"}},
+			expected:    0,
+		},
+		{
+			description: "empty approvals returns 0",
+			status:      models.PolicySetStatus{Approvals: []models.PolicySetApproval{}, Hashes: []string{"h1"}},
+			expected:    0,
+		},
+		{
+			description: "all approvals cover hashes",
+			status: models.PolicySetStatus{
+				Hashes: []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{
+					{Approver: "user1", Hashes: []string{"h1", "h2"}},
+					{Approver: "user2", Hashes: []string{"h1", "h2", "h3"}},
+				},
+			},
+			expected: 2,
+		},
+		{
+			description: "only matching approvals counted",
+			status: models.PolicySetStatus{
+				Hashes: []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{
+					{Approver: "user1", Hashes: []string{"h1", "h2"}},
+					{Approver: "user2", Hashes: []string{"h1"}},
+				},
+			},
+			expected: 1,
+		},
+		{
+			description: "nil hashes means all approvals count",
+			status: models.PolicySetStatus{
+				Hashes: nil,
+				Approvals: []models.PolicySetApproval{
+					{Approver: "user1", Hashes: nil},
+					{Approver: "user2", Hashes: []string{"h1"}},
+				},
+			},
+			expected: 2,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.expected, c.status.GetCurApprovals())
+		})
+	}
+}
+
+func TestPolicySetStatus_OwnerHasFullyApproved(t *testing.T) {
+	cases := []struct {
+		description string
+		status      models.PolicySetStatus
+		owner       string
+		expected    bool
+	}{
+		{
+			description: "owner not in approvals",
+			status: models.PolicySetStatus{
+				Hashes:    []string{"h1"},
+				Approvals: []models.PolicySetApproval{{Approver: "other", Hashes: []string{"h1"}}},
+			},
+			owner:    "user1",
+			expected: false,
+		},
+		{
+			description: "owner approved but hashes stale",
+			status: models.PolicySetStatus{
+				Hashes:    []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{{Approver: "user1", Hashes: []string{"h1"}}},
+			},
+			owner:    "user1",
+			expected: false,
+		},
+		{
+			description: "owner approved with matching hashes",
+			status: models.PolicySetStatus{
+				Hashes:    []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{{Approver: "user1", Hashes: []string{"h1", "h2"}}},
+			},
+			owner:    "user1",
+			expected: true,
+		},
+		{
+			description: "empty approvals returns false",
+			status: models.PolicySetStatus{
+				Hashes:    []string{"h1"},
+				Approvals: nil,
+			},
+			owner:    "user1",
+			expected: false,
+		},
+		{
+			description: "nil hashes means any approval covers",
+			status: models.PolicySetStatus{
+				Hashes:    nil,
+				Approvals: []models.PolicySetApproval{{Approver: "user1", Hashes: nil}},
+			},
+			owner:    "user1",
+			expected: true,
+		},
+		{
+			description: "stale approval followed by valid approval from same owner",
+			status: models.PolicySetStatus{
+				Hashes: []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{
+					{Approver: "user1", Hashes: []string{"h1"}},
+					{Approver: "user1", Hashes: []string{"h1", "h2"}},
+				},
+			},
+			owner:    "user1",
+			expected: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.expected, c.status.OwnerHasFullyApproved(c.owner))
+		})
+	}
+}
+
+func TestNewPolicySetResult(t *testing.T) {
+	cases := []struct {
+		description      string
+		name             string
+		output           string
+		passed           bool
+		reqApprovalCount int
+		regex            string
+		expHashes        []string
+	}{
+		{
+			description:      "dot-star regex includes empty-string hash",
+			name:             "policy1",
+			output:           "FAIL - plan.json - deny\n\n2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions\n",
+			passed:           false,
+			reqApprovalCount: 1,
+			regex:            `.*`,
+			expHashes: []string{
+				models.HashPolicyItem("FAIL - plan.json - deny"),
+				models.HashPolicyItem(""),
+				models.HashPolicyItem("2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions"),
+			},
+		},
+		{
+			description:      "custom multiline regex extracts only FAIL lines",
+			name:             "policy1",
+			output:           "FAIL - plan.json - deny\nOK - plan.json - allow\nFAIL - plan.json - other",
+			passed:           false,
+			reqApprovalCount: 1,
+			regex:            `(?m)^FAIL.*`,
+			expHashes: []string{
+				models.HashPolicyItem("FAIL - plan.json - deny"),
+				models.HashPolicyItem("FAIL - plan.json - other"),
+			},
+		},
+		{
+			description:      "empty output with dot-star regex yields hash of empty string",
+			name:             "policy1",
+			output:           "",
+			passed:           true,
+			reqApprovalCount: 1,
+			regex:            `.*`,
+			expHashes:        []string{models.HashPolicyItem("")},
+		},
+		{
+			description:      "default regex matches entire output as one item",
+			name:             "policy1",
+			output:           "FAIL - plan.json - deny\n\n2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions\n",
+			passed:           false,
+			reqApprovalCount: 1,
+			regex:            `(?s).+`,
+			expHashes: []string{
+				models.HashPolicyItem("FAIL - plan.json - deny\n\n2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions\n"),
+			},
+		},
+		{
+			description:      "default regex on empty output yields hash of empty string",
+			name:             "policy1",
+			output:           "",
+			passed:           true,
+			reqApprovalCount: 1,
+			regex:            `(?s).+`,
+			expHashes:        []string{models.HashPolicyItem("")},
+		},
+		{
+			description:      "no matches with specific regex falls back to hash of raw output",
+			name:             "policy1",
+			output:           "all good here",
+			passed:           true,
+			reqApprovalCount: 0,
+			regex:            `^FAIL.*`,
+			expHashes:        []string{models.HashPolicyItem("all good here")},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			result, err := models.NewPolicySetResult(c.name, c.output, c.passed, c.reqApprovalCount, c.regex)
+			Ok(t, err)
+			Equals(t, c.name, result.PolicySetName)
+			Equals(t, c.output, result.PolicyOutput)
+			Equals(t, c.passed, result.Passed)
+			Equals(t, c.reqApprovalCount, result.ReqApprovalCount)
+			Equals(t, c.expHashes, result.Hashes)
+			Assert(t, result.Approvals == nil, "new result should have nil approvals")
+		})
+	}
+}
+
+func TestNewPolicySetResult_InvalidRegex(t *testing.T) {
+	result, err := models.NewPolicySetResult("policy1", "output", true, 1, `[invalid`)
+	Assert(t, err != nil, "expected error for invalid regex")
+	Assert(t, result == nil, "expected nil result for invalid regex")
+}
+
+func TestPolicySetResult_GetCurApprovals(t *testing.T) {
+	cases := []struct {
+		description string
+		result      models.PolicySetResult
+		expected    int
+	}{
+		{
+			description: "nil approvals",
+			result:      models.PolicySetResult{Hashes: []string{"h1"}},
+			expected:    0,
+		},
+		{
+			description: "approval covers all hashes",
+			result: models.PolicySetResult{
+				Hashes:    []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{{Approver: "u", Hashes: []string{"h1", "h2"}}},
+			},
+			expected: 1,
+		},
+		{
+			description: "stale approval not counted",
+			result: models.PolicySetResult{
+				Hashes:    []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{{Approver: "u", Hashes: []string{"h1"}}},
+			},
+			expected: 0,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.expected, c.result.GetCurApprovals())
+		})
+	}
+}
+
+func TestPolicySetResult_ApprovedHashes(t *testing.T) {
+	cases := []struct {
+		description string
+		result      models.PolicySetResult
+		expected    []string
+	}{
+		{
+			description: "no approvals returns empty",
+			result:      models.PolicySetResult{},
+			expected:    nil,
+		},
+		{
+			description: "single approval returns its hashes",
+			result: models.PolicySetResult{
+				Approvals: []models.PolicySetApproval{
+					{Approver: "u1", Hashes: []string{"a", "b"}},
+				},
+			},
+			expected: []string{"a", "b"},
+		},
+		{
+			description: "multiple approvals deduplicates",
+			result: models.PolicySetResult{
+				Approvals: []models.PolicySetApproval{
+					{Approver: "u1", Hashes: []string{"a", "b"}},
+					{Approver: "u2", Hashes: []string{"b", "c"}},
+				},
+			},
+			expected: []string{"a", "b", "c"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.expected, c.result.ApprovedHashes())
+		})
+	}
+}
+
+func TestNewPolicySetResult_StoresPolicyItemRegex(t *testing.T) {
+	result, err := models.NewPolicySetResult("test", "line1\nline2", true, 1, `line\d`)
+	Ok(t, err)
+	Equals(t, `line\d`, result.PolicyItemRegex)
+	Equals(t, []string{models.HashPolicyItem("line1"), models.HashPolicyItem("line2")}, result.Hashes)
+}
+
+func TestPolicySetResult_PolicySetHashes(t *testing.T) {
+	result := models.PolicySetResult{
+		PolicyOutput: "FAIL - plan.json - deny\nOK - plan.json - allow\nFAIL - plan.json - other",
+	}
+
+	allLines, err := result.PolicySetHashes(`.*`)
+	Ok(t, err)
+	Equals(t, 3, len(allLines))
+
+	failOnly, err := result.PolicySetHashes(`(?m)^FAIL.*`)
+	Ok(t, err)
+	Equals(t, 2, len(failOnly))
+	Equals(t, models.HashPolicyItem("FAIL - plan.json - deny"), failOnly[0])
+	Equals(t, models.HashPolicyItem("FAIL - plan.json - other"), failOnly[1])
+
+	noMatch, err := result.PolicySetHashes(`(?m)^WARN.*`)
+	Ok(t, err)
+	Equals(t, 1, len(noMatch))
+	Equals(t, models.HashPolicyItem(result.PolicyOutput), noMatch[0])
+
+	_, err = result.PolicySetHashes(`[invalid`)
+	Assert(t, err != nil, "expected error for invalid regex")
+}
+
+func TestHashPolicyItem(t *testing.T) {
+	h := models.HashPolicyItem("FAIL - plan.json - deny")
+	Equals(t, 64, len(h))
+	Assert(t, h == models.HashPolicyItem("FAIL - plan.json - deny"), "same input should produce same hash")
+	Assert(t, h != models.HashPolicyItem("FAIL - plan.json - other"), "different input should produce different hash")
+	Assert(t, models.HashPolicyItem("") != "", "empty string should still produce a hash")
+}
+
+func TestPolicySetResult_PolicySetHashes_DefaultRegex(t *testing.T) {
+	result := models.PolicySetResult{
+		PolicyOutput: "FAIL - plan.json - deny\nOK\nFAIL - other",
+	}
+	hashes, err := result.PolicySetHashes(`(?s).+`)
+	Ok(t, err)
+	Equals(t, 1, len(hashes))
+	Equals(t, models.HashPolicyItem("FAIL - plan.json - deny\nOK\nFAIL - other"), hashes[0])
+}
+
+func TestPolicyCheckResults_PolicyFuncs_WithHashes(t *testing.T) {
+	cases := []struct {
+		description      string
+		policysetResults []models.PolicySetResult
+		policyClearedExp bool
+		policySummaryExp string
+	}{
+		{
+			description: "approval with matching hashes clears policy",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 1,
+					Hashes:           []string{"h1", "h2"},
+					Approvals: []models.PolicySetApproval{
+						{Approver: "user1", Hashes: []string{"h1", "h2"}},
+					},
+				},
+			},
+			policyClearedExp: true,
+			policySummaryExp: "policy set: policy1: approved.",
+		},
+		{
+			description: "approval with stale hashes does not clear",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 1,
+					Hashes:           []string{"h1", "h2", "h3"},
+					Approvals: []models.PolicySetApproval{
+						{Approver: "user1", Hashes: []string{"h1", "h2"}},
+					},
+				},
+			},
+			policyClearedExp: false,
+			policySummaryExp: "policy set: policy1: requires: 1 approval(s), have: 0.",
+		},
+		{
+			description: "mixed: one stale and one fresh among two required",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 2,
+					Hashes:           []string{"h1"},
+					Approvals: []models.PolicySetApproval{
+						{Approver: "user1", Hashes: []string{"h1"}},
+						{Approver: "user2", Hashes: []string{"old_h1"}},
+					},
+				},
+			},
+			policyClearedExp: false,
+			policySummaryExp: "policy set: policy1: requires: 2 approval(s), have: 1.",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			pcs := models.PolicyCheckResults{
+				PolicySetResults: c.policysetResults,
+			}
+			Equals(t, c.policyClearedExp, pcs.PolicyCleared())
+			Equals(t, c.policySummaryExp, pcs.PolicySummary())
 		})
 	}
 }
