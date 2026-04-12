@@ -1125,7 +1125,8 @@ func (g *Client) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, t
 		} `graphql:"organization(login: $orgName)"`
 	}
 	var childSlugs []string
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	for {
 		err := g.v4Client.Query(ctx, &q, variables)
 		if err != nil {

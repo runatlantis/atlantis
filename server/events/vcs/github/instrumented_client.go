@@ -50,7 +50,6 @@ type InstrumentedGithubClient struct {
 	Logger            logging.SimpleLogging
 }
 
-
 func (c *InstrumentedGithubClient) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error) {
 	scope := c.StatsScope.SubScope("get_pull_request")
 	scope = common.SetGitScopeTags(scope, repo.FullName, pullNum)

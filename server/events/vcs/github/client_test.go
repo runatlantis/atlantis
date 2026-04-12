@@ -1622,6 +1622,7 @@ func TestClient_GetChildTeams(t *testing.T) {
 				return
 			}
 		}))
+	defer testServer.Close()
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
 	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)

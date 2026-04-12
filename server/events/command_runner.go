@@ -263,32 +263,50 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 	}
 }
 
-// childTeamFetcher is implemented by VCS clients that support GitHub-style team hierarchies.
-// GetChildTeams returns the direct child team slugs for a given team slug.
-type childTeamFetcher interface {
-	GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error)
-}
-
-// fetchDescendantTeams recursively fetches all descendant team slugs for the given team,
-// up to maxDepth levels deep. This prevents infinite loops in circular-hierarchy edge cases.
-func fetchDescendantTeams(fetcher childTeamFetcher, logger logging.SimpleLogging, repo models.Repo, teamSlug string, maxDepth int) ([]string, error) {
+// fetchDescendantTeams fetches all descendant team slugs for the given team up to maxDepth
+// levels deep using an iterative BFS with a visited set to avoid duplicate API calls and
+// handle any cycles in unexpected hierarchy configurations.
+func fetchDescendantTeams(fetcher vcs.Client, logger logging.SimpleLogging, repo models.Repo, teamSlug string, maxDepth int) ([]string, error) {
 	if maxDepth <= 0 {
 		return nil, nil
 	}
-	children, err := fetcher.GetChildTeams(logger, repo, teamSlug)
-	if err != nil {
-		return nil, err
+
+	type queueItem struct {
+		slug  string
+		depth int
 	}
-	result := make([]string, len(children))
-	copy(result, children)
-	for _, child := range children {
-		grandchildren, err := fetchDescendantTeams(fetcher, logger, repo, child, maxDepth-1)
-		if err != nil {
-			logger.Warn("Could not fetch child teams for '%s': %s", child, err)
+
+	visited := map[string]struct{}{teamSlug: {}}
+	queue := []queueItem{{slug: teamSlug, depth: 0}}
+	var result []string
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		if current.depth >= maxDepth {
 			continue
 		}
-		result = append(result, grandchildren...)
+
+		children, err := fetcher.GetChildTeams(logger, repo, current.slug)
+		if err != nil {
+			if current.slug == teamSlug {
+				return nil, err
+			}
+			logger.Warn("Could not fetch child teams for '%s': %s", current.slug, err)
+			continue
+		}
+
+		for _, child := range children {
+			if _, ok := visited[child]; ok {
+				continue
+			}
+			visited[child] = struct{}{}
+			result = append(result, child)
+			queue = append(queue, queueItem{slug: child, depth: current.depth + 1})
+		}
 	}
+
 	return result, nil
 }
 
@@ -319,13 +337,7 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *mode
 		return true, nil
 	}
 
-	// Slow path: check if the user belongs to a child team of any allowlisted team.
-	// Only available when the VCS client supports fetching child teams (e.g. GitHub).
-	fetcher, ok := c.VCSClient.(childTeamFetcher)
-	if !ok {
-		return false, nil
-	}
-
+	// Slow path: check if the user belongs to a descendant team of any allowlisted team.
 	const maxHierarchyDepth = 20
 	for _, allowedTeam := range c.TeamAllowlistChecker.AllTeams() {
 		if allowedTeam == "*" {
@@ -335,20 +347,22 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *mode
 		if !c.TeamAllowlistChecker.IsCommandAllowedForTeam(ctx, allowedTeam, cmdName) {
 			continue
 		}
-		descendants, err := fetchDescendantTeams(fetcher, c.Logger, repo, allowedTeam, maxHierarchyDepth)
+		descendants, err := fetchDescendantTeams(c.VCSClient, c.Logger, repo, allowedTeam, maxHierarchyDepth)
 		if err != nil {
 			c.Logger.Warn("Could not fetch child teams for '%s': %s", allowedTeam, err)
 			continue
 		}
+		descendantSet := make(map[string]struct{}, len(descendants))
+		for _, desc := range descendants {
+			descendantSet[strings.ToLower(desc)] = struct{}{}
+		}
 		for _, userTeam := range user.Teams {
-			for _, desc := range descendants {
-				if strings.EqualFold(userTeam, desc) {
-					// Add the matched allowlisted parent team to user.Teams so that
-					// per-project allowlist filters (which check direct membership)
-					// also pass for this user.
-					user.Teams = append(user.Teams, allowedTeam)
-					return true, nil
-				}
+			if _, ok := descendantSet[strings.ToLower(userTeam)]; ok {
+				// Add the matched allowlisted parent team to user.Teams so that
+				// per-project allowlist filters (which check direct membership)
+				// also pass for this user.
+				user.Teams = append(user.Teams, allowedTeam)
+				return true, nil
 			}
 		}
 	}
