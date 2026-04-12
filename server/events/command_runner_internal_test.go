@@ -115,6 +115,17 @@ func TestFetchDescendantTeams(t *testing.T) {
 		// child-b and grandchild-b are also traversed successfully.
 		Equals(t, []string{"child-a", "child-b", "grandchild-b"}, result)
 	})
+
+	t.Run("cycle is handled without infinite loop", func(t *testing.T) {
+		// a -> b -> a forms a cycle; visited set should break it.
+		fetcher := &mockChildTeamFetcher{children: map[string][]string{
+			"team-a": {"team-b"},
+			"team-b": {"team-a"},
+		}}
+		result, err := fetchDescendantTeams(fetcher, logger, repo, "team-a", 20)
+		Ok(t, err)
+		Equals(t, []string{"team-b"}, result)
+	})
 }
 
 func TestCheckUserPermissions(t *testing.T) {
