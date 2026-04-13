@@ -1,3 +1,3 @@
-FROM ghcr.io/runatlantis/atlantis:latest@sha256:bdf219f4ee5a87435ef1f1b0ffc39cf8e86d39bd67d2fac6d86f25a8500c4ce2
+FROM ghcr.io/runatlantis/atlantis:latest@sha256:634ffcdb7c1eb308349be81a09c3778a4fb4cb5b397c2ecf6d843f0e18d51bd7
 COPY atlantis /usr/local/bin/atlantis
 WORKDIR /atlantis/src
