@@ -360,8 +360,8 @@ func (w *FileWorkspace) hasDivergedForPatterns(logger logging.SimpleLogging, clo
 	for _, file := range nonEmptyChangedFiles {
 		match, err := pm.MatchesOrParentMatches(file)
 		if err != nil {
-			logger.Debug("HasDiverged: match error for file %q: %s", file, err)
-			continue
+			logger.Debug("HasDiverged: match error for file %q: %s, treating as diverged", file, err)
+			return true
 		}
 		if match {
 			logger.Debug("HasDiverged: file %q matched patterns - branch has diverged", file)
