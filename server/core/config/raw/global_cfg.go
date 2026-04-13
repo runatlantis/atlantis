@@ -44,6 +44,7 @@ type Repo struct {
 	CustomPolicyCheck         *bool          `yaml:"custom_policy_check,omitempty" json:"custom_policy_check,omitempty"`
 	AutoDiscover              *AutoDiscover  `yaml:"autodiscover,omitempty" json:"autodiscover,omitempty"`
 	SilencePRComments         []string       `yaml:"silence_pr_comments,omitempty" json:"silence_pr_comments,omitempty"`
+	BundleURI                 string         `yaml:"bundle_uri,omitempty" json:"bundle_uri,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -397,5 +398,6 @@ OuterGlobalImportReqs:
 		CustomPolicyCheck:         r.CustomPolicyCheck,
 		AutoDiscover:              autoDiscover,
 		SilencePRComments:         r.SilencePRComments,
+		BundleURI:                 r.BundleURI,
 	}
 }

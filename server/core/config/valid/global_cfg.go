@@ -93,6 +93,7 @@ type Repo struct {
 	CustomPolicyCheck         *bool
 	AutoDiscover              *AutoDiscover
 	SilencePRComments         []string
+	BundleURI                 string
 }
 
 type MergedProjectCfg struct {
@@ -714,6 +715,15 @@ func (g GlobalCfg) MatchingRepo(repoID string) *Repo {
 		}
 	}
 	return nil
+}
+
+// RepoBundleURI returns the bundle URI configured for the given repo, or empty string if not set.
+func (g GlobalCfg) RepoBundleURI(repoID string) string {
+	repo := g.MatchingRepo(repoID)
+	if repo != nil {
+		return repo.BundleURI
+	}
+	return ""
 }
 
 // RepoConfigFile returns a repository specific file path

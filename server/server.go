@@ -525,6 +525,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		DataDir:          userConfig.DataDir,
 		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:    userConfig.CheckoutDepth,
+		GlobalCfg:        globalCfg,
 		GithubAppEnabled: githubAppEnabled,
 	}
 

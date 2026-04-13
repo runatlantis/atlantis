@@ -16,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -106,6 +107,48 @@ func TestClone_MainBranchWithMergeStrategy(t *testing.T) {
 	// Check that our proof file is still there, proving that we didn't reclone.
 	_, err = os.Stat(filepath.Join(cloneDir, "proof"))
 	Ok(t, err)
+}
+
+// Test that clone works with a bundle URI
+func TestClone_BundleURI(t *testing.T) {
+	repoDir := initRepo(t)
+	expCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	dataDir := t.TempDir()
+
+	// Create a bundle from the repo.
+	bundlePath := filepath.Join(dataDir, "repo.bundle")
+	runCmd(t, repoDir, "git", "bundle", "create", bundlePath, "--all")
+
+	logger := logging.NewNoopLogger(t)
+
+	repoID := "github.com/test/repo"
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+		GlobalCfg: valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID:        repoID,
+					BundleURI: bundlePath,
+				},
+			},
+		},
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo: models.Repo{
+			VCSHost:  models.VCSHost{Hostname: "github.com"},
+			FullName: "test/repo",
+		},
+		HeadBranch: "branch",
+	}, "default")
+	Ok(t, err)
+
+	actCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD")
+	Equals(t, expCommit, actCommit)
 }
 
 // Test that if we don't have any existing files, we check out the repo

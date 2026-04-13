@@ -104,6 +104,10 @@ repos:
     ignore_paths:
       - foo/*
 
+  # bundle_uri specifies a bundle URI to pass to git clone via --bundle-uri for faster cloning.
+  # See https://git-scm.com/docs/bundle-uri for more information.
+  bundle_uri: https://bundle-server.example.com/org/repo
+
   # id can also be an exact match.
 - id: github.com/myorg/specific-repo
 

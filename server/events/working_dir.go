@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/moby/patternmatcher"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -90,6 +91,8 @@ type FileWorkspace struct {
 	// the ref "pull/PR_NUMBER/head" from the "origin" remote. If this is false,
 	// we fetch "+refs/heads/$HEAD_BRANCH" from the "<prSourceRemote>" remote.
 	GithubAppEnabled bool
+	// GlobalCfg is the server-side repo config used to look up per-repo settings.
+	GlobalCfg valid.GlobalCfg
 	// use the global setting without overriding
 	GpgNoSigningEnabled bool
 	// flag indicating if we have to merge with potential new changes upstream (directly after grabbing project lock)
@@ -472,22 +475,33 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 		baseCloneURL = w.TestingOverrideBaseCloneURL
 	}
 
+	bundleURI := w.GlobalCfg.RepoBundleURI(c.pr.BaseRepo.ID())
+
 	// if branch strategy, use depth=1
 	if !w.CheckoutMerge {
-		return w.wrappedGit(logger, c, "clone", "--depth=1", "--branch", c.pr.HeadBranch, "--single-branch", headCloneURL, c.dir)
+		cloneArgs := []string{"clone", "--branch", c.pr.HeadBranch, "--single-branch"}
+		// --bundle-uri is incompatible with --depth
+		if bundleURI != "" {
+			cloneArgs = append(cloneArgs, "--bundle-uri", bundleURI)
+		} else {
+			cloneArgs = append(cloneArgs, "--depth=1")
+		}
+		cloneArgs = append(cloneArgs, headCloneURL, c.dir)
+		return w.wrappedGit(logger, c, cloneArgs...)
 	}
 
 	// if merge strategy...
 
-	// if no checkout depth, omit depth arg
-	if w.CheckoutDepth == 0 {
-		if err := w.wrappedGit(logger, c, "clone", "--branch", c.pr.BaseBranch, "--single-branch", baseCloneURL, c.dir); err != nil {
-			return err
-		}
-	} else {
-		if err := w.wrappedGit(logger, c, "clone", "--depth", fmt.Sprint(w.CheckoutDepth), "--branch", c.pr.BaseBranch, "--single-branch", baseCloneURL, c.dir); err != nil {
-			return err
-		}
+	cloneArgs := []string{"clone", "--branch", c.pr.BaseBranch, "--single-branch"}
+	// --bundle-uri is incompatible with --depth
+	if bundleURI != "" {
+		cloneArgs = append(cloneArgs, "--bundle-uri", bundleURI)
+	} else if w.CheckoutDepth != 0 {
+		cloneArgs = append(cloneArgs, "--depth", fmt.Sprint(w.CheckoutDepth))
+	}
+	cloneArgs = append(cloneArgs, baseCloneURL, c.dir)
+	if err := w.wrappedGit(logger, c, cloneArgs...); err != nil {
+		return err
 	}
 
 	if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
