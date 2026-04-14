@@ -42,8 +42,7 @@ If you have any questions about the contribution process, see [Atlantis Contribu
 # Developing
 
 ## Updating The Website
-* To view the generated website locally, run `npm website:dev` and then
-open your browser to http://localhost:8080.
+* To view the generated website locally, run `npm run website:dev` and then open your browser to http://localhost:8080.
 * The website will be regenerated when your pull request is merged to main.
 
 ## Running Atlantis Locally
