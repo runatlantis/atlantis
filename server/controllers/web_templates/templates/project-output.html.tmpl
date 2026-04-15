@@ -1,0 +1,371 @@
+{{ define "title" }}{{ .Path }} - {{ .RepoFullName }} #{{ .PullNum }} - Atlantis{{ end }}
+
+{{ define "head" }}
+<link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/xterm-5.3.0.css">
+{{ end }}
+
+{{ define "content" }}
+<div class="page-container--full-height" x-data="{ copied: false, outputExpanded: true, errorExpanded: true, policyExpanded: true }">
+  <!-- Breadcrumb Navigation -->
+  <nav class="breadcrumb">
+    <a href="{{ .CleanedBasePath }}/prs">Pull Requests</a>
+    <i data-lucide="chevron-right" class="icon-xs"></i>
+    <a href="{{ .CleanedBasePath }}/pr/{{ .RepoOwner }}/{{ .RepoName }}/pulls/{{ .PullNum }}">{{ .RepoFullName }} #{{ .PullNum }}</a>
+    <i data-lucide="chevron-right" class="icon-xs"></i>
+    <span>{{ .Path }}{{ if .ProjectName }} ({{ .ProjectName }}){{ end }}</span>
+  </nav>
+
+  <!-- Header Card -->
+  <div class="pr-header-card">
+    <div class="pr-header-title">
+      <h1>{{ .Path }}{{ if .ProjectName }} ({{ .ProjectName }}){{ end }}</h1>
+      <span class="status-badge status-badge--{{ .LatestStatus }}">
+        {{ if eq .LatestStatus "success" }}<i data-lucide="check-circle" class="icon-xs"></i>{{ end }}
+        {{ if eq .LatestStatus "applied" }}<i data-lucide="check-circle" class="icon-xs"></i>{{ end }}
+        {{ if eq .LatestStatus "failed" }}<i data-lucide="x-circle" class="icon-xs"></i>{{ end }}
+        {{ if eq .LatestStatus "pending" }}<i data-lucide="clock" class="icon-xs"></i>{{ end }}
+        {{ .LatestStatusLabel }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Run History & Stats Section -->
+  <div class="run-info-card">
+    {{ if gt (len .History) 1 }}
+    <div class="history-section" x-data="{ expanded: false }">
+      <button
+        class="history-toggle"
+        @click="expanded = !expanded"
+        :aria-expanded="expanded"
+      >
+        <i data-lucide="chevron-right" class="icon-sm collapse-chevron" :class="{ 'collapse-chevron--open': expanded }"></i>
+        <span>Run History ({{ len .History }} runs)</span>
+        <span class="history-viewing-past" id="viewing-past-indicator" {{ if not .IsHistorical }}style="display: none;"{{ end }}>Viewing past run</span>
+      </button>
+
+      <div class="history-list" x-show="expanded" x-cloak>
+        {{ $basePath := .CleanedBasePath }}
+        {{ $owner := .RepoOwner }}
+        {{ $repo := .RepoName }}
+        {{ $pullNum := .PullNum }}
+        {{ $path := .Path }}
+        {{ $workspace := .Workspace }}
+        {{ $projectName := .ProjectName }}
+        {{ $currentRun := .RunTimestamp }}
+        {{ $latestRun := (index .History 0).RunTimestamp }}
+
+        {{ if .ActiveJob }}
+        <div
+          class="history-item history-item--live"
+          data-job-id="{{ .ActiveJob.JobID }}"
+          data-stream-url="{{ .ActiveJob.StreamURL }}"
+          @click="
+            document.querySelectorAll('.history-item').forEach(el => el.classList.remove('history-item--current'));
+            $el.classList.add('history-item--current');
+            window.dispatchEvent(new CustomEvent('show-live-job', { detail: { streamURL: $el.dataset.streamUrl } }));
+          "
+        >
+          <span class="history-item-indicator history-item-indicator--live">
+            <span class="live-dot"></span>
+          </span>
+          <span class="history-item-command">{{ .ActiveJob.JobStep }}</span>
+          <span class="status-badge status-badge--running status-badge--sm">
+            <span class="running-indicator"></span>
+            Running
+          </span>
+          <span class="history-item-user">-</span>
+          <span class="history-item-time">{{ .ActiveJob.StartedAt }}</span>
+          <span class="history-item-duration">-</span>
+        </div>
+        {{ end }}
+
+        {{ range .History }}
+        <div
+          class="history-item{{ if .IsCurrent }} history-item--current{{ end }}"
+          data-run-timestamp="{{ .RunTimestamp }}"
+          data-is-latest="{{ if eq .RunTimestamp $latestRun }}true{{ else }}false{{ end }}"
+          hx-get="{{ $basePath }}/pr/{{ $owner }}/{{ $repo }}/pulls/{{ $pullNum }}/project/{{ $path }}/output?workspace={{ $workspace }}{{ if $projectName }}&project={{ $projectName }}{{ end }}&run={{ .RunTimestamp }}"
+          hx-target="#output-content"
+          hx-swap="innerHTML"
+          hx-push-url="?workspace={{ $workspace }}{{ if $projectName }}&project={{ $projectName }}{{ end }}&run={{ .RunTimestamp }}"
+          @click="
+            document.querySelectorAll('.history-item').forEach(el => el.classList.remove('history-item--current'));
+            $el.classList.add('history-item--current');
+            document.getElementById('viewing-past-indicator').style.display = $el.dataset.isLatest === 'true' ? 'none' : 'inline';
+          "
+        >
+          <span class="history-item-indicator">
+            {{ if .IsCurrent }}●{{ else }}○{{ end }}
+          </span>
+          <span class="history-item-command">{{ .CommandName }}</span>
+          <span class="status-badge status-badge--{{ .Status }} status-badge--sm">{{ .StatusLabel }}</span>
+          <span class="history-item-user">{{ .TriggeredBy }}</span>
+          <span class="history-item-time">{{ .RunTimestampFmt }}</span>
+          <span class="history-item-duration">{{ .Duration }}</span>
+        </div>
+        {{ end }}
+      </div>
+    </div>
+    {{ end }}
+
+    <!-- Run Stats (always visible) -->
+    <div class="run-stats-row" id="output-stats">
+      <div class="run-stat">
+        <span class="run-stat-label">Workspace</span>
+        <span class="run-stat-value"><span class="badge">{{ .Workspace }}</span></span>
+      </div>
+      <div class="run-stat">
+        <span class="run-stat-label">Command</span>
+        <span class="run-stat-value">{{ .CommandName }}</span>
+      </div>
+      <div class="run-stat">
+        <span class="run-stat-label">Triggered By</span>
+        <span class="run-stat-value">{{ if .TriggeredBy }}{{ .TriggeredBy }}{{ else }}-{{ end }}</span>
+      </div>
+      <div class="run-stat">
+        <span class="run-stat-label">Duration</span>
+        <span class="run-stat-value">{{ if .Duration }}{{ .Duration }}{{ else }}-{{ end }}</span>
+      </div>
+      <div class="run-stat">
+        <span class="run-stat-label">Changes</span>
+        <span class="run-stat-value resource-changes">
+          {{ if gt .AddCount 0 }}<span class="text-success">+{{ .AddCount }}</span>{{ end }}
+          {{ if gt .ChangeCount 0 }}<span class="text-warning">~{{ .ChangeCount }}</span>{{ end }}
+          {{ if gt .DestroyCount 0 }}<span class="text-danger">-{{ .DestroyCount }}</span>{{ end }}
+          {{ if gt .ImportCount 0 }}<span class="text-success">{{ .ImportCount }} import</span>{{ end }}
+          {{ if and (eq .AddCount 0) (eq .ChangeCount 0) (eq .DestroyCount 0) (eq .ImportCount 0) }}<span class="text-muted">No changes</span>{{ end }}
+        </span>
+      </div>
+      <div class="run-stat">
+        <span class="run-stat-label">Policy</span>
+        <span class="run-stat-value">
+          {{ if .HasPolicyCheck }}
+            {{ if .PolicyPassed }}
+            <i data-lucide="shield-check" class="icon-sm text-success" title="Policy passed"></i>
+            {{ else }}
+            <i data-lucide="shield-x" class="icon-sm text-danger" title="Policy failed"></i>
+            {{ end }}
+          {{ else }}
+            <i data-lucide="shield" class="icon-sm text-muted" title="No policy check"></i>
+          {{ end }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Terraform Output Section -->
+  <div class="output-section output-section--expand output-section--terminal{{ if .Error }} output-section--error{{ end }}" :class="{ 'output-section--collapsed': !outputExpanded }">
+    <button
+      class="output-section-header output-section-header--clickable"
+      @click="outputExpanded = !outputExpanded"
+      :aria-expanded="outputExpanded"
+    >
+      <span class="output-section-title">
+        <i data-lucide="chevron-right" class="icon-sm collapse-chevron" :class="{ 'collapse-chevron--open': outputExpanded }"></i>
+        {{ if .Error }}<i data-lucide="alert-triangle" class="icon-sm text-danger"></i>{{ else }}<i data-lucide="file-text" class="icon-sm"></i>{{ end }}
+        <span>Terraform {{ .CommandName | title }} Output</span>
+      </span>
+      <span
+        class="btn btn--secondary btn--sm"
+        @click.stop="navigator.clipboard.writeText(document.getElementById('output-terminal')?.querySelector('.xterm-accessibility-tree')?.textContent || (document.getElementById('output-data') ? JSON.parse(document.getElementById('output-data').textContent).output : '') || ''); copied = true; setTimeout(() => copied = false, 2000)"
+      >
+        <i data-lucide="copy" class="icon-xs" x-show="!copied"></i>
+        <i data-lucide="check" class="icon-xs" x-show="copied" x-cloak></i>
+        <span x-text="copied ? 'Copied!' : 'Copy'"></span>
+      </span>
+    </button>
+    <div class="output-section-content" id="output-content" x-show="outputExpanded">
+      {{ if or .Output .Error .ActiveJob }}
+      <div id="output-terminal" class="output-terminal" data-is-live="{{ if .ActiveJob }}true{{ else }}false{{ end }}" data-stream-url="{{ if .ActiveJob }}{{ .ActiveJob.StreamURL }}{{ end }}"></div>
+      <div id="output-data" hidden>{{ .OutputScriptData }}</div>
+      {{ else if eq .Status "pending" }}
+      <div class="output-pending-state">
+        <i data-lucide="loader-2" class="output-pending-spinner"></i>
+        <h3>Command is still running...</h3>
+        <p><a href="">Refresh</a> to check for updates.</p>
+      </div>
+      {{ else }}
+      <div class="empty-state" style="padding: 40px;">
+        <i data-lucide="file-x" class="empty-state-icon"></i>
+        <h3>No Output Available</h3>
+        <p>Output may not have been captured for this command.</p>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+
+  <!-- Error section (OOB swap target for HTMX partial updates) -->
+  <div id="output-error"></div>
+
+  <!-- Policy Output Section (OOB swap target for HTMX partial updates) -->
+  <div id="output-policy">
+  {{ if .PolicyOutput }}
+  <div class="output-section">
+    <button
+      class="output-section-header output-section-header--clickable"
+      @click="policyExpanded = !policyExpanded"
+      :aria-expanded="policyExpanded"
+    >
+      <span class="output-section-title">
+        <i data-lucide="chevron-right" class="icon-sm collapse-chevron" :class="{ 'collapse-chevron--open': policyExpanded }"></i>
+        <i data-lucide="shield" class="icon-sm"></i>
+        <span>Policy Check Output</span>
+      </span>
+      <span class="status-badge status-badge--{{ if .PolicyPassed }}success{{ else }}failed{{ end }}">
+        {{ if .PolicyPassed }}<i data-lucide="check-circle" class="icon-xs"></i> Passed{{ else }}<i data-lucide="x-circle" class="icon-xs"></i> Failed{{ end }}
+      </span>
+    </button>
+    <div class="output-section-content" x-show="policyExpanded">
+      <pre class="policy-output">{{ .PolicyOutput }}</pre>
+    </div>
+  </div>
+  {{ end }}
+  </div>
+
+  <!-- Footer Links -->
+  <div class="page-footer-links">
+    <a href="{{ .PullURL }}" target="_blank" rel="noopener">
+      View on GitHub
+      <i data-lucide="external-link" class="icon-xs"></i>
+    </a>
+  </div>
+</div>
+{{ end }}
+
+{{ define "scripts" }}
+<script src="{{ .CleanedBasePath }}/static/js/xterm-5.3.0.js"></script>
+<script src="{{ .CleanedBasePath }}/static/js/xterm-addon-fit-0.8.0.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const container = document.getElementById('output-terminal');
+  if (!container) return;
+
+  let term = new Terminal({
+    scrollback: 15000,
+    disableStdin: true,
+    convertEol: true,
+    fontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace",
+    fontSize: 13,
+    lineHeight: 1.5,
+    theme: { background: '#1e1e1e' }
+  });
+  let fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.open(container);
+  fitAddon.fit();
+
+  // Write output and/or error to terminal
+  function writeContent(output, error) {
+    if (error) {
+      term.write(error.replace(/\n/g, '\r\n'));
+      if (output) {
+        term.write('\r\n\r\n');
+      }
+    }
+    if (output) {
+      term.write(output.replace(/\n/g, '\r\n'));
+    }
+  }
+
+  const isLive = container.dataset.isLive === 'true';
+  const outputDataEl = document.getElementById('output-data');
+  const outputData = outputDataEl ? JSON.parse(outputDataEl.textContent) : {};
+  const staticOutput = outputData.output || '';
+  const staticError = outputData.error || '';
+
+  if (isLive) {
+    // SSE streaming
+    const source = new EventSource(container.dataset.streamUrl);
+    source.onmessage = (e) => term.write(e.data + '\r\n');
+    source.addEventListener('complete', () => source.close());
+  } else {
+    writeContent(staticOutput, staticError);
+  }
+
+  // Handle resize
+  if (window.ResizeObserver) {
+    const resizeObserver = new ResizeObserver(() => {
+      if (container.offsetWidth > 0 && container.offsetHeight > 0) {
+        fitAddon.fit();
+      }
+    });
+    resizeObserver.observe(container);
+  }
+  window.addEventListener('resize', () => fitAddon.fit());
+
+  // Refit terminal when output section is expanded/collapsed
+  const outputSection = document.querySelector('.output-section--terminal');
+  if (outputSection) {
+    const observer = new MutationObserver(() => {
+      if (container.offsetHeight > 0) {
+        fitAddon.fit();
+        setTimeout(() => fitAddon.fit(), 50);
+      }
+    });
+    observer.observe(outputSection, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  // Refit terminal when history section expands/collapses (changes available space)
+  const historyList = document.querySelector('.history-list');
+  if (historyList) {
+    const historyObserver = new MutationObserver(() => {
+      // Delay to let animation complete
+      setTimeout(() => fitAddon.fit(), 300);
+    });
+    historyObserver.observe(historyList, { attributes: true, attributeFilter: ['style'] });
+  }
+
+  // Initial delayed fit
+  setTimeout(() => fitAddon.fit(), 100);
+
+  // Dispose terminal before HTMX removes its container from the DOM.
+  // If we wait until afterSwap, xterm's viewport tries to refresh as
+  // the container disappears, crashing on undefined dimensions.
+  window.addEventListener('htmx:beforeSwap', function(e) {
+    if (e.detail.target.id === 'output-content') {
+      term.dispose();
+    }
+  });
+
+  // Reinitialize terminal in the new container after HTMX swap.
+  // NOTE: HTMX v2 fires htmx:afterSwap for every settled element (including
+  // OOB swaps) with the same e.detail.target, so we guard with a data attribute
+  // to ensure we only initialize the terminal once per swap.
+  window.addEventListener('htmx:afterSwap', function(e) {
+    if (e.detail.target.id !== 'output-content') return;
+    const newContainer = document.getElementById('output-terminal');
+    if (!newContainer || newContainer.dataset.initialized) return;
+    newContainer.dataset.initialized = 'true';
+
+    term = new Terminal({
+      scrollback: 15000,
+      disableStdin: true,
+      convertEol: true,
+      fontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace",
+      fontSize: 13,
+      lineHeight: 1.5,
+      theme: { background: '#1e1e1e' }
+    });
+    fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(newContainer);
+    fitAddon.fit();
+    const newDataEl = document.getElementById('output-data');
+    const newData = newDataEl ? JSON.parse(newDataEl.textContent) : {};
+    writeContent(newData.output || '', newData.error || '');
+
+    // Toggle error styling on parent section
+    const section = document.querySelector('.output-section--terminal');
+    if (section) {
+      section.classList.toggle('output-section--error', !!(newData.error));
+    }
+
+    // Re-initialize Lucide icons in swapped content
+    // (inline <script> tags in partials are stripped by allowScriptTags=false)
+    if (window.lucide) window.lucide.createIcons();
+  });
+});
+</script>
+{{ end }}
+
+{{ template "layout" . }}

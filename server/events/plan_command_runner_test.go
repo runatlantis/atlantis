@@ -18,6 +18,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestPlanCommandRunner_IsSilenced(t *testing.T) {
@@ -129,7 +130,13 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				}
 				return ReturnValues{[]command.ProjectContext{}, nil}
 			})
-			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+			// Set up gomock expectations for projectCommandRunner.Plan when projects are matched
+			if c.Matched {
+				projectCommandRunner.EXPECT().Plan(gomock.Any()).Return(command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan output"},
+				}).AnyTimes()
+			}
 
 			planCommandRunner.Run(ctx, cmd)
 
@@ -173,7 +180,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 		Description           string
 		ProjectContexts       []command.ProjectContext
 		ProjectCommandOutputs []command.ProjectCommandOutput
-		RunnerInvokeMatch     []*EqMatcher
+		RunnerInvokeTimes     []int // number of times Plan should be called (1=once, 0=never)
 		PrevPlanStored        bool
 		PlanFailed            bool
 	}{
@@ -207,11 +214,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					Error: errors.New("shabang"),
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			PlanFailed:        true,
 		},
 		{
 			Description: "When first fails, the second will not run",
@@ -240,11 +244,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Never(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 0},
+			PlanFailed:        true,
 		},
 		{
 			Description: "When first fails by autorun, the second will not run",
@@ -275,11 +276,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Never(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 0},
+			PlanFailed:        true,
 		},
 		{
 			Description: "When both in a group of two succeeds, the following two will run",
@@ -330,13 +328,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-				Never(),
-				Never(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 1, 0, 0},
+			PlanFailed:        true,
 		},
 		{
 			Description: "When one out of two fails, the following two will not run",
@@ -390,13 +383,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-				Once(),
-				Once(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 1, 1, 1},
+			PlanFailed:        true,
 		},
 		{
 			Description: "Don't block when parallel is not set",
@@ -424,11 +412,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			PlanFailed:        true,
 		},
 		{
 			Description: "All project finished successfully",
@@ -456,11 +441,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			PlanFailed: false,
+			RunnerInvokeTimes: []int{1, 1},
+			PlanFailed:        false,
 		},
 		{
 			Description: "Don't block when abortOnExecutionOrderFail is not set",
@@ -486,11 +468,8 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					},
 				},
 			},
-			RunnerInvokeMatch: []*EqMatcher{
-				Once(),
-				Once(),
-			},
-			PlanFailed: true,
+			RunnerInvokeTimes: []int{1, 1},
+			PlanFailed:        true,
 		},
 	}
 
@@ -531,18 +510,17 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
-			// When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).Then(func(args []Param) ReturnValues {
-			// 	return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
-			// })
+			// Create a map from project name to expected output
+			outputByProject := make(map[string]command.ProjectCommandOutput)
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutputs[i])
+				outputByProject[c.ProjectContexts[i].ProjectName] = c.ProjectCommandOutputs[i]
 			}
+			// Set up gomock expectation with dynamic return based on project name
+			projectCommandRunner.EXPECT().Plan(gomock.Any()).DoAndReturn(func(ctx command.ProjectContext) command.ProjectCommandOutput {
+				return outputByProject[ctx.ProjectName]
+			}).AnyTimes()
 
 			planCommandRunner.Run(ctx, cmd)
-
-			for i := range c.ProjectContexts {
-				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Plan(c.ProjectContexts[i])
-			}
 
 			require.Equal(t, c.PlanFailed, ctx.CommandHasErrors)
 
@@ -762,8 +740,9 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
 
+			// Set up gomock expectations for projectCommandRunner.Plan
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutput[i])
+				projectCommandRunner.EXPECT().Plan(gomock.Eq(c.ProjectContexts[i])).Return(c.ProjectCommandOutput[i]).AnyTimes()
 			}
 
 			planCommandRunner.Run(ctx, cmd)
@@ -1087,7 +1066,7 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			}
 
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(projectContexts, nil)
-			When(projectCommandRunner.Plan(projectContexts[0])).ThenReturn(c.ProjectResults[0])
+			projectCommandRunner.EXPECT().Plan(gomock.Eq(projectContexts[0])).Return(c.ProjectResults[0]).AnyTimes()
 
 			planCommandRunner.Run(ctx, cmd)
 
