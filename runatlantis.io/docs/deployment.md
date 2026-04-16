@@ -731,6 +731,7 @@ atlantis server \
 --atlantis-url="$URL" \
 --gitea-user="$USERNAME" \
 --gitea-token="$TOKEN" \
+--gitea-base-url="$GITEABASEURL" \
 --gitea-webhook-secret="$SECRET" \
 --gitea-page-size=30 \
 --repo-allowlist="$REPO_ALLOWLIST"
