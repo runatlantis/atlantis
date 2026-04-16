@@ -37,8 +37,8 @@ const prSourceRemote = "source"
 var gitLocks sync.Map
 var recheckRequiredMap sync.Map
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
 
 // WorkingDir handles the workspace on disk for running commands.
 type WorkingDir interface {

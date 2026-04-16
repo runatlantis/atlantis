@@ -16,7 +16,7 @@ import (
 	"github.com/opentofu/tofudl"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_downloader.go Downloader
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_downloader.go Downloader
 
 // Downloader is for downloading terraform versions.
 type Downloader interface {
