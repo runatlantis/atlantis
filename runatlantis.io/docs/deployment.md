@@ -727,11 +727,12 @@ atlantis server \
 ##### Gitea
 
 ```bash
+GITEA_BASE_URL=YOUR_GITEA_BASE_URL # ex. https://gitea.example.com:3000
 atlantis server \
 --atlantis-url="$URL" \
 --gitea-user="$USERNAME" \
 --gitea-token="$TOKEN" \
---gitea-base-url="$GITEABASEURL" \
+--gitea-base-url="$GITEA_BASE_URL" \
 --gitea-webhook-secret="$SECRET" \
 --gitea-page-size=30 \
 --repo-allowlist="$REPO_ALLOWLIST"
