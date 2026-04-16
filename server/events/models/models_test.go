@@ -757,7 +757,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
 			`Terraform will perform the following actions:
 
   # aws_cloudformation_stack.example will be created
-  + resource "aws_cloudformation_stack" "example" {
++   resource "aws_cloudformation_stack" "example" {
 +       id            = (known after apply)
 +       name          = "my-stack"
 +       template_body = <<-EOT
@@ -794,7 +794,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
         EOT
     }`,
 			`# aws_cloudformation_stack.example will be updated in-place
-  ~ resource "aws_cloudformation_stack" "example" {
+!   resource "aws_cloudformation_stack" "example" {
         id              = "arn:aws:cloudformation:..."
 !       name            -> "updated-stack-name"
 !       parameters      = {
@@ -831,7 +831,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
         }
     }`,
 			`# aws_cloudformation_stack.example will be created
-  + resource "aws_cloudformation_stack" "example" {
++   resource "aws_cloudformation_stack" "example" {
 +       capabilities  = ["CAPABILITY_IAM"]
 +       id            = (known after apply)
 +       outputs       = (known after apply)
@@ -867,7 +867,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
                 Type: AWS::EC2::InternetGateway
         EOT
     }`,
-			`+ resource "aws_cloudformation_stack" "vpc" {
+			`+   resource "aws_cloudformation_stack" "vpc" {
 +       arn           = (known after apply)
 +       name          = "vpc-stack"
 +       parameters    = {
@@ -909,7 +909,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
 			`Terraform will perform the following actions:
 
   # aws_instance.example will be updated
-  ~ resource "aws_instance" "example" {
+!   resource "aws_instance" "example" {
         id                = "i-1234567890"
 !       instance_type     -> "t3.medium"
 +       monitoring        = true
@@ -918,7 +918,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
     }
 
   # aws_s3_bucket.data will be created
-  + resource "aws_s3_bucket" "data" {
++   resource "aws_s3_bucket" "data" {
 +       bucket          = "my-bucket"
 +       id              = (known after apply)
 +       versioning      {
@@ -953,7 +953,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
         EOT
     }`,
 			`# aws_cloudformation_stack.iam_role will be created
-  + resource "aws_cloudformation_stack" "iam_role" {
++   resource "aws_cloudformation_stack" "iam_role" {
 +       id            = (known after apply)
 +       name          = "audit-role-stack"
 +       template_body = <<-EOT
@@ -974,6 +974,43 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
                   ManagedPolicyArns:
                     - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess
                     - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/SecurityAudit
+        EOT
+    }`,
+		},
+		{
+			"cloudformation stack with extra-spaced yaml list items in heredoc",
+			`  + resource "aws_cloudformation_stack" "conditions" {
+      + id            = (known after apply)
+      + name          = "conditions-stack"
+      + template_body = <<-EOT
+            AWSTemplateFormatVersion: '2010-09-09'
+            Conditions:
+              isOrg:
+                Fn::Not:
+                  -   Fn::Equals:
+                        -   !Ref ManagementAccountId
+                        -   ""
+              isProd:
+                Fn::Equals:
+                  -   !Ref Environment
+                  -   production
+        EOT
+    }`,
+			`+   resource "aws_cloudformation_stack" "conditions" {
++       id            = (known after apply)
++       name          = "conditions-stack"
++       template_body = <<-EOT
+            AWSTemplateFormatVersion: '2010-09-09'
+            Conditions:
+              isOrg:
+                Fn::Not:
+                  -   Fn::Equals:
+                        -   !Ref ManagementAccountId
+                        -   ""
+              isProd:
+                Fn::Equals:
+                  -   !Ref Environment
+                  -   production
         EOT
     }`,
 		},
