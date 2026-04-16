@@ -439,7 +439,7 @@ func (p *PlanSuccess) NoChanges() bool {
 var (
 	diffKeywordRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)([a-zA-Z_][\w]*\s*)(=|\s->\s|\(known after apply\)|\{)(.*)`)
 	diffHeredocRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)(<<)(.*)`)
-	diffColonRegex   = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {2,}[^ ]+:.*)`)
+	diffColonRegex   = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {2,}[a-zA-Z_][\w-]*:.*)`)
 	diffListRegex    = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
 	diffTildeRegex   = regexp.MustCompile(`(?m)^~`)
 )
