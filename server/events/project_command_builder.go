@@ -381,6 +381,27 @@ func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Cont
 	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
 }
 
+// parseRepoCfg parses the repo config file from repoDir if it exists. Returns the
+// parsed config (or a zero-valued RepoCfg if absent), a bool indicating whether the
+// file was found, and any parse error. Logs at Info level for both outcomes.
+func (p *DefaultProjectCommandBuilder) parseRepoCfg(ctx *command.Context, repoDir string) (valid.RepoCfg, bool, error) {
+	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
+	if err != nil {
+		return valid.RepoCfg{}, false, fmt.Errorf("looking for '%s' file in '%s': %w", repoCfgFile, repoDir, err)
+	}
+	if !hasRepoCfg {
+		ctx.Log.Info("repo config file %s is absent, using global defaults", repoCfgFile)
+		return valid.RepoCfg{}, false, nil
+	}
+	repoCfg, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+	if err != nil {
+		return valid.RepoCfg{}, false, fmt.Errorf("parsing %s: %w", repoCfgFile, err)
+	}
+	ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+	return repoCfg, true, nil
+}
+
 // isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery.
 // Global config ignore_paths takes precedence when explicitly set; otherwise falls through to repo config.
 func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
@@ -510,27 +531,12 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		modifiedFiles = append(modifiedFiles, untrackedFiles...)
 	}
 
-	// Parse config file if it exists.
-	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
+	repoCfg, hasRepoCfg, err := p.parseRepoCfg(ctx, repoDir)
 	if err != nil {
-		return nil, fmt.Errorf("looking for '%s' file in '%s': %w", repoCfgFile, repoDir, err)
+		return nil, err
 	}
 
 	var projCtxs []command.ProjectContext
-	var repoCfg valid.RepoCfg
-
-	if hasRepoCfg {
-		// If there's a repo cfg with projects then we'll use it to figure out which projects
-		// should be planed.
-		repoCfg, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
-		if err != nil {
-			return nil, fmt.Errorf("parsing %s: %w", repoCfgFile, err)
-		}
-		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
-	} else {
-		ctx.Log.Info("repo config file %s is absent, using global defaults", repoCfgFile)
-	}
 
 	mergedProjectCfgs, err := p.getMergedProjectCfgs(ctx, repoDir, modifiedFiles, repoCfg)
 	if err != nil {
@@ -819,17 +825,9 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	// .terragrunt-cache. Apply the same ignore_paths filtering here so
 	// apply doesn't pick up .tfplan files in paths that should be ignored
 	// (e.g. .terraform/modules/).
-	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(defaultRepoDir, repoCfgFile)
+	repoCfg, _, err := p.parseRepoCfg(ctx, defaultRepoDir)
 	if err != nil {
-		return nil, fmt.Errorf("looking for '%s' file in '%s': %w", repoCfgFile, defaultRepoDir, err)
-	}
-	var repoCfg valid.RepoCfg
-	if hasRepoCfg {
-		repoCfg, err = p.ParserValidator.ParseRepoCfg(defaultRepoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
-		if err != nil {
-			return nil, fmt.Errorf("parsing %s: %w", repoCfgFile, err)
-		}
+		return nil, err
 	}
 
 	// Filter out plans in paths matching autodiscover.ignore_paths.
