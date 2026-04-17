@@ -1135,7 +1135,29 @@ func (g *Client) GetFileContent(logger logging.SimpleLogging, repo models.Repo, 
 		return true, []byte{}, err
 	}
 
-	decodedData, err := base64.StdEncoding.DecodeString(*fileContent.Content)
+	// GitHub Contents API returns empty Content for files > 1MB (size > 0 but no content).
+	// Fall back to the Git Blobs API which has no size limit.
+	// We check size > 0 to avoid triggering the fallback for genuinely empty files.
+	if (fileContent.Content == nil || *fileContent.Content == "") && fileContent.GetSize() > 0 {
+		if fileContent.SHA == nil {
+			return true, []byte{}, fmt.Errorf("file %s is too large and has no SHA for blob fetch", fileName)
+		}
+		blob, _, err := g.client.Git.GetBlob(g.ctx, repo.Owner, repo.Name, *fileContent.SHA)
+		if err != nil {
+			return true, []byte{}, fmt.Errorf("fetching blob for large file %s: %w", fileName, err)
+		}
+		// GitHub's base64 payloads include newline separators; strip them before decoding.
+		encoded := strings.ReplaceAll(blob.GetContent(), "\n", "")
+		decodedData, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			return true, []byte{}, err
+		}
+		return true, decodedData, nil
+	}
+
+	// GitHub's base64 payloads include newline separators; strip them before decoding.
+	encoded := strings.ReplaceAll(*fileContent.Content, "\n", "")
+	decodedData, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return true, []byte{}, err
 	}
