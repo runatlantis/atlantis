@@ -110,7 +110,13 @@ func (r *RunStepRunner) Run(
 	}
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output)
+		err = runStepError{
+			err:          err,
+			command:      command,
+			path:         path,
+			output:       output,
+			streamOutput: streamOutput,
+		}
 		if !ctx.CustomPolicyCheck {
 			ctx.Log.Debug("error: %s", err)
 		} else {
@@ -128,4 +134,23 @@ func (r *RunStepRunner) Run(
 	}
 
 	return output, nil
+}
+
+type runStepError struct {
+	err          error
+	command      string
+	path         string
+	output       string
+	streamOutput bool
+}
+
+func (e runStepError) Error() string {
+	return fmt.Sprintf("%s: running %q in %q: \n%s", e.err, e.command, e.path, e.output)
+}
+
+func (e runStepError) JobMessage() string {
+	if !e.streamOutput && e.output != "" {
+		return e.Error()
+	}
+	return e.err.Error()
 }

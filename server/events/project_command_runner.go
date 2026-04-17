@@ -203,6 +203,8 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 			ctx.Log.Err("updating project PR status: %s", err)
 		}
 
+		p.streamFailureToJob(ctx, result)
+
 		return result
 	}
 
@@ -211,6 +213,64 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	}
 
 	return result
+}
+
+// streamFailureToJob emits the project's error and/or failure text to the job
+// output stream so the per-project job page linked from the VCS commit status
+// has a visible final status when plan or apply fails before producing any
+// terraform output (e.g. lock contention, depends_on, requirement checks).
+// Uses \r\n so the xterm-based job page renders the banner on its own lines.
+func (p *ProjectOutputWrapper) streamFailureToJob(ctx command.ProjectContext, result command.ProjectCommandOutput) {
+	if result.Error != nil {
+		p.JobMessageSender.Send(ctx, jobFailureBanner("Error", jobErrorMessage(result.Error)), false)
+	}
+	if result.Failure != "" {
+		p.JobMessageSender.Send(ctx, jobFailureBanner("Failure", result.Failure), false)
+	}
+}
+
+func jobFailureBanner(label string, message string) string {
+	return fmt.Sprintf("\r\n%s:\r\n%s\r\n", label, normalizeJobLineEndings(message))
+}
+
+func normalizeJobLineEndings(message string) string {
+	message = strings.ReplaceAll(message, "\r\n", "\n")
+	message = strings.ReplaceAll(message, "\r", "\n")
+	return strings.ReplaceAll(message, "\n", "\r\n")
+}
+
+func jobErrorMessage(err error) string {
+	if errWithOutput, ok := err.(interface{ JobMessage() string }); ok {
+		return errWithOutput.JobMessage()
+	}
+	return err.Error()
+}
+
+type errWithStepOutput struct {
+	err    error
+	output string
+}
+
+func (e errWithStepOutput) Error() string {
+	if e.output == "" {
+		return e.err.Error()
+	}
+	return fmt.Sprintf("%s\n%s", e.err, e.output)
+}
+
+func (e errWithStepOutput) Unwrap() error {
+	return e.err
+}
+
+func (e errWithStepOutput) JobMessage() string {
+	return jobErrorMessage(e.err)
+}
+
+func errorWithStepOutput(err error, outputs []string) error {
+	return errWithStepOutput{
+		err:    err,
+		output: strings.Join(outputs, "\n"),
+	}
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
@@ -745,7 +805,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		return nil, "", errorWithStepOutput(err, outputs)
 	}
 
 	return &models.PlanSuccess{
@@ -813,7 +873,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	})
 
 	if err != nil {
-		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		return "", "", errorWithStepOutput(err, outputs)
 	}
 
 	return strings.Join(outputs, "\n"), "", nil
