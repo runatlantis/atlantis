@@ -234,7 +234,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 		Scope:                        scope,
 		CommentParser:                &events.CommentParser{ExecutableName: "atlantis"},
 		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{},
-		Parser:                       &events.EventParser{},
+		Parser:                       &events.EventParser{GitlabHostname: "example.com"},
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab},
 		RepoAllowlistChecker:         &events.RepoAllowlistChecker{},
 		VCSClient:                    vcsClient,

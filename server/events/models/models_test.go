@@ -231,9 +231,10 @@ func TestNewRepo_Gitlab_Host_CaseInsensitive(t *testing.T) {
 }
 
 func TestNewRepo_Gitlab_EmptyHostname_SkipsEnhancedCheck(t *testing.T) {
-	// Regression guard: empty vcsHostname preserves pre-change behavior.
-	// A subpath URL would be rejected because the enhanced check is off and
-	// strict path equality still applies.
+	// When vcsHostname is empty, NewRepo falls back to the pre-change
+	// strict-path-equality behavior. cmd/server.go defaults GitlabHostname to
+	// "gitlab.com" in production, so this path guards direct-API callers and
+	// test helpers that construct EventParser without setting a hostname.
 	_, err := models.NewRepo(
 		models.Gitlab, "owner/repo",
 		"https://acme.com/gitlab/owner/repo.git",
