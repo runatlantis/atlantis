@@ -252,7 +252,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	exp := "repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	expRepo, _ := models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "")
+	expRepo, _ := models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "", "")
 	vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(expRepo), Eq(1), Eq("```\nError: This repo is not allowlisted for Atlantis.\n```"), Eq(""))
 }
@@ -321,7 +321,7 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	exp := "repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	expRepo, _ := models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "")
+	expRepo, _ := models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "", "")
 	vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(expRepo), Eq(2), Eq("```\nError: This repo is not allowlisted for Atlantis.\n```"), Eq(""))
 }
