@@ -361,6 +361,7 @@ type EventParser struct {
 	GithubTokenFile    string
 	GitlabUser         string
 	GitlabToken        string
+	GitlabHostname     string
 	GiteaUser          string
 	GiteaToken         string
 	AllowDraftPRs      bool
