@@ -159,6 +159,98 @@ func TestNewRepo_HTTPSAuth(t *testing.T) {
 	}, repo)
 }
 
+// TestNewRepo_Gitlab_HostAndSubpath exercises the GitLab-specific host and
+// subpath validation introduced for subpath-hosted GitLab instances.
+func TestNewRepo_Gitlab_SaaS_Valid(t *testing.T) {
+	repo, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://gitlab.com/owner/repo.git",
+		"u", "p", "gitlab.com")
+	Ok(t, err)
+	Equals(t, "owner/repo", repo.FullName)
+	Equals(t, "gitlab.com", repo.VCSHost.Hostname)
+}
+
+func TestNewRepo_Gitlab_SaaS_WrongHost(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://evil.com/owner/repo.git",
+		"u", "p", "gitlab.com")
+	ErrEquals(t, `expected clone url host "gitlab.com" but had "evil.com"`, err)
+}
+
+func TestNewRepo_Gitlab_SaaS_UnexpectedSubpath(t *testing.T) {
+	// gitlab.com configured with no subpath — a URL carrying a subpath must
+	// still be rejected (regression guard against the suffix-match approach).
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://gitlab.com/x/owner/repo.git",
+		"u", "p", "gitlab.com")
+	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/x/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_Valid(t *testing.T) {
+	repo, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	Ok(t, err)
+	Equals(t, "owner/repo", repo.FullName)
+}
+
+func TestNewRepo_Gitlab_Subpath_MissingSubpath(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url to have path "/gitlab/owner/repo.git" but had "/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_WrongSubpath(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/other/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url to have path "/gitlab/owner/repo.git" but had "/other/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_WrongHost(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://evil.com/gitlab/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url host "acme.com" but had "evil.com"`, err)
+}
+
+func TestNewRepo_Gitlab_Host_CaseInsensitive(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "ACME.com/gitlab")
+	Ok(t, err)
+}
+
+func TestNewRepo_Gitlab_EmptyHostname_SkipsEnhancedCheck(t *testing.T) {
+	// Regression guard: empty vcsHostname preserves pre-change behavior.
+	// A subpath URL would be rejected because the enhanced check is off and
+	// strict path equality still applies.
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "")
+	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/gitlab/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_InvalidConfiguredHostname(t *testing.T) {
+	// If the configured hostname is itself malformed, NewRepo must surface a
+	// wrapping error rather than silently skipping validation.
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "https:///no/host/here")
+	ErrContains(t, "parsing configured gitlab hostname", err)
+}
+
 func TestProject_String(t *testing.T) {
 	Equals(t, "repofullname=owner/repo path=my/path", (models.Project{
 		RepoFullName: "owner/repo",
