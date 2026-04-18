@@ -1323,19 +1323,19 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   plan_requirements: [invalid]`,
-			expErr: "repos: (0: (plan_requirements: \"invalid\" is not a valid plan_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
+			expErr: "repos: (0: (plan_requirements: \"invalid\" is not a valid plan_requirement, only \"approved\", \"approved:N\", \"mergeable\" and \"undiverged\" are supported.).).",
 		},
 		"invalid apply_requirement": {
 			input: `repos:
 - id: /.*/
   apply_requirements: [invalid]`,
-			expErr: "repos: (0: (apply_requirements: \"invalid\" is not a valid apply_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
+			expErr: "repos: (0: (apply_requirements: \"invalid\" is not a valid apply_requirement, only \"approved\", \"approved:N\", \"mergeable\" and \"undiverged\" are supported.).).",
 		},
 		"invalid import_requirement": {
 			input: `repos:
 - id: /.*/
   import_requirements: [invalid]`,
-			expErr: "repos: (0: (import_requirements: \"invalid\" is not a valid import_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
+			expErr: "repos: (0: (import_requirements: \"invalid\" is not a valid import_requirement, only \"approved\", \"approved:N\", \"mergeable\" and \"undiverged\" are supported.).).",
 		},
 		"invalid silence_pr_comments": {
 			input: `repos:
