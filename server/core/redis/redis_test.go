@@ -5,13 +5,14 @@ package redis_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -20,6 +21,8 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/pkg/errors"
+	redisLib "github.com/redis/go-redis/v9"
 	"github.com/runatlantis/atlantis/server/core/redis"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -143,6 +146,101 @@ func TestUnlockCommandFail(t *testing.T) {
 	r := newTestRedis(s)
 	err := r.UnlockCommand(command.Apply)
 	ErrEquals(t, "db transaction failed: no lock exists", err)
+}
+
+func TestMigrationOldLockKeysToNewFormat(t *testing.T) {
+	t.Log("migration should convert old format keys to new format with project name")
+
+	s := miniredis.RunT(t)
+
+	// Create a direct redis client to set up old format locks
+	client := redisLib.NewClient(&redisLib.Options{
+		Addr: s.Addr(),
+	})
+	defer client.Close()
+
+	// Create a lock in old format: {repoFullName}/{path}/{workspace}
+	oldKey := "pr/owner/repo/path/default"
+	oldProject := models.NewProject("owner/repo", "path", "myproject")
+	oldLock := models.ProjectLock{
+		Pull:      models.PullRequest{Num: 1},
+		User:      models.User{Username: "testuser"},
+		Workspace: "default",
+		Project:   oldProject,
+		Time:      time.Now(),
+	}
+
+	oldLockSerialized, err := json.Marshal(oldLock)
+	Ok(t, err)
+
+	// Insert old format lock directly
+	err = client.Set(context.Background(), oldKey, oldLockSerialized, 0).Err()
+	Ok(t, err)
+
+	// Verify old key exists before migration
+	val, err := client.Get(context.Background(), oldKey).Result()
+	Ok(t, err)
+	Assert(t, val != "", "old key should exist before migration")
+
+	// Now create a new Redis instance which should trigger the migration
+	r, err := redis.New(s.Host(), s.Server().Addr().Port, "", false, false, 0)
+	Ok(t, err)
+
+	// Verify the old key no longer exists
+	_, err = client.Get(context.Background(), oldKey).Result()
+	Assert(t, err != nil, "old key should be deleted after migration")
+
+	// Verify the new key exists with correct format
+	retrievedLock, err := r.GetLock(oldProject, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist with new key format")
+	Equals(t, "owner/repo", retrievedLock.Project.RepoFullName)
+	Equals(t, "path", retrievedLock.Project.Path)
+	Equals(t, "myproject", retrievedLock.Project.ProjectName)
+	Equals(t, "default", retrievedLock.Workspace)
+	Equals(t, "testuser", retrievedLock.User.Username)
+}
+
+func TestNoMigrationNeededForNewFormatKeys(t *testing.T) {
+	t.Log("migration should not affect keys already in new format")
+
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
+
+	// Create a lock with the new format (includes project name)
+	projectWithName := models.NewProject("owner/repo", "path", "projectName")
+	newLock := models.ProjectLock{
+		Pull:      models.PullRequest{Num: 1},
+		User:      models.User{Username: "testuser"},
+		Workspace: "default",
+		Project:   projectWithName,
+		Time:      time.Now(),
+	}
+
+	// Try to lock using the new format
+	acquired, _, err := r.TryLock(newLock)
+	Ok(t, err)
+	Assert(t, acquired, "should acquire lock")
+
+	// Verify the lock was created and can be retrieved with the correct key format
+	retrievedLock, err := r.GetLock(projectWithName, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist")
+	Equals(t, "projectName", retrievedLock.Project.ProjectName)
+	Equals(t, "testuser", retrievedLock.User.Username)
+
+	// Close the current Redis connection and create a new one
+	// This simulates a restart which would trigger the migration logic
+	r.Close()
+	r = newTestRedis(s)
+	defer r.Close()
+	// Verify lock still exists after "migration"
+	retrievedLock, err = r.GetLock(projectWithName, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist")
+	Equals(t, "projectName", retrievedLock.Project.ProjectName)
+	Equals(t, "testuser", retrievedLock.User.Username)
+
 }
 
 func TestMixedLocksPresent(t *testing.T) {

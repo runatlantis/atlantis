@@ -8,12 +8,13 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
@@ -51,6 +52,33 @@ func New(hostname string, port int, password string, tlsEnabled bool, insecureSk
 	err := rdb.Ping(ctx).Err()
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to redis instance at %s:%d: %w", hostname, port, err)
+	}
+
+	// Migrate old lock keys to new format.
+	// Old format: pr/{repoFullName}/{path}/{workspace}
+	// New format: pr/{repoFullName}/{path}/{workspace}/{projectName}
+	// We scan all keys and for those that don't match the new format,
+	// we read their value, create a new key with the new format and
+	// delete the old key.
+	allKeys := rdb.Keys(ctx, "pr/*")
+	for _, oldKey := range allKeys.Val() {
+		// Remove the "pr/" prefix to validate the key format
+		keyWithoutPrefix := strings.TrimPrefix(oldKey, "pr/")
+
+		_, err := locking.IsCurrentLocking(keyWithoutPrefix)
+		if err != nil {
+			var currLock models.ProjectLock
+			oldValue, err := rdb.Get(ctx, oldKey).Result()
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get current lock")
+			}
+			if err := json.Unmarshal([]byte(oldValue), &currLock); err != nil {
+				return nil, errors.Wrap(err, "failed to deserialize current lock")
+			}
+			newKey := fmt.Sprintf("pr/%s", models.GenerateLockKey(currLock.Project, currLock.Workspace))
+			rdb.Set(ctx, newKey, oldValue, 0)
+			rdb.Del(ctx, oldKey)
+		}
 	}
 
 	return &RedisDB{

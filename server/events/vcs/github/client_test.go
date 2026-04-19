@@ -644,6 +644,64 @@ func TestClient_PullIsMergeable(t *testing.T) {
 	}
 }
 
+func TestClient_PullIsMergeable_Draft(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	vcsStatusName := "atlantis-test"
+
+	// Use a real GitHub json response and inject draft: true.
+	jsBytes, err := os.ReadFile("testdata/pull-request.json")
+	Ok(t, err)
+	prJSON := string(jsBytes)
+
+	// Inject draft: true.
+	// We replace "mergeable_state": "clean" to ensure it's clean (so it would be mergeable otherwise)
+	// and add "draft": true.
+	response := strings.Replace(prJSON,
+		`"mergeable_state": "clean"`,
+		`"mergeable_state": "clean", "draft": true`,
+		1,
+	)
+
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo/pulls/1":
+				w.Write([]byte(response)) // nolint: errcheck
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logging.NewNoopLogger(t))
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	actMergeable, err := client.PullIsMergeable(
+		logger,
+		models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.Github,
+				Hostname: "github.com",
+			},
+		}, models.PullRequest{
+			Num: 1,
+		}, vcsStatusName, []string{})
+	Ok(t, err)
+	Equals(t, models.MergeableStatus{
+		IsMergeable: false,
+		Reason:      "PR is a draft",
+	}, actMergeable)
+}
+
 func TestClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	vcsStatusName := "atlantis"

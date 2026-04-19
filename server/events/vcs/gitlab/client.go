@@ -176,13 +176,9 @@ func (g *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 }
 
 // CreateComment creates a comment on the merge request.
-func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, _ string) error {
+func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	logger.Debug("Creating comment on GitLab merge request %d", pullNum)
-	sepEnd := "\n```\n</details>" +
-		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
-	sepStart := "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
-		"```diff\n"
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, 0, "")
+	comments := common.SplitComment(logger, comment, maxCommentLength, 0, command)
 	for _, c := range comments {
 		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(c)})
 		if resp != nil {

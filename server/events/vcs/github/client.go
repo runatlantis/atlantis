@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/gofri/go-github-ratelimit/github_ratelimit"
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v83/github"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -228,24 +228,8 @@ listloop:
 // multiple comments.
 func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	logger.Debug("Creating comment on GitHub pull request %d", pullNum)
-	var sepStart string
 
-	sepEnd := "\n```\n</details>" +
-		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
-
-	if command != "" {
-		sepStart = fmt.Sprintf("Continued %s output from previous comment.\n<details><summary>Show Output</summary>\n\n", command) +
-			"```diff\n"
-	} else {
-		sepStart = "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
-			"```diff\n"
-	}
-
-	truncationHeader := "> [!WARNING]\n" +
-		"> **Warning**: Command output is larger than the maximum number of comments per command. Output truncated.\n<details><summary>Show Output</summary>\n\n" +
-		"```diff\n"
-
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, g.maxCommentsPerCommand, truncationHeader)
+	comments := common.SplitComment(logger, comment, maxCommentLength, g.maxCommentsPerCommand, command)
 	for i := range comments {
 		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
 		if resp != nil {
@@ -876,7 +860,7 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 
 	// We map our mergeable check to when the GitHub merge button is clickable.
-	// This corresponds to the following states:
+	// This corresponds to when the PR is not a draft and has one of the following states:
 	// clean: No conflicts, all requirements satisfied.
 	//        Merging is allowed (green box).
 	// unstable: Failing/pending commit status that is not part of the required
@@ -884,6 +868,12 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
+	if githubPR.GetDraft() {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "PR is a draft",
+		}, nil
+	}
 	state := githubPR.GetMergeableState()
 	if state == "" {
 		state = "<unknown>"
@@ -968,7 +958,7 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 
 	logger.Info("Updating GitHub Check status for '%s' to '%s'", src, ghState)
 
-	status := &github.RepoStatus{
+	status := github.RepoStatus{
 		State:       github.Ptr(ghState),
 		Description: github.Ptr(description),
 		Context:     github.Ptr(src),
