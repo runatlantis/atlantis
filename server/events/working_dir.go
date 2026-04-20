@@ -252,11 +252,11 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 
 	// Hold ref lock and repo read lock for the full duration (fetch + status) so we don't race with
 	// clone/reset/merge. recheckDiverged does not take the read lock because it already holds the write lock.
-	unlockGitRefLock := w.gitRefLock(cloneDir)
-	defer unlockGitRefLock()
-
 	unlockGitReadLock := w.gitReadLock(cloneDir)
 	defer unlockGitReadLock()
+
+	unlockGitRefLock := w.gitRefLock(cloneDir)
+	defer unlockGitRefLock()
 
 	if len(autoplanWhenModified) > 0 {
 		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest)
