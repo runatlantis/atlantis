@@ -881,6 +881,26 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			},
 		},
 		{
+			"ci/external-pipeline",
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			defaultMr,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/external-pipeline has status failed",
+			},
+		},
+		{
+			"ci/external-pipeline",
+			models.PendingCommitStatus,
+			gitlabServerVersions,
+			defaultMr,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/external-pipeline has status running",
+			},
+		},
+		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
