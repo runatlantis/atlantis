@@ -41,5 +41,5 @@ func ParseGitlabHostname(raw string) (host, basePath string, err error) {
 	if u.Host == "" {
 		return "", "", fmt.Errorf("gitlab hostname %q has no host component", raw)
 	}
-	return u.Host, strings.TrimSuffix(u.Path, "/"), nil
+	return u.Host, strings.TrimRight(u.Path, "/"), nil
 }

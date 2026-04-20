@@ -35,6 +35,7 @@ func TestParseGitlabHostname(t *testing.T) {
 		{"http with port and subpath", "http://acme.com:8080/gitlab", "acme.com:8080", "/gitlab"},
 		{"multi-level subpath trailing slash", "acme.com/group/sub/", "acme.com", "/group/sub"},
 		{"https trailing slash", "https://acme.com/", "acme.com", ""},
+		{"multiple trailing slashes", "acme.com/gitlab///", "acme.com", "/gitlab"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
