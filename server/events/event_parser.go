@@ -26,7 +26,7 @@ import (
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v83/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -208,7 +208,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, sub
 	}
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_event_parsing.go EventParsing
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_event_parsing.go EventParsing
 
 // EventParsing parses webhook events from different VCS hosts into their
 // respective Atlantis models.
