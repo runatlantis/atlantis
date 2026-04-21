@@ -106,7 +106,7 @@ jobs:
       - name: run http-server
         run: |
           # build site
-          npm install
+          npm ci
           npm run website:build
 
           # start http-server for integration testing

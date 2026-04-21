@@ -4,6 +4,6 @@
 
 # Register go-118-fuzz-build so compile_native_go_fuzzer can inject its harness.
 printf "package main\nimport _ \"github.com/AdamKorcz/go-118-fuzz-build/testing\"\n" > "$SRC/atlantis/register.go"
-cd "$SRC/atlantis" && go get github.com/AdamKorcz/go-118-fuzz-build/testing && go mod tidy -e
+cd "$SRC/atlantis" && go get github.com/AdamKorcz/go-118-fuzz-build/testing@v0.0.0-20250520111509-a70c2aa677fa && go mod tidy -e
 
 compile_native_go_fuzzer github.com/runatlantis/atlantis/server/core/config/cfgfuzz FuzzParseRepoCfgData FuzzParseRepoCfgData
