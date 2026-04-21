@@ -284,7 +284,7 @@ type Plan struct {
 // GenerateLockKey creates a consistent lock key from a project and workspace.
 // This ensures the same format is used across all locking operations.
 func GenerateLockKey(project Project, workspace string) string {
-	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, workspace)
+	return fmt.Sprintf("%s/%s/%s/%s", project.RepoFullName, project.Path, workspace, project.ProjectName)
 }
 
 // NewProject constructs a Project. Use this constructor because it
@@ -437,14 +437,20 @@ func (p *PlanSuccess) NoChanges() bool {
 
 // Diff Markdown regexes
 var (
-	diffKeywordRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s=\s|\s->\s|<<|\{|\(known after apply\)| {2,}[^ ]+:.*)(.*)`)
-	diffListRegex    = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
-	diffTildeRegex   = regexp.MustCompile(`(?m)^~`)
+	diffKeywordRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)([a-zA-Z_][\w]*\s*)(=|\s->\s|\(known after apply\)|\{)(.*)`)
+	diffResourceRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)((?:resource|data|module)\s+.+\{.*)`)
+	diffHeredocRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(<<)(.*)`)
+	diffColonRegex    = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {4,}[a-zA-Z_][\w-]*:.*)`)
+	diffListRegex     = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
+	diffTildeRegex    = regexp.MustCompile(`(?m)^~`)
 )
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5")
+	formattedTerraformOutput = diffResourceRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
+	formattedTerraformOutput = diffHeredocRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3$4")
+	formattedTerraformOutput = diffColonRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
 

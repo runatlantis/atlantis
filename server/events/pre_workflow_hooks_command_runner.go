@@ -15,14 +15,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
 
 // PreWorkflowHookURLGenerator generates urls to view the pre workflow progress.
 type PreWorkflowHookURLGenerator interface {
 	GenerateProjectWorkflowHookURL(hookID string) (string, error)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
 
 type PreWorkflowHooksCommandRunner interface {
 	RunPreHooks(ctx *command.Context, cmd *CommentCommand) error
@@ -55,7 +55,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 
 	ctx.Log.Info("Pre-workflow hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, cmd.Name)
+	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, "", cmd.Name)
 	if err != nil {
 		return err
 	}

@@ -22,20 +22,26 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   changes:
+    permissions:
+      contents: read  # for dorny/paths-filter to fetch a list of changed files
+      pull-requests: read  # for dorny/paths-filter to read pull requests
     outputs:
       should-run-build: ${{ steps.changes.outputs.src == 'true' || startsWith(github.ref, 'refs/tags/') }}
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
         with:
           egress-policy: audit
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
         id: changes
         with:
           filters: |
@@ -67,7 +73,7 @@ jobs:
 
     steps:
     - name: Harden Runner
-      uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+      uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
       with:
         egress-policy: audit
 
@@ -87,14 +93,14 @@ jobs:
     - name: Set up QEMU
       uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       with:
-        image: tonistiigi/binfmt:latest
+        image: tonistiigi/binfmt:qemu-v10.2.1@sha256:d3b963f787999e6c0219a48dba02978769286ff61a5f4d26245cb6a6e5567ea3
         platforms: arm64,arm
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
     - name: "Install cosign"
-      uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
       if: env.PUSH == 'true' && github.event_name != 'pull_request'
 
     # release version is the name of the tag i.e. v0.10.0
@@ -137,7 +143,7 @@ jobs:
           # Suffix is not used here since there's no way to disable it above
 
     - name: Login to Packages Container registry
-      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+      uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -151,7 +157,7 @@ jobs:
     - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
       id: build
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+      uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
       with:
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -183,19 +189,24 @@ jobs:
         # Sign dev tags, version tags, and latest tags
         echo "${TAGS}" | xargs -I {} cosign sign \
           --yes \
-          -a actor=${{ github.actor}} \
-          -a ref_name=${{ github.ref_name}} \
-          -a ref=${{ github.sha }} \
+          -a "actor=${ACTOR}" \
+          -a "ref_name=${REF_NAME}" \
+          -a "ref=${SHA}" \
           {}@${DIGEST}
       env:
         TAGS: ${{ steps.meta.outputs.tags }}
         DIGEST: ${{ steps.build.outputs.digest }}
+        ACTOR: ${{ github.actor }}
+        REF_NAME: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
 
   test:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'true'
     name: Test Image With Goss
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     strategy:
       matrix:
         image_type: [alpine, debian]
@@ -206,7 +217,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
         with:
           egress-policy: audit
 
@@ -216,7 +227,7 @@ jobs:
 
       - name: "Build and load into Docker"
         if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -241,13 +252,15 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'false'
     name: Build Image
+    permissions:
+      contents: read
     strategy:
       matrix:
         image_type: [alpine, debian]
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
         with:
           egress-policy: audit
 
