@@ -29,8 +29,6 @@ Current AI tools are useful as coding assistants — but not as autonomous contr
 
    Many AI coding tools automatically add `Co-authored-by` trailers — this is acceptable and need not be changed to `Assisted-by`.
 
-[Atlantis Maintainers](MAINTAINERS.md) are exempt from these rules and may use AI tools at their discretion.
-
 ## AI Tooling in Atlantis Workflows
 
 Atlantis maintainers use the following AI tools as part of the standard development workflow:
