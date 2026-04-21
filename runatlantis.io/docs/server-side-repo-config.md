@@ -185,7 +185,7 @@ repos:
 
 See [Command Requirements](command-requirements.md) for more details.
 
-### Repos Can Set Their Own Apply an applicable subcommand
+### Repos Can Set Their Own Apply Requirements
 
 If you want all (or specific) repos to be able to override the default apply requirements, use
 the `allowed_overrides` key.
