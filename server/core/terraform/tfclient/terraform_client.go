@@ -41,7 +41,7 @@ import (
 
 var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
 
-//go:generate pegomock generate --package mocks -o mocks/mock_terraform_client.go Client
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_terraform_client.go Client
 
 type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
