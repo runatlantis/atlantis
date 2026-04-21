@@ -2,7 +2,7 @@
 
 **What it does:** Self-hosted Go application that listens for Terraform PR webhooks, runs `terraform plan/apply`, and comments results back to PRs.
 
-**Stack:** Go 1.25.4 • 381 Go files • Gorilla Mux • Cobra CLI • Viper config • VitePress docs (Node.js) • Docker deployment
+**Stack:** Go 1.25.8 • 381 Go files • Gorilla Mux • Cobra CLI • Viper config • VitePress docs (Node.js) • Docker deployment
 
 **Key Info:** ~35MB repo, server + CLI app, E2E tests with Playwright, integration tests with Terraform
 
@@ -10,7 +10,7 @@
 
 ## Build & Test (Always from repo root)
 
-**Prerequisites:** Go 1.25.4 (from go.mod, not .tool-versions) • Node 20+ & npm 10+ (website) • Docker • Terraform 1.11.1+ (integration tests)
+**Prerequisites:** Go 1.25.8 (from go.mod) • Node 20+ & npm 10+ (website) • Docker • Terraform 1.11.1+ (integration tests)
 
 **Build:** `make build-service` → creates `./atlantis` binary (~51MB, 30-60s first run, 10s subsequent). Clean: `make clean`
 
@@ -92,4 +92,4 @@
 
 ---
 
-**Trust these instructions first.** Search codebase only if info is incomplete/incorrect. Validated 2026-01-30 • Go 1.25.4
+**Trust these instructions first.** Search codebase only if info is incomplete/incorrect. Validated 2026-04-20 • Go 1.25.8

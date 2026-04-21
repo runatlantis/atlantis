@@ -257,7 +257,7 @@ func TestNewClient_BadVersion(t *testing.T) {
 	mockDownloader := mocks.NewMockDownloader()
 	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
 	_, err := tfclient.NewClient(logger, distribution, binDir, cacheDir, "", "", "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, true, true, projectCmdOutputHandler)
-	ErrEquals(t, "Malformed version: malformed", err)
+	ErrEquals(t, "malformed version: malformed", err)
 }
 
 // Test that if we run a command with a version we don't have, we download it.
