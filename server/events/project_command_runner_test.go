@@ -67,6 +67,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
 		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
@@ -310,7 +311,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	}
 	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
-	When(mockWorkingDir.HasDiverged(ctx.Log, tmp)).ThenReturn(true)
+	When(mockWorkingDir.HasDiverged(ctx.Log, tmp, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull)).ThenReturn(true)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
@@ -429,6 +430,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
 				Any[models.PullRequest](),
@@ -511,6 +513,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		Any[models.PullRequest](),
 		Any[string](),
 	)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(
 		Any[logging.SimpleLogging](),
 		Any[models.PullRequest](),
@@ -579,6 +582,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
 		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
@@ -721,6 +725,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			repoDir := t.TempDir()
 			When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 			if c.setup != nil {
 				c.setup(repoDir, ctx, mockLocker, mockInit, mockImport)
 			}
@@ -892,6 +897,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
@@ -1020,6 +1026,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *test
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
@@ -1184,6 +1191,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckFailureDetection(t *testin
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
@@ -1316,6 +1324,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_NoPreOrPostConftestOutput
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
@@ -1887,6 +1896,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
 				Any[models.PullRequest](),

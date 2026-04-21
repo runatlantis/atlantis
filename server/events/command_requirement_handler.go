@@ -12,7 +12,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_command_requirement_handler.go CommandRequirementHandler
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_command_requirement_handler.go CommandRequirementHandler
 type CommandRequirementHandler interface {
 	ValidateProjectDependencies(ctx command.ProjectContext) (string, error)
 	ValidatePlanProject(repoDir string, ctx command.ProjectContext) (string, error)
@@ -72,7 +72,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 				return fmt.Sprintf("Pull request must be mergeable before running %s%s.", cmd, suffix), nil
 			}
 		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(ctx.Log, repoDir) {
+			if a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull) {
 				return fmt.Sprintf("Default branch must be rebased onto pull request before running %s.", cmd), nil
 			}
 		}

@@ -1370,9 +1370,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	noOpLocker := locking.NewNoOpLocker()
 	applyLocker = locking.NewApplyClient(b, disableApply, disableGlobalApplyLock)
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:     lockingClient,
-		NoOpLocker: noOpLocker,
-		VCSClient:  e2eVCSClient,
+		Locker:         lockingClient,
+		NoOpLocker:     noOpLocker,
+		VCSClient:      e2eVCSClient,
+		ExecutableName: "atlantis",
 	}
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
