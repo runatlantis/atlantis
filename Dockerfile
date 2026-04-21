@@ -3,7 +3,7 @@
 ARG ALPINE_TAG=3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
 ARG DEBIAN_TAG=12.13-slim@sha256:4724b8cc51e33e398f0e2e15e18d5ec2851ff0c2280647e1310bc1642182655d
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.25.4-alpine@sha256:d3f0cf7723f3429e3f9ed846243970b20a2de7bae6a5b66fc5914e228d831bbb
+ARG GOLANG_TAG=1.25.8-alpine@sha256:8e02eb337d9e0ea459e041f1ee5eece41cbb61f1d83e7d883a3e2fb4862063fa
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.14.8
@@ -37,8 +37,8 @@ WORKDIR /app
 # This is needed to download transitive dependencies instead of compiling them
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
-# renovate: datasource=repology depName=alpine_3_22/bash versioning=loose
-ENV BUILDER_BASH_VERSION="5.2.37-r0"
+# renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
+ENV BUILDER_BASH_VERSION="5.3.3-r1"
 
 RUN apk add --no-cache \
     bash=${BUILDER_BASH_VERSION}
