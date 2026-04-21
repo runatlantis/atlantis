@@ -999,6 +999,24 @@ func TestClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
 				IsMergeable: true,
 			},
 		},
+		// Ruleset-enforced required reviewer approvals (reviewDecision is null when rulesets control reviews)
+		{
+			"blocked",
+			"ruleset-required-reviewer-pending.json",
+			"null",
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
+		},
+		{
+			"blocked",
+			"ruleset-required-reviewer-approved.json",
+			"null",
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
 	}
 
 	// Use a real GitHub json response and edit the mergeable_state field.
