@@ -70,7 +70,7 @@ var DefaultBlockedExtraArgs = []string{
 // and pasting GitHub comments.
 var multiLineRegex = regexp.MustCompile(`.*\r?\n[^\r\n]+`)
 
-//go:generate pegomock generate --package mocks -o mocks/mock_comment_parsing.go CommentParsing
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_comment_parsing.go CommentParsing
 
 // CommentParsing handles parsing pull request comments.
 type CommentParsing interface {
@@ -79,7 +79,7 @@ type CommentParsing interface {
 	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_comment_building.go CommentBuilder
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_comment_building.go CommentBuilder
 
 // CommentBuilder builds comment commands that can be used on pull requests.
 type CommentBuilder interface {
