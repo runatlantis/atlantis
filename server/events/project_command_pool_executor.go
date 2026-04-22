@@ -183,6 +183,19 @@ func runProjectCmdsWithCancellationTracker(
 			ctx.Log.Info("abort on execution order when failed")
 			break
 		}
+
+		if ctx.PullStatus != nil {
+			for _, result := range groupResult.ProjectResults {
+				for projectIdx := range ctx.PullStatus.Projects {
+					if result.Workspace == ctx.PullStatus.Projects[projectIdx].Workspace &&
+						result.RepoRelDir == ctx.PullStatus.Projects[projectIdx].RepoRelDir &&
+						result.ProjectName == ctx.PullStatus.Projects[projectIdx].ProjectName {
+						ctx.PullStatus.Projects[projectIdx].Status = result.PlanStatus()
+						break
+					}
+				}
+			}
+		}
 	}
 
 	return command.Result{ProjectResults: results}

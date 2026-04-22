@@ -27,7 +27,7 @@ const SlackKind = "slack"
 const HttpKind = "http"
 const ApplyEvent = "apply"
 
-//go:generate pegomock generate --package mocks -o mocks/mock_sender.go Sender
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_sender.go Sender
 
 // Sender sends webhooks.
 type Sender interface {
