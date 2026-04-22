@@ -11,6 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	tally "github.com/uber-go/tally/v4"
@@ -301,8 +302,7 @@ func findResult(result command.Result, projectName string) *command.ProjectResul
 		}
 	}
 	return nil
-	. "github.com/runatlantis/atlantis/testing"
-)
+}
 
 func TestRunProjectCmdsWithCancellationTracker_UpdatesPullStatusBetweenGroups(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
