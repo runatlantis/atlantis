@@ -562,9 +562,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:     lockingClient,
-		NoOpLocker: noOpLocker,
-		VCSClient:  vcsClient,
+		Locker:         lockingClient,
+		NoOpLocker:     noOpLocker,
+		VCSClient:      vcsClient,
+		ExecutableName: userConfig.ExecutableName,
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
@@ -609,6 +610,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AzureDevopsUser,
 		userConfig.ExecutableName,
 		allowCommands,
+		userConfig.ToBlockedExtraArgs(),
 	)
 	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()
