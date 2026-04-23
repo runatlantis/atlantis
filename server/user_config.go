@@ -46,6 +46,8 @@ type UserConfig struct {
 	DisableUnlockLabel          string `mapstructure:"disable-unlock-label"`
 	DiscardApprovalOnPlanFlag   bool   `mapstructure:"discard-approval-on-plan"`
 	EmojiReaction               string `mapstructure:"emoji-reaction"`
+	EmojiRunReaction            string `mapstructure:"emoji-run-reaction"`
+	EmojiErrorReaction          string `mapstructure:"emoji-error-reaction"`
 	EnablePolicyChecksFlag      bool   `mapstructure:"enable-policy-checks"`
 	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
 	EnableProfilingAPI          bool   `mapstructure:"enable-profiling-api"`
