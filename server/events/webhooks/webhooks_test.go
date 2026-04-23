@@ -59,7 +59,7 @@ func TestNewWebhooksManager_InvalidWorkspaceRegex(t *testing.T) {
 	invalidRegex := "("
 	configs := validConfigs()
 	configs[0].WorkspaceRegex = invalidRegex
-	_, err := webhooks.NewMultiWebhookSender(configs, clients)
+	_, err := webhooks.NewMultiWebhookSender(configs, clients, false)
 	Assert(t, err != nil, "expected error")
 	Assert(t, strings.Contains(err.Error(), "error parsing regexp"), "expected regex error")
 }
@@ -72,7 +72,7 @@ func TestNewWebhooksManager_InvalidBranchRegex(t *testing.T) {
 	invalidRegex := "("
 	configs := validConfigs()
 	configs[0].BranchRegex = invalidRegex
-	_, err := webhooks.NewMultiWebhookSender(configs, clients)
+	_, err := webhooks.NewMultiWebhookSender(configs, clients, false)
 	Assert(t, err != nil, "expected error")
 	Assert(t, strings.Contains(err.Error(), "error parsing regexp"), "expected regex error")
 }
@@ -86,7 +86,7 @@ func TestNewWebhooksManager_InvalidBranchAndWorkspaceRegex(t *testing.T) {
 	configs := validConfigs()
 	configs[0].WorkspaceRegex = invalidRegex
 	configs[0].BranchRegex = invalidRegex
-	_, err := webhooks.NewMultiWebhookSender(configs, clients)
+	_, err := webhooks.NewMultiWebhookSender(configs, clients, false)
 	Assert(t, err != nil, "expected error")
 	Assert(t, strings.Contains(err.Error(), "error parsing regexp"), "expected regex error")
 }
@@ -97,7 +97,7 @@ func TestNewWebhooksManager_NoEvent(t *testing.T) {
 	clients := validClients()
 	configs := validConfigs()
 	configs[0].Event = ""
-	_, err := webhooks.NewMultiWebhookSender(configs, clients)
+	_, err := webhooks.NewMultiWebhookSender(configs, clients, false)
 	Assert(t, err != nil, "expected error")
 	Equals(t, "must specify \"kind\" and \"event\" keys for webhooks", err.Error())
 }
@@ -110,7 +110,7 @@ func TestNewWebhooksManager_UnsupportedEvent(t *testing.T) {
 	unsupportedEvent := "badevent"
 	configs := validConfigs()
 	configs[0].Event = unsupportedEvent
-	_, err := webhooks.NewMultiWebhookSender(configs, clients)
+	_, err := webhooks.NewMultiWebhookSender(configs, clients, false)
 	Assert(t, err != nil, "expected error")
 	Equals(t, "\"event: badevent\" not supported. Only \"event: apply\" is supported right now", err.Error())
 }
@@ -121,7 +121,7 @@ func TestNewWebhooksManager_NoKind(t *testing.T) {
 	clients := validClients()
 	configs := validConfigs()
 	configs[0].Kind = ""
-	_, err := webhooks.NewMultiWebhookSender(configs, clients)
+	_, err := webhooks.NewMultiWebhookSender(configs, clients, false)
 	Assert(t, err != nil, "expected error")
 	Equals(t, "must specify \"kind\" and \"event\" keys for webhooks", err.Error())
 }
@@ -134,7 +134,7 @@ func TestNewWebhooksManager_UnsupportedKind(t *testing.T) {
 	unsupportedKind := "badkind"
 	configs := validConfigs()
 	configs[0].Kind = unsupportedKind
-	_, err := webhooks.NewMultiWebhookSender(configs, clients)
+	_, err := webhooks.NewMultiWebhookSender(configs, clients, false)
 	Assert(t, err != nil, "expected error")
 	Equals(t, "\"kind: badkind\" not supported. Only \"kind: slack\" and \"kind: http\" are supported right now", err.Error())
 }
@@ -148,12 +148,12 @@ func TestNewWebhooksManager_NoConfigSuccess(t *testing.T) {
 		Slack: webhooks.NewSlackClient(emptyToken),
 		Http:  &webhooks.HttpClient{Client: http.DefaultClient},
 	}
-	m, err := webhooks.NewMultiWebhookSender(emptyConfigs, anyClients)
+	m, err := webhooks.NewMultiWebhookSender(emptyConfigs, anyClients, false)
 	Ok(t, err)
 	Equals(t, 0, len(m.Webhooks)) // nolint: staticcheck
 
 	t.Log("passing nil client should succeed")
-	m, err = webhooks.NewMultiWebhookSender(emptyConfigs, webhooks.Clients{})
+	m, err = webhooks.NewMultiWebhookSender(emptyConfigs, webhooks.Clients{}, false)
 	Ok(t, err)
 	Equals(t, 0, len(m.Webhooks)) // nolint: staticcheck
 }
@@ -164,7 +164,7 @@ func TestNewWebhooksManager_SingleConfigSuccess(t *testing.T) {
 	When(clients.Slack.TokenIsSet()).ThenReturn(true)
 
 	configs := validConfigs()
-	m, err := webhooks.NewMultiWebhookSender(configs, clients)
+	m, err := webhooks.NewMultiWebhookSender(configs, clients, false)
 	Ok(t, err)
 	Equals(t, 1, len(m.Webhooks)) // nolint: staticcheck
 }
@@ -180,7 +180,7 @@ func TestNewWebhooksManager_MultipleConfigSuccess(t *testing.T) {
 	for range nConfigs {
 		configs = append(configs, validConfig)
 	}
-	m, err := webhooks.NewMultiWebhookSender(configs, clients)
+	m, err := webhooks.NewMultiWebhookSender(configs, clients, false)
 	Ok(t, err)
 	Equals(t, nConfigs, len(m.Webhooks)) // nolint: staticcheck
 }
