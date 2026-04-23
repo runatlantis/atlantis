@@ -55,6 +55,8 @@ func (s *ServerStarterMock) Start() error {
 // Adding a new flag? Add it to this slice for testing in alphabetical
 // order.
 var testFlags = map[string]any{
+	ADAllowMergeableBypassApply:      false,
+	ADBypassMergeRequirementTeams:    "",
 	ADHostnameFlag:                   "dev.azure.com",
 	ADTokenFlag:                      "ad-token",
 	ADUserFlag:                       "ad-user",

@@ -148,6 +148,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	autoMerger = &events.AutoMerger{
 		VCSClient:       vcsClient,
 		GlobalAutomerge: false,
+		VCSStatusName:   "atlantis",
 	}
 
 	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
