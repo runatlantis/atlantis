@@ -275,7 +275,7 @@ func TestPlanSuccess_Summary(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.expResult, func(t *testing.T) {
-			Equals(t, c.expResult, c.p.PlanSuccess.Summary())
+			Equals(t, c.expResult, c.p.ProjectCommandOutput.PlanSuccess.Summary())
 		})
 	}
 }
