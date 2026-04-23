@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/runatlantis/atlantis/server/api"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -116,9 +117,8 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 	if result.HasErrors() {
 		code = http.StatusInternalServerError
 	}
-
-	// TODO: make a better response
-	response, err := json.Marshal(result)
+	apiPlanResult := api.BuildPlanResult(result)
+	response, err := json.Marshal(apiPlanResult)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
