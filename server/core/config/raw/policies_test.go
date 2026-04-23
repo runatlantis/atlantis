@@ -138,7 +138,7 @@ func TestPolicySets_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "conftest_version: version \"\" could not be parsed: Malformed version: .",
+			expErr: "conftest_version: version \"\" could not be parsed: malformed version: .",
 		},
 		{
 			description: "invalid version",
@@ -152,7 +152,7 @@ func TestPolicySets_Validate(t *testing.T) {
 					},
 				},
 			},
-			expErr: "conftest_version: version \"version123\" could not be parsed: Malformed version: version123.",
+			expErr: "conftest_version: version \"version123\" could not be parsed: malformed version: version123.",
 		},
 		{
 			description: "invalid top-level policy_item_regex",
