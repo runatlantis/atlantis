@@ -18,6 +18,7 @@ import (
 	"embed"
 	"fmt"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -55,9 +56,14 @@ type MarkdownRenderer struct {
 	disableRepoLocking        bool
 	enableDiffMarkdownFormat  bool
 	markdownTemplates         *template.Template
+	templatesMu               sync.RWMutex // protects markdownTemplates
 	executableName            string
 	hideUnchangedPlanComments bool
 	quietPolicyChecks         bool
+	// markdownTemplateOverridesDir is the directory containing template overrides for live editing.
+	markdownTemplateOverridesDir string
+	// liveReloadEnabled is true if templates should be reloaded on each render call.
+	liveReloadEnabled bool
 }
 
 // commonData is data that all responses have.
@@ -153,30 +159,55 @@ func NewMarkdownRenderer(
 	executableName string,
 	hideUnchangedPlanComments bool,
 	quietPolicyChecks bool,
+	liveReloadEnabled bool,
 ) *MarkdownRenderer {
-	var templates *template.Template
-	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
+	templates := loadTemplates(markdownTemplateOverridesDir)
+	return &MarkdownRenderer{
+		gitlabSupportsCommonMark:     gitlabSupportsCommonMark,
+		disableApplyAll:              disableApplyAll,
+		disableMarkdownFolding:       disableMarkdownFolding,
+		disableApply:                 disableApply,
+		disableRepoLocking:           disableRepoLocking,
+		enableDiffMarkdownFormat:     enableDiffMarkdownFormat,
+		markdownTemplates:            templates,
+		executableName:               executableName,
+		hideUnchangedPlanComments:    hideUnchangedPlanComments,
+		quietPolicyChecks:            quietPolicyChecks,
+		markdownTemplateOverridesDir: markdownTemplateOverridesDir,
+		liveReloadEnabled:            liveReloadEnabled,
+	}
+}
+
+// loadTemplates loads templates from embedded FS and optionally from override directory.
+func loadTemplates(markdownTemplateOverridesDir string) *template.Template {
+	templates, _ := template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
 	if overrides, err := templates.ParseGlob(fmt.Sprintf("%s/*.tmpl", markdownTemplateOverridesDir)); err == nil {
 		// doesn't override if templates directory doesn't exist
 		templates = overrides
 	}
-	return &MarkdownRenderer{
-		gitlabSupportsCommonMark:  gitlabSupportsCommonMark,
-		disableApplyAll:           disableApplyAll,
-		disableMarkdownFolding:    disableMarkdownFolding,
-		disableApply:              disableApply,
-		disableRepoLocking:        disableRepoLocking,
-		enableDiffMarkdownFormat:  enableDiffMarkdownFormat,
-		markdownTemplates:         templates,
-		executableName:            executableName,
-		hideUnchangedPlanComments: hideUnchangedPlanComments,
-		quietPolicyChecks:         quietPolicyChecks,
+	return templates
+}
+
+// reloadTemplates reloads templates if live reload is enabled.
+func (m *MarkdownRenderer) reloadTemplates() {
+	if m.liveReloadEnabled {
+		m.templatesMu.Lock()
+		m.markdownTemplates = loadTemplates(m.markdownTemplateOverridesDir)
+		m.templatesMu.Unlock()
 	}
 }
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
 func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd PullCommand) string {
+	// Reload templates if live reload is enabled
+	m.reloadTemplates()
+
+	// Get a local copy of templates under read lock
+	m.templatesMu.RLock()
+	templates := m.markdownTemplates
+	m.templatesMu.RUnlock()
+
 	commandStr := cases.Title(language.English).String(strings.ReplaceAll(cmd.CommandName().String(), "_", " "))
 	var vcsRequestType string
 	if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab {
@@ -201,18 +232,16 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 		VcsRequestType:            vcsRequestType,
 	}
 
-	templates := m.markdownTemplates
-
 	if res.Error != nil {
 		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), "", common})
 	}
 	if res.Failure != "" {
 		return m.renderTemplateTrimSpace(templates.Lookup("failureWithLog"), failureData{res.Failure, "", common})
 	}
-	return m.renderProjectResults(ctx, res.ProjectResults, common)
+	return m.renderProjectResults(ctx, res.ProjectResults, common, templates)
 }
 
-func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []command.ProjectResult, common commonData) string {
+func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []command.ProjectResult, common commonData, templates *template.Template) string {
 	vcsHost := ctx.Pull.BaseRepo.VCSHost.Type
 
 	var resultsTmplData []projectResultTmplData
@@ -225,8 +254,6 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 	numApplySuccesses := 0
 	numApplyFailures := 0
 	numApplyErrors := 0
-
-	templates := m.markdownTemplates
 
 	for _, result := range results {
 		resultData := projectResultTmplData{
