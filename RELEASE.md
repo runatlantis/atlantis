@@ -98,6 +98,68 @@ For detailed information about past releases, see:
 
 -  [GitHub Releases](https://github.com/runatlantis/atlantis/releases)
 
+### GPG Signing Setup
+
+Release binaries are signed with GPG. The `checksums.txt` file gets a detached signature (`checksums.txt.sig`) that allows users to verify release integrity.
+
+#### Generating the signing key (one-time setup)
+
+Run the following on a secure, trusted machine. Replace the passphrase with a strong, randomly generated value:
+
+```sh
+gpg --batch --gen-key <<EOF
+Key-Type: EDDSA
+Key-Curve: ed25519
+Subkey-Type: ECDH
+Subkey-Curve: cv25519
+Name-Real: Atlantis Release Signing
+Name-Email: cncf-atlantis-maintainers@lists.cncf.io
+Expire-Date: 2y
+Passphrase: <your-secure-passphrase>
+%commit
+EOF
+```
+
+A 2-year expiry is recommended; it limits the impact of a key compromise while keeping maintenance reasonable. When the key expires, repeat this process, update the repository secrets, and publish the new public key. Use `gpg --quick-set-expire <fingerprint> 2y` to extend the existing key's expiry without replacing it.
+
+#### Setting the repository secrets
+
+After generating the key, add the following [repository secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets):
+
+```sh
+# Show the fingerprint of the newly created key
+gpg --list-secret-keys --keyid-format=long
+
+# Export the armored private key — store as the GPG_PRIVATE_KEY secret
+gpg --armor --export-secret-keys <fingerprint>
+
+# The passphrase used above becomes the GPG_PASSPHRASE secret
+```
+
+| Secret | Value |
+|---|---|
+| `GPG_PRIVATE_KEY` | Output of `gpg --armor --export-secret-keys <fingerprint>` |
+| `GPG_PASSPHRASE` | The passphrase chosen during key generation |
+
+The public key should be published (e.g. to a keyserver or in the repository) so users can verify signatures:
+
+```sh
+gpg --armor --export <fingerprint>
+```
+
+#### Verifying a release (for users)
+
+```sh
+# Import the Atlantis release public key
+gpg --import atlantis-release-public.asc
+
+# Verify the checksums file
+gpg --verify checksums.txt.sig checksums.txt
+
+# Then verify a downloaded binary against the checksums
+sha256sum --check --ignore-missing checksums.txt
+```
+
 ---
 
 _This document is maintained by the Atlantis maintainers. For questions about the release process, please open an issue or contact the maintainers._
