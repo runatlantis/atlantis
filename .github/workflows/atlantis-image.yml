@@ -63,7 +63,7 @@ jobs:
       attestations: write
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        image_type: [alpine, alpine-slim-terraform, alpine-slim-tofu, debian]
     runs-on: ubuntu-24.04
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
@@ -209,7 +209,19 @@ jobs:
       contents: read
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        image_type:
+         - target: alpine
+           EXPECT_TERRAFORM: true
+           EXPECT_TOFU: true
+         - target: alpine-slim-terraform
+           EXPECT_TERRAFORM: true
+           EXPECT_TOFU: false
+         - target: alpine-slim-tofu
+           EXPECT_TERRAFORM: false
+           EXPECT_TOFU: true
+         - target: debian
+           EXPECT_TERRAFORM: true
+           EXPECT_TOFU: true
         platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
@@ -233,11 +245,11 @@ jobs:
           cache-to: type=gha,mode=max
           context: .
           build-args: |
-            ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type }}
+            ATLANTIS_BASE_TAG_TYPE=${{ matrix.image_type.target }}
           push: false
           load: true
           tags: "${{ env.DOCKER_REPO }}:goss-test"
-          target: ${{ matrix.image_type }}
+          target: ${{ matrix.image_type.target }}
 
       - name: "Setup Goss"
         uses: e1himself/goss-installation-action@3b8340a7c772f8064444f48b0df4c2a80d2e50fc # v1.3.0
@@ -246,7 +258,10 @@ jobs:
 
       - name: Execute Goss tests
         run: |
-          dgoss run --rm ${{ env.DOCKER_REPO }}:goss-test bash -c 'while true; do sleep 1; done;'
+          dgoss run \
+           -e EXPECT_TERRAFORM=${{matrix.image_type.EXPECT_TERRAFORM}} \
+           -e EXPECT_TOFU=${{matrix.image_type.EXPECT_TOFU}} \
+           --rm ${{ env.DOCKER_REPO }}:goss-test bash -c 'while true; do sleep 1; done;'
 
   skip-build:
     needs: [changes]
@@ -256,7 +271,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        image_type: [alpine, alpine-slim-terraform, alpine-slim-tofu, debian]
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
