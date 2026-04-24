@@ -267,10 +267,8 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
 # Remove any file capabilities from the image filesystem so runtime cap-drop ALL
 # matches policy and scanners expecting no fcaps on disk.
-# renovate: datasource=repology depName=debian_12/libcap2-bin versioning=loose
-ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libcap2-bin=${DEBIAN_LIBCAP2_BIN_VERSION} && \
+    apt-get install -y --no-install-recommends libcap2-bin && \
     for d in /bin /sbin /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin /lib /lib64 /usr/lib /usr/lib64; do \
         [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
     done | awk '{ print $1 }' | sort -u | while read -r f; do \
