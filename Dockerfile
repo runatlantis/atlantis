@@ -283,7 +283,7 @@ RUN fcap_scan_dirs="/bin /sbin /usr /usr/local /opt /lib /lib64" && \
     done | awk '{ print $1 }' | sort -u | while read -r f; do \
         [ -n "$f" ] && setcap -r "$f" 2>/dev/null || true; \
     done && \
-    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done | grep -E ' = ' || :)" && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d"; done | grep -E ' = ' || :)" && \
     if [ -n "$remaining" ]; then \
         echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
         echo "$remaining" >&2; \
