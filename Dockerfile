@@ -222,7 +222,9 @@ RUN apk add --no-cache \
 # renovate: datasource=repology depName=alpine_3_23/libcap versioning=loose
 ENV LIBCAP_VERSION="2.77-r0"
 RUN apk add --no-cache libcap=${LIBCAP_VERSION} && \
-    getcap -r / 2>/dev/null | awk '{ print $1 }' | sort -u | while read -r f; do \
+    for d in /bin /sbin /usr /usr/local /lib /lib64; do \
+        [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
+    done | awk '{ print $1 }' | sort -u | while read -r f; do \
         [ -n "$f" ] && setcap -r "$f" 2>/dev/null || true; \
     done && \
     remaining_caps="$(getcap -r / 2>/dev/null || true)" && \
