@@ -650,11 +650,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
 	}
+	projectFinder := &events.DefaultProjectFinder{}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
 		policyChecksEnabled,
 		parserValidator,
-		&events.DefaultProjectFinder{},
+		projectFinder,
 		vcsClient,
 		workingDir,
 		workingDirLocker,
@@ -694,6 +695,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	applyRequirementHandler := &events.DefaultCommandRequirementHandler{
 		WorkingDir: workingDir,
+		ProjectImpactResolver: events.NewUndivergedProjectImpactResolver(
+			parserValidator,
+			projectFinder,
+			globalCfg,
+			userConfig.AutoplanModulesFromProjects,
+			userConfig.AutoplanFileList,
+			userConfig.AutoDiscoverModeFlag,
+		),
 	}
 
 	cancellationTracker := events.NewCancellationTracker()
