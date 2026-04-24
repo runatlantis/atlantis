@@ -276,7 +276,7 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 # 2>/dev/null and setcap || true; verification is the hard guarantee.
 # renovate: datasource=repology depName=debian_12/libcap2-bin versioning=loose
 ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
-RUN fcap_scan_dirs="/bin /sbin /usr /usr/local /opt /lib /lib64" && \
+RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     apt-get update && \
     apt-get install -y --no-install-recommends libcap2-bin=${DEBIAN_LIBCAP2_BIN_VERSION} && \
     for d in $fcap_scan_dirs; do \
