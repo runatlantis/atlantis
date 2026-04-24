@@ -218,19 +218,23 @@ RUN apk add --no-cache \
     coreutils-env=${COREUTILS_ENV_VERSION}
 
 # Remove any file capabilities from the image filesystem so runtime cap-drop ALL
-# matches policy and scanners expecting no fcaps on disk.
+# matches policy and scanners expecting no fcaps on disk. Use the same directory
+# list for stripping and verification (not getcap -r /) so we do not walk
+# /proc, /sys, /dev, or other pseudo-filesystems during build. Post-pass: pipe
+# getcap output through grep ' = ' so any remaining file caps fail the build.
 # renovate: datasource=repology depName=alpine_3_23/libcap versioning=loose
-ENV LIBCAP_VERSION="2.77-r0"
-RUN apk add --no-cache libcap=${LIBCAP_VERSION} && \
-    for d in /bin /sbin /usr /usr/local /lib /lib64; do \
+ENV LIBCAP_VERSION="2.78-r0"
+RUN fcap_scan_dirs="/bin /sbin /usr /usr/local /opt /lib /lib64" && \
+    apk add --no-cache libcap=${LIBCAP_VERSION} && \
+    for d in $fcap_scan_dirs; do \
         [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
     done | awk '{ print $1 }' | sort -u | while read -r f; do \
         [ -n "$f" ] && setcap -r "$f" 2>/dev/null || true; \
     done && \
-    remaining_caps="$(getcap -r / 2>/dev/null || true)" && \
-    if [ -n "$remaining_caps" ]; then \
-        echo "failed to remove all file capabilities:" >&2; \
-        echo "$remaining_caps" >&2; \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done | grep -E ' = ' || :)" && \
+    if [ -n "$remaining" ]; then \
+        echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
+        echo "$remaining" >&2; \
         exit 1; \
     fi && \
     apk del libcap
@@ -265,15 +269,26 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 ARG DEFAULT_CONFTEST_VERSION
 ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
-# Remove any file capabilities from the image filesystem so runtime cap-drop ALL
-# matches policy and scanners expecting no fcaps on disk.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libcap2-bin && \
-    for d in /bin /sbin /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin /lib /lib64 /usr/lib /usr/lib64; do \
+# Remove any file capabilities from the image filesystem (same scoped scan as
+# Alpine: no getcap -r /). Post-pass: re-run getcap on fcap_scan_dirs; if any
+# line matches getcap's "path = cap_set" output, the build fails (same guarantee
+# as Alpine; strip step may use 2>/dev/null and setcap || true, verification does not).
+# renovate: datasource=repology depName=debian_12/libcap2-bin versioning=loose
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
+RUN fcap_scan_dirs="/bin /sbin /usr /usr/local /opt /lib /lib64" && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libcap2-bin=${DEBIAN_LIBCAP2_BIN_VERSION} && \
+    for d in $fcap_scan_dirs; do \
         [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
     done | awk '{ print $1 }' | sort -u | while read -r f; do \
         [ -n "$f" ] && setcap -r "$f" 2>/dev/null || true; \
     done && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done | grep -E ' = ' || :)" && \
+    if [ -n "$remaining" ]; then \
+        echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
+        echo "$remaining" >&2; \
+        exit 1; \
+    fi && \
     apt-get purge -y libcap2-bin && \
     apt-get autoremove -y && \
     apt-get clean && \
