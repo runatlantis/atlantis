@@ -271,7 +271,9 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libcap2-bin=${DEBIAN_LIBCAP2_BIN_VERSION} && \
-    getcap -r / 2>/dev/null | awk '{ print $1 }' | sort -u | while read -r f; do \
+    for d in /bin /sbin /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin /lib /lib64 /usr/lib /usr/lib64; do \
+        [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
+    done | awk '{ print $1 }' | sort -u | while read -r f; do \
         [ -n "$f" ] && setcap -r "$f" 2>/dev/null || true; \
     done && \
     apt-get purge -y libcap2-bin && \
