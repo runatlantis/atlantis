@@ -225,6 +225,12 @@ RUN apk add --no-cache libcap=${LIBCAP_VERSION} && \
     getcap -r / 2>/dev/null | awk '{ print $1 }' | sort -u | while read -r f; do \
         [ -n "$f" ] && setcap -r "$f" 2>/dev/null || true; \
     done && \
+    remaining_caps="$(getcap -r / 2>/dev/null || true)" && \
+    if [ -n "$remaining_caps" ]; then \
+        echo "failed to remove all file capabilities:" >&2; \
+        echo "$remaining_caps" >&2; \
+        exit 1; \
+    fi && \
     apk del libcap
 
 ARG DEFAULT_CONFTEST_VERSION
