@@ -218,14 +218,14 @@ RUN apk add --no-cache \
     coreutils-env=${COREUTILS_ENV_VERSION}
 
 # Strip file capabilities only under fcap_scan_dirs (common rootfs locations for
-# binaries and libs: /bin, /sbin, /usr, /usr/local, /opt, /lib, /lib64). This is
-# a scoped scan, not a full getcap -r /: walking from / would traverse /proc,
-# /sys, /dev, etc. and is slow/noisy. Anything outside fcap_scan_dirs is not
-# checked. Strip and verify share the same list; post-pass getcap|grep fails the
-# build if capabilities remain under that scope.
+# binaries and libs: /bin, /sbin, /usr, /opt, /lib, /lib64). This is a scoped
+# scan, not a full getcap -r /: walking from / would traverse /proc, /sys, /dev,
+# etc. and is slow/noisy. Anything outside fcap_scan_dirs is not checked. Strip
+# and verify share the same list; post-pass getcap|grep fails the build if
+# capabilities remain under that scope.
 # renovate: datasource=repology depName=alpine_3_23/libcap versioning=loose
 ENV LIBCAP_VERSION="2.78-r0"
-RUN fcap_scan_dirs="/bin /sbin /usr /usr/local /opt /lib /lib64" && \
+RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     apk add --no-cache libcap=${LIBCAP_VERSION} && \
     for d in $fcap_scan_dirs; do \
         [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
