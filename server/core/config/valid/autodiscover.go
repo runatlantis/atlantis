@@ -17,6 +17,7 @@ const (
 type AutoDiscover struct {
 	Mode        AutoDiscoverMode
 	IgnorePaths []string
+	Workspace   string
 }
 
 func (a AutoDiscover) IsPathIgnored(path string) bool {

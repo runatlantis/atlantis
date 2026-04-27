@@ -38,6 +38,16 @@ ignore_paths:
 				IgnorePaths: []string{"foobar"},
 			},
 		},
+		{
+			description: "workspace set",
+			input: `
+workspace: qa
+`,
+			exp: raw.AutoDiscover{
+				Mode:      nil,
+				Workspace: "qa",
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -196,6 +206,17 @@ func TestAutoDiscover_ToValid(t *testing.T) {
 					"foo",
 					"bar/*",
 				},
+			},
+		},
+		{
+			description: "workspace set",
+			input: raw.AutoDiscover{
+				Mode:      &autoDiscoverEnabled,
+				Workspace: "qa",
+			},
+			exp: &valid.AutoDiscover{
+				Mode:      valid.AutoDiscoverEnabledMode,
+				Workspace: "qa",
 			},
 		},
 	}
