@@ -263,18 +263,10 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 	}
 }
 
-// childTeamFetcher is a narrow interface used by fetchDescendantTeams so that
-// callers (and tests) only need to provide GetChildTeams rather than the full
-// vcs.Client. In production the vcs.Client is passed directly since it
-// includes GetChildTeams; non-GitHub providers return nil, nil.
-type childTeamFetcher interface {
-	GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error)
-}
-
 // fetchDescendantTeams fetches all descendant team slugs for the given team up to maxDepth
 // levels deep using an iterative BFS with a visited set to avoid duplicate API calls and
 // handle any cycles in unexpected hierarchy configurations.
-func fetchDescendantTeams(fetcher childTeamFetcher, logger logging.SimpleLogging, repo models.Repo, teamSlug string, maxDepth int) ([]string, error) {
+func fetchDescendantTeams(fetcher vcs.Client, logger logging.SimpleLogging, repo models.Repo, teamSlug string, maxDepth int) ([]string, error) {
 	if maxDepth <= 0 {
 		return nil, nil
 	}

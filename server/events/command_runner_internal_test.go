@@ -14,31 +14,20 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-// mockChildTeamFetcher is a test double for the childTeamFetcher interface
-// used by fetchDescendantTeams. It maps team slug -> list of direct child
-// slugs, and returns an error for any slug present in errOn.
-type mockChildTeamFetcher struct {
+// childTeamVCSClient combines vcs.NotConfiguredVCSClient (satisfying vcs.Client)
+// with a configurable team hierarchy map, so tests can exercise GetChildTeams
+// without a real VCS connection.
+type childTeamVCSClient struct {
+	vcs.NotConfiguredVCSClient
 	children map[string][]string
 	errOn    map[string]bool
 }
 
-func (m *mockChildTeamFetcher) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, teamSlug string) ([]string, error) {
-	if m.errOn[teamSlug] {
+func (c *childTeamVCSClient) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, teamSlug string) ([]string, error) {
+	if c.errOn[teamSlug] {
 		return nil, errors.New("API error for " + teamSlug)
 	}
-	return m.children[teamSlug], nil
-}
-
-// childTeamVCSClient combines vcs.NotConfiguredVCSClient (satisfying vcs.Client)
-// with a mockChildTeamFetcher, overriding GetChildTeams so the slow path in
-// checkUserPermissions can be exercised without a real VCS connection.
-type childTeamVCSClient struct {
-	vcs.NotConfiguredVCSClient
-	mockChildTeamFetcher
-}
-
-func (c *childTeamVCSClient) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error) {
-	return c.mockChildTeamFetcher.GetChildTeams(logger, repo, teamSlug)
+	return c.children[teamSlug], nil
 }
 
 func TestFetchDescendantTeams(t *testing.T) {
@@ -46,14 +35,14 @@ func TestFetchDescendantTeams(t *testing.T) {
 	repo := models.Repo{Owner: "test-org"}
 
 	t.Run("leaf team returns empty", func(t *testing.T) {
-		fetcher := &mockChildTeamFetcher{children: map[string][]string{}}
+		fetcher := &childTeamVCSClient{children: map[string][]string{}}
 		result, err := fetchDescendantTeams(fetcher, logger, repo, "leaf-team", 20)
 		Ok(t, err)
 		Equals(t, 0, len(result))
 	})
 
 	t.Run("single level of children", func(t *testing.T) {
-		fetcher := &mockChildTeamFetcher{children: map[string][]string{
+		fetcher := &childTeamVCSClient{children: map[string][]string{
 			"parent": {"child-a", "child-b"},
 		}}
 		result, err := fetchDescendantTeams(fetcher, logger, repo, "parent", 20)
@@ -62,7 +51,7 @@ func TestFetchDescendantTeams(t *testing.T) {
 	})
 
 	t.Run("multiple levels of nesting", func(t *testing.T) {
-		fetcher := &mockChildTeamFetcher{children: map[string][]string{
+		fetcher := &childTeamVCSClient{children: map[string][]string{
 			"grandparent": {"parent"},
 			"parent":      {"child"},
 		}}
@@ -72,7 +61,7 @@ func TestFetchDescendantTeams(t *testing.T) {
 	})
 
 	t.Run("maxDepth=0 returns nothing", func(t *testing.T) {
-		fetcher := &mockChildTeamFetcher{children: map[string][]string{
+		fetcher := &childTeamVCSClient{children: map[string][]string{
 			"parent": {"child"},
 		}}
 		result, err := fetchDescendantTeams(fetcher, logger, repo, "parent", 0)
@@ -81,7 +70,7 @@ func TestFetchDescendantTeams(t *testing.T) {
 	})
 
 	t.Run("maxDepth=1 returns only direct children", func(t *testing.T) {
-		fetcher := &mockChildTeamFetcher{children: map[string][]string{
+		fetcher := &childTeamVCSClient{children: map[string][]string{
 			"grandparent": {"parent"},
 			"parent":      {"child"},
 		}}
@@ -91,7 +80,7 @@ func TestFetchDescendantTeams(t *testing.T) {
 	})
 
 	t.Run("error at root propagates", func(t *testing.T) {
-		fetcher := &mockChildTeamFetcher{
+		fetcher := &childTeamVCSClient{
 			children: map[string][]string{},
 			errOn:    map[string]bool{"parent": true},
 		}
@@ -102,7 +91,7 @@ func TestFetchDescendantTeams(t *testing.T) {
 	t.Run("error in recursive call is logged and skipped", func(t *testing.T) {
 		// parent fetches OK; fetching child-a's children errors.
 		// child-b and its subtree should still be traversed.
-		fetcher := &mockChildTeamFetcher{
+		fetcher := &childTeamVCSClient{
 			children: map[string][]string{
 				"parent":  {"child-a", "child-b"},
 				"child-b": {"grandchild-b"},
@@ -118,7 +107,7 @@ func TestFetchDescendantTeams(t *testing.T) {
 
 	t.Run("cycle is handled without infinite loop", func(t *testing.T) {
 		// a -> b -> a forms a cycle; visited set should break it.
-		fetcher := &mockChildTeamFetcher{children: map[string][]string{
+		fetcher := &childTeamVCSClient{children: map[string][]string{
 			"team-a": {"team-b"},
 			"team-b": {"team-a"},
 		}}
@@ -225,9 +214,7 @@ func TestCheckUserPermissions(t *testing.T) {
 			cr := &DefaultCommandRunner{
 				Logger:               logger,
 				TeamAllowlistChecker: checker,
-				VCSClient: &childTeamVCSClient{
-					mockChildTeamFetcher: mockChildTeamFetcher{children: tc.hierarchy},
-				},
+				VCSClient: &childTeamVCSClient{children: tc.hierarchy},
 			}
 			user := models.User{Username: "testuser", Teams: tc.userTeams}
 			ok, checkErr := cr.checkUserPermissions(repo, &user, tc.cmdName)
@@ -243,9 +230,7 @@ func TestCheckUserPermissions(t *testing.T) {
 			Logger:               logger,
 			TeamAllowlistChecker: checker,
 			VCSClient: &childTeamVCSClient{
-				mockChildTeamFetcher: mockChildTeamFetcher{
-					children: map[string][]string{"parent-team": {"child-team"}},
-				},
+				children: map[string][]string{"parent-team": {"child-team"}},
 			},
 		}
 		user := models.User{Username: "alice", Teams: []string{"child-team"}}
