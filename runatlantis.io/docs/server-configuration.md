@@ -376,6 +376,23 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
+### `--blocked-extra-args`
+
+```bash
+atlantis server --blocked-extra-args="-chdir,--chdir,-plugin-dir,--plugin-dir"
+# or
+ATLANTIS_BLOCKED_EXTRA_ARGS='-chdir,--chdir,-plugin-dir,--plugin-dir'
+```
+
+Comma-separated list of Terraform CLI flag prefixes that are not allowed in comment extra args (the flags after `--`).
+Defaults to `-chdir,--chdir,-plugin-dir,--plugin-dir`.
+
+Notes:
+
+- These flags are blocked to prevent security issues such as working-directory traversal (`-chdir`) or loading malicious providers (`-plugin-dir`).
+- Setting this flag **replaces** the default list entirely. To extend the defaults, include them along with your custom flags, e.g. `-chdir,--chdir,-plugin-dir,--plugin-dir,-my-flag`.
+- Accepts a comma separated list, ex. `-flag1,-flag2`.
+
 ### `--checkout-depth` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
@@ -543,8 +560,8 @@ Defaults to "" (empty string).
 ::: warning NOTE
 Each VCS provider supports a different list of emojis:
 
-- [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
-- [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
+- [GitHub](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
+- [GitLab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
 - [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
 
    :::
@@ -744,7 +761,7 @@ In versions v0.35.0 and later, the GitHub team name can only be a slug because i
 
 In versions between v0.21.0 and v0.34.0, the GitHub team name can be a name or a slug.
 
-In versions v0.20.1 and below, the Github team name required the case sensitive team name.
+In versions v0.20.1 and below, the GitHub team name required the case sensitive team name.
 
 Comma-separated list of GitHub teams and permission pairs.
 
@@ -889,7 +906,7 @@ atlantis server --gitlab-hostname="my.gitlab.enterprise.com"
 ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 ```
 
-Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
+Hostname of your GitLab Enterprise installation. If using [GitLab.com](https://gitlab.com),
 don't set. Defaults to `gitlab.com`.
 
 ### `--gitlab-status-retry-enabled`
@@ -1484,7 +1501,7 @@ This flag is useful when having multiple projects that need to run a plan and ap
 - [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
 - [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
 
-The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
+The effect of the race condition is more evident when using parallel configuration to run plan and apply. Disabling the use of plugin cache will impact the performance when starting a new plan or apply, but in large Atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
 
 ### `--var-file-allowlist` <Badge text="v0.19.5" type="info"/>
 

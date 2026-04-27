@@ -1,6 +1,6 @@
 # How Atlantis Works
 
-This section of docs talks about how Atlantis at deeper level.
+This section of docs talks about how Atlantis works at a deeper level.
 
 * [Locking](locking.md)
 * [Autoplanning](autoplanning.md)

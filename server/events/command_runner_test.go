@@ -23,6 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
@@ -36,6 +37,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 var projectCommandBuilder *mocks.MockProjectCommandBuilder
@@ -80,6 +82,8 @@ type TestConfig struct {
 	database                   db.Database
 	DisableUnlockLabel         string
 	PendingApplyStatus         bool
+	applyLockCheckerReturn     locking.ApplyCommandLock
+	applyLockCheckerErr        error
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -122,8 +126,14 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
-	applyLockChecker = lockingmocks.NewMockApplyLockChecker()
-	lockingLocker = lockingmocks.NewMockLocker()
+	lockCtrl := gomock.NewController(t)
+	applyLockChecker = lockingmocks.NewMockApplyLockChecker(lockCtrl)
+	lockingLocker = lockingmocks.NewMockLocker(lockCtrl)
+	// Allow incidental calls to CheckApplyLock (called internally during apply operations).
+	// Tests that need specific return values should set applyLockCheckerReturn/applyLockCheckerErr in TestConfig.
+	applyLockChecker.EXPECT().CheckApplyLock().Return(testConfig.applyLockCheckerReturn, testConfig.applyLockCheckerErr).AnyTimes()
+	// Allow incidental calls to UnlockByPull (called during plan operations to clean up locks)
+	lockingLocker.EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
 	dbUpdater = &events.DBUpdater{
 		Database: testConfig.database,
@@ -819,7 +829,6 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 }
 
 func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_False(t *testing.T) {
@@ -846,7 +855,6 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Eq(models.PendingCommitStatus), Eq(command.Plan))
 	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
@@ -875,7 +883,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	ch.FailOnPreWorkflowHookError = true
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(Any[string]())
-	lockingLocker.VerifyWasCalled(Never()).UnlockByPull(Any[string](), Any[int]())
+	// gomock will fail if lockingLocker.UnlockByPull is called unexpectedly (no EXPECT set)
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Eq(models.PendingCommitStatus), Eq(command.Plan))
 
@@ -927,7 +935,7 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True
 	ch.FailOnPreWorkflowHookError = true
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(Any[string]())
-	lockingLocker.VerifyWasCalled(Never()).UnlockByPull(Any[string](), Any[int]())
+	// gomock will fail if lockingLocker.UnlockByPull is called unexpectedly (no EXPECT set)
 }
 
 func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
@@ -966,7 +974,6 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 }
 
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {

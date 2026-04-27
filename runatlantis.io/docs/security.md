@@ -76,7 +76,7 @@ Even with the `--repo-allowlist` flag set, without a webhook secret, attackers c
 Webhook secrets ensure that the webhook requests are actually coming from your VCS provider (GitHub or GitLab).
 
 :::tip Tip
-If you are using Azure DevOps, instead of webhook secrets add a [basic username and password](#azure devops basic authentication)
+If you are using Azure DevOps, instead of webhook secrets add a [basic username and password](#azure-devops-basic-authentication)
 :::
 
 ### Azure DevOps Basic Authentication
@@ -91,7 +91,7 @@ flags.
 
 ### Enable Authentication on Atlantis Web Server
 
-It is very recommended to enable authentication in the web service. Enable BasicAuth using the `--web-basic-auth=true` and setup a username and a password using `--web-username=yourUsername` and `--web-password=yourPassword` flags.
+It is highly recommended to enable authentication in the web service. Enable BasicAuth using the `--web-basic-auth=true` and set up a username and a password using `--web-username=yourUsername` and `--web-password=yourPassword` flags.
 
 You can also pass these as environment variables `ATLANTIS_WEB_BASIC_AUTH=true` `ATLANTIS_WEB_USERNAME=yourUsername` and `ATLANTIS_WEB_PASSWORD=yourPassword`.
 

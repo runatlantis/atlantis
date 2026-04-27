@@ -13,7 +13,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_external_team_allowlist_runner.go ExternalTeamAllowlistRunner
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_external_team_allowlist_runner.go ExternalTeamAllowlistRunner
 type ExternalTeamAllowlistRunner interface {
 	Run(ctx models.TeamAllowlistCheckerContext, shell, shellArgs, command string) (string, error)
 }
