@@ -1580,6 +1580,20 @@ ATLANTIS_WEBSOCKET_CHECK_ORIGIN=true
 
 Only allow websockets connection when they originate from the running Atlantis web server
 
+### `--websocket-message-delay`
+
+```bash
+atlantis server --websocket-message-delay=1ms
+# or
+ATLANTIS_WEBSOCKET_MESSAGE_DELAY=1ms
+```
+
+Add a small delay between WebSocket messages. This can work around buffering
+issues with Layer 7 load balancers (e.g. GCP HTTP(S) Load Balancer, AWS
+Application Load Balancer) that batch WebSocket frames before forwarding them.
+
+Defaults to `0` (no delay). Accepts Go duration strings (e.g. `1ms`, `5ms`).
+
 ### `--write-git-creds` <Badge text="v0.11.0+" type="info"/>
 
 ```bash
