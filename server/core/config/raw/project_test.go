@@ -252,7 +252,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:              String("."),
 				TerraformVersion: String(""),
 			},
-			expErr: "terraform_version: version \"\" could not be parsed: Malformed version: .",
+			expErr: "terraform_version: version \"\" could not be parsed: malformed version: .",
 		},
 		{
 			description: "tf version with v prepended",

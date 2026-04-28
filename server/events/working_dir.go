@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/moby/patternmatcher"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -32,11 +33,12 @@ const workingDirPrefix = "repos"
 
 const prSourceRemote = "source"
 
-var cloneLocks sync.Map
+// gitLocks holds per-clone-dir locks: "repo-lock/<cloneDir>" -> *sync.RWMutex (read for steps, write for clone/reset/merge), "ref-lock/<cloneDir>" -> *sync.Mutex (serialize fetch).
+var gitLocks sync.Map
 var recheckRequiredMap sync.Map
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
 
 // WorkingDir handles the workspace on disk for running commands.
 type WorkingDir interface {
@@ -49,7 +51,11 @@ type WorkingDir interface {
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
-	HasDiverged(logger logging.SimpleLogging, cloneDir string) bool
+	// HasDiverged checks if the branch has diverged from the base branch.
+	// When autoplanWhenModified patterns are provided, only divergence affecting
+	// files matching those patterns is considered. When patterns are empty,
+	// any divergence is reported.
+	HasDiverged(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error
@@ -58,6 +64,8 @@ type WorkingDir interface {
 	DeletePlan(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string, path string, projectName string) error
 	// GetGitUntrackedFiles returns a list of Git untracked files in the working dir.
 	GetGitUntrackedFiles(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) ([]string, error)
+	// GitReadLock acquires a shared lock so clone/reset/merge cannot run while the caller is using the working dir (e.g. running plan/apply). Call the returned function when done.
+	GitReadLock(r models.Repo, p models.PullRequest, workspace string) func()
 }
 
 // FileWorkspace implements WorkingDir with the file system.
@@ -101,10 +109,8 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 
 	// Unconditionally wait for the clone lock here, if anyone else is doing any clone
 	// operation in this directory, we wait for it to finish before we check anything.
-	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
-	mutex := value.(*sync.Mutex)
-	mutex.Lock()
-	defer mutex.Unlock()
+	gitWriteUnlockFn := w.gitWriteLock(cloneDir)
+	defer gitWriteUnlockFn()
 
 	c := wrappedGitContext{cloneDir, headRepo, p}
 	ok, err := w.attemptReuseCloneDir(logger, c, cloneDir)
@@ -123,6 +129,7 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 // - (true, nil) → reuse succeeded; caller should use this cloneDir directly
 // - (false, nil) → reuse was not possible for an expected reason; caller should force clone
 // - (false, err) → an unexpected error occurred; caller should log the error and force clone
+// Locks are acquired by the caller.
 func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wrappedGitContext, cloneDir string) (bool, error) {
 	// If the directory doesn't exist yet, surely we can't reuse it
 	if _, err := os.Stat(cloneDir); err != nil {
@@ -174,10 +181,8 @@ func (w *FileWorkspace) MergeAgain(
 
 	// Unconditionally wait for the clone lock here, if anyone else is doing any clone
 	// operation in this directory, we wait for it to finish before we check anything.
-	value, _ := cloneLocks.LoadOrStore(cloneDir, new(sync.Mutex))
-	mutex := value.(*sync.Mutex)
-	mutex.Lock()
-	defer mutex.Unlock()
+	gitWriteUnlockFn := w.gitWriteLock(cloneDir)
+	defer gitWriteUnlockFn()
 
 	if _, exists := recheckRequiredMap.Load(cloneDir); !exists {
 		logger.Debug("Skipping upstream check. Some other thread has done this for us")
@@ -200,6 +205,7 @@ func (w *FileWorkspace) MergeAgain(
 // and we have to perform a new merge.
 // If there are any errors we return true since we prefer to assume divergence
 // for safety.
+// Locks are acquired by the caller.
 func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.PullRequest, headRepo models.Repo, cloneDir string) bool {
 	if !w.CheckoutMerge {
 		// It only makes sense to warn that main has diverged if we're using
@@ -237,25 +243,48 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 		}
 	}
 
-	return w.HasDiverged(logger, cloneDir)
+	// We already hold the write lock; take ref lock so fetch is serialized with other HasDiverged callers.
+	unlockRef := w.gitRefLock(cloneDir)
+	defer unlockRef()
+	return w.hasDiverged(logger, cloneDir)
 }
 
-func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
+func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+	logger.Debug("HasDiverged: starting divergence check in %s", cloneDir)
 	if !w.CheckoutMerge {
-		// Both the diverged warning and the UnDiverged apply requirement only apply to merge checkout strategy so
-		// we assume false here for 'branch' strategy.
+		logger.Debug("HasDiverged: CheckoutMerge is false, skipping divergence check")
 		return false
 	}
 
-	statusFetchCmd := exec.Command("git", "fetch")
-	statusFetchCmd.Dir = cloneDir
-	outputStatusFetch, err := statusFetchCmd.CombinedOutput()
+	// Hold ref lock and repo read lock for the full duration (fetch + status) so we don't race with
+	// clone/reset/merge. recheckDiverged does not take the read lock because it already holds the write lock.
+	unlockGitReadLock := w.gitReadLock(cloneDir)
+	defer unlockGitReadLock()
+
+	unlockGitRefLock := w.gitRefLock(cloneDir)
+	defer unlockGitRefLock()
+
+	if len(autoplanWhenModified) > 0 {
+		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest)
+	}
+	return w.hasDiverged(logger, cloneDir)
+}
+
+// hasDiverged runs fetch and git status to detect divergence. Caller must hold
+// gitRefLock(cloneDir); if not already holding the repo write lock (e.g. from recheckDiverged),
+// caller must also hold gitReadLock(cloneDir).
+func (w *FileWorkspace) hasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
+	logger.Debug("HasDiverged: running git fetch in %s", cloneDir)
+	cmd := exec.Command("git", "fetch")
+	cmd.Dir = cloneDir
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Warn("fetching repo has failed: %s", string(outputStatusFetch))
+		logger.Warn("HasDiverged: fetching repo has failed: %s", string(output))
 		return true
 	}
+	logger.Debug("HasDiverged: git fetch completed successfully")
 
-	// Check if remote main branch has diverged.
+	logger.Debug("HasDiverged: running git status --untracked-files=no")
 	statusUnoCmd := exec.Command("git", "status", "--untracked-files=no")
 	statusUnoCmd.Dir = cloneDir
 	outputStatusUno, err := statusUnoCmd.CombinedOutput()
@@ -263,8 +292,91 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 		logger.Warn("getting repo status has failed: %s", string(outputStatusUno))
 		return true
 	}
+	logger.Debug("HasDiverged: git status output: %s", string(outputStatusUno))
 	hasDiverged := strings.Contains(string(outputStatusUno), "have diverged")
+	logger.Debug("HasDiverged: result=%t", hasDiverged)
 	return hasDiverged
+}
+
+// hasDivergedForPatterns checks if the base branch has new commits that affect files
+// matching the given when_modified patterns. Caller must hold gitRefLock and gitReadLock.
+func (w *FileWorkspace) hasDivergedForPatterns(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+	logger.Debug("HasDiverged: running targeted divergence check for project %s with %d patterns",
+		projectPath, len(autoplanWhenModified))
+
+	logger.Debug("HasDiverged: running git fetch")
+	fetchCmd := exec.Command("git", "fetch")
+	fetchCmd.Dir = cloneDir
+	outputFetch, err := fetchCmd.CombinedOutput()
+	if err != nil {
+		logger.Warn("HasDiverged: fetching repo has failed: %s", string(outputFetch))
+		return true
+	}
+
+	remoteRef := fmt.Sprintf("origin/%s", pullRequest.BaseBranch)
+	revisionRange := fmt.Sprintf("HEAD..%s", remoteRef)
+
+	logger.Debug("HasDiverged: getting changed files in %s", revisionRange)
+	changedFilesCmd := exec.Command("git", "log", revisionRange, "--name-only", "--format=") //nolint:gosec // remoteRef is from pullRequest.BaseBranch, a controlled VCS branch name
+	changedFilesCmd.Dir = cloneDir
+	outputChangedFiles, err := changedFilesCmd.CombinedOutput()
+	if err != nil {
+		logger.Warn("HasDiverged: getting changed files has failed: %s", string(outputChangedFiles))
+		return true
+	}
+
+	changedFiles := strings.Split(strings.TrimSpace(string(outputChangedFiles)), "\n")
+	var nonEmptyChangedFiles []string
+	for _, file := range changedFiles {
+		if strings.TrimSpace(file) != "" {
+			nonEmptyChangedFiles = append(nonEmptyChangedFiles, file)
+		}
+	}
+
+	if len(nonEmptyChangedFiles) == 0 {
+		logger.Debug("HasDiverged: no changed files found in divergent commits")
+		return false
+	}
+
+	logger.Debug("HasDiverged: found %d changed files in divergent commits", len(nonEmptyChangedFiles))
+
+	var whenModifiedRelToRepoRoot []string
+	for _, wm := range autoplanWhenModified {
+		wm = strings.TrimSpace(wm)
+		exclusion := false
+		if wm != "" && wm[0] == '!' {
+			wm = wm[1:]
+			exclusion = true
+		}
+
+		wmRelPath := filepath.Clean(filepath.Join(projectPath, wm))
+		if exclusion {
+			wmRelPath = "!" + wmRelPath
+		}
+		whenModifiedRelToRepoRoot = append(whenModifiedRelToRepoRoot, wmRelPath)
+	}
+	logger.Debug("HasDiverged: adjusted patterns to repo root: %v", whenModifiedRelToRepoRoot)
+
+	pm, err := patternmatcher.New(whenModifiedRelToRepoRoot)
+	if err != nil {
+		logger.Warn("HasDiverged: creating pattern matcher has failed: %s", err)
+		return true
+	}
+
+	for _, file := range nonEmptyChangedFiles {
+		match, err := pm.MatchesOrParentMatches(file)
+		if err != nil {
+			logger.Debug("HasDiverged: match error for file %q: %s, treating as diverged", file, err)
+			return true
+		}
+		if match {
+			logger.Debug("HasDiverged: file %q matched patterns - branch has diverged", file)
+			return true
+		}
+	}
+
+	logger.Debug("HasDiverged: no changed files matched the patterns - no divergence")
+	return false
 }
 
 func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {
@@ -279,6 +391,7 @@ func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedG
 	return true
 }
 
+// Locks are acquired by the caller.
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
 	// We use both `<prSourceRemote>` and `origin` remotes, update them both
@@ -437,6 +550,7 @@ func (w *FileWorkspace) wrappedGit(logger logging.SimpleLogging, c wrappedGitCon
 }
 
 // Merge the PR into the base branch.
+// Locks are acquired by the caller.
 func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappedGitContext) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", c.pr.HeadBranch)
 	fetchRemote := prSourceRemote
@@ -588,4 +702,46 @@ func (w *FileWorkspace) GetGitUntrackedFiles(logger logging.SimpleLogging, r mod
 	untrackedFiles := strings.Split(string(output), "\n")[:]
 	logger.Debug("Untracked files: '%s'", strings.Join(untrackedFiles, ","))
 	return untrackedFiles, nil
+}
+
+// gitWriteLock acquires an exclusive lock for clone/reset/merge in the given clone dir.
+// Callers must call the returned function to release the lock.
+func (w *FileWorkspace) gitWriteLock(cloneDir string) func() {
+	key := fmt.Sprintf("repo-lock/%s", cloneDir)
+	value, _ := gitLocks.LoadOrStore(key, new(sync.RWMutex))
+	mu := value.(*sync.RWMutex)
+	mu.Lock()
+	return func() { mu.Unlock() }
+}
+
+// GitReadLock acquires a shared lock so that clone/reset/merge (write lock) cannot run
+// while steps are using the working dir. Call the returned function when steps are done.
+func (w *FileWorkspace) GitReadLock(r models.Repo, p models.PullRequest, workspace string) func() {
+	cloneDir, err := w.cloneDir(r, p, workspace)
+	if err != nil {
+		// Path traversal or other validation error: return a no-op unlock.
+		return func() {}
+	}
+	return w.gitReadLock(cloneDir)
+}
+
+// gitReadLock acquires the same shared lock as GitReadLock but by workspace dir path.
+// Used when only the workspace directory path is available.
+func (w *FileWorkspace) gitReadLock(workspaceDir string) func() {
+	key := fmt.Sprintf("repo-lock/%s", workspaceDir)
+	value, _ := gitLocks.LoadOrStore(key, new(sync.RWMutex))
+	mu := value.(*sync.RWMutex)
+	mu.RLock()
+	return func() { mu.RUnlock() }
+}
+
+// gitRefLock acquires an exclusive lock for ref update operations.
+// It is separate from the repo read lock to allow for concurrent repo read operations
+// and not introduce unnecessary latency.
+func (w *FileWorkspace) gitRefLock(workspaceDir string) func() {
+	key := fmt.Sprintf("ref-lock/%s", workspaceDir)
+	value, _ := gitLocks.LoadOrStore(key, new(sync.Mutex))
+	mu := value.(*sync.Mutex)
+	mu.Lock()
+	return func() { mu.Unlock() }
 }
