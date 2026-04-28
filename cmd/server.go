@@ -105,6 +105,7 @@ const (
 	GHOrganizationFlag               = "gh-org"
 	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
 	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
+	GHMergeQueueEnabledFlag          = "gh-merge-queue-enabled"
 	GiteaBaseURLFlag                 = "gitea-base-url"
 	GiteaTokenFlag                   = "gitea-token"
 	GiteaUserFlag                    = "gitea-user"
@@ -558,6 +559,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	GHAllowMergeableBypassApply: {
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
+		defaultValue: false,
+	},
+	GHMergeQueueEnabledFlag: {
+		description:  "Enable handling of GitHub merge queue (merge_group) events. When enabled, Atlantis posts success for plan/apply/policy_check on merge group commits so the merge queue can proceed.",
 		defaultValue: false,
 	},
 	GitlabStatusRetryEnabledFlag: {

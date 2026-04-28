@@ -28,6 +28,7 @@ import (
 	"github.com/google/go-github/v83/github"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
@@ -87,7 +88,12 @@ type VCSEventsController struct {
 	// startup to support.
 	SupportedVCSHosts []models.VCSHostType `validate:"required"`
 	VCSClient         vcs.Client           `validate:"required"`
-	TestingMode       bool
+	// CommitStatusUpdater is used to set commit statuses outside of the regular
+	// command runner flow, e.g. when handling GitHub merge queue events.
+	CommitStatusUpdater events.CommitStatusUpdater `validate:"required"`
+	// GithubMergeQueueEnabled toggles handling of GitHub merge_group events.
+	GithubMergeQueueEnabled bool
+	TestingMode             bool
 	// BitbucketWebhookSecret is the secret added to this webhook via the Bitbucket
 	// UI that identifies this call as coming from Bitbucket. If empty, no
 	// request validation is done.
@@ -201,6 +207,10 @@ func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Re
 		resp = e.HandleGithubPullRequestEvent(logger, event, githubReqID)
 		scope = scope.SubScope(fmt.Sprintf("pr_%s", *event.Action))
 		scope = common.SetGitScopeTags(scope, event.GetRepo().GetFullName(), event.GetNumber())
+	case *github.MergeGroupEvent:
+		resp = e.HandleGithubMergeGroupEvent(logger, event, githubReqID)
+		scope = scope.SubScope(fmt.Sprintf("merge_group_%s", event.GetAction()))
+		scope = common.SetGitScopeTags(scope, event.GetRepo().GetFullName(), 0)
 	default:
 		resp = HTTPResponse{
 			body: fmt.Sprintf("Ignoring unsupported event %s", githubReqID),
@@ -560,6 +570,96 @@ func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.Simple
 
 	logger.Info("Handling GitHub Pull Request '%s' event", pullEventType.String())
 	return e.handlePullRequestEvent(logger, baseRepo, headRepo, pull, user, pullEventType)
+}
+
+// HandleGithubMergeGroupEvent handles GitHub merge_group webhook events. When
+// a merge group's checks are requested, Atlantis posts success commit statuses
+// for plan, apply, and policy_check on the merge group's head SHA so that the
+// merge queue can proceed. The PR was already validated by Atlantis before it
+// joined the queue, so re-running plans here is unnecessary.
+func (e *VCSEventsController) HandleGithubMergeGroupEvent(logger logging.SimpleLogging, event *github.MergeGroupEvent, githubReqID string) HTTPResponse {
+	if !e.GithubMergeQueueEnabled {
+		return HTTPResponse{
+			body: fmt.Sprintf("Ignoring merge_group event since gh-merge-queue-enabled is false %s", githubReqID),
+		}
+	}
+
+	action := event.GetAction()
+	if action != "checks_requested" {
+		return HTTPResponse{
+			body: fmt.Sprintf("Ignoring merge_group event with action %q %s", action, githubReqID),
+		}
+	}
+
+	baseRepo, err := e.Parser.ParseGithubRepo(event.GetRepo())
+	if err != nil {
+		wrapped := fmt.Errorf("parsing merge_group event: %s: %w", githubReqID, err)
+		return HTTPResponse{
+			body: wrapped.Error(),
+			err: HTTPError{
+				code:       http.StatusBadRequest,
+				err:        wrapped,
+				isSilenced: false,
+			},
+		}
+	}
+
+	logger = logger.With("repo", baseRepo.FullName)
+
+	if !e.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		err := fmt.Errorf("merge_group event from non-allowlisted repo '%s/%s'", baseRepo.VCSHost.Hostname, baseRepo.FullName)
+		return HTTPResponse{
+			body: err.Error(),
+			err: HTTPError{
+				code:       http.StatusForbidden,
+				err:        err,
+				isSilenced: e.SilenceAllowlistErrors,
+			},
+		}
+	}
+
+	headSHA := event.GetMergeGroup().GetHeadSHA()
+	if headSHA == "" {
+		err := fmt.Errorf("merge_group event missing head SHA %s", githubReqID)
+		return HTTPResponse{
+			body: err.Error(),
+			err: HTTPError{
+				code:       http.StatusBadRequest,
+				err:        err,
+				isSilenced: false,
+			},
+		}
+	}
+
+	logger.Info("Handling GitHub Merge Group 'checks_requested' event for %s", headSHA)
+
+	pull := models.PullRequest{
+		HeadCommit: headSHA,
+		BaseRepo:   baseRepo,
+	}
+
+	cmds := []command.Name{command.Plan, command.Apply, command.PolicyCheck}
+	var errs []error
+	for _, cmd := range cmds {
+		if err := e.CommitStatusUpdater.UpdateCombined(logger, baseRepo, pull, models.SuccessCommitStatus, cmd); err != nil {
+			errs = append(errs, fmt.Errorf("updating %s status: %w", cmd.String(), err))
+		}
+	}
+	if len(errs) > 0 {
+		joined := errors.Join(errs...)
+		return HTTPResponse{
+			body: joined.Error(),
+			err: HTTPError{
+				code:       http.StatusInternalServerError,
+				err:        joined,
+				isSilenced: false,
+			},
+		}
+	}
+
+	return HTTPResponse{
+		body: "Merge group checks marked as successful",
+	}
 }
 
 func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType) HTTPResponse {
