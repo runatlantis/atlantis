@@ -102,7 +102,10 @@ type FileWorkspace struct {
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
-	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
+	cloneDir, err := w.validateCloneDir(p.BaseRepo, p, workspace)
+	if err != nil {
+		return "", err
+	}
 	c := wrappedGitContext{cloneDir, headRepo, p}
 
 	// Fast path: if the directory already exists and is at the right commit,
@@ -184,7 +187,10 @@ func (w *FileWorkspace) MergeAgain(
 		return false, nil
 	}
 
-	cloneDir := w.cloneDir(p.BaseRepo, p, workspace)
+	cloneDir, err := w.validateCloneDir(p.BaseRepo, p, workspace)
+	if err != nil {
+		return false, err
+	}
 	// We atomically set the recheckRequiredMap flag here before grabbing any lock.
 	// If the flag is cleared after we grab the write lock, it means some other
 	// thread did the necessary work late enough that we do not have to do it again.
@@ -652,6 +658,19 @@ func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string 
 
 func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) string {
 	return filepath.Join(w.repoPullDir(r, p), workspace)
+}
+
+// validateCloneDir computes the clone dir for the given repo/PR/workspace and
+// confirms it is contained within the managed data directory. Repo names already
+// pass through ATLANTIS_REPO_ALLOWLIST, but this explicit check makes the bound
+// provable to static analyzers that taint-track user input into filesystem APIs.
+func (w *FileWorkspace) validateCloneDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
+	cloneDir := filepath.Clean(w.cloneDir(r, p, workspace))
+	expectedPrefix := filepath.Clean(filepath.Join(w.DataDir, workingDirPrefix)) + string(filepath.Separator)
+	if !strings.HasPrefix(cloneDir, expectedPrefix) {
+		return "", fmt.Errorf("clone dir %q escapes managed data directory %q", cloneDir, expectedPrefix)
+	}
+	return cloneDir, nil
 }
 
 // sanitizeGitCredentials replaces any git clone urls that contain credentials
