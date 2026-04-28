@@ -58,6 +58,7 @@ func safeProjectDir(repoDir, repoRelDir string) (string, error) {
 	return absPath, nil
 }
 
+
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
 
 // LockURLGenerator generates urls to locks.
