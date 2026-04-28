@@ -55,6 +55,7 @@ const (
 	ADUserFlag                       = "azuredevops-user"
 	ADHostnameFlag                   = "azuredevops-hostname"
 	AllowCommandsFlag                = "allow-commands"
+	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
@@ -171,6 +172,7 @@ const (
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
+	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
@@ -229,6 +231,12 @@ var stringFlags = map[string]stringFlag{
 	AllowCommandsFlag: {
 		description:  "Comma separated list of acceptable atlantis commands.",
 		defaultValue: DefaultAllowCommands,
+	},
+	BlockedExtraArgsFlag: {
+		description: "Comma separated list of Terraform CLI flag prefixes that are not allowed " +
+			"in comment extra args (the flags after '--'). " +
+			"Defaults to " + DefaultBlockedExtraArgs + ".",
+		defaultValue: DefaultBlockedExtraArgs,
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
@@ -910,6 +918,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
+	}
+	if c.BlockedExtraArgs == "" {
+		c.BlockedExtraArgs = DefaultBlockedExtraArgs
 	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
