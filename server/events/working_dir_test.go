@@ -923,6 +923,22 @@ func TestHasDiverged_WithPatterns_CheckoutMergeDisabled(t *testing.T) {
 	Equals(t, false, hasDiverged)
 }
 
+func TestGetDivergedFiles_CheckoutMergeDisabled(t *testing.T) {
+	wd := &events.FileWorkspace{
+		DataDir:             t.TempDir(),
+		CheckoutMerge:       false,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	files, err := wd.GetDivergedFiles(logging.NewNoopLogger(t), t.TempDir(), models.PullRequest{
+		BaseBranch: "main",
+	})
+
+	Ok(t, err)
+	Equals(t, []string(nil), files)
+}
+
 func TestHasDiverged_WithEmptyPatterns(t *testing.T) {
 	// Initialize the git repo.
 	repoDir := initRepo(t)

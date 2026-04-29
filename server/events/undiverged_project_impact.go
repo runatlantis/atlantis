@@ -238,7 +238,7 @@ func (r *undivergedProjectImpactResolver) autoDiscoverModeEnabled(ctx command.Pr
 
 func (r *undivergedProjectImpactResolver) isAutoDiscoverPathIgnored(ctx command.ProjectContext, repoCfg valid.RepoCfg, path string) bool {
 	fromGlobalAutoDiscover := r.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if fromGlobalAutoDiscover != nil {
+	if fromGlobalAutoDiscover != nil && fromGlobalAutoDiscover.IgnorePaths != nil {
 		return fromGlobalAutoDiscover.IsPathIgnored(path)
 	}
 	if repoCfg.AutoDiscover != nil {
