@@ -1,7 +1,7 @@
 # Note: This file is only used for Atlantis local development
 services:
   ngrok:
-    image: ngrok/ngrok:latest@sha256:068852d1cf8b0c6f63cd1e8b7ebd42ece7b399458b9f1e93093c103cf992ccbf
+    image: ngrok/ngrok:latest@sha256:6ead4323c504b78c0a3325ad701845a74b72341c4bb1e57108edf645cbb15897
     ports:
       - 4040:4040
     command:
@@ -12,7 +12,7 @@ services:
     depends_on:
       - atlantis
   redis:
-    image: redis:8.6-alpine@sha256:81b6f81d6a6c5b9019231a2e8eb10085e3a139a34f833dcc965a8a959b040b72
+    image: redis:8.6-alpine@sha256:c5e375abb885e6b2021c0377879e4890bf76f9065b8922ffc113f2b226b9fc17
     restart: always
     ports:
       - 6379:6379
