@@ -239,14 +239,16 @@ func (r *undivergedProjectImpactResolver) shouldUseAutoDiscoveredTargeting(ctx c
 }
 
 func (r *undivergedProjectImpactResolver) autoDiscoverModeEnabled(ctx command.ProjectContext, repoCfg valid.RepoCfg) bool {
+	if global := r.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID()); global != nil {
+		return repoCfg.AutoDiscoverEnabled(global.Mode)
+	}
+	if repoCfg.AutoDiscover != nil {
+		return repoCfg.AutoDiscoverEnabled(repoCfg.AutoDiscover.Mode)
+	}
+
 	defaultAutoDiscoverMode := valid.AutoDiscoverMode(r.AutoDiscoverMode)
 	if defaultAutoDiscoverMode == "" {
 		defaultAutoDiscoverMode = valid.AutoDiscoverAutoMode
-	}
-
-	globalAutoDiscover := r.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if globalAutoDiscover != nil {
-		defaultAutoDiscoverMode = globalAutoDiscover.Mode
 	}
 
 	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)

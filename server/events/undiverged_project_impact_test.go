@@ -87,6 +87,27 @@ func TestUndivergedProjectImpactResolver_NoTargetWhenGlobalAutoDiscoverDisabled(
 	Equals(t, undivergedProjectImpactModeNone, target.mode)
 }
 
+func TestUndivergedProjectImpactResolver_NoTargetWhenRepoAutoDiscoverDisabled(t *testing.T) {
+	repoDir := autoDiscoveredRepoWithAutoDiscoverMode(t, valid.AutoDiscoverDisabledMode)
+	resolver := newTestUndivergedProjectImpactResolver("**/*.tf", defaultAutoplanFileList, "auto")
+	ctx := newTestUndivergedProjectContext(t, "project1")
+
+	target, err := resolver.resolveTarget(ctx, repoDir)
+	Ok(t, err)
+	Equals(t, undivergedProjectImpactModeNone, target.mode)
+}
+
+func TestUndivergedProjectImpactResolver_GlobalAutoDiscoverModeOverridesRepoMode(t *testing.T) {
+	repoDir := autoDiscoveredRepoWithAutoDiscoverMode(t, valid.AutoDiscoverDisabledMode)
+	resolver := newTestUndivergedProjectImpactResolver("**/*.tf", defaultAutoplanFileList, "auto")
+	resolver.GlobalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{Mode: valid.AutoDiscoverEnabledMode}
+	ctx := newTestUndivergedProjectContext(t, "project1")
+
+	target, err := resolver.resolveTarget(ctx, repoDir)
+	Ok(t, err)
+	Equals(t, undivergedProjectImpactModeAutoDiscovered, target.mode)
+}
+
 func TestUndivergedProjectImpactResolver_GlobalAutoDiscoverWithoutIgnorePathsUsesRepoIgnorePaths(t *testing.T) {
 	repoDir := autoDiscoveredRepoWithIgnorePaths(t)
 	resolver := newTestUndivergedProjectImpactResolver("**/*.tf", defaultAutoplanFileList, "auto")
@@ -319,6 +340,18 @@ func autoDiscoveredRepo(t *testing.T) string {
 	writeTestFile(t, filepath.Join(repoDir, "modules", "database", "main.tf"), `output "name" {
   value = "database"
 }
+`)
+
+	return repoDir
+}
+
+func autoDiscoveredRepoWithAutoDiscoverMode(t *testing.T, mode valid.AutoDiscoverMode) string {
+	t.Helper()
+
+	repoDir := autoDiscoveredRepo(t)
+	writeTestFile(t, filepath.Join(repoDir, "atlantis.yaml"), `version: 3
+autodiscover:
+  mode: `+string(mode)+`
 `)
 
 	return repoDir

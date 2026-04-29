@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/core/config"
-	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -86,7 +85,6 @@ func TestNewGlobalCfg(t *testing.T) {
 				RepoLocks:                 &valid.DefaultRepoLocks,
 				PolicyCheck:               Bool(false),
 				CustomPolicyCheck:         Bool(false),
-				AutoDiscover:              raw.DefaultAutoDiscover(),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
