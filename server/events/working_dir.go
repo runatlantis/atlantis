@@ -457,10 +457,7 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 		if err := w.wrappedGit(logger, c, "reset", "--hard", targetRef); err != nil {
 			return err
 		}
-		// Plan files are untracked, so git reset --hard does not remove them.
-		// Delete them now so a subsequent bare `atlantis apply` cannot pick up
-		// stale plans generated for a previous commit.
-		return w.wrappedGit(logger, c, "clean", "-f", "-e", ".terragrunt-cache", "*.tfplan")
+		return w.cleanStalePlanFiles(logger, c)
 	}
 
 	// For merge strategy, we have to "redo" the merge
@@ -485,10 +482,13 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 		return fmt.Errorf("post-merge verification failed: HEAD^2 != %s", targetRef)
 	}
 
+	return w.cleanStalePlanFiles(logger, c)
+}
+
+func (w *FileWorkspace) cleanStalePlanFiles(logger logging.SimpleLogging, c wrappedGitContext) error {
 	// Plan files are untracked, so git reset --hard does not remove them.
-	// Delete them now so a subsequent bare `atlantis apply` cannot pick up
-	// stale plans generated for a previous commit.
-	return w.wrappedGit(logger, c, "clean", "-f", "-e", ".terragrunt-cache", "*.tfplan")
+	// Use -x because Terraform plan files are commonly ignored by repos.
+	return w.wrappedGit(logger, c, "clean", "-f", "-x", "-e", ".terragrunt-cache", "--", ":(glob)**/*.tfplan")
 }
 
 // isBranchAtTargetRef confirm
