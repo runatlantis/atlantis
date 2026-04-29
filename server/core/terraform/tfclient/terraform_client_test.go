@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package tfclient_test
@@ -257,7 +248,7 @@ func TestNewClient_BadVersion(t *testing.T) {
 	mockDownloader := mocks.NewMockDownloader()
 	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
 	_, err := tfclient.NewClient(logger, distribution, binDir, cacheDir, "", "", "malformed", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, true, true, projectCmdOutputHandler)
-	ErrEquals(t, "Malformed version: malformed", err)
+	ErrEquals(t, "malformed version: malformed", err)
 }
 
 // Test that if we run a command with a version we don't have, we download it.

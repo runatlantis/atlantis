@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package github
 
 import (
@@ -28,7 +31,7 @@ func NewInstrumentedGithubClient(client *Client, statsScope tally.Scope, logger 
 	}
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_github_pull_request_getter.go GithubPullRequestGetter
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_github_pull_request_getter.go GithubPullRequestGetter
 
 type GithubPullRequestGetter interface {
 	GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error)

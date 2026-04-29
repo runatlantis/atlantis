@@ -8,11 +8,17 @@ package common
 import (
 	"crypto/tls"
 	"fmt"
-	"math"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/logging"
 )
+
+// estimateBuffer is subtracted when estimating the start position for closure-type
+// detection. It compensates for the difference between the estimated and actual
+// start-separator lengths so the initial guess lands inside (not past) the chunk.
+const estimateBuffer = 50
 
 // ClosureType represents the type of markdown closure at a given position
 type ClosureType int
@@ -29,6 +35,9 @@ const (
 	// InlineCode means we're inside an inline code block (`)
 	InlineCode
 )
+
+// closureRegex matches code blocks (3+ backticks), inline code (1 backtick), and details tags (with optional attributes)
+var closureRegex = regexp.MustCompile("(`{3,})|(`)|(<details(?:\\s[^>]*)?>)|(</details>)")
 
 // SeparatorSet contains the separators for a specific closure type
 type SeparatorSet struct {
@@ -77,8 +86,8 @@ func GenerateSeparators(command string) map[ClosureType]SeparatorSet {
 	// CodeInDetails separators
 	separators[CodeInDetails] = SeparatorSet{
 		SepEnd:           fmt.Sprintf("\n```\n</details>\n%s", baseEnd),
-		SepStart:         fmt.Sprintf("%s```diff\n", baseStart),
-		TruncationHeader: fmt.Sprintf("%s```diff\n", baseTruncation),
+		SepStart:         fmt.Sprintf("%s<details><summary>Show Output</summary>\n\n```diff\n", baseStart),
+		TruncationHeader: fmt.Sprintf("%s<details><summary>Show Output</summary>\n\n```diff\n", baseTruncation),
 	}
 
 	// InlineCode separators
@@ -93,46 +102,48 @@ func GenerateSeparators(command string) map[ClosureType]SeparatorSet {
 
 // detectClosureType determines what type of closure is needed at a given position in the comment
 func detectClosureType(comment string, position int) ClosureType {
-	// Track whether we're inside code blocks and details blocks
-	inCodeBlock := false
-	detailsBlockCount := 0
-	inInlineCode := false
-
 	// Look at the text up to the position
 	text := comment[:position]
 
-	// Process character by character to handle inline code properly
-	i := 0
-	for i < len(text) {
-		char := text[i]
+	// Find all matches for our closure tokens
+	matches := closureRegex.FindAllStringIndex(text, -1)
 
-		// Check for triple backticks (code blocks)
-		if i <= len(text)-3 && text[i:i+3] == "```" {
-			inCodeBlock = !inCodeBlock
-			i += 3
-			continue
-		}
+	// Track state
+	inCodeBlock := false
+	inInlineCode := false
+	detailsBlockCount := 0
 
-		// Check for single backticks (inline code) - only if not in a code block
-		if char == '`' && !inCodeBlock {
-			inInlineCode = !inInlineCode
-		}
+	for _, loc := range matches {
+		token := text[loc[0]:loc[1]]
 
-		// Check for details block markers
-		if char == '<' {
-			if i <= len(text)-9 && text[i:i+9] == "<details>" {
+		if strings.HasPrefix(token, "```") {
+			// Code block fence (3+ backticks)
+			// Only toggle if we're not inside inline code
+			if !inInlineCode {
+				inCodeBlock = !inCodeBlock
+			}
+		} else if token == "`" {
+			// Inline code delimiter
+			// Only toggle if we're not inside a code block
+			if !inCodeBlock {
+				inInlineCode = !inInlineCode
+			}
+		} else if strings.HasPrefix(token, "<details") {
+			// Opening details tag
+			// Only count if not inside code block or inline code
+			if !inCodeBlock && !inInlineCode {
 				detailsBlockCount++
-				i += 9
-				continue
 			}
-			if i <= len(text)-10 && text[i:i+10] == "</details>" {
-				detailsBlockCount--
-				i += 10
-				continue
+		} else if token == "</details>" {
+			// Closing details tag
+			// Only count if not inside code block or inline code
+			if !inCodeBlock && !inInlineCode {
+				// Prevent count from going negative (e.g. if we missed an opening tag or saw stray closing tag)
+				if detailsBlockCount > 0 {
+					detailsBlockCount--
+				}
 			}
 		}
-
-		i++
 	}
 
 	// Determine closure type based on current state
@@ -161,7 +172,7 @@ SplitComment splits comment into a slice of comments that are under maxSize.
 - If maxCommentsPerCommand is non-zero, it never returns more than maxCommentsPerCommand
 comments, and it truncates the beginning of the comment to preserve the end of the comment string,
 which usually contains more important information, such as warnings, errors, and the plan summary.
-- SplitComment appends the appropriate TruncationHeader to the first comment if it would have produced more comments.
+- SplitComment prepends the appropriate TruncationHeader to the first comment if it would have produced more comments.
 */
 func SplitComment(logger logging.SimpleLogging, comment string, maxSize int, maxCommentsPerCommand int, command string) []string {
 	if len(comment) <= maxSize {
@@ -171,87 +182,133 @@ func SplitComment(logger logging.SimpleLogging, comment string, maxSize int, max
 	// Generate separators for different closure types
 	separators := GenerateSeparatorsFunc(command)
 
-	// Calculate initial estimate for number of comments using a more accurate separator length
-	// We'll refine this as we go with per-split calculation
-	estimatedSepLength := 30 // More accurate estimate based on typical separator lengths
-	maxContentSize := maxSize - estimatedSepLength
-	if maxContentSize <= 0 {
-		return []string{comment}
-	}
-
 	var comments []string
-	numPotentialComments := int(math.Ceil(float64(len(comment)) / float64(maxContentSize)))
-	var numComments int
-	if maxCommentsPerCommand == 0 {
-		numComments = numPotentialComments
-	} else {
-		numComments = min(numPotentialComments, maxCommentsPerCommand)
-	}
-	isTruncated := numComments < numPotentialComments
-
 	upTo := len(comment)
 
-	for len(comments) < numComments {
-		// Detect closure type at the split position
-		closureType := detectClosureType(comment, upTo)
-		sepSet := separators[closureType]
+	for upTo > 0 {
+		// Check if this is the last allowed comment (which becomes the first comment in the array)
+		// because we are limited by maxCommentsPerCommand
+		isLastAllowed := maxCommentsPerCommand > 0 && len(comments) == maxCommentsPerCommand-1
 
-		// Determine what separators this comment will need based on final array position
-		currentCommentIndex := len(comments)
-		isFirstCommentInArray := (currentCommentIndex + 1) == numComments // This portion becomes the first comment in final array
-		isLastCommentInArray := currentCommentIndex == 0                  // This portion becomes the last comment in final array
-
-		var startSepLength, endSepLength int
-		// Calculate startSepLength
-		switch {
-		case isFirstCommentInArray && isTruncated:
-			startSepLength = len(sepSet.TruncationHeader)
-		case !isFirstCommentInArray:
-			startSepLength = len(sepSet.SepStart)
-		default:
-			startSepLength = 0
+		// 1. Determine End Separator (needed if there are comments after this one)
+		closureAtEnd := detectClosureType(comment, upTo)
+		endSepSet := separators[closureAtEnd]
+		endSepLength := 0
+		if len(comments) > 0 {
+			endSepLength = len(endSepSet.SepEnd)
 		}
 
-		// Calculate endSepLength
-		if isLastCommentInArray {
-			endSepLength = 0
-		} else {
-			endSepLength = len(sepSet.SepEnd)
+		// 2. Determine Start Separator (needed if this is NOT the start of string)
+		// We estimate downFrom to guess the closure type at the start
+		estimatedDownFrom := min(upTo, max(0, upTo-(maxSize-endSepLength-estimateBuffer)))
+		closureAtStart := detectClosureType(comment, estimatedDownFrom)
+		startSepSet := separators[closureAtStart]
+
+		startSepLength := len(startSepSet.SepStart)
+		if isLastAllowed {
+			startSepLength = len(startSepSet.TruncationHeader)
 		}
 
-		// Calculate split position with exact separator lengths
-		totalSepLength := startSepLength + endSepLength
-		maxContentSize := maxSize - totalSepLength
-
+		maxContentSize := maxSize - endSepLength - startSepLength
 		if maxContentSize <= 0 {
+			// Separators are too large for maxSize. Return as is (best effort).
 			return []string{comment}
 		}
 
 		downFrom := max(0, upTo-maxContentSize)
 
-		// Skip empty portions
-		if downFrom >= upTo {
-			break
+		// Optimization: Check if we can fit everything from 0 to upTo without SepStart
+		// (Only if we are not forced to truncate)
+		if !isLastAllowed && downFrom > 0 {
+			// If we assume no Start separator, can we fit from 0?
+			if upTo <= (maxSize - endSepLength) {
+				downFrom = 0
+			}
 		}
 
+		// 3. Adjust split point for line boundaries or spaces
+		// Prefer splitting at a line boundary. Search forward from downFrom.
+		// If no newline found, look for a space.
+		// This shrinks the current comment (safe) but leaves more for previous ones.
+		if downFrom > 0 && downFrom < len(comment) {
+			// whitespaceForwardSearchWindow limits how far ahead we scan when adjusting
+			// splits to align with whitespace or newlines. 500 bytes is a compromise
+			// between usually finding a natural boundary near the ideal split point
+			// and avoiding excessive scanning on very large comments.
+			const whitespaceForwardSearchWindow = 500
+
+			searchLimit := min(upTo-1, downFrom+whitespaceForwardSearchWindow)
+			foundSpace := -1
+			foundNewline := -1
+
+			for p := downFrom; p < searchLimit; p++ {
+				if comment[p] == '\n' {
+					foundNewline = p
+					break
+				}
+				if comment[p] == ' ' && foundSpace == -1 {
+					foundSpace = p
+				}
+			}
+
+			if foundNewline != -1 {
+				downFrom = foundNewline + 1
+			} else if foundSpace != -1 {
+				downFrom = foundSpace + 1
+			}
+		}
+
+		// 4. Re-calculate closure at actual downFrom and ensure we fit maxSize
+		// If closure type changed or we underestimated header size, we might overflow.
+		// Iterate to stabilize.
+		for {
+			closureAtStart = detectClosureType(comment, downFrom)
+			startSepSet = separators[closureAtStart]
+
+			actualStartSepLength := 0
+			if downFrom > 0 {
+				if isLastAllowed {
+					actualStartSepLength = len(startSepSet.TruncationHeader)
+				} else {
+					actualStartSepLength = len(startSepSet.SepStart)
+				}
+			}
+
+			currentTotalSize := (upTo - downFrom) + actualStartSepLength + endSepLength
+			if currentTotalSize <= maxSize {
+				break
+			}
+
+			// We overflowed. Shrink the chunk by increasing downFrom.
+			overflow := currentTotalSize - maxSize
+			downFrom = min(upTo, downFrom+overflow)
+		}
+
+		// 5. Construct the comment portion
 		portion := comment[downFrom:upTo]
 
-		// Apply the separators we calculated
-
-		// Apply separators in a clear order: start, then end
-		switch {
-		case isFirstCommentInArray && isTruncated:
-			portion = sepSet.TruncationHeader + portion
-		case !isFirstCommentInArray:
-			portion = sepSet.SepStart + portion
+		if downFrom > 0 {
+			if isLastAllowed {
+				portion = startSepSet.TruncationHeader + portion
+			} else {
+				// Re-verify if we really needed SepStart (logic above handled downFrom=0)
+				// If downFrom > 0, we definitely need it.
+				portion = startSepSet.SepStart + portion
+			}
 		}
 
-		if !isLastCommentInArray {
-			portion += sepSet.SepEnd
+		if len(comments) > 0 {
+			portion += endSepSet.SepEnd
 		}
 
 		comments = append([]string{portion}, comments...)
 		upTo = downFrom
+
+		// If we hit the limit and still have content left (downFrom > 0), stop.
+		// The current comment (comments[0]) already has TruncationHeader.
+		if isLastAllowed && downFrom > 0 {
+			break
+		}
 	}
 
 	return comments
