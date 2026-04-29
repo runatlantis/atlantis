@@ -113,6 +113,7 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedFailsForImpactedConf
 
 	ctx := newTestUndivergedProjectContext(t, "project1")
 	ctx.ApplyRequirements = []string{raw.UnDivergedRequirement}
+	ctx.AutoplanWhenModified = raw.DefaultAutoPlanWhenModified
 
 	failure, err := handler.ValidateApplyProject(repoDir, ctx)
 	Ok(t, err)
@@ -134,10 +135,58 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedPassesForUnrelatedCo
 
 	ctx := newTestUndivergedProjectContext(t, "project1")
 	ctx.ApplyRequirements = []string{raw.UnDivergedRequirement}
+	ctx.AutoplanWhenModified = raw.DefaultAutoPlanWhenModified
 
 	failure, err := handler.ValidateApplyProject(repoDir, ctx)
 	Ok(t, err)
 	Equals(t, "", failure)
+}
+
+func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackWhenGeneratedConfigMissing(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	repoDir := autoDiscoveredRepo(t)
+	resolver := newTestUndivergedProjectImpactResolver("**/*.tf", defaultAutoplanFileList, "auto")
+	workingDir := NewMockWorkingDir()
+	When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Eq(repoDir), Eq("project1"), Eq([]string{"generated-only/**"}), Any[models.PullRequest]())).ThenReturn(true)
+
+	handler := &DefaultCommandRequirementHandler{
+		WorkingDir:            workingDir,
+		ProjectImpactResolver: resolver,
+	}
+
+	ctx := newTestUndivergedProjectContext(t, "project1")
+	ctx.ApplyRequirements = []string{raw.UnDivergedRequirement}
+	ctx.AutoplanWhenModified = []string{"generated-only/**"}
+	ctx.RepoConfigVersion = 3
+	ctx.Workspace = "nondefault"
+
+	failure, err := handler.ValidateApplyProject(repoDir, ctx)
+	Ok(t, err)
+	Equals(t, "Default branch must be rebased onto pull request before running apply.", failure)
+}
+
+func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackForEmptyConfiguredWhenModified(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	repoDir := configuredProjectRepoWithEmptyWhenModified(t)
+	resolver := newTestUndivergedProjectImpactResolver("**/*.tf", defaultAutoplanFileList, "auto")
+	workingDir := NewMockWorkingDir()
+	When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Eq(repoDir), Eq("project1"), Eq([]string{}), Any[models.PullRequest]())).ThenReturn(true)
+
+	handler := &DefaultCommandRequirementHandler{
+		WorkingDir:            workingDir,
+		ProjectImpactResolver: resolver,
+	}
+
+	ctx := newTestUndivergedProjectContext(t, "project1")
+	ctx.ApplyRequirements = []string{raw.UnDivergedRequirement}
+	ctx.AutoplanWhenModified = []string{}
+	ctx.RepoConfigVersion = 3
+
+	failure, err := handler.ValidateApplyProject(repoDir, ctx)
+	Ok(t, err)
+	Equals(t, "Default branch must be rebased onto pull request before running apply.", failure)
 }
 
 func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackToFullCheckOnResolverError(t *testing.T) {
@@ -199,6 +248,21 @@ projects:
 	writeTestFile(t, filepath.Join(repoDir, "modules", "database", "main.tf"), `output "name" {
   value = "database"
 }
+`)
+
+	return repoDir
+}
+
+func configuredProjectRepoWithEmptyWhenModified(t *testing.T) string {
+	t.Helper()
+
+	repoDir := configuredProjectRepo(t)
+	writeTestFile(t, filepath.Join(repoDir, "atlantis.yaml"), `version: 3
+projects:
+- dir: project1
+  workspace: default
+  autoplan:
+    when_modified: []
 `)
 
 	return repoDir

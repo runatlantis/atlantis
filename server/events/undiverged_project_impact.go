@@ -66,6 +66,11 @@ func (r *undivergedProjectImpactResolver) HasUndivergedImpact(
 	if target.mode == undivergedProjectImpactModeNone {
 		return false, false, nil
 	}
+	if target.mode == undivergedProjectImpactModeConfigured && len(ctx.AutoplanWhenModified) == 0 {
+		// Preserve the previous empty-pattern behavior for configured projects:
+		// HasDiverged treats an empty list as a full divergence check.
+		return false, false, nil
+	}
 
 	divergedFiles, err := workingDir.GetDivergedFiles(ctx.Log, repoDir, ctx.Pull)
 	if err != nil {
@@ -97,6 +102,14 @@ func (r *undivergedProjectImpactResolver) resolveTarget(ctx command.ProjectConte
 		if err != nil {
 			return undivergedProjectImpactTarget{}, fmt.Errorf("parsing %s: %w", repoCfgFile, err)
 		}
+	} else if ctx.RepoConfigVersion > 0 {
+		// The command context came from repo config, but this workspace clone
+		// does not have the config file. That can happen with pre-workflow
+		// generated config in non-default workspaces. Fall back to the existing
+		// HasDiverged path using the context's stored when_modified patterns.
+		return undivergedProjectImpactTarget{
+			mode: undivergedProjectImpactModeNone,
+		}, nil
 	}
 
 	for _, project := range repoCfg.Projects {
