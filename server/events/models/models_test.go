@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package models_test
@@ -23,34 +14,34 @@ import (
 )
 
 func TestNewRepo_EmptyRepoFullName(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "", "https://github.com/notowner/repo.git", "u", "p")
+	_, err := models.NewRepo(models.Github, "", "https://github.com/notowner/repo.git", "u", "p", "")
 	ErrEquals(t, "repoFullName can't be empty", err)
 }
 
 func TestNewRepo_EmptyCloneURL(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", "", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", "", "u", "p", "")
 	ErrEquals(t, "cloneURL can't be empty", err)
 }
 
 func TestNewRepo_InvalidCloneURL(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", ":", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", ":", "u", "p", "")
 	ErrEquals(t, "invalid clone url: parse \":.git\": missing protocol scheme", err)
 }
 
 func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/notowner/repo.git", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/notowner/repo.git", "u", "p", "")
 	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/notowner/repo.git"`, err)
 }
 
 func TestNewRepo_EmptyAzureDevopsProject(t *testing.T) {
-	_, err := models.NewRepo(models.AzureDevops, "", "https://dev.azure.com/notowner/project/_git/repo", "u", "p")
+	_, err := models.NewRepo(models.AzureDevops, "", "https://dev.azure.com/notowner/project/_git/repo", "u", "p", "")
 	ErrEquals(t, "repoFullName can't be empty", err)
 }
 
 // For bitbucket server we don't validate the clone URL because the callers
 // are actually constructing it.
 func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
-	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p")
+	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p", "")
 	Ok(t, err)
 	Equals(t, models.Repo{
 		FullName:          "owner/repo",
@@ -67,12 +58,12 @@ func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
 
 // If the clone URL contains a space, NewRepo() should encode it
 func TestNewRepo_CloneURLContainsSpace(t *testing.T) {
-	repo, err := models.NewRepo(models.AzureDevops, "owner/project space/repo", "https://dev.azure.com/owner/project space/repo", "u", "p")
+	repo, err := models.NewRepo(models.AzureDevops, "owner/project space/repo", "https://dev.azure.com/owner/project space/repo", "u", "p", "")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@dev.azure.com/owner/project%20space/repo")
 	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@dev.azure.com/owner/project%20space/repo")
 
-	repo, err = models.NewRepo(models.BitbucketCloud, "owner/repo space", "https://bitbucket.org/owner/repo space", "u", "p")
+	repo, err = models.NewRepo(models.BitbucketCloud, "owner/repo space", "https://bitbucket.org/owner/repo space", "u", "p", "")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo%20space.git")
 	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@bitbucket.org/owner/repo%20space.git")
@@ -111,7 +102,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.repoFullName, func(t *testing.T) {
 			cloneURL := fmt.Sprintf("https://github.com/%s.git", c.repoFullName)
-			_, err := models.NewRepo(models.Github, c.repoFullName, cloneURL, "u", "p")
+			_, err := models.NewRepo(models.Github, c.repoFullName, cloneURL, "u", "p", "")
 			ErrEquals(t, c.expErr, err)
 		})
 	}
@@ -119,7 +110,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 
 // If the clone url doesn't end with .git, and VCS is not Azure DevOps, it is appended
 func TestNewRepo_MissingDotGit(t *testing.T) {
-	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
+	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p", "")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo.git")
 	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@bitbucket.org/owner/repo.git")
@@ -127,7 +118,7 @@ func TestNewRepo_MissingDotGit(t *testing.T) {
 
 func TestNewRepo_HTTPAuth(t *testing.T) {
 	// When the url has http the auth should be added.
-	repo, err := models.NewRepo(models.Github, "owner/repo", "http://github.com/owner/repo.git", "u", "p")
+	repo, err := models.NewRepo(models.Github, "owner/repo", "http://github.com/owner/repo.git", "u", "p", "")
 	Ok(t, err)
 	Equals(t, models.Repo{
 		VCSHost: models.VCSHost{
@@ -144,7 +135,7 @@ func TestNewRepo_HTTPAuth(t *testing.T) {
 
 func TestNewRepo_HTTPSAuth(t *testing.T) {
 	// When the url has https the auth should be added.
-	repo, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/owner/repo.git", "u", "p")
+	repo, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/owner/repo.git", "u", "p", "")
 	Ok(t, err)
 	Equals(t, models.Repo{
 		VCSHost: models.VCSHost{
@@ -157,6 +148,99 @@ func TestNewRepo_HTTPSAuth(t *testing.T) {
 		Owner:             "owner",
 		Name:              "repo",
 	}, repo)
+}
+
+// TestNewRepo_Gitlab_HostAndSubpath exercises the GitLab-specific host and
+// subpath validation introduced for subpath-hosted GitLab instances.
+func TestNewRepo_Gitlab_SaaS_Valid(t *testing.T) {
+	repo, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://gitlab.com/owner/repo.git",
+		"u", "p", "gitlab.com")
+	Ok(t, err)
+	Equals(t, "owner/repo", repo.FullName)
+	Equals(t, "gitlab.com", repo.VCSHost.Hostname)
+}
+
+func TestNewRepo_Gitlab_SaaS_WrongHost(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://evil.com/owner/repo.git",
+		"u", "p", "gitlab.com")
+	ErrEquals(t, `expected clone url host "gitlab.com" but had "evil.com"`, err)
+}
+
+func TestNewRepo_Gitlab_SaaS_UnexpectedSubpath(t *testing.T) {
+	// gitlab.com configured with no subpath — a URL carrying a subpath must
+	// still be rejected (regression guard against the suffix-match approach).
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://gitlab.com/x/owner/repo.git",
+		"u", "p", "gitlab.com")
+	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/x/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_Valid(t *testing.T) {
+	repo, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	Ok(t, err)
+	Equals(t, "owner/repo", repo.FullName)
+}
+
+func TestNewRepo_Gitlab_Subpath_MissingSubpath(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url to have path "/gitlab/owner/repo.git" but had "/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_WrongSubpath(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/other/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url to have path "/gitlab/owner/repo.git" but had "/other/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_WrongHost(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://evil.com/gitlab/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url host "acme.com" but had "evil.com"`, err)
+}
+
+func TestNewRepo_Gitlab_Host_CaseInsensitive(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "ACME.com/gitlab")
+	Ok(t, err)
+}
+
+func TestNewRepo_Gitlab_EmptyHostname_SkipsEnhancedCheck(t *testing.T) {
+	// When vcsHostname is empty, NewRepo falls back to the pre-change
+	// strict-path-equality behavior. cmd/server.go defaults GitlabHostname to
+	// "gitlab.com" in production, so this path guards direct-API callers and
+	// test helpers that construct EventParser without setting a hostname.
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "")
+	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/gitlab/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_InvalidConfiguredHostname(t *testing.T) {
+	// If the configured hostname is itself malformed, NewRepo must surface a
+	// wrapping error rather than silently skipping validation.
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "https:///no/host/here")
+	ErrContains(t, "parsing configured gitlab hostname", err)
 }
 
 func TestProject_String(t *testing.T) {
