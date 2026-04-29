@@ -593,6 +593,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubTokenFile:    userConfig.GithubTokenFile,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
+		GitlabHostname:     userConfig.GitlabHostname,
 		GiteaUser:          userConfig.GiteaUser,
 		GiteaToken:         userConfig.GiteaToken,
 		AllowDraftPRs:      userConfig.PlanDrafts,
@@ -610,6 +611,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AzureDevopsUser,
 		userConfig.ExecutableName,
 		allowCommands,
+		userConfig.ToBlockedExtraArgs(),
 	)
 	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()

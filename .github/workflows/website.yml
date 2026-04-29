@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Spell check
-        uses: crate-ci/typos@02ea592e44b3a53c302f697cddca7641cd051c3d # v1.45.0
+        uses: crate-ci/typos@cf5f1c29a8ac336af8568821ec41919923b05a83 # v1.45.1
         with:
           files: ./runatlantis.io/docs
 
@@ -99,7 +99,7 @@ jobs:
             ./runatlantis.io
 
       - name: setup npm
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           cache: 'npm'
 

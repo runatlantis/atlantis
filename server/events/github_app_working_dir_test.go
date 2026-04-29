@@ -82,6 +82,7 @@ func TestClone_GithubAppSetsCorrectUrl(t *testing.T) {
 		// user and token have to be blank otherwise this proxy wouldn't be invoked to begin with
 		"",
 		"",
+		"",
 	)
 
 	headRepo := baseRepo
@@ -125,6 +126,7 @@ func TestMergeAgain_GithubAppSetsCorrectUrl(t *testing.T) {
 		"https://github.com/runatlantis/atlantis.git",
 
 		// user and token have to be blank otherwise this proxy wouldn't be invoked to begin with
+		"",
 		"",
 		"",
 	)

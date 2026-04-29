@@ -23,34 +23,34 @@ import (
 )
 
 func TestNewRepo_EmptyRepoFullName(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "", "https://github.com/notowner/repo.git", "u", "p")
+	_, err := models.NewRepo(models.Github, "", "https://github.com/notowner/repo.git", "u", "p", "")
 	ErrEquals(t, "repoFullName can't be empty", err)
 }
 
 func TestNewRepo_EmptyCloneURL(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", "", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", "", "u", "p", "")
 	ErrEquals(t, "cloneURL can't be empty", err)
 }
 
 func TestNewRepo_InvalidCloneURL(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", ":", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", ":", "u", "p", "")
 	ErrEquals(t, "invalid clone url: parse \":.git\": missing protocol scheme", err)
 }
 
 func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/notowner/repo.git", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/notowner/repo.git", "u", "p", "")
 	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/notowner/repo.git"`, err)
 }
 
 func TestNewRepo_EmptyAzureDevopsProject(t *testing.T) {
-	_, err := models.NewRepo(models.AzureDevops, "", "https://dev.azure.com/notowner/project/_git/repo", "u", "p")
+	_, err := models.NewRepo(models.AzureDevops, "", "https://dev.azure.com/notowner/project/_git/repo", "u", "p", "")
 	ErrEquals(t, "repoFullName can't be empty", err)
 }
 
 // For bitbucket server we don't validate the clone URL because the callers
 // are actually constructing it.
 func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
-	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p")
+	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p", "")
 	Ok(t, err)
 	Equals(t, models.Repo{
 		FullName:          "owner/repo",
@@ -67,12 +67,12 @@ func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
 
 // If the clone URL contains a space, NewRepo() should encode it
 func TestNewRepo_CloneURLContainsSpace(t *testing.T) {
-	repo, err := models.NewRepo(models.AzureDevops, "owner/project space/repo", "https://dev.azure.com/owner/project space/repo", "u", "p")
+	repo, err := models.NewRepo(models.AzureDevops, "owner/project space/repo", "https://dev.azure.com/owner/project space/repo", "u", "p", "")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@dev.azure.com/owner/project%20space/repo")
 	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@dev.azure.com/owner/project%20space/repo")
 
-	repo, err = models.NewRepo(models.BitbucketCloud, "owner/repo space", "https://bitbucket.org/owner/repo space", "u", "p")
+	repo, err = models.NewRepo(models.BitbucketCloud, "owner/repo space", "https://bitbucket.org/owner/repo space", "u", "p", "")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo%20space.git")
 	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@bitbucket.org/owner/repo%20space.git")
@@ -111,7 +111,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.repoFullName, func(t *testing.T) {
 			cloneURL := fmt.Sprintf("https://github.com/%s.git", c.repoFullName)
-			_, err := models.NewRepo(models.Github, c.repoFullName, cloneURL, "u", "p")
+			_, err := models.NewRepo(models.Github, c.repoFullName, cloneURL, "u", "p", "")
 			ErrEquals(t, c.expErr, err)
 		})
 	}
@@ -119,7 +119,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 
 // If the clone url doesn't end with .git, and VCS is not Azure DevOps, it is appended
 func TestNewRepo_MissingDotGit(t *testing.T) {
-	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
+	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p", "")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo.git")
 	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@bitbucket.org/owner/repo.git")
@@ -127,7 +127,7 @@ func TestNewRepo_MissingDotGit(t *testing.T) {
 
 func TestNewRepo_HTTPAuth(t *testing.T) {
 	// When the url has http the auth should be added.
-	repo, err := models.NewRepo(models.Github, "owner/repo", "http://github.com/owner/repo.git", "u", "p")
+	repo, err := models.NewRepo(models.Github, "owner/repo", "http://github.com/owner/repo.git", "u", "p", "")
 	Ok(t, err)
 	Equals(t, models.Repo{
 		VCSHost: models.VCSHost{
@@ -144,7 +144,7 @@ func TestNewRepo_HTTPAuth(t *testing.T) {
 
 func TestNewRepo_HTTPSAuth(t *testing.T) {
 	// When the url has https the auth should be added.
-	repo, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/owner/repo.git", "u", "p")
+	repo, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/owner/repo.git", "u", "p", "")
 	Ok(t, err)
 	Equals(t, models.Repo{
 		VCSHost: models.VCSHost{
@@ -157,6 +157,99 @@ func TestNewRepo_HTTPSAuth(t *testing.T) {
 		Owner:             "owner",
 		Name:              "repo",
 	}, repo)
+}
+
+// TestNewRepo_Gitlab_HostAndSubpath exercises the GitLab-specific host and
+// subpath validation introduced for subpath-hosted GitLab instances.
+func TestNewRepo_Gitlab_SaaS_Valid(t *testing.T) {
+	repo, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://gitlab.com/owner/repo.git",
+		"u", "p", "gitlab.com")
+	Ok(t, err)
+	Equals(t, "owner/repo", repo.FullName)
+	Equals(t, "gitlab.com", repo.VCSHost.Hostname)
+}
+
+func TestNewRepo_Gitlab_SaaS_WrongHost(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://evil.com/owner/repo.git",
+		"u", "p", "gitlab.com")
+	ErrEquals(t, `expected clone url host "gitlab.com" but had "evil.com"`, err)
+}
+
+func TestNewRepo_Gitlab_SaaS_UnexpectedSubpath(t *testing.T) {
+	// gitlab.com configured with no subpath — a URL carrying a subpath must
+	// still be rejected (regression guard against the suffix-match approach).
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://gitlab.com/x/owner/repo.git",
+		"u", "p", "gitlab.com")
+	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/x/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_Valid(t *testing.T) {
+	repo, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	Ok(t, err)
+	Equals(t, "owner/repo", repo.FullName)
+}
+
+func TestNewRepo_Gitlab_Subpath_MissingSubpath(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url to have path "/gitlab/owner/repo.git" but had "/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_WrongSubpath(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/other/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url to have path "/gitlab/owner/repo.git" but had "/other/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_WrongHost(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://evil.com/gitlab/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url host "acme.com" but had "evil.com"`, err)
+}
+
+func TestNewRepo_Gitlab_Host_CaseInsensitive(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "ACME.com/gitlab")
+	Ok(t, err)
+}
+
+func TestNewRepo_Gitlab_EmptyHostname_SkipsEnhancedCheck(t *testing.T) {
+	// When vcsHostname is empty, NewRepo falls back to the pre-change
+	// strict-path-equality behavior. cmd/server.go defaults GitlabHostname to
+	// "gitlab.com" in production, so this path guards direct-API callers and
+	// test helpers that construct EventParser without setting a hostname.
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "")
+	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/gitlab/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_InvalidConfiguredHostname(t *testing.T) {
+	// If the configured hostname is itself malformed, NewRepo must surface a
+	// wrapping error rather than silently skipping validation.
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "https:///no/host/here")
+	ErrContains(t, "parsing configured gitlab hostname", err)
 }
 
 func TestProject_String(t *testing.T) {
@@ -679,7 +772,7 @@ func TestPlanSuccessStats(t *testing.T) {
 		{
 			"with imports",
 			`Terraform used the selected providers to generate the following execution
-			plan. Resource actions are indicated with the following symbols:	
+			plan. Resource actions are indicated with the following symbols:
 			  + create
 			  ~ update in-place
 			  - destroy
@@ -723,6 +816,352 @@ func TestPlanSuccessStats(t *testing.T) {
 			if s != tt.exp {
 				t.Errorf("\nexp: %#v\ngot: %#v", tt.exp, s)
 			}
+		})
+	}
+}
+
+func TestDiffMarkdownFormattedTerraformOutput(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		exp   string
+	}{
+		{
+			"cloudformation stack with heredoc template",
+			`Terraform will perform the following actions:
+
+  # aws_cloudformation_stack.example will be created
+  + resource "aws_cloudformation_stack" "example" {
+      + id            = (known after apply)
+      + name          = "my-stack"
+      + template_body = <<-EOT
+            {
+              "AWSTemplateFormatVersion": "2010-09-09",
+              "Resources": {
+                "MyBucket": {
+                  "Type": "AWS::S3::Bucket"
+                }
+              }
+            }
+        EOT
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.`,
+			`Terraform will perform the following actions:
+
+  # aws_cloudformation_stack.example will be created
++   resource "aws_cloudformation_stack" "example" {
++       id            = (known after apply)
++       name          = "my-stack"
++       template_body = <<-EOT
+            {
+              "AWSTemplateFormatVersion": "2010-09-09",
+              "Resources": {
+                "MyBucket": {
+                  "Type": "AWS::S3::Bucket"
+                }
+              }
+            }
+        EOT
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.`,
+		},
+		{
+			"cloudformation stack with parameters and tags",
+			`  # aws_cloudformation_stack.example will be updated in-place
+  ~ resource "aws_cloudformation_stack" "example" {
+        id              = "arn:aws:cloudformation:..."
+      ~ name            -> "updated-stack-name"
+      ~ parameters      = {
+          - "OldParam" = "old-value" -> null
+          + "NewParam" = "new-value"
+        }
+      + tags            = {
+          + "Environment" = "production"
+        }
+        template_body   = <<-EOT
+            {
+              "AWSTemplateFormatVersion": "2010-09-09"
+            }
+        EOT
+    }`,
+			`# aws_cloudformation_stack.example will be updated in-place
+!   resource "aws_cloudformation_stack" "example" {
+        id              = "arn:aws:cloudformation:..."
+!       name            -> "updated-stack-name"
+!       parameters      = {
+          - "OldParam" = "old-value" -> null
+          + "NewParam" = "new-value"
+        }
++       tags            = {
+          + "Environment" = "production"
+        }
+        template_body   = <<-EOT
+            {
+              "AWSTemplateFormatVersion": "2010-09-09"
+            }
+        EOT
+    }`,
+		},
+		{
+			"cloudformation stack with nested attributes",
+			`  # aws_cloudformation_stack.example will be created
+  + resource "aws_cloudformation_stack" "example" {
+      + capabilities  = ["CAPABILITY_IAM"]
+      + id            = (known after apply)
+      + outputs       = (known after apply)
+      + policy_body   = jsonencode({
+          + Statement = [
+              + {
+                  + Effect = "Allow"
+                },
+            ]
+        })
+      + template_url  = "https://s3.amazonaws.com/bucket/template.json"
+      + timeouts      {
+          + create = "30m"
+        }
+    }`,
+			`# aws_cloudformation_stack.example will be created
++   resource "aws_cloudformation_stack" "example" {
++       capabilities  = ["CAPABILITY_IAM"]
++       id            = (known after apply)
++       outputs       = (known after apply)
++       policy_body   = jsonencode({
++           Statement = [
+              + {
++                   Effect = "Allow"
+                },
+            ]
+        })
++       template_url  = "https://s3.amazonaws.com/bucket/template.json"
++       timeouts      {
++           create = "30m"
+        }
+    }`,
+		},
+		{
+			"cloudformation stack with complex template body",
+			`  + resource "aws_cloudformation_stack" "vpc" {
+      + arn           = (known after apply)
+      + name          = "vpc-stack"
+      + parameters    = {
+          + "CidrBlock" = "10.0.0.0/16"
+        }
+      + template_body = <<-EOT
+            Resources:
+              VPC:
+                Type: AWS::EC2::VPC
+                Properties:
+                  CidrBlock: !Ref CidrBlock
+                  EnableDnsSupport: true
+              InternetGateway:
+                Type: AWS::EC2::InternetGateway
+        EOT
+    }`,
+			`+   resource "aws_cloudformation_stack" "vpc" {
++       arn           = (known after apply)
++       name          = "vpc-stack"
++       parameters    = {
+          + "CidrBlock" = "10.0.0.0/16"
+        }
++       template_body = <<-EOT
+            Resources:
+              VPC:
+                Type: AWS::EC2::VPC
+                Properties:
+                  CidrBlock: !Ref CidrBlock
+                  EnableDnsSupport: true
+              InternetGateway:
+                Type: AWS::EC2::InternetGateway
+        EOT
+    }`,
+		},
+		{
+			"multiple resource types with various operators",
+			`Terraform will perform the following actions:
+
+  # aws_instance.example will be updated
+  ~ resource "aws_instance" "example" {
+        id                = "i-1234567890"
+      ~ instance_type     -> "t3.medium"
+      + monitoring        = true
+      - user_data         = "old-data" -> null
+        ami                = "ami-12345"
+    }
+
+  # aws_s3_bucket.data will be created
+  + resource "aws_s3_bucket" "data" {
+      + bucket          = "my-bucket"
+      + id              = (known after apply)
+      + versioning      {
+          + enabled = true
+        }
+    }`,
+			`Terraform will perform the following actions:
+
+  # aws_instance.example will be updated
+!   resource "aws_instance" "example" {
+        id                = "i-1234567890"
+!       instance_type     -> "t3.medium"
++       monitoring        = true
+-       user_data         = "old-data" -> null
+        ami                = "ami-12345"
+    }
+
+  # aws_s3_bucket.data will be created
++   resource "aws_s3_bucket" "data" {
++       bucket          = "my-bucket"
++       id              = (known after apply)
++       versioning      {
++           enabled = true
+        }
+    }`,
+		},
+		{
+			"cloudformation stack with yaml template and fn sub intrinsics",
+			`  # aws_cloudformation_stack.iam_role will be created
+  + resource "aws_cloudformation_stack" "iam_role" {
+      + id            = (known after apply)
+      + name          = "audit-role-stack"
+      + template_body = <<-EOT
+            AWSTemplateFormatVersion: '2010-09-09'
+            Description: IAM Role with managed policies
+            Resources:
+              AuditRole:
+                Type: AWS::IAM::Role
+                Properties:
+                  RoleName: AuditRole
+                  AssumeRolePolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Principal:
+                          Service: ec2.amazonaws.com
+                        Action: sts:AssumeRole
+                  ManagedPolicyArns:
+                    - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess
+                    - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/SecurityAudit
+        EOT
+    }`,
+			`# aws_cloudformation_stack.iam_role will be created
++   resource "aws_cloudformation_stack" "iam_role" {
++       id            = (known after apply)
++       name          = "audit-role-stack"
++       template_body = <<-EOT
+            AWSTemplateFormatVersion: '2010-09-09'
+            Description: IAM Role with managed policies
+            Resources:
+              AuditRole:
+                Type: AWS::IAM::Role
+                Properties:
+                  RoleName: AuditRole
+                  AssumeRolePolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Principal:
+                          Service: ec2.amazonaws.com
+                        Action: sts:AssumeRole
+                  ManagedPolicyArns:
+                    - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/job-function/ViewOnlyAccess
+                    - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/SecurityAudit
+        EOT
+    }`,
+		},
+		{
+			// Regression test for https://github.com/runatlantis/atlantis/issues/6419
+			// YAML list items using key=value format (e.g. ArgoCD syncOptions) inside a heredoc
+			// must not be mistaken for Terraform diff markers.
+			"argocd application with yaml key=value list items in heredoc",
+			`  # argocd_application.example will be updated in-place
+  ~ resource "argocd_application" "example" {
+        id   = "my-app"
+      ~ metadata {
+          ~ resource_version = "12345" -> (known after apply)
+        }
+        spec = <<-EOT
+            destination:
+              namespace: default
+              server: https://kubernetes.default.svc
+            source:
+              repoURL: https://github.com/example/repo
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              - ServerSideApply=true
+        EOT
+    }`,
+			`# argocd_application.example will be updated in-place
+!   resource "argocd_application" "example" {
+        id   = "my-app"
+!       metadata {
+!           resource_version = "12345" -> (known after apply)
+        }
+        spec = <<-EOT
+            destination:
+              namespace: default
+              server: https://kubernetes.default.svc
+            source:
+              repoURL: https://github.com/example/repo
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              - ServerSideApply=true
+        EOT
+    }`,
+		},
+		{
+			"cloudformation stack with extra-spaced yaml list items in heredoc",
+			`  + resource "aws_cloudformation_stack" "conditions" {
+      + id            = (known after apply)
+      + name          = "conditions-stack"
+      + template_body = <<-EOT
+            AWSTemplateFormatVersion: '2010-09-09'
+            Conditions:
+              isOrg:
+                Fn::Not:
+                  -   Fn::Equals:
+                        -   !Ref ManagementAccountId
+                        -   ""
+              isProd:
+                Fn::Equals:
+                  -   !Ref Environment
+                  -   production
+        EOT
+    }`,
+			`+   resource "aws_cloudformation_stack" "conditions" {
++       id            = (known after apply)
++       name          = "conditions-stack"
++       template_body = <<-EOT
+            AWSTemplateFormatVersion: '2010-09-09'
+            Conditions:
+              isOrg:
+                Fn::Not:
+                  -   Fn::Equals:
+                        -   !Ref ManagementAccountId
+                        -   ""
+              isProd:
+                Fn::Equals:
+                  -   !Ref Environment
+                  -   production
+        EOT
+    }`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ps := models.PlanSuccess{
+				TerraformOutput: tt.input,
+			}
+			result := ps.DiffMarkdownFormattedTerraformOutput()
+			Equals(t, tt.exp, result)
 		})
 	}
 }
