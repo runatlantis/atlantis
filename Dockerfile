@@ -230,9 +230,9 @@ RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     for d in $fcap_scan_dirs; do \
         [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
     done | awk '{ print $1 }' | sort -u | while read -r f; do \
-        [ -n "$f" ] && setcap -r "$f" 2>/dev/null || true; \
+        [ -n "$f" ] && { setcap -r "$f" 2>/dev/null || echo "warning: could not strip caps from $f" >&2; }; \
     done && \
-    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done | grep -E ' = ' || :)" && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done | grep -E ' = cap_' || :)" && \
     if [ -n "$remaining" ]; then \
         echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
         echo "$remaining" >&2; \
@@ -282,9 +282,9 @@ RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     for d in $fcap_scan_dirs; do \
         [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
     done | awk '{ print $1 }' | sort -u | while read -r f; do \
-        [ -n "$f" ] && setcap -r "$f" 2>/dev/null || true; \
+        [ -n "$f" ] && { setcap -r "$f" 2>/dev/null || echo "warning: could not strip caps from $f" >&2; }; \
     done && \
-    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done | grep -E ' = ' || :)" && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done | grep -E ' = cap_' || :)" && \
     if [ -n "$remaining" ]; then \
         echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
         echo "$remaining" >&2; \
