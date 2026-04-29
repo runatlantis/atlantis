@@ -275,7 +275,7 @@ func TestStep_Validate(t *testing.T) {
 						"name":      "test",
 						"command":   "echo 123",
 						"shell":     "bash",
-						"shellArgs": []interface{}{"-c", "--debug"},
+						"shellArgs": []any{"-c", "--debug"},
 					},
 				},
 			},
@@ -477,7 +477,7 @@ func TestStep_Validate(t *testing.T) {
 						"name":      "name",
 						"command":   "echo",
 						"shell":     "shell",
-						"shellArgs": []interface{}{"-c", 42},
+						"shellArgs": []any{"-c", 42},
 					},
 				},
 			},
@@ -841,6 +841,6 @@ func TestStep_ToValid(t *testing.T) {
 }
 
 type MapType map[string]map[string][]string
-type EnvType map[string]map[string]interface{}
-type RunType map[string]map[string]interface{}
-type MultiEnvType map[string]map[string]interface{}
+type EnvType map[string]map[string]any
+type RunType map[string]map[string]any
+type MultiEnvType map[string]map[string]any

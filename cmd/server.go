@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package cmd
@@ -18,11 +9,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -55,6 +46,7 @@ const (
 	ADUserFlag                       = "azuredevops-user"
 	ADHostnameFlag                   = "azuredevops-hostname"
 	AllowCommandsFlag                = "allow-commands"
+	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
@@ -170,7 +162,8 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
+	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
+	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
@@ -229,6 +222,12 @@ var stringFlags = map[string]stringFlag{
 	AllowCommandsFlag: {
 		description:  "Comma separated list of acceptable atlantis commands.",
 		defaultValue: DefaultAllowCommands,
+	},
+	BlockedExtraArgsFlag: {
+		description: "Comma separated list of Terraform CLI flag prefixes that are not allowed " +
+			"in comment extra args (the flags after '--'). " +
+			"Defaults to " + DefaultBlockedExtraArgs + ".",
+		defaultValue: DefaultBlockedExtraArgs,
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
@@ -845,7 +844,7 @@ func (s *ServerCmd) preRun() error {
 	if configFile != "" {
 		s.Viper.SetConfigFile(configFile)
 		if err := s.Viper.ReadInConfig(); err != nil {
-			return errors.Wrapf(err, "invalid config: reading %s", configFile)
+			return fmt.Errorf("invalid config: reading %s: %w", configFile, err)
 		}
 	}
 	return nil
@@ -893,7 +892,7 @@ func (s *ServerCmd) run() error {
 	})
 
 	if err != nil {
-		return errors.Wrap(err, "initializing server")
+		return fmt.Errorf("initializing server: %w", err)
 	}
 	return server.Start()
 }
@@ -910,6 +909,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
+	}
+	if c.BlockedExtraArgs == "" {
+		c.BlockedExtraArgs = DefaultBlockedExtraArgs
 	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
@@ -1096,15 +1098,15 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	_, patternErr := patternmatcher.New(strings.Split(userConfig.AutoplanFileList, ","))
 	if patternErr != nil {
-		return errors.Wrapf(patternErr, "invalid pattern in --%s, %s", AutoplanFileListFlag, userConfig.AutoplanFileList)
+		return fmt.Errorf("invalid pattern in --%s, %s: %w", AutoplanFileListFlag, userConfig.AutoplanFileList, patternErr)
 	}
 
 	if _, err := userConfig.ToAllowCommandNames(); err != nil {
-		return errors.Wrapf(err, "invalid --%s", AllowCommandsFlag)
+		return fmt.Errorf("invalid --%s: %w", AllowCommandsFlag, err)
 	}
 
 	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {
-		return errors.Wrapf(err, "invalid --%s", WebhookHttpHeaders)
+		return fmt.Errorf("invalid --%s: %w", WebhookHttpHeaders, err)
 	}
 
 	return nil
@@ -1115,7 +1117,7 @@ func (s *ServerCmd) setAtlantisURL(userConfig *server.UserConfig) error {
 	if userConfig.AtlantisURL == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			return errors.Wrap(err, "failed to determine hostname")
+			return fmt.Errorf("failed to determine hostname: %w", err)
 		}
 		userConfig.AtlantisURL = fmt.Sprintf("http://%s:%d", hostname, userConfig.Port)
 	}
@@ -1133,14 +1135,14 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 		var err error
 		finalPath, err = homedir.Expand(finalPath)
 		if err != nil {
-			return errors.Wrap(err, "determining home directory")
+			return fmt.Errorf("determining home directory: %w", err)
 		}
 	}
 
 	// Convert relative paths to absolute.
 	finalPath, err := filepath.Abs(finalPath)
 	if err != nil {
-		return errors.Wrap(err, "making data-dir absolute")
+		return fmt.Errorf("making data-dir absolute: %w", err)
 	}
 	userConfig.DataDir = finalPath
 	return nil
@@ -1157,14 +1159,14 @@ func (s *ServerCmd) setMarkdownTemplateOverridesDir(userConfig *server.UserConfi
 		var err error
 		finalPath, err = homedir.Expand(finalPath)
 		if err != nil {
-			return errors.Wrap(err, "determining home directory")
+			return fmt.Errorf("determining home directory: %w", err)
 		}
 	}
 
 	// Convert relative paths to absolute.
 	finalPath, err := filepath.Abs(finalPath)
 	if err != nil {
-		return errors.Wrap(err, "making markdown-template-overrides-dir absolute")
+		return fmt.Errorf("making markdown-template-overrides-dir absolute: %w", err)
 	}
 	userConfig.MarkdownTemplateOverridesDir = finalPath
 	return nil
@@ -1250,11 +1252,5 @@ func (s *ServerCmd) printErr(err error) {
 }
 
 func isValidLogLevel(level string) bool {
-	for _, logLevel := range ValidLogLevels {
-		if logLevel == level {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(ValidLogLevels, level)
 }

@@ -26,7 +26,7 @@ func NewMockJobURLSetter(options ...pegomock.Option) *MockJobURLSetter {
 func (mock *MockJobURLSetter) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockJobURLSetter) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockJobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectResult) error {
+func (mock *MockJobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockJobURLSetter().")
 	}
@@ -78,7 +78,7 @@ type VerifierMockJobURLSetter struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockJobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectResult) *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification {
+func (verifier *VerifierMockJobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification {
 	_params := []pegomock.Param{ctx, cmdName, status, res}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "SetJobURLWithStatus", _params, verifier.timeout)
 	return &MockJobURLSetter_SetJobURLWithStatus_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -89,12 +89,12 @@ type MockJobURLSetter_SetJobURLWithStatus_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification) GetCapturedArguments() (command.ProjectContext, command.Name, models.CommitStatus, *command.ProjectResult) {
+func (c *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification) GetCapturedArguments() (command.ProjectContext, command.Name, models.CommitStatus, *command.ProjectCommandOutput) {
 	ctx, cmdName, status, res := c.GetAllCapturedArguments()
 	return ctx[len(ctx)-1], cmdName[len(cmdName)-1], status[len(status)-1], res[len(res)-1]
 }
 
-func (c *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []command.Name, _param2 []models.CommitStatus, _param3 []*command.ProjectResult) {
+func (c *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []command.Name, _param2 []models.CommitStatus, _param3 []*command.ProjectCommandOutput) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -116,9 +116,9 @@ func (c *MockJobURLSetter_SetJobURLWithStatus_OngoingVerification) GetAllCapture
 			}
 		}
 		if len(_params) > 3 {
-			_param3 = make([]*command.ProjectResult, len(c.methodInvocations))
+			_param3 = make([]*command.ProjectCommandOutput, len(c.methodInvocations))
 			for u, param := range _params[3] {
-				_param3[u] = param.(*command.ProjectResult)
+				_param3[u] = param.(*command.ProjectCommandOutput)
 			}
 		}
 	}

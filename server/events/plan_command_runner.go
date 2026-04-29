@@ -27,6 +27,7 @@ func NewPlanCommandRunner(
 	commitStatusUpdater CommitStatusUpdater,
 	projectCommandBuilder ProjectPlanCommandBuilder,
 	projectCommandRunner ProjectPlanCommandRunner,
+	cancellationTracker CancellationTracker,
 	dbUpdater *DBUpdater,
 	pullUpdater *PullUpdater,
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
@@ -49,6 +50,7 @@ func NewPlanCommandRunner(
 		commitStatusUpdater:        commitStatusUpdater,
 		prjCmdBuilder:              projectCommandBuilder,
 		prjCmdRunner:               projectCommandRunner,
+		cancellationTracker:        cancellationTracker,
 		dbUpdater:                  dbUpdater,
 		pullUpdater:                pullUpdater,
 		policyCheckCommandRunner:   policyCheckCommandRunner,
@@ -79,6 +81,7 @@ type PlanCommandRunner struct {
 	workingDir                 WorkingDir
 	prjCmdBuilder              ProjectPlanCommandBuilder
 	prjCmdRunner               ProjectPlanCommandRunner
+	cancellationTracker        CancellationTracker
 	dbUpdater                  *DBUpdater
 	pullUpdater                *PullUpdater
 	policyCheckCommandRunner   *PolicyCheckCommandRunner
@@ -97,6 +100,16 @@ type PlanCommandRunner struct {
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+
+	var err error
+	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
+	if err != nil {
+		// On error we continue the request with mergeable assumed false.
+		// We want to continue because not all plan's will need this status,
+		// only if they rely on the mergeability requirement.
+		// All PullRequestStatus fields are set to false by default when error.
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+	}
 
 	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
@@ -140,14 +153,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		ctx.Log.Err("deleting locks: %s", err)
 	}
 
-	// Only run commands in parallel if enabled
-	var result command.Result
-	if p.isParallelEnabled(projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
-	} else {
-		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
-	}
+	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -270,14 +276,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		}
 	}
 
-	// Only run commands in parallel if enabled
-	var result command.Result
-	if p.isParallelEnabled(projectCmds) {
-		ctx.Log.Info("Running plans in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, p.prjCmdRunner.Plan, p.parallelPoolSize)
-	} else {
-		result = runProjectCmds(projectCmds, p.prjCmdRunner.Plan)
-	}
+	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 	ctx.CommandHasErrors = result.HasErrors()
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {

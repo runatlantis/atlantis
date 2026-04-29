@@ -1,25 +1,16 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v71/github"
-	"github.com/pkg/errors"
+	"github.com/google/go-github/v83/github"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -37,7 +28,7 @@ const (
 	ShutdownComment = "Atlantis server is shutting down, please try again later."
 )
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_command_runner.go CommandRunner
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_command_runner.go CommandRunner
 
 // CommandRunner is the first step after a command request has been parsed.
 type CommandRunner interface {
@@ -48,7 +39,7 @@ type CommandRunner interface {
 	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
 
 // GithubPullGetter makes API calls to get pull requests.
 type GithubPullGetter interface {
@@ -56,7 +47,7 @@ type GithubPullGetter interface {
 	GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
 
 // AzureDevopsPullGetter makes API calls to get pull requests.
 type AzureDevopsPullGetter interface {
@@ -64,7 +55,7 @@ type AzureDevopsPullGetter interface {
 	GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
 // GitlabMergeRequestGetter makes API calls to get merge requests.
 type GitlabMergeRequestGetter interface {
@@ -98,7 +89,7 @@ type DefaultCommandRunner struct {
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
 	GitlabMergeRequestGetter GitlabMergeRequestGetter
-	GiteaPullGetter          *gitea.GiteaClient
+	GiteaPullGetter          *gitea.Client
 	// User config option: Disables autoplan when a pull request is opened or updated.
 	DisableAutoplan      bool
 	DisableAutoplanLabel string
@@ -431,41 +422,41 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GithubPullGetter == nil {
-		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support GitHub")
+		return models.PullRequest{}, models.Repo{}, errors.New("atlantis not configured to support GitHub")
 	}
 	ghPull, err := c.GithubPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to GitHub")
+		return models.PullRequest{}, models.Repo{}, fmt.Errorf("making pull request API call to GitHub: %w", err)
 	}
 	pull, _, headRepo, err := c.EventParser.ParseGithubPull(logger, ghPull)
 	if err != nil {
-		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+		return pull, headRepo, fmt.Errorf("extracting required fields from comment data: %w", err)
 	}
 	return pull, headRepo, nil
 }
 
 func (c *DefaultCommandRunner) getGiteaData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {
 	if c.GiteaPullGetter == nil {
-		return models.PullRequest{}, models.Repo{}, errors.New("Atlantis not configured to support Gitea")
+		return models.PullRequest{}, models.Repo{}, errors.New("atlantis not configured to support Gitea")
 	}
 	giteaPull, err := c.GiteaPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Gitea")
+		return models.PullRequest{}, models.Repo{}, fmt.Errorf("making pull request API call to Gitea: %w", err)
 	}
 	pull, _, headRepo, err := c.EventParser.ParseGiteaPull(giteaPull)
 	if err != nil {
-		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+		return pull, headRepo, fmt.Errorf("extracting required fields from comment data: %w", err)
 	}
 	return pull, headRepo, nil
 }
 
 func (c *DefaultCommandRunner) getGitlabData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, error) {
 	if c.GitlabMergeRequestGetter == nil {
-		return models.PullRequest{}, errors.New("Atlantis not configured to support GitLab")
+		return models.PullRequest{}, errors.New("atlantis not configured to support GitLab")
 	}
 	mr, err := c.GitlabMergeRequestGetter.GetMergeRequest(logger, baseRepo.FullName, pullNum)
 	if err != nil {
-		return models.PullRequest{}, errors.Wrap(err, "making merge request API call to GitLab")
+		return models.PullRequest{}, fmt.Errorf("making merge request API call to GitLab: %w", err)
 	}
 	pull := c.EventParser.ParseGitlabMergeRequest(mr, baseRepo)
 	return pull, nil
@@ -477,11 +468,11 @@ func (c *DefaultCommandRunner) getAzureDevopsData(logger logging.SimpleLogging, 
 	}
 	adPull, err := c.AzureDevopsPullGetter.GetPullRequest(logger, baseRepo, pullNum)
 	if err != nil {
-		return models.PullRequest{}, models.Repo{}, errors.Wrap(err, "making pull request API call to Azure DevOps")
+		return models.PullRequest{}, models.Repo{}, fmt.Errorf("making pull request API call to Azure DevOps: %w", err)
 	}
 	pull, _, headRepo, err := c.EventParser.ParseAzureDevopsPull(adPull)
 	if err != nil {
-		return pull, headRepo, errors.Wrap(err, "extracting required fields from comment data")
+		return pull, headRepo, fmt.Errorf("extracting required fields from comment data: %w", err)
 	}
 	return pull, headRepo, nil
 }
@@ -522,7 +513,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	case models.Gitea:
 		pull, headRepo, err = c.getGiteaData(log, baseRepo, pullNum)
 	default:
-		err = errors.New("Unknown VCS type–this is a bug")
+		err = errors.New("unknown VCS type–this is a bug")
 	}
 
 	if err != nil {

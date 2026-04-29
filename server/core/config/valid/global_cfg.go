@@ -106,6 +106,7 @@ type MergedProjectCfg struct {
 	Workspace                 string
 	Name                      string
 	AutoplanEnabled           bool
+	AutoplanWhenModified      []string
 	AutoMergeDisabled         bool
 	AutoMergeMethod           string
 	TerraformDistribution     *string
@@ -209,12 +210,14 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	}
 	// Must construct slices here instead of using a `var` declaration because
 	// we treat nil slices differently.
-	commandReqs := []string{}
+	applyReqs := []string{}
+	importReqs := []string{}
+	planReqs := []string{}
 	allowedOverrides := []string{}
 	allowedWorkflows := []string{}
 	policyCheck := false
 	if args.PolicyCheckEnabled {
-		commandReqs = append(commandReqs, PoliciesPassedCommandReq)
+		applyReqs = append(applyReqs, PoliciesPassedCommandReq)
 		policyCheck = true
 	}
 
@@ -235,9 +238,9 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 				IDRegex:                   regexp.MustCompile(".*"),
 				BranchRegex:               regexp.MustCompile(".*"),
 				RepoConfigFile:            args.RepoConfigFile,
-				PlanRequirements:          commandReqs,
-				ApplyRequirements:         commandReqs,
-				ImportRequirements:        commandReqs,
+				PlanRequirements:          planReqs,
+				ApplyRequirements:         applyReqs,
+				ImportRequirements:        importReqs,
 				PreWorkflowHooks:          args.PreWorkflowHooks,
 				Workflow:                  &defaultWorkflow,
 				PostWorkflowHooks:         args.PostWorkflowHooks,
@@ -416,6 +419,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		DependsOn:                 proj.DependsOn,
 		Name:                      proj.GetName(),
 		AutoplanEnabled:           proj.Autoplan.Enabled,
+		AutoplanWhenModified:      proj.Autoplan.WhenModified,
 		TerraformDistribution:     proj.TerraformDistribution,
 		TerraformVersion:          proj.TerraformVersion,
 		RepoCfgVersion:            rCfg.Version,
@@ -443,6 +447,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		Workspace:                 workspace,
 		Name:                      "",
 		AutoplanEnabled:           DefaultAutoPlanEnabled,
+		AutoplanWhenModified:      []string{},
 		TerraformDistribution:     nil,
 		TerraformVersion:          nil,
 		PolicySets:                g.PolicySets,
@@ -591,7 +596,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 // getMatchingCfg returns the key settings for repoID.
 func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (planReqs []string, applyReqs []string, importReqs []string, workflow Workflow, allowedOverrides []string, allowCustomWorkflows bool, deleteSourceBranchOnMerge bool, repoLocks RepoLocks, policyCheck bool, customPolicyCheck bool, autoDiscover AutoDiscover, silencePRComments []string) {
 	toLog := make(map[string]string)
-	traceF := func(repoIdx int, repoID string, key string, val interface{}) string {
+	traceF := func(repoIdx int, repoID string, key string, val any) string {
 		from := "default server config"
 		if repoIdx > 0 {
 			from = fmt.Sprintf("repos[%d], id: %s", repoIdx, repoID)

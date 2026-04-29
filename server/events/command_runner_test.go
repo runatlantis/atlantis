@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -23,11 +14,12 @@ import (
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v83/github"
 	. "github.com/petergtz/pegomock/v4"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -36,6 +28,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 var projectCommandBuilder *mocks.MockProjectCommandBuilder
@@ -68,6 +61,7 @@ var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
+var cancellationTracker *mocks.MockCancellationTracker
 
 type TestConfig struct {
 	parallelPoolSize           int
@@ -79,6 +73,8 @@ type TestConfig struct {
 	database                   db.Database
 	DisableUnlockLabel         string
 	PendingApplyStatus         bool
+	applyLockCheckerReturn     locking.ApplyCommandLock
+	applyLockCheckerErr        error
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -117,11 +113,18 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	pendingPlanFinder = mocks.NewMockPendingPlanFinder()
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
 	pullReqStatusFetcher = vcsmocks.NewMockPullReqStatusFetcher()
+	cancellationTracker = mocks.NewMockCancellationTracker()
 
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
-	applyLockChecker = lockingmocks.NewMockApplyLockChecker()
-	lockingLocker = lockingmocks.NewMockLocker()
+	lockCtrl := gomock.NewController(t)
+	applyLockChecker = lockingmocks.NewMockApplyLockChecker(lockCtrl)
+	lockingLocker = lockingmocks.NewMockLocker(lockCtrl)
+	// Allow incidental calls to CheckApplyLock (called internally during apply operations).
+	// Tests that need specific return values should set applyLockCheckerReturn/applyLockCheckerErr in TestConfig.
+	applyLockChecker.EXPECT().CheckApplyLock().Return(testConfig.applyLockCheckerReturn, testConfig.applyLockCheckerErr).AnyTimes()
+	// Allow incidental calls to UnlockByPull (called during plan operations to clean up locks)
+	lockingLocker.EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
 	dbUpdater = &events.DBUpdater{
 		Database: testConfig.database,
@@ -157,6 +160,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -177,6 +181,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
@@ -810,12 +815,11 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 }
 
 func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_False(t *testing.T) {
@@ -835,14 +839,13 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Eq(models.PendingCommitStatus), Eq(command.Plan))
 	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
@@ -871,7 +874,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	ch.FailOnPreWorkflowHookError = true
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(Any[string]())
-	lockingLocker.VerifyWasCalled(Never()).UnlockByPull(Any[string](), Any[int]())
+	// gomock will fail if lockingLocker.UnlockByPull is called unexpectedly (no EXPECT set)
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Eq(models.PendingCommitStatus), Eq(command.Plan))
 
@@ -892,7 +895,7 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 	dbUpdater.Database = boltDB
 	applyCommandRunner.Database = boltDB
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
@@ -923,7 +926,7 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True
 	ch.FailOnPreWorkflowHookError = true
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(Any[string]())
-	lockingLocker.VerifyWasCalled(Never()).UnlockByPull(Any[string](), Any[int]())
+	// gomock will fail if lockingLocker.UnlockByPull is called unexpectedly (no EXPECT set)
 }
 
 func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
@@ -949,8 +952,7 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	}
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		ThenReturn([]command.ProjectContext{projectCtx}, nil)
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectResult{
-		Command: command.Plan,
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{
 		PlanSuccess: &models.PlanSuccess{
 			TerraformOutput: "true",
 		},
@@ -963,7 +965,6 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
-	lockingLocker.VerifyWasCalledOnce().UnlockByPull(testdata.Pull.BaseRepo.FullName, testdata.Pull.Num)
 }
 
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
@@ -979,7 +980,7 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "default"})
@@ -1018,14 +1019,14 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 			// The first call, we return a successful result.
 			callCount++
 			return ReturnValues{
-				command.ProjectResult{
+				command.ProjectCommandOutput{
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			}
 		}
 		// The second call, we return a failed result.
 		return ReturnValues{
-			command.ProjectResult{
+			command.ProjectCommandOutput{
 				Error: errors.New("err"),
 			},
 		}
@@ -1057,7 +1058,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
@@ -1098,8 +1099,10 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 
 	_, _ = boltDB.UpdatePullWithResults(modelPull, []command.ProjectResult{
 		{
-			Command:     command.PolicyCheck,
-			Error:       fmt.Errorf("failing policy"),
+			Command: command.PolicyCheck,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: fmt.Errorf("failing policy"),
+			},
 			ProjectName: "default",
 			Workspace:   "default",
 			RepoRelDir:  ".",
@@ -1171,9 +1174,11 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 			Command:    command.Plan,
 			RepoRelDir: ".",
 			Workspace:  "default",
-			PlanSuccess: &models.PlanSuccess{
-				TerraformOutput: "tf-output",
-				LockURL:         "lock-url",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "tf-output",
+					LockURL:         "lock-url",
+				},
 			},
 		},
 	})

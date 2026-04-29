@@ -5,10 +5,10 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
-
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -19,6 +19,7 @@ import (
 type UserConfig struct {
 	AllowForkPRs                bool   `mapstructure:"allow-fork-prs"`
 	AllowCommands               string `mapstructure:"allow-commands"`
+	BlockedExtraArgs            string `mapstructure:"blocked-extra-args"`
 	AtlantisURL                 string `mapstructure:"atlantis-url"`
 	AutoDiscoverModeFlag        string `mapstructure:"autodiscover-mode"`
 	Automerge                   bool   `mapstructure:"automerge"`
@@ -144,7 +145,7 @@ type UserConfig struct {
 func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 	var allowCommands []command.Name
 	var hasAll bool
-	for _, input := range strings.Split(u.AllowCommands, ",") {
+	for input := range strings.SplitSeq(u.AllowCommands, ",") {
 		if input == "" {
 			continue
 		}
@@ -164,13 +165,28 @@ func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 	return allowCommands, nil
 }
 
+// ToBlockedExtraArgs parses BlockedExtraArgs into a slice of flag prefixes.
+// When BlockedExtraArgs is empty, events.DefaultBlockedExtraArgs is returned.
+func (u UserConfig) ToBlockedExtraArgs() []string {
+	if u.BlockedExtraArgs == "" {
+		return events.DefaultBlockedExtraArgs
+	}
+	var args []string
+	for arg := range strings.SplitSeq(u.BlockedExtraArgs, ",") {
+		if trimmed := strings.TrimSpace(arg); trimmed != "" {
+			args = append(args, trimmed)
+		}
+	}
+	return args
+}
+
 // ToWebhookHttpHeaders parses WebhookHttpHeaders into a map of HTTP headers.
 func (u UserConfig) ToWebhookHttpHeaders() (map[string][]string, error) {
 	if u.WebhookHttpHeaders == "" {
 		return nil, nil
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	err := json.Unmarshal([]byte(u.WebhookHttpHeaders), &m)
 	if err != nil {
 		return nil, err
@@ -178,18 +194,18 @@ func (u UserConfig) ToWebhookHttpHeaders() (map[string][]string, error) {
 	headers := make(map[string][]string)
 	for name, rawValue := range m {
 		switch val := rawValue.(type) {
-		case []interface{}:
+		case []any:
 			for _, v := range val {
 				s, ok := v.(string)
 				if !ok {
-					return nil, errors.Errorf("expected string array element, got %T", v)
+					return nil, fmt.Errorf("expected string array element, got %T", v)
 				}
 				headers[name] = append(headers[name], s)
 			}
 		case string:
 			headers[name] = []string{val}
 		default:
-			return nil, errors.Errorf("expected string or array, got %T", val)
+			return nil, fmt.Errorf("expected string or array, got %T", val)
 		}
 	}
 	return headers, nil

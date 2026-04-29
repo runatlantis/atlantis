@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -67,6 +58,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
 		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
@@ -179,7 +171,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			var prjResult command.ProjectResult
+			var prjResult command.ProjectCommandOutput
 			var expCommitStatus models.CommitStatus
 
 			mockJobURLSetter := mocks.NewMockJobURLSetter()
@@ -193,18 +185,18 @@ func TestProjectOutputWrapper(t *testing.T) {
 			}
 
 			if c.Success {
-				prjResult = command.ProjectResult{
+				prjResult = command.ProjectCommandOutput{
 					PlanSuccess:  &models.PlanSuccess{},
 					ApplySuccess: "exists",
 				}
 				expCommitStatus = models.SuccessCommitStatus
 			} else if c.Failure {
-				prjResult = command.ProjectResult{
+				prjResult = command.ProjectCommandOutput{
 					Failure: "failure",
 				}
 				expCommitStatus = models.FailedCommitStatus
 			} else if c.Error {
-				prjResult = command.ProjectResult{
+				prjResult = command.ProjectCommandOutput{
 					Error: errors.New("error"),
 				}
 				expCommitStatus = models.FailedCommitStatus
@@ -310,7 +302,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	}
 	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
-	When(mockWorkingDir.HasDiverged(ctx.Log, tmp)).ThenReturn(true)
+	When(mockWorkingDir.HasDiverged(ctx.Log, tmp, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull)).ThenReturn(true)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
@@ -429,6 +421,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
 				Any[models.PullRequest](),
@@ -511,6 +504,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		Any[models.PullRequest](),
 		Any[string](),
 	)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(
 		Any[logging.SimpleLogging](),
 		Any[models.PullRequest](),
@@ -579,6 +573,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 	repoDir := t.TempDir()
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
 		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
@@ -721,6 +716,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 			repoDir := t.TempDir()
 			When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 			if c.setup != nil {
 				c.setup(repoDir, ctx, mockLocker, mockInit, mockImport)
 			}
@@ -892,6 +888,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
@@ -1020,6 +1017,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *test
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
@@ -1184,6 +1182,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckFailureDetection(t *testin
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
@@ -1242,6 +1241,136 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckFailureDetection(t *testin
 			Equals(t, c.expectedPassed, policyResults[0].Passed)
 			Equals(t, c.expectedOutput, policyResults[0].PolicyOutput)
 			Equals(t, "test_policy", policyResults[0].PolicySetName)
+		})
+	}
+}
+
+// Test that custom policy checks do not produce any additional output in the PreConftestOutput or PostConfTestOutput blocks
+// This is a regression test for two bugs:
+// 1. A blank code block would appear in custom policy check comments due PreConftestOutput being present.
+// 2. The last policy output would appear both in the PolicySetResults and in PostConftestOutput.
+func TestDefaultProjectCommandRunner_CustomPolicyCheck_NoPreOrPostConftestOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		description   string
+		policyOutputs []string
+		policySets    []valid.PolicySet
+	}{
+		{
+			description:   "Single custom policy check",
+			policyOutputs: []string{"Custom policy check - 0 failures, 5 passed"},
+			policySets: []valid.PolicySet{
+				{
+					Name:         "policy1",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Teams: []string{"team-1"},
+					},
+				},
+			},
+		},
+		{
+			description: "Multiple custom policy checks",
+			policyOutputs: []string{
+				"Custom policy check 1 - 0 failures, 5 passed",
+				"Custom policy check 2 - 1 failures, 3 passed",
+			},
+			policySets: []valid.PolicySet{
+				{
+					Name:         "policy1",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Teams: []string{"team-1"},
+					},
+				},
+				{
+					Name:         "policy2",
+					ApproveCount: 1,
+					Owners: valid.PolicyOwners{
+						Teams: []string{"team-2"},
+					},
+				},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			mockPolicyCheck := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                mockLocker,
+				LockURLGenerator:      mockURLGenerator{},
+				PolicyCheckStepRunner: mockPolicyCheck,
+				WorkingDir:            mockWorkingDir,
+				WorkingDirLocker:      events.NewDefaultWorkingDirLocker(),
+			}
+
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[string](),
+			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				Any[bool](),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
+
+			var steps []valid.Step
+			for range c.policyOutputs {
+				steps = append(steps, valid.Step{StepName: "policy_check"})
+			}
+
+			mockCall := When(mockPolicyCheck.Run(
+				Any[command.ProjectContext](),
+				Any[[]string](),
+				Any[string](),
+				Any[map[string]string](),
+			))
+			for _, output := range c.policyOutputs {
+				mockCall = mockCall.ThenReturn(output, nil)
+			}
+
+			ctx := command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				Workspace:         "default",
+				RepoRelDir:        ".",
+				CustomPolicyCheck: true,
+				PolicySets: valid.PolicySets{
+					PolicySets: c.policySets,
+				},
+				Steps: steps,
+			}
+
+			res := runner.PolicyCheck(ctx)
+
+			Assert(t, res.Error == nil, "not expecting error: %v", res.Error)
+			Assert(t, res.PolicyCheckResults != nil, "expecting policy check results")
+
+			policyResults := res.PolicyCheckResults.PolicySetResults
+			Equals(t, len(c.policyOutputs), len(policyResults))
+
+			for i, expectedOutput := range c.policyOutputs {
+				Equals(t, c.policySets[i].Name, policyResults[i].PolicySetName)
+				Equals(t, expectedOutput, policyResults[i].PolicyOutput)
+			}
+
+			// All outputs should be in PolicySetResults, not in PreConftestOutput or PostConftestOutput
+			Equals(t, "", res.PolicyCheckResults.PreConftestOutput)
+			Equals(t, "", res.PolicyCheckResults.PostConftestOutput)
 		})
 	}
 }
@@ -1758,6 +1887,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
 				Any[models.PullRequest](),

@@ -13,10 +13,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v83/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 
@@ -1196,6 +1197,23 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:     "custom policy check with multiple policy sets - no duplicate output",
+			RepoDir:         "policy-checks-custom-policy-check",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1330,11 +1348,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	}
 	disableApply := true
 	disableGlobalApplyLock := false
-	for _, allowCommand := range allowCommands {
-		if allowCommand == command.Apply {
-			disableApply = false
-			break
-		}
+	if slices.Contains(allowCommands, command.Apply) {
+		disableApply = false
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:     "github-user",
@@ -1355,9 +1370,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	noOpLocker := locking.NewNoOpLocker()
 	applyLocker = locking.NewApplyClient(b, disableApply, disableGlobalApplyLock)
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:     lockingClient,
-		NoOpLocker: noOpLocker,
-		VCSClient:  e2eVCSClient,
+		Locker:         lockingClient,
+		NoOpLocker:     noOpLocker,
+		VCSClient:      e2eVCSClient,
+		ExecutableName: "atlantis",
 	}
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
@@ -1475,6 +1491,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	Ok(t, err)
 
+	cancellationTracker := events.NewCancellationTracker()
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		VcsClient:        e2eVCSClient,
 		Locker:           projectLocker,
@@ -1510,6 +1528,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: workingDir,
 		},
+		CancellationTracker: cancellationTracker,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -1559,6 +1578,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -1579,6 +1599,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,

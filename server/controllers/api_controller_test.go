@@ -23,6 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 const atlantisTokenHeader = "X-Atlantis-Token"
@@ -203,6 +204,79 @@ func TestAPIController_Apply(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Apply(Any[command.ProjectContext]())
 }
 
+// TestAPIController_Plan_PreWorkflowHooksReceiveCorrectCommand verifies that when
+// calling the Plan API endpoint, the pre-workflow hooks receive a CommentCommand
+// with Name set to command.Plan (not the zero value which would be command.Apply).
+func TestAPIController_Plan_PreWorkflowHooksReceiveCorrectCommand(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	// Get access to the pre-workflow hooks mock for verification
+	preWorkflowHooksRunner := ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	// Capture the CommentCommand passed to RunPreHooks and verify Name is Plan
+	_, capturedCmd := preWorkflowHooksRunner.VerifyWasCalled(Times(1)).
+		RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+
+	Assert(t, capturedCmd.Name == command.Plan,
+		"expected CommentCommand.Name to be Plan (%d), got %s (%d)",
+		command.Plan, capturedCmd.Name.String(), capturedCmd.Name)
+}
+
+// TestAPIController_Apply_PreWorkflowHooksReceiveCorrectCommand verifies that when
+// calling the Apply API endpoint, the pre-workflow hooks receive a CommentCommand
+// with Name set to command.Apply for the apply phase (and command.Plan for the
+// plan phase that runs first).
+func TestAPIController_Apply_PreWorkflowHooksReceiveCorrectCommand(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	// Get access to the pre-workflow hooks mock for verification
+	preWorkflowHooksRunner := ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	// Apply calls apiPlan first (which runs pre-hooks with Plan), then apiApply (which runs pre-hooks with Apply)
+	// So we expect 2 calls: first with Plan, second with Apply
+	_, capturedCmds := preWorkflowHooksRunner.VerifyWasCalled(Times(2)).
+		RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetAllCapturedArguments()
+
+	Assert(t, len(capturedCmds) == 2,
+		"expected 2 pre-workflow hook calls, got %d", len(capturedCmds))
+
+	Assert(t, capturedCmds[0].Name == command.Plan,
+		"expected first CommentCommand.Name to be Plan (%d), got %s (%d)",
+		command.Plan, capturedCmds[0].Name.String(), capturedCmds[0].Name)
+
+	Assert(t, capturedCmds[1].Name == command.Apply,
+		"expected second CommentCommand.Name to be Apply (%d), got %s (%d)",
+		command.Apply, capturedCmds[1].Name.String(), capturedCmds[1].Name)
+}
+
 func TestAPIController_ListLocks(t *testing.T) {
 	ac, _, _ := setup(t)
 	time := time.Now()
@@ -230,7 +304,7 @@ func TestAPIController_ListLocks(t *testing.T) {
 	mockLocks := map[string]models.ProjectLock{
 		"lock-id": mockLock,
 	}
-	When(ac.Locker.List()).ThenReturn(mockLocks, nil)
+	ac.Locker.(*MockLocker).EXPECT().List().Return(mockLocks, nil)
 
 	req, _ := http.NewRequest("GET", "", nil)
 	w := httptest.NewRecorder()
@@ -247,7 +321,7 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 
 	expected := controllers.ListLocksResult{}
 	mockLocks := map[string]models.ProjectLock{}
-	When(ac.Locker.List()).ThenReturn(mockLocks, nil)
+	ac.Locker.(*MockLocker).EXPECT().List().Return(mockLocks, nil)
 
 	req, _ := http.NewRequest("GET", "", nil)
 	w := httptest.NewRecorder()
@@ -261,7 +335,10 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 
 func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
 	RegisterMockTestingT(t)
-	locker := NewMockLocker()
+	gmockCtrl := gomock.NewController(t)
+	locker := NewMockLocker(gmockCtrl)
+	// Allow incidental calls to UnlockByPull (called internally during plan/apply operations)
+	locker.EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 	logger := logging.NewNoopLogger(t)
 	parser := NewMockEventParsing()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")
@@ -271,7 +348,7 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 	Ok(t, err)
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir), Eq(""), Any[command.Name]())).
 		ThenReturn(func() {}, nil)
 
 	projectCommandBuilder := NewMockProjectCommandBuilder()
@@ -285,10 +362,10 @@ func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder,
 		}}, nil)
 
 	projectCommandRunner := NewMockProjectCommandRunner()
-	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
 		PlanSuccess: &models.PlanSuccess{},
 	})
-	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectResult{
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
 		ApplySuccess: "success",
 	})
 

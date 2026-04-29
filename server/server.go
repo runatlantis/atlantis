@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 // Package server handles the web server and executing commands that come in
@@ -19,6 +10,7 @@ import (
 	"context"
 	"crypto/tls"
 	"embed"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -52,7 +44,6 @@ import (
 	"github.com/runatlantis/atlantis/server/scheduled"
 
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/controllers"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
@@ -65,9 +56,13 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/azuredevops"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketserver"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
+	"github.com/runatlantis/atlantis/server/events/vcs/gitlab"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -180,15 +175,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	var supportedVCSHosts []models.VCSHostType
-	var githubClient vcs.IGithubClient
+	var githubClient github.IGithubClient
 	var githubAppEnabled bool
-	var githubConfig vcs.GithubConfig
-	var githubCredentials vcs.GithubCredentials
-	var gitlabClient *vcs.GitlabClient
+	var githubConfig github.Config
+	var githubCredentials github.Credentials
+	var gitlabClient *gitlab.Client
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
-	var azuredevopsClient *vcs.AzureDevopsClient
-	var giteaClient *gitea.GiteaClient
+	var azuredevopsClient *azuredevops.Client
+	var giteaClient *gitea.Client
 
 	policyChecksEnabled := false
 	if userConfig.EnablePolicyChecksFlag {
@@ -200,13 +195,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	disableApply := true
-	for _, allowCommand := range allowCommands {
-		if allowCommand == command.Apply {
-			disableApply = false
-			break
-		}
-	}
+	disableApply := !slices.Contains(allowCommands, command.Apply)
 
 	parserValidator := &cfg.ParserValidator{}
 
@@ -217,30 +206,30 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.RepoConfig != "" {
 		globalCfg, err = parserValidator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing %s file", userConfig.RepoConfig)
+			return nil, fmt.Errorf("parsing %s file: %w", userConfig.RepoConfig, err)
 		}
 	} else if userConfig.RepoConfigJSON != "" {
 		globalCfg, err = parserValidator.ParseGlobalCfgJSON(userConfig.RepoConfigJSON, globalCfg)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing --%s", config.RepoConfigJSONFlag)
+			return nil, fmt.Errorf("parsing --%s: %w", config.RepoConfigJSONFlag, err)
 		}
 	}
 
 	statsScope, statsReporter, closer, err := metrics.NewScope(globalCfg.Metrics, logger, userConfig.StatsNamespace)
 
 	if err != nil {
-		return nil, errors.Wrapf(err, "instantiating metrics scope")
+		return nil, fmt.Errorf("instantiating metrics scope: %w", err)
 	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
 		if userConfig.GithubAllowMergeableBypassApply {
-			githubConfig = vcs.GithubConfig{
+			githubConfig = github.Config{
 				AllowMergeableBypassApply: true,
 			}
 		}
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
-			githubCredentials = &vcs.GithubUserCredentials{
+			githubCredentials = &github.UserCredentials{
 				User:      userConfig.GithubUser,
 				Token:     userConfig.GithubToken,
 				TokenFile: userConfig.GithubTokenFile,
@@ -250,7 +239,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			if err != nil {
 				return nil, err
 			}
-			githubCredentials = &vcs.GithubAppCredentials{
+			githubCredentials = &github.AppCredentials{
 				AppID:          userConfig.GithubAppID,
 				InstallationID: userConfig.GithubAppInstallationID,
 				Key:            privateKey,
@@ -259,7 +248,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			}
 			githubAppEnabled = true
 		} else if userConfig.GithubAppID != 0 && userConfig.GithubAppKey != "" {
-			githubCredentials = &vcs.GithubAppCredentials{
+			githubCredentials = &github.AppCredentials{
 				AppID:          userConfig.GithubAppID,
 				InstallationID: userConfig.GithubAppInstallationID,
 				Key:            []byte(userConfig.GithubAppKey),
@@ -270,12 +259,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 
 		var err error
-		rawGithubClient, err := vcs.NewGithubClient(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
+		rawGithubClient, err := github.New(userConfig.GithubHostname, githubCredentials, githubConfig, userConfig.MaxCommentsPerCommand, logger)
 		if err != nil {
 			return nil, err
 		}
 
-		githubClient = vcs.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
+		githubClient = github.NewInstrumentedGithubClient(rawGithubClient, statsScope, logger)
 	}
 	if userConfig.GitlabUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitlab)
@@ -288,7 +277,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 		gitlabGroups := slices.Concat(gitlabGroupAllowlistChecker.AllTeams(), globalCfg.PolicySets.AllTeams())
 		slices.Sort(gitlabGroups)
-		gitlabClient, err = vcs.NewGitlabClient(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
+		gitlabClient, err = gitlab.New(userConfig.GitlabHostname, userConfig.GitlabToken, slices.Compact(gitlabGroups), logger)
 		if err != nil {
 			return nil, err
 		}
@@ -297,7 +286,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.BitbucketUser != "" {
 		if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
 			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketCloud)
-			bitbucketCloudClient = bitbucketcloud.NewClient(
+			bitbucketCloudClient = bitbucketcloud.New(
 				http.DefaultClient,
 				userConfig.BitbucketUser,
 				userConfig.BitbucketToken,
@@ -313,7 +302,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				userConfig.BitbucketBaseURL,
 				userConfig.AtlantisURL)
 			if err != nil {
-				return nil, errors.Wrapf(err, "setting up Bitbucket Server client")
+				return nil, fmt.Errorf("setting up Bitbucket Server client: %w", err)
 			}
 		}
 	}
@@ -321,7 +310,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
 
 		var err error
-		azuredevopsClient, err = vcs.NewAzureDevopsClient(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
+		azuredevopsClient, err = azuredevops.New(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
 		if err != nil {
 			return nil, err
 		}
@@ -329,10 +318,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GiteaToken != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.Gitea)
 
-		giteaClient, err = gitea.NewClient(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaPageSize, logger)
+		giteaClient, err = gitea.New(userConfig.GiteaBaseURL, userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaPageSize, logger)
 		if err != nil {
 			fmt.Println("error setting up gitea client", "error", err)
-			return nil, errors.Wrapf(err, "setting up Gitea client")
+			return nil, fmt.Errorf("setting up Gitea client: %w", err)
 		} else {
 			logger.Info("gitea client configured successfully")
 		}
@@ -347,17 +336,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	home, err := homedir.Dir()
 	if err != nil {
-		return nil, errors.Wrap(err, "getting home dir to write ~/.git-credentials file")
+		return nil, fmt.Errorf("getting home dir to write ~/.git-credentials file: %w", err)
 	}
 
 	if userConfig.WriteGitCreds {
 		if userConfig.GithubUser != "" {
-			if err := vcs.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger, false); err != nil {
+			if err := common.WriteGitCreds(userConfig.GithubUser, userConfig.GithubToken, userConfig.GithubHostname, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.GitlabUser != "" {
-			if err := vcs.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger, false); err != nil {
+			if err := common.WriteGitCreds(userConfig.GitlabUser, userConfig.GitlabToken, userConfig.GitlabHostname, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -368,17 +357,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			if bitbucketBaseURL == "https://api.bitbucket.org" {
 				bitbucketBaseURL = "bitbucket.org"
 			}
-			if err := vcs.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger, false); err != nil {
+			if err := common.WriteGitCreds(userConfig.BitbucketUser, userConfig.BitbucketToken, bitbucketBaseURL, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.AzureDevopsUser != "" {
-			if err := vcs.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger, false); err != nil {
+			if err := common.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger, false); err != nil {
 				return nil, err
 			}
 		}
 		if userConfig.GiteaUser != "" {
-			if err := vcs.WriteGitCreds(userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaBaseURL, home, logger, false); err != nil {
+			if err := common.WriteGitCreds(userConfig.GiteaUser, userConfig.GiteaToken, userConfig.GiteaBaseURL, home, logger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -404,7 +393,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 	webhookHeaders, err := userConfig.ToWebhookHttpHeaders()
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing webhook http headers")
+		return nil, fmt.Errorf("parsing webhook http headers: %w", err)
 	}
 	webhooksManager, err := webhooks.NewMultiWebhookSender(
 		webhooksConfig,
@@ -414,7 +403,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		},
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing webhooks")
+		return nil, fmt.Errorf("initializing webhooks: %w", err)
 	}
 	vcsClient := vcs.NewClientProxy(githubClient, gitlabClient, bitbucketCloudClient, bitbucketServerClient, azuredevopsClient, giteaClient)
 	commitStatusUpdater := &events.DefaultCommitStatusUpdater{Client: vcsClient, StatusName: userConfig.VCSStatusName}
@@ -433,7 +422,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
 	if err != nil {
-		return nil, errors.Wrapf(err, "parsing --%s flag %q", config.AtlantisURLFlag, userConfig.AtlantisURL)
+		return nil, fmt.Errorf("parsing --%s flag %q: %w", config.AtlantisURLFlag, userConfig.AtlantisURL, err)
 	}
 
 	underlyingRouter := mux.NewRouter()
@@ -477,7 +466,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// are, then we don't error out because we don't have/want terraform
 	// installed on our CI system where the unit tests run.
 	if err != nil && flag.Lookup("test.v") == nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("initializing %s", userConfig.DefaultTFDistribution))
+		return nil, fmt.Errorf("initializing %s: %w", userConfig.DefaultTFDistribution, err)
 	}
 	markdownRenderer := events.NewMarkdownRenderer(
 		gitlabClient.SupportsCommonMark(),
@@ -538,7 +527,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// provide fresh tokens before clone from the GitHub Apps integration, proxy workingDir
 	if githubAppEnabled {
 		if !userConfig.WriteGitCreds {
-			return nil, errors.New("Github App requires --write-git-creds to support cloning")
+			return nil, errors.New("github App requires --write-git-creds to support cloning")
 		}
 		workingDir = &events.GithubAppWorkingDir{
 			WorkingDir:     workingDir,
@@ -546,27 +535,28 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			GithubHostname: userConfig.GithubHostname,
 		}
 
-		githubAppTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, "x-access-token", home)
+		githubAppTokenRotator := github.NewTokenRotator(logger, githubCredentials, userConfig.GithubHostname, "x-access-token", home)
 		tokenJd, err := githubAppTokenRotator.GenerateJob()
 		if err != nil {
-			return nil, errors.Wrap(err, "could not write credentials")
+			return nil, fmt.Errorf("could not write credentials: %w", err)
 		}
 		scheduledExecutorService.AddJob(tokenJd)
 	}
 
 	if userConfig.GithubUser != "" && userConfig.GithubTokenFile != "" && userConfig.WriteGitCreds {
-		githubTokenRotator := vcs.NewGithubTokenRotator(logger, githubCredentials, userConfig.GithubHostname, userConfig.GithubUser, home)
+		githubTokenRotator := github.NewTokenRotator(logger, githubCredentials, userConfig.GithubHostname, userConfig.GithubUser, home)
 		tokenJd, err := githubTokenRotator.GenerateJob()
 		if err != nil {
-			return nil, errors.Wrap(err, "could not write credentials")
+			return nil, fmt.Errorf("could not write credentials: %w", err)
 		}
 		scheduledExecutorService.AddJob(tokenJd)
 	}
 
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:     lockingClient,
-		NoOpLocker: noOpLocker,
-		VCSClient:  vcsClient,
+		Locker:         lockingClient,
+		NoOpLocker:     noOpLocker,
+		VCSClient:      vcsClient,
+		ExecutableName: userConfig.ExecutableName,
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
@@ -594,6 +584,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubTokenFile:    userConfig.GithubTokenFile,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
+		GitlabHostname:     userConfig.GitlabHostname,
 		GiteaUser:          userConfig.GiteaUser,
 		GiteaToken:         userConfig.GiteaToken,
 		AllowDraftPRs:      userConfig.PlanDrafts,
@@ -611,6 +602,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AzureDevopsUser,
 		userConfig.ExecutableName,
 		allowCommands,
+		userConfig.ToBlockedExtraArgs(),
 	)
 	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()
@@ -650,11 +642,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
 	}
+	projectFinder := &events.DefaultProjectFinder{}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
 		policyChecksEnabled,
 		parserValidator,
-		&events.DefaultProjectFinder{},
+		projectFinder,
 		vcsClient,
 		workingDir,
 		workingDirLocker,
@@ -679,7 +672,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing show step runner")
+		return nil, fmt.Errorf("initializing show step runner: %w", err)
 	}
 
 	policyCheckStepRunner, err := runtime.NewPolicyCheckStepRunner(
@@ -689,12 +682,22 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "initializing policy check step runner")
+		return nil, fmt.Errorf("initializing policy check step runner: %w", err)
 	}
 
 	applyRequirementHandler := &events.DefaultCommandRequirementHandler{
 		WorkingDir: workingDir,
+		ProjectImpactResolver: events.NewUndivergedProjectImpactResolver(
+			parserValidator,
+			projectFinder,
+			globalCfg,
+			userConfig.AutoplanModulesFromProjects,
+			userConfig.AutoplanFileList,
+			userConfig.AutoDiscoverModeFlag,
+		),
 	}
+
+	cancellationTracker := events.NewCancellationTracker()
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		VcsClient:        vcsClient,
@@ -734,6 +737,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,
 		CommandRequirementHandler: applyRequirementHandler,
+		CancellationTracker:       cancellationTracker,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -781,6 +785,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
+		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -801,6 +806,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		commitStatusUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
+		cancellationTracker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
@@ -851,6 +857,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		instrumentedProjectCmdRunner,
 	)
 
+	cancelCommandRunner := events.NewCancelCommandRunner(
+		vcsClient,
+		projectOutputWrapper.ProjectCommandRunner,
+		pullUpdater,
+		workingDirLocker,
+		userConfig.SilenceNoProjects,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
@@ -859,6 +873,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
 		command.State:           stateCommandRunner,
+		command.Cancel:          cancelCommandRunner,
 	}
 
 	var teamAllowlistChecker command.TeamAllowlistChecker
@@ -1278,7 +1293,7 @@ func preparePullToJobMappings(s *Server) []jobs.PullInfoWithJobIDs {
 func mkSubDir(parentDir string, subDir string) (string, error) {
 	fullDir := filepath.Join(parentDir, subDir)
 	if err := os.MkdirAll(fullDir, 0700); err != nil {
-		return "", errors.Wrapf(err, "unable to create dir %q", fullDir)
+		return "", fmt.Errorf("unable to create dir %q: %w", fullDir, err)
 	}
 
 	return fullDir, nil

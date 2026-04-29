@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package server_test
@@ -30,11 +21,13 @@ import (
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
-	"github.com/runatlantis/atlantis/server/core/locking/mocks"
+	"github.com/runatlantis/atlantis/server/core/locking"
+	lockMocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 const (
@@ -77,9 +70,9 @@ func TestNewServer_InvalidAtlantisURL(t *testing.T) {
 
 func TestIndex_LockErr(t *testing.T) {
 	t.Log("index should return a 503 if unable to list locks")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.List()).ThenReturn(nil, errors.New("err"))
+	ctrl := gomock.NewController(t)
+	l := lockMocks.NewMockLocker(ctrl)
+	l.EXPECT().List().Return(nil, errors.New("err"))
 	s := server.Server{
 		Locker: l,
 	}
@@ -91,9 +84,10 @@ func TestIndex_LockErr(t *testing.T) {
 
 func TestIndex_Success(t *testing.T) {
 	t.Log("Index should render the index template successfully.")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	al := mocks.NewMockApplyLocker()
+	RegisterMockTestingT(t) // needed for pegomock TemplateWriter mock
+	ctrl := gomock.NewController(t)
+	l := lockMocks.NewMockLocker(ctrl)
+	al := lockMocks.NewMockApplyLocker(ctrl)
 	// These are the locks that we expect to be rendered.
 	now := time.Now()
 	locks := map[string]models.ProjectLock{
@@ -107,7 +101,8 @@ func TestIndex_Success(t *testing.T) {
 			Time: now,
 		},
 	}
-	When(l.List()).ThenReturn(locks, nil)
+	l.EXPECT().List().Return(locks, nil)
+	al.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 	it := tMocks.NewMockTemplateWriter()
 	r := mux.NewRouter()
 	atlantisVersion := "0.3.1"
@@ -181,7 +176,7 @@ var s = &server.Server{}
 
 func BenchmarkHealthz(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		s.Healthz(w, nil)
 	}
 }

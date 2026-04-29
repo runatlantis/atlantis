@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -16,6 +7,7 @@ package events_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
@@ -307,14 +299,7 @@ func TestDetermineProjects(t *testing.T) {
 				"exp %q but found %q", c.expProjectPaths, paths)
 
 			for _, expPath := range c.expProjectPaths {
-				found := false
-				for _, actPath := range paths {
-					if expPath == actPath {
-						found = true
-						break
-					}
-				}
-				if !found {
+				if !slices.Contains(paths, expPath) {
 					t.Fatalf("exp %q but was not in paths %v", expPath, paths)
 				}
 			}
@@ -334,18 +319,18 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	// modules/
 	//   module/
 	//	  main.tf
-	tmpDir := DirStructure(t, map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]any{
 		"main.tf": nil,
-		"project1": map[string]interface{}{
+		"project1": map[string]any{
 			"main.tf":               nil,
 			"terraform.tfvars.json": nil,
 		},
-		"project2": map[string]interface{}{
+		"project2": map[string]any{
 			"main.tf":          nil,
 			"terraform.tfvars": nil,
 		},
-		"modules": map[string]interface{}{
-			"module": map[string]interface{}{
+		"modules": map[string]any{
+			"module": map[string]any{
 				"main.tf": nil,
 			},
 		},

@@ -1,16 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // Package locking handles locking projects when they have in-progress runs.
@@ -40,7 +29,7 @@ type Client struct {
 	database db.Database
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_locker.go Locker
+//go:generate go tool mockgen -package mocks -destination mocks/mock_locker.go . Locker
 
 type Locker interface {
 	TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error)
@@ -57,8 +46,8 @@ func NewClient(database db.Database) *Client {
 	}
 }
 
-// keyRegex matches and captures {repoFullName}/{path}/{workspace} where path can have multiple /'s in it.
-var keyRegex = regexp.MustCompile(`^(.*?\/.*?)\/(.*)\/(.*)$`)
+// keyRegex matches and captures {repoFullName}/{path}/{workspace}/{projectName} where path can have multiple /'s in it.
+var keyRegex = regexp.MustCompile(`^(.*?\/.*?)\/(.*)\/(.*)\/(.*)$`)
 
 // TryLock attempts to acquire a lock to a project and workspace.
 func (c *Client) TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error) {
@@ -129,13 +118,20 @@ func (c *Client) key(p models.Project, workspace string) string {
 	return models.GenerateLockKey(p, workspace)
 }
 
-func (c *Client) lockKeyToProjectWorkspace(key string) (models.Project, string, error) {
+func IsCurrentLocking(key string) ([]string, error) {
 	matches := keyRegex.FindStringSubmatch(key)
-	if len(matches) != 4 {
-		return models.Project{}, "", errors.New("invalid key format")
+	if len(matches) != 5 {
+		return []string{}, errors.New("invalid key format")
 	}
+	return matches, nil
+}
 
-	return models.Project{RepoFullName: matches[1], Path: matches[2]}, matches[3], nil
+func (c *Client) lockKeyToProjectWorkspace(key string) (models.Project, string, error) {
+	matches, err := IsCurrentLocking(key)
+	if err != nil {
+		return models.Project{}, "", err
+	}
+	return models.Project{RepoFullName: matches[1], Path: matches[2], ProjectName: matches[4]}, matches[3], nil
 }
 
 type NoOpLocker struct{}

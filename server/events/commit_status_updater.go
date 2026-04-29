@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events
@@ -25,7 +16,7 @@ import (
 	"golang.org/x/text/language"
 )
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_commit_status_updater.go CommitStatusUpdater
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_commit_status_updater.go CommitStatusUpdater
 
 // CommitStatusUpdater updates the status of a commit with the VCS host. We set
 // the status to signify whether the plan/apply succeeds.
@@ -82,7 +73,7 @@ func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLo
 	return d.Client.UpdateStatus(logger, repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectResult) error {
+func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectCommandOutput) error {
 	projectID := ctx.ProjectName
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)

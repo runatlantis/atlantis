@@ -4,10 +4,10 @@
 package websocket
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -31,7 +31,7 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 	conn, err := w.upgrader.Upgrade(rw, r, nil)
 
 	if err != nil {
-		return errors.Wrap(err, "upgrading websocket connection")
+		return fmt.Errorf("upgrading websocket connection: %w", err)
 	}
 
 	// block on reading our input channel

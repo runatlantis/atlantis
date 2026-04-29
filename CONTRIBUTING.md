@@ -42,8 +42,7 @@ If you have any questions about the contribution process, see [Atlantis Contribu
 # Developing
 
 ## Updating The Website
-* To view the generated website locally, run `npm website:dev` and then
-open your browser to http://localhost:8080.
+* To view the generated website locally, run `npm run website:dev` and then open your browser to http://localhost:8080.
 * The website will be regenerated when your pull request is merged to main.
 
 ## Running Atlantis Locally
@@ -136,8 +135,8 @@ ngrok http 4141
 
 ### Errors
 - **ALWAYS** use lowercase unless the word requires it
-- **ALWAYS** use `errors.Wrap(err, "additional context...")"` instead of `fmt.Errorf("additional context: %s", err)`
-because it is less likely to result in mistakes and gives us the ability to trace call stacks
+- **ALWAYS** use `fmt.Errorf("additional context: %w", err)"` instead of `fmt.Errorf("additional context: %s", err)`
+because it is less likely to result in mistakes and gives us the ability to trace calls
 - **NEVER** use the words "error occurred when...", or "failed to..." or "unable to...", etc. Instead, describe what was occurring at
 time of the error, ex. "cloning repository", "creating AWS session". This will prevent errors from looking like
 ```

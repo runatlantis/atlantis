@@ -52,11 +52,11 @@ var defaultUserConfig = struct {
 	AutoDiscoverMode:         "auto",
 }
 
-func ChangedFiles(dirStructure map[string]interface{}, parent string) []string {
+func ChangedFiles(dirStructure map[string]any, parent string) []string {
 	var files []string
 	for k, v := range dirStructure {
 		switch v := v.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			files = append(files, ChangedFiles(v, k)...)
 		default:
 			files = append(files, filepath.Join(parent, k))
@@ -74,7 +74,7 @@ func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
 		RepoRelDir  string
 		Workspace   string
 	}
-	defaultTestDirStructure := map[string]interface{}{
+	defaultTestDirStructure := map[string]any{
 		"main.tf": nil,
 	}
 
@@ -82,7 +82,7 @@ func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
 		Description      string
 		AtlantisYAML     string
 		ServerSideYAML   string
-		TestDirStructure map[string]interface{}
+		TestDirStructure map[string]any
 		exp              []expCtxFields
 	}{
 		{
@@ -172,8 +172,8 @@ projects:
 		},
 		{
 			Description: "workspaces from subdirectories detected",
-			TestDirStructure: map[string]interface{}{
-				"work": map[string]interface{}{
+			TestDirStructure: map[string]any{
+				"work": map[string]any{
 					"main.tf": `
 terraform {
   cloud {
@@ -184,7 +184,7 @@ terraform {
   }
 }`,
 				},
-				"test": map[string]interface{}{
+				"test": map[string]any{
 					"main.tf": `
 terraform {
   cloud {
@@ -211,7 +211,7 @@ terraform {
 		},
 		{
 			Description: "workspaces in parent directory are detected",
-			TestDirStructure: map[string]interface{}{
+			TestDirStructure: map[string]any{
 				"main.tf": `
 terraform {
   cloud {
@@ -599,7 +599,7 @@ projects:
 		for _, cmdName := range []command.Name{command.Plan, command.Apply} {
 			t.Run(c.Description+"_"+cmdName.String(), func(t *testing.T) {
 				RegisterMockTestingT(t)
-				tmpDir := DirStructure(t, map[string]interface{}{
+				tmpDir := DirStructure(t, map[string]any{
 					"main.tf": nil,
 				})
 
@@ -688,7 +688,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 	cases := []struct {
 		Description        string
 		AtlantisYAML       string
-		DirectoryStructure map[string]interface{}
+		DirectoryStructure map[string]any
 		ModifiedFiles      []string
 		Cmd                events.CommentCommand
 		ExpErr             string
@@ -700,11 +700,11 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 				RepoRelDir: "directory-1",
 				Workspace:  "default",
 			},
-			DirectoryStructure: map[string]interface{}{
-				"directory-1": map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				"directory-1": map[string]any{
 					"main.tf": nil,
 				},
-				"directory-2": map[string]interface{}{
+				"directory-2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -718,11 +718,11 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 				RepoRelDir: "directory-1",
 				Workspace:  "default",
 			},
-			DirectoryStructure: map[string]interface{}{
-				"directory-1": map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				"directory-1": map[string]any{
 					"main.tf": nil,
 				},
-				"directory-2": map[string]interface{}{
+				"directory-2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -743,11 +743,11 @@ projects:
 - name: project-2
   dir: directory-2
 `,
-			DirectoryStructure: map[string]interface{}{
-				"directory-1": map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				"directory-1": map[string]any{
 					"main.tf": nil,
 				},
-				"directory-2": map[string]interface{}{
+				"directory-2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -769,11 +769,11 @@ projects:
 - name: project-2
   dir: directory-2
 `,
-			DirectoryStructure: map[string]interface{}{
-				"directory-1": map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				"directory-1": map[string]any{
 					"main.tf": nil,
 				},
-				"directory-2": map[string]interface{}{
+				"directory-2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -869,17 +869,17 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 		AutoMergeUserCfg            bool
 		ParallelPlanEnabledUserCfg  bool
 		ParallelApplyEnabledUserCfg bool
-		DirStructure                map[string]interface{}
+		DirStructure                map[string]any
 		AtlantisYAML                string
 		ModifiedFiles               []string
 		Exp                         []expCtxFields
 	}{
 		"no atlantis.yaml": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -898,11 +898,11 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 			},
 		},
 		"no projects in atlantis.yaml with parallel operations in atlantis.yaml": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -933,11 +933,11 @@ parallel_apply: true
 			},
 		},
 		"no projects in atlantis.yaml with parallel operations and automerge not in atlantis.yaml, but in user conf": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -968,11 +968,11 @@ version: 3
 			},
 		},
 		"no projects in atlantis.yaml with parallel operations and automerge set to false in atlantis.yaml and true in user conf": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -1006,21 +1006,21 @@ parallel_apply: false
 			},
 		},
 		"no modified files": {
-			DirStructure: map[string]interface{}{
+			DirStructure: map[string]any{
 				"main.tf": nil,
 			},
 			ModifiedFiles: []string{},
 			Exp:           []expCtxFields{},
 		},
 		"follow when_modified config": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -1049,14 +1049,14 @@ projects:
 			},
 		},
 		"follow autodiscover enabled config": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -1082,14 +1082,14 @@ projects:
 			},
 		},
 		"autodiscover enabled but ignoring explicit project": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -1118,14 +1118,14 @@ projects:
 			},
 		},
 		"autodiscover enabled but project excluded by empty when_modified": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -1231,23 +1231,23 @@ projects:
 // In this case we should apply all outstanding plans.
 func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	RegisterMockTestingT(t)
-	tmpDir := DirStructure(t, map[string]interface{}{
-		"workspace1": map[string]interface{}{
-			"project1": map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]any{
+		"workspace1": map[string]any{
+			"project1": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
-			"project2": map[string]interface{}{
+			"project2": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
 		},
-		"workspace2": map[string]interface{}{
-			"project1": map[string]interface{}{
+		"workspace2": map[string]any{
+			"project1": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
-			"project2": map[string]interface{}{
+			"project2": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
@@ -1322,15 +1322,523 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	Equals(t, "workspace2", ctxs[3].Workspace)
 }
 
+// Test that autodiscover.ignore_paths is respected during multi-apply.
+// Plans in ignored paths (e.g. .terraform/modules/) should not be applied.
+func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			"project2": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			".terraform": map[string]any{
+				"modules": map[string]any{
+					"some_module": map[string]any{
+						"test-deployment": map[string]any{
+							"main.tf":        nil,
+							"default.tfplan": nil,
+						},
+					},
+				},
+			},
+		},
+	})
+	// Initialize git repo so .tfplan files get picked up as untracked.
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	// Set ignore_paths on the global config's AutoDiscover so that
+	// isAutoDiscoverPathIgnored filters .terraform paths.
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{".terraform/**"},
+	}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "default", ctxs[1].Workspace)
+}
+
+// Test that autodiscover.ignore_paths set in repo-level atlantis.yaml (not
+// global config) is respected during multi-apply.
+func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePathsRepoCfg(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - ".terraform/**"
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			"project2": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			".terraform": map[string]any{
+				"modules": map[string]any{
+					"some_module": map[string]any{
+						"test-deployment": map[string]any{
+							"main.tf":        nil,
+							"default.tfplan": nil,
+						},
+					},
+				},
+			},
+		},
+	})
+	// Initialize git repo so .tfplan files get picked up as untracked.
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	// No global-level ignore_paths — only the repo atlantis.yaml has it.
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "default", ctxs[1].Workspace)
+}
+
+// Test that when global AutoDiscover is set (mode enabled) but has no
+// IgnorePaths, isAutoDiscoverPathIgnored falls through to the repo config's
+// ignore_paths. This validates the guard change from "!= nil" to
+// "!= nil && IgnorePaths != nil".
+func TestDefaultProjectCommandBuilder_BuildMultiApply_GlobalAutoDiscoverFallthrough(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - ".terraform/**"
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			".terraform": map[string]any{
+				"modules": map[string]any{
+					"some_module": map[string]any{
+						"test-deployment": map[string]any{
+							"main.tf":        nil,
+							"default.tfplan": nil,
+						},
+					},
+				},
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	// Global AutoDiscover with mode set but NO IgnorePaths.
+	// The guard change means this falls through to repo config's ignore_paths.
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode: valid.AutoDiscoverEnabledMode,
+	}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	// .terraform/modules/some_module/test-deployment should be filtered by
+	// the repo config's ignore_paths, even though global AutoDiscover is set.
+	Equals(t, 1, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+}
+
+func TestDefaultProjectCommandBuilder_BuildMultiApply_ExplicitPlanInIgnoredPath(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\nautodiscover:\n  mode: auto\n  ignore_paths:\n  - \"ignored/**\"\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"ignored": map[string]any{
+				"dir": map[string]any{
+					"main.tf":        nil,
+					"default.tfplan": nil,
+				},
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Workspace:  "default",
+						RepoRelDir: "ignored/dir",
+						Status:     models.PlannedPlanStatus,
+					},
+				},
+			},
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "ignored/dir", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+}
+
+func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnoreStaleNamedPlanInIgnoredPath(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\nautodiscover:\n  mode: enabled\n  ignore_paths:\n  - \"ignored/**\"\nprojects:\n- name: app\n  dir: app\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"app": map[string]any{
+				"main.tf":            nil,
+				"app-default.tfplan": nil,
+			},
+			"ignored": map[string]any{
+				"stale": map[string]any{
+					"main.tf":            nil,
+					"app-default.tfplan": nil,
+				},
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Workspace:   "default",
+						RepoRelDir:  "app",
+						ProjectName: "app",
+						Status:      models.PlannedPlanStatus,
+					},
+				},
+			},
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "app", ctxs[0].RepoRelDir)
+	Equals(t, "app", ctxs[0].ProjectName)
+	Equals(t, "default", ctxs[0].Workspace)
+}
+
 // Test that if a directory has a list of workspaces configured then we don't
 // allow plans for other workspace names.
 func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
 	RegisterMockTestingT(t)
 	workingDir := mocks.NewMockWorkingDir()
 
-	tmpDir := DirStructure(t, map[string]interface{}{
-		"pulldir": map[string]interface{}{
-			"notconfigured": map[string]interface{}{},
+	tmpDir := DirStructure(t, map[string]any{
+		"pulldir": map[string]any{
+			"notconfigured": map[string]any{},
 		},
 	})
 	repoDir := filepath.Join(tmpDir, "pulldir/notconfigured")
@@ -1428,7 +1936,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 	for _, c := range cases {
 		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
 			RegisterMockTestingT(t)
-			tmpDir := DirStructure(t, map[string]interface{}{
+			tmpDir := DirStructure(t, map[string]any{
 				"main.tf": nil,
 			})
 
@@ -1512,7 +2020,7 @@ projects:
 `
 
 	type testCase struct {
-		DirStructure  map[string]interface{}
+		DirStructure  map[string]any
 		AtlantisYAML  string
 		ModifiedFiles []string
 		Exp           map[string]string
@@ -1522,8 +2030,8 @@ projects:
 
 	// atlantis.yaml should take precedence over terraform config
 	testCases["with project config and terraform config"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
 				"main.tf": baseVersionConfig,
 			},
 			valid.DefaultAtlantisFile: atlantisYamlContent,
@@ -1535,8 +2043,8 @@ projects:
 	}
 
 	testCases["with project config only"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
 				"main.tf": nil,
 			},
 			valid.DefaultAtlantisFile: atlantisYamlContent,
@@ -1548,8 +2056,8 @@ projects:
 	}
 
 	testCases["neither project config or terraform config"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
 				"main.tf": nil,
 			},
 		},
@@ -1560,11 +2068,11 @@ projects:
 	}
 
 	testCases["project with different terraform config"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
 				"main.tf": baseVersionConfig,
 			},
-			"project2": map[string]interface{}{
+			"project2": map[string]any{
 				"main.tf": strings.ReplaceAll(baseVersionConfig, "0.12.8", "0.12.9"),
 			},
 		},
@@ -1810,7 +2318,7 @@ projects:
 
 func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanCommand(t *testing.T) {
 	RegisterMockTestingT(t)
-	tmpDir := DirStructure(t, map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]any{
 		"main.tf": nil,
 	})
 
@@ -1879,23 +2387,23 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 // Test building version command for multiple projects
 func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	RegisterMockTestingT(t)
-	tmpDir := DirStructure(t, map[string]interface{}{
-		"workspace1": map[string]interface{}{
-			"project1": map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]any{
+		"workspace1": map[string]any{
+			"project1": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
-			"project2": map[string]interface{}{
+			"project2": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
 		},
-		"workspace2": map[string]interface{}{
-			"project1": map[string]interface{}{
+		"workspace2": map[string]any{
+			"project1": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
-			"project2": map[string]interface{}{
+			"project2": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
@@ -1979,7 +2487,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 	cases := []struct {
 		Description        string
 		AtlantisYAML       string
-		DirectoryStructure map[string]interface{}
+		DirectoryStructure map[string]any
 		ModifiedFiles      []string
 		UntrackedFiles     []string
 		Cmd                events.CommentCommand
@@ -1993,8 +2501,8 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				RepoRelDir: testDir1 + "/ci-cdktf.out/stacks/test",
 				Workspace:  "default",
 			},
-			DirectoryStructure: map[string]interface{}{
-				testDir1: map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				testDir1: map[string]any{
 					"main.ts": nil,
 				},
 			},
@@ -2009,8 +2517,8 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				RepoRelDir: testDir2 + "/ci-cdktf.out/stacks/test",
 				Workspace:  "default",
 			},
-			DirectoryStructure: map[string]interface{}{
-				testDir1: map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				testDir1: map[string]any{
 					"main.ts": nil,
 				},
 			},
@@ -2101,7 +2609,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 	cases := []struct {
 		Description        string
 		AtlantisYAML       string
-		DirectoryStructure map[string]interface{}
+		DirectoryStructure map[string]any
 		ModifiedFiles      []string
 		UntrackedFiles     []string
 		Cmd                events.CommentCommand
@@ -2113,12 +2621,12 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 			Cmd: events.CommentCommand{
 				Name: command.Plan,
 			},
-			DirectoryStructure: map[string]interface{}{
-				testDir1: map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				testDir1: map[string]any{
 					"main.ts": nil,
-					"ci-cdktf.out": map[string]interface{}{
-						"stacks": map[string]interface{}{
-							"test": map[string]interface{}{
+					"ci-cdktf.out": map[string]any{
+						"stacks": map[string]any{
+							"test": map[string]any{
 								"cdk.tf.json": nil,
 							},
 						},

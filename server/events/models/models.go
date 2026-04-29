@@ -1,16 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // Package models holds all models that are needed across packages.
@@ -19,6 +8,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	paths "path"
@@ -28,8 +18,6 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/logging"
-
-	"github.com/pkg/errors"
 )
 
 type PullReqStatus struct {
@@ -73,7 +61,11 @@ func (r Repo) ID() string {
 // ex. https://github.com/runatlantis/atlantis.git OR
 //
 //	https://github.com/runatlantis/atlantis
-func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
+//
+// vcsHostname is the configured hostname for the VCS (may include a subpath
+// for GitLab, e.g. "acme.com/gitlab"). Pass empty string to skip the
+// enhanced host/subpath validation; non-GitLab callers always pass "".
+func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string, vcsHostname string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
 	}
@@ -88,7 +80,7 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 
 	cloneURLParsed, err := url.Parse(cloneURL)
 	if err != nil {
-		return Repo{}, errors.Wrap(err, "invalid clone url")
+		return Repo{}, fmt.Errorf("invalid clone url: %w", err)
 	}
 
 	// Ensure the Clone URL is for the same repo to avoid something malicious.
@@ -98,6 +90,18 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	// Azure DevOps also does not require .git at the end of clone urls.
 	if vcsHostType != BitbucketServer && vcsHostType != AzureDevops {
 		expClonePath := fmt.Sprintf("/%s.git", repoFullName)
+
+		if vcsHostType == Gitlab && vcsHostname != "" {
+			expectedHost, basePath, parseErr := ParseGitlabHostname(vcsHostname)
+			if parseErr != nil {
+				return Repo{}, fmt.Errorf("parsing configured gitlab hostname %q: %w", vcsHostname, parseErr)
+			}
+			if !strings.EqualFold(cloneURLParsed.Host, expectedHost) {
+				return Repo{}, fmt.Errorf("expected clone url host %q but had %q", expectedHost, cloneURLParsed.Host)
+			}
+			expClonePath = basePath + expClonePath
+		}
+
 		if expClonePath != cloneURLParsed.Path {
 			return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
 		}
@@ -285,7 +289,7 @@ type Plan struct {
 // GenerateLockKey creates a consistent lock key from a project and workspace.
 // This ensures the same format is used across all locking operations.
 func GenerateLockKey(project Project, workspace string) string {
-	return fmt.Sprintf("%s/%s/%s", project.RepoFullName, project.Path, workspace)
+	return fmt.Sprintf("%s/%s/%s/%s", project.RepoFullName, project.Path, workspace, project.ProjectName)
 }
 
 // NewProject constructs a Project. Use this constructor because it
@@ -438,14 +442,20 @@ func (p *PlanSuccess) NoChanges() bool {
 
 // Diff Markdown regexes
 var (
-	diffKeywordRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)(.*)(\s=\s|\s->\s|<<|\{|\(known after apply\)| {2,}[^ ]+:.*)(.*)`)
-	diffListRegex    = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
-	diffTildeRegex   = regexp.MustCompile(`(?m)^~`)
+	diffKeywordRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)([a-zA-Z_][\w]*\s*)(\s=\s|\s->\s|\(known after apply\)|\{)(.*)`)
+	diffResourceRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)((?:resource|data|module)\s+.+\{.*)`)
+	diffHeredocRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(<<)(.*)`)
+	diffColonRegex    = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {4,}[a-zA-Z_][\w-]*:.*)`)
+	diffListRegex     = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
+	diffTildeRegex    = regexp.MustCompile(`(?m)^~`)
 )
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5")
+	formattedTerraformOutput = diffResourceRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
+	formattedTerraformOutput = diffHeredocRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3$4")
+	formattedTerraformOutput = diffColonRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
 
@@ -497,7 +507,7 @@ func (p *PolicyCheckResults) CombinedOutput() string {
 	combinedOutput := ""
 	for _, psResult := range p.PolicySetResults {
 		// accounting for json output from conftest.
-		for _, psResultLine := range strings.Split(psResult.PolicyOutput, "\\n") {
+		for psResultLine := range strings.SplitSeq(psResult.PolicyOutput, "\\n") {
 			combinedOutput = fmt.Sprintf("%s\n%s", combinedOutput, psResultLine)
 		}
 	}

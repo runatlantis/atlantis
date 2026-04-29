@@ -1,16 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // Package logging handles logging throughout Atlantis.
@@ -20,35 +9,34 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_simple_logging.go SimpleLogging
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_simple_logging.go SimpleLogging
 
 // SimpleLogging is the interface used for logging throughout the codebase.
 type SimpleLogging interface {
 
 	// These basically just fmt.Sprintf() the message and args.
-	Debug(format string, a ...interface{})
-	Info(format string, a ...interface{})
-	Warn(format string, a ...interface{})
-	Err(format string, a ...interface{})
-	Log(level LogLevel, format string, a ...interface{})
+	Debug(format string, a ...any)
+	Info(format string, a ...any)
+	Warn(format string, a ...any)
+	Err(format string, a ...any)
+	Log(level LogLevel, format string, a ...any)
 	SetLevel(lvl LogLevel)
 
 	// With adds a variadic number of fields to the logging context. It accepts a
 	// mix of strongly-typed Field objects and loosely-typed key-value pairs. When
 	// processing pairs, the first element of the pair is used as the field key
 	// and the second as the field value.
-	With(a ...interface{}) SimpleLogging
+	With(a ...any) SimpleLogging
 
 	// Creates a new logger with history preserved . log storage + search strategies
 	// should ideally be used instead of managing this ourselves.
 	// keeping as a separate method to ensure that usage of history is completely intentional
-	WithHistory(a ...interface{}) SimpleLogging
+	WithHistory(a ...any) SimpleLogging
 
 	// Fetches the history we've stored associated with the logging context
 	GetHistory() string
@@ -97,7 +85,7 @@ func newStructuredLogger(cfg zap.Config) (*StructuredLogger, error) {
 		With(zap.Namespace("json"))
 
 	if err != nil {
-		return nil, errors.Wrap(err, " initializing structured logger")
+		return nil, fmt.Errorf(" initializing structured logger: %w", err)
 	}
 
 	return &StructuredLogger{
@@ -106,14 +94,14 @@ func newStructuredLogger(cfg zap.Config) (*StructuredLogger, error) {
 	}, nil
 }
 
-func (l *StructuredLogger) With(a ...interface{}) SimpleLogging {
+func (l *StructuredLogger) With(a ...any) SimpleLogging {
 	return &StructuredLogger{
 		z:     l.z.With(a...),
 		level: l.level,
 	}
 }
 
-func (l *StructuredLogger) WithHistory(a ...interface{}) SimpleLogging {
+func (l *StructuredLogger) WithHistory(a ...any) SimpleLogging {
 	logger := &StructuredLogger{
 		z:     l.z.With(a...),
 		level: l.level,
@@ -130,27 +118,27 @@ func (l *StructuredLogger) GetHistory() string {
 	return l.history.String()
 }
 
-func (l *StructuredLogger) Debug(format string, a ...interface{}) {
+func (l *StructuredLogger) Debug(format string, a ...any) {
 	l.z.Debugf(format, a...)
 	l.saveToHistory(Debug, format, a...)
 }
 
-func (l *StructuredLogger) Info(format string, a ...interface{}) {
+func (l *StructuredLogger) Info(format string, a ...any) {
 	l.z.Infof(format, a...)
 	l.saveToHistory(Info, format, a...)
 }
 
-func (l *StructuredLogger) Warn(format string, a ...interface{}) {
+func (l *StructuredLogger) Warn(format string, a ...any) {
 	l.z.Warnf(format, a...)
 	l.saveToHistory(Warn, format, a...)
 }
 
-func (l *StructuredLogger) Err(format string, a ...interface{}) {
+func (l *StructuredLogger) Err(format string, a ...any) {
 	l.z.Errorf(format, a...)
 	l.saveToHistory(Error, format, a...)
 }
 
-func (l *StructuredLogger) Log(level LogLevel, format string, a ...interface{}) {
+func (l *StructuredLogger) Log(level LogLevel, format string, a ...any) {
 	switch level {
 	case Debug:
 		l.z.Debugf(format, a...)
@@ -173,7 +161,7 @@ func (l *StructuredLogger) Flush() error {
 	return l.z.Sync()
 }
 
-func (l *StructuredLogger) saveToHistory(lvl LogLevel, format string, a ...interface{}) {
+func (l *StructuredLogger) saveToHistory(lvl LogLevel, format string, a ...any) {
 	if !l.keepHistory {
 		return
 	}

@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -244,11 +235,13 @@ func TestRenderProjectResults(t *testing.T) {
 			"",
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -289,12 +282,14 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						MergedAgain:     true,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							MergedAgain:     true,
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -336,11 +331,13 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -382,28 +379,30 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								// strings.Repeat require to get wrapped result
-								PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									// strings.Repeat require to get wrapped result
+									PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-								Passed:       false,
-								ReqApprovals: 1,
+									Passed:       false,
+									ReqApprovals: 1,
+								},
+								{
+									PolicySetName: "policy2",
+									// strings.Repeat require to get wrapped result
+									PolicyOutput: "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+									Passed:       true,
+									ReqApprovals: 1,
+								},
 							},
-							{
-								PolicySetName: "policy2",
-								// strings.Repeat require to get wrapped result
-								PolicyOutput: "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
-								Passed:       true,
-								ReqApprovals: 1,
-							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
 						},
-						LockURL:   "lock-url",
-						RePlanCmd: "atlantis plan -d path -w workspace",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -459,21 +458,23 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								// strings.Repeat require to get wrapped result
-								PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									// strings.Repeat require to get wrapped result
+									PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-								Passed:       false,
-								ReqApprovals: 1,
+									Passed:       false,
+									ReqApprovals: 1,
+								},
 							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
 						},
-						LockURL:   "lock-url",
-						RePlanCmd: "atlantis plan -d path -w workspace",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -543,9 +544,11 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					ImportSuccess: &models.ImportSuccess{
-						Output:    "import-output",
-						RePlanCmd: "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ImportSuccess: &models.ImportSuccess{
+							Output:    "import-output",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -574,9 +577,11 @@ $$$
 			"rm",
 			[]command.ProjectResult{
 				{
-					StateRmSuccess: &models.StateRmSuccess{
-						Output:    "state-rm-output",
-						RePlanCmd: "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						StateRmSuccess: &models.StateRmSuccess{
+							Output:    "state-rm-output",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -605,9 +610,11 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					ApplySuccess: "success",
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
 				},
 			},
 			models.Github,
@@ -625,10 +632,12 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					ApplySuccess: "success",
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ProjectName:  "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
 				},
 			},
 			models.Github,
@@ -648,22 +657,26 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output2",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output2",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -729,33 +742,37 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:        true,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
 							},
+							LockURL:   "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
 						},
-						LockURL:   "lock-url",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
-						RePlanCmd: "atlantis plan -d path -w workspace",
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:        true,
-							},
-						}, LockURL: "lock-url2",
-						ApplyCmd:  "atlantis apply -d path2 -w workspace",
-						RePlanCmd: "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							}, LockURL: "lock-url2",
+							ApplyCmd:  "atlantis apply -d path2 -w workspace",
+							RePlanCmd: "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -819,15 +836,19 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					RepoRelDir:   "path",
-					Workspace:    "workspace",
-					ProjectName:  "projectname",
-					ApplySuccess: "success",
+					RepoRelDir:  "path",
+					Workspace:   "workspace",
+					ProjectName: "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
-					RepoRelDir:   "path2",
-					Workspace:    "workspace",
-					ApplySuccess: "success2",
+					RepoRelDir: "path2",
+					Workspace:  "workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success2",
+					},
 				},
 			},
 			models.Github,
@@ -861,7 +882,9 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 					RepoRelDir: "path",
 					Workspace:  "workspace",
 				},
@@ -884,7 +907,9 @@ $$$
 				{
 					RepoRelDir: "path",
 					Workspace:  "workspace",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 			},
 			models.Github,
@@ -902,23 +927,29 @@ Ran Plan for dir: $path$ workspace: $workspace$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname",
-					Error:       errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -979,40 +1010,46 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:        true,
-							},
-						}, LockURL: "lock-url",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
-						RePlanCmd: "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							}, LockURL: "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
-								Passed:        false,
-								ReqApprovals:  1,
-							},
-						}, LockURL: "lock-url",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
-						RePlanCmd: "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+									Passed:        false,
+									ReqApprovals:  1,
+								},
+							}, LockURL: "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname",
-					Error:       errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -1092,19 +1129,25 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ApplySuccess: "success",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path3",
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -1144,19 +1187,25 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ApplySuccess: "success",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path3",
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -1258,26 +1307,28 @@ func TestRenderProjectResultsWithQuietPolicyChecks(t *testing.T) {
 			"",
 			[]command.ProjectResult{
 				{
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-								Passed:       false,
-								ReqApprovals: 1,
+									Passed:       false,
+									ReqApprovals: 1,
+								},
+								{
+									PolicySetName: "policy2",
+									PolicyOutput:  "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+									Passed:        true,
+									ReqApprovals:  1,
+								},
 							},
-							{
-								PolicySetName: "policy2",
-								PolicyOutput:  "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
-								Passed:        true,
-								ReqApprovals:  1,
-							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
 						},
-						LockURL:   "lock-url",
-						RePlanCmd: "atlantis plan -d path -w workspace",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -1333,21 +1384,23 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								// strings.Repeat require to get wrapped result
-								PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									// strings.Repeat require to get wrapped result
+									PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-								Passed:       false,
-								ReqApprovals: 1,
+									Passed:       false,
+									ReqApprovals: 1,
+								},
 							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
 						},
-						LockURL:   "lock-url",
-						RePlanCmd: "atlantis plan -d path -w workspace",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -1419,33 +1472,37 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:        true,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
 							},
+							LockURL:   "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
 						},
-						LockURL:   "lock-url",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
-						RePlanCmd: "atlantis plan -d path -w workspace",
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:        true,
-							},
-						}, LockURL: "lock-url2",
-						ApplyCmd:  "atlantis apply -d path2 -w workspace",
-						RePlanCmd: "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							}, LockURL: "lock-url2",
+							ApplyCmd:  "atlantis apply -d path2 -w workspace",
+							RePlanCmd: "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -1475,40 +1532,46 @@ Ran Policy Check for 2 projects:
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:        true,
-							},
-						}, LockURL: "lock-url",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
-						RePlanCmd: "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							}, LockURL: "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
-								Passed:        false,
-								ReqApprovals:  1,
-							},
-						}, LockURL: "lock-url",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
-						RePlanCmd: "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+									Passed:        false,
+									ReqApprovals:  1,
+								},
+							}, LockURL: "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname",
-					Error:       errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -1631,11 +1694,13 @@ func TestRenderProjectResultsDisableApplyAll(t *testing.T) {
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -1665,11 +1730,13 @@ $$$
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -1702,22 +1769,26 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output2",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output2",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -1831,11 +1902,13 @@ func TestRenderProjectResultsDisableApply(t *testing.T) {
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -1861,11 +1934,13 @@ $$$
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -1894,22 +1969,26 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output2",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output2",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -2042,16 +2121,18 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 			{
 				Workspace:  "workspace",
 				RepoRelDir: "path",
-				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
-						{
-							PolicySetName: "policy1",
-							PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-							Passed:        true,
-						},
-					}, LockURL: "lock-url",
-					ApplyCmd:  "atlantis apply -d path -w workspace",
-					RePlanCmd: "atlantis plan -d path -w workspace",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
+							},
+						}, LockURL: "lock-url",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
 				},
 			},
 		},
@@ -2116,7 +2197,9 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
-				Error:      errors.New(strings.Repeat("line\n", 13)),
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New(strings.Repeat("line\n", 13)),
+				},
 			},
 		},
 	}
@@ -2226,7 +2309,9 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 						{
 							RepoRelDir: ".",
 							Workspace:  "default",
-							Error:      errors.New(c.Output),
+							ProjectCommandOutput: command.ProjectCommandOutput{
+								Error: errors.New(c.Output),
+							},
 						},
 					},
 				}
@@ -2374,18 +2459,22 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 						pr = command.ProjectResult{
 							RepoRelDir: ".",
 							Workspace:  "default",
-							PlanSuccess: &models.PlanSuccess{
-								TerraformOutput: c.Output,
-								LockURL:         "lock-url",
-								RePlanCmd:       "replancmd",
-								ApplyCmd:        "applycmd",
+							ProjectCommandOutput: command.ProjectCommandOutput{
+								PlanSuccess: &models.PlanSuccess{
+									TerraformOutput: c.Output,
+									LockURL:         "lock-url",
+									RePlanCmd:       "replancmd",
+									ApplyCmd:        "applycmd",
+								},
 							},
 						}
 					case command.Apply:
 						pr = command.ProjectResult{
-							RepoRelDir:   ".",
-							Workspace:    "default",
-							ApplySuccess: c.Output,
+							RepoRelDir: ".",
+							Workspace:  "default",
+							ProjectCommandOutput: command.ProjectCommandOutput{
+								ApplySuccess: c.Output,
+							},
 						}
 					}
 					res := command.Result{
@@ -2522,14 +2611,18 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 	res := command.Result{
 		ProjectResults: []command.ProjectResult{
 			{
-				RepoRelDir:   ".",
-				Workspace:    "staging",
-				ApplySuccess: tfOut,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: tfOut,
+				},
 			},
 			{
-				RepoRelDir:   ".",
-				Workspace:    "production",
-				ApplySuccess: tfOut,
+				RepoRelDir: ".",
+				Workspace:  "production",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: tfOut,
+				},
 			},
 		},
 	}
@@ -2604,21 +2697,25 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 			{
 				RepoRelDir: ".",
 				Workspace:  "staging",
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: tfOut,
-					LockURL:         "staging-lock-url",
-					ApplyCmd:        "staging-apply-cmd",
-					RePlanCmd:       "staging-replan-cmd",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: tfOut,
+						LockURL:         "staging-lock-url",
+						ApplyCmd:        "staging-apply-cmd",
+						RePlanCmd:       "staging-replan-cmd",
+					},
 				},
 			},
 			{
 				RepoRelDir: ".",
 				Workspace:  "production",
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: tfOut,
-					LockURL:         "production-lock-url",
-					ApplyCmd:        "production-apply-cmd",
-					RePlanCmd:       "production-replan-cmd",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: tfOut,
+						LockURL:         "production-lock-url",
+						ApplyCmd:        "production-apply-cmd",
+						RePlanCmd:       "production-replan-cmd",
+					},
 				},
 			},
 		},
@@ -2704,7 +2801,9 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 					{
 						RepoRelDir: ".",
 						Workspace:  "staging",
-						Failure:    "failure",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Failure: "failure",
+						},
 					},
 				},
 				PlansDeleted: true,
@@ -2721,12 +2820,16 @@ Ran Plan for dir: $.$ workspace: $staging$
 					{
 						RepoRelDir: ".",
 						Workspace:  "staging",
-						Failure:    "failure",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Failure: "failure",
+						},
 					},
 					{
 						RepoRelDir: ".",
 						Workspace:  "production",
-						Failure:    "failure",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Failure: "failure",
+						},
 					},
 				},
 				PlansDeleted: true,
@@ -2757,16 +2860,20 @@ Ran Plan for 2 projects:
 					{
 						RepoRelDir: ".",
 						Workspace:  "staging",
-						Failure:    "failure",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Failure: "failure",
+						},
 					},
 					{
 						RepoRelDir: ".",
 						Workspace:  "production",
-						PlanSuccess: &models.PlanSuccess{
-							TerraformOutput: "tf out",
-							LockURL:         "lock-url",
-							RePlanCmd:       "re-plan cmd",
-							ApplyCmd:        "apply cmd",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: &models.PlanSuccess{
+								TerraformOutput: "tf out",
+								LockURL:         "lock-url",
+								RePlanCmd:       "re-plan cmd",
+								ApplyCmd:        "apply cmd",
+							},
 						},
 					},
 				},
@@ -2856,11 +2963,13 @@ func TestRenderProjectResultsWithRepoLockingDisabled(t *testing.T) {
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -2899,12 +3008,14 @@ $$$
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						MergedAgain:     true,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							MergedAgain:     true,
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -2944,11 +3055,13 @@ $$$
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -2988,9 +3101,11 @@ $$$
 			command.Apply,
 			[]command.ProjectResult{
 				{
-					ApplySuccess: "success",
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
 				},
 			},
 			models.Github,
@@ -3007,10 +3122,12 @@ $$$
 			command.Apply,
 			[]command.ProjectResult{
 				{
-					ApplySuccess: "success",
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ProjectName:  "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
 				},
 			},
 			models.Github,
@@ -3029,22 +3146,26 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output2",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output2",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -3105,15 +3226,19 @@ $$$
 			command.Apply,
 			[]command.ProjectResult{
 				{
-					RepoRelDir:   "path",
-					Workspace:    "workspace",
-					ProjectName:  "projectname",
-					ApplySuccess: "success",
+					RepoRelDir:  "path",
+					Workspace:   "workspace",
+					ProjectName: "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
-					RepoRelDir:   "path2",
-					Workspace:    "workspace",
-					ApplySuccess: "success2",
+					RepoRelDir: "path2",
+					Workspace:  "workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success2",
+					},
 				},
 			},
 			models.Github,
@@ -3146,7 +3271,9 @@ $$$
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 					RepoRelDir: "path",
 					Workspace:  "workspace",
 				},
@@ -3168,7 +3295,9 @@ $$$
 				{
 					RepoRelDir: "path",
 					Workspace:  "workspace",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 			},
 			models.Github,
@@ -3185,23 +3314,29 @@ Ran Plan for dir: $path$ workspace: $workspace$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname",
-					Error:       errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -3258,19 +3393,25 @@ $$$
 			command.Apply,
 			[]command.ProjectResult{
 				{
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ApplySuccess: "success",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path3",
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -3309,19 +3450,25 @@ $$$
 			command.Apply,
 			[]command.ProjectResult{
 				{
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ApplySuccess: "success",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path3",
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -3422,22 +3569,26 @@ func TestRenderProjectResultsWithGitLab(t *testing.T) {
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output2",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output2",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -3742,11 +3893,13 @@ var cases = []struct {
 		command.Plan,
 		[]command.ProjectResult{
 			{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: tfOutput,
-					LockURL:         "lock-url",
-					RePlanCmd:       "atlantis plan -d path -w workspace",
-					ApplyCmd:        "atlantis apply -d path -w workspace",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: tfOutput,
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
 				},
 				Workspace:  "workspace",
 				RepoRelDir: "path",
@@ -4076,33 +4229,39 @@ func TestRenderProjectResultsHideUnchangedPlans(t *testing.T) {
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname2",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output3",
-						LockURL:         "lock-url3",
-						ApplyCmd:        "atlantis apply -d path3 -w workspace",
-						RePlanCmd:       "atlantis plan -d path3 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output3",
+							LockURL:         "lock-url3",
+							ApplyCmd:        "atlantis apply -d path3 -w workspace",
+							RePlanCmd:       "atlantis plan -d path3 -w workspace",
+						},
 					},
 				},
 			},
@@ -4169,33 +4328,39 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname2",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
-						LockURL:         "lock-url3",
-						ApplyCmd:        "atlantis apply -d path3 -w workspace",
-						RePlanCmd:       "atlantis plan -d path3 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+							LockURL:         "lock-url3",
+							ApplyCmd:        "atlantis apply -d path3 -w workspace",
+							RePlanCmd:       "atlantis plan -d path3 -w workspace",
+						},
 					},
 				},
 			},

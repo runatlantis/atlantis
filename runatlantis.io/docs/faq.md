@@ -12,7 +12,7 @@ Terraform locking can be used alongside Atlantis locking since Atlantis is simpl
 
 **Q: How to run Atlantis in high availability mode? Does it need to be?**
 
-A: Atlantis server can easily be run under the supervision of a init system like `upstart` or `systemd` to make sure `atlantis server` is always running.
+A: Atlantis server can easily be run under the supervision of an init system like `upstart` or `systemd` to make sure `atlantis server` is always running.
 
 Atlantis, by default, stores all locking and Terraform plans locally on disk under the `--data-dir` directory (defaults to `~/.atlantis`). If multiple Atlantis hosts are run by utilizing a shared redis backend, then it's important that the `data-dir` is using a shared filesystem between hosts.
 

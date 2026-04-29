@@ -1,16 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // Package tfclient handles the actual running of terraform commands.
@@ -30,7 +19,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -42,7 +30,7 @@ import (
 
 var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
 
-//go:generate pegomock generate --package mocks -o mocks/mock_terraform_client.go Client
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_terraform_client.go Client
 
 type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
@@ -167,7 +155,7 @@ func NewClientWithDefaultVersion(
 	if tfeToken != "" {
 		home, err := homedir.Dir()
 		if err != nil {
-			return nil, errors.Wrap(err, "getting home dir to write ~/.terraformrc file")
+			return nil, fmt.Errorf("getting home dir to write ~/.terraformrc file: %w", err)
 		}
 		if err := generateRCFile(tfeToken, tfeHostname, home); err != nil {
 			return nil, err
@@ -381,7 +369,7 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 	dur := time.Since(start)
 	log := ctx.Log.With("duration", dur)
 	if err != nil {
-		err = errors.Wrapf(err, "running '%s' in '%s'", tfCmd, path)
+		err = fmt.Errorf("running '%s' in '%s': %w", tfCmd, path, err)
 		log.Err(err.Error())
 		return ansi.Strip(string(out)), err
 	}
@@ -535,7 +523,7 @@ func ensureVersion(
 	execPath, err := dist.Downloader().Install(context.Background(), binDir, downloadURL, v)
 
 	if err != nil {
-		return "", errors.Wrapf(err, "error downloading %s version %s", dist.BinName(), v.String())
+		return "", fmt.Errorf("error downloading %s version %s: %w", dist.BinName(), v.String(), err)
 	}
 
 	log.Info("Downloaded %s %s to %s", dist.BinName(), v.String(), execPath)
@@ -557,7 +545,7 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 	if _, err := os.Stat(rcFile); err == nil {
 		currContents, err := os.ReadFile(rcFile) // nolint: gosec
 		if err != nil {
-			return errors.Wrapf(err, "trying to read %s to ensure we're not overwriting it", rcFile)
+			return fmt.Errorf("trying to read %s to ensure we're not overwriting it: %w", rcFile, err)
 		}
 		if config != string(currContents) {
 			return fmt.Errorf("can't write TFE token to %s because that file has contents that would be overwritten", rcFile)
@@ -568,7 +556,7 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 	}
 
 	if err := os.WriteFile(rcFile, []byte(config), 0600); err != nil {
-		return errors.Wrapf(err, "writing generated %s file with TFE token to %s", rcFilename, rcFile)
+		return fmt.Errorf("writing generated %s file with TFE token to %s: %w", rcFilename, rcFile, err)
 	}
 	return nil
 }
@@ -586,7 +574,7 @@ func getVersion(tfBinary string, binName string) (*version.Version, error) {
 	versionOutBytes, err := exec.Command(tfBinary, "version").Output() // #nosec
 	versionOutput := string(versionOutBytes)
 	if err != nil {
-		return nil, errors.Wrapf(err, "running %s version: %s", binName, versionOutput)
+		return nil, fmt.Errorf("running %s version: %s: %w", binName, versionOutput, err)
 	}
 	match := versionRegex.FindStringSubmatch(versionOutput)
 	if len(match) <= 1 {

@@ -56,16 +56,18 @@ type APIRequest struct {
 	}
 }
 
-func (a *APIRequest) getCommands(ctx *command.Context, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
+func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
 	cc := make([]*events.CommentCommand, 0)
 
 	for _, project := range a.Projects {
 		cc = append(cc, &events.CommentCommand{
+			Name:        cmdName,
 			ProjectName: project,
 		})
 	}
 	for _, path := range a.Paths {
 		cc = append(cc, &events.CommentCommand{
+			Name:       cmdName,
 			RepoRelDir: strings.TrimRight(path.Directory, "/"),
 			Workspace:  path.Workspace,
 		})
@@ -219,7 +221,7 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) err
 	baseRepo := ctx.Pull.BaseRepo
 	headRepo := ctx.HeadRepo
 
-	unlockFn, err := a.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, cmdName)
+	unlockFn, err := a.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", cmdName)
 	if err != nil {
 		return err
 	}
@@ -236,7 +238,7 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) err
 }
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
-	cmds, cc, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildPlanCommands)
+	cmds, cc, err := request.getCommands(ctx, command.Plan, a.ProjectCommandBuilder.BuildPlanCommands)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +277,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 			}
 		}
 
-		res := a.ProjectPlanCommandRunner.Plan(cmd)
+		res := events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
 		projectResults = append(projectResults, res)
 
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
@@ -284,7 +286,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 }
 
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
-	cmds, cc, err := request.getCommands(ctx, a.ProjectCommandBuilder.BuildApplyCommands)
+	cmds, cc, err := request.getCommands(ctx, command.Apply, a.ProjectCommandBuilder.BuildApplyCommands)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +325,7 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 			}
 		}
 
-		res := a.ProjectApplyCommandRunner.Apply(cmd)
+		res := events.RunOneProjectCmd(a.ProjectApplyCommandRunner.Apply, cmd)
 		projectResults = append(projectResults, res)
 
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
@@ -389,7 +391,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	}, http.StatusOK, nil
 }
 
-func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
+func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	a.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)
