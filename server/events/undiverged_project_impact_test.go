@@ -6,6 +6,7 @@ package events
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
@@ -101,6 +102,25 @@ func TestUndivergedProjectImpactResolver_GlobalAutoDiscoverModeOverridesRepoMode
 	repoDir := autoDiscoveredRepoWithAutoDiscoverMode(t, valid.AutoDiscoverDisabledMode)
 	resolver := newTestUndivergedProjectImpactResolver("**/*.tf", defaultAutoplanFileList, "auto")
 	resolver.GlobalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{Mode: valid.AutoDiscoverEnabledMode}
+	ctx := newTestUndivergedProjectContext(t, "project1")
+
+	target, err := resolver.resolveTarget(ctx, repoDir)
+	Ok(t, err)
+	Equals(t, undivergedProjectImpactModeAutoDiscovered, target.mode)
+}
+
+func TestUndivergedProjectImpactResolver_InheritedGlobalAutoDiscoverModeOverridesRepoMode(t *testing.T) {
+	repoDir := autoDiscoveredRepoWithAutoDiscoverMode(t, valid.AutoDiscoverDisabledMode)
+	resolver := newTestUndivergedProjectImpactResolver("**/*.tf", defaultAutoplanFileList, "auto")
+	resolver.GlobalCfg.Repos = []valid.Repo{
+		{
+			IDRegex:      regexp.MustCompile(".*"),
+			AutoDiscover: &valid.AutoDiscover{Mode: valid.AutoDiscoverEnabledMode},
+		},
+		{
+			IDRegex: regexp.MustCompile(".*"),
+		},
+	}
 	ctx := newTestUndivergedProjectContext(t, "project1")
 
 	target, err := resolver.resolveTarget(ctx, repoDir)

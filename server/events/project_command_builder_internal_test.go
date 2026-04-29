@@ -1400,6 +1400,27 @@ autodiscover:
 			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
 			expLen:        3,
 		},
+		"autodiscover inherited from broad global config, disabled at repo level": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+- id: /.*/
+  allowed_overrides: [workflow]
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: disabled
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        3,
+		},
 		"autodiscover respects ignore_paths in repo config": {
 			globalCfg: `
 repos:
@@ -1544,6 +1565,27 @@ autodiscover:
 
 		})
 	}
+}
+
+func TestDefaultProjectCommandBuilder_AutoDiscoverModeEnabledDefaultsEmptyToAuto(t *testing.T) {
+	builder := &DefaultProjectCommandBuilder{
+		GlobalCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+	}
+	ctx := &command.Context{
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				FullName: "owner/repo",
+				VCSHost: models.VCSHost{
+					Hostname: "github.com",
+				},
+			},
+		},
+	}
+
+	Equals(t, true, builder.autoDiscoverModeEnabled(ctx, valid.RepoCfg{}))
+	Equals(t, false, builder.autoDiscoverModeEnabled(ctx, valid.RepoCfg{
+		Projects: []valid.Project{{Dir: "project1"}},
+	}))
 }
 
 func mustVersion(v string) *version.Version {

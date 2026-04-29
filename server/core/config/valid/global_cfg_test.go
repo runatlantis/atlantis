@@ -1185,6 +1185,58 @@ func TestGlobalCfg_MatchingRepo(t *testing.T) {
 	}
 }
 
+func TestGlobalCfg_RepoAutoDiscoverCfg(t *testing.T) {
+	inheritedAutoDiscover := &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"ignored/**"},
+	}
+	overrideAutoDiscover := &valid.AutoDiscover{
+		Mode: valid.AutoDiscoverDisabledMode,
+	}
+
+	cases := map[string]struct {
+		gCfg   valid.GlobalCfg
+		repoID string
+		exp    *valid.AutoDiscover
+	}{
+		"returns nil when no matching repo defines autodiscover": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{IDRegex: regexp.MustCompile(".*")},
+					{ID: "github.com/owner/repo"},
+				},
+			},
+			repoID: "github.com/owner/repo",
+		},
+		"inherits autodiscover from earlier matching repo": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{IDRegex: regexp.MustCompile(".*"), AutoDiscover: inheritedAutoDiscover},
+					{ID: "github.com/owner/repo"},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			exp:    inheritedAutoDiscover,
+		},
+		"uses later matching autodiscover override": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{IDRegex: regexp.MustCompile(".*"), AutoDiscover: inheritedAutoDiscover},
+					{ID: "github.com/owner/repo", AutoDiscover: overrideAutoDiscover},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			exp:    overrideAutoDiscover,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			Equals(t, c.exp, c.gCfg.RepoAutoDiscoverCfg(c.repoID))
+		})
+	}
+}
+
 func TestGlobalCfg_PolicyCheckOverride(t *testing.T) {
 	var emptyPolicySets valid.PolicySets
 

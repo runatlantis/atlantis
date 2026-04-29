@@ -384,7 +384,11 @@ func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Cont
 	}
 
 	// 3. Otherwise use CLI/default
-	return repoCfg.AutoDiscoverEnabled(valid.AutoDiscoverMode(p.AutoDiscoverMode))
+	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
+	if defaultAutoDiscoverMode == "" {
+		defaultAutoDiscoverMode = valid.AutoDiscoverAutoMode
+	}
+	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
 }
 
 // parseRepoCfg parses the repo config file from repoDir if it exists. Returns the
