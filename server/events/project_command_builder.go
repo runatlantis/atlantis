@@ -834,6 +834,12 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	// when autodiscovery is active — matching the plan-path behavior in
 	// getMergedProjectCfgs. Without this gate, explicitly planned dirs that
 	// happen to match ignore_paths would be silently dropped during apply-all.
+	//
+	// Known limitation: PendingPlan does not track whether a plan was
+	// auto-discovered or explicitly requested via "plan -d <dir>". If a
+	// user explicitly plans in an ignored path and then runs apply-all,
+	// the plan will be filtered out here. Workaround: use "apply -d <dir>"
+	// for plans in ignored paths.
 	if p.autoDiscoverModeEnabled(ctx, repoCfg) {
 		configuredProjDirs := make(map[string]bool)
 		for _, configProj := range repoCfg.Projects {
