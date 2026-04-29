@@ -72,7 +72,11 @@ func (r Repo) ID() string {
 // ex. https://github.com/runatlantis/atlantis.git OR
 //
 //	https://github.com/runatlantis/atlantis
-func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
+//
+// vcsHostname is the configured hostname for the VCS (may include a subpath
+// for GitLab, e.g. "acme.com/gitlab"). Pass empty string to skip the
+// enhanced host/subpath validation; non-GitLab callers always pass "".
+func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string, vcsHostname string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
 	}
@@ -97,6 +101,18 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	// Azure DevOps also does not require .git at the end of clone urls.
 	if vcsHostType != BitbucketServer && vcsHostType != AzureDevops {
 		expClonePath := fmt.Sprintf("/%s.git", repoFullName)
+
+		if vcsHostType == Gitlab && vcsHostname != "" {
+			expectedHost, basePath, parseErr := ParseGitlabHostname(vcsHostname)
+			if parseErr != nil {
+				return Repo{}, fmt.Errorf("parsing configured gitlab hostname %q: %w", vcsHostname, parseErr)
+			}
+			if !strings.EqualFold(cloneURLParsed.Host, expectedHost) {
+				return Repo{}, fmt.Errorf("expected clone url host %q but had %q", expectedHost, cloneURLParsed.Host)
+			}
+			expClonePath = basePath + expClonePath
+		}
+
 		if expClonePath != cloneURLParsed.Path {
 			return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
 		}
