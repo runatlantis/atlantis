@@ -228,12 +228,13 @@ ENV LIBCAP_VERSION="2.78-r0"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     apk add --no-cache libcap=${LIBCAP_VERSION} && \
+    command -v getcap >/dev/null && command -v setcap >/dev/null && \
     for d in $fcap_scan_dirs; do \
         [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
     done | awk '{ print $1 }' | sort -u | while read -r f; do \
         [ -n "$f" ] && { setcap -r "$f" 2>/dev/null || echo "warning: could not strip caps from $f" >&2; }; \
     done && \
-    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done | grep -E ' = cap_' || :)" && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done)" && \
     if [ -n "$remaining" ]; then \
         echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
         echo "$remaining" >&2; \
@@ -281,12 +282,13 @@ ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     apt-get update && \
     apt-get install -y --no-install-recommends libcap2-bin=${DEBIAN_LIBCAP2_BIN_VERSION} && \
+    command -v getcap >/dev/null && command -v setcap >/dev/null && \
     for d in $fcap_scan_dirs; do \
         [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
     done | awk '{ print $1 }' | sort -u | while read -r f; do \
         [ -n "$f" ] && { setcap -r "$f" 2>/dev/null || echo "warning: could not strip caps from $f" >&2; }; \
     done && \
-    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done | grep -E ' = cap_' || :)" && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done)" && \
     if [ -n "$remaining" ]; then \
         echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
         echo "$remaining" >&2; \
