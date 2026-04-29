@@ -1532,6 +1532,114 @@ autodiscover:
 	Equals(t, "default", ctxs[1].Workspace)
 }
 
+// Test that when global AutoDiscover is set (mode enabled) but has no
+// IgnorePaths, isAutoDiscoverPathIgnored falls through to the repo config's
+// ignore_paths. This validates the guard change from "!= nil" to
+// "!= nil && IgnorePaths != nil".
+func TestDefaultProjectCommandBuilder_BuildMultiApply_GlobalAutoDiscoverFallthrough(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - ".terraform/**"
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			".terraform": map[string]any{
+				"modules": map[string]any{
+					"some_module": map[string]any{
+						"test-deployment": map[string]any{
+							"main.tf":        nil,
+							"default.tfplan": nil,
+						},
+					},
+				},
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	// Global AutoDiscover with mode set but NO IgnorePaths.
+	// The guard change means this falls through to repo config's ignore_paths.
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode: valid.AutoDiscoverEnabledMode,
+	}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	// .terraform/modules/some_module/test-deployment should be filtered by
+	// the repo config's ignore_paths, even though global AutoDiscover is set.
+	Equals(t, 1, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+}
+
 // Test that if a directory has a list of workspaces configured then we don't
 // allow plans for other workspace names.
 func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
