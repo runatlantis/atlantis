@@ -859,7 +859,8 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			defaultMr,
 			models.MergeableStatus{
-				IsMergeable: true,
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
 			},
 		},
 		{
@@ -868,7 +869,8 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			defaultMr,
 			models.MergeableStatus{
-				IsMergeable: true,
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
 			},
 		},
 		{
@@ -915,7 +917,8 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			ciMustPassMR,
 			models.MergeableStatus{
-				IsMergeable: true,
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
 			},
 		},
 		// This MR should be listed as not mergeable. However, in older versions they don't have detailed_merge_status,
@@ -963,7 +966,8 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			noHeadPipelineMR,
 			models.MergeableStatus{
-				IsMergeable: true,
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
 			},
 		},
 		{
@@ -972,7 +976,8 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			noHeadPipelineMR,
 			models.MergeableStatus{
-				IsMergeable: true,
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
 			},
 		},
 		{
@@ -981,7 +986,8 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			noHeadPipelineMR,
 			models.MergeableStatus{
-				IsMergeable: true,
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
 			},
 		},
 		{
@@ -1140,11 +1146,10 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 		expState      models.MergeableStatus
 	}{
 		{
-			description:   "all Atlantis status types are skipped",
+			description:   "skippable Atlantis status types are skipped",
 			vcsStatusName: vcsStatusName,
 			statuses: []testStatus{
-				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "failed"},
-				{Name: fmt.Sprintf("%s/plan: myproject/default", vcsStatusName), Status: "running"},
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success"},
 				{Name: fmt.Sprintf("%s/policy_check", vcsStatusName), Status: "failed"},
 				{Name: fmt.Sprintf("%s/apply", vcsStatusName), Status: "failed"},
 				{Name: fmt.Sprintf("%s/apply: myproject/default", vcsStatusName), Status: "failed"},
@@ -1156,10 +1161,33 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			},
 		},
 		{
-			description:   "non-Atlantis status still blocks",
+			description:   "Atlantis failed plan status still blocks",
 			vcsStatusName: vcsStatusName,
 			statuses: []testStatus{
 				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "failed"},
+				{Name: fmt.Sprintf("%s/apply", vcsStatusName), Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+			},
+		},
+		{
+			description:   "Atlantis running project plan status still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan: myproject/default", vcsStatusName), Status: "running"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: myproject/default has status running", vcsStatusName),
+			},
+		},
+		{
+			description:   "non-Atlantis status still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/apply", vcsStatusName), Status: "failed"},
 				{Name: "ci/build", Status: "failed"},
 			},
 			expState: models.MergeableStatus{
@@ -1171,7 +1199,7 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			description:   "non-Atlantis running status still blocks",
 			vcsStatusName: vcsStatusName,
 			statuses: []testStatus{
-				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "running"},
+				{Name: fmt.Sprintf("%s/apply", vcsStatusName), Status: "running"},
 				{Name: "ci/build", Status: "running"},
 			},
 			expState: models.MergeableStatus{
@@ -1194,7 +1222,7 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			description:   "custom vcs-status-name only skips Atlantis status names",
 			vcsStatusName: "ci",
 			statuses: []testStatus{
-				{Name: "ci/plan", Status: "failed"},
+				{Name: "ci/apply", Status: "failed"},
 				{Name: "ci/build", Status: "failed"},
 			},
 			expState: models.MergeableStatus{
@@ -1206,7 +1234,7 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			description:   "mixed Atlantis failures with passing external status",
 			vcsStatusName: vcsStatusName,
 			statuses: []testStatus{
-				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "failed"},
+				{Name: fmt.Sprintf("%s/policy_check", vcsStatusName), Status: "failed"},
 				{Name: fmt.Sprintf("%s/apply: myproject/default", vcsStatusName), Status: "failed"},
 				{Name: "ci/build", Status: "success"},
 			},
@@ -1215,7 +1243,7 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			},
 		},
 		{
-			description:   "race condition: plan still running during apply check",
+			description:   "running plan blocks stale apply",
 			vcsStatusName: vcsStatusName,
 			statuses: []testStatus{
 				{Name: fmt.Sprintf("%s/plan: infra/production", vcsStatusName), Status: "running"},
@@ -1223,14 +1251,15 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				{Name: fmt.Sprintf("%s/apply: infra/staging", vcsStatusName), Status: "success"},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: true,
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: infra/production has status running", vcsStatusName),
 			},
 		},
 		{
-			description:   "custom vcs-status-name prefix is matched",
+			description:   "custom vcs-status-name prefix is matched for skippable status",
 			vcsStatusName: "mycompany-atlantis",
 			statuses: []testStatus{
-				{Name: "mycompany-atlantis/plan", Status: "failed"},
+				{Name: "mycompany-atlantis/apply", Status: "failed"},
 			},
 			expState: models.MergeableStatus{
 				IsMergeable: true,
