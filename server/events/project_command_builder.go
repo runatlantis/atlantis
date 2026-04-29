@@ -416,6 +416,29 @@ func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Co
 	return false
 }
 
+func pendingPlanInPullStatus(ctx *command.Context, plan PendingPlan) bool {
+	if ctx.PullStatus == nil {
+		return false
+	}
+
+	path := filepath.Clean(plan.RepoRelDir)
+	for _, project := range ctx.PullStatus.Projects {
+		if project.Workspace != plan.Workspace {
+			continue
+		}
+		if plan.ProjectName != "" {
+			if project.ProjectName == plan.ProjectName {
+				return true
+			}
+			continue
+		}
+		if project.ProjectName == "" && filepath.Clean(project.RepoRelDir) == path {
+			return true
+		}
+	}
+	return false
+}
+
 // getMergedProjectCfgs gets all merged project configs for building commands given a context and a clone repo
 func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context, repoDir string, modifiedFiles []string, repoCfg valid.RepoCfg) ([]valid.MergedProjectCfg, error) {
 	mergedCfgs := make([]valid.MergedProjectCfg, 0)
@@ -830,16 +853,10 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		return nil, err
 	}
 
-	// Filter out plans in paths matching autodiscover.ignore_paths, but only
-	// when autodiscovery is active — matching the plan-path behavior in
-	// getMergedProjectCfgs. Without this gate, explicitly planned dirs that
-	// happen to match ignore_paths would be silently dropped during apply-all.
-	//
-	// Known limitation: PendingPlan does not track whether a plan was
-	// auto-discovered or explicitly requested via "plan -d <dir>". If a
-	// user explicitly plans in an ignored path and then runs apply-all,
-	// the plan will be filtered out here. Workaround: use "apply -d <dir>"
-	// for plans in ignored paths.
+	// Filter out untracked plan files in paths matching autodiscover.ignore_paths,
+	// but only when autodiscovery is active, matching the plan-path behavior in
+	// getMergedProjectCfgs. Preserve ignored-path plans already present in pull
+	// status because Atlantis created those plans through an explicit command.
 	if p.autoDiscoverModeEnabled(ctx, repoCfg) {
 		configuredProjDirs := make(map[string]bool)
 		for _, configProj := range repoCfg.Projects {
@@ -848,7 +865,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		var filteredPlans []PendingPlan
 		for _, plan := range plans {
 			path := filepath.Clean(plan.RepoRelDir)
-			if !configuredProjDirs[path] && p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) {
+			if !configuredProjDirs[path] && p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) && !pendingPlanInPullStatus(ctx, plan) {
 				ctx.Log.Debug("ignoring plan in '%s' due to autodiscover.ignore_paths", plan.RepoRelDir)
 				continue
 			}
