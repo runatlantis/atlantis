@@ -1004,7 +1004,10 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 	return err
 }
 
-// MergePull merges the pull request.
+// MergePull merges the pull request. If the base branch enforces a merge
+// queue, Atlantis cannot merge directly via the REST API (GitHub returns 405);
+// in that case it enables auto-merge via GraphQL so GitHub will enqueue the
+// PR and merge it once the queue's checks pass.
 func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	logger.Debug("Merging GitHub pull request %d", pull.Num)
 	// Users can set their repo to disallow certain types of merging.
@@ -1055,6 +1058,17 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		}
 	}
 
+	pullNodeID, requiresMergeQueue, err := g.getPullMergeQueueStatus(pull)
+	if err != nil {
+		// If we can't determine merge queue status (e.g. token lacks scope),
+		// fall through to the direct merge — GitHub will reject it with 405
+		// if the queue is required, surfacing the failure to the user.
+		logger.Warn("Failed to determine merge queue status for PR %d: %s — attempting direct merge", pull.Num, err)
+	} else if requiresMergeQueue {
+		logger.Info("Base branch of PR %d requires merge queue; enabling auto-merge", pull.Num)
+		return g.enablePullAutoMerge(logger, pull, pullNodeID, method)
+	}
+
 	// Now we're ready to make our API call to merge the pull request.
 	options := &github.PullRequestOptions{
 		MergeMethod: method,
@@ -1077,6 +1091,69 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 	}
 	if !mergeResult.GetMerged() {
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMessage())
+	}
+	return nil
+}
+
+// getPullMergeQueueStatus returns the PR's GraphQL node ID and whether its
+// base branch requires a merge queue (via classic branch protection).
+func (g *Client) getPullMergeQueueStatus(pull models.PullRequest) (githubv4.ID, bool, error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				ID      githubv4.ID
+				BaseRef struct {
+					BranchProtectionRule struct {
+						RequiresMergeQueue githubv4.Boolean
+					}
+				}
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	variables := map[string]any{
+		"owner":  githubv4.String(pull.BaseRepo.Owner),
+		"name":   githubv4.String(pull.BaseRepo.Name),
+		"number": githubv4.Int(pull.Num), // #nosec G115: PR numbers fit in int32.
+	}
+	if err := g.v4Client.Query(g.ctx, &query, variables); err != nil {
+		return nil, false, fmt.Errorf("querying PR merge queue status: %w", err)
+	}
+	return query.Repository.PullRequest.ID, bool(query.Repository.PullRequest.BaseRef.BranchProtectionRule.RequiresMergeQueue), nil
+}
+
+// enablePullAutoMerge enables auto-merge on the PR via GraphQL. For branches
+// that require a merge queue, GitHub enqueues the PR and merges it once the
+// queue's checks pass. The merge method is honored for non-queue branches; for
+// merge-queue branches GitHub ignores it and uses the queue's configured method.
+func (g *Client) enablePullAutoMerge(logger logging.SimpleLogging, pull models.PullRequest, pullNodeID githubv4.ID, method string) error {
+	var mutation struct {
+		EnablePullRequestAutoMerge struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"enablePullRequestAutoMerge(input: $input)"`
+	}
+
+	var ghMethod githubv4.PullRequestMergeMethod
+	switch method {
+	case "merge":
+		ghMethod = githubv4.PullRequestMergeMethodMerge
+	case "rebase":
+		ghMethod = githubv4.PullRequestMergeMethodRebase
+	case "squash":
+		ghMethod = githubv4.PullRequestMergeMethodSquash
+	default:
+		ghMethod = githubv4.PullRequestMergeMethodMerge
+	}
+
+	input := githubv4.EnablePullRequestAutoMergeInput{
+		PullRequestID:    pullNodeID,
+		MergeMethod:      &ghMethod,
+		ClientMutationID: clientMutationID,
+	}
+	logger.Debug("enablePullRequestAutoMerge for PR %d", pull.Num)
+	if err := g.v4Client.Mutate(g.ctx, &mutation, input, nil); err != nil {
+		return fmt.Errorf("enabling auto-merge for pull request: %w", err)
 	}
 	return nil
 }

@@ -57,6 +57,7 @@ type UserConfig struct {
 	FailOnPreWorkflowHookError      bool   `mapstructure:"fail-on-pre-workflow-hook-error"`
 	HideUnchangedPlanComments       bool   `mapstructure:"hide-unchanged-plan-comments"`
 	GithubAllowMergeableBypassApply bool   `mapstructure:"gh-allow-mergeable-bypass-apply"`
+	GithubMergeQueueEnabled         bool   `mapstructure:"gh-merge-queue-enabled"`
 	GithubHostname                  string `mapstructure:"gh-hostname"`
 	GithubToken                     string `mapstructure:"gh-token"`
 	GithubTokenFile                 string `mapstructure:"gh-token-file"`
