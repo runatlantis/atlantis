@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:2780b5c3bab67f1f76c781860de469442999ed1a0d7992a5efdf2cffc0e3d769
 # what distro is the image being built for
-ARG ALPINE_TAG=3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
+ARG ALPINE_TAG=3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 ARG DEBIAN_TAG=12.13-slim@sha256:f9c6a2fd2ddbc23e336b6257a5245e31f996953ef06cd13a59fa0a1df2d5c252
 # renovate: datasource=docker depName=golang versioning=docker
 ARG GOLANG_TAG=1.25.8-alpine@sha256:8e02eb337d9e0ea459e041f1ee5eece41cbb61f1d83e7d883a3e2fb4862063fa
@@ -217,6 +217,31 @@ RUN apk add --no-cache \
     gcompat=${GCOMPAT_VERSION} \
     coreutils-env=${COREUTILS_ENV_VERSION}
 
+# Strip file capabilities only under fcap_scan_dirs (common rootfs locations for
+# binaries and libs: /bin, /sbin, /usr, /opt, /lib, /lib64). This is a scoped
+# scan, not a full getcap -r /: walking from / would traverse /proc, /sys, /dev,
+# etc. and is slow/noisy. Anything outside fcap_scan_dirs is not checked. Strip
+# and verify share the same list; post-pass getcap|grep fails the build if
+# capabilities remain under that scope.
+# renovate: datasource=repology depName=alpine_3_23/libcap versioning=loose
+ENV LIBCAP_VERSION="2.78-r0"
+# hadolint ignore=DL4006
+RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
+    apk add --no-cache libcap=${LIBCAP_VERSION} && \
+    command -v getcap >/dev/null && command -v setcap >/dev/null && \
+    for d in $fcap_scan_dirs; do \
+        [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
+    done | awk '{ print $1 }' | sort -u | while read -r f; do \
+        [ -n "$f" ] && { setcap -r "$f" 2>/dev/null || echo "warning: could not strip caps from $f" >&2; }; \
+    done && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done)" && \
+    if [ -n "$remaining" ]; then \
+        echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
+        echo "$remaining" >&2; \
+        exit 1; \
+    fi && \
+    apk del libcap
+
 ARG DEFAULT_CONFTEST_VERSION
 ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
@@ -246,6 +271,33 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 ARG DEFAULT_CONFTEST_VERSION
 ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
+
+# Same as Alpine: strip and verify only under fcap_scan_dirs (scoped rootfs
+# trees, not the entire image). Post-pass: if getcap still reports any
+# "path = cap_set" line under that scope, the build fails. Strip may use
+# 2>/dev/null and setcap || true; verification is the hard guarantee.
+# renovate: datasource=repology depName=debian_12/libcap2-bin versioning=loose
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
+# hadolint ignore=DL4006
+RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libcap2-bin=${DEBIAN_LIBCAP2_BIN_VERSION} && \
+    command -v getcap >/dev/null && command -v setcap >/dev/null && \
+    for d in $fcap_scan_dirs; do \
+        [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
+    done | awk '{ print $1 }' | sort -u | while read -r f; do \
+        [ -n "$f" ] && { setcap -r "$f" 2>/dev/null || echo "warning: could not strip caps from $f" >&2; }; \
+    done && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done)" && \
+    if [ -n "$remaining" ]; then \
+        echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
+        echo "$remaining" >&2; \
+        exit 1; \
+    fi && \
+    apt-get purge -y libcap2-bin && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
