@@ -423,16 +423,13 @@ func pendingPlanInPullStatus(ctx *command.Context, plan PendingPlan) bool {
 
 	path := filepath.Clean(plan.RepoRelDir)
 	for _, project := range ctx.PullStatus.Projects {
-		if project.Workspace != plan.Workspace {
+		if project.Workspace != plan.Workspace || filepath.Clean(project.RepoRelDir) != path {
 			continue
 		}
 		if plan.ProjectName != "" {
-			if project.ProjectName == plan.ProjectName {
-				return true
-			}
-			continue
+			return project.ProjectName == plan.ProjectName
 		}
-		if project.ProjectName == "" && filepath.Clean(project.RepoRelDir) == path {
+		if project.ProjectName == "" {
 			return true
 		}
 	}

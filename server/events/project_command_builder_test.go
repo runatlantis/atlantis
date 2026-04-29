@@ -1732,6 +1732,104 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_ExplicitPlanInIgnoredPath(
 	Equals(t, "default", ctxs[0].Workspace)
 }
 
+func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnoreStaleNamedPlanInIgnoredPath(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\nautodiscover:\n  mode: enabled\n  ignore_paths:\n  - \"ignored/**\"\nprojects:\n- name: app\n  dir: app\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"app": map[string]any{
+				"main.tf":            nil,
+				"app-default.tfplan": nil,
+			},
+			"ignored": map[string]any{
+				"stale": map[string]any{
+					"main.tf":            nil,
+					"app-default.tfplan": nil,
+				},
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Workspace:   "default",
+						RepoRelDir:  "app",
+						ProjectName: "app",
+						Status:      models.PlannedPlanStatus,
+					},
+				},
+			},
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "app", ctxs[0].RepoRelDir)
+	Equals(t, "app", ctxs[0].ProjectName)
+	Equals(t, "default", ctxs[0].Workspace)
+}
+
 // Test that if a directory has a list of workspaces configured then we don't
 // allow plans for other workspace names.
 func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
