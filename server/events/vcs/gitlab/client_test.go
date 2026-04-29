@@ -897,7 +897,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			defaultMr,
 			models.MergeableStatus{
 				IsMergeable: false,
-				Reason:      "Pipeline ci/external-pipeline has status running",
+				Reason:      "Pipeline ci/external-pipeline has status pending",
 			},
 		},
 		{
@@ -1165,6 +1165,18 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			expState: models.MergeableStatus{
 				IsMergeable: false,
 				Reason:      "Pipeline ci/build has status failed",
+			},
+		},
+		{
+			description:   "non-Atlantis running status still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "running"},
+				{Name: "ci/build", Status: "running"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status running",
 			},
 		},
 		{
