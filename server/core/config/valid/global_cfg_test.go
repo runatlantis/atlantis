@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/core/config"
-	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -86,7 +85,6 @@ func TestNewGlobalCfg(t *testing.T) {
 				RepoLocks:                 &valid.DefaultRepoLocks,
 				PolicyCheck:               Bool(false),
 				CustomPolicyCheck:         Bool(false),
-				AutoDiscover:              raw.DefaultAutoDiscover(),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -1183,6 +1181,58 @@ func TestGlobalCfg_MatchingRepo(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			Equals(t, c.exp, c.gCfg.MatchingRepo(c.repoID))
+		})
+	}
+}
+
+func TestGlobalCfg_RepoAutoDiscoverCfg(t *testing.T) {
+	inheritedAutoDiscover := &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"ignored/**"},
+	}
+	overrideAutoDiscover := &valid.AutoDiscover{
+		Mode: valid.AutoDiscoverDisabledMode,
+	}
+
+	cases := map[string]struct {
+		gCfg   valid.GlobalCfg
+		repoID string
+		exp    *valid.AutoDiscover
+	}{
+		"returns nil when no matching repo defines autodiscover": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{IDRegex: regexp.MustCompile(".*")},
+					{ID: "github.com/owner/repo"},
+				},
+			},
+			repoID: "github.com/owner/repo",
+		},
+		"inherits autodiscover from earlier matching repo": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{IDRegex: regexp.MustCompile(".*"), AutoDiscover: inheritedAutoDiscover},
+					{ID: "github.com/owner/repo"},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			exp:    inheritedAutoDiscover,
+		},
+		"uses later matching autodiscover override": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{IDRegex: regexp.MustCompile(".*"), AutoDiscover: inheritedAutoDiscover},
+					{ID: "github.com/owner/repo", AutoDiscover: overrideAutoDiscover},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			exp:    overrideAutoDiscover,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			Equals(t, c.exp, c.gCfg.RepoAutoDiscoverCfg(c.repoID))
 		})
 	}
 }

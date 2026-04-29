@@ -376,6 +376,23 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
+### `--blocked-extra-args`
+
+```bash
+atlantis server --blocked-extra-args="-chdir,--chdir,-plugin-dir,--plugin-dir"
+# or
+ATLANTIS_BLOCKED_EXTRA_ARGS='-chdir,--chdir,-plugin-dir,--plugin-dir'
+```
+
+Comma-separated list of Terraform CLI flag prefixes that are not allowed in comment extra args (the flags after `--`).
+Defaults to `-chdir,--chdir,-plugin-dir,--plugin-dir`.
+
+Notes:
+
+- These flags are blocked to prevent security issues such as working-directory traversal (`-chdir`) or loading malicious providers (`-plugin-dir`).
+- Setting this flag **replaces** the default list entirely. To extend the defaults, include them along with your custom flags, e.g. `-chdir,--chdir,-plugin-dir,--plugin-dir,-my-flag`.
+- Accepts a comma separated list, ex. `-flag1,-flag2`.
+
 ### `--checkout-depth` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
@@ -537,7 +554,7 @@ atlantis server --emoji-reaction eyes
 ATLANTIS_EMOJI_REACTION=eyes
 ```
 
-The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
+The emoji reaction to use for marking processed comments. Currently supported on Gitea, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
 Defaults to "" (empty string).
 
 ::: warning NOTE
@@ -545,7 +562,7 @@ Each VCS provider supports a different list of emojis:
 
 - [GitHub](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
 - [GitLab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
-- [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
+- [Gitea](https://docs.gitea.com/administration/customizing-gitea#reactions)
 
    :::
 
