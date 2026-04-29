@@ -830,23 +830,26 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		return nil, err
 	}
 
-	// Filter out plans in paths matching autodiscover.ignore_paths.
-	// Match plan-path behavior: only filter auto-discovered projects,
-	// not plans that correspond to explicitly configured project dirs.
-	configuredProjDirs := make(map[string]bool)
-	for _, configProj := range repoCfg.Projects {
-		configuredProjDirs[filepath.Clean(configProj.Dir)] = true
-	}
-	var filteredPlans []PendingPlan
-	for _, plan := range plans {
-		path := filepath.Clean(plan.RepoRelDir)
-		if !configuredProjDirs[path] && p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) {
-			ctx.Log.Debug("ignoring plan in '%s' due to autodiscover.ignore_paths", plan.RepoRelDir)
-			continue
+	// Filter out plans in paths matching autodiscover.ignore_paths, but only
+	// when autodiscovery is active — matching the plan-path behavior in
+	// getMergedProjectCfgs. Without this gate, explicitly planned dirs that
+	// happen to match ignore_paths would be silently dropped during apply-all.
+	if p.autoDiscoverModeEnabled(ctx, repoCfg) {
+		configuredProjDirs := make(map[string]bool)
+		for _, configProj := range repoCfg.Projects {
+			configuredProjDirs[filepath.Clean(configProj.Dir)] = true
 		}
-		filteredPlans = append(filteredPlans, plan)
+		var filteredPlans []PendingPlan
+		for _, plan := range plans {
+			path := filepath.Clean(plan.RepoRelDir)
+			if !configuredProjDirs[path] && p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) {
+				ctx.Log.Debug("ignoring plan in '%s' due to autodiscover.ignore_paths", plan.RepoRelDir)
+				continue
+			}
+			filteredPlans = append(filteredPlans, plan)
+		}
+		plans = filteredPlans
 	}
-	plans = filteredPlans
 
 	var cmds []command.ProjectContext
 	for _, plan := range plans {
