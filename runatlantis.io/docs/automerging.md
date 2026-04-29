@@ -79,3 +79,15 @@ then they should all be applied before Atlantis automatically merges the PR.
 ## Permissions
 
 The Atlantis VCS user must have the ability to merge pull requests.
+
+## GitHub Merge Queue
+
+If the PR's base branch requires a [merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue), Atlantis cannot merge the PR directly via the REST API (GitHub returns `405 Method Not Allowed`). Instead, when automerge fires Atlantis enables auto-merge on the PR via GraphQL, which adds the PR to the merge queue. GitHub then runs the queue's required checks against the merge candidate commit and merges the PR once they pass.
+
+For this to work end-to-end:
+
+- Set [`--gh-merge-queue-enabled`](server-configuration.md#--gh-merge-queue-enabled) so Atlantis posts `success` for `plan`/`apply`/`policy_check` on `merge_group` events; otherwise the queue stalls waiting for those checks.
+- Subscribe the GitHub webhook to the `merge_group` event (see [Configuring Webhooks](configuring-webhooks.md#github)).
+- The Atlantis VCS user / GitHub App must have permission to enable auto-merge on the repo.
+
+The `--auto-merge-method` setting is honored for non-queue branches; for branches enforcing a merge queue GitHub uses the queue's configured method and ignores any per-PR override.
