@@ -25,7 +25,6 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/jpillora/backoff"
-	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -337,8 +336,10 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 
 	for _, status := range statuses {
-		// Ignore any commit statuses with 'atlantis/apply' as prefix
-		if strings.HasPrefix(status.Name, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+		// Ignore Atlantis-owned commit statuses that can self-block apply.
+		// Keep plan statuses in this check: a later failed or running specific
+		// plan can leave an older .tfplan on disk, so it must still block apply.
+		if isSkippableAtlantisCommitStatus(status.Name, vcsstatusname) {
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
@@ -367,6 +368,22 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		logger.Debug("Merge request is not mergeable")
 	}
 	return res, nil
+}
+
+func isSkippableAtlantisCommitStatus(statusName string, vcsStatusName string) bool {
+	prefix := vcsStatusName + "/"
+	if !strings.HasPrefix(statusName, prefix) {
+		return false
+	}
+
+	statusContext := strings.TrimPrefix(statusName, prefix)
+	commandName, _, _ := strings.Cut(statusContext, ": ")
+	switch commandName {
+	case "apply", "policy_check", "pre_workflow_hook", "post_workflow_hook":
+		return true
+	default:
+		return false
+	}
 }
 
 // gitlabIsMergeable a pure function that encapsulates the tricky logic behind determining whether a gitlab MR is mergeable
