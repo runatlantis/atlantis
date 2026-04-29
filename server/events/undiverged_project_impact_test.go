@@ -142,6 +142,29 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedPassesForUnrelatedCo
 	Equals(t, "", failure)
 }
 
+func TestDefaultCommandRequirementHandler_TargetedUndivergedSkipsImpactResolutionWhenNoDivergedFiles(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	repoDir := configuredProjectRepo(t)
+	writeTestFile(t, filepath.Join(repoDir, "project1", "main.tf"), "invalid terraform")
+	resolver := newTestUndivergedProjectImpactResolver("**/*.tf", defaultAutoplanFileList, "auto")
+	workingDir := NewMockWorkingDir()
+	When(workingDir.GetDivergedFiles(Any[logging.SimpleLogging](), Any[string](), Any[models.PullRequest]())).ThenReturn([]string{}, nil)
+
+	handler := &DefaultCommandRequirementHandler{
+		WorkingDir:            workingDir,
+		ProjectImpactResolver: resolver,
+	}
+
+	ctx := newTestUndivergedProjectContext(t, "project1")
+	ctx.ApplyRequirements = []string{raw.UnDivergedRequirement}
+	ctx.AutoplanWhenModified = raw.DefaultAutoPlanWhenModified
+
+	failure, err := handler.ValidateApplyProject(repoDir, ctx)
+	Ok(t, err)
+	Equals(t, "", failure)
+}
+
 func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackWhenGeneratedConfigMissing(t *testing.T) {
 	RegisterMockTestingT(t)
 

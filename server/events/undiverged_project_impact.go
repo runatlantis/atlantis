@@ -76,6 +76,9 @@ func (r *undivergedProjectImpactResolver) HasUndivergedImpact(
 	if err != nil {
 		return true, false, err
 	}
+	if len(divergedFiles) == 0 {
+		return true, false, nil
+	}
 
 	impacted, err = r.impactedByModifiedFiles(ctx, repoDir, target, divergedFiles)
 	if err != nil {
