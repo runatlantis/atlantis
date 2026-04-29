@@ -340,7 +340,7 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		// Without this, Atlantis's own plan/policy_check/workflow hook statuses
 		// in pending/running/failed state would cause it to consider the MR
 		// unmergeable, blocking apply operations.
-		if strings.HasPrefix(status.Name, vcsstatusname+"/") {
+		if isAtlantisCommitStatus(status.Name, vcsstatusname) {
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
@@ -369,6 +369,22 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		logger.Debug("Merge request is not mergeable")
 	}
 	return res, nil
+}
+
+func isAtlantisCommitStatus(statusName string, vcsStatusName string) bool {
+	prefix := vcsStatusName + "/"
+	if !strings.HasPrefix(statusName, prefix) {
+		return false
+	}
+
+	statusContext := strings.TrimPrefix(statusName, prefix)
+	commandName, _, _ := strings.Cut(statusContext, ": ")
+	switch commandName {
+	case "plan", "apply", "policy_check", "pre_workflow_hook", "post_workflow_hook":
+		return true
+	default:
+		return false
+	}
 }
 
 // gitlabIsMergeable a pure function that encapsulates the tricky logic behind determining whether a gitlab MR is mergeable

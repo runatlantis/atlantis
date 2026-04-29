@@ -1180,6 +1180,29 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			},
 		},
 		{
+			description:   "unknown status under Atlantis namespace still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/security", vcsStatusName), Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/security has status failed", vcsStatusName),
+			},
+		},
+		{
+			description:   "custom vcs-status-name only skips Atlantis status names",
+			vcsStatusName: "ci",
+			statuses: []testStatus{
+				{Name: "ci/plan", Status: "failed"},
+				{Name: "ci/build", Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
+			},
+		},
+		{
 			description:   "mixed Atlantis failures with passing external status",
 			vcsStatusName: vcsStatusName,
 			statuses: []testStatus{
