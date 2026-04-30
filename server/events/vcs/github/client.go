@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package github
@@ -1168,7 +1159,29 @@ func (g *Client) GetFileContent(logger logging.SimpleLogging, repo models.Repo, 
 		return true, []byte{}, err
 	}
 
-	decodedData, err := base64.StdEncoding.DecodeString(*fileContent.Content)
+	// GitHub Contents API returns empty Content for files > 1MB (size > 0 but no content).
+	// Fall back to the Git Blobs API which has no size limit.
+	// We check size > 0 to avoid triggering the fallback for genuinely empty files.
+	if (fileContent.Content == nil || *fileContent.Content == "") && fileContent.GetSize() > 0 {
+		if fileContent.SHA == nil {
+			return true, []byte{}, fmt.Errorf("file %s is too large and has no SHA for blob fetch", fileName)
+		}
+		blob, _, err := g.client.Git.GetBlob(g.ctx, repo.Owner, repo.Name, *fileContent.SHA)
+		if err != nil {
+			return true, []byte{}, fmt.Errorf("fetching blob for large file %s: %w", fileName, err)
+		}
+		// GitHub's base64 payloads include newline separators; strip them before decoding.
+		encoded := strings.ReplaceAll(blob.GetContent(), "\n", "")
+		decodedData, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			return true, []byte{}, err
+		}
+		return true, decodedData, nil
+	}
+
+	// GitHub's base64 payloads include newline separators; strip them before decoding.
+	encoded := strings.ReplaceAll(*fileContent.Content, "\n", "")
+	decodedData, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return true, []byte{}, err
 	}
