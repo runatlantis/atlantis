@@ -1121,6 +1121,18 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("if setting --%s, must set --%s", TFEHostnameFlag, TFETokenFlag)
 	}
 
+	if userConfig.RedisClusterAddresses != "" {
+		if userConfig.RedisHost != "" {
+			return fmt.Errorf("--%s cannot be combined with --%s", RedisClusterAddresses, RedisHost)
+		}
+		if userConfig.RedisPort != DefaultRedisPort {
+			return fmt.Errorf("--%s cannot be combined with --%s", RedisClusterAddresses, RedisPort)
+		}
+		if userConfig.RedisDB != DefaultRedisDB {
+			return fmt.Errorf("--%s is not supported in cluster mode (Redis Cluster ignores the DB parameter)", RedisDB)
+		}
+	}
+
 	_, patternErr := patternmatcher.New(strings.Split(userConfig.AutoplanFileList, ","))
 	if patternErr != nil {
 		return fmt.Errorf("invalid pattern in --%s, %s: %w", AutoplanFileListFlag, userConfig.AutoplanFileList, patternErr)
