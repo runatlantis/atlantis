@@ -1327,10 +1327,12 @@ func mkSubDir(parentDir string, subDir string) (string, error) {
 // and returns 503 if the database is unreachable.
 func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := s.database.Ping(); err != nil {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write(fmt.Appendf(nil, `{"status":"error","error":%q}`, err.Error())) // nolint: errcheck
-		return
+	if s.database != nil {
+		if err := s.database.Ping(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write(fmt.Appendf(nil, `{"status":"error","error":%q}`, err.Error())) // nolint: errcheck
+			return
+		}
 	}
 	w.Write(healthzData) // nolint: errcheck
 }
