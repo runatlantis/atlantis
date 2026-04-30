@@ -1145,6 +1145,16 @@ ATLANTIS_QUIET_POLICY_CHECKS=true
 
 Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
 
+### `--redis-cluster-addresses`
+
+```bash
+atlantis server --redis-cluster-addresses="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
+# or
+ATLANTIS_REDIS_CLUSTER_ADDRESSES="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
+```
+
+Comma-delimited list of Redis cluster node addresses in the format `host:port`. When set, Atlantis uses Redis Cluster mode instead of single-node mode. This is mutually exclusive with `--redis-host`/`--redis-port` (which are used for single-node mode).
+
 ### `--redis-db` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
@@ -1218,16 +1228,6 @@ ATLANTIS_REDIS_USERNAME="myuser"
 ```
 
 The Redis Username for when using a Locking DB type of `redis`. Useful when Redis is configured with ACL-based authentication.
-
-### `--redis-cluster-addresses`
-
-```bash
-atlantis server --redis-cluster-addresses="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
-# or
-ATLANTIS_REDIS_CLUSTER_ADDRESSES="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
-```
-
-Comma-delimited list of Redis cluster node addresses in the format `host:port`. When set, Atlantis uses Redis Cluster mode instead of single-node mode. This is mutually exclusive with `--redis-host`/`--redis-port` (which are used for single-node mode).
 
 ### `--repo-allowlist` <Badge text="v0.13.0" type="info"/>
 

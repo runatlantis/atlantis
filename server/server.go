@@ -489,8 +489,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	case "redis":
 		var clusterAddrs []string
 		if userConfig.RedisClusterAddresses != "" {
-			rawClusterAddrs := strings.Split(userConfig.RedisClusterAddresses, ",")
-			for _, addr := range rawClusterAddrs {
+			for addr := range strings.SplitSeq(userConfig.RedisClusterAddresses, ",") {
 				trimmed := strings.TrimSpace(addr)
 				if trimmed == "" {
 					continue
@@ -1330,7 +1329,7 @@ func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := s.database.Ping(); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte(fmt.Sprintf(`{"status":"error","error":%q}`, err.Error()))) // nolint: errcheck
+		w.Write(fmt.Appendf(nil, `{"status":"error","error":%q}`, err.Error())) // nolint: errcheck
 		return
 	}
 	w.Write(healthzData) // nolint: errcheck
