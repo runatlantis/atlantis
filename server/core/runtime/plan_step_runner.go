@@ -34,15 +34,17 @@ type planStepRunner struct {
 	DefaultTFVersion      *version.Version
 	CommitStatusUpdater   StatusUpdater
 	AsyncTFExec           AsyncTFExec
+	PlanStore             PlanStore
 }
 
-func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec) Runner {
+func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec, planStore PlanStore) Runner {
 	runner := &planStepRunner{
 		TerraformExecutor:     terraformExecutor,
 		DefaultTFDistribution: defaultTfDistribution,
 		DefaultTFVersion:      defaultTfVersion,
 		CommitStatusUpdater:   commitStatusUpdater,
 		AsyncTFExec:           asyncTFExec,
+		PlanStore:             planStore,
 	}
 	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfDistribution, defaultTfVersion, runner)
 }
@@ -66,6 +68,9 @@ func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 	}
 	if err != nil {
 		return output, err
+	}
+	if saveErr := p.PlanStore.Save(ctx, planFile); saveErr != nil {
+		return output, fmt.Errorf("saving plan: %w", saveErr)
 	}
 	return p.fmtPlanOutput(output, tfVersion), nil
 }
@@ -108,6 +113,9 @@ func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 	err = os.WriteFile(planFile, []byte(remoteOpsHeader+planOutput), 0600)
 	if err != nil {
 		return output, fmt.Errorf("unable to create planfile for remote ops: %w", err)
+	}
+	if saveErr := p.PlanStore.Save(ctx, planFile); saveErr != nil {
+		return output, fmt.Errorf("saving plan: %w", saveErr)
 	}
 
 	return p.fmtPlanOutput(output, tfVersion), nil

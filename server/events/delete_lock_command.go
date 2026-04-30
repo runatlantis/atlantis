@@ -6,6 +6,7 @@ package events
 import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -24,6 +25,7 @@ type DefaultDeleteLockCommand struct {
 	WorkingDir       WorkingDir
 	WorkingDirLocker WorkingDirLocker
 	Database         db.Database
+	PlanStore        planstore.PlanStore
 }
 
 // DeleteLock handles deleting the lock at id
@@ -40,6 +42,19 @@ func (l *DefaultDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id s
 	if removeErr != nil {
 		logger.Warn("Failed to delete plan: %s", removeErr)
 		return nil, removeErr
+	}
+
+	if l.PlanStore != nil {
+		if err := l.PlanStore.DeletePlanForProject(
+			lock.Pull.BaseRepo.Owner,
+			lock.Pull.BaseRepo.Name,
+			lock.Pull.Num,
+			lock.Workspace,
+			lock.Project.Path,
+			lock.Project.ProjectName,
+		); err != nil {
+			logger.Warn("Failed to delete plan from external store: %s", err)
+		}
 	}
 
 	return lock, nil
@@ -64,6 +79,16 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLoggin
 		if err != nil {
 			logger.Warn("Failed to delete plan: %s", err)
 			return numLocks, err
+		}
+	}
+
+	// Clean up external plan store for the entire pull request.
+	if l.PlanStore != nil && numLocks > 0 {
+		owner := locks[0].Pull.BaseRepo.Owner
+		repo := locks[0].Pull.BaseRepo.Name
+		pullNum := locks[0].Pull.Num
+		if err := l.PlanStore.DeleteForPull(owner, repo, pullNum); err != nil {
+			logger.Warn("Failed to delete plans from external store: %s", err)
 		}
 	}
 

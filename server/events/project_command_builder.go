@@ -18,6 +18,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -93,6 +94,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
+	planStore runtime.PlanStore,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -125,6 +127,7 @@ func NewInstrumentedProjectCommandBuilder(
 			AutoDiscoverMode,
 			scope,
 			terraformClient,
+			planStore,
 		),
 		Logger: logger,
 		scope:  scope,
@@ -155,6 +158,7 @@ func NewProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
+	planStore runtime.PlanStore,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
 		ParserValidator:          parserValidator,
@@ -164,6 +168,7 @@ func NewProjectCommandBuilder(
 		WorkingDirLocker:         workingDirLocker,
 		GlobalCfg:                globalCfg,
 		PendingPlanFinder:        pendingPlanFinder,
+		PlanStore:                planStore,
 		SkipCloneNoChanges:       skipCloneNoChanges,
 		EnableRegExpCmd:          EnableRegExpCmd,
 		EnableAutoMerge:          EnableAutoMerge,
@@ -268,6 +273,8 @@ type DefaultProjectCommandBuilder struct {
 	GlobalCfg valid.GlobalCfg
 	// Finds unapplied plans.
 	PendingPlanFinder *DefaultPendingPlanFinder
+	// Persists plan files to external storage (S3) so they survive container restarts.
+	PlanStore runtime.PlanStore
 	// Builds project command contexts for Atlantis commands.
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	// User config option: Skip cloning the repo during autoplan if there are no changes to Terraform projects.
@@ -1196,7 +1203,31 @@ func (p *DefaultProjectCommandBuilder) pathConfiguredOnlyOnAnotherBranch(ctx *co
 func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *command.Context, commentCmd *CommentCommand) ([]command.ProjectContext, error) {
 	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
-		return nil, err
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		// Try to restore plans from the store. If the store doesn't support
+		// restore (e.g. LocalPlanStore), surface the original "not exist" error.
+		ctx.Log.Info("pull directory missing, attempting to restore plans")
+		if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace); cloneErr != nil {
+			return nil, fmt.Errorf("re-cloning repo for apply: %w", cloneErr)
+		}
+		pullDir, err = p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+		if err != nil {
+			return nil, err
+		}
+		if restoreErr := p.PlanStore.RestorePlans(pullDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
+			if errors.Is(restoreErr, runtime.ErrRestoreNotSupported) {
+				return nil, os.ErrNotExist
+			}
+			return nil, fmt.Errorf("restoring plans from external store: %w", restoreErr)
+		}
+		// RestorePlans may create workspace directories that weren't cloned.
+		// PendingPlanFinder uses 'git ls-files' which requires a git repo, so
+		// clone into any workspace dir that is missing a .git directory.
+		if cloneErr := p.cloneMissingWorkspaces(ctx, pullDir); cloneErr != nil {
+			return nil, fmt.Errorf("cloning workspaces after plan restore: %w", cloneErr)
+		}
 	}
 
 	plans, err := p.PendingPlanFinder.Find(pullDir)
@@ -1511,7 +1542,17 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
 	if errors.Is(err, os.ErrNotExist) {
-		return projCtx, errors.New("no working directory found–did you run plan?")
+		// Re-clone only if the plan store can recover plans externally.
+		// LocalPlanStore signals this via ErrRestoreNotSupported; external
+		// stores (S3) return nil and restore during the apply step.
+		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
+			return projCtx, errors.New("no working directory found–did you run plan?")
+		}
+		ctx.Log.Info("working directory missing, re-cloning repo for apply")
+		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+		if err != nil {
+			return projCtx, fmt.Errorf("re-cloning repo for apply: %w", err)
+		}
 	} else if err != nil {
 		return projCtx, err
 	}
@@ -1752,6 +1793,32 @@ func filterProjectsByModifiedFiles(projects []valid.Project, modifiedFiles []str
 // because if users have gone to the trouble of defining projects in repoRelDir
 // then it's likely that if we're running a command for a workspace that isn't
 // defined then they probably just typed the workspace name wrong.
+// cloneMissingWorkspaces ensures every workspace directory under pullDir has a
+// git repo. RestorePlans may create workspace dirs for plans that were stored
+// in non-default workspaces. PendingPlanFinder.Find uses 'git ls-files' which
+// fails without a .git directory.
+func (p *DefaultProjectCommandBuilder) cloneMissingWorkspaces(ctx *command.Context, pullDir string) error {
+	entries, err := os.ReadDir(pullDir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		workspace := entry.Name()
+		gitDir := filepath.Join(pullDir, workspace, ".git")
+		if _, err := os.Stat(gitDir); err == nil {
+			continue // already cloned
+		}
+		ctx.Log.Info("cloning workspace %q after plan restore", workspace)
+		if _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); err != nil {
+			return fmt.Errorf("cloning workspace %q: %w", workspace, err)
+		}
+	}
+	return nil
+}
+
 func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(repoCfg *valid.RepoCfg, repoRelDir string, workspace string) error {
 	if repoCfg == nil {
 		return nil
