@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 // Package server handles the web server and executing commands that come in
@@ -593,6 +584,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubTokenFile:    userConfig.GithubTokenFile,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
+		GitlabHostname:     userConfig.GitlabHostname,
 		GiteaUser:          userConfig.GiteaUser,
 		GiteaToken:         userConfig.GiteaToken,
 		AllowDraftPRs:      userConfig.PlanDrafts,
@@ -610,6 +602,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AzureDevopsUser,
 		userConfig.ExecutableName,
 		allowCommands,
+		userConfig.ToBlockedExtraArgs(),
 	)
 	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()
@@ -649,11 +642,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
 	}
+	projectFinder := &events.DefaultProjectFinder{}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
 		policyChecksEnabled,
 		parserValidator,
-		&events.DefaultProjectFinder{},
+		projectFinder,
 		vcsClient,
 		workingDir,
 		workingDirLocker,
@@ -693,6 +687,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	applyRequirementHandler := &events.DefaultCommandRequirementHandler{
 		WorkingDir: workingDir,
+		ProjectImpactResolver: events.NewUndivergedProjectImpactResolver(
+			parserValidator,
+			projectFinder,
+			globalCfg,
+			userConfig.AutoplanModulesFromProjects,
+			userConfig.AutoplanFileList,
+			userConfig.AutoDiscoverModeFlag,
+		),
 	}
 
 	cancellationTracker := events.NewCancellationTracker()

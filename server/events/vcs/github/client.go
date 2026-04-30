@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package github
@@ -591,13 +582,19 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 	requiredWorkflows []WorkflowFileReference,
 	checkRuns []CheckRun,
 	statusContexts []StatusContext,
+	pendingRequiredReviewerApproval bool,
 	err error,
 ) {
 	var query struct {
 		Repository struct {
 			PullRequest struct {
-				ReviewDecision githubv4.String
-				BaseRef        struct {
+				ReviewDecision           githubv4.String
+				LatestOpinionatedReviews struct {
+					Nodes []struct {
+						State githubv4.String
+					}
+				} `graphql:"latestOpinionatedReviews(first: 100)"`
+				BaseRef struct {
 					BranchProtectionRule struct {
 						RequiredStatusChecks []struct {
 							Context githubv4.String
@@ -619,6 +616,9 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 								WorkflowsParameters struct {
 									Workflows []WorkflowFileReference
 								} `graphql:"... on WorkflowsParameters"`
+								PullRequestParameters struct {
+									RequiredApprovingReviewCount githubv4.Int
+								} `graphql:"... on PullRequestParameters"`
 							}
 						}
 					} `graphql:"rules(first: 100, after: $ruleCursor)"`
@@ -652,6 +652,7 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 	}
 
 	requiredChecksSet := make(map[githubv4.String]any)
+	maxRequiredApprovals := 0
 
 pagination:
 	for {
@@ -679,6 +680,11 @@ pagination:
 			case "WORKFLOWS":
 				for _, workflow := range rule.Parameters.WorkflowsParameters.Workflows {
 					requiredWorkflows = append(requiredWorkflows, workflow.Copy())
+				}
+			case "PULL_REQUEST":
+				required := int(rule.Parameters.PullRequestParameters.RequiredApprovingReviewCount)
+				if required > maxRequiredApprovals {
+					maxRequiredApprovals = required
 				}
 			default:
 				continue
@@ -716,14 +722,27 @@ pagination:
 	}
 
 	if err != nil {
-		return "", nil, nil, nil, nil, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
+		return "", nil, nil, nil, nil, false, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
+	}
+
+	// latestOpinionatedReviews is not paginated, so compute the approved count once after the loop.
+	if maxRequiredApprovals > 0 {
+		approvedReviewCount := 0
+		for _, review := range query.Repository.PullRequest.LatestOpinionatedReviews.Nodes {
+			if review.State == "APPROVED" {
+				approvedReviewCount++
+			}
+		}
+		if approvedReviewCount < maxRequiredApprovals {
+			pendingRequiredReviewerApproval = true
+		}
 	}
 
 	for context := range requiredChecksSet {
 		requiredChecks = append(requiredChecks, context)
 	}
 
-	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, nil
+	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, pendingRequiredReviewerApproval, nil
 }
 
 func CheckSuitePassed(checkSuite CheckSuite) bool {
@@ -805,17 +824,22 @@ func (g *Client) IsMergeableMinusApply(logger logging.SimpleLogging, repo models
 	if pull.Number == nil {
 		return false, errors.New("pull request number is nil")
 	}
-	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, err := g.GetPullRequestMergeabilityInfo(repo, pull)
+	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, pendingRequiredReviewerApproval, err := g.GetPullRequestMergeabilityInfo(repo, pull)
 	if err != nil {
 		return false, err
 	}
 
 	notMergeablePrefix := fmt.Sprintf("Pull Request %s/%s:%s is not mergeable", repo.Owner, repo.Name, strconv.Itoa(*pull.Number))
 
-	// Review decision takes CODEOWNERS into account
-	// Empty review decision means review is not required
+	// reviewDecision covers CODEOWNERS and classic branch protection review requirements.
+	// Empty/null means GitHub rulesets may be enforcing reviews via required_reviewers
+	// instead — check that separately via pendingRequiredReviewerApproval.
 	if reviewDecision != "APPROVED" && len(reviewDecision) != 0 {
 		logger.Debug("%s: Review Decision: %s", notMergeablePrefix, reviewDecision)
+		return false, nil
+	}
+	if pendingRequiredReviewerApproval {
+		logger.Debug("%s: Pending required reviewer approval from ruleset", notMergeablePrefix)
 		return false, nil
 	}
 
@@ -1135,7 +1159,29 @@ func (g *Client) GetFileContent(logger logging.SimpleLogging, repo models.Repo, 
 		return true, []byte{}, err
 	}
 
-	decodedData, err := base64.StdEncoding.DecodeString(*fileContent.Content)
+	// GitHub Contents API returns empty Content for files > 1MB (size > 0 but no content).
+	// Fall back to the Git Blobs API which has no size limit.
+	// We check size > 0 to avoid triggering the fallback for genuinely empty files.
+	if (fileContent.Content == nil || *fileContent.Content == "") && fileContent.GetSize() > 0 {
+		if fileContent.SHA == nil {
+			return true, []byte{}, fmt.Errorf("file %s is too large and has no SHA for blob fetch", fileName)
+		}
+		blob, _, err := g.client.Git.GetBlob(g.ctx, repo.Owner, repo.Name, *fileContent.SHA)
+		if err != nil {
+			return true, []byte{}, fmt.Errorf("fetching blob for large file %s: %w", fileName, err)
+		}
+		// GitHub's base64 payloads include newline separators; strip them before decoding.
+		encoded := strings.ReplaceAll(blob.GetContent(), "\n", "")
+		decodedData, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			return true, []byte{}, err
+		}
+		return true, decodedData, nil
+	}
+
+	// GitHub's base64 payloads include newline separators; strip them before decoding.
+	encoded := strings.ReplaceAll(*fileContent.Content, "\n", "")
+	decodedData, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return true, []byte{}, err
 	}

@@ -194,7 +194,7 @@ type ProjectStateCommandBuilder interface {
 	BuildStateRmCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
@@ -373,24 +373,78 @@ func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, mod
 
 // autoDiscoverModeEnabled determines whether to use autodiscover
 func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Context, repoCfg valid.RepoCfg) bool {
+	// 1. If global defines autodiscover, evaluate it directly
+	if global := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID()); global != nil {
+		return repoCfg.AutoDiscoverEnabled(global.Mode)
+	}
+
+	// 2. Otherwise if repo defines it, evaluate that
+	if repoCfg.AutoDiscover != nil {
+		return repoCfg.AutoDiscoverEnabled(repoCfg.AutoDiscover.Mode)
+	}
+
+	// 3. Otherwise use CLI/default
 	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
-	globalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if globalAutoDiscover != nil {
-		defaultAutoDiscoverMode = globalAutoDiscover.Mode
+	if defaultAutoDiscoverMode == "" {
+		defaultAutoDiscoverMode = valid.AutoDiscoverAutoMode
 	}
 	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
 }
 
-// isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery
+// parseRepoCfg parses the repo config file from repoDir if it exists. Returns the
+// parsed config (or a zero-valued RepoCfg if absent), a bool indicating whether the
+// file was found, and any parse error. Logs at Info level for both outcomes.
+func (p *DefaultProjectCommandBuilder) parseRepoCfg(ctx *command.Context, repoDir string) (valid.RepoCfg, bool, error) {
+	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
+	if err != nil {
+		return valid.RepoCfg{}, false, fmt.Errorf("looking for '%s' file in '%s': %w", repoCfgFile, repoDir, err)
+	}
+	if !hasRepoCfg {
+		ctx.Log.Info("repo config file %s is absent, using global defaults", repoCfgFile)
+		return valid.RepoCfg{}, false, nil
+	}
+	repoCfg, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+	if err != nil {
+		return valid.RepoCfg{}, false, fmt.Errorf("parsing %s: %w", repoCfgFile, err)
+	}
+	ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+	return repoCfg, true, nil
+}
+
+// isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery.
+// Global config ignore_paths takes precedence when explicitly set; otherwise falls through to repo config.
 func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
+	// 1. If global defines autodiscover, evaluate that
 	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if fromGlobalAutoDiscover != nil {
+	if fromGlobalAutoDiscover != nil && fromGlobalAutoDiscover.IgnorePaths != nil {
 		return fromGlobalAutoDiscover.IsPathIgnored(path)
 	}
+	// 2. Otherwise, if repo defines, evaluate that
 	if repoCfg.AutoDiscover != nil {
 		return repoCfg.AutoDiscover.IsPathIgnored(path)
 	}
+	// The CLI default for auto discover is to not ignore any paths
+	return false
+}
 
+func pendingPlanInPullStatus(ctx *command.Context, plan PendingPlan) bool {
+	if ctx.PullStatus == nil {
+		return false
+	}
+
+	path := filepath.Clean(plan.RepoRelDir)
+	for _, project := range ctx.PullStatus.Projects {
+		if project.Workspace != plan.Workspace || filepath.Clean(project.RepoRelDir) != path {
+			continue
+		}
+		if plan.ProjectName != "" {
+			return project.ProjectName == plan.ProjectName
+		}
+		if project.ProjectName == "" {
+			return true
+		}
+	}
 	return false
 }
 
@@ -509,27 +563,12 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		modifiedFiles = append(modifiedFiles, untrackedFiles...)
 	}
 
-	// Parse config file if it exists.
-	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
+	repoCfg, hasRepoCfg, err := p.parseRepoCfg(ctx, repoDir)
 	if err != nil {
-		return nil, fmt.Errorf("looking for '%s' file in '%s': %w", repoCfgFile, repoDir, err)
+		return nil, err
 	}
 
 	var projCtxs []command.ProjectContext
-	var repoCfg valid.RepoCfg
-
-	if hasRepoCfg {
-		// If there's a repo cfg with projects then we'll use it to figure out which projects
-		// should be planed.
-		repoCfg, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
-		if err != nil {
-			return nil, fmt.Errorf("parsing %s: %w", repoCfgFile, err)
-		}
-		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
-	} else {
-		ctx.Log.Info("repo config file %s is absent, using global defaults", repoCfgFile)
-	}
 
 	mergedProjectCfgs, err := p.getMergedProjectCfgs(ctx, repoDir, modifiedFiles, repoCfg)
 	if err != nil {
@@ -810,6 +849,38 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	defaultRepoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
 	if err != nil {
 		return nil, err
+	}
+
+	// Parse config file to check autodiscover.ignore_paths.
+	// During plan, getMergedProjectCfgs calls isAutoDiscoverPathIgnored to
+	// filter ignored paths, but PendingPlanFinder only filters
+	// .terragrunt-cache. Apply the same ignore_paths filtering here so
+	// apply doesn't pick up .tfplan files in paths that should be ignored
+	// (e.g. .terraform/modules/).
+	repoCfg, _, err := p.parseRepoCfg(ctx, defaultRepoDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter out untracked plan files in paths matching autodiscover.ignore_paths,
+	// but only when autodiscovery is active, matching the plan-path behavior in
+	// getMergedProjectCfgs. Preserve ignored-path plans already present in pull
+	// status because Atlantis created those plans through an explicit command.
+	if p.autoDiscoverModeEnabled(ctx, repoCfg) {
+		configuredProjDirs := make(map[string]bool)
+		for _, configProj := range repoCfg.Projects {
+			configuredProjDirs[filepath.Clean(configProj.Dir)] = true
+		}
+		var filteredPlans []PendingPlan
+		for _, plan := range plans {
+			path := filepath.Clean(plan.RepoRelDir)
+			if !configuredProjDirs[path] && p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) && !pendingPlanInPullStatus(ctx, plan) {
+				ctx.Log.Debug("ignoring plan in '%s' due to autodiscover.ignore_paths", plan.RepoRelDir)
+				continue
+			}
+			filteredPlans = append(filteredPlans, plan)
+		}
+		plans = filteredPlans
 	}
 
 	var cmds []command.ProjectContext

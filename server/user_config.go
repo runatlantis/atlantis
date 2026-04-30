@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -18,6 +19,7 @@ import (
 type UserConfig struct {
 	AllowForkPRs                bool   `mapstructure:"allow-fork-prs"`
 	AllowCommands               string `mapstructure:"allow-commands"`
+	BlockedExtraArgs            string `mapstructure:"blocked-extra-args"`
 	AtlantisURL                 string `mapstructure:"atlantis-url"`
 	AutoDiscoverModeFlag        string `mapstructure:"autodiscover-mode"`
 	Automerge                   bool   `mapstructure:"automerge"`
@@ -161,6 +163,21 @@ func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 		return command.AllCommentCommands, nil
 	}
 	return allowCommands, nil
+}
+
+// ToBlockedExtraArgs parses BlockedExtraArgs into a slice of flag prefixes.
+// When BlockedExtraArgs is empty, events.DefaultBlockedExtraArgs is returned.
+func (u UserConfig) ToBlockedExtraArgs() []string {
+	if u.BlockedExtraArgs == "" {
+		return events.DefaultBlockedExtraArgs
+	}
+	var args []string
+	for arg := range strings.SplitSeq(u.BlockedExtraArgs, ",") {
+		if trimmed := strings.TrimSpace(arg); trimmed != "" {
+			args = append(args, trimmed)
+		}
+	}
+	return args
 }
 
 // ToWebhookHttpHeaders parses WebhookHttpHeaders into a map of HTTP headers.
