@@ -84,6 +84,21 @@ func (t tfFs) ReadDir(dirname string) ([]os.FileInfo, error) {
 var _ tfconfig.FS = tfFs{}
 
 func (m moduleInfo) load(files fs.FS, dir string, projects ...string) (_ *module, diags tfconfig.Diagnostics) {
+	return m.loadWithCycle(files, dir, map[string]bool{}, projects...)
+}
+
+func (m moduleInfo) loadWithCycle(files fs.FS, dir string, visiting map[string]bool, projects ...string) (_ *module, diags tfconfig.Diagnostics) {
+	if visiting[dir] {
+		// Cycle detected, just record the project on the already loaded module and return.
+		if existing, ok := m[dir]; ok {
+			for _, p := range projects {
+				existing.projects[p] = true
+			}
+			return existing, nil
+		}
+		return nil, nil
+	}
+	visiting[dir] = true
 	if _, set := m[dir]; !set {
 		tfFiles := tfFs{files}
 		var mod *tfconfig.Module
@@ -106,17 +121,18 @@ func (m moduleInfo) load(files fs.FS, dir string, projects ...string) (_ *module
 			projects:     make(map[string]bool),
 		}
 	}
+	// set projects on this module
+	for _, p := range projects {
+		m[dir].projects[p] = true
+	}
 	// set projects on my dependencies
 	for dep := range m[dir].dependencies {
-		_, err := m.load(files, dep, projects...)
+		_, err := m.loadWithCycle(files, dep, visiting, projects...)
 		if err != nil {
 			diags = append(diags, err...)
 		}
 	}
-	// add projects to the list of dependant projects
-	for _, p := range projects {
-		m[dir].projects[p] = true
-	}
+	delete(visiting, dir)
 	return m[dir], diags
 }
 
