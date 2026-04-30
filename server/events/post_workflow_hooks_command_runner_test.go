@@ -231,6 +231,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 			Eq(defaultShellArgs),
 			Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
+		ctx.CommandHasErrors = false
 	})
 	t.Run("success hooks not in cfg", func(t *testing.T) {
 		postWorkflowHooksSetup(t)
