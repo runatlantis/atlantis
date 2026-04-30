@@ -235,7 +235,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/status'
 
 #### Description
 
-Serves as the health-check endpoint for a containerized Atlantis server.
+Liveness endpoint. Returns 200 if the Atlantis process is running. Does not check external dependencies. Suitable for Kubernetes liveness probes.
 
 #### Sample Request
 
@@ -248,6 +248,37 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/healthz'
 ```json
 {
   "status": "ok"
+}
+```
+
+### GET /readyz
+
+#### Description
+
+Readiness endpoint. Returns 200 if the server is ready to handle requests, including connectivity to external dependencies (e.g. Redis). Returns 503 if any dependency is unreachable. Suitable for Kubernetes readiness probes.
+
+#### Sample Request
+
+```shell
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/readyz'
+```
+
+#### Sample Response (healthy)
+
+```json
+{
+  "status": "ok"
+}
+```
+
+#### Sample Response (unhealthy)
+
+Returns HTTP 503:
+
+```json
+{
+  "status": "error",
+  "error": "failed to ping redis: ..."
 }
 ```
 
