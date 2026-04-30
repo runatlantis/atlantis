@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -111,9 +112,13 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 		return nil, fmt.Errorf("failed to connect to redis at %s: %w", connDesc, err)
 	}
 
-	// Migrate old lock keys to new format
-	if err := migrateOldLockKeys(rdb); err != nil {
-		return nil, err
+	// Migrate old lock keys to new format with a bounded timeout.
+	// Non-fatal: if migration times out or fails, remaining keys will be
+	// retried on next startup. This avoids blocking boot on large key sets.
+	migrateCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := migrateOldLockKeys(migrateCtx, rdb); err != nil {
+		log.Printf("WARN: lock key migration incomplete (will retry next startup): %v", err)
 	}
 
 	return &RedisDB{
@@ -126,7 +131,7 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 // New format: pr/{repoFullName}/{path}/{workspace}/{projectName}
 // Uses Scan instead of Keys for compatibility with Redis Cluster (Scan fans out
 // across all nodes via go-redis ClusterClient, whereas Keys does not).
-func migrateOldLockKeys(rdb redis.Cmdable) error {
+func migrateOldLockKeys(ctx context.Context, rdb redis.Cmdable) error {
 	iter := rdb.Scan(ctx, 0, "pr/*", 0).Iterator()
 	for iter.Next(ctx) {
 		oldKey := iter.Val()
