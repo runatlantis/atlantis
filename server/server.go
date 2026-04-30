@@ -1093,6 +1093,7 @@ func (s *Server) Start() error {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
+	s.Router.HandleFunc("/readyz", s.Readyz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
@@ -1323,9 +1324,18 @@ func mkSubDir(parentDir string, subDir string) (string, error) {
 	return fullDir, nil
 }
 
-// Healthz returns the health check response. It checks the database connection
-// and returns 503 if the database is unreachable.
+// Healthz returns the health check response. It always returns 200 if the
+// process is running. Use /readyz for dependency health checks.
+// Suitable for K8s liveness probes (should not depend on external services).
 func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(healthzData) // nolint: errcheck
+}
+
+// Readyz checks whether the server is ready to handle requests by verifying
+// connectivity to external dependencies (e.g. Redis). Returns 503 if any
+// dependency is unreachable. Suitable for K8s readiness probes.
+func (s *Server) Readyz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.database != nil {
 		if err := s.database.Ping(); err != nil {
