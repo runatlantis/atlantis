@@ -144,6 +144,14 @@ func migrateOldLockKeys(rdb redis.Cmdable) error {
 				return errors.Wrap(err, "failed to deserialize current lock")
 			}
 			newKey := fmt.Sprintf("pr/%s", models.GenerateLockKey(currLock.Project, currLock.Workspace))
+
+			// Skip if the new key already exists (idempotent on retry).
+			if _, err := rdb.Get(ctx, newKey).Result(); err == nil {
+				// New key exists — just clean up the old one.
+				rdb.Del(ctx, oldKey)
+				continue
+			}
+
 			if err := rdb.Set(ctx, newKey, oldValue, 0).Err(); err != nil {
 				return errors.Wrapf(err, "failed to set new lock key %s", newKey)
 			}
