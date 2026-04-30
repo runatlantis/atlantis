@@ -360,7 +360,7 @@ func TestRunPostHooks_Clone(t *testing.T) {
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 
-	t.Run("comment args passed to webhooks", func(t *testing.T) {
+	t.Run("comment args and projectname passed to webhooks", func(t *testing.T) {
 		postWorkflowHooksSetup(t)
 
 		unlockCalled := newBool(false)
@@ -378,29 +378,41 @@ func TestRunPostHooks_Clone(t *testing.T) {
 				},
 			},
 		}
+		postWh.GlobalCfg = globalCfg
 
 		planCmd := &events.CommentCommand{
-			Name:  command.Plan,
-			Flags: []string{"comment", "args"},
+			Name:        command.Plan,
+			Flags:       []string{"comment", "args"},
+			ProjectName: "*",
 		}
 
 		expectedCtx := pCtx
+		expectedCtx.HookStepName = "post plan #0"
+		expectedCtx.HookDescription = "Post workflow hook #0"
 		expectedCtx.EscapedCommentArgs = []string{"\\c\\o\\m\\m\\e\\n\\t", "\\a\\r\\g\\s"}
-
-		postWh.GlobalCfg = globalCfg
+		expectedCtx.ProjectName = "*"
 
 		When(postWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
 			events.DefaultRepoRelDir, "", command.Plan)).ThenReturn(unlockFn, nil)
 		When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
 			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
-		When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
-			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
+		When(whPostWorkflowHookRunner.Run(
+			ArgThat[models.WorkflowHookCommandContext](WorkflowHookCommandContextMatcher{expected: expectedCtx}),
+			Eq(testHook.RunCommand),
+			Any[string](),
+			Any[string](),
+			Eq(repoDir),
+		)).ThenReturn(result, runtimeDesc, nil)
 
 		err := postWh.RunPostHooks(ctx, planCmd)
 
 		Ok(t, err)
-		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](),
-			Eq(testHook.RunCommand), Eq(defaultShell), Eq(defaultShellArgs), Eq(repoDir))
+		whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(
+			ArgThat[models.WorkflowHookCommandContext](WorkflowHookCommandContextMatcher{expected: expectedCtx}),
+			Eq(testHook.RunCommand),
+			Eq(defaultShell),
+			Eq(defaultShellArgs),
+			Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 
