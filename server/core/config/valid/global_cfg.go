@@ -225,7 +225,6 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	deleteSourceBranchOnMerge := false
 	repoLocks := DefaultRepoLocks
 	customPolicyCheck := false
-	autoDiscover := AutoDiscover{Mode: AutoDiscoverAutoMode}
 	var silencePRComments []string
 	if args.AllowAllRepoSettings {
 		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, RepoLocksKey, PolicyCheckKey, SilencePRCommentsKey}
@@ -251,7 +250,6 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 				RepoLocks:                 &repoLocks,
 				PolicyCheck:               &policyCheck,
 				CustomPolicyCheck:         &customPolicyCheck,
-				AutoDiscover:              &autoDiscover,
 				SilencePRComments:         silencePRComments,
 			},
 		},
@@ -459,15 +457,17 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 	}
 }
 
-// RepoAutoDiscoverCfg returns the AutoDiscover config from the global config
-// for the repo with id repoID. If no matching repo is found or there is no
-// AutoDiscover config then this function returns nil.
+// RepoAutoDiscoverCfg returns the inherited AutoDiscover config from matching
+// server-side repo config for repoID. If no matching repo defines
+// AutoDiscover, this function returns nil.
 func (g GlobalCfg) RepoAutoDiscoverCfg(repoID string) *AutoDiscover {
-	repo := g.MatchingRepo(repoID)
-	if repo != nil {
-		return repo.AutoDiscover
+	var autoDiscover *AutoDiscover
+	for _, repo := range g.Repos {
+		if repo.IDMatches(repoID) && repo.AutoDiscover != nil {
+			autoDiscover = repo.AutoDiscover
+		}
 	}
-	return nil
+	return autoDiscover
 }
 
 // ValidateRepoCfg validates that rCfg for repo with id repoID is valid based

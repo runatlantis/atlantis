@@ -20,8 +20,13 @@ type CommandRequirementHandler interface {
 	ValidateImportProject(repoDir string, ctx command.ProjectContext) (string, error)
 }
 
+type UndivergedProjectImpactResolver interface {
+	HasUndivergedImpact(ctx command.ProjectContext, repoDir string, workingDir WorkingDir) (handled bool, impacted bool, err error)
+}
+
 type DefaultCommandRequirementHandler struct {
-	WorkingDir WorkingDir
+	WorkingDir            WorkingDir
+	ProjectImpactResolver UndivergedProjectImpactResolver
 }
 
 func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) (failure string, err error) {
@@ -72,11 +77,31 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 				return fmt.Sprintf("Pull request must be mergeable before running %s%s.", cmd, suffix), nil
 			}
 		case raw.UnDivergedRequirement:
-			if a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull) {
+			diverged, err := a.hasUndivergedImpact(repoDir, ctx)
+			if err != nil {
+				ctx.Log.Warn("evaluating undiverged requirement has failed, falling back to full divergence check: %s", err)
+				diverged = a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, nil, ctx.Pull)
+			}
+			if diverged {
 				return fmt.Sprintf("Default branch must be rebased onto pull request before running %s.", cmd), nil
 			}
 		}
 	}
 	// Passed all requirements configured.
 	return "", nil
+}
+
+func (a *DefaultCommandRequirementHandler) hasUndivergedImpact(repoDir string, ctx command.ProjectContext) (bool, error) {
+	if a.ProjectImpactResolver == nil {
+		return a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull), nil
+	}
+
+	handled, impacted, err := a.ProjectImpactResolver.HasUndivergedImpact(ctx, repoDir, a.WorkingDir)
+	if err != nil {
+		return false, err
+	}
+	if !handled {
+		return a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull), nil
+	}
+	return impacted, nil
 }

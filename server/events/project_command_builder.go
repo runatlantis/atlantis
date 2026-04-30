@@ -373,10 +373,20 @@ func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, mod
 
 // autoDiscoverModeEnabled determines whether to use autodiscover
 func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Context, repoCfg valid.RepoCfg) bool {
+	// 1. If global defines autodiscover, evaluate it directly
+	if global := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID()); global != nil {
+		return repoCfg.AutoDiscoverEnabled(global.Mode)
+	}
+
+	// 2. Otherwise if repo defines it, evaluate that
+	if repoCfg.AutoDiscover != nil {
+		return repoCfg.AutoDiscoverEnabled(repoCfg.AutoDiscover.Mode)
+	}
+
+	// 3. Otherwise use CLI/default
 	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
-	globalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if globalAutoDiscover != nil {
-		defaultAutoDiscoverMode = globalAutoDiscover.Mode
+	if defaultAutoDiscoverMode == "" {
+		defaultAutoDiscoverMode = valid.AutoDiscoverAutoMode
 	}
 	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
 }
@@ -405,14 +415,16 @@ func (p *DefaultProjectCommandBuilder) parseRepoCfg(ctx *command.Context, repoDi
 // isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery.
 // Global config ignore_paths takes precedence when explicitly set; otherwise falls through to repo config.
 func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
+	// 1. If global defines autodiscover, evaluate that
 	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
 	if fromGlobalAutoDiscover != nil && fromGlobalAutoDiscover.IgnorePaths != nil {
 		return fromGlobalAutoDiscover.IsPathIgnored(path)
 	}
+	// 2. Otherwise, if repo defines, evaluate that
 	if repoCfg.AutoDiscover != nil {
 		return repoCfg.AutoDiscover.IsPathIgnored(path)
 	}
-
+	// The CLI default for auto discover is to not ignore any paths
 	return false
 }
 
