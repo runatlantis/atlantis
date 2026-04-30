@@ -101,6 +101,16 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
+	var err error
+	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
+	if err != nil {
+		// On error we continue the request with mergeable assumed false.
+		// We want to continue because not all plan's will need this status,
+		// only if they rely on the mergeability requirement.
+		// All PullRequestStatus fields are set to false by default when error.
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+	}
+
 	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
