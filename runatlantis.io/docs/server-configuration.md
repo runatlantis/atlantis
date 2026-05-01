@@ -1403,6 +1403,14 @@ File containing x509 Certificate used for serving HTTPS.
 If the cert is signed by a CA, the file should be the concatenation
 of the server's certificate, any intermediates, and the CA's certificate.
 
+When both `--ssl-cert-file` and `--ssl-key-file` are set, Atlantis validates
+TLS material at startup and on certificate reload:
+- Startup fails fast for invalid certificate/key pairs and encrypted private keys.
+- Expired certificates and cert hostname mismatches (checked against the
+  `--atlantis-url` hostname) are logged as warnings.
+- On the next TLS handshake after certificate/key files change, invalid
+  replacements are logged as errors and TLS handshakes fail until fixed.
+
 ### `--ssl-key-file` <Badge text="v0.2.4+" type="info"/>
 
 ```bash
@@ -1412,6 +1420,8 @@ ATLANTIS_SSL_KEY_FILE="/etc/ssl/private/my-cert.key"
 ```
 
 File containing x509 private key matching `--ssl-cert-file`.
+Encrypted private keys are not supported because Atlantis cannot be configured
+with a passphrase.
 
 ### `--stats-namespace` <Badge text="v0.43.0+" type="info"/>
 

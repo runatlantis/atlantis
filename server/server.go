@@ -1114,6 +1114,19 @@ func (s *Server) Start() error {
 
 	defer s.Logger.Flush()
 
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
+	if s.SSLCertFile != "" && s.SSLKeyFile != "" {
+		cert, certLastRefreshTime, keyLastRefreshTime, warnings, err := s.loadAndValidateSSLCertificate()
+		if err != nil {
+			return fmt.Errorf("invalid tls configuration cert=%q key=%q: %w", s.SSLCertFile, s.SSLKeyFile, err)
+		}
+		s.logTLSWarnings(warnings)
+		s.SSLCert = cert
+		s.CertLastRefreshTime = certLastRefreshTime
+		s.KeyLastRefreshTime = keyLastRefreshTime
+		tlsConfig.GetCertificate = s.GetSSLCertificate
+	}
+
 	// Ensure server gracefully drains connections when stopped.
 	stop := make(chan os.Signal, 1)
 	// Stop on SIGINTs and SIGTERMs.
@@ -1125,9 +1138,13 @@ func (s *Server) Start() error {
 		s.ProjectCmdOutputHandler.Handle()
 	}()
 
-	tlsConfig := &tls.Config{GetCertificate: s.GetSSLCertificate, MinVersion: tls.VersionTLS12}
-
-	server := &http.Server{Addr: fmt.Sprintf(":%d", s.Port), Handler: n, TLSConfig: tlsConfig, ReadHeaderTimeout: 10 * time.Second}
+	server := &http.Server{
+		Addr:              fmt.Sprintf(":%d", s.Port),
+		Handler:           n,
+		TLSConfig:         tlsConfig,
+		ReadHeaderTimeout: 10 * time.Second,
+		ErrorLog:          log.New(&stdlibServerErrorLogWriter{logger: s.Logger}, "", 0),
+	}
 	go func() {
 		s.Logger.Info("Atlantis started - listening on port %v", s.Port)
 
@@ -1321,12 +1338,13 @@ func (s *Server) GetSSLCertificate(*tls.ClientHelloInfo) (*tls.Certificate, erro
 	}
 
 	if s.SSLCert == nil || certStat.ModTime() != s.CertLastRefreshTime || keyStat.ModTime() != s.KeyLastRefreshTime {
-		cert, err := tls.LoadX509KeyPair(s.SSLCertFile, s.SSLKeyFile)
+		validationResult, err := validateTLSCertificate(s.SSLCertFile, s.SSLKeyFile, s.tlsValidationHostname(), time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("while loading tls cert: %w", err)
 		}
+		s.logTLSWarnings(validationResult.Warnings)
 
-		s.SSLCert = &cert
+		s.SSLCert = &validationResult.Certificate
 		s.CertLastRefreshTime = certStat.ModTime()
 		s.KeyLastRefreshTime = keyStat.ModTime()
 	}
