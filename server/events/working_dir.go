@@ -454,7 +454,10 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 
 	// For branch strategy it's easy: just *go to* the ref we're supposed to be at.
 	if !w.CheckoutMerge {
-		return w.wrappedGit(logger, c, "reset", "--hard", targetRef)
+		if err := w.wrappedGit(logger, c, "reset", "--hard", targetRef); err != nil {
+			return err
+		}
+		return w.cleanStalePlanFiles(logger, c)
 	}
 
 	// For merge strategy, we have to "redo" the merge
@@ -479,7 +482,13 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 		return fmt.Errorf("post-merge verification failed: HEAD^2 != %s", targetRef)
 	}
 
-	return nil
+	return w.cleanStalePlanFiles(logger, c)
+}
+
+func (w *FileWorkspace) cleanStalePlanFiles(logger logging.SimpleLogging, c wrappedGitContext) error {
+	// Plan files are untracked, so git reset --hard does not remove them.
+	// Use -x because Terraform plan files are commonly ignored by repos.
+	return w.wrappedGit(logger, c, "clean", "-f", "-x", "-e", ".terragrunt-cache", "--", ":(glob)**/*.tfplan")
 }
 
 // isBranchAtTargetRef confirm
