@@ -214,6 +214,8 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.
 type DefaultProjectCommandRunner struct {
+	AtlantisVersion           string
+	VCSStatusName             string
 	VcsClient                 vcs.Client
 	Locker                    ProjectLocker
 	LockURLGenerator          LockURLGenerator
@@ -824,8 +826,29 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 	// Hold a read lock for the whole step run so clone/reset/merge cannot run in this dir until we're done.
 	unlock := p.WorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	defer unlock()
+  
+  	// Truncate the verbose atlantis version (ex: 'dev (commit: none) (build date: unknown)' -> 'dev').
+	atlantisVersion, _, _ := strings.Cut(p.AtlantisVersion, " ")
 
-	envs := make(map[string]string)
+	vcsStatusName := p.VCSStatusName
+	if vcsStatusName == "" {
+		vcsStatusName = "atlantis"
+	}
+
+	envs := map[string]string{
+		"TF_APPEND_USER_AGENT": fmt.Sprintf(
+			"%s/%s (%s; %s; %s; %s; %s; +%s)",
+			vcsStatusName,
+			atlantisVersion,
+			ctx.User.Username,
+			ctx.CommandName,
+			ctx.RepoRelDir,
+			ctx.Workspace,
+			ctx.Pull.HeadCommit,
+			ctx.Pull.URL,
+		),
+	}
+
 	for _, step := range steps {
 		var out string
 		var err error
