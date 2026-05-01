@@ -2299,3 +2299,98 @@ projects:
 		Assert(t, p.Name == nil, "expanded projects should not have names")
 	}
 }
+
+// Test that glob_file_match filters directories by specific file patterns.
+func TestParseRepoCfg_GlobExpansionGlobFileMatch(t *testing.T) {
+	// Create a temp directory with the following structure:
+	// repo/
+	//   modules/
+	//     with-terragrunt/
+	//       terragrunt.hcl
+	//     with-tf/
+	//       main.tf
+	//     with-both/
+	//       terragrunt.hcl
+	//       main.tf
+	//     empty/
+	//       readme.md
+
+	tmpDir := t.TempDir()
+
+	dirs := []string{
+		"modules/with-terragrunt",
+		"modules/with-tf",
+		"modules/with-both",
+		"modules/empty",
+	}
+	for _, dir := range dirs {
+		err := os.MkdirAll(filepath.Join(tmpDir, dir), 0755)
+		Ok(t, err)
+	}
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, "modules/with-terragrunt/terragrunt.hcl"), []byte(""), 0600))
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, "modules/with-tf/main.tf"), []byte(""), 0600))
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, "modules/with-both/terragrunt.hcl"), []byte(""), 0600))
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, "modules/with-both/main.tf"), []byte(""), 0600))
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, "modules/empty/readme.md"), []byte(""), 0600))
+
+	cases := []struct {
+		description string
+		input       string
+		expDirs     []string
+	}{
+		{
+			description: "glob_file_match terragrunt.hcl only",
+			input: `
+version: 3
+projects:
+- dir: "modules/*"
+  glob_file_match:
+  - "terragrunt.hcl"
+`,
+			expDirs: []string{"modules/with-terragrunt", "modules/with-both"},
+		},
+		{
+			description: "default (no glob_file_match) matches *.tf",
+			input: `
+version: 3
+projects:
+- dir: "modules/*"
+`,
+			expDirs: []string{"modules/with-tf", "modules/with-both"},
+		},
+		{
+			description: "multiple patterns match any",
+			input: `
+version: 3
+projects:
+- dir: "modules/*"
+  glob_file_match:
+  - "terragrunt.hcl"
+  - "*.tf"
+`,
+			expDirs: []string{"modules/with-terragrunt", "modules/with-tf", "modules/with-both"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
+			Ok(t, err)
+
+			r := config.ParserValidator{}
+			cfg, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
+			Ok(t, err)
+
+			var actualDirs []string
+			for _, p := range cfg.Projects {
+				actualDirs = append(actualDirs, p.Dir)
+			}
+
+			Equals(t, len(c.expDirs), len(actualDirs))
+			for _, expDir := range c.expDirs {
+				found := slices.Contains(actualDirs, expDir)
+				Assert(t, found, "expected dir %q not found in actual dirs %v", expDir, actualDirs)
+			}
+		})
+	}
+}
