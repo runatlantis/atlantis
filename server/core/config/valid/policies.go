@@ -54,6 +54,27 @@ func (p *PolicySets) HasTeamOwners() bool {
 	return hasTeamOwners
 }
 
+// MergedWith returns a new PolicyOwners combining o and other, deduplicating case-insensitively.
+func (o PolicyOwners) MergedWith(other PolicyOwners) PolicyOwners {
+	return PolicyOwners{
+		Users: mergeUniqueStrings(o.Users, other.Users),
+		Teams: mergeUniqueStrings(o.Teams, other.Teams),
+	}
+}
+
+func mergeUniqueStrings(a, b []string) []string {
+	seen := map[string]bool{}
+	result := []string{}
+	for _, s := range append(a, b...) {
+		lower := strings.ToLower(s)
+		if !seen[lower] {
+			seen[lower] = true
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
 func (o *PolicyOwners) IsOwner(username string, userTeams []string) bool {
 	for _, uname := range o.Users {
 		if strings.EqualFold(uname, username) {
