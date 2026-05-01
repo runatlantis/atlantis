@@ -202,6 +202,8 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 			ctx.Log.Err("updating project PR status", err)
 		}
 
+		p.streamFailureToJob(ctx, result)
+
 		return result
 	}
 
@@ -210,6 +212,20 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	}
 
 	return result
+}
+
+// streamFailureToJob emits the project's error and/or failure text to the job
+// output stream so the per-project job page linked from the VCS commit status
+// has a visible final status when plan or apply fails before producing any
+// terraform output (e.g. lock contention, depends_on, requirement checks).
+// Uses \r\n so the xterm-based job page renders the banner on its own lines.
+func (p *ProjectOutputWrapper) streamFailureToJob(ctx command.ProjectContext, result command.ProjectCommandOutput) {
+	if result.Error != nil {
+		p.JobMessageSender.Send(ctx, fmt.Sprintf("\r\nError:\r\n%s\r\n", result.Error.Error()), false)
+	}
+	if result.Failure != "" {
+		p.JobMessageSender.Send(ctx, fmt.Sprintf("\r\nFailure:\r\n%s\r\n", result.Failure), false)
+	}
 }
 
 // DefaultProjectCommandRunner implements ProjectCommandRunner.

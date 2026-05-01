@@ -130,6 +130,11 @@ func TestProjectOutputWrapper(t *testing.T) {
 		RepoRelDir: ".",
 	}
 
+	const (
+		expErrorBanner   = "\r\nError:\r\nerror\r\n"
+		expFailureBanner = "\r\nFailure:\r\nfailure\r\n"
+	)
+
 	cases := []struct {
 		Description string
 		Failure     bool
@@ -153,6 +158,12 @@ func TestProjectOutputWrapper(t *testing.T) {
 			CommandName: command.Plan,
 		},
 		{
+			Description: "plan error and failure",
+			Error:       true,
+			Failure:     true,
+			CommandName: command.Plan,
+		},
+		{
 			Description: "apply success",
 			Success:     true,
 			CommandName: command.Apply,
@@ -165,6 +176,12 @@ func TestProjectOutputWrapper(t *testing.T) {
 		{
 			Description: "apply error",
 			Error:       true,
+			CommandName: command.Apply,
+		},
+		{
+			Description: "apply error and failure",
+			Error:       true,
+			Failure:     true,
 			CommandName: command.Apply,
 		},
 	}
@@ -190,16 +207,14 @@ func TestProjectOutputWrapper(t *testing.T) {
 					ApplySuccess: "exists",
 				}
 				expCommitStatus = models.SuccessCommitStatus
-			} else if c.Failure {
-				prjResult = command.ProjectCommandOutput{
-					Failure: "failure",
-				}
+			} else {
 				expCommitStatus = models.FailedCommitStatus
-			} else if c.Error {
-				prjResult = command.ProjectCommandOutput{
-					Error: errors.New("error"),
+				if c.Error {
+					prjResult.Error = errors.New("error")
 				}
-				expCommitStatus = models.FailedCommitStatus
+				if c.Failure {
+					prjResult.Failure = "failure"
+				}
 			}
 
 			When(mockProjectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(prjResult)
@@ -221,6 +236,23 @@ func TestProjectOutputWrapper(t *testing.T) {
 			case command.Apply:
 				mockProjectCommandRunner.VerifyWasCalledOnce().Apply(ctx)
 			}
+
+			// Assert the ordering and content of JobMessageSender.Send calls.
+			// Banners (if any) must be streamed before the OperationComplete signal
+			// so the xterm-based job page renders the final status.
+			inOrder := new(InOrderContext)
+			expectedSends := 0
+			if c.Error {
+				mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, expErrorBanner, false)
+				expectedSends++
+			}
+			if c.Failure {
+				mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, expFailureBanner, false)
+				expectedSends++
+			}
+			mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, "", true)
+			expectedSends++
+			mockJobMessageSender.VerifyWasCalled(Times(expectedSends)).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
 		})
 	}
 }
