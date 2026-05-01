@@ -163,6 +163,23 @@ type WebhookConfig struct {
 //go:embed static
 var staticAssets embed.FS
 
+// ParsePlanTimeout parses a plan timeout string into a time.Duration.
+// Returns zero duration for empty input (no timeout). Returns an error
+// for invalid or negative durations.
+func ParsePlanTimeout(s string) (time.Duration, error) {
+	if s == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("parsing plan-timeout %q: %w", s, err)
+	}
+	if d < 0 {
+		return 0, fmt.Errorf("plan-timeout must not be negative, got %s", d)
+	}
+	return d, nil
+}
+
 // NewServer returns a new server. If there are issues starting the server or
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
@@ -699,6 +716,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	cancellationTracker := events.NewCancellationTracker()
 
+	planTimeout, err := ParsePlanTimeout(userConfig.PlanTimeout)
+	if err != nil {
+		return nil, err
+	}
+	if planTimeout > 0 {
+		logger.Info("Plan timeout configured: %s", planTimeout)
+	}
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		VcsClient:        vcsClient,
 		Locker:           projectLocker,
@@ -738,6 +763,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:          workingDirLocker,
 		CommandRequirementHandler: applyRequirementHandler,
 		CancellationTracker:       cancellationTracker,
+		PlanTimeout:               planTimeout,
 	}
 
 	dbUpdater := &events.DBUpdater{

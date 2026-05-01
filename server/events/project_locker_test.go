@@ -7,6 +7,7 @@ package events_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/locking/mocks"
@@ -234,6 +235,68 @@ func TestDefaultProjectLocker_RepoLocking(t *testing.T) {
 			res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, tt.repoLocking)
 			Ok(t, err)
 			Equals(t, true, res.LockAcquired)
+		})
+	}
+}
+
+func TestDefaultProjectLocker_TryLockPopulatesLockTime(t *testing.T) {
+	lockTime := time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
+
+	tests := []struct {
+		name         string
+		lockAcquired bool
+		description  string
+	}{
+		{
+			name:         "fresh lock",
+			lockAcquired: true,
+		},
+		{
+			name:         "re-acquired from same PR",
+			lockAcquired: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			var githubClient *github.Client
+			mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
+			mockLocker := mocks.NewMockLocker(ctrl)
+			locker := events.DefaultProjectLocker{
+				Locker:    mockLocker,
+				VCSClient: mockClient,
+			}
+
+			expProject := models.Project{}
+			expWorkspace := "default"
+			expPull := models.PullRequest{Num: 2}
+			expUser := models.User{}
+			lockKey := "key"
+
+			mockLocker.EXPECT().TryLock(expProject, expWorkspace, expPull, expUser).Return(
+				locking.TryLockResponse{
+					LockAcquired: tt.lockAcquired,
+					CurrLock: models.ProjectLock{
+						Pull: expPull,
+						Time: lockTime,
+					},
+					LockKey: lockKey,
+				},
+				nil,
+			)
+			if tt.lockAcquired {
+				mockLocker.EXPECT().Unlock(lockKey).Return(nil, nil)
+			} else {
+				mockLocker.EXPECT().Unlock(lockKey).Return(nil, nil)
+			}
+
+			res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
+			Ok(t, err)
+			Equals(t, true, res.LockAcquired)
+			Equals(t, lockTime, res.LockTime)
+
+			err = res.UnlockFn()
+			Ok(t, err)
 		})
 	}
 }

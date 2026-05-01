@@ -8,7 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
@@ -535,6 +538,237 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	Assert(t, res.ApplySuccess == "", "exp apply failure")
 
 	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+}
+
+func TestDefaultProjectCommandRunner_ApplyPlanExpired(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	applyReqHandler := &events.DefaultCommandRequirementHandler{
+		WorkingDir: mockWorkingDir,
+	}
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: applyReqHandler,
+		Webhooks:                  mockSender,
+		PlanTimeout:               1 * time.Millisecond,
+	}
+	repoDir := t.TempDir()
+
+	// Create a plan file that should be deleted on expiry.
+	planFile := filepath.Join(repoDir, "default.tfplan")
+	Ok(t, os.WriteFile(planFile, []byte("fake-plan"), 0600))
+
+	When(mockWorkingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string](),
+	)).ThenReturn(repoDir, nil)
+
+	unlocked := false
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+		LockTime:     time.Now().Add(-1 * time.Hour),
+		UnlockFn:     func() error { unlocked = true; return nil },
+	}, nil)
+
+	ctx := command.ProjectContext{
+		Log:               logging.NewNoopLogger(t),
+		Steps:             valid.DefaultApplyStage.Steps,
+		Workspace:         "default",
+		ApplyRequirements: []string{},
+		RepoRelDir:        ".",
+	}
+
+	res := runner.Apply(ctx)
+	Assert(t, res.ApplySuccess == "", "expected no apply output")
+	Assert(t, strings.Contains(res.Failure, "plan has expired"), "expected expiry failure message, got: %s", res.Failure)
+	Assert(t, strings.Contains(res.Failure, "atlantis plan"), "expected re-plan hint in message")
+	Assert(t, unlocked, "expected lock to be released")
+	_, err := os.Stat(planFile)
+	Assert(t, os.IsNotExist(err), "expected plan file to be deleted")
+}
+
+func TestDefaultProjectCommandRunner_ApplyPlanNotExpired(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	applyReqHandler := &events.DefaultCommandRequirementHandler{
+		WorkingDir: mockWorkingDir,
+	}
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: applyReqHandler,
+		Webhooks:                  mockSender,
+		PlanTimeout:               1 * time.Hour,
+	}
+	repoDir := t.TempDir()
+	When(mockWorkingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string](),
+	)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+		LockTime:     time.Now(),
+	}, nil)
+
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		Steps: []valid.Step{
+			{StepName: "apply"},
+		},
+		Workspace:         "default",
+		ApplyRequirements: []string{},
+		RepoRelDir:        ".",
+	}
+	expEnvs := map[string]string{}
+	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
+
+	res := runner.Apply(ctx)
+	Equals(t, "apply", res.ApplySuccess)
+	Equals(t, "", res.Failure)
+	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+}
+
+func TestDefaultProjectCommandRunner_ApplyNoPlanTimeout(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	applyReqHandler := &events.DefaultCommandRequirementHandler{
+		WorkingDir: mockWorkingDir,
+	}
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: applyReqHandler,
+		Webhooks:                  mockSender,
+		// PlanTimeout is zero — timeout disabled
+	}
+	repoDir := t.TempDir()
+	When(mockWorkingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string](),
+	)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+		LockTime:     time.Now().Add(-24 * time.Hour),
+	}, nil)
+
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		Steps: []valid.Step{
+			{StepName: "apply"},
+		},
+		Workspace:         "default",
+		ApplyRequirements: []string{},
+		RepoRelDir:        ".",
+	}
+	expEnvs := map[string]string{}
+	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
+
+	res := runner.Apply(ctx)
+	Equals(t, "apply", res.ApplySuccess)
+	Equals(t, "", res.Failure)
+}
+
+func TestDefaultProjectCommandRunner_ApplyPlanExpiredZeroLockTime(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	applyReqHandler := &events.DefaultCommandRequirementHandler{
+		WorkingDir: mockWorkingDir,
+	}
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: applyReqHandler,
+		Webhooks:                  mockSender,
+		PlanTimeout:               1 * time.Millisecond,
+	}
+	repoDir := t.TempDir()
+	When(mockWorkingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string](),
+	)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+		// LockTime is zero value — should skip expiry check
+	}, nil)
+
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		Steps: []valid.Step{
+			{StepName: "apply"},
+		},
+		Workspace:         "default",
+		ApplyRequirements: []string{},
+		RepoRelDir:        ".",
+	}
+	expEnvs := map[string]string{}
+	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
+
+	res := runner.Apply(ctx)
+	Equals(t, "apply", res.ApplySuccess)
+	Equals(t, "", res.Failure)
 }
 
 // Test run and env steps. We don't use mocks for this test since we're

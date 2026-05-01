@@ -117,6 +117,7 @@ const (
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
 	PendingApplyStatusFlag           = "pending-apply-status"
+	PlanTimeoutFlag                  = "plan-timeout"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
 	PortFlag                         = "port"
@@ -492,6 +493,13 @@ var stringFlags = map[string]stringFlag{
 	WebPasswordFlag: {
 		description:  "Password used for Web Basic Authentication on Atlantis HTTP Middleware",
 		defaultValue: DefaultWebPassword,
+	},
+	PlanTimeoutFlag: {
+		description: "Duration after which a plan is considered stale and will be discarded on apply. " +
+			"The lock will be released so another user can plan. " +
+			"Uses Go duration format (e.g. 15m, 1h, 2h30m). " +
+			"If empty or zero, plans never expire (default behavior).",
+		defaultValue: "",
 	},
 }
 
