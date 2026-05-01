@@ -118,4 +118,5 @@ command](custom-workflows.md#custom-run-command).
   * `COMMAND_NAME` - The name of the command that is being executed, i.e. `plan`, `apply` etc.
   * `COMMAND_HAS_ERRORS` - Indicates whether any errors occurred during the execution of the command (`plan`, `apply`). If set to `true`, at least one error was encountered; otherwise, it is `false`.
   * `OUTPUT_STATUS_FILE` - An output file to customize the success or failure status. ex. `echo 'failure' > $OUTPUT_STATUS_FILE`.
+  * `PROJECT_NAME` - Project name passed by the `-p` option. If `-p` is not provided, this value is empty.
 :::
