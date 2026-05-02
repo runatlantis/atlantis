@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package webhooks
@@ -24,7 +15,7 @@ const (
 	slackFailureColour = "danger"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_slack_client.go SlackClient
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_slack_client.go SlackClient
 
 // SlackClient handles making API calls to Slack.
 type SlackClient interface {
@@ -33,7 +24,7 @@ type SlackClient interface {
 	PostMessage(channel string, applyResult ApplyResult) error
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_underlying_slack_client.go UnderlyingSlackClient
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_underlying_slack_client.go UnderlyingSlackClient
 
 // UnderlyingSlackClient wraps the nlopes/slack.Client implementation so
 // we can mock it during tests.

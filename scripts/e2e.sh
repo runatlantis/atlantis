@@ -34,11 +34,18 @@ function cleanupPid() {
 # start atlantis server in the background and wait for it to start
 # It's the responsibility of the caller of this script to set the github, gitlab, etc.
 # permissions via environment variable
+# Enable --write-git-creds when using GitHub App auth (required for cloning)
+WRITE_GIT_CREDS=""
+if [ -n "${ATLANTIS_GH_APP_ID:-}" ]; then
+  WRITE_GIT_CREDS="--write-git-creds"
+fi
+
 ./atlantis server \
   --data-dir="/tmp" \
   --log-level="debug" \
   --repo-allowlist="github.com/runatlantis/atlantis-tests,gitlab.com/runatlantis/atlantis-tests" \
   --repo-config-json='{"repos":[{"id":"/.*/", "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true}]}' \
+  $WRITE_GIT_CREDS \
   &> /tmp/atlantis-server.log &
 ATLANTIS_PID=$!
 sleep 2
