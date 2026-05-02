@@ -1,16 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // Package models holds all models that are needed across packages.
@@ -72,7 +61,11 @@ func (r Repo) ID() string {
 // ex. https://github.com/runatlantis/atlantis.git OR
 //
 //	https://github.com/runatlantis/atlantis
-func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
+//
+// vcsHostname is the configured hostname for the VCS (may include a subpath
+// for GitLab, e.g. "acme.com/gitlab"). Pass empty string to skip the
+// enhanced host/subpath validation; non-GitLab callers always pass "".
+func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string, vcsHostname string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
 	}
@@ -97,6 +90,18 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	// Azure DevOps also does not require .git at the end of clone urls.
 	if vcsHostType != BitbucketServer && vcsHostType != AzureDevops {
 		expClonePath := fmt.Sprintf("/%s.git", repoFullName)
+
+		if vcsHostType == Gitlab && vcsHostname != "" {
+			expectedHost, basePath, parseErr := ParseGitlabHostname(vcsHostname)
+			if parseErr != nil {
+				return Repo{}, fmt.Errorf("parsing configured gitlab hostname %q: %w", vcsHostname, parseErr)
+			}
+			if !strings.EqualFold(cloneURLParsed.Host, expectedHost) {
+				return Repo{}, fmt.Errorf("expected clone url host %q but had %q", expectedHost, cloneURLParsed.Host)
+			}
+			expClonePath = basePath + expClonePath
+		}
+
 		if expClonePath != cloneURLParsed.Path {
 			return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
 		}

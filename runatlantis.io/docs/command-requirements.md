@@ -232,6 +232,13 @@ monorepos where unrelated changes to other projects should not block your applie
 
 If no `when_modified` patterns are configured (e.g. auto-discovered projects), `undiverged` falls back to checking all files.
 
+Targeted `undiverged` checks also follow Atlantis project selection for:
+
+* repo-configured projects affected through [module autoplanning](server-configuration.md#autoplan-modules)
+* auto-discovered projects selected by the default `autoplan-file-list` rules
+
+If Atlantis cannot determine project impact for a repository, `undiverged` falls back to checking all files.
+
 **Example scenario:**
 
 ```text

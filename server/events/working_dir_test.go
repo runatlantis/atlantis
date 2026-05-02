@@ -923,6 +923,22 @@ func TestHasDiverged_WithPatterns_CheckoutMergeDisabled(t *testing.T) {
 	Equals(t, false, hasDiverged)
 }
 
+func TestGetDivergedFiles_CheckoutMergeDisabled(t *testing.T) {
+	wd := &events.FileWorkspace{
+		DataDir:             t.TempDir(),
+		CheckoutMerge:       false,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	files, err := wd.GetDivergedFiles(logging.NewNoopLogger(t), t.TempDir(), models.PullRequest{
+		BaseBranch: "main",
+	})
+
+	Ok(t, err)
+	Equals(t, []string(nil), files)
+}
+
 func TestHasDiverged_WithEmptyPatterns(t *testing.T) {
 	// Initialize the git repo.
 	repoDir := initRepo(t)
@@ -1929,7 +1945,8 @@ func TestFileWorkspace_PathTraversal(t *testing.T) {
 	t.Run("DeleteForWorkspace rejects traversal in workspace name", func(t *testing.T) {
 		safeRepo := models.Repo{FullName: "owner/repo"}
 		safePull := models.PullRequest{Num: 1, BaseRepo: safeRepo}
-		err := wd.DeleteForWorkspace(logger, safeRepo, safePull, "../../etc")
+		// "../../../../etc" traverses past repos/ and dataDir/, escaping the managed directory.
+		err := wd.DeleteForWorkspace(logger, safeRepo, safePull, "../../../../etc")
 		Assert(t, err != nil, "expected error for path traversal in workspace name")
 		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
 	})
