@@ -76,7 +76,14 @@ func (c *Client) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, 
 	pr, resp, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pullNum))
 
 	if err != nil {
-		logger.Debug("GET /repos/%v/%v/pulls/%d returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
+		// Network errors before a response is received leave `resp` nil — the
+		// previous unconditional `resp.StatusCode` access panicked Atlantis on
+		// every other request when the upstream Gitea returned 502 (#5580).
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("GET /repos/%v/%v/pulls/%d returned: %v", repo.Owner, repo.Name, pullNum, status)
 		return nil, err
 	}
 
@@ -103,7 +110,11 @@ func (c *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 		listOptions.Page = page
 		files, resp, err := c.giteaClient.ListPullRequestFiles(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 		if err != nil {
-			logger.Debug("[page %d] GET /repos/%v/%v/pulls/%d/files returned: %v", page, repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+			status := "no response"
+			if resp != nil {
+				status = fmt.Sprintf("%d", resp.StatusCode)
+			}
+			logger.Debug("[page %d] GET /repos/%v/%v/pulls/%d/files returned: %v", page, repo.Owner, repo.Name, pull.Num, status)
 			return nil, err
 		}
 
@@ -133,7 +144,11 @@ func (c *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, p
 	_, resp, err := c.giteaClient.CreateIssueComment(repo.Owner, repo.Name, int64(pullNum), opt)
 
 	if err != nil {
-		logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, status)
 		return err
 	}
 
@@ -149,7 +164,11 @@ func (c *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, 
 	_, resp, err := c.giteaClient.PostIssueCommentReaction(repo.Owner, repo.Name, commentID, reaction)
 
 	if err != nil {
-		logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions returned: %v", repo.Owner, repo.Name, commentID, resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions returned: %v", repo.Owner, repo.Name, commentID, status)
 		return err
 	}
 
@@ -175,7 +194,11 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 
 		comments, resp, err := c.giteaClient.ListIssueComments(repo.Owner, repo.Name, int64(pullNum), opts)
 		if err != nil {
-			logger.Debug("GET /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
+			status := "no response"
+			if resp != nil {
+				status = fmt.Sprintf("%d", resp.StatusCode)
+			}
+			logger.Debug("GET /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, status)
 			return err
 		}
 
@@ -190,7 +213,11 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 
 	currentUser, resp, err := c.giteaClient.GetMyUserInfo()
 	if err != nil {
-		logger.Debug("GET /user returned: %v", resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("GET /user returned: %v", status)
 		return err
 	}
 
@@ -246,7 +273,11 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		pullReviews, resp, err := c.giteaClient.ListPullReviews(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 
 		if err != nil {
-			logger.Debug("GET /repos/%v/%v/pulls/%d/reviews returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+			status := "no response"
+			if resp != nil {
+				status = fmt.Sprintf("%d", resp.StatusCode)
+			}
+			logger.Debug("GET /repos/%v/%v/pulls/%d/reviews returned: %v", repo.Owner, repo.Name, pull.Num, status)
 			return approvalStatus, err
 		}
 
@@ -319,7 +350,11 @@ func (c *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 	_, resp, err := c.giteaClient.CreateStatus(repo.Owner, repo.Name, pull.HeadCommit, newStatusOption)
 
 	if err != nil {
-		logger.Debug("POST /repos/%v/%v/statuses/%s returned: %v", repo.Owner, repo.Name, pull.HeadCommit, resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("POST /repos/%v/%v/statuses/%s returned: %v", repo.Owner, repo.Name, pull.HeadCommit, status)
 		return err
 	}
 
@@ -388,7 +423,11 @@ func (c *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 	succeeded, resp, err := c.giteaClient.MergePullRequest(pull.BaseRepo.Owner, pull.BaseRepo.Name, int64(pull.Num), mergeOptions)
 
 	if err != nil {
-		logger.Debug("POST /repos/%v/%v/pulls/%d/merge returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, pull.Num, resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("POST /repos/%v/%v/pulls/%d/merge returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, pull.Num, status)
 		return err
 	}
 
@@ -418,7 +457,11 @@ func (c *Client) GetFileContent(logger logging.SimpleLogging, repo models.Repo, 
 	content, resp, err := c.giteaClient.GetContents(repo.Owner, repo.Name, branch, fileName)
 
 	if err != nil {
-		logger.Debug("GET /repos/%v/%v/contents/%s?ref=%v returned: %v", repo.Owner, repo.Name, fileName, branch, resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("GET /repos/%v/%v/contents/%s?ref=%v returned: %v", repo.Owner, repo.Name, fileName, branch, status)
 		return false, nil, err
 	}
 
@@ -476,7 +519,11 @@ func (c *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, p
 		labels, resp, err := c.giteaClient.GetIssueLabels(repo.Owner, repo.Name, int64(pull.Num), opts)
 
 		if err != nil {
-			logger.Debug("GET /repos/%v/%v/issues/%d/labels?%v returned: %v", repo.Owner, repo.Name, pull.Num, "unknown", resp.StatusCode)
+			status := "no response"
+			if resp != nil {
+				status = fmt.Sprintf("%d", resp.StatusCode)
+			}
+			logger.Debug("GET /repos/%v/%v/issues/%d/labels?%v returned: %v", repo.Owner, repo.Name, pull.Num, "unknown", status)
 			return nil, err
 		}
 
