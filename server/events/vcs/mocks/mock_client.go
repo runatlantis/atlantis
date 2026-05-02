@@ -117,6 +117,25 @@ func (mock *MockClient) GetModifiedFiles(logger logging.SimpleLogging, repo mode
 	return _ret0, _ret1
 }
 
+func (mock *MockClient) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockClient().")
+	}
+	_params := []pegomock.Param{logger, repo, teamSlug}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetChildTeams", _params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 []string
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].([]string)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
 func (mock *MockClient) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
@@ -541,6 +560,47 @@ func (c *MockClient_GetModifiedFiles_OngoingVerification) GetAllCapturedArgument
 			_param2 = make([]models.PullRequest, len(c.methodInvocations))
 			for u, param := range _params[2] {
 				_param2[u] = param.(models.PullRequest)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockClient) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) *MockClient_GetChildTeams_OngoingVerification {
+	_params := []pegomock.Param{logger, repo, teamSlug}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetChildTeams", _params, verifier.timeout)
+	return &MockClient_GetChildTeams_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockClient_GetChildTeams_OngoingVerification struct {
+	mock              *MockClient
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockClient_GetChildTeams_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.Repo, string) {
+	logger, repo, teamSlug := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], repo[len(repo)-1], teamSlug[len(teamSlug)-1]
+}
+
+func (c *MockClient_GetChildTeams_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []string) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(logging.SimpleLogging)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]models.Repo, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(models.Repo)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(string)
 			}
 		}
 	}

@@ -495,6 +495,10 @@ func (c *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, p
 	return results, nil
 }
 
+func (c *Client) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, _ string) ([]string, error) {
+	return nil, nil
+}
+
 func ValidateSignature(payload []byte, signature string, secretKey []byte) error {
 	isValid, err := gitea.VerifyWebhookSignature(string(secretKey), signature, payload)
 	if err != nil {

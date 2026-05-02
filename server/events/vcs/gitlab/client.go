@@ -789,3 +789,7 @@ func (g *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, p
 
 	return mr.Labels, nil
 }
+
+func (g *Client) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, _ string) ([]string, error) {
+	return nil, nil
+}

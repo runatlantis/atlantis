@@ -1697,6 +1697,140 @@ func TestClient_GetTeamNamesForUser(t *testing.T) {
 	Equals(t, []string{"frontend-developers", "employees"}, teams)
 }
 
+// TestClient_GetChildTeams verifies that direct child teams of a given team are returned.
+func TestClient_GetChildTeams(t *testing.T) {
+	t.Run("single page", func(t *testing.T) {
+		logger := logging.NewNoopLogger(t)
+		resp := `{
+			"data":{
+			  "organization": {
+				"team": {
+					"childTeams": {
+						"nodes": [
+							{"slug": "child-team-a"},
+							{"slug": "child-team-b"}
+						],
+						"pageInfo": {
+							"endCursor": "Y3Vyc29yOnYyOpHOAFMoLQ==",
+							"hasNextPage": false
+						}
+					}
+				}
+			}
+		  }
+		}`
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/api/graphql":
+					w.Write([]byte(resp)) // nolint: errcheck
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+			}))
+		defer testServer.Close()
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		children, err := client.GetChildTeams(
+			logger,
+			models.Repo{Owner: "testrepo"},
+			"parent-team",
+		)
+		Ok(t, err)
+		Equals(t, []string{"child-team-a", "child-team-b"}, children)
+	})
+
+	t.Run("multiple pages", func(t *testing.T) {
+		logger := logging.NewNoopLogger(t)
+		firstCursor := "cursor-page-1"
+		firstResp := `{
+			"data":{
+			  "organization": {
+				"team": {
+					"childTeams": {
+						"nodes": [
+							{"slug": "child-team-a"},
+							{"slug": "child-team-b"}
+						],
+						"pageInfo": {
+							"endCursor": "cursor-page-1",
+							"hasNextPage": true
+						}
+					}
+				}
+			}
+		  }
+		}`
+		secondResp := `{
+			"data":{
+			  "organization": {
+				"team": {
+					"childTeams": {
+						"nodes": [
+							{"slug": "child-team-c"}
+						],
+						"pageInfo": {
+							"endCursor": "cursor-page-2",
+							"hasNextPage": false
+						}
+					}
+				}
+			}
+		  }
+		}`
+
+		requestBodies := make([]string, 0, 2)
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/api/graphql":
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						t.Errorf("reading request body: %s", err)
+						http.Error(w, "bad request", http.StatusBadRequest)
+						return
+					}
+					requestBodies = append(requestBodies, string(body))
+					if len(requestBodies) == 1 {
+						w.Write([]byte(firstResp)) // nolint: errcheck
+					} else {
+						w.Write([]byte(secondResp)) // nolint: errcheck
+					}
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+			}))
+		defer testServer.Close()
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		children, err := client.GetChildTeams(
+			logger,
+			models.Repo{Owner: "testrepo"},
+			"parent-team",
+		)
+		Ok(t, err)
+		Equals(t, []string{"child-team-a", "child-team-b", "child-team-c"}, children)
+		Equals(t, 2, len(requestBodies))
+		// First request should not contain the cursor; second should.
+		Assert(t, !strings.Contains(requestBodies[0], firstCursor),
+			"expected first request not to include cursor")
+		Assert(t, strings.Contains(requestBodies[1], firstCursor),
+			"expected second request to include cursor")
+	})
+}
+
 func TestClient_DiscardReviews(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	type ResponseDef struct {
