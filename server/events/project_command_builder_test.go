@@ -17,6 +17,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -277,7 +278,7 @@ terraform {
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -643,7 +644,7 @@ projects:
 					userConfig.IncludeGitUntrackedFiles,
 					c.AutoDiscoverModeUserCfg,
 					scope,
-					terraformClient,
+					terraformClient, &runtime.LocalPlanStore{},
 				)
 
 				var actCtxs []command.ProjectContext
@@ -831,7 +832,7 @@ projects:
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -1196,7 +1197,7 @@ projects:
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -1294,7 +1295,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -1401,7 +1402,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) 
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -1508,7 +1509,7 @@ autodiscover:
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -1616,7 +1617,7 @@ autodiscover:
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -1701,7 +1702,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_ExplicitPlanInIgnoredPath(
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -1797,7 +1798,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnoreStaleNamedPlanInIgno
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -1888,7 +1889,7 @@ projects:
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctx := &command.Context{
@@ -1976,7 +1977,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -2138,7 +2139,7 @@ projects:
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -2279,7 +2280,7 @@ projects:
 			c.IncludeGitUntrackedFiles,
 			userConfig.AutoDiscoverMode,
 			scope,
-			terraformClient,
+			terraformClient, &runtime.LocalPlanStore{},
 		)
 
 		var actCtxs []command.ProjectContext
@@ -2363,7 +2364,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -2451,7 +2452,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildVersionCommands(
@@ -2581,7 +2582,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -2692,7 +2693,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -2712,4 +2713,125 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 			Equals(t, c.ExpRepoRelDir, actCtx.RepoRelDir)
 		})
 	}
+}
+
+// Test that when GetPullDir returns os.ErrNotExist with an external PlanStore,
+// the builder re-clones and calls RestorePlans before discovering plans.
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	// The directory that will exist after "re-clone".
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	// First GetPullDir call: directory missing (container restart).
+	// Second GetPullDir call: directory exists after re-clone.
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn("", os.ErrNotExist).
+		ThenReturn(tmpDir, nil)
+
+	When(workingDir.Clone(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(tmpDir, nil)
+
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfgArgs := valid.GlobalCfgArgs{}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	restoreCalled := false
+	planStore := &mockExternalPlanStore{
+		restoreFn: func(pullDir, owner, repo string, pullNum int) error {
+			restoreCalled = true
+			return nil
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Assert(t, restoreCalled, "expected RestorePlans to be called")
+	Equals(t, 1, len(ctxs))
+}
+
+// mockExternalPlanStore satisfies the runtime.PlanStore interface for testing
+// the external plan store recovery path.
+type mockExternalPlanStore struct {
+	restoreFn func(pullDir, owner, repo string, pullNum int) error
+}
+
+func (m *mockExternalPlanStore) Save(ctx command.ProjectContext, planPath string) error {
+	return nil
+}
+func (m *mockExternalPlanStore) Load(ctx command.ProjectContext, planPath string) error {
+	return nil
+}
+func (m *mockExternalPlanStore) Remove(ctx command.ProjectContext, planPath string) error {
+	return nil
+}
+func (m *mockExternalPlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) error {
+	if m.restoreFn != nil {
+		return m.restoreFn(pullDir, owner, repo, pullNum)
+	}
+	return nil
+}
+func (m *mockExternalPlanStore) DeleteForPull(owner, repo string, pullNum int) error {
+	return nil
 }
