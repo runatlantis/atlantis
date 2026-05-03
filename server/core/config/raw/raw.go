@@ -8,6 +8,7 @@ package raw
 
 import (
 	"fmt"
+	"regexp"
 
 	version "github.com/hashicorp/go-version"
 )
@@ -22,6 +23,20 @@ func VersionValidator(value any) error {
 	_, err := version.NewVersion(*strPtr)
 	if err != nil {
 		return fmt.Errorf("version %q could not be parsed: %w", *strPtr, err)
+	}
+	return nil
+}
+
+// RegexValidator validates that a *string field is a valid regular expression.
+// Implements ozzo-validation::Rule.Validate interface.
+func RegexValidator(value any) error {
+	strPtr := value.(*string)
+	if strPtr == nil {
+		return nil
+	}
+	_, err := regexp.Compile(*strPtr)
+	if err != nil {
+		return fmt.Errorf("policy_item_regex %q is not a valid regular expression: %w", *strPtr, err)
 	}
 	return nil
 }

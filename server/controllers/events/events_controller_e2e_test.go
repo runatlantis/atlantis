@@ -1214,6 +1214,28 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:     "sticky approval survives re-plan",
+			RepoDir:         "policy-checks-sticky-approvals",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
+			Comments: []string{
+				"atlantis approve_policies",
+				"atlantis plan",
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-approve-policies.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-policy-check-approved.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {

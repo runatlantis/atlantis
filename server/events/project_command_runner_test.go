@@ -1409,8 +1409,8 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
 				},
 			},
 			expFailure: "One or more policy sets require additional approval.",
@@ -1435,14 +1435,14 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  2,
-					CurApprovals:  1,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 2,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 			},
 			expFailure: "One or more policy sets require additional approval.",
@@ -1467,14 +1467,13 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  2,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 2,
 				},
 			},
 			expFailure: "One or more policy sets require additional approval.",
@@ -1499,14 +1498,14 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 			},
 			expFailure: "",
@@ -1532,14 +1531,13 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 1,
 				},
 			},
 			expFailure: "One or more policy sets require additional approval.",
@@ -1561,14 +1559,14 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     2,
+					Approvals:     make([]models.PolicySetApproval, 2),
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  2,
-					CurApprovals:  2,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 2,
+					Approvals:        make([]models.PolicySetApproval, 2),
 				},
 			},
 			expFailure: ``,
@@ -1592,15 +1590,14 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        true,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  2,
-					CurApprovals:  0,
-					Passed:        true,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 2,
+					Passed:           true,
 				},
 			},
 			expFailure: ``,
@@ -1631,25 +1628,24 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     0,
+					Approvals:     nil,
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     0,
+					Approvals:     nil,
 					Passed:        false,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 1,
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,
@@ -1680,25 +1676,25 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  2,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 2,
+					Approvals:        []models.PolicySetApproval{},
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,
@@ -1729,25 +1725,25 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  2,
-					CurApprovals:  1,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 2,
+					Approvals:        make([]models.PolicySetApproval, 1),
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,
@@ -1779,25 +1775,25 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     1,
+					Approvals:     make([]models.PolicySetApproval, 1),
 					Passed:        false,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        make([]models.PolicySetApproval, 1),
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  2,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 2,
+					Approvals:        []models.PolicySetApproval{},
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,
@@ -1829,25 +1825,24 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     0,
+					Approvals:     nil,
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     0,
+					Approvals:     nil,
 					Passed:        false,
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
 				},
 				{
-					PolicySetName: "policy2",
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy2",
+					ReqApprovalCount: 1,
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,
@@ -1932,6 +1927,436 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				Assert(t, res.Error != nil, "expecting error.")
 			} else {
 				Assert(t, res.Error == nil, "not expecting error.")
+			}
+		})
+	}
+}
+
+func TestDefaultProjectCommandRunner_ApprovePolicies_DuplicateApproval(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockVcsClient := vcsmocks.NewMockClient()
+	mockInit := mocks.NewMockStepRunner()
+	mockPlan := mocks.NewMockStepRunner()
+	mockApply := mocks.NewMockStepRunner()
+	mockRun := mocks.NewMockCustomStepRunner()
+	mockEnv := mocks.NewMockEnvStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:           mockLocker,
+		VcsClient:        mockVcsClient,
+		LockURLGenerator: mockURLGenerator{},
+		InitStepRunner:   mockInit,
+		PlanStepRunner:   mockPlan,
+		ApplyStepRunner:  mockApply,
+		RunStepRunner:    mockRun,
+		EnvStepRunner:    mockEnv,
+		WorkingDir:       mockWorkingDir,
+		Webhooks:         mockSender,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+	}
+	repoDir := t.TempDir()
+	When(mockWorkingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string](),
+	)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+	}, nil)
+
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, Author: testdata.User.Username}
+	When(runner.VcsClient.GetTeamNamesForUser(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.User))).ThenReturn(nil, nil)
+
+	ctx := command.ProjectContext{
+		User:       testdata.User,
+		Log:        logging.NewNoopLogger(t),
+		Workspace:  "default",
+		RepoRelDir: ".",
+		PolicySets: valid.PolicySets{
+			Owners: valid.PolicyOwners{
+				Users: []string{testdata.User.Username},
+			},
+			PolicySets: []valid.PolicySet{
+				{
+					Name:         "policy1",
+					ApproveCount: 2,
+				},
+			},
+		},
+		ProjectPolicyStatus: []models.PolicySetStatus{
+			{
+				PolicySetName: "policy1",
+				Hashes:        []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{
+					{Approver: testdata.User.Username, Hashes: []string{"h1", "h2"}},
+				},
+			},
+		},
+		Pull: modelPull,
+	}
+
+	res := runner.ApprovePolicies(ctx)
+	Assert(t, res.Error != nil, "expected error for duplicate approval by same user")
+	Equals(t, 1, len(res.PolicyCheckResults.PolicySetResults))
+	result := res.PolicyCheckResults.PolicySetResults[0]
+	Equals(t, 1, result.GetCurApprovals())
+}
+
+// Test that sticky carry-over preserves all approvals (including dormant ones
+// for non-current hashes) so they can reactivate if code is reverted.
+func TestDefaultProjectCommandRunner_PolicyCheck_StickyCarryOverPreservesDormantApprovals(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockPolicyCheck := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                mockLocker,
+		LockURLGenerator:      mockURLGenerator{},
+		PolicyCheckStepRunner: mockPolicyCheck,
+		WorkingDir:            mockWorkingDir,
+		WorkingDirLocker:      events.NewDefaultWorkingDirLocker(),
+	}
+
+	repoDir := t.TempDir()
+	When(mockWorkingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string](),
+	)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+	}, nil)
+
+	// Custom policy check returning NEW hashes (simulating changed code).
+	When(mockPolicyCheck.Run(
+		Any[command.ProjectContext](),
+		Any[[]string](),
+		Any[string](),
+		Any[map[string]string](),
+	)).ThenReturn("1 failure found\nnew-violation-line", nil)
+
+	ctx := command.ProjectContext{
+		Log:               logging.NewNoopLogger(t),
+		Workspace:         "default",
+		RepoRelDir:        ".",
+		CustomPolicyCheck: true,
+		PolicySets: valid.PolicySets{
+			PolicySets: []valid.PolicySet{
+				{
+					Name:            "policy1",
+					ApproveCount:    1,
+					StickyApprovals: true,
+					PolicyItemRegex: ".*",
+				},
+			},
+		},
+		// Previous status has an approval for OLD hashes (from a prior commit).
+		ProjectPolicyStatus: []models.PolicySetStatus{
+			{
+				PolicySetName: "policy1",
+				Hashes:        []string{"old-violation-line"},
+				Approvals: []models.PolicySetApproval{
+					{Approver: "boss", Hashes: []string{"old-violation-line"}},
+				},
+			},
+		},
+		Steps: []valid.Step{{StepName: "policy_check"}},
+	}
+
+	res := runner.PolicyCheck(ctx)
+
+	Assert(t, res.Error == nil, "not expecting error: %v", res.Error)
+	Assert(t, res.PolicyCheckResults != nil, "expecting policy check results")
+
+	result := res.PolicyCheckResults.PolicySetResults[0]
+
+	// The old approval should be preserved even though it doesn't match new hashes.
+	Equals(t, 1, len(result.Approvals))
+	Equals(t, "boss", result.Approvals[0].Approver)
+	Equals(t, []string{"old-violation-line"}, result.Approvals[0].Hashes)
+
+	// But GetCurApprovals should return 0 because the approval doesn't cover new hashes.
+	status := models.PolicySetStatus{
+		PolicySetName: result.PolicySetName,
+		Hashes:        result.Hashes,
+		Approvals:     result.Approvals,
+	}
+	Equals(t, 0, status.GetCurApprovals())
+}
+
+func TestDefaultProjectCommandRunner_PolicyCheck_StickyCarryOverBehavior(t *testing.T) {
+	cases := []struct {
+		description       string
+		stickyApprovals   bool
+		configRegex       string
+		storedRegex       string
+		storedApprovals   []models.PolicySetApproval
+		expectCarriedOver bool
+	}{
+		{
+			description:     "non-sticky policy set drops all previous approvals",
+			stickyApprovals: false,
+			configRegex:     ".*",
+			storedRegex:     ".*",
+			storedApprovals: []models.PolicySetApproval{
+				{Approver: "boss", Hashes: []string{"old-hash"}},
+			},
+			expectCarriedOver: false,
+		},
+		{
+			description:     "sticky with matching regex preserves approvals",
+			stickyApprovals: true,
+			configRegex:     ".+",
+			storedRegex:     ".+",
+			storedApprovals: []models.PolicySetApproval{
+				{Approver: "boss", Hashes: []string{"old-hash"}},
+			},
+			expectCarriedOver: true,
+		},
+		{
+			description:     "sticky with changed regex drops approvals",
+			stickyApprovals: true,
+			configRegex:     `(?m)^FAIL.*`,
+			storedRegex:     ".+",
+			storedApprovals: []models.PolicySetApproval{
+				{Approver: "boss", Hashes: []string{"old-hash"}},
+			},
+			expectCarriedOver: false,
+		},
+		{
+			description:     "sticky with empty stored regex (legacy) preserves approvals",
+			stickyApprovals: true,
+			configRegex:     ".+",
+			storedRegex:     "",
+			storedApprovals: []models.PolicySetApproval{
+				{Approver: "boss", Hashes: []string{"old-hash"}},
+			},
+			expectCarriedOver: true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockPolicyCheck := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                mockLocker,
+				LockURLGenerator:      mockURLGenerator{},
+				PolicyCheckStepRunner: mockPolicyCheck,
+				WorkingDir:            mockWorkingDir,
+				WorkingDirLocker:      events.NewDefaultWorkingDirLocker(),
+			}
+
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[string](),
+			)).ThenReturn(repoDir, nil)
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
+
+			When(mockPolicyCheck.Run(
+				Any[command.ProjectContext](),
+				Any[[]string](),
+				Any[string](),
+				Any[map[string]string](),
+			)).ThenReturn("new-violation-line", nil)
+
+			ctx := command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				Workspace:         "default",
+				RepoRelDir:        ".",
+				CustomPolicyCheck: true,
+				PolicySets: valid.PolicySets{
+					PolicySets: []valid.PolicySet{
+						{
+							Name:            "policy1",
+							ApproveCount:    1,
+							StickyApprovals: c.stickyApprovals,
+							PolicyItemRegex: c.configRegex,
+						},
+					},
+				},
+				ProjectPolicyStatus: []models.PolicySetStatus{
+					{
+						PolicySetName:   "policy1",
+						Hashes:          []string{"old-hash"},
+						PolicyItemRegex: c.storedRegex,
+						Approvals:       c.storedApprovals,
+					},
+				},
+				Steps: []valid.Step{{StepName: "policy_check"}},
+			}
+
+			res := runner.PolicyCheck(ctx)
+
+			Assert(t, res.Error == nil, "not expecting error: %v", res.Error)
+			Assert(t, res.PolicyCheckResults != nil, "expecting policy check results")
+
+			result := res.PolicyCheckResults.PolicySetResults[0]
+			if c.expectCarriedOver {
+				Equals(t, len(c.storedApprovals), len(result.Approvals))
+				Equals(t, c.storedApprovals[0].Approver, result.Approvals[0].Approver)
+			} else {
+				Assert(t, len(result.Approvals) == 0 || result.Approvals == nil,
+					"expected no approvals carried over but got %d", len(result.Approvals))
+			}
+		})
+	}
+}
+
+func TestDefaultProjectCommandRunner_ApprovePolicies_HashAwareApproval(t *testing.T) {
+	cases := []struct {
+		description       string
+		policySetStatus   []models.PolicySetStatus
+		policySetCfg      valid.PolicySets
+		expTotalApprovals int
+		expValidApprovals int
+		expFailure        string
+		hasErr            bool
+	}{
+		{
+			description: "approval with matching hashes counts",
+			policySetCfg: valid.PolicySets{
+				Owners: valid.PolicyOwners{
+					Users: []string{testdata.User.Username},
+				},
+				PolicySets: []valid.PolicySet{
+					{Name: "policy1", ApproveCount: 1},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Hashes:        []string{"h1", "h2"},
+				},
+			},
+			expTotalApprovals: 1,
+			expValidApprovals: 1,
+			expFailure:        "",
+		},
+		{
+			description: "stale approval preserved alongside fresh approval, only fresh one valid",
+			policySetCfg: valid.PolicySets{
+				Owners: valid.PolicyOwners{
+					Users: []string{testdata.User.Username},
+				},
+				PolicySets: []valid.PolicySet{
+					{Name: "policy1", ApproveCount: 2},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{
+					PolicySetName: "policy1",
+					Hashes:        []string{"h_new"},
+					Approvals: []models.PolicySetApproval{
+						{Approver: "other-user", Hashes: []string{"h_old"}},
+					},
+				},
+			},
+			expTotalApprovals: 2,
+			expValidApprovals: 1,
+			expFailure:        "One or more policy sets require additional approval.",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockVcsClient := vcsmocks.NewMockClient()
+			mockInit := mocks.NewMockStepRunner()
+			mockPlan := mocks.NewMockStepRunner()
+			mockApply := mocks.NewMockStepRunner()
+			mockRun := mocks.NewMockCustomStepRunner()
+			mockEnv := mocks.NewMockEnvStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+			mockSender := mocks.NewMockWebhooksSender()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:           mockLocker,
+				VcsClient:        mockVcsClient,
+				LockURLGenerator: mockURLGenerator{},
+				InitStepRunner:   mockInit,
+				PlanStepRunner:   mockPlan,
+				ApplyStepRunner:  mockApply,
+				RunStepRunner:    mockRun,
+				EnvStepRunner:    mockEnv,
+				WorkingDir:       mockWorkingDir,
+				Webhooks:         mockSender,
+				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+			}
+			repoDir := t.TempDir()
+			When(mockWorkingDir.GetWorkingDir(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[string](),
+			)).ThenReturn(repoDir, nil)
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
+
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, Author: testdata.User.Username}
+			When(runner.VcsClient.GetTeamNamesForUser(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.User))).ThenReturn(nil, nil)
+
+			ctx := command.ProjectContext{
+				User:                testdata.User,
+				Log:                 logging.NewNoopLogger(t),
+				Workspace:           "default",
+				RepoRelDir:          ".",
+				PolicySets:          c.policySetCfg,
+				ProjectPolicyStatus: c.policySetStatus,
+				Pull:                modelPull,
+			}
+
+			res := runner.ApprovePolicies(ctx)
+			Equals(t, c.expFailure, res.Failure)
+			result := res.PolicyCheckResults.PolicySetResults[0]
+			Equals(t, c.expTotalApprovals, len(result.Approvals))
+			Equals(t, c.expValidApprovals, result.GetCurApprovals())
+			if c.hasErr {
+				Assert(t, res.Error != nil, "expecting error")
 			}
 		})
 	}

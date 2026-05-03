@@ -4,16 +4,16 @@
 package policy
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
-
-	"encoding/json"
-	"regexp"
 
 	"github.com/hashicorp/go-getter/v2"
 
@@ -227,12 +227,22 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 			passed = false
 		}
 
-		policySetResults = append(policySetResults, models.PolicySetResult{
-			PolicySetName: policySet.Name,
-			PolicyOutput:  cmdOutput,
-			Passed:        passed,
-			ReqApprovals:  policySet.ApproveCount,
-		})
+		// Sanitize before hashing so that hashes are stable across runs
+		// (temp file paths vary) and match what ends up in PolicyOutput.
+		sanitizedOutput := c.sanitizeOutput(inputFile, cmdOutput)
+
+		result, regexErr := models.NewPolicySetResult(
+			policySet.Name,
+			sanitizedOutput,
+			passed,
+			policySet.ApproveCount,
+			policySet.PolicyItemRegex,
+		)
+		if regexErr != nil {
+			ctx.Log.Err("invalid policy_item_regex for policy set %q: %v", policySet.Name, regexErr)
+			continue
+		}
+		policySetResults = append(policySetResults, *result)
 	}
 
 	if policySetResults == nil {
@@ -242,20 +252,21 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		// return "", errors.Wrap(err, "building args")
 	}
 
-	marshaledStatus, err := json.Marshal(policySetResults)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(policySetResults); err != nil {
 		return "", errors.New("cannot marshal data into []PolicySetResult. data")
 	}
+	marshaledStatus := bytes.TrimRight(buf.Bytes(), "\n")
 
 	// Write policy check results to a file which can be used by custom workflow run steps for metrics, notifications, etc.
 	policyCheckResultFile := filepath.Join(workdir, ctx.GetPolicyCheckResultFileName())
-	err = os.WriteFile(policyCheckResultFile, marshaledStatus, 0600)
+	if writeErr := os.WriteFile(policyCheckResultFile, marshaledStatus, 0600); writeErr != nil {
+		combinedErr = errors.Join(combinedErr, writeErr)
+	}
 
-	combinedErr = errors.Join(combinedErr, err)
-
-	output := string(marshaledStatus)
-
-	return c.sanitizeOutput(inputFile, output), combinedErr
+	return string(marshaledStatus), combinedErr
 
 }
 
