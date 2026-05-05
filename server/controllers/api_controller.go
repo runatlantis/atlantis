@@ -29,8 +29,9 @@ type APIController struct {
 	Logger                         logging.SimpleLogging            `validate:"required"`
 	Parser                         events.EventParsing              `validate:"required"`
 	ProjectCommandBuilder          events.ProjectCommandBuilder     `validate:"required"`
-	ProjectPlanCommandRunner       events.ProjectPlanCommandRunner  `validate:"required"`
-	ProjectApplyCommandRunner      events.ProjectApplyCommandRunner `validate:"required"`
+	ProjectPlanCommandRunner        events.ProjectPlanCommandRunner        `validate:"required"`
+	ProjectApplyCommandRunner       events.ProjectApplyCommandRunner       `validate:"required"`
+	ProjectPolicyCheckCommandRunner events.ProjectPolicyCheckCommandRunner `validate:"required"`
 	FailOnPreWorkflowHookError     bool
 	PreWorkflowHooksCommandRunner  events.PreWorkflowHooksCommandRunner  `validate:"required"`
 	PostWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner `validate:"required"`
@@ -288,7 +289,13 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 			}
 		}
 
-		res := events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
+		var res command.ProjectResult
+		switch cmd.CommandName {
+		case command.PolicyCheck:
+			res = events.RunOneProjectCmd(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
+		default:
+			res = events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
+		}
 		projectResults = append(projectResults, res)
 
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
