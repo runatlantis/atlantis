@@ -57,16 +57,16 @@ type APIRequest struct {
 }
 
 func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
-	cc := make([]*events.CommentCommand, 0)
+	inputCC := make([]*events.CommentCommand, 0)
 
 	for _, project := range a.Projects {
-		cc = append(cc, &events.CommentCommand{
+		inputCC = append(inputCC, &events.CommentCommand{
 			Name:        cmdName,
 			ProjectName: project,
 		})
 	}
 	for _, path := range a.Paths {
-		cc = append(cc, &events.CommentCommand{
+		inputCC = append(inputCC, &events.CommentCommand{
 			Name:       cmdName,
 			RepoRelDir: strings.TrimRight(path.Directory, "/"),
 			Workspace:  path.Workspace,
@@ -74,11 +74,22 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 	}
 
 	cmds := make([]command.ProjectContext, 0)
-	for _, commentCommand := range cc {
+	cc := make([]*events.CommentCommand, 0)
+
+	for _, commentCommand := range inputCC {
 		projectCmds, err := cmdBuilder(ctx, commentCommand)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to build command: %v", err)
 		}
+		for _, projectCmd := range projectCmds {
+			cc = append(cc, &events.CommentCommand{
+				Name:        projectCmd.CommandName,
+				ProjectName: commentCommand.ProjectName,
+				RepoRelDir:  commentCommand.RepoRelDir,
+				Workspace:   commentCommand.Workspace,
+			})
+		}
+
 		cmds = append(cmds, projectCmds...)
 	}
 
