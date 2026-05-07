@@ -492,21 +492,16 @@ func ensureVersion(
 	if err != nil {
 		return "", err
 	}
-	// Try to run version. If it doesn't work, try deleting the binary and redownloading it
+	// Try running a test command (i.e. `terraform version`). If it doesn't work, try deleting the binary and redownloading it
 	for attempt := range 2 {
-		cmd := exec.Command(binPath, "version")
 
-		// Don't waste time trying to check for newer versions of terraform
-		cmd.Env = append(os.Environ(),
-			"CHECKPOINT_DISABLE=1",
-		)
-
-		output, err := cmd.CombinedOutput()
+		_, err := getVersion(binPath, dist.BinName())
 		if err == nil {
+			// The command succeeded, the installed binary looks good
 			break
 		}
 		if attempt == 0 && downloadsAllowed {
-			log.Warn("Terraform binary %s appears to be invalid, attempting to re-download", binPath)
+			log.Warn("%s binary %s failed execution validation, attempting to re-download", dist.BinName(), binPath)
 			delete(versions, v.String())
 			err := os.Remove(binPath)
 			if err != nil {
@@ -520,10 +515,9 @@ func ensureVersion(
 			continue
 		}
 		return "", fmt.Errorf(
-			"terraform binary at %s failed to execute: %w\noutput:\n%s",
+			"terraform binary at %s failed to execute: %w",
 			binPath,
 			err,
-			string(output),
 		)
 
 	}
