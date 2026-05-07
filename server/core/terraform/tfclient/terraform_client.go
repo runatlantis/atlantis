@@ -487,6 +487,43 @@ func ensureVersion(
 	downloadURL string,
 	downloadsAllowed bool,
 ) (string, error) {
+
+	binPath, err := findOrDownloadVersionBinaryPath(log, dist, versions, v, binDir, downloadURL, downloadsAllowed)
+	if err != nil {
+		return "", err
+	}
+	// Attempt to exercise the binary to make sure it works.
+	// For example, users sometimes change out architectures of the underlying host, which produces weird errors later
+	cmd := exec.Command(binPath, "version")
+
+	// Don't waste time trying to check for newer versions of terraform
+	cmd.Env = append(os.Environ(),
+		"CHECKPOINT_DISABLE=1",
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf(
+			"terraform binary at %s failed to execute: %w\noutput:\n%s",
+			binPath,
+			err,
+			string(output),
+		)
+	}
+	return binPath, nil
+}
+
+// findOrDownloadVersionBinaryPath returns the path to a terraform binary of version v.
+// It will download this version if we don't have it.
+func findOrDownloadVersionBinaryPath(
+	log logging.SimpleLogging,
+	dist terraform.Distribution,
+	versions map[string]string,
+	v *version.Version,
+	binDir string,
+	downloadURL string,
+	downloadsAllowed bool,
+) (string, error) {
 	if binPath, ok := versions[v.String()]; ok {
 		return binPath, nil
 	}
