@@ -45,6 +45,27 @@ func TestPendingPlanFinder_FindIncludingNotGitDir(t *testing.T) {
 	Equals(t, gitDirName, plans[0].Workspace)
 }
 
+// Non-directory entries (files, symlinks) in the pull dir should be silently skipped.
+func TestPendingPlanFinder_FindSkipsNonDirEntries(t *testing.T) {
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"default.tfplan": nil,
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	// Create a plain file at the top level of the pull dir (not a workspace clone).
+	if err := os.WriteFile(filepath.Join(tmpDir, "somefile.txt"), []byte("data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	pf := &events.DefaultPendingPlanFinder{}
+	plans, err := pf.Find(tmpDir)
+	Ok(t, err)
+	Equals(t, 1, len(plans))
+	Equals(t, "default", plans[0].Workspace)
+}
+
 // Test different directory structures.
 func TestPendingPlanFinder_Find(t *testing.T) {
 	cases := []struct {

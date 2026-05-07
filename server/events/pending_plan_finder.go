@@ -4,11 +4,13 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/utils"
@@ -53,13 +55,21 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 	var plans []PendingPlan
 	var absPaths []string
 	for _, workspaceDir := range workspaceDirs {
+		// Skip non-directory entries (files, symlinks) — workspace clones are always directories.
+		if !workspaceDir.IsDir() {
+			continue
+		}
+
 		workspace := workspaceDir.Name()
 		repoDir := filepath.Join(pullDir, workspace)
 
 		// Skip directories that are not git repositories (e.g. stray directories
 		// left by external processes). Workspace clones always have a .git entry.
-		if _, err := os.Stat(filepath.Join(repoDir, ".git")); os.IsNotExist(err) {
-			continue
+		if _, statErr := os.Stat(filepath.Join(repoDir, ".git")); statErr != nil {
+			if os.IsNotExist(statErr) || errors.Is(statErr, syscall.ENOTDIR) {
+				continue
+			}
+			return nil, nil, fmt.Errorf("checking git repository in '%s': %w", repoDir, statErr)
 		}
 
 		// Any generated plans should be untracked by git since Atlantis created
