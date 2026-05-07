@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -42,6 +43,9 @@ func (r DefaultExternalTeamAllowlistRunner) Run(ctx models.TeamAllowlistCheckerC
 		"PROJECT_NAME":     ctx.ProjectName,
 		"REPO_ROOT":        ctx.RepoDir,
 		"REPO_REL_PATH":    ctx.RepoRelDir,
+		"WORKSPACE":        ctx.Workspace,
+		"API":              strconv.FormatBool(ctx.API),
+		"VERBOSE":          strconv.FormatBool(ctx.Verbose),
 	}
 
 	finalEnvVars := baseEnvVars
