@@ -56,6 +56,12 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 		workspace := workspaceDir.Name()
 		repoDir := filepath.Join(pullDir, workspace)
 
+		// Skip directories that are not git repositories (e.g. stray directories
+		// left by external processes). Workspace clones always have a .git entry.
+		if _, err := os.Stat(filepath.Join(repoDir, ".git")); os.IsNotExist(err) {
+			continue
+		}
+
 		// Any generated plans should be untracked by git since Atlantis created
 		// them.
 		lsCmd := exec.Command("git", "ls-files", ".", "--others") // nolint: gosec

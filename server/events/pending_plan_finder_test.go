@@ -4,7 +4,6 @@
 package events_test
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,10 +21,10 @@ func TestPendingPlanFinder_FindNoDir(t *testing.T) {
 	ErrEquals(t, "open /doesntexist: no such file or directory", err)
 }
 
-// If one of the dir in PR dir is not git dir then it should throw an error.
+// Non-git subdirectories in the pull dir should be silently skipped.
 func TestPendingPlanFinder_FindIncludingNotGitDir(t *testing.T) {
-	gitDirName := ".default"
-	notGitDirName := ".terragrunt-cache"
+	gitDirName := "default"
+	notGitDirName := "reviews"
 	tmpDir := DirStructure(t, map[string]any{
 		gitDirName: map[string]any{
 			"default.tfplan": nil,
@@ -34,14 +33,16 @@ func TestPendingPlanFinder_FindIncludingNotGitDir(t *testing.T) {
 			"some_file.tfplan": nil,
 		},
 	})
-	// Initialize git in 'default' directory
+	// Initialize git only in the workspace directory, not in the stray directory.
 	gitDir := filepath.Join(tmpDir, gitDirName)
 	runCmd(t, gitDir, "git", "init")
 	pf := &events.DefaultPendingPlanFinder{}
 
-	_, err := pf.Find(tmpDir)
-	ErrEquals(t, fmt.Sprintf("running 'git ls-files . --others' in '%s/%s' directory: fatal: "+
-		"not a git repository (or any of the parent directories): .git\n: exit status 128", tmpDir, notGitDirName), err)
+	plans, err := pf.Find(tmpDir)
+	Ok(t, err)
+	// Only the plan from the git workspace should be found; the reviews dir is skipped.
+	Equals(t, 1, len(plans))
+	Equals(t, gitDirName, plans[0].Workspace)
 }
 
 // Test different directory structures.
