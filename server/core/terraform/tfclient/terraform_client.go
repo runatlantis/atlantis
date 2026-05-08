@@ -137,7 +137,7 @@ func NewClientWithDefaultVersion(
 			// Since ensureVersion might end up downloading terraform,
 			// we call it asynchronously so as to not delay server startup.
 			versionsLock.Lock()
-			_, err := ensureVersion(log, distribution, versions, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed)
+			_, err := ensureVersion(log, distribution, versions, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed, true)
 			versionsLock.Unlock()
 			if err != nil {
 				log.Err("could not download %s %s: %s", distribution.BinName(), defaultVersion.String(), err)
@@ -326,7 +326,7 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, d terraform.Dis
 
 	var err error
 	c.versionsLock.Lock()
-	_, err = ensureVersion(log, d, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
+	_, err = ensureVersion(log, d, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
 	c.versionsLock.Unlock()
 	if err != nil {
 		return err
@@ -407,7 +407,7 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 	} else {
 		var err error
 		c.versionsLock.Lock()
-		binPath, err = ensureVersion(log, d, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
+		binPath, err = ensureVersion(log, d, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, false)
 		c.versionsLock.Unlock()
 		if err != nil {
 			return "", nil, err
@@ -486,11 +486,15 @@ func ensureVersion(
 	binDir string,
 	downloadURL string,
 	downloadsAllowed bool,
+	redownloadOnFailedExecution bool,
 ) (string, error) {
 
 	binPath, err := findOrDownloadVersionBinaryPath(log, dist, versions, v, binDir, downloadURL, downloadsAllowed)
 	if err != nil {
 		return "", err
+	}
+	if !redownloadOnFailedExecution {
+		return binPath, nil
 	}
 	// Try running a test command (i.e. `terraform version`). If it doesn't work, try deleting the binary and redownloading it
 	for attempt := range 2 {
