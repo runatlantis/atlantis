@@ -643,9 +643,31 @@ func (p ProjectPlanStatus) String() string {
 
 // TeamAllowlistCheckerContext defines the context for a TeamAllowlistChecker to verify
 // command permissions.
+//
+// Atlantis performs two authorization checks per command:
+//
+//  1. Pre-flight check – runs immediately after the comment is parsed, before the
+//     repo is cloned or projects are discovered. Only repo-level and command-level
+//     context is reliably available. Workspace and ProjectName may be populated if
+//     the user explicitly specified them in the command (e.g. "atlantis apply -w prod"),
+//     but will be empty for bare commands like "atlantis apply".
+//
+//  2. Project check – runs after pre-workflow hooks, repo config parsing, and project
+//     discovery. Full project context (Workspace, ProjectName, RepoRelDir, etc.) is
+//     always available.
+//
+// The CheckType field distinguishes between these two phases so that external
+// authorization scripts can apply different logic depending on the available context.
 type TeamAllowlistCheckerContext struct {
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
+
+	// CheckType indicates which authorization phase this check belongs to.
+	// "pre_flight" for the early repo-level gate (before clone/project discovery),
+	// "project" for the granular per-project gate (after project discovery).
+	// External authorization scripts can use this to decide how to handle
+	// requests where workspace/project context may be absent.
+	CheckType string
 
 	// The name of the command that is being executed, i.e. 'plan', 'apply' etc.
 	CommandName string
@@ -669,6 +691,8 @@ type TeamAllowlistCheckerContext struct {
 
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
 	// no name this will be an empty string.
+	// During pre-flight checks this is only populated if the user explicitly
+	// specified it in the command (e.g. "atlantis apply -p my-project").
 	ProjectName string
 
 	// RepoDir is the absolute path to the repo root
@@ -683,8 +707,9 @@ type TeamAllowlistCheckerContext struct {
 	// Verbose is true when the user would like verbose output.
 	Verbose bool
 
-	// Workspace is the Terraform workspace this project is in. It will be set
-	// when project context is available; empty for pre-project permission checks.
+	// Workspace is the Terraform workspace this project is in.
+	// During pre-flight checks this is only populated if the user explicitly
+	// specified it in the command (e.g. "atlantis apply -w prod").
 	Workspace string
 
 	// API is true if plan/apply by API endpoints
