@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -23,6 +24,14 @@ const (
 	MergeableRequirement  = "mergeable"
 	UnDivergedRequirement = "undiverged"
 )
+
+// terraformProjectIndicators are files that suggest a directory
+// should be treated as a Terraform/Terragrunt project.
+var terraformProjectIndicators = []string{
+	"*.tf*",
+	"terragrunt.hcl",
+	".terraform.lock.hcl",
+}
 
 type Project struct {
 	Name                      *string    `yaml:"name,omitempty"`
@@ -44,6 +53,25 @@ type Project struct {
 	PolicyCheck               *bool      `yaml:"policy_check,omitempty"`
 	CustomPolicyCheck         *bool      `yaml:"custom_policy_check,omitempty"`
 	SilencePRComments         []string   `yaml:"silence_pr_comments,omitempty"`
+}
+
+// IsTerraformProjectDir returns true if the directory contains files that make it look like a Terraform project
+func IsTerraformProjectDir(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		for _, indicator := range terraformProjectIndicators {
+			if doublestar.MatchUnvalidated(indicator, entry.Name()) {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func (p Project) Validate() error {

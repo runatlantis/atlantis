@@ -111,7 +111,7 @@ func TestAutoplan_ToValid(t *testing.T) {
 			input:       raw.Autoplan{},
 			exp: valid.Autoplan{
 				Enabled:      true,
-				WhenModified: raw.DefaultAutoPlanWhenModified,
+				WhenModified: raw.DefaultAutoPlanWhenModified(),
 			},
 		},
 		{
@@ -131,7 +131,7 @@ func TestAutoplan_ToValid(t *testing.T) {
 			},
 			exp: valid.Autoplan{
 				Enabled:      false,
-				WhenModified: raw.DefaultAutoPlanWhenModified,
+				WhenModified: raw.DefaultAutoPlanWhenModified(),
 			},
 		},
 		{
@@ -141,7 +141,7 @@ func TestAutoplan_ToValid(t *testing.T) {
 			},
 			exp: valid.Autoplan{
 				Enabled:      true,
-				WhenModified: raw.DefaultAutoPlanWhenModified,
+				WhenModified: raw.DefaultAutoPlanWhenModified(),
 			},
 		},
 	}

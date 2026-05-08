@@ -284,12 +284,11 @@ func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.P
 				continue
 			}
 
-			// Check if the directory contains any .tf files
-			hasTerraformFiles, err := p.dirContainsTerraformFiles(match)
+			isTerraformProjectDir, err := raw.IsTerraformProjectDir(match)
 			if err != nil {
-				return nil, fmt.Errorf("error checking for Terraform files in %q: %w", match, err)
+				return nil, fmt.Errorf("error checking for Terraform project in %q: %w", match, err)
 			}
-			if !hasTerraformFiles {
+			if !isTerraformProjectDir {
 				continue
 			}
 
@@ -307,20 +306,6 @@ func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.P
 	}
 
 	return expandedProjects, nil
-}
-
-// dirContainsTerraformFiles returns true if the directory contains at least one .tf file.
-func (p *ParserValidator) dirContainsTerraformFiles(dir string) (bool, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false, err
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".tf") {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // copyProjectWithDir creates a copy of a project with a new directory value.
