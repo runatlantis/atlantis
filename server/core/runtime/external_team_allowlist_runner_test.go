@@ -22,6 +22,7 @@ func TestDefaultExternalTeamAllowlistRunner_Run(t *testing.T) {
 			Name:  "atlantis",
 			Owner: "runatlantis",
 		},
+		CheckType: "project",
 		HeadRepo: models.Repo{
 			Name:  "atlantis",
 			Owner: "contrib-user",
@@ -55,6 +56,7 @@ func TestDefaultExternalTeamAllowlistRunner_Run(t *testing.T) {
 			"BASE_BRANCH_NAME=$BASE_BRANCH_NAME " +
 			"BASE_REPO_NAME=$BASE_REPO_NAME " +
 			"BASE_REPO_OWNER=$BASE_REPO_OWNER " +
+			"CHECK_TYPE=$CHECK_TYPE " +
 			"HEAD_BRANCH_NAME=$HEAD_BRANCH_NAME " +
 			"HEAD_COMMIT=$HEAD_COMMIT " +
 			"HEAD_REPO_NAME=$HEAD_REPO_NAME " +
@@ -77,6 +79,7 @@ func TestDefaultExternalTeamAllowlistRunner_Run(t *testing.T) {
 		expected := "BASE_BRANCH_NAME=main " +
 			"BASE_REPO_NAME=atlantis " +
 			"BASE_REPO_OWNER=runatlantis " +
+			"CHECK_TYPE=project " +
 			"HEAD_BRANCH_NAME=feature-branch " +
 			"HEAD_COMMIT=abc123 " +
 			"HEAD_REPO_NAME=atlantis " +
@@ -94,6 +97,24 @@ func TestDefaultExternalTeamAllowlistRunner_Run(t *testing.T) {
 			"VERBOSE=false"
 
 		Equals(t, expected, out)
+	})
+
+	t.Run("CHECK_TYPE is pre_flight for pre-flight checks", func(t *testing.T) {
+		runner := runtime.DefaultExternalTeamAllowlistRunner{}
+		ctx := baseCtx
+		ctx.CheckType = "pre_flight"
+
+		out, err := runner.Run(ctx, "sh", "-c", "echo $CHECK_TYPE")
+		Ok(t, err)
+		Equals(t, "pre_flight", out)
+	})
+
+	t.Run("CHECK_TYPE is project for project checks", func(t *testing.T) {
+		runner := runtime.DefaultExternalTeamAllowlistRunner{}
+
+		out, err := runner.Run(baseCtx, "sh", "-c", "echo $CHECK_TYPE")
+		Ok(t, err)
+		Equals(t, "project", out)
 	})
 
 	t.Run("WORKSPACE env var is set correctly", func(t *testing.T) {

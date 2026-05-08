@@ -156,7 +156,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 			return
 		}
 
-		ok, err := c.checkUserPermissions(baseRepo, user, "plan")
+		ok, err := c.checkUserPermissions(baseRepo, user, &CommentCommand{Name: command.Plan})
 		if err != nil {
 			log.Err("Unable to check user permissions: %s", err)
 			return
@@ -253,22 +253,33 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 	}
 }
 
-// checkUserPermissions checks if the user has permissions to execute the command
-func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmdName string) (bool, error) {
+// checkUserPermissions performs the pre-flight authorization check.
+// This runs before the repo is cloned or projects are discovered, so only
+// repo-level context and any flags explicitly provided in the command
+// (workspace, project name) are available. The CHECK_TYPE env var is set
+// to "pre_flight" so external authorization scripts can distinguish this
+// from the later per-project check.
+func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmd *CommentCommand) (bool, error) {
 	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
-		// allowlist restriction is not enabled
 		return true, nil
 	}
+
 	ctx := models.TeamAllowlistCheckerContext{
 		BaseRepo:    repo,
-		CommandName: cmdName,
+		CheckType:   "pre_flight",
+		CommandName: cmd.Name.String(),
 		Log:         c.Logger,
 		Pull:        models.PullRequest{},
 		User:        user,
-		Verbose:     false,
+		Verbose:     cmd.Verbose,
 		API:         false,
+		// Workspace and ProjectName are only populated if the user explicitly
+		// specified them in the command (e.g. "atlantis apply -w prod -p myproject").
+		// For bare commands like "atlantis apply" these will be empty.
+		Workspace:   cmd.Workspace,
+		ProjectName: cmd.ProjectName,
 	}
-	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmdName)
+	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmd.Name.String())
 	if !ok {
 		return false, nil
 	}
@@ -317,7 +328,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			return
 		}
 
-		ok, err := c.checkUserPermissions(baseRepo, user, cmd.Name.String())
+		ok, err := c.checkUserPermissions(baseRepo, user, cmd)
 		if err != nil {
 			c.Logger.Err("Unable to check user permissions: %s", err)
 			return

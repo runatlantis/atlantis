@@ -30,6 +30,7 @@ func (r DefaultExternalTeamAllowlistRunner) Run(ctx models.TeamAllowlistCheckerC
 		"BASE_BRANCH_NAME": ctx.Pull.BaseBranch,
 		"BASE_REPO_NAME":   ctx.BaseRepo.Name,
 		"BASE_REPO_OWNER":  ctx.BaseRepo.Owner,
+		"CHECK_TYPE":       ctx.CheckType,
 		"COMMENT_ARGS":     strings.Join(ctx.EscapedCommentArgs, ","),
 		"HEAD_BRANCH_NAME": ctx.Pull.HeadBranch,
 		"HEAD_COMMIT":      ctx.Pull.HeadCommit,

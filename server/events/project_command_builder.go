@@ -614,14 +614,16 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
 	})
 
-	// Filter projects to only include ones the user is authorized for
+	// Filter projects to only include ones the user is authorized for.
+	// This is the per-project authorization check, run after project discovery
+	// with full context (workspace, project name, repo path, etc.).
 	projCtxs = slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
 		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
-			// allowlist restriction is not enabled
 			return false
 		}
-		ctx := models.TeamAllowlistCheckerContext{
+		authzCtx := models.TeamAllowlistCheckerContext{
 			BaseRepo:           projCtx.BaseRepo,
+			CheckType:          "project",
 			CommandName:        projCtx.CommandName.String(),
 			EscapedCommentArgs: projCtx.EscapedCommentArgs,
 			HeadRepo:           projCtx.HeadRepo,
@@ -635,7 +637,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			Workspace:          projCtx.Workspace,
 			API:                ctx.API,
 		}
-		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
+		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(authzCtx, projCtx.User.Teams, projCtx.CommandName.String())
 	})
 
 	return projCtxs, nil
@@ -1037,14 +1039,15 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		return []command.ProjectContext{}, err
 	}
 
-	// Filter projects to only include ones the user is authorized for
+	// Filter projects to only include ones the user is authorized for.
+	// This is the per-project authorization check with full context.
 	projCtxs = slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
 		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
-			// allowlist restriction is not enabled
 			return false
 		}
-		ctx := models.TeamAllowlistCheckerContext{
+		authzCtx := models.TeamAllowlistCheckerContext{
 			BaseRepo:           projCtx.BaseRepo,
+			CheckType:          "project",
 			CommandName:        projCtx.CommandName.String(),
 			EscapedCommentArgs: projCtx.EscapedCommentArgs,
 			HeadRepo:           projCtx.HeadRepo,
@@ -1058,7 +1061,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 			Workspace:          projCtx.Workspace,
 			API:                ctx.API,
 		}
-		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
+		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(authzCtx, projCtx.User.Teams, projCtx.CommandName.String())
 	})
 
 	return projCtxs, nil
