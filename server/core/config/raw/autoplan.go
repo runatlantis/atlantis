@@ -9,7 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
-// DefaultAutoPlanWhenModified() is the default element in the when_modified
+// DefaultAutoPlanWhenModified is the default element in the when_modified
 // list if none is defined.
 func DefaultAutoPlanWhenModified() []string {
 	var ret []string

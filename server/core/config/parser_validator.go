@@ -257,8 +257,7 @@ func (p *ParserValidator) applyLegacyShellParsing(cfg *valid.RepoCfg) error {
 }
 
 // expandProjectGlobs expands projects with glob patterns in their dir field
-// into multiple projects, one for each matching directory that contains
-// Terraform files (.tf).
+// into multiple projects, one for each matching directory that appears to be a terraform directory
 func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.Project) ([]raw.Project, error) {
 	var expandedProjects []raw.Project
 

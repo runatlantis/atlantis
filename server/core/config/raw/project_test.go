@@ -694,7 +694,7 @@ func TestIsTerraformProjectDir(t *testing.T) {
 				err := os.MkdirAll(dirPath, 0o700)
 				Ok(t, err)
 
-				os.WriteFile(fullPath, []byte(content), 0o600)
+				err = os.WriteFile(fullPath, []byte(content), 0o600)
 				Ok(t, err)
 
 			}
