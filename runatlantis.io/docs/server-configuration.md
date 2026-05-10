@@ -376,6 +376,23 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
+### `--blocked-extra-args`
+
+```bash
+atlantis server --blocked-extra-args="-chdir,--chdir,-plugin-dir,--plugin-dir"
+# or
+ATLANTIS_BLOCKED_EXTRA_ARGS='-chdir,--chdir,-plugin-dir,--plugin-dir'
+```
+
+Comma-separated list of Terraform CLI flag prefixes that are not allowed in comment extra args (the flags after `--`).
+Defaults to `-chdir,--chdir,-plugin-dir,--plugin-dir`.
+
+Notes:
+
+- These flags are blocked to prevent security issues such as working-directory traversal (`-chdir`) or loading malicious providers (`-plugin-dir`).
+- Setting this flag **replaces** the default list entirely. To extend the defaults, include them along with your custom flags, e.g. `-chdir,--chdir,-plugin-dir,--plugin-dir,-my-flag`.
+- Accepts a comma separated list, ex. `-flag1,-flag2`.
+
 ### `--checkout-depth` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
@@ -537,7 +554,7 @@ atlantis server --emoji-reaction eyes
 ATLANTIS_EMOJI_REACTION=eyes
 ```
 
-The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
+The emoji reaction to use for marking processed comments. Currently supported on Gitea, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
 Defaults to "" (empty string).
 
 ::: warning NOTE
@@ -545,7 +562,7 @@ Each VCS provider supports a different list of emojis:
 
 - [GitHub](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
 - [GitLab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
-- [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
+- [Gitea](https://docs.gitea.com/administration/customizing-gitea#reactions)
 
    :::
 
@@ -1211,7 +1228,7 @@ Notes:
 - An entry beginning with `!` negates it, ex. `github.com/foo/*,!github.com/foo/bar` will match all github repos in the `foo` owner _except_ `bar`.
 - For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
   - User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
-- For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
+- For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{owner}/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
 - Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo allowlist for each repository until the change is complete.
 
 Examples:
@@ -1225,7 +1242,7 @@ Examples:
 - Allowlist all repos in my GitHub Enterprise installation
   - `--repo-allowlist='github.yourcompany.com/*'`
 - Allowlist all repos under `myorg` project `myproject` on Azure DevOps
-  - `--repo-allowlist='myorg.visualstudio.com/myproject/*,dev.azure.com/myorg/myproject/*'`
+  - `--repo-allowlist='myorg.visualstudio.com/myorg/myproject/*,dev.azure.com/myorg/myproject/*'`
 - Allowlist all repositories
   - `--repo-allowlist='*'`
 
