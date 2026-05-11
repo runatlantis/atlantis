@@ -28,6 +28,17 @@ const prSourceRemote = "source"
 var gitLocks sync.Map
 var recheckRequiredMap sync.Map
 
+// pendingMerge coordinates parallel goroutines that all detect divergence at
+// the same time. The leader performs the actual merge while followers wait on
+// the done channel for the result — no write-lock contention between them.
+type pendingMerge struct {
+	done   chan struct{} // closed when the merge completes
+	merged bool         // whether a merge was actually performed
+	err    error        // error from the merge, if any
+}
+
+var pendingMerges sync.Map
+
 //go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
 //go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
 
@@ -198,8 +209,23 @@ func (w *FileWorkspace) MergeAgain(
 		return false, nil
 	}
 
-	// Diverged — acquire the write lock to perform the merge, which mutates the
-	// working tree (git reset --hard + git merge).
+	// Coordinate parallel goroutines: only the first to detect divergence acquires
+	// the write lock and performs the merge. Others wait on a done channel instead
+	// of queuing on the write lock (which would serialize behind runSteps read locks).
+	pm := &pendingMerge{done: make(chan struct{})}
+	if actual, loaded := pendingMerges.LoadOrStore(cloneDir, pm); loaded {
+		leader := actual.(*pendingMerge)
+		logger.Debug("Another goroutine is already merging, waiting for it to finish")
+		<-leader.done
+		return leader.merged, leader.err
+	}
+	// Leader: broadcast result to followers when done.
+	// Defers run LIFO: write lock released first, then channel closed and map entry deleted.
+	defer func() {
+		close(pm.done)
+		pendingMerges.Delete(cloneDir)
+	}()
+
 	gitWriteUnlockFn := w.gitWriteLock(cloneDir)
 	defer gitWriteUnlockFn()
 
@@ -210,7 +236,8 @@ func (w *FileWorkspace) MergeAgain(
 	recheckRequiredMap.Delete(cloneDir)
 
 	logger.Info("base branch may have been updated, using merge strategy and will merge again")
-	return true, w.mergeAgain(logger, c)
+	pm.merged, pm.err = true, w.mergeAgain(logger, c)
+	return pm.merged, pm.err
 }
 
 // recheckDiverged returns true if the branch we're merging into has diverged
