@@ -999,6 +999,24 @@ func TestClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
 				IsMergeable: true,
 			},
 		},
+		// Ruleset-enforced required reviewer approvals (reviewDecision is null when rulesets control reviews)
+		{
+			"blocked",
+			"ruleset-required-reviewer-pending.json",
+			"null",
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
+		},
+		{
+			"blocked",
+			"ruleset-required-reviewer-approved.json",
+			"null",
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
 	}
 
 	// Use a real GitHub json response and edit the mergeable_state field.
@@ -1357,6 +1375,96 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClient_GetFileContent(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	repo := models.Repo{
+		FullName: "owner/repo",
+		Owner:    "owner",
+		Name:     "repo",
+		VCSHost: models.VCSHost{
+			Type:     models.Github,
+			Hostname: "github.com",
+		},
+	}
+
+	t.Run("normal file under 1MB", func(t *testing.T) {
+		encoded := "cHJvamVjdHM6Ci0gbmFtZTogbXlwcm9qZWN0CiAgZGlyOiAuCg=="
+
+		contentsResp := fmt.Sprintf(`{"name":"atlantis.yaml","sha":"abc123","size":42,"content":"%s","encoding":"base64"}`, encoded)
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/api/v3/repos/owner/repo/contents/atlantis.yaml?ref=main":
+					w.Write([]byte(contentsResp)) // nolint: errcheck
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+				}
+			}))
+		t.Cleanup(testServer.Close)
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		found, content, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+		Ok(t, err)
+		Assert(t, found, "expected file to be found")
+		Equals(t, "projects:\n- name: myproject\n  dir: .\n", string(content))
+	})
+
+	t.Run("file not found returns false", func(t *testing.T) {
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, `{"message":"Not Found"}`, http.StatusNotFound)
+			}))
+		t.Cleanup(testServer.Close)
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		found, content, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+		Ok(t, err)
+		Assert(t, !found, "expected file to not be found")
+		Equals(t, 0, len(content))
+	})
+
+	t.Run("file over 1MB falls back to blobs API", func(t *testing.T) {
+		encoded := "bGFyZ2UgZmlsZSBjb250ZW50"
+
+		// Contents API returns empty content for files > 1MB, but provides size and SHA.
+		contentsResp := `{"name":"atlantis.yaml","sha":"deadbeef","size":2000000,"content":"","encoding":"base64"}`
+		blobResp := fmt.Sprintf(`{"sha":"deadbeef","content":"%s","encoding":"base64"}`, encoded)
+
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/api/v3/repos/owner/repo/contents/atlantis.yaml?ref=main":
+					w.Write([]byte(contentsResp)) // nolint: errcheck
+				case "/api/v3/repos/owner/repo/git/blobs/deadbeef":
+					w.Write([]byte(blobResp)) // nolint: errcheck
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+				}
+			}))
+		t.Cleanup(testServer.Close)
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		found, content, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+		Ok(t, err)
+		Assert(t, found, "expected file to be found")
+		Equals(t, "large file content", string(content))
+	})
 }
 
 func TestClient_MarkdownPullLink(t *testing.T) {

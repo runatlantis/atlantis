@@ -31,6 +31,7 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 func TestCreateApplyLock(t *testing.T) {
@@ -43,8 +44,9 @@ func TestCreateApplyLock(t *testing.T) {
 		expLockTime := "2020-09-01 00:45:26"
 		lockTime, _ := time.Parse(layout, strLockTime)
 
-		l := mocks.NewMockApplyLocker()
-		When(l.LockApply()).ThenReturn(locking.ApplyCommandLock{
+		ctrl := gomock.NewController(t)
+		l := mocks.NewMockApplyLocker(ctrl)
+		l.EXPECT().LockApply().Return(locking.ApplyCommandLock{
 			Locked: true,
 			Time:   lockTime,
 		}, nil)
@@ -62,8 +64,9 @@ func TestCreateApplyLock(t *testing.T) {
 		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 		w := httptest.NewRecorder()
 
-		l := mocks.NewMockApplyLocker()
-		When(l.LockApply()).ThenReturn(locking.ApplyCommandLock{
+		ctrl := gomock.NewController(t)
+		l := mocks.NewMockApplyLocker(ctrl)
+		l.EXPECT().LockApply().Return(locking.ApplyCommandLock{
 			Locked: false,
 		}, errors.New("failed to acquire lock"))
 
@@ -82,8 +85,9 @@ func TestUnlockApply(t *testing.T) {
 		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 		w := httptest.NewRecorder()
 
-		l := mocks.NewMockApplyLocker()
-		When(l.UnlockApply()).ThenReturn(nil)
+		ctrl := gomock.NewController(t)
+		l := mocks.NewMockApplyLocker(ctrl)
+		l.EXPECT().UnlockApply().Return(nil)
 
 		lc := controllers.LocksController{
 			Logger:      logging.NewNoopLogger(t),
@@ -98,8 +102,9 @@ func TestUnlockApply(t *testing.T) {
 		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 		w := httptest.NewRecorder()
 
-		l := mocks.NewMockApplyLocker()
-		When(l.UnlockApply()).ThenReturn(errors.New("failed to delete lock"))
+		ctrl := gomock.NewController(t)
+		l := mocks.NewMockApplyLocker(ctrl)
+		l.EXPECT().UnlockApply().Return(errors.New("failed to delete lock"))
 
 		lc := controllers.LocksController{
 			Logger:      logging.NewNoopLogger(t),
@@ -136,9 +141,9 @@ func TestGetLock_InvalidLockID(t *testing.T) {
 
 func TestGetLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.GetLock("id")).ThenReturn(nil, errors.New("err"))
+	ctrl := gomock.NewController(t)
+	l := mocks.NewMockLocker(ctrl)
+	l.EXPECT().GetLock("id").Return(nil, errors.New("err"))
 	lc := controllers.LocksController{
 		Logger: logging.NewNoopLogger(t),
 		Locker: l,
@@ -152,9 +157,9 @@ func TestGetLock_LockerErr(t *testing.T) {
 
 func TestGetLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 404")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.GetLock("id")).ThenReturn(nil, nil)
+	ctrl := gomock.NewController(t)
+	l := mocks.NewMockLocker(ctrl)
+	l.EXPECT().GetLock("id").Return(nil, nil)
 	lc := controllers.LocksController{
 		Logger: logging.NewNoopLogger(t),
 		Locker: l,
@@ -168,9 +173,10 @@ func TestGetLock_None(t *testing.T) {
 
 func TestGetLock_Success(t *testing.T) {
 	t.Log("Should be able to render a lock successfully")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.GetLock("id")).ThenReturn(&models.ProjectLock{
+	RegisterMockTestingT(t) // needed for pegomock TemplateWriter mock
+	ctrl := gomock.NewController(t)
+	l := mocks.NewMockLocker(ctrl)
+	l.EXPECT().GetLock("id").Return(&models.ProjectLock{
 		Project:   models.Project{RepoFullName: "owner/repo", Path: "path"},
 		Pull:      models.PullRequest{URL: "url", Author: "lkysow"},
 		Workspace: "workspace",

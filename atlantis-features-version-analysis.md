@@ -288,7 +288,7 @@ These features have been available since the initial release or very early versi
 -  `branch` - Regex matching projects by base branch
 -  `depends_on` - Project dependencies
 
-### v0.25.0+
+### v0.33.0+
 
 -  `terraform_distribution` - Terraform distribution (terraform/opentofu)
 

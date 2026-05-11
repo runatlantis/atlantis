@@ -883,6 +883,26 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			},
 		},
 		{
+			"ci/external-pipeline",
+			models.FailedCommitStatus,
+			gitlabServerVersions,
+			defaultMr,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/external-pipeline has status failed",
+			},
+		},
+		{
+			"ci/external-pipeline",
+			models.PendingCommitStatus,
+			gitlabServerVersions,
+			defaultMr,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/external-pipeline has status pending",
+			},
+		},
+		{
 			fmt.Sprintf("%s/apply", vcsStatusName),
 			models.FailedCommitStatus,
 			gitlabServerVersions,
@@ -1096,6 +1116,242 @@ func TestClient_PullIsMergeable(t *testing.T) {
 						BaseRepo:   repo,
 						HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
 					}, vcsStatusName, []string{})
+
+				Ok(t, err)
+				Equals(t, c.expState, mergeable)
+			})
+		}
+	}
+}
+
+func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	gitlabClientUnderTest = true
+	vcsStatusName := "atlantis-test"
+
+	projectSuccess, err := os.ReadFile("testdata/project-success.json")
+	Ok(t, err)
+
+	mrData := mustReadFile(t, "testdata/pipeline-success.json")
+
+	type testStatus struct {
+		Name   string
+		Status string // GitLab API status string: "success", "failed", "running", "pending"
+	}
+
+	cases := []struct {
+		description   string
+		vcsStatusName string
+		statuses      []testStatus
+		expState      models.MergeableStatus
+	}{
+		{
+			description:   "skippable Atlantis status types are skipped",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success"},
+				{Name: fmt.Sprintf("%s/policy_check", vcsStatusName), Status: "failed"},
+				{Name: fmt.Sprintf("%s/apply", vcsStatusName), Status: "failed"},
+				{Name: fmt.Sprintf("%s/apply: myproject/default", vcsStatusName), Status: "failed"},
+				{Name: fmt.Sprintf("%s/pre_workflow_hook: validate", vcsStatusName), Status: "failed"},
+				{Name: fmt.Sprintf("%s/post_workflow_hook: cleanup", vcsStatusName), Status: "running"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			description:   "Atlantis failed plan status still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "failed"},
+				{Name: fmt.Sprintf("%s/apply", vcsStatusName), Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+			},
+		},
+		{
+			description:   "Atlantis running project plan status still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan: myproject/default", vcsStatusName), Status: "running"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: myproject/default has status running", vcsStatusName),
+			},
+		},
+		{
+			description:   "non-Atlantis status still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/apply", vcsStatusName), Status: "failed"},
+				{Name: "ci/build", Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
+			},
+		},
+		{
+			description:   "non-Atlantis running status still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/apply", vcsStatusName), Status: "running"},
+				{Name: "ci/build", Status: "running"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status running",
+			},
+		},
+		{
+			description:   "unknown status under Atlantis namespace still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/security", vcsStatusName), Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/security has status failed", vcsStatusName),
+			},
+		},
+		{
+			description:   "custom vcs-status-name only skips Atlantis status names",
+			vcsStatusName: "ci",
+			statuses: []testStatus{
+				{Name: "ci/apply", Status: "failed"},
+				{Name: "ci/build", Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
+			},
+		},
+		{
+			description:   "mixed Atlantis failures with passing external status",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/policy_check", vcsStatusName), Status: "failed"},
+				{Name: fmt.Sprintf("%s/apply: myproject/default", vcsStatusName), Status: "failed"},
+				{Name: "ci/build", Status: "success"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			description:   "running plan blocks stale apply",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan: infra/production", vcsStatusName), Status: "running"},
+				{Name: fmt.Sprintf("%s/plan: infra/staging", vcsStatusName), Status: "success"},
+				{Name: fmt.Sprintf("%s/apply: infra/staging", vcsStatusName), Status: "success"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: infra/production has status running", vcsStatusName),
+			},
+		},
+		{
+			description:   "custom vcs-status-name prefix is matched for skippable status",
+			vcsStatusName: "mycompany-atlantis",
+			statuses: []testStatus{
+				{Name: "mycompany-atlantis/apply", Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			description:   "prefix boundary: slash separator prevents false positive",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s-extra/plan", vcsStatusName), Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s-extra/plan has status failed", vcsStatusName),
+			},
+		},
+	}
+
+	gitlabVersions := []string{"15.8.3-ee", "15.6.0-ee", "15.3.2-ce"}
+
+	for _, c := range cases {
+		for _, serverVersion := range gitlabVersions {
+			t.Run(fmt.Sprintf("%s_%s", c.description, serverVersion), func(t *testing.T) {
+				// Build the commit statuses JSON response
+				var statusEntries []string
+				for i, s := range c.statuses {
+					statusEntries = append(statusEntries, fmt.Sprintf(
+						`{"id":%d,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"test","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}`,
+						133702594+i, s.Status, s.Name))
+				}
+				statusesJSON := "[" + strings.Join(statusEntries, ",") + "]"
+
+				testServer := httptest.NewServer(
+					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						switch {
+						case r.RequestURI == "/api/v4/":
+							w.WriteHeader(http.StatusOK)
+
+						case strings.HasPrefix(r.RequestURI, "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/"):
+							w.WriteHeader(http.StatusOK)
+							w.Write(mrData) // nolint: errcheck
+
+						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v", projectID):
+							w.WriteHeader(http.StatusOK)
+							w.Write(projectSuccess) // nolint: errcheck
+
+						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
+							w.WriteHeader(http.StatusOK)
+							w.Write([]byte(statusesJSON)) // nolint: errcheck
+
+						case r.RequestURI == "/api/v4/version":
+							w.WriteHeader(http.StatusOK)
+							w.Header().Set("Content-Type", "application/json")
+							type version struct {
+								Version string
+							}
+							v := version{Version: serverVersion}
+							err := json.NewEncoder(w).Encode(v)
+							Ok(t, err)
+
+						default:
+							t.Errorf("got unexpected request at %q", r.RequestURI)
+							http.Error(w, "not found", http.StatusNotFound)
+						}
+					}))
+				defer testServer.Close()
+
+				internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+				Ok(t, err)
+				client := &Client{
+					Client:  internalClient,
+					Version: nil,
+				}
+
+				repo := models.Repo{
+					FullName: "runatlantis/atlantis",
+					Owner:    "runatlantis",
+					Name:     "atlantis",
+					VCSHost: models.VCSHost{
+						Type:     models.Gitlab,
+						Hostname: "gitlab.com",
+					},
+				}
+
+				mergeable, err := client.PullIsMergeable(
+					logger,
+					repo,
+					models.PullRequest{
+						Num:        1,
+						BaseRepo:   repo,
+						HeadCommit: "67cb91d3f6198189f433c045154a885784ba6977",
+					}, c.vcsStatusName, []string{})
 
 				Ok(t, err)
 				Equals(t, c.expState, mergeable)

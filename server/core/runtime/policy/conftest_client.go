@@ -80,7 +80,7 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 
 // SourceResolver resolves the policy set to a local fs path
 //
-//go:generate pegomock generate --package mocks -o mocks/mock_conftest_client.go SourceResolver
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_conftest_client.go SourceResolver
 type SourceResolver interface {
 	Resolve(policySet valid.PolicySet) (string, error)
 }
@@ -108,7 +108,7 @@ func (p *SourceResolverProxy) Resolve(policySet valid.PolicySet) (string, error)
 	}
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_downloader.go Downloader
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_downloader.go Downloader
 
 type Downloader interface {
 	GetAny(dst, src string) error

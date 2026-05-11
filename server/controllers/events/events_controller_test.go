@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -26,7 +17,7 @@ import (
 	"testing"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v83/github"
 	. "github.com/petergtz/pegomock/v4"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
@@ -45,6 +36,7 @@ const githubHeader = "X-Github-Event"
 const giteaHeader = "X-Gitea-Event"
 const gitlabHeader = "X-Gitlab-Event"
 const azuredevopsHeader = "Request-Id"
+const azuredevopsServerHeader = "X-VSS-ActivityId"
 
 var user = []byte("user")
 var secret = []byte("secret")
@@ -234,7 +226,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 		Scope:                        scope,
 		CommentParser:                &events.CommentParser{ExecutableName: "atlantis"},
 		GitlabRequestParserValidator: &events_controllers.DefaultGitlabRequestParserValidator{},
-		Parser:                       &events.EventParser{},
+		Parser:                       &events.EventParser{GitlabHostname: "example.com"},
 		SupportedVCSHosts:            []models.VCSHostType{models.Gitlab},
 		RepoAllowlistChecker:         &events.RepoAllowlistChecker{},
 		VCSClient:                    vcsClient,
@@ -252,7 +244,7 @@ func TestPost_GitlabCommentNotAllowlisted(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	exp := "repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	expRepo, _ := models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "")
+	expRepo, _ := models.NewRepo(models.Gitlab, "gitlabhq/gitlab-test", "https://example.com/gitlabhq/gitlab-test.git", "", "", "")
 	vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(expRepo), Eq(1), Eq("```\nError: This repo is not allowlisted for Atlantis.\n```"), Eq(""))
 }
@@ -321,7 +313,7 @@ func TestPost_GithubCommentNotAllowlisted(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	exp := "repo not allowlisted"
 	Assert(t, strings.Contains(string(body), exp), "exp %q to be contained in %q", exp, string(body))
-	expRepo, _ := models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "")
+	expRepo, _ := models.NewRepo(models.Github, "baxterthehacker/public-repo", "https://github.com/baxterthehacker/public-repo.git", "", "", "")
 	vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(expRepo), Eq(2), Eq("```\nError: This repo is not allowlisted for Atlantis.\n```"), Eq(""))
 }
@@ -987,6 +979,20 @@ func TestPost_PullOpenedOrUpdated(t *testing.T) {
 			cr.VerifyWasCalledOnce().RunAutoplanCommand(models.Repo{}, models.Repo{}, models.PullRequest{State: models.ClosedPullState}, models.User{})
 		})
 	}
+}
+
+func TestPost_AzureDevopsServerHeader(t *testing.T) {
+	t.Log("when the request has the Azure DevOps Server header it is handled")
+	e, _, _, ado, _, _, _, _, _ := setup(t)
+	payload := `{"eventType": "git.pullrequest.created", "resource": {"repository": {"url": "https://dev.azure.com/owner/repo/_apis/git/repositories/repo-id"}}}`
+	req, _ := http.NewRequest("POST", "", strings.NewReader(payload))
+	req.Header.Set(azuredevopsServerHeader, "activityID")
+	When(ado.Validate(req, user, secret)).ThenReturn([]byte(payload), nil)
+	w := httptest.NewRecorder()
+	e.Post(w, req)
+	// We expect a 200 or 400 depending on how parsing goes, but the key is that it didn't return "Ignoring request"
+	Assert(t, w.Code < 500, "unexpected server error")
+	Assert(t, !strings.Contains(w.Body.String(), "Ignoring request"), "Should not ignore request")
 }
 
 func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGithubRequestValidator, *mocks.MockGitlabRequestParserValidator, *mocks.MockAzureDevopsRequestValidator, *emocks.MockEventParsing, *emocks.MockCommandRunner, *emocks.MockPullCleaner, *vcsmocks.MockClient, *emocks.MockCommentParsing) {

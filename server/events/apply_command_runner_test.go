@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v83/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -53,7 +53,10 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
-			vcsClient := setup(t)
+			vcsClient := setup(t, func(tc *TestConfig) {
+				tc.applyLockCheckerReturn = locking.ApplyCommandLock{Locked: c.ApplyLocked}
+				tc.applyLockCheckerErr = c.ApplyLockError
+			})
 
 			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
@@ -73,7 +76,6 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 
-			When(applyLockChecker.CheckApplyLock()).ThenReturn(locking.ApplyCommandLock{Locked: c.ApplyLocked}, c.ApplyLockError)
 			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
