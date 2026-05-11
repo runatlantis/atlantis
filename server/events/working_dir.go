@@ -47,8 +47,10 @@ type WorkingDir interface {
 	// Clone git clones headRepo, checks out the branch and then returns the
 	// absolute path to the root of the cloned repo.
 	Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
-	// MergeAgain merges again with upstream if upstream has been modified, returns
-	// whether it actually did a new merge
+	// MergeAgain refreshes the working tree if the base branch has advanced since
+	// the last clone/merge. Returns true if the working tree was updated — either
+	// because this goroutine performed the merge or because a concurrent goroutine
+	// did so and the result was shared.
 	MergeAgain(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
@@ -176,13 +178,15 @@ func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wra
 	return true, nil
 }
 
-// MergeAgain merges again with upstream if we are using the merge checkout strategy,
-// and upstream has been modified since we last checked.
-// It returns a flag indicating whether we had to merge with upstream again.
+// MergeAgain refreshes the working tree with upstream changes if we are using
+// the merge checkout strategy and the base branch has advanced since the last
+// clone/merge. Returns true if the working tree was updated (whether by this
+// goroutine or a concurrent one that shared its result).
 //
-// Locking strategy: recheckDiverged uses the read and ref lock to serialize git metadata
-// operations (URL updates, fetch, status) without taking the repo write lock.
-// The write lock is only acquired when we actually need to merge.
+// Locking strategy: recheckDiverged runs under the read and ref locks so it
+// can run concurrently with runSteps. The write lock is only acquired by the
+// elected merge leader; concurrent goroutines wait on a done channel instead
+// of queuing on the write lock (which would serialize behind runSteps readers).
 func (w *FileWorkspace) MergeAgain(
 	logger logging.SimpleLogging,
 	headRepo models.Repo,
@@ -219,15 +223,17 @@ func (w *FileWorkspace) MergeAgain(
 		<-leader.done
 		return leader.merged, leader.err
 	}
-	// Leader: broadcast result to followers when done.
-	// Defers run LIFO: write lock released first, then channel closed and map entry deleted.
+	// Leader: acquire the write lock, then register the broadcast defer.
+	// Defers run LIFO: pending entry closed/deleted first (while the write lock
+	// is still held), then write lock released. This prevents a new caller from
+	// observing and joining a stale completed merge in the window after unlock.
+	gitWriteUnlockFn := w.gitWriteLock(cloneDir)
+	defer gitWriteUnlockFn()
+
 	defer func() {
 		close(pm.done)
 		pendingMerges.Delete(cloneDir)
 	}()
-
-	gitWriteUnlockFn := w.gitWriteLock(cloneDir)
-	defer gitWriteUnlockFn()
 
 	if _, exists := recheckRequiredMap.Load(cloneDir); !exists {
 		logger.Debug("Skipping upstream merge. Some other thread has done this for us")
