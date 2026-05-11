@@ -7,7 +7,7 @@
     "@vueuse/core": "12.8.2",
     "markdown-it-footnote": "4.0.0",
     "markdownlint-cli": "0.47.0",
-    "mermaid": "11.12.3",
+    "mermaid": "11.15.0",
     "sitemap-ts": "1.10.1",
     "vite": "6.4.2",
     "vitepress": "1.6.4",
