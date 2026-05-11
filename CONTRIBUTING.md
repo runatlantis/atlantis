@@ -1,25 +1,25 @@
-# Contributing <!-- omit in toc -->
+# Contributing
 
-# Table of Contents <!-- omit in toc -->
+<!-- toc -->
+
 - [Reporting Issues](#reporting-issues)
 - [Reporting Security Issues](#reporting-security-issues)
 - [Creating a Pull Request](#creating-a-pull-request)
 - [Developing](#developing)
-  - [Updating The Website](#updating-the-website)
-  - [Running Atlantis Locally](#running-atlantis-locally)
-  - [Running Atlantis With Local Changes](#running-atlantis-with-local-changes)
-    - [Rebuilding](#rebuilding)
-  - [Running Tests Locally](#running-tests-locally)
-  - [Running Tests In Docker](#running-tests-in-docker)
-  - [Calling Your Local Atlantis From GitHub](#calling-your-local-atlantis-from-github)
-  - [Code Style](#code-style)
-    - [Logging](#logging)
-    - [Errors](#errors)
-    - [Testing](#testing)
-    - [Mocks](#mocks)
-- [Backporting Fixes](#backporting-fixes)
-  - [Manual Backporting Fixes](#manual-backporting-fixes)
-- [Creating a New Release](#creating-a-new-release)
+  * [Updating The Website](#updating-the-website)
+  * [Running Atlantis Locally](#running-atlantis-locally)
+  * [Running Atlantis With Local Changes](#running-atlantis-with-local-changes)
+    + [Rebuilding](#rebuilding)
+  * [Running Tests Locally](#running-tests-locally)
+  * [Running Tests In Docker](#running-tests-in-docker)
+  * [Calling Your Local Atlantis From GitHub](#calling-your-local-atlantis-from-github)
+  * [Code Style](#code-style)
+    + [Logging](#logging)
+    + [Errors](#errors)
+    + [Testing](#testing)
+    + [Mocks](#mocks)
+
+<!-- tocstop -->
 
 # Reporting Issues
 * When reporting issues, please include the output of `atlantis version`.
