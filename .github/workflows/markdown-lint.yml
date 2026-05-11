@@ -17,11 +17,12 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
-  checks: write
 
 jobs:
   changes:
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       should-run-markdown-lint: ${{ steps.changes.outputs.markdown == 'true' }}
     if: github.event.pull_request.draft == false
