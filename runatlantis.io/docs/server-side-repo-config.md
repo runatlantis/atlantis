@@ -101,7 +101,7 @@ repos:
   autodiscover:
     mode: auto
     # Optionally ignore some paths for autodiscovery by a glob path.
-    # Also applies to targeted commands (e.g. atlantis plan -d <path>)
+    # Also applies to all targeted -d commands (plan, apply, import, etc.)
     # when the path has no explicit project configuration.
     ignore_paths:
       - foo/*
