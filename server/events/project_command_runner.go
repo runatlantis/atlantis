@@ -366,7 +366,8 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 				if isOwner && !ignorePolicy && (ctx.User.Username != ctx.Pull.Author || !policySet.PreventSelfApprove) {
 					alreadyFullyApproved := policyStatus.OwnerHasFullyApproved(ctx.User.Username) && policyStatus.GetCurApprovals() < policySet.ApproveCount
 					if alreadyFullyApproved {
-						prjErr = errors.Join(prjErr, fmt.Errorf("policy set: requires %d additional approvals from policy owners other than %s", policySet.ApproveCount-policyStatus.GetCurApprovals(), ctx.User.Username))
+						remaining := policySet.ApproveCount - policyStatus.GetCurApprovals()
+						prjErr = errors.Join(prjErr, fmt.Errorf("policy set: already approved by %s; need %d more approval(s) from a different policy owner", ctx.User.Username, remaining))
 					}
 					if !alreadyFullyApproved {
 						if !ctx.ClearPolicyApproval {
@@ -505,10 +506,15 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			}
 			preConftestOutput = append(preConftestOutput, output)
 		} else {
-			// Using a policy tool other than Conftest, manually building result struct
+			// Using a policy tool other than Conftest, manually building result struct.
+			// Excess outputs (no matching configured policy set) fall back to the
+			// top-level policies block for both regex and approve count.
 			policySetName := "Custom"
 			policyItemRegex := ctx.PolicySets.PolicyItemRegex
-			approveCount := 1
+			approveCount := ctx.PolicySets.ApproveCount
+			if approveCount <= 0 {
+				approveCount = 1
+			}
 			if index < len(inputPolicySets) {
 				policySetName = inputPolicySets[index].Name
 				policyItemRegex = inputPolicySets[index].PolicyItemRegex
@@ -582,10 +588,17 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		if !stickyPolicySetNames[status.PolicySetName] {
 			continue
 		}
-		// If policy_item_regex changed since approvals were stored, hashes are not
-		// comparable; do not carry over. Empty stored regex means legacy data—keep
-		// prior sticky behavior.
-		if status.PolicyItemRegex != "" && currentPolicyItemRegex[status.PolicySetName] != status.PolicyItemRegex {
+		// Skip if the policy set is no longer in the current config; the
+		// resultByName lookup below would also miss, but doing this explicitly
+		// makes the intent unambiguous against empty-string regex values.
+		currentRegex, inConfig := currentPolicyItemRegex[status.PolicySetName]
+		if !inConfig {
+			continue
+		}
+		// If policy_item_regex changed since approvals were stored, hashes are
+		// not comparable; do not carry over. Empty stored regex means legacy
+		// data—keep prior sticky behavior.
+		if status.PolicyItemRegex != "" && currentRegex != status.PolicyItemRegex {
 			continue
 		}
 		result := resultByName[status.PolicySetName]

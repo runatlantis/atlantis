@@ -1559,14 +1559,14 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     make([]models.PolicySetApproval, 2),
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}, {Approver: "approver2"}},
 				},
 			},
 			expOut: []models.PolicySetResult{
 				{
 					PolicySetName:    "policy1",
 					ReqApprovalCount: 2,
-					Approvals:        make([]models.PolicySetApproval, 2),
+					Approvals:        []models.PolicySetApproval{{Approver: "approver1"}, {Approver: "approver2"}},
 				},
 			},
 			expFailure: ``,
@@ -1676,12 +1676,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     make([]models.PolicySetApproval, 1),
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     make([]models.PolicySetApproval, 1),
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 					Passed:        false,
 				},
 			},
@@ -1725,12 +1725,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     make([]models.PolicySetApproval, 1),
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     make([]models.PolicySetApproval, 1),
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 					Passed:        false,
 				},
 			},
@@ -1743,7 +1743,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				{
 					PolicySetName:    "policy2",
 					ReqApprovalCount: 2,
-					Approvals:        make([]models.PolicySetApproval, 1),
+					Approvals:        []models.PolicySetApproval{{Approver: "approver1"}},
 				},
 			},
 			expFailure: `One or more policy sets require additional approval.`,
@@ -1775,12 +1775,12 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			policySetStatus: []models.PolicySetStatus{
 				{
 					PolicySetName: "policy1",
-					Approvals:     make([]models.PolicySetApproval, 1),
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 					Passed:        false,
 				},
 				{
 					PolicySetName: "policy2",
-					Approvals:     make([]models.PolicySetApproval, 1),
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 					Passed:        false,
 				},
 			},
@@ -1788,7 +1788,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				{
 					PolicySetName:    "policy1",
 					ReqApprovalCount: 1,
-					Approvals:        make([]models.PolicySetApproval, 1),
+					Approvals:        []models.PolicySetApproval{{Approver: "approver1"}},
 				},
 				{
 					PolicySetName:    "policy2",

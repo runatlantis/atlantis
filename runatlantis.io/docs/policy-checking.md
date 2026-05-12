@@ -297,6 +297,10 @@ policies:
 
 With `.+`, each line is tracked independently. Approvals remain valid as long as every current line was present at approval time. Fixing a violation (removing a line) preserves existing approvals; adding or changing one invalidates them.
 
+::: tip
+The subset semantics above are intentional: an approval covers a specific set of items, and any current item must have been part of that set. Removing items (e.g., a policy author fixes a previously-flagged violation) is treated as progress and does **not** invalidate prior approvals. Only the appearance of new or changed items triggers re-approval.
+:::
+
 For text output, use `(?m)^FAIL.*` to track only lines starting with `FAIL`:
 
 ```yaml

@@ -15,7 +15,6 @@ import (
 	"net/url"
 	paths "path"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -36,11 +35,13 @@ func HashPolicyItem(item string) string {
 func policyItemHashes(policyOutput string, re *regexp.Regexp) []string {
 	matches := re.FindAllString(policyOutput, -1)
 	hashes := make([]string, 0, len(matches))
+	seen := make(map[string]struct{}, len(matches))
 	for _, m := range matches {
 		h := HashPolicyItem(m)
-		if slices.Contains(hashes, h) {
+		if _, ok := seen[h]; ok {
 			continue
 		}
+		seen[h] = struct{}{}
 		hashes = append(hashes, h)
 	}
 	if len(hashes) == 0 {

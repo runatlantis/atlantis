@@ -1018,7 +1018,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 							{
 								PolicySetName:    "policy1",
 								ReqApprovalCount: 1,
-								Approvals:        make([]models.PolicySetApproval, 1),
+								Approvals:        []models.PolicySetApproval{{Approver: "approver1"}},
 							},
 						},
 					},
@@ -1042,7 +1042,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     make([]models.PolicySetApproval, 1),
+						Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 					},
 				},
 			},
