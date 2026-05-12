@@ -2035,6 +2035,7 @@ func TestDefaultProjectCommandRunner_PolicyCheck_StickyCarryOverPreservesDormant
 		Any[models.PullRequest](),
 		Any[string](),
 	)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(
 		Any[logging.SimpleLogging](),
 		Any[models.PullRequest](),
@@ -2176,6 +2177,7 @@ func TestDefaultProjectCommandRunner_PolicyCheck_StickyCarryOverBehavior(t *test
 				Any[models.PullRequest](),
 				Any[string](),
 			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 			When(mockLocker.TryLock(
 				Any[logging.SimpleLogging](),
 				Any[models.PullRequest](),
