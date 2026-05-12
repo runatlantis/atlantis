@@ -46,7 +46,7 @@ If you have any questions about the contribution process, see [Atlantis Contribu
 
 It is the Author's responsibility to review and resolve all comments on their PRs. Even if no change is made, it's still important to engage with the feedback from the community.
 
-This also applies to comments from Copilot, see our [AI Usage PolicyCreate a GitHub token](https://github.com/runatlantis/atlantis/tree/main/AI_USAGE_POLICY.md#copilot) for more details.
+This also applies to comments from Copilot, see our [AI Usage Policy](AI_USAGE_POLICY.md#copilot) for more details.
 
 # Developing
 
