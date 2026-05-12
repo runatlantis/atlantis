@@ -100,7 +100,9 @@ repos:
   # If any part of this setting is set here, it overrides the entire setting in the repo config.
   autodiscover:
     mode: auto
-    # Optionally ignore some paths for autodiscovery by a glob path
+    # Optionally ignore some paths for autodiscovery by a glob path.
+    # Also applies to targeted commands (e.g. atlantis plan -d <path>)
+    # when the path has no explicit project configuration.
     ignore_paths:
       - foo/*
 
