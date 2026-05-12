@@ -35,7 +35,7 @@ Atlantis maintainers use several AI tools as part of the development workflow. T
 
 ### Dosu
 
-[Dosu](https://dosu.dev/) is used in Issues to help provide users with context to the codebase. Feel free to ask it follow-up questions via `@dosu`, but note that it is only basing its answers on the code and history, so may lack high level goals of the project.
+[Dosu](https://dosu.dev/) is used in Issues to help provide users with context to the codebase. Feel free to ask it follow-up questions via `@dosu`, but note that it is only basing its answers on the code and history, so may lack high-level goals of the project.
 
 ### Copilot
 
