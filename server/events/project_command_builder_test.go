@@ -872,6 +872,25 @@ autodiscover:
 	Ok(t, err)
 	Equals(t, 1, len(planCtxs))
 	Equals(t, "environments/nonprod", planCtxs[0].RepoRelDir)
+
+	// Targeted apply -d to ignored path should return no projects
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/prod",
+		Workspace:  "default",
+	})
+	Ok(t, err)
+	Equals(t, 0, len(applyCtxs))
+
+	// Targeted apply -d to non-ignored path should work
+	applyCtxs, err = builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/nonprod",
+		Workspace:  "default",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(applyCtxs))
+	Equals(t, "environments/nonprod", applyCtxs[0].RepoRelDir)
 }
 
 // Test that targeted -d commands to a path with an explicit project config

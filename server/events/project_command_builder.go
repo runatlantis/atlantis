@@ -412,6 +412,27 @@ func (p *DefaultProjectCommandBuilder) parseRepoCfg(ctx *command.Context, repoDi
 	return repoCfg, true, nil
 }
 
+// shouldIgnoreTargetedDir checks whether a targeted -d command should be
+// silently skipped because the path matches autodiscover.ignore_paths. It only
+// applies when autodiscovery is active and the directory has no explicit project
+// config in atlantis.yaml.
+func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDir(ctx *command.Context, repoDir string, repoRelDir string) bool {
+	repoCfg, _, err := p.parseRepoCfg(ctx, repoDir)
+	if err != nil {
+		return false
+	}
+	if !p.autoDiscoverModeEnabled(ctx, repoCfg) {
+		return false
+	}
+	cleanDir := filepath.Clean(repoRelDir)
+	for _, proj := range repoCfg.Projects {
+		if filepath.Clean(proj.Dir) == cleanDir {
+			return false // explicit project config overrides ignore_paths
+		}
+	}
+	return p.isAutoDiscoverPathIgnored(ctx, repoCfg, cleanDir)
+}
+
 // isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery.
 // Global config ignore_paths takes precedence when explicitly set; otherwise falls through to repo config.
 func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
@@ -748,26 +769,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		repoRelDir = cmd.RepoRelDir
 	}
 
-	// Check ignore_paths for targeted plan commands against non-configured
-	// paths. This prevents targeted 'atlantis plan -d <path>' from running
-	// on paths the operator intended to exclude (e.g. multi-instance setups).
-	// Paths with explicit project config in atlantis.yaml are not affected.
-	if cmd.ProjectName == "" {
-		repoCfg, _, repoCfgErr := p.parseRepoCfg(ctx, defaultRepoDir)
-		if repoCfgErr == nil {
-			cleanDir := filepath.Clean(repoRelDir)
-			hasExplicitCfg := false
-			for _, proj := range repoCfg.Projects {
-				if filepath.Clean(proj.Dir) == cleanDir {
-					hasExplicitCfg = true
-					break
-				}
-			}
-			if !hasExplicitCfg && p.isAutoDiscoverPathIgnored(ctx, repoCfg, cleanDir) {
-				ctx.Log.Debug("ignoring targeted plan for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
-				return pcc, nil
-			}
-		}
+	if cmd.ProjectName == "" && p.shouldIgnoreTargetedDir(ctx, defaultRepoDir, repoRelDir) {
+		ctx.Log.Debug("ignoring targeted plan for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
+		return pcc, nil
 	}
 
 	return p.buildProjectCommandCtx(
@@ -956,24 +960,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		repoRelDir = cmd.RepoRelDir
 	}
 
-	// Same ignore_paths check as buildProjectPlanCommand for targeted commands.
-	// Paths with explicit project config in atlantis.yaml are not affected.
-	if cmd.ProjectName == "" {
-		repoCfg, _, repoCfgErr := p.parseRepoCfg(ctx, repoDir)
-		if repoCfgErr == nil {
-			cleanDir := filepath.Clean(repoRelDir)
-			hasExplicitCfg := false
-			for _, proj := range repoCfg.Projects {
-				if filepath.Clean(proj.Dir) == cleanDir {
-					hasExplicitCfg = true
-					break
-				}
-			}
-			if !hasExplicitCfg && p.isAutoDiscoverPathIgnored(ctx, repoCfg, cleanDir) {
-				ctx.Log.Debug("ignoring targeted command for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
-				return projCtx, nil
-			}
-		}
+	if cmd.ProjectName == "" && p.shouldIgnoreTargetedDir(ctx, repoDir, repoRelDir) {
+		ctx.Log.Debug("ignoring targeted command for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
+		return projCtx, nil
 	}
 
 	return p.buildProjectCommandCtx(
