@@ -415,8 +415,11 @@ func (p *DefaultProjectCommandBuilder) parseRepoCfg(ctx *command.Context, repoDi
 // shouldIgnoreTargetedDir checks whether a targeted -d command should be
 // silently skipped because the path matches autodiscover.ignore_paths. It only
 // applies when autodiscovery is active and the directory has no explicit project
-// config in atlantis.yaml.
+// config in the repo config file.
 func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDir(ctx *command.Context, repoDir string, repoRelDir string) bool {
+	if valid.ContainsDirGlobPattern(repoRelDir) {
+		return false
+	}
 	repoCfg, _, err := p.parseRepoCfg(ctx, repoDir)
 	if err != nil {
 		return false
@@ -427,7 +430,7 @@ func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDir(ctx *command.Cont
 	cleanDir := filepath.Clean(repoRelDir)
 	for _, proj := range repoCfg.Projects {
 		if filepath.Clean(proj.Dir) == cleanDir {
-			return false // explicit project config overrides ignore_paths
+			return false
 		}
 	}
 	return p.isAutoDiscoverPathIgnored(ctx, repoCfg, cleanDir)

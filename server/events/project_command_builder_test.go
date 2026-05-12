@@ -971,6 +971,16 @@ projects:
 	Ok(t, err)
 	Equals(t, 1, len(planCtxs))
 	Equals(t, "prod-project", planCtxs[0].ProjectName)
+
+	// Targeted apply -d to ignored path with explicit config should succeed
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/prod",
+		Workspace:  "default",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(applyCtxs))
+	Equals(t, "prod-project", applyCtxs[0].ProjectName)
 }
 
 // Test building a plan and apply command for one project
