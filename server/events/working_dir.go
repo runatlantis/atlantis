@@ -33,8 +33,8 @@ var recheckRequiredMap sync.Map
 // the done channel for the result — no write-lock contention between them.
 type pendingMerge struct {
 	done   chan struct{} // closed when the merge completes
-	merged bool         // whether a merge was actually performed
-	err    error        // error from the merge, if any
+	merged bool          // whether a merge was actually performed
+	err    error         // error from the merge, if any
 }
 
 var pendingMerges sync.Map
