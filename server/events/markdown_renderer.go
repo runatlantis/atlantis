@@ -7,6 +7,7 @@ package events
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
 	"strings"
 	"text/template"
@@ -124,12 +125,13 @@ type policyCheckResultsData struct {
 }
 
 type projectResultTmplData struct {
-	Workspace    string
-	RepoRelDir   string
-	ProjectName  string
-	Rendered     string
-	NoChanges    bool
-	IsSuccessful bool
+	Workspace       string
+	RepoRelDir      string
+	ProjectName     string
+	Rendered        string
+	NoChanges       bool
+	SuppressComment bool
+	IsSuccessful    bool
 }
 
 // Initialize templates
@@ -225,6 +227,11 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 			RepoRelDir:   result.RepoRelDir,
 			ProjectName:  result.ProjectName,
 			IsSuccessful: result.IsSuccessful(),
+		}
+		if common.Command == planCommandTitle && common.HideUnchangedPlanComments && isSuppressedPlanError(result.Error) {
+			resultData.SuppressComment = true
+			resultsTmplData = append(resultsTmplData, resultData)
+			continue
 		}
 		if result.PlanSuccess != nil {
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
@@ -430,4 +437,12 @@ func (m *MarkdownRenderer) renderTemplateTrimSpace(tmpl *template.Template, data
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
 	}
 	return strings.TrimSpace(buf.String())
+}
+
+func isSuppressedPlanError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return errors.Is(err, errOperationCancelled) || err.Error() == operationCancelledErrMsg
 }

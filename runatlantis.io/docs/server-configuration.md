@@ -989,7 +989,7 @@ atlantis server --hide-unchanged-plan-comments
 ATLANTIS_HIDE_UNCHANGED_PLAN_COMMENTS=true
 ```
 
-Remove no-changes plan comments from the pull request.
+Remove no-changes plan comments and cancellation plan comments from the pull request.
 
 This is useful when you have many projects and want to keep the pull request clean from useless comments.
 
