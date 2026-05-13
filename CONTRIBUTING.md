@@ -1,6 +1,9 @@
-# Contributing <!-- omit in toc -->
+# Contributing
 
-# Table of Contents <!-- omit in toc -->
+# Table of Contents
+
+<!-- toc -->
+
 - [Reporting Issues](#reporting-issues)
 - [Reporting Security Issues](#reporting-security-issues)
 - [Creating a Pull Request](#creating-a-pull-request)
@@ -17,9 +20,8 @@
     - [Errors](#errors)
     - [Testing](#testing)
     - [Mocks](#mocks)
-- [Backporting Fixes](#backporting-fixes)
-  - [Manual Backporting Fixes](#manual-backporting-fixes)
-- [Creating a New Release](#creating-a-new-release)
+
+<!-- tocstop -->
 
 # Reporting Issues
 * When reporting issues, please include the output of `atlantis version`.
