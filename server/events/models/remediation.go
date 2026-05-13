@@ -69,7 +69,9 @@ type RemediationRequest struct {
 	Type string `json:"type"`
 	// Action specifies plan-only or auto-apply. Defaults to "plan".
 	Action RemediationAction `json:"action"`
-	// Projects is a list of project names to remediate. If empty, all projects with drift are remediated.
+	// Projects is a list of project names to remediate. If empty, all stored
+	// projects matching the request filters are remediated. To restrict to
+	// projects that actually have detected drift, set DriftOnly to true.
 	Projects []string `json:"projects,omitempty"`
 	// Workspaces filters remediation to specific workspaces. If empty, all workspaces.
 	Workspaces []string `json:"workspaces,omitempty"`

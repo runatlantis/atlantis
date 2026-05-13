@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/core/drift"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
@@ -184,13 +185,14 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 	// Convert to API response format
 	apiResult := NewCommandResultAPI(result, command.Plan.String())
 
+	// Return per-project statuses inside the success envelope. Project-level
+	// failures use 207 Multi-Status so clients can read per-project results
+	// without needing to parse an error envelope.
+	statusCode := http.StatusOK
 	if result.HasErrors() {
-		responder.Error(w, r, http.StatusInternalServerError,
-			NewAPIError(ErrCodeInternal, "plan had errors").WithDetails(apiResult))
-		return
+		statusCode = http.StatusMultiStatus
 	}
-
-	responder.Success(w, r, http.StatusOK, apiResult)
+	responder.Success(w, r, statusCode, apiResult)
 }
 
 func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
@@ -240,13 +242,14 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	// Convert to API response format
 	apiResult := NewCommandResultAPI(result, command.Apply.String())
 
+	// Return per-project statuses inside the success envelope. Project-level
+	// failures use 207 Multi-Status so clients can read per-project results
+	// without needing to parse an error envelope.
+	statusCode := http.StatusOK
 	if result.HasErrors() {
-		responder.Error(w, r, http.StatusInternalServerError,
-			NewAPIError(ErrCodeInternal, "apply had errors").WithDetails(apiResult))
-		return
+		statusCode = http.StatusMultiStatus
 	}
-
-	responder.Success(w, r, http.StatusOK, apiResult)
+	responder.Success(w, r, statusCode, apiResult)
 }
 
 // LockDetail is deprecated - use LockDetailAPI instead.
@@ -809,15 +812,12 @@ func (a *APIController) GetRemediationResult(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Get the ID from query parameter (or path, depending on router)
-	id := r.URL.Query().Get("id")
+	// Get the ID from the gorilla/mux path variable.
+	// Route registered as /api/drift/remediate/{id}.
+	id := mux.Vars(r)["id"]
 	if id == "" {
-		// Try to extract from path for routers that support path parameters
-		// Path format: /api/drift/remediate/{id}
-		path := r.URL.Path
-		if pathID, found := strings.CutPrefix(path, "/api/drift/remediate/"); found {
-			id = pathID
-		}
+		// Fallback to query parameter for routers that do not populate path vars.
+		id = r.URL.Query().Get("id")
 	}
 
 	if id == "" {

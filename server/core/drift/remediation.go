@@ -108,9 +108,14 @@ func (s *InMemoryRemediationService) Remediate(req models.RemediationRequest, ex
 func (s *InMemoryRemediationService) getProjectsToRemediate(req models.RemediationRequest) ([]models.ProjectDrift, error) {
 	var projects []models.ProjectDrift
 
+	// Drift records are keyed by ref, so when reading from storage we restrict
+	// to the requested ref. This prevents remediating a project that drifted on
+	// a different branch/commit than the one the caller asked about, which is
+	// especially risky for auto-apply.
+	opts := GetOptions{Ref: req.Ref}
+
 	// If drift storage is available and DriftOnly is true, get projects with drift
 	if s.driftStorage != nil && req.DriftOnly {
-		opts := GetOptions{}
 		drifts, err := s.driftStorage.Get(req.Repository, opts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get drift data: %w", err)
@@ -135,8 +140,8 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 			})
 		}
 	} else if s.driftStorage != nil {
-		// Get all projects from drift storage
-		drifts, err := s.driftStorage.Get(req.Repository, GetOptions{})
+		// Get all projects from drift storage for the requested ref
+		drifts, err := s.driftStorage.Get(req.Repository, opts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get drift data: %w", err)
 		}

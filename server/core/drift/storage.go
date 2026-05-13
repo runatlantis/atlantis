@@ -38,6 +38,10 @@ type GetOptions struct {
 	Path string
 	// Workspace filters by Terraform workspace (exact match).
 	Workspace string
+	// Ref filters by git reference (exact match). Drift records are keyed
+	// by ref, so callers that want to act on a specific branch/commit
+	// should set this to avoid mixing data across refs.
+	Ref string
 	// MaxAge filters out drift results older than this duration.
 	// If zero, no age filtering is applied.
 	MaxAge time.Duration
@@ -101,6 +105,9 @@ func (s *InMemoryStorage) Get(repository string, opts GetOptions) ([]models.Proj
 			continue
 		}
 		if opts.Workspace != "" && drift.Workspace != opts.Workspace {
+			continue
+		}
+		if opts.Ref != "" && drift.Ref != opts.Ref {
 			continue
 		}
 		if opts.MaxAge > 0 && now.Sub(drift.LastChecked) > opts.MaxAge {
