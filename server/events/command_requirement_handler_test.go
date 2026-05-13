@@ -193,7 +193,13 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				ApplyRequirements: []string{raw.UnDivergedRequirement},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string]())).ThenReturn(true)
+				When(workingDir.HasDiverged(
+					Any[logging.SimpleLogging](),
+					Any[string](),
+					Any[string](),
+					Any[[]string](),
+					Any[models.PullRequest](),
+				)).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running apply.",
 			wantErr:     assert.NoError,
