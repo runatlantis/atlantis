@@ -26,7 +26,6 @@ const prSourceRemote = "source"
 
 // gitLocks holds per-clone-dir locks: "repo-lock/<cloneDir>" -> *sync.RWMutex (read for steps, write for clone/reset/merge), "ref-lock/<cloneDir>" -> *sync.Mutex (serialize fetch).
 var gitLocks sync.Map
-var recheckRequiredMap sync.Map
 
 // pendingMerge coordinates parallel goroutines that all detect divergence at
 // the same time. The leader performs the actual merge while followers wait on
@@ -201,15 +200,9 @@ func (w *FileWorkspace) MergeAgain(
 	if err != nil {
 		return false, err
 	}
-	// We atomically set the recheckRequiredMap flag here before grabbing any lock.
-	// If the flag is cleared after we grab the write lock, it means some other
-	// thread did the necessary work late enough that we do not have to do it again.
-	recheckRequiredMap.Store(cloneDir, struct{}{})
-
 	c := wrappedGitContext{cloneDir, headRepo, p}
 
 	if !w.recheckDiverged(logger, p, headRepo, cloneDir) {
-		recheckRequiredMap.Delete(cloneDir)
 		return false, nil
 	}
 
@@ -234,12 +227,6 @@ func (w *FileWorkspace) MergeAgain(
 		close(pm.done)
 		pendingMerges.Delete(cloneDir)
 	}()
-
-	if _, exists := recheckRequiredMap.Load(cloneDir); !exists {
-		logger.Debug("Skipping upstream merge. Some other thread has done this for us")
-		return false, nil
-	}
-	recheckRequiredMap.Delete(cloneDir)
 
 	logger.Info("base branch may have been updated, using merge strategy and will merge again")
 	pm.merged, pm.err = true, w.mergeAgain(logger, c)
