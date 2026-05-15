@@ -33,11 +33,6 @@ on:
 permissions:
   contents: read
 
-env:
-  NPM_CONFIG_IGNORE_SCRIPTS: "true"
-  # npm script and git dependency hardening: https://github.blog/changelog/2026-02-18-npm-bulk-trusted-publishing-config-and-script-security-now-generally-available/
-  NPM_CONFIG_ALLOW_GIT: "none"
-
 jobs:
   changes:
     permissions:
@@ -101,7 +96,6 @@ jobs:
 
         # Details on CodeQL's query packs refer to : https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
         # queries: security-extended,security-and-quality
-
 
     # Autobuild attempts to build any compiled languages  (C/C++, C#, Go, or Java).
     # If this step fails, then you should remove it and run the build manually (see below)

@@ -11,11 +11,6 @@ on:
 permissions:
   contents: read
 
-env:
-  NPM_CONFIG_IGNORE_SCRIPTS: "true"
-  # npm script and git dependency hardening: https://github.blog/changelog/2026-02-18-npm-bulk-trusted-publishing-config-and-script-security-now-generally-available/
-  NPM_CONFIG_ALLOW_GIT: "none"
-
 jobs:
   triage:
     permissions:

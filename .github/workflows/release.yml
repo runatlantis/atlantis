@@ -9,11 +9,6 @@ on:
 permissions:
   contents: write  # for goreleaser to create releases and upload release assets
 
-env:
-  NPM_CONFIG_IGNORE_SCRIPTS: "true"
-  # npm script and git dependency hardening: https://github.blog/changelog/2026-02-18-npm-bulk-trusted-publishing-config-and-script-security-now-generally-available/
-  NPM_CONFIG_ALLOW_GIT: "none"
-
 jobs:
   goreleaser:
     runs-on: ubuntu-24.04
