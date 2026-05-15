@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write  # for goreleaser to create releases and upload release assets
 
+env:
+  NPM_CONFIG_IGNORE_SCRIPTS: "true"
+
 jobs:
   goreleaser:
     runs-on: ubuntu-24.04

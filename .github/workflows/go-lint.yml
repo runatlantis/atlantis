@@ -23,6 +23,9 @@ permissions:
   # Optional: Allow write access to checks to allow the action to annotate code in the PR.
   checks: write
 
+env:
+  NPM_CONFIG_IGNORE_SCRIPTS: "true"
+
 jobs:
   changes:
     outputs:

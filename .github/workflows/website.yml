@@ -23,6 +23,9 @@ permissions:
   # Required: allow read access to the content for analysis.
   contents: read
 
+env:
+  NPM_CONFIG_IGNORE_SCRIPTS: "true"
+
 jobs:
   changes:
     outputs:

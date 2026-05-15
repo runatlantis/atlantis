@@ -10,6 +10,9 @@ on:
 permissions:
   pull-requests: read
 
+env:
+  NPM_CONFIG_IGNORE_SCRIPTS: "true"
+
 jobs:
   main:
     name: Validate PR title

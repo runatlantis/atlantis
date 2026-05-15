@@ -17,6 +17,9 @@ concurrency:
 
 permissions: read-all
 
+env:
+  NPM_CONFIG_IGNORE_SCRIPTS: "true"
+
 jobs:
   Fuzzing:
     if: github.event.pull_request.draft == false

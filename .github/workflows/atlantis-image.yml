@@ -25,6 +25,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  NPM_CONFIG_IGNORE_SCRIPTS: "true"
+
 jobs:
   changes:
     permissions:

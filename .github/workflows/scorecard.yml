@@ -8,6 +8,9 @@ on:
 
 permissions: read-all
 
+env:
+  NPM_CONFIG_IGNORE_SCRIPTS: "true"
+
 jobs:
   analysis:
     name: Scorecard analysis

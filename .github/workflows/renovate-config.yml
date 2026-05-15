@@ -15,6 +15,9 @@ on:
 permissions:
   contents: read
 
+env:
+  NPM_CONFIG_IGNORE_SCRIPTS: "true"
+
 jobs:
   validate:
     runs-on: ubuntu-24.04

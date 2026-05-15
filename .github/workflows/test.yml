@@ -23,6 +23,7 @@ permissions:
   contents: read
 
 env:
+  NPM_CONFIG_IGNORE_SCRIPTS: "true"
   TERRAFORM_VERSION: 1.11.1
   NGROK_DOWNLOAD_URL: https://bin.equinox.io/a/bNzUz3YQtcB/ngrok-v3-3.33.1-linux-amd64.tar.gz
 
