@@ -136,16 +136,15 @@ func TestAutomerge_DeleteSourceBranch_PassedToMerge(t *testing.T) {
 	)
 }
 
-func TestAutomerge_EmptyProjects_DoesNotMerge(t *testing.T) {
+func TestAutomerge_EmptyProjects_VacuouslyMerges(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := vcsmocks.NewMockClient()
 	am := &AutoMerger{VCSClient: vcsClient, GlobalAutomerge: true}
 	ctx := buildApplyContext(t, vcsClient)
 
-	// PullStatus with no projects – nothing to check, nothing to merge.
+	// No projects == vacuously all applied → should still merge.
 	am.automerge(ctx, models.PullStatus{}, false, "")
 
-	// No projects == vacuously all applied → should still merge.
 	vcsClient.VerifyWasCalledOnce().MergePull(
 		Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions](),
 	)
