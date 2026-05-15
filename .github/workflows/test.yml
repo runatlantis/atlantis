@@ -24,6 +24,8 @@ permissions:
 
 env:
   NPM_CONFIG_IGNORE_SCRIPTS: "true"
+  # npm script and git dependency hardening: https://github.blog/changelog/2026-02-18-npm-bulk-trusted-publishing-config-and-script-security-now-generally-available/
+  NPM_CONFIG_ALLOW_GIT: "none"
   TERRAFORM_VERSION: 1.11.1
   NGROK_DOWNLOAD_URL: https://bin.equinox.io/a/bNzUz3YQtcB/ngrok-v3-3.33.1-linux-amd64.tar.gz
 
