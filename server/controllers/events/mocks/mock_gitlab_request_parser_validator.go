@@ -25,17 +25,17 @@ func NewMockGitlabRequestParserValidator(options ...pegomock.Option) *MockGitlab
 func (mock *MockGitlabRequestParserValidator) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockGitlabRequestParserValidator) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockGitlabRequestParserValidator) ParseAndValidate(r *http.Request, secret []byte) (interface{}, error) {
+func (mock *MockGitlabRequestParserValidator) ParseAndValidate(r *http.Request, secret []byte) (any, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockGitlabRequestParserValidator().")
 	}
 	_params := []pegomock.Param{r, secret}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("ParseAndValidate", _params, []reflect.Type{reflect.TypeOf((*interface{})(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var _ret0 interface{}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("ParseAndValidate", _params, []reflect.Type{reflect.TypeOf((*any)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 any
 	var _ret1 error
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(interface{})
+			_ret0 = _result[0].(any)
 		}
 		if _result[1] != nil {
 			_ret1 = _result[1].(error)

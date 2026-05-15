@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -26,11 +17,12 @@ import (
 )
 
 var commentParser = events.CommentParser{
-	GithubUser:     "github-user",
-	GitlabUser:     "gitlab-user",
-	GiteaUser:      "gitea-user",
-	ExecutableName: "atlantis",
-	AllowCommands:  command.AllCommentCommands,
+	GithubUser:       "github-user",
+	GitlabUser:       "gitlab-user",
+	GiteaUser:        "gitea-user",
+	ExecutableName:   "atlantis",
+	AllowCommands:    command.AllCommentCommands,
+	BlockedExtraArgs: events.DefaultBlockedExtraArgs,
 }
 
 func TestNewCommentParser(t *testing.T) {
@@ -54,7 +46,8 @@ func TestNewCommentParser(t *testing.T) {
 				allowCommands: []command.Name{command.Plan, command.Plan, command.Plan},
 			},
 			want: &events.CommentParser{
-				AllowCommands: []command.Name{command.Plan},
+				AllowCommands:    []command.Name{command.Plan},
+				BlockedExtraArgs: nil,
 			},
 		},
 		{
@@ -64,13 +57,14 @@ func TestNewCommentParser(t *testing.T) {
 				allowCommands: []command.Name{command.Plan, command.Apply, command.Unlock, command.PolicyCheck, command.ApprovePolicies, command.Autoplan, command.Version, command.Import},
 			},
 			want: &events.CommentParser{
-				AllowCommands: []command.Name{command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import},
+				AllowCommands:    []command.Name{command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import},
+				BlockedExtraArgs: nil,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.giteaUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands), "NewCommentParser(%v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
+			assert.Equalf(t, tt.want, events.NewCommentParser(tt.args.githubUser, tt.args.gitlabUser, tt.args.giteaUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands, nil), "NewCommentParser(%v, %v, %v, %v, %v, %v, %v)", tt.args.githubUser, tt.args.gitlabUser, tt.args.giteaUser, tt.args.bitbucketUser, tt.args.azureDevopsUser, tt.args.executableName, tt.args.allowCommands)
 		})
 	}
 }
@@ -306,6 +300,7 @@ func TestParse_InvalidCommand(t *testing.T) {
 			command.Plan,
 			command.Apply, // duplicate command is filtered
 		},
+		nil,
 	)
 	for _, c := range comments {
 		r := cp.Parse(c, models.Github)
@@ -530,6 +525,109 @@ func TestParse_InvalidWorkspace(t *testing.T) {
 		Assert(t, strings.Contains(r.CommentResponse, exp),
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 	}
+}
+
+func TestParse_WorkspaceTildeInvalid(t *testing.T) {
+	t.Log("if -w is used with a value starting with '~', should return an error (tilde expansion prevention)")
+	comments := []string{
+		"atlantis plan -w ~",
+		"atlantis apply -w ~",
+		"atlantis plan -w ~user",
+		"atlantis apply -w ~root",
+		"atlantis import -w ~ address id",
+		"atlantis state -w ~ rm address",
+	}
+	for _, c := range comments {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			exp := "Error: invalid workspace"
+			Assert(t, strings.Contains(r.CommentResponse, exp),
+				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		})
+	}
+}
+
+func TestParse_BlockedExtraArgs(t *testing.T) {
+	t.Log("extra args containing blocked Terraform flags should be rejected")
+	cases := []struct {
+		comment string
+		expMsg  string
+	}{
+		{
+			comment: "atlantis plan -- -chdir=../other",
+			expMsg:  `flag "-chdir=../other" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- --chdir=/tmp",
+			expMsg:  `flag "--chdir=/tmp" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- -chdir",
+			expMsg:  `flag "-chdir" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- --chdir",
+			expMsg:  `flag "--chdir" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- -plugin-dir=/tmp/evil",
+			expMsg:  `flag "-plugin-dir=/tmp/evil" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- --plugin-dir=/tmp/evil",
+			expMsg:  `flag "--plugin-dir=/tmp/evil" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis apply -- -chdir=../sensitive",
+			expMsg:  `flag "-chdir=../sensitive" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis import address id -- -chdir=..",
+			expMsg:  `flag "-chdir=.." is not allowed in extra args`,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.comment, func(t *testing.T) {
+			r := commentParser.Parse(c.comment, models.Github)
+			Assert(t, strings.Contains(r.CommentResponse, c.expMsg),
+				"For comment %q expected CommentResponse %q to contain %q", c.comment, r.CommentResponse, c.expMsg)
+		})
+	}
+}
+
+func TestParse_CustomBlockedExtraArgs(t *testing.T) {
+	t.Log("a CommentParser with a custom BlockedExtraArgs list blocks exactly those flags and allows the defaults")
+
+	customParser := events.CommentParser{
+		ExecutableName:   "atlantis",
+		AllowCommands:    command.AllCommentCommands,
+		BlockedExtraArgs: []string{"-no-color", "--no-color"},
+	}
+
+	// The custom flag should be blocked.
+	t.Run("custom flag blocked", func(t *testing.T) {
+		r := customParser.Parse("atlantis plan -- -no-color", models.Github)
+		exp := `flag "-no-color" is not allowed in extra args`
+		Assert(t, strings.Contains(r.CommentResponse, exp),
+			"expected CommentResponse to contain %q, got: %q", exp, r.CommentResponse)
+	})
+
+	// The default flags (-chdir etc.) should now be allowed because the
+	// custom list replaces (rather than extends) the defaults.
+	t.Run("default flag allowed when overridden", func(t *testing.T) {
+		r := customParser.Parse("atlantis plan -- -chdir=other", models.Github)
+		Assert(t, r.CommentResponse == "",
+			"expected no CommentResponse but got: %q", r.CommentResponse)
+		Assert(t, r.Command != nil, "expected a Command to be parsed")
+	})
+
+	// Flags not in the custom list should pass through.
+	t.Run("unblocked flag allowed", func(t *testing.T) {
+		r := customParser.Parse("atlantis plan -- -var=foo=bar", models.Github)
+		Assert(t, r.CommentResponse == "",
+			"expected no CommentResponse but got: %q", r.CommentResponse)
+		Assert(t, r.Command != nil, "expected a Command to be parsed")
+	})
 }
 
 func TestParse_UsingProjectAtSameTimeAsWorkspaceOrDir(t *testing.T) {

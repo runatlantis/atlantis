@@ -1197,6 +1197,23 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:     "custom policy check with multiple policy sets - no duplicate output",
+			RepoDir:         "policy-checks-custom-policy-check",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1353,9 +1370,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	noOpLocker := locking.NewNoOpLocker()
 	applyLocker = locking.NewApplyClient(b, disableApply, disableGlobalApplyLock)
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:     lockingClient,
-		NoOpLocker: noOpLocker,
-		VCSClient:  e2eVCSClient,
+		Locker:         lockingClient,
+		NoOpLocker:     noOpLocker,
+		VCSClient:      e2eVCSClient,
+		ExecutableName: "atlantis",
 	}
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
