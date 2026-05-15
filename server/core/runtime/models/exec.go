@@ -9,7 +9,7 @@ import (
 	"os/exec"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_exec.go Exec
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_exec.go Exec
 
 type Exec interface {
 	LookPath(file string) (string, error)

@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events
@@ -208,7 +199,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, sub
 	}
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_event_parsing.go EventParsing
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_event_parsing.go EventParsing
 
 // EventParsing parses webhook events from different VCS hosts into their
 // respective Atlantis models.
@@ -361,6 +352,7 @@ type EventParser struct {
 	GithubTokenFile    string
 	GitlabUser         string
 	GitlabToken        string
+	GitlabHostname     string
 	GiteaUser          string
 	GiteaToken         string
 	AllowDraftPRs      bool
@@ -382,11 +374,11 @@ func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFu
 			}
 			token = string(content)
 		}
-		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, token)
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, token, "")
 	case models.Gitea:
-		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GiteaUser, e.GiteaToken)
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GiteaUser, e.GiteaToken, "")
 	case models.Gitlab:
-		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken, e.GitlabHostname)
 	}
 	return models.Repo{}, fmt.Errorf("not implemented")
 }
@@ -451,7 +443,8 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		*event.PullRequest.Source.Repository.FullName,
 		*event.PullRequest.Source.Repository.Links.HTML.HREF,
 		e.BitbucketUser,
-		e.BitbucketToken)
+		e.BitbucketToken,
+		"")
 	if err != nil {
 		return
 	}
@@ -460,7 +453,8 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		*event.Repository.FullName,
 		*event.Repository.Links.HTML.HREF,
 		e.BitbucketUser,
-		e.BitbucketToken)
+		e.BitbucketToken,
+		"")
 	if err != nil {
 		return
 	}
@@ -645,14 +639,14 @@ func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, e
 		token = string(content)
 	}
 
-	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, token)
+	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, token, "")
 }
 
 // ParseGiteaRepo parses the response from the Gitea API endpoint that
 // returns a repo into the Atlantis model.
 // See EventParsing for return value docs.
 func (e *EventParser) ParseGiteaRepo(repo giteasdk.Repository) (models.Repo, error) {
-	return models.NewRepo(models.Gitea, repo.FullName, repo.CloneURL, e.GiteaUser, e.GiteaToken)
+	return models.NewRepo(models.Gitea, repo.FullName, repo.CloneURL, e.GiteaUser, e.GiteaToken, "")
 }
 
 // ParseGitlabMergeRequestUpdateEvent dives deeper into Gitlab merge request update events
@@ -677,11 +671,11 @@ func (e *EventParser) ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (pul
 	// GitLab also has a "merged" state, but we map that to Closed so we don't
 	// need to check for it.
 
-	baseRepo, err = models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	baseRepo, err = models.NewRepo(models.Gitlab, event.Project.PathWithNamespace, event.Project.GitHTTPURL, e.GitlabUser, e.GitlabToken, e.GitlabHostname)
 	if err != nil {
 		return
 	}
-	headRepo, err = models.NewRepo(models.Gitlab, event.ObjectAttributes.Source.PathWithNamespace, event.ObjectAttributes.Source.GitHTTPURL, e.GitlabUser, e.GitlabToken)
+	headRepo, err = models.NewRepo(models.Gitlab, event.ObjectAttributes.Source.PathWithNamespace, event.ObjectAttributes.Source.GitHTTPURL, e.GitlabUser, e.GitlabToken, e.GitlabHostname)
 	if err != nil {
 		return
 	}
@@ -732,7 +726,7 @@ func (e *EventParser) ParseGitlabMergeRequestCommentEvent(event gitlab.MergeComm
 	repoFullName := event.Project.PathWithNamespace
 	cloneURL := event.Project.GitHTTPURL
 	commentID = event.ObjectAttributes.ID
-	baseRepo, err = models.NewRepo(models.Gitlab, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken)
+	baseRepo, err = models.NewRepo(models.Gitlab, repoFullName, cloneURL, e.GitlabUser, e.GitlabToken, e.GitlabHostname)
 	if err != nil {
 		return
 	}
@@ -743,7 +737,7 @@ func (e *EventParser) ParseGitlabMergeRequestCommentEvent(event gitlab.MergeComm
 	// Now parse the head repo.
 	headRepoFullName := event.MergeRequest.Source.PathWithNamespace
 	headCloneURL := event.MergeRequest.Source.GitHTTPURL
-	headRepo, err = models.NewRepo(models.Gitlab, headRepoFullName, headCloneURL, e.GitlabUser, e.GitlabToken)
+	headRepo, err = models.NewRepo(models.Gitlab, headRepoFullName, headCloneURL, e.GitlabUser, e.GitlabToken, e.GitlabHostname)
 	return
 }
 
@@ -846,7 +840,8 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 		headRepoFullname,
 		headRepoCloneURL,
 		e.BitbucketUser,
-		e.BitbucketToken)
+		e.BitbucketToken,
+		"")
 	if err != nil {
 		return
 	}
@@ -859,7 +854,8 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 		baseRepoFullname,
 		baseRepoCloneURL,
 		e.BitbucketUser,
-		e.BitbucketToken)
+		e.BitbucketToken,
+		"")
 	if err != nil {
 		return
 	}
@@ -1058,7 +1054,7 @@ func (e *EventParser) ParseAzureDevopsRepo(adRepo *azuredevops.GitRepository) (m
 	}
 	fmt.Println("%", cloneURL)
 	fullName := fmt.Sprintf("%s/%s/%s", owner, project, repo)
-	return models.NewRepo(models.AzureDevops, fullName, cloneURL, e.AzureDevopsUser, e.AzureDevopsToken)
+	return models.NewRepo(models.AzureDevops, fullName, cloneURL, e.AzureDevopsUser, e.AzureDevopsToken, "")
 }
 
 func (e *EventParser) ParseGiteaPullRequestEvent(event giteasdk.PullRequest) (models.PullRequest, models.PullRequestEventType, models.Repo, models.Repo, models.User, error) {
@@ -1081,6 +1077,7 @@ func (e *EventParser) ParseGiteaPullRequestEvent(event giteasdk.PullRequest) (mo
 		event.Base.Repository.CloneURL,
 		e.GiteaUser,
 		e.GiteaToken,
+		"",
 	)
 	if err != nil {
 		return models.PullRequest{}, models.OtherPullEvent, models.Repo{}, models.Repo{}, models.User{}, err
@@ -1093,6 +1090,7 @@ func (e *EventParser) ParseGiteaPullRequestEvent(event giteasdk.PullRequest) (mo
 		event.Head.Repository.CloneURL,
 		e.GiteaUser,
 		e.GiteaToken,
+		"",
 	)
 	if err != nil {
 		return models.PullRequest{}, models.OtherPullEvent, models.Repo{}, models.Repo{}, models.User{}, err

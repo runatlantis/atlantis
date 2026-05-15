@@ -1,16 +1,5 @@
 // Copyright 2024 Martijn van der Kleijn & Florian Beisel
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package gitea
 
@@ -110,7 +99,7 @@ func (c *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 	}
 
 	for page < nextPage {
-		page = +1
+		page++
 		listOptions.Page = page
 		files, resp, err := c.giteaClient.ListPullRequestFiles(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 		if err != nil {
@@ -252,7 +241,7 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	}
 
 	for page < nextPage {
-		page = +1
+		page++
 		listOptions.Page = page
 		pullReviews, resp, err := c.giteaClient.ListPullReviews(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 
@@ -324,6 +313,7 @@ func (c *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 		State:       giteaState,
 		TargetURL:   url,
 		Description: description,
+		Context:     src,
 	}
 
 	_, resp, err := c.giteaClient.CreateStatus(repo.Owner, repo.Name, pull.HeadCommit, newStatusOption)
@@ -355,7 +345,7 @@ func (c *Client) DiscardReviews(_ logging.SimpleLogging, repo models.Repo, pull 
 	}
 
 	for page < nextPage {
-		page = +1
+		page++
 		listOptions.Page = page
 		pullReviews, resp, err := c.giteaClient.ListPullReviews(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 
@@ -480,7 +470,7 @@ func (c *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, p
 	}
 
 	for page < nextPage {
-		page = +1
+		page++
 		opts.Page = page
 
 		labels, resp, err := c.giteaClient.GetIssueLabels(repo.Owner, repo.Name, int64(pull.Num), opts)
