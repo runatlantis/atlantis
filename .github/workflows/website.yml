@@ -105,8 +105,11 @@ jobs:
 
       - name: run http-server
         run: |
+          # install npq to intercept and audit packages before installation
+          npm install --global npq
+
           # build site
-          npm install
+          NPQ_YES=1 npq install
           npm run website:build
 
           # start http-server for integration testing
