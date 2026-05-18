@@ -518,7 +518,13 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 				policyOutput = output
 			}
 
-			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: policySetName, PolicyOutput: policyOutput, Passed: passed, ReqApprovals: 1, CurApprovals: 0})
+			var merged valid.PolicyOwners
+			if index < len(inputPolicySets) {
+				merged = ctx.PolicySets.Owners.MergedWith(inputPolicySets[index].Owners)
+			} else {
+				merged = ctx.PolicySets.Owners
+			}
+			policySetResults = append(policySetResults, models.PolicySetResult{PolicySetName: policySetName, PolicyOutput: policyOutput, Passed: passed, ReqApprovals: 1, CurApprovals: 0, OwnerUsers: merged.Users, OwnerTeams: merged.Teams})
 		}
 	}
 

@@ -402,6 +402,8 @@ type PolicySetResult struct {
 	Passed        bool
 	ReqApprovals  int
 	CurApprovals  int
+	OwnerUsers    []string
+	OwnerTeams    []string
 }
 
 // PolicySetApproval tracks the number of approvals a given policy set has.
