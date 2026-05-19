@@ -215,3 +215,60 @@ func TestUnlockDifferentProjectNames(t *testing.T) {
 	_, err = locker.TryLock(repo, 1, workspace, path, newProjectName, cmd)
 	Ok(t, err)
 }
+
+func TestTryLockReconfigureConflictsWithWorkspaceLocks(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	_, err := locker.TryLock(repo, 1, workspace, path, projectName, command.Plan)
+	Ok(t, err)
+
+	_, err = locker.TryLock(repo, 1, "", "", "", command.Reconfigure)
+	ErrEquals(t, "cannot run \"reconfigure\": this pull request is currently locked by \"plan\".\n"+
+		"Wait until the previous command is complete and try again", err)
+}
+
+func TestTryLockWorkspaceConflictsWithReconfigure(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlockFn, err := locker.TryLock(repo, 1, "", "", "", command.Reconfigure)
+	Ok(t, err)
+
+	_, err = locker.TryLock(repo, 1, workspace, path, projectName, command.Plan)
+	ErrEquals(t, "cannot run \"plan\": this pull request is currently locked by \"reconfigure\".\n"+
+		"Wait until the previous command is complete and try again", err)
+
+	unlockFn()
+	_, err = locker.TryLock(repo, 1, workspace, path, projectName, command.Plan)
+	Ok(t, err)
+}
+
+func TestTryLockReconfigureDifferentRepoAndPull(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	_, err := locker.TryLock(repo, 1, "", "", "", command.Reconfigure)
+	Ok(t, err)
+
+	_, err = locker.TryLock("owner/newrepo", 1, workspace, path, projectName, command.Plan)
+	Ok(t, err)
+
+	_, err = locker.TryLock(repo, 2, workspace, path, projectName, command.Plan)
+	Ok(t, err)
+}
+
+func TestUnlockByPullReleasesReconfigureLockForSamePullOnly(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	_, err := locker.TryLock(repo, 1, "", "", "", command.Reconfigure)
+	Ok(t, err)
+	_, err = locker.TryLock(repo, 2, "", "", "", command.Reconfigure)
+	Ok(t, err)
+
+	locker.UnlockByPull(repo, 1)
+
+	_, err = locker.TryLock(repo, 1, workspace, path, projectName, command.Plan)
+	Ok(t, err)
+
+	_, err = locker.TryLock(repo, 2, workspace, path, projectName, command.Plan)
+	ErrEquals(t, "cannot run \"plan\": this pull request is currently locked by \"reconfigure\".\n"+
+		"Wait until the previous command is complete and try again", err)
+}

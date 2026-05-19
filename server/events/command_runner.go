@@ -365,6 +365,16 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	if cmd.Name == command.Reconfigure {
+		planVerbose := cmd.Verbose
+		reconfigureRunner := buildCommentCommandRunner(c, command.Reconfigure)
+		reconfigureRunner.Run(ctx, cmd)
+		if ctx.CommandHasErrors {
+			return
+		}
+		cmd = &CommentCommand{Name: command.Plan, Verbose: planVerbose}
+	}
+
 	// Only set pending status if silence is not enabled
 	// The command runners will handle the final status decision based on project results
 	if !c.SilenceVCSStatusNoProjects {

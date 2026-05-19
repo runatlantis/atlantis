@@ -54,10 +54,10 @@ func TestNewCommentParser(t *testing.T) {
 			name: "comment un-available commands filtered",
 			args: args{
 				// PolicyCheck and Autoplan cannot be used on comment command, so filtered
-				allowCommands: []command.Name{command.Plan, command.Apply, command.Unlock, command.PolicyCheck, command.ApprovePolicies, command.Autoplan, command.Version, command.Import},
+				allowCommands: []command.Name{command.Plan, command.Reconfigure, command.Apply, command.Unlock, command.PolicyCheck, command.ApprovePolicies, command.Autoplan, command.Version, command.Import},
 			},
 			want: &events.CommentParser{
-				AllowCommands:    []command.Name{command.Version, command.Plan, command.Apply, command.Unlock, command.ApprovePolicies, command.Import},
+				AllowCommands:    []command.Name{command.Version, command.Plan, command.Reconfigure, command.Apply, command.Unlock, command.ApprovePolicies, command.Import},
 				BlockedExtraArgs: nil,
 			},
 		},
@@ -318,6 +318,8 @@ func TestParse_SubcommandUsage(t *testing.T) {
 	}{
 		{"atlantis plan -h", "plan"},
 		{"atlantis plan --help", "plan"},
+		{"atlantis reconfigure -h", "reconfigure"},
+		{"atlantis reconfigure --help", "reconfigure"},
 		{"atlantis apply -h", "apply"},
 		{"atlantis apply --help", "apply"},
 		{"atlantis approve_policies -h", "approve_policies"},
@@ -334,6 +336,38 @@ func TestParse_SubcommandUsage(t *testing.T) {
 			"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 		Assert(t, !strings.Contains(r.CommentResponse, "Error:"),
 			"For comment %q expected CommentResponse %q to not contain %q", c, r.CommentResponse, "Error: ")
+	}
+}
+
+func TestParse_Reconfigure(t *testing.T) {
+	for _, comment := range []string{
+		"atlantis reconfigure",
+		"atlantis reconfigure --verbose",
+	} {
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, models.Github)
+
+			Equals(t, "", r.CommentResponse)
+			Equals(t, command.Reconfigure, r.Command.Name)
+			Equals(t, "", r.Command.RepoRelDir)
+			Equals(t, "", r.Command.Workspace)
+			Equals(t, "", r.Command.ProjectName)
+			Equals(t, []string(nil), r.Command.Flags)
+			Equals(t, strings.Contains(comment, "--verbose"), r.Command.Verbose)
+		})
+	}
+}
+
+func TestParse_ReconfigureRejectsArgs(t *testing.T) {
+	for _, comment := range []string{
+		"atlantis reconfigure -d .",
+		"atlantis reconfigure -- -target=resource",
+		"atlantis reconfigure unexpected",
+	} {
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, models.Github)
+			Assert(t, strings.Contains(r.CommentResponse, "Error:"), "expected error for %q but got %q", comment, r.CommentResponse)
+		})
 	}
 }
 
@@ -1062,6 +1096,9 @@ Examples:
   # run plan in the root directory passing the -target flag to terraform
   atlantis plan -d . -- -target=resource
 
+  # delete this pull request's local Atlantis workspace and run plan again
+  atlantis reconfigure
+
   # apply all unapplied plans from this pull request
   atlantis apply
 
@@ -1071,6 +1108,8 @@ Examples:
 Commands:
   plan     Runs 'terraform plan' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.
+  reconfigure
+           Deletes this pull request's local Atlantis workspace and runs plan again.
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
   unlock   Removes all atlantis locks and discards all plans for this PR.
