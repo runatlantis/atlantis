@@ -761,19 +761,30 @@ func NewPlanSuccessStats(output string) PlanSuccessStats {
 	// When the output contains multiple "Plan:" lines (e.g. terragrunt stack
 	// run plan produces one summary per unit), aggregate the counters so the
 	// stats reflect the total across all units.
+	//
+	// m[1] is the optional "X to import" group: it is an empty string for
+	// plans without import blocks, so it must be parsed leniently. m[2..4]
+	// are always present in a match because rePlanChanges only matches the
+	// full "Plan: ... to add, ... to change, ... to destroy." form.
 	for _, m := range matches {
-		// We can skip checking the error here as we can assume
-		// Terraform output will always render an integer on these
-		// blocks.
-		imp, _ := strconv.Atoi(m[1])
-		add, _ := strconv.Atoi(m[2])
-		change, _ := strconv.Atoi(m[3])
-		destroy, _ := strconv.Atoi(m[4])
-		s.Import += imp
-		s.Add += add
-		s.Change += change
-		s.Destroy += destroy
+		s.Import += parsePlanCount(m[1])
+		s.Add += parsePlanCount(m[2])
+		s.Change += parsePlanCount(m[3])
+		s.Destroy += parsePlanCount(m[4])
 	}
 
 	return s
+}
+
+// parsePlanCount converts a numeric capture group from rePlanChanges into an
+// int. The "to import" group is optional in the regexp, so an empty string is
+// a normal case (no import block) and must produce 0 rather than be treated
+// as a parse failure. A non-empty value that fails to parse is unreachable
+// given the (\d+) capture, but we return 0 defensively rather than panic.
+func parsePlanCount(s string) int {
+	if s == "" {
+		return 0
+	}
+	n, _ := strconv.Atoi(s)
+	return n
 }
