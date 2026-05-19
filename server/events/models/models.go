@@ -428,11 +428,20 @@ func (p *PlanSuccess) Summary() string {
 }
 
 // DiffSummary extracts one line summary of plan changes from TerraformOutput.
+// When the output contains multiple "Plan:" lines (e.g. terragrunt stack run
+// plan, which prints one summary per unit), the counters are aggregated so the
+// rendered summary reflects the total across all units.
 func (p *PlanSuccess) DiffSummary() string {
-	if match := rePlanChanges.FindString(p.TerraformOutput); match != "" {
-		return match
+	stats := NewPlanSuccessStats(p.TerraformOutput)
+	if !stats.Changes {
+		return reNoChanges.FindString(p.TerraformOutput)
 	}
-	return reNoChanges.FindString(p.TerraformOutput)
+	if stats.Import > 0 {
+		return fmt.Sprintf("Plan: %d to import, %d to add, %d to change, %d to destroy.",
+			stats.Import, stats.Add, stats.Change, stats.Destroy)
+	}
+	return fmt.Sprintf("Plan: %d to add, %d to change, %d to destroy.",
+		stats.Add, stats.Change, stats.Destroy)
 }
 
 // NoChanges returns true if the plan has no changes.
@@ -742,21 +751,28 @@ type PlanSuccessStats struct {
 }
 
 func NewPlanSuccessStats(output string) PlanSuccessStats {
-	m := rePlanChanges.FindStringSubmatch(output)
+	matches := rePlanChanges.FindAllStringSubmatch(output, -1)
 
 	s := PlanSuccessStats{
 		ChangesOutside: reChangesOutside.MatchString(output),
-		Changes:        len(m) > 0,
+		Changes:        len(matches) > 0,
 	}
 
-	if s.Changes {
+	// When the output contains multiple "Plan:" lines (e.g. terragrunt stack
+	// run plan produces one summary per unit), aggregate the counters so the
+	// stats reflect the total across all units.
+	for _, m := range matches {
 		// We can skip checking the error here as we can assume
 		// Terraform output will always render an integer on these
 		// blocks.
-		s.Import, _ = strconv.Atoi(m[1])
-		s.Add, _ = strconv.Atoi(m[2])
-		s.Change, _ = strconv.Atoi(m[3])
-		s.Destroy, _ = strconv.Atoi(m[4])
+		imp, _ := strconv.Atoi(m[1])
+		add, _ := strconv.Atoi(m[2])
+		change, _ := strconv.Atoi(m[3])
+		destroy, _ := strconv.Atoi(m[4])
+		s.Import += imp
+		s.Add += add
+		s.Change += change
+		s.Destroy += destroy
 	}
 
 	return s
