@@ -1848,6 +1848,37 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 			expFailure: `One or more policy sets require additional approval.`,
 			hasErr:     true,
 		},
+		{
+			// Regression: prior to the explicit break in doApprovePolicies'
+			// inner loop, two ProjectPolicyStatus entries that share a name
+			// would each receive an approval and emit a duplicate
+			// PolicySetResult. The break ensures exactly one match per
+			// configured policy set.
+			description: "Duplicate PolicySetName entries in ProjectPolicyStatus only produce one approval and one result.",
+			hasErr:      false,
+			policySetCfg: valid.PolicySets{
+				Owners: valid.PolicyOwners{
+					Users: []string{testdata.User.Username},
+				},
+				PolicySets: []valid.PolicySet{
+					{
+						Name:         "policy1",
+						ApproveCount: 1,
+					},
+				},
+			},
+			policySetStatus: []models.PolicySetStatus{
+				{PolicySetName: "policy1"},
+				{PolicySetName: "policy1"},
+			},
+			expOut: []models.PolicySetResult{
+				{
+					PolicySetName:    "policy1",
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: testdata.User.Username, Hashes: nil}},
+				},
+			},
+		},
 	}
 
 	for _, c := range cases {

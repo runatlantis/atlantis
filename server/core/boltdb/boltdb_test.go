@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -1124,6 +1125,83 @@ func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 1, len(getStatus.Projects[0].PolicyStatus[0].Approvals))
 	b.Close()
+}
+
+// TestPullStatus_UpdateOverwritesCorruptData verifies that
+// UpdatePullWithResults tolerates a pre-existing pull-status blob whose JSON
+// no longer matches the current Go shape (e.g. after upgrading across a
+// PullStatus schema change). The corrupt entry should be logged and
+// overwritten rather than causing every subsequent plan to fail.
+func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
+	tmp := t.TempDir()
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	// First, let boltdb.New create the file and buckets.
+	b, err := boltdb.New(tmp)
+	Ok(t, err)
+	Ok(t, b.Close())
+
+	// Inject a corrupt pull-status blob simulating a legacy on-disk shape
+	// that the current Go types cannot unmarshal.
+	key := fmt.Appendf(nil, "%s::%s::%d",
+		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`)
+	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
+	Ok(t, err)
+	err = raw.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte("pulls")).Put(key, corrupt)
+	})
+	Ok(t, err)
+	Ok(t, raw.Close())
+
+	// Reopen and write fresh results. This must succeed despite the
+	// unreadable prior entry.
+	b, err = boltdb.New(tmp)
+	Ok(t, err)
+	defer b.Close()
+
+	status, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "plan output"},
+			},
+		},
+	})
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+	Equals(t, "mydir", status.Projects[0].RepoRelDir)
+	// Prior in-flight approvals are lost; this is the documented trade-off.
+	Equals(t, 0, len(status.Projects[0].PolicyStatus))
+
+	// The corrupt entry is gone: reading it back returns clean data.
+	got, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, got != nil, "expected non-nil pull status")
+	Equals(t, 1, len(got.Projects))
+	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
 }
 
 // newTestDB returns a TestDB using a temporary path.

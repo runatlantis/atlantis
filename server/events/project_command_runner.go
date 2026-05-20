@@ -548,7 +548,17 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 				policyItemRegex,
 			)
 			if regexErr != nil {
+				// RegexValidator runs at config-parse time so this is in
+				// theory unreachable. Fail closed with a synthetic failing
+				// result so the project surfaces the misconfiguration rather
+				// than silently passing without this policy set.
 				ctx.Log.Err("invalid policy_item_regex for policy set %q: %v", policySetName, regexErr)
+				policySetResults = append(policySetResults, models.PolicySetResult{
+					PolicySetName:    policySetName,
+					PolicyOutput:     fmt.Sprintf("invalid policy_item_regex %q: %v", policyItemRegex, regexErr),
+					ReqApprovalCount: approveCount,
+					PolicyItemRegex:  policyItemRegex,
+				})
 				continue
 			}
 			policySetResults = append(policySetResults, *result)
@@ -596,8 +606,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			continue
 		}
 		// If policy_item_regex changed since approvals were stored, hashes are
-		// not comparable; do not carry over. Empty stored regex means legacy
-		// data—keep prior sticky behavior.
+		// not comparable; do not carry over.
 		if status.PolicyItemRegex != "" && currentRegex != status.PolicyItemRegex {
 			continue
 		}

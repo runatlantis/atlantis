@@ -239,7 +239,17 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 			policySet.PolicyItemRegex,
 		)
 		if regexErr != nil {
+			// RegexValidator runs at config-parse time so this is in theory
+			// unreachable. Fail closed with a synthetic failing result so the
+			// project surfaces the misconfiguration rather than silently
+			// passing without this policy set.
 			ctx.Log.Err("invalid policy_item_regex for policy set %q: %v", policySet.Name, regexErr)
+			policySetResults = append(policySetResults, models.PolicySetResult{
+				PolicySetName:    policySet.Name,
+				PolicyOutput:     fmt.Sprintf("invalid policy_item_regex %q: %v", policySet.PolicyItemRegex, regexErr),
+				ReqApprovalCount: policySet.ApproveCount,
+				PolicyItemRegex:  policySet.PolicyItemRegex,
+			})
 			continue
 		}
 		policySetResults = append(policySetResults, *result)

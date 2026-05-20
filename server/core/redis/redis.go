@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -341,7 +342,11 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 	var newStatus models.PullStatus
 	currStatus, err := r.getPull(key)
 	if err != nil {
-		return newStatus, fmt.Errorf("db transaction failed: %w", err)
+		// Tolerate an unreadable prior entry (e.g. after a PullStatus schema
+		// change). It will be overwritten with fresh data below; in-flight
+		// policy approvals captured in the old blob are lost.
+		log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
+		currStatus = nil
 	}
 
 	// If there is no pull OR if the pull we have is out of date, we

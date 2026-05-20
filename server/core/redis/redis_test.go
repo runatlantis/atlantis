@@ -1144,6 +1144,68 @@ func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
 	Equals(t, 1, len(getStatus.Projects[0].PolicyStatus[0].Approvals))
 }
 
+// TestPullStatus_UpdateOverwritesCorruptData verifies that
+// UpdatePullWithResults tolerates a pre-existing pull-status blob whose JSON
+// no longer matches the current Go shape (e.g. after upgrading across a
+// PullStatus schema change). The corrupt entry should be logged and
+// overwritten rather than causing every subsequent plan to fail.
+func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	// Inject a corrupt pull-status blob simulating a legacy on-disk shape
+	// that the current Go types cannot unmarshal (Approvals used to be int).
+	key := fmt.Sprintf("%s::%s::%d",
+		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	corrupt := `{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`
+	Ok(t, s.Set(key, corrupt))
+
+	// Write fresh results. This must succeed despite the unreadable prior entry.
+	status, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "plan output"},
+			},
+		},
+	})
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+	Equals(t, "mydir", status.Projects[0].RepoRelDir)
+	// Prior in-flight approvals are lost; this is the documented trade-off.
+	Equals(t, 0, len(status.Projects[0].PolicyStatus))
+
+	// The corrupt entry is gone: reading it back returns clean data.
+	got, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, got != nil, "expected non-nil pull status")
+	Equals(t, 1, len(got.Projects))
+	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
+}
+
 func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {
 	r, err := redis.New(mr.Host(), mr.Server().Addr().Port, "", false, false, 0)
 	if err != nil {
