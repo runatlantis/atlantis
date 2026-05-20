@@ -61,17 +61,17 @@ ENV DEBIAN_CA_CERTIFICATES_VERSION="20230311+deb12u1"
 # renovate: datasource=repology depName=debian_12/curl versioning=loose
 ENV DEBIAN_CURL_VERSION="7.88.1-10+deb12u14"
 # renovate: datasource=repology depName=debian_12/git versioning=loose
-ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u2"
+ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u3"
 # renovate: datasource=repology depName=debian_12/unzip versioning=loose
 ENV DEBIAN_UNZIP_VERSION="6.0-28"
 # renovate: datasource=repology depName=debian_12/openssh-server versioning=loose
-ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u9"
+ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u10"
 # renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
 ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
 # renovate: datasource=repology depName=debian_12/gnupg versioning=loose
 ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1+deb12u2"
 # renovate: datasource=repology depName=debian_12/openssl versioning=loose
-ENV DEBIAN_OPENSSL_VERSION="3.0.17-1~deb12u2"
+ENV DEBIAN_OPENSSL_VERSION="3.0.20-1~deb12u1"
 
 # Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
 RUN groupadd --gid 1000 atlantis && \
@@ -188,7 +188,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # renovate: datasource=repology depName=alpine_3_23/ca-certificates versioning=loose
 ENV CA_CERTIFICATES_VERSION="20260413-r0"
 # renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
-ENV CURL_VERSION="8.17.0-r1"
+ENV CURL_VERSION="8.19.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/git versioning=loose
 ENV GIT_VERSION="2.52.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/unzip versioning=loose
@@ -277,7 +277,7 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 # "path = cap_set" line under that scope, the build fails. Strip may use
 # 2>/dev/null and setcap || true; verification is the hard guarantee.
 # renovate: datasource=repology depName=debian_12/libcap2-bin versioning=loose
-ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u3+b1"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     apt-get update && \
