@@ -65,7 +65,7 @@ ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u2"
 # renovate: datasource=repology depName=debian_12/unzip versioning=loose
 ENV DEBIAN_UNZIP_VERSION="6.0-28"
 # renovate: datasource=repology depName=debian_12/openssh-server versioning=loose
-ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u9"
+ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u10"
 # renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
 ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
 # renovate: datasource=repology depName=debian_12/gnupg versioning=loose
@@ -277,7 +277,7 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 # "path = cap_set" line under that scope, the build fails. Strip may use
 # 2>/dev/null and setcap || true; verification is the hard guarantee.
 # renovate: datasource=repology depName=debian_12/libcap2-bin versioning=loose
-ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u3+b1"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     apt-get update && \
