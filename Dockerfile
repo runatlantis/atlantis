@@ -65,7 +65,7 @@ ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u2"
 # renovate: datasource=repology depName=debian_12/unzip versioning=loose
 ENV DEBIAN_UNZIP_VERSION="6.0-28"
 # renovate: datasource=repology depName=debian_12/openssh-server versioning=loose
-ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u9"
+ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u10"
 # renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
 ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
 # renovate: datasource=repology depName=debian_12/gnupg versioning=loose
@@ -188,7 +188,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # renovate: datasource=repology depName=alpine_3_23/ca-certificates versioning=loose
 ENV CA_CERTIFICATES_VERSION="20260413-r0"
 # renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
-ENV CURL_VERSION="8.17.0-r1"
+ENV CURL_VERSION="8.19.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/git versioning=loose
 ENV GIT_VERSION="2.52.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/unzip versioning=loose
