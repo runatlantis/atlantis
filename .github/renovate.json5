@@ -136,7 +136,10 @@
       ],
       versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}loose{{/if}}',
     },
-    // Dockerfile pins backed by github-releases / other vX.Y.Z sources.
+    // Dockerfile pins backed by github-releases / docker / other
+    // vX.Y.Z sources. Renovate's regex engine is RE2 — no lookahead —
+    // so we enumerate non-repology datasources explicitly instead of
+    // using a negative lookahead.
     {
       customType: 'regex',
       managerFilePatterns: [
@@ -144,7 +147,7 @@
         '/(^|/)Dockerfile\\.[^/]*$/',
       ],
       matchStrings: [
-        'renovate: datasource=(?<datasource>(?!repology)[^\\s]+) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION=(?<currentValue>.*)\\s',
+        'renovate: datasource=(?<datasource>github-releases|github-tags|docker) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION=(?<currentValue>.*)\\s',
       ],
       versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}',
       extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',
