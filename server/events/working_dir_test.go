@@ -1268,13 +1268,15 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 		CheckoutDepth:       50,
 		GpgNoSigningEnabled: true,
 	}
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", nil, models.PullRequest{})
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", nil, models.PullRequest{})
+	assert.NoError(t, err)
 	Equals(t, hasDiverged, true)
 
 	// Run it again but without the checkout merge strategy. It should return
 	// false.
 	wd.CheckoutMerge = false
-	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", nil, models.PullRequest{})
+	hasDiverged, err = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", nil, models.PullRequest{})
+	assert.NoError(t, err)
 	Equals(t, hasDiverged, false)
 }
 
@@ -1373,7 +1375,8 @@ func TestHasDiverged_WithPatterns_CheckoutMergeDisabled(t *testing.T) {
 	}
 
 	// Should return false when CheckoutMerge is disabled.
-	hasDiverged := wd.HasDiverged(logger, firstPRDir, ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, firstPRDir, ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1460,7 +1463,8 @@ func TestHasDiverged_WithEmptyPatterns(t *testing.T) {
 	}
 
 	// With empty patterns, should fall back to regular HasDiverged which should return true.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 }
 
@@ -1508,20 +1512,25 @@ func TestHasDivergedFromPullHead_FreshMergeCheckoutUsesPullHead(t *testing.T) {
 		HeadCommit: headCommit,
 	}
 
-	hasDiverged := wd.HasDiverged(logger, prDir, ".", []string{}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, prDir, ".", []string{}, pullRequest)
 	Equals(t, false, hasDiverged)
+	assert.NoError(t, err)
 
-	hasDiverged = wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err = wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
 	Equals(t, false, hasDiverged)
+	assert.NoError(t, err)
 
-	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{}, pullRequest)
+	hasDiverged, err = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{}, pullRequest)
 	Equals(t, true, hasDiverged)
+	assert.NoError(t, err)
 
-	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project1/**"}, pullRequest)
 	Equals(t, true, hasDiverged)
+	assert.NoError(t, err)
 
-	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project2/**"}, pullRequest)
+	hasDiverged, err = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project2/**"}, pullRequest)
 	Equals(t, false, hasDiverged)
+	assert.NoError(t, err)
 }
 
 func TestHasDiverged_PatternHasDiverged(t *testing.T) {
@@ -1593,7 +1602,8 @@ func TestHasDiverged_PatternHasDiverged(t *testing.T) {
 	}
 
 	// Pattern matches files that have diverged (project1 was modified in first-pr and merged to main).
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 }
 
@@ -1654,7 +1664,8 @@ func TestHasDiverged_PatternHasNotDiverged(t *testing.T) {
 
 	// Pattern matches project1 files. Main's last commit for project1 is in second-pr's history (since it branched from main).
 	// So it has not diverged.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1715,7 +1726,8 @@ func TestHasDiverged_MultiplePatterns(t *testing.T) {
 
 	// Both patterns match files. Main's commits for these patterns are in feature-pr's history.
 	// So neither has diverged.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**", "project3/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**", "project3/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1759,7 +1771,8 @@ func TestHasDiverged_PatternMatchesNothing(t *testing.T) {
 	}
 
 	// Pattern matches no files (project2 doesn't exist), should not be considered diverged.
-	hasDiverged := wd.HasDiverged(logger, firstPRDir, ".", []string{"project2/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, firstPRDir, ".", []string{"project2/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1807,7 +1820,8 @@ func TestHasDiverged_BrandNewFiles(t *testing.T) {
 
 	// Pattern matches brand new files that main has never touched.
 	// Main hasn't "diverged" - we're just adding new content.
-	hasDiverged := wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1870,7 +1884,8 @@ func TestHasDiverged_FilesDeletedFromMain(t *testing.T) {
 
 	// Pattern matches project1 which has been deleted from main.
 	// This IS divergence - main has moved forward by deleting the files.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 }
 
@@ -1940,11 +1955,13 @@ func TestHasDiverged_MixedPatternsOneDiverged(t *testing.T) {
 
 	// Check with both patterns: project1 (diverged) and project2 (not diverged).
 	// Should return true because at least one pattern has diverged.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**", "project2/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**", "project2/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 
 	// Check with only project2 pattern (not diverged).
-	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**"}, pullRequest)
+	hasDiverged, err = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -2015,7 +2032,8 @@ func TestHasDiverged_PRDidNotTouchPattern(t *testing.T) {
 	// first-pr never touched project1, but main has moved forward on it.
 	// This IS considered diverged - the pattern is in autoplanWhenModified,
 	// and we want to ensure plans stay current with main's changes.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 }
 
@@ -2092,12 +2110,14 @@ func TestHasDiverged_WithStaleOriginMain(t *testing.T) {
 	// Test 1: Pattern matching project1 should detect divergence.
 	// Even though HEAD has a merge commit, origin/main has a new commit touching project1/**
 	// that isn't in HEAD. The fetch should pick this up.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 
 	// Test 2: Pattern matching project2 should NOT detect divergence.
 	// Main has no new commits touching project2/**, so it hasn't diverged for this pattern.
-	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**"}, pullRequest)
+	hasDiverged, err = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -2179,17 +2199,20 @@ func TestHasDiverged_ProjectInSubdirectory(t *testing.T) {
 	// When adjusted, it should become "modules/**/*.tf" relative to repo root.
 	projectPath := "deployments/staging/app"
 	pattern := "../../../modules/**/*.tf" // 3 levels up from deployments/staging/app
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{pattern}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{pattern}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged) // Should detect that modules/database/main.tf changed
 
 	// Test 2: Pattern that matches files within the project directory itself
 	projectPattern := "*.tf"
-	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{projectPattern}, pullRequest)
+	hasDiverged, err = wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{projectPattern}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged) // No .tf files changed in the project directory in divergent commits
 
 	// Test 3: Pattern at repo root should also work
 	absolutePattern := "modules/**/*.tf"
-	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{absolutePattern}, pullRequest)
+	hasDiverged, err = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{absolutePattern}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 }
 
@@ -2266,7 +2289,8 @@ func TestHasDiverged_DeepProjectPath(t *testing.T) {
 	projectPath := deepPath
 
 	whenModifiedPattern := "../../../../../../../config/**"
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{whenModifiedPattern}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{whenModifiedPattern}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged) // Should detect that config/settings.yaml changed
 }
 
@@ -2387,7 +2411,8 @@ func TestHasDiverged_PatternMatching(t *testing.T) {
 				HeadCommit: prHeadCommit,
 			}
 
-			hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", tt.patterns, pullRequest)
+			hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", tt.patterns, pullRequest)
+			assert.NoError(t, err)
 			if hasDiverged != tt.expectDivergence {
 				t.Errorf("expected divergence=%v, got=%v for patterns=%v and changedFiles=%v",
 					tt.expectDivergence, hasDiverged, tt.patterns, tt.changedFiles)
