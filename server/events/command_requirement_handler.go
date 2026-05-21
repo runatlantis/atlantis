@@ -80,7 +80,9 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 			diverged, err := a.hasUndivergedImpact(repoDir, ctx)
 			if err != nil {
 				ctx.Log.Warn("evaluating undiverged requirement has failed, falling back to full divergence check: %s", err)
-				diverged = a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, nil, ctx.Pull)
+				// Here it doesn't matter if diverged check has errored. If `true` is returned,
+				// diverged path will be followed which will ask the user to rebase
+				diverged, _ = a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, nil, ctx.Pull)
 			}
 			if diverged {
 				return fmt.Sprintf("Default branch must be rebased onto pull request before running %s.", cmd), nil
@@ -93,7 +95,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 
 func (a *DefaultCommandRequirementHandler) hasUndivergedImpact(repoDir string, ctx command.ProjectContext) (bool, error) {
 	if a.ProjectImpactResolver == nil {
-		return a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull), nil
+		return a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull)
 	}
 
 	handled, impacted, err := a.ProjectImpactResolver.HasUndivergedImpact(ctx, repoDir, a.WorkingDir)
@@ -101,7 +103,7 @@ func (a *DefaultCommandRequirementHandler) hasUndivergedImpact(repoDir string, c
 		return false, err
 	}
 	if !handled {
-		return a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull), nil
+		return a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull)
 	}
 	return impacted, nil
 }
