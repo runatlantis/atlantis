@@ -1507,6 +1507,16 @@ func TestParseAzureDevopsPull(t *testing.T) {
 	}, actPull)
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, expBaseRepo, actHeadRepo)
+
+	// Regression test for #6492: a nil Status field used to panic with a
+	// nil-pointer dereference. It must now be treated as a non-active
+	// (closed) pull request, consistent with the nil-safe pattern used for
+	// every other optional field above.
+	testPull = deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
+	testPull.Status = nil
+	actPull, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	Ok(t, err)
+	Equals(t, models.ClosedPullState, actPull.State)
 }
 
 func TestParseAzureDevopsSelfHostedRepo(t *testing.T) {
