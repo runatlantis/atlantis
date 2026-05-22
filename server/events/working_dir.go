@@ -257,7 +257,7 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 			"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL,
 		},
 		{
-			"git", "remote", "update",
+			"git", "remote", "update", "--prune",
 		},
 	}
 
@@ -317,7 +317,7 @@ func (w *FileWorkspace) GetDivergedFiles(logger logging.SimpleLogging, cloneDir 
 // gitRefLock(cloneDir) and gitReadLock(cloneDir) (or the write lock).
 func (w *FileWorkspace) hasDiverged(logger logging.SimpleLogging, cloneDir string) (bool, error) {
 	logger.Debug("HasDiverged: running git fetch in %s", cloneDir)
-	cmd := exec.Command("git", "fetch")
+	cmd := exec.Command("git", "fetch", "--prune")
 	cmd.Dir = cloneDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -409,7 +409,7 @@ func divergedFilesCommandError(action string, err error, output []byte) error {
 
 func (w *FileWorkspace) getDivergedFiles(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error) {
 	logger.Debug("GetDivergedFiles: running git fetch")
-	fetchCmd := exec.Command("git", "fetch")
+	fetchCmd := exec.Command("git", "fetch", "--prune")
 	fetchCmd.Dir = cloneDir
 	outputFetch, err := fetchCmd.CombinedOutput()
 	if err != nil {
@@ -454,7 +454,7 @@ func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedG
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
 	// We use both `<prSourceRemote>` and `origin` remotes, update them both
-	if err := w.wrappedGit(logger, c, "fetch", "--all"); err != nil {
+	if err := w.wrappedGit(logger, c, "fetch", "--all", "--prune"); err != nil {
 		return err
 	}
 
@@ -632,7 +632,7 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 	if err := w.wrappedGit(logger, c, "merge-base", c.pr.BaseBranch, "FETCH_HEAD"); err != nil {
 		// git merge-base returning error means that we did not receive enough commits in shallow clone.
 		// Fall back to retrieving full repo history.
-		if err := w.wrappedGit(logger, c, "fetch", "--unshallow"); err != nil {
+		if err := w.wrappedGit(logger, c, "fetch", "--unshallow", "--prune"); err != nil {
 			return err
 		}
 

@@ -755,6 +755,66 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	assert.FileExists(t, planFile, "Existing plan file should not have been deleted")
 }
 
+// TestMergeAgain_PrunesConflictingRefNames verifies that git remote update uses --prune.
+// Without --prune, if origin once had "feature/foo" (leaving refs/remotes/origin/feature/
+// as a directory on disk) and the remote then deletes that branch and creates "feature",
+// git remote update fails with "cannot lock ref 'refs/remotes/origin/feature': ... exists;
+// cannot create 'refs/remotes/origin/feature'". With --prune, the stale ref is removed
+// first and the update succeeds.
+func TestMergeAgain_PrunesConflictingRefNames(t *testing.T) {
+	repoDir := initRepo(t)
+
+	// Create feature/foo on remote so that cloning it will create
+	// refs/remotes/origin/feature/foo (i.e. the "feature/" directory on disk).
+	runCmd(t, repoDir, "git", "checkout", "-b", "feature/foo")
+	runCmd(t, repoDir, "touch", "foo.tf")
+	runCmd(t, repoDir, "git", "add", "foo.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add feature/foo")
+	runCmd(t, repoDir, "git", "checkout", "main")
+
+	// Clone without --single-branch so all remote branches are fetched,
+	// which creates refs/remotes/origin/feature/foo in the workspace.
+	atlantisDir := repoDir + "/repos/0/default"
+	runCmd(t, repoDir, "mkdir", "-p", "repos/0/default")
+	runCmd(t, atlantisDir, "git", "clone", repoDir, ".")
+	runCmd(t, atlantisDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, atlantisDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, atlantisDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, atlantisDir, "git", "config", "--local", "commit.gpgsign", "false")
+
+	// Confirm the conflicting ref exists in the workspace.
+	remoteBranches := runCmd(t, atlantisDir, "git", "branch", "-r")
+	assert.Contains(t, remoteBranches, "origin/feature/foo")
+
+	// Delete feature/foo from remote and replace it with a flat "feature" branch.
+	// refs/remotes/origin/feature can't be a file while refs/remotes/origin/feature/
+	// is a directory, so git remote update (without --prune) would fail here.
+	runCmd(t, repoDir, "git", "branch", "-D", "feature/foo")
+	runCmd(t, repoDir, "git", "checkout", "-b", "feature")
+	runCmd(t, repoDir, "touch", "feature.tf")
+	runCmd(t, repoDir, "git", "add", "feature.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add feature")
+	runCmd(t, repoDir, "git", "checkout", "main")
+
+	logger := logging.NewNoopLogger(t)
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	// MergeAgain calls recheckDiverged which runs git remote update --prune.
+	// --prune removes refs/remotes/origin/feature/foo before fetching
+	// refs/remotes/origin/feature, avoiding the "cannot lock ref" failure.
+	_, err := wd.MergeAgain(logger, models.Repo{CloneURL: repoDir}, models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "main",
+		BaseBranch: "main",
+	}, "default")
+	Ok(t, err)
+}
+
 func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	// Initialize the git repo.
 	repoDir := initRepo(t)
