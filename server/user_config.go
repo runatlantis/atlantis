@@ -89,6 +89,8 @@ type UserConfig struct {
 	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
 	MaxCommentsPerCommand           int    `mapstructure:"max-comments-per-command"`
 	IgnoreVCSStatusNames            string `mapstructure:"ignore-vcs-status-names"`
+	Language                        string `mapstructure:"language"`
+	LanguageConfigFile              string `mapstructure:"language-config-file"`
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`

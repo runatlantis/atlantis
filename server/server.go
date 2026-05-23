@@ -64,6 +64,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitlab"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -479,6 +480,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ExecutableName,
 		userConfig.HideUnchangedPlanComments,
 		userConfig.QuietPolicyChecks,
+		i18n.TranslatorConfig{
+			LanguageCode: userConfig.Language,
+			CatalogPath:  userConfig.LanguageConfigFile,
+		},
 	)
 
 	var lockingClient locking.Locker
