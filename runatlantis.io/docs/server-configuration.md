@@ -486,6 +486,19 @@ ATLANTIS_DISABLE_APPLY_ALL=true
 Disable `atlantis apply` command so a specific project/workspace/directory has to
 be specified for applies.
 
+### `--disable-automerge-label` <Badge text="v0.45.0+" type="info"/>
+
+```bash
+atlantis server --disable-automerge-label="no-auto-merge"
+# or
+ATLANTIS_DISABLE_AUTOMERGE_LABEL="no-auto-merge"
+```
+
+Disable atlantis automerge only on pull requests with the specified label.
+Defaults to an empty string, so no label disables automerge by default.
+This flag has no effect unless automerge is enabled with `--automerge` or
+repo-level `automerge: true`.
+
 ### `--disable-autoplan` <Badge text="v0.15.0+" type="info"/>
 
 ```bash
