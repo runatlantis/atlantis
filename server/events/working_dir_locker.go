@@ -48,6 +48,24 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 	defer d.mutex.Unlock()
 
 	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path, projectName)
+	pullKey := d.pullKey(repoFullName, pullNum)
+
+	if cmdName == command.Reconfigure && workspaceKey == pullKey {
+		if currentLock, exists := d.findPullLock(pullKey); exists {
+			return func() {}, fmt.Errorf("cannot run %q: this pull request is currently locked by %q.\n"+
+				"Wait until the previous command is complete and try again", cmdName, currentLock)
+		}
+		d.locks[pullKey] = cmdName
+		return func() {
+			d.unlock(repoFullName, pullNum, workspace, path, projectName)
+		}, nil
+	}
+
+	if currentLock, exists := d.locks[pullKey]; exists {
+		return func() {}, fmt.Errorf("cannot run %q: this pull request is currently locked by %q.\n"+
+			"Wait until the previous command is complete and try again", cmdName, currentLock)
+	}
+
 	if currentLock, exists := d.locks[workspaceKey]; exists {
 		return func() {}, fmt.Errorf("cannot run %q: the %s workspace at path %s is currently locked for this pull request by %q.\n"+
 			"Wait until the previous command is complete and try again", cmdName, workspace, path, currentLock)
@@ -64,9 +82,10 @@ func (d *DefaultWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int)
 	defer d.mutex.Unlock()
 
 	// Find and remove all locks for this pull request
-	prefix := fmt.Sprintf("%s/%d/", repoFullName, pullNum)
+	pullKey := d.pullKey(repoFullName, pullNum)
+	prefix := pullKey + "/"
 	for key := range d.locks {
-		if strings.HasPrefix(key, prefix) {
+		if key == pullKey || strings.HasPrefix(key, prefix) {
 			delete(d.locks, key)
 		}
 	}
@@ -83,4 +102,22 @@ func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, works
 
 func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace string, path string, projectName string) string {
 	return strings.TrimRight(fmt.Sprintf("%s/%d/%s/%s/%s", repo, pull, workspace, path, projectName), "/")
+}
+
+func (d *DefaultWorkingDirLocker) pullKey(repo string, pull int) string {
+	return fmt.Sprintf("%s/%d", repo, pull)
+}
+
+func (d *DefaultWorkingDirLocker) findPullLock(pullKey string) (command.Name, bool) {
+	if currentLock, exists := d.locks[pullKey]; exists {
+		return currentLock, true
+	}
+
+	prefix := pullKey + "/"
+	for key, currentLock := range d.locks {
+		if strings.HasPrefix(key, prefix) {
+			return currentLock, true
+		}
+	}
+	return -1, false
 }

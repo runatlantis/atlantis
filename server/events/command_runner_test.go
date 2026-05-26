@@ -57,6 +57,7 @@ var planCommandRunner *events.PlanCommandRunner
 var applyLockChecker *lockingmocks.MockApplyLockChecker
 var lockingLocker *lockingmocks.MockLocker
 var applyCommandRunner *events.ApplyCommandRunner
+var reconfigureCommandRunner *events.ReconfigureCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
@@ -192,6 +193,16 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		pullReqStatusFetcher,
 	)
 
+	reconfigureCommandRunner = events.NewReconfigureCommandRunner(
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		lockingLocker,
+		testConfig.database,
+		pullUpdater,
+		nil,
+		cancellationTracker,
+	)
+
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
 		commitUpdater,
 		projectCommandBuilder,
@@ -228,6 +239,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
+		command.Reconfigure:     reconfigureCommandRunner,
 		command.Apply:           applyCommandRunner,
 		command.ApprovePolicies: approvePoliciesCommandRunner,
 		command.Unlock:          unlockCommandRunner,
@@ -965,6 +977,53 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+}
+
+func TestRunCommentCommand_ReconfigureCleansThenRunsPlan(t *testing.T) {
+	setup(t)
+	tmp := t.TempDir()
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	projectCtx := command.ProjectContext{
+		CommandName:         command.Plan,
+		ExecutionOrderGroup: 0,
+		ProjectName:         "default",
+		Workspace:           "default",
+		BaseRepo:            testdata.GithubRepo,
+		Pull:                modelPull,
+	}
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		{
+			ProjectName: "old",
+			RepoRelDir:  "old",
+			Workspace:   "default",
+			Command:     command.Plan,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+		},
+	})
+	Ok(t, err)
+
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))).ThenReturn(nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Reconfigure, Verbose: true})
+
+	workingDir.(*mocks.MockWorkingDir).VerifyWasCalledOnce().Delete(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
+	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	_, planCmd := projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).GetCapturedArguments()
+	Equals(t, command.Plan, planCmd.Name)
+	Assert(t, planCmd.Verbose, "expected reconfigure --verbose to carry into synthesized plan")
+	Equals(t, "", planCmd.RepoRelDir)
+	Equals(t, "", planCmd.Workspace)
+	Equals(t, "", planCmd.ProjectName)
+	cancellationTracker.VerifyWasCalled(Times(2)).Clear(modelPull)
 }
 
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {

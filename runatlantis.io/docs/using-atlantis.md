@@ -94,6 +94,40 @@ atlantis plan -d dir -- -var foo='bar'
 
 If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.md#adding-extra-arguments-to-terraform-commands).
 
+---
+
+## atlantis reconfigure
+
+```bash
+atlantis reconfigure [--verbose]
+```
+
+### Explanation
+
+Deletes this pull request's local Atlantis workspace, clears stale Atlantis plan state, releases Atlantis locks for the pull request, and then runs a normal unqualified `atlantis plan` from the current pull request head.
+
+This is useful when an idle pull request was already planned before the Atlantis server's default Terraform version changed. A normal `atlantis plan` can reuse an existing local checkout and Terraform initialization state; `atlantis reconfigure` forces Atlantis to rebuild that local PR workspace before planning.
+
+::: warning NOTE
+`atlantis reconfigure` invalidates previous plans for the pull request. Run `atlantis apply` only after the new plan has completed successfully.
+:::
+
+### Examples
+
+```bash
+# Rebuild the local PR workspace and run plan for modified projects.
+atlantis reconfigure
+
+# Include Atlantis logs in the resulting comment.
+atlantis reconfigure --verbose
+```
+
+### Options
+
+* `--verbose` Append Atlantis log to comment.
+
+Scoped flags such as `-d`, `-w`, `-p`, and Terraform extra args after `--` are not supported. Use `atlantis plan` for project-scoped planning.
+
 ### Automatic Environment Variable Files
 
 Atlantis automatically includes workspace-specific variable files if they exist in your repository. This feature helps reduce duplication across different environments and workspaces.

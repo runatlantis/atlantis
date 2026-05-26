@@ -865,8 +865,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 	)
 
+	reconfigureCommandRunner := events.NewReconfigureCommandRunner(
+		workingDir,
+		workingDirLocker,
+		lockingClient,
+		database,
+		pullUpdater,
+		projectCmdOutputHandler,
+		cancellationTracker,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
+		command.Reconfigure:     reconfigureCommandRunner,
 		command.Apply:           applyCommandRunner,
 		command.ApprovePolicies: approvePoliciesCommandRunner,
 		command.Unlock:          unlockCommandRunner,

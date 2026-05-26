@@ -38,6 +38,7 @@ func TestName_String(t *testing.T) {
 	}{
 		{command.Apply, "apply"},
 		{command.Plan, "plan"},
+		{command.Reconfigure, "reconfigure"},
 		{command.Unlock, "unlock"},
 		{command.PolicyCheck, "policy_check"},
 		{command.ApprovePolicies, "approve_policies"},
@@ -61,6 +62,7 @@ func TestName_DefaultUsage(t *testing.T) {
 	}{
 		{command.Apply, "apply"},
 		{command.Plan, "plan"},
+		{command.Reconfigure, "reconfigure"},
 		{command.Unlock, "unlock"},
 		{command.PolicyCheck, "policy_check"},
 		{command.ApprovePolicies, "approve_policies"},
@@ -84,6 +86,7 @@ func TestName_SubCommands(t *testing.T) {
 	}{
 		{c: command.Apply},
 		{c: command.Plan},
+		{c: command.Reconfigure},
 		{c: command.Unlock},
 		{c: command.PolicyCheck},
 		{c: command.ApprovePolicies},
@@ -109,6 +112,7 @@ func TestName_CommandArgCount(t *testing.T) {
 	}{
 		{c: command.Apply, want: &command.ArgCount{}},
 		{c: command.Plan, want: &command.ArgCount{}},
+		{c: command.Reconfigure, want: &command.ArgCount{}},
 		{c: command.Unlock, want: &command.ArgCount{}},
 		{c: command.PolicyCheck, want: &command.ArgCount{}},
 		{c: command.ApprovePolicies, want: &command.ArgCount{}},
@@ -176,6 +180,7 @@ func TestParseCommandName(t *testing.T) {
 	}{
 		{command.Apply, "apply"},
 		{command.Plan, "plan"},
+		{command.Reconfigure, "reconfigure"},
 		{command.Unlock, "unlock"},
 		{command.PolicyCheck, "policy_check"},
 		{command.ApprovePolicies, "approve_policies"},

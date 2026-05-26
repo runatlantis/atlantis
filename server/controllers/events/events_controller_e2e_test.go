@@ -1672,8 +1672,19 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		projectCommandRunner,
 	)
 
+	reconfigureCommandRunner := events.NewReconfigureCommandRunner(
+		workingDir,
+		locker,
+		lockingClient,
+		database,
+		pullUpdater,
+		projectCmdOutputHandler,
+		cancellationTracker,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
+		command.Reconfigure:     reconfigureCommandRunner,
 		command.Apply:           applyCommandRunner,
 		command.ApprovePolicies: approvePoliciesCommandRunner,
 		command.Unlock:          unlockCommandRunner,

@@ -138,8 +138,8 @@ type CommentParseResult struct {
 // Valid commands contain:
 //   - The initial "executable" name, 'run' or 'atlantis' or '@GithubUser'
 //     where GithubUser is the API user Atlantis is running as.
-//   - Then a command: 'plan', 'apply', 'unlock', 'version, 'approve_policies',
-//     or 'help'.
+//   - Then a command: 'plan', 'reconfigure', 'apply', 'unlock', 'version,
+//     'approve_policies', or 'help'.
 //   - Then optional flags, then an optional separator '--' followed by optional
 //     extra flags to be appended to the terraform plan/apply command.
 //
@@ -149,6 +149,7 @@ type CommentParseResult struct {
 // - @GithubUser plan -w staging
 // - atlantis plan -w staging -d dir --verbose
 // - atlantis plan --verbose -- -key=value -key2 value2
+// - atlantis reconfigure
 // - atlantis unlock
 // - atlantis version
 // - atlantis approve_policies
@@ -255,6 +256,11 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run plan for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+	case command.Reconfigure.String():
+		name = command.Reconfigure
+		flagSet = pflag.NewFlagSet(command.Reconfigure.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.Apply.String():
 		name = command.Apply
 		flagSet = pflag.NewFlagSet(command.Apply.String(), pflag.ContinueOnError)
@@ -313,6 +319,9 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	subName, extraArgs, errResult := e.parseArgs(name, args, flagSet)
 	if errResult != "" {
 		return CommentParseResult{CommentResponse: errResult}
+	}
+	if name == command.Reconfigure && len(extraArgs) > 0 {
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("unknown argument(s) - %s", strings.Join(extraArgs, " ")), name.DefaultUsage(), flagSet)}
 	}
 
 	dir, err = e.validateDir(dir)
@@ -571,6 +580,7 @@ func (e *CommentParser) HelpComment() string {
 		ExecutableName       string
 		AllowVersion         bool
 		AllowPlan            bool
+		AllowReconfigure     bool
 		AllowApply           bool
 		AllowUnlock          bool
 		AllowApprovePolicies bool
@@ -580,6 +590,7 @@ func (e *CommentParser) HelpComment() string {
 		ExecutableName:       e.ExecutableName,
 		AllowVersion:         e.isAllowedCommand(command.Version.String()),
 		AllowPlan:            e.isAllowedCommand(command.Plan.String()),
+		AllowReconfigure:     e.isAllowedCommand(command.Reconfigure.String()),
 		AllowApply:           e.isAllowedCommand(command.Apply.String()),
 		AllowUnlock:          e.isAllowedCommand(command.Unlock.String()),
 		AllowApprovePolicies: e.isAllowedCommand(command.ApprovePolicies.String()),
@@ -606,6 +617,11 @@ Examples:
   # run plan in the root directory passing the -target flag to terraform
   {{ .ExecutableName }} plan -d . -- -target=resource
 {{- end }}
+{{- if .AllowReconfigure }}
+
+  # delete this pull request's local Atlantis workspace and run plan again
+  {{ .ExecutableName }} reconfigure
+{{- end }}
 {{- if .AllowApply }}
 
   # apply all unapplied plans from this pull request
@@ -619,6 +635,10 @@ Commands:
 {{- if .AllowPlan }}
   plan     Runs 'terraform plan' for the changes in this pull request.
            To plan a specific project, use the -d, -w and -p flags.
+{{- end }}
+{{- if .AllowReconfigure }}
+  reconfigure
+           Deletes this pull request's local Atlantis workspace and runs plan again.
 {{- end }}
 {{- if .AllowApply }}
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.

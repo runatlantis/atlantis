@@ -19,6 +19,8 @@ const (
 	Apply Name = iota
 	// Plan is a command to run terraform plan.
 	Plan
+	// Reconfigure is a command to delete local PR workspace/cache state before running terraform plan.
+	Reconfigure
 	// Unlock is a command to discard previous plans as well as the atlantis locks.
 	Unlock
 	// PolicyCheck is a command to run conftest test.
@@ -47,6 +49,7 @@ type ArgCount struct {
 var AllCommentCommands = []Name{
 	Version,
 	Plan,
+	Reconfigure,
 	Apply,
 	Cancel,
 	Unlock,
@@ -68,6 +71,8 @@ func (c Name) String() string {
 		return "apply"
 	case Plan, Autoplan:
 		return "plan"
+	case Reconfigure:
+		return "reconfigure"
 	case Unlock:
 		return "unlock"
 	case PolicyCheck:
@@ -145,6 +150,8 @@ func ParseCommandName(name string) (Name, error) {
 		return Apply, nil
 	case "plan":
 		return Plan, nil
+	case "reconfigure":
+		return Reconfigure, nil
 	case "unlock":
 		return Unlock, nil
 	case "policy_check":
