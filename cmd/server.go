@@ -70,6 +70,7 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
+	DisableAutomergeLabelFlag        = "disable-automerge-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
@@ -293,6 +294,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	DisableAutoplanLabelFlag: {
 		description:  "Pull request label to disable atlantis auto planning feature only if present.",
+		defaultValue: "",
+	},
+	DisableAutomergeLabelFlag: {
+		description:  "Pull request label to disable atlantis automerge feature only if present.",
 		defaultValue: "",
 	},
 	DisableUnlockLabelFlag: {

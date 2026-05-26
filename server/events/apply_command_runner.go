@@ -4,6 +4,8 @@
 package events
 
 import (
+	"slices"
+
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -27,6 +29,7 @@ func NewApplyCommandRunner(
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
+	disableAutomergeLabel string,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
 		vcsClient:                  vcsClient,
@@ -44,23 +47,25 @@ func NewApplyCommandRunner(
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
+		disableAutomergeLabel:      disableAutomergeLabel,
 	}
 }
 
 type ApplyCommandRunner struct {
-	DisableApplyAll      bool
-	Database             db.Database
-	locker               locking.ApplyLockChecker
-	vcsClient            vcs.Client
-	commitStatusUpdater  CommitStatusUpdater
-	prjCmdBuilder        ProjectApplyCommandBuilder
-	prjCmdRunner         ProjectApplyCommandRunner
-	cancellationTracker  CancellationTracker
-	autoMerger           *AutoMerger
-	pullUpdater          *PullUpdater
-	dbUpdater            *DBUpdater
-	parallelPoolSize     int
-	pullReqStatusFetcher vcs.PullReqStatusFetcher
+	DisableApplyAll       bool
+	Database              db.Database
+	locker                locking.ApplyLockChecker
+	vcsClient             vcs.Client
+	commitStatusUpdater   CommitStatusUpdater
+	prjCmdBuilder         ProjectApplyCommandBuilder
+	prjCmdRunner          ProjectApplyCommandRunner
+	cancellationTracker   CancellationTracker
+	autoMerger            *AutoMerger
+	pullUpdater           *PullUpdater
+	dbUpdater             *DBUpdater
+	parallelPoolSize      int
+	pullReqStatusFetcher  vcs.PullReqStatusFetcher
+	disableAutomergeLabel string
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects bool
@@ -177,6 +182,15 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	a.updateCommitStatus(ctx, pullStatus)
 
 	if a.autoMerger.automergeEnabled(projectCmds) && !cmd.AutoMergeDisabled {
+		if len(a.disableAutomergeLabel) > 0 {
+			labels, err := a.vcsClient.GetPullLabels(ctx.Log, baseRepo, pull)
+			if err != nil {
+				ctx.Log.Err("Unable to get pull request labels: %s. Proceeding with automerge.", err)
+			} else if slices.Contains(labels, a.disableAutomergeLabel) {
+				ctx.Log.Info("Pull/merge request has disable automerge label '%s' so not automerging.", a.disableAutomergeLabel)
+				return
+			}
+		}
 		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
 	}
 }

@@ -839,6 +839,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
+		userConfig.DisableAutomergeLabel,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(

@@ -72,6 +72,7 @@ type TestConfig struct {
 	discardApprovalOnPlan      bool
 	database                   db.Database
 	DisableUnlockLabel         string
+	DisableAutomergeLabel      string
 	PendingApplyStatus         bool
 	applyLockCheckerReturn     locking.ApplyCommandLock
 	applyLockCheckerErr        error
@@ -190,6 +191,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.SilenceNoProjects,
 		testConfig.silenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
+		testConfig.DisableAutomergeLabel,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
