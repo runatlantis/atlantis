@@ -4,9 +4,10 @@
 package events
 
 import (
+	"slices"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
-	"github.com/runatlantis/atlantis/server/utils"
 )
 
 type PullUpdater struct {
@@ -36,7 +37,7 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 	if len(res.ProjectResults) > 0 {
 		var commentOnProjects []command.ProjectResult
 		for _, result := range res.ProjectResults {
-			if utils.SlicesContains(result.SilencePRComments, cmd.CommandName().String()) {
+			if slices.Contains(result.SilencePRComments, cmd.CommandName().String()) {
 				ctx.Log.Debug("silenced command '%s' comment for project '%s'", cmd.CommandName().String(), result.ProjectName)
 				continue
 			}

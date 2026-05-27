@@ -387,7 +387,7 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 			return "", nil, e.errMarkdown("subcommand required", name.String(), flagSet)
 		}
 		subCommand, commandArgs = commandArgs[0], commandArgs[1:]
-		isAvailableSubCommand := utils.SlicesContains(availableSubCommands, subCommand)
+		isAvailableSubCommand := slices.Contains(availableSubCommands, subCommand)
 		if !isAvailableSubCommand {
 			errMsg := fmt.Sprintf("invalid subcommand %s (not %s)", subCommand, strings.Join(availableSubCommands, ", "))
 			return "", nil, e.errMarkdown(errMsg, name.String(), flagSet)
