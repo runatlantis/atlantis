@@ -76,11 +76,12 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	pull := ctx.Pull
 
 	locked, err := a.IsLocked()
-	// CheckApplyLock falls back to AllowedCommand flag if fetching the lock
-	// raises an error
-	// We will log failure as warning
 	if err != nil {
-		ctx.Log.Warn("checking global apply lock: %s", err)
+		ctx.Log.Err("checking global apply lock: %s", err)
+		if err := a.vcsClient.CreateComment(ctx.Log, baseRepo, pull.Num, applyLockCheckFailedComment, command.Apply.String()); err != nil {
+			ctx.Log.Err("unable to comment on pull request: %s", err)
+		}
+		return
 	}
 
 	if locked {
@@ -227,3 +228,6 @@ var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags
 
 // applyDisabledComment is posted when apply commands are disabled globally and an apply command is issued.
 var applyDisabledComment = "**Error:** Running `atlantis apply` is disabled."
+
+// applyLockCheckFailedComment is posted when the global apply lock check fails (e.g. database unreachable).
+var applyLockCheckFailedComment = "**Error:** Failed to check global apply lock. Running `atlantis apply` is not allowed until the lock backend is reachable."
