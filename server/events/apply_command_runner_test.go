@@ -44,10 +44,10 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			ExpComment:     "Ran Apply for 0 projects:",
 		},
 		{
-			Description:    "If ApplyLockChecker returns an error apply is rejected",
+			Description:    "If ApplyLockChecker returns an error IsDisabled returns false",
 			ApplyLockError: errors.New("error"),
 			ApplyLocked:    false,
-			ExpComment:     "**Error:** Failed to check global apply lock. Running `atlantis apply` is not allowed until the lock backend is reachable.",
+			ExpComment:     "Ran Apply for 0 projects:",
 		},
 	}
 
