@@ -316,6 +316,52 @@ func TestAPIController_ListLocks(t *testing.T) {
 	Equals(t, expected, result)
 }
 
+func TestAPIController_PlanFetchesPullReqStatus(t *testing.T) {
+	ac, _, _ := setup(t)
+	fetcher := NewMockPullReqStatusFetcher()
+	When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())).
+		ThenReturn(models.PullReqStatus{
+			ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
+		}, nil)
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(1)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+}
+
+func TestAPIController_PlanSkipsPullReqStatusWhenNoPR(t *testing.T) {
+	ac, _, _ := setup(t)
+	fetcher := NewMockPullReqStatusFetcher()
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Never()).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+}
+
 func TestAPIController_ListLocksEmpty(t *testing.T) {
 	ac, _, _ := setup(t)
 

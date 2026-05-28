@@ -981,6 +981,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:                     workingDir,
 		WorkingDirLocker:               workingDirLocker,
 		CommitStatusUpdater:            commitStatusUpdater,
+		PullReqStatusFetcher:           pullReqStatusFetcher,
 		SilenceVCSStatusNoProjects:     userConfig.SilenceVCSStatusNoProjects,
 	}
 

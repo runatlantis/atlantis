@@ -40,6 +40,11 @@ type APIController struct {
 	WorkingDir                     events.WorkingDir                     `validate:"required"`
 	WorkingDirLocker               events.WorkingDirLocker               `validate:"required"`
 	CommitStatusUpdater            events.CommitStatusUpdater            `validate:"required"`
+	// PullReqStatusFetcher is optional. When set and the API request supplies a
+	// PR number, it is used to populate command.Context.PullRequestStatus so
+	// apply requirements like 'mergeable' and 'approved' evaluate against real
+	// VCS state instead of always failing.
+	PullReqStatusFetcher vcs.PullReqStatusFetcher
 	// SilenceVCSStatusNoProjects is whether API should set commit status if no projects are found
 	SilenceVCSStatusNoProjects bool
 }
@@ -376,19 +381,32 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusForbidden, fmt.Errorf("repo not allowlisted")
 	}
 
-	return &request, &command.Context{
+	pull := models.PullRequest{
+		Num:        request.PR,
+		BaseBranch: request.Ref,
+		HeadBranch: request.Ref,
+		HeadCommit: request.Ref,
+		BaseRepo:   baseRepo,
+	}
+	ctx := &command.Context{
 		HeadRepo: baseRepo,
-		Pull: models.PullRequest{
-			Num:        request.PR,
-			BaseBranch: request.Ref,
-			HeadBranch: request.Ref,
-			HeadCommit: request.Ref,
-			BaseRepo:   baseRepo,
-		},
-		Scope: a.Scope,
-		Log:   a.Logger,
-		API:   true,
-	}, http.StatusOK, nil
+		Pull:     pull,
+		Scope:    a.Scope,
+		Log:      a.Logger,
+		API:      true,
+	}
+	// When a real PR is supplied, populate PullRequestStatus so that apply
+	// requirements (e.g. 'mergeable', 'approved') evaluate against actual VCS
+	// state instead of defaulting to false. The comment-driven runners do the
+	// equivalent before building project commands.
+	if request.PR > 0 && a.PullReqStatusFetcher != nil {
+		status, err := a.PullReqStatusFetcher.FetchPullStatus(a.Logger, pull)
+		if err != nil {
+			return nil, nil, http.StatusInternalServerError, fmt.Errorf("fetching pull status: %v", err)
+		}
+		ctx.PullRequestStatus = status
+	}
+	return &request, ctx, http.StatusOK, nil
 }
 
 func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {
