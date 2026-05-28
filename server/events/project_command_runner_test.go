@@ -5115,3 +5115,117 @@ func TestDefaultProjectCommandRunner_PathTraversal(t *testing.T) {
 		}
 	}
 }
+
+// TestDefaultProjectCommandRunner_TFAppendUserAgent verifies that
+// TF_APPEND_USER_AGENT is composed from AtlantisVersion (truncated at the
+// first space), VCSStatusName (falling back to "atlantis"), and PR context.
+// It also verifies that an operator-supplied TF_APPEND_USER_AGENT in the
+// Atlantis process environment is preserved by appending it after the
+// Atlantis-built value rather than being silently overwritten.
+func TestDefaultProjectCommandRunner_TFAppendUserAgent(t *testing.T) {
+	cases := []struct {
+		description     string
+		atlantisVersion string
+		vcsStatusName   string
+		existingEnv     string
+		expEnv          string
+	}{
+		{
+			description:     "non-empty version is truncated at first space and custom vcs status name is used",
+			atlantisVersion: "1.2.3 (commit: abc) (build date: 2024-01-01)",
+			vcsStatusName:   "myatlantis",
+			existingEnv:     "",
+			expEnv:          "myatlantis/1.2.3 (alice; apply; project1; default; deadbeef; +https://github.com/owner/repo/pull/42)",
+		},
+		{
+			description:     "empty vcs status name falls back to atlantis",
+			atlantisVersion: "1.2.3",
+			vcsStatusName:   "",
+			existingEnv:     "",
+			expEnv:          "atlantis/1.2.3 (alice; apply; project1; default; deadbeef; +https://github.com/owner/repo/pull/42)",
+		},
+		{
+			description:     "operator-supplied TF_APPEND_USER_AGENT is appended after the atlantis-built value",
+			atlantisVersion: "1.2.3",
+			vcsStatusName:   "atlantis",
+			existingEnv:     "my-org/1.0 (custom)",
+			expEnv:          "atlantis/1.2.3 (alice; apply; project1; default; deadbeef; +https://github.com/owner/repo/pull/42) my-org/1.0 (custom)",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			if c.existingEnv != "" {
+				t.Setenv("TF_APPEND_USER_AGENT", c.existingEnv)
+			} else {
+				_ = os.Unsetenv("TF_APPEND_USER_AGENT")
+			}
+
+			mockApply := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+			mockSender := mocks.NewMockWebhooksSender()
+			applyReqHandler := &events.DefaultCommandRequirementHandler{
+				WorkingDir: mockWorkingDir,
+			}
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                    mockLocker,
+				LockURLGenerator:          mockURLGenerator{},
+				ApplyStepRunner:           mockApply,
+				WorkingDir:                mockWorkingDir,
+				Webhooks:                  mockSender,
+				WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+				CommandRequirementHandler: applyReqHandler,
+				AtlantisVersion:           c.atlantisVersion,
+				VCSStatusName:             c.vcsStatusName,
+			}
+
+			repoDir := t.TempDir()
+			projectDir := filepath.Join(repoDir, "project1")
+			Ok(t, os.Mkdir(projectDir, 0700))
+
+			When(mockWorkingDir.GetWorkingDir(
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[string](),
+			)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+			When(mockLocker.TryLock(
+				Any[logging.SimpleLogging](),
+				Any[models.PullRequest](),
+				Any[models.User](),
+				Any[string](),
+				Any[models.Project](),
+				AnyBool(),
+			)).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+			}, nil)
+
+			ctx := command.ProjectContext{
+				Log: logging.NewNoopLogger(t),
+				Steps: []valid.Step{
+					{StepName: "apply"},
+				},
+				Workspace:         "default",
+				ApplyRequirements: []string{},
+				RepoRelDir:        "project1",
+				User:              models.User{Username: "alice"},
+				Pull: models.PullRequest{
+					HeadCommit: "deadbeef",
+					URL:        "https://github.com/owner/repo/pull/42",
+				},
+			}
+			expEnvs := map[string]string{
+				"TF_APPEND_USER_AGENT": c.expEnv,
+			}
+			When(mockApply.Run(ctx, nil, projectDir, expEnvs)).ThenReturn("apply", nil)
+
+			res := runner.Apply(ctx)
+			Equals(t, "apply", res.ApplySuccess)
+			mockApply.VerifyWasCalledOnce().Run(ctx, nil, projectDir, expEnvs)
+		})
+	}
+}

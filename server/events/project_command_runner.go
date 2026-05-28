@@ -1108,18 +1108,27 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		vcsStatusName = "atlantis"
 	}
 
+	tfAppendUserAgent := fmt.Sprintf(
+		"%s/%s (%s; %s; %s; %s; %s; +%s)",
+		vcsStatusName,
+		atlantisVersion,
+		ctx.User.Username,
+		ctx.CommandName,
+		ctx.RepoRelDir,
+		ctx.Workspace,
+		ctx.Pull.HeadCommit,
+		ctx.Pull.URL,
+	)
+	// If the operator already set TF_APPEND_USER_AGENT on the Atlantis
+	// process, preserve their value by appending it after ours. The
+	// resulting HTTP User-Agent sent by Terraform providers will be:
+	//   Terraform/x.y.z <atlantis-built-value> <operator-value>
+	if existing := os.Getenv("TF_APPEND_USER_AGENT"); existing != "" {
+		tfAppendUserAgent = tfAppendUserAgent + " " + existing
+	}
+
 	envs := map[string]string{
-		"TF_APPEND_USER_AGENT": fmt.Sprintf(
-			"%s/%s (%s; %s; %s; %s; %s; +%s)",
-			vcsStatusName,
-			atlantisVersion,
-			ctx.User.Username,
-			ctx.CommandName,
-			ctx.RepoRelDir,
-			ctx.Workspace,
-			ctx.Pull.HeadCommit,
-			ctx.Pull.URL,
-		),
+		"TF_APPEND_USER_AGENT": tfAppendUserAgent,
 	}
 
 	for _, step := range steps {
