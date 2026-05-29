@@ -47,9 +47,15 @@ func main() {
 		AtlantisVersion: atlantisVersion,
 		Logger:          logger,
 	}
+	serverValidate := &cmd.ServerValidateCmd{
+		Viper:  viper.New(),
+		Logger: logger,
+	}
 	version := &cmd.VersionCmd{AtlantisVersion: atlantisVersion}
 	testdrive := &cmd.TestdriveCmd{}
-	cmd.RootCmd.AddCommand(server.Init())
+	serverCmd := server.Init()
+	serverCmd.AddCommand(serverValidate.Init())
+	cmd.RootCmd.AddCommand(serverCmd)
 	cmd.RootCmd.AddCommand(version.Init())
 	cmd.RootCmd.AddCommand(testdrive.Init())
 	cmd.Execute()
