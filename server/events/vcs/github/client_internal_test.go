@@ -15,14 +15,14 @@ import (
 func TestNew_GithubCom(t *testing.T) {
 	client, err := New("github.com", &UserCredentials{"user", "pass", ""}, Config{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
-	Equals(t, "https://api.github.com/", client.client.BaseURL.String())
+	Equals(t, "https://api.github.com/", client.client.BaseURL())
 }
 
 // If the hostname is a non-github hostname should use the right BaseURL.
 func TestNew_NonGithub(t *testing.T) {
 	client, err := New("example.com", &UserCredentials{"user", "pass", ""}, Config{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
-	Equals(t, "https://example.com/api/v3/", client.client.BaseURL.String())
+	Equals(t, "https://example.com/api/v3/", client.client.BaseURL())
 	// If possible in the future, test the GraphQL client's URL as well. But at the
 	// moment the shurcooL library doesn't expose it.
 }

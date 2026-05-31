@@ -124,14 +124,19 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 	var graphqlURL string
 	var client *github.Client
 	if hostname == "github.com" {
-		client = github.NewClient(transportWithRateLimit)
+		client, err = github.NewClient(github.WithHTTPClient(transportWithRateLimit))
+		if err != nil {
+			return nil, fmt.Errorf("creating github client: %w", err)
+		}
 		graphqlURL = "https://api.github.com/graphql"
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
-		// TODO: Deprecated: Use NewClient(httpClient).WithEnterpriseURLs(baseURL, uploadURL) instead
-		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transportWithRateLimit) //nolint:staticcheck
+		client, err = github.NewClient(
+			github.WithHTTPClient(transportWithRateLimit),
+			github.WithEnterpriseURLs(apiURL.String(), apiURL.String()),
+		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("creating github enterprise client: %w", err)
 		}
 		graphqlURL = fmt.Sprintf("https://%s/api/graphql", apiURL.Host)
 	}
