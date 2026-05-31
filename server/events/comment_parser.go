@@ -572,6 +572,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowVersion         bool
 		AllowPlan            bool
 		AllowApply           bool
+		AllowCancel          bool
 		AllowUnlock          bool
 		AllowApprovePolicies bool
 		AllowImport          bool
@@ -581,6 +582,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowVersion:         e.isAllowedCommand(command.Version.String()),
 		AllowPlan:            e.isAllowedCommand(command.Plan.String()),
 		AllowApply:           e.isAllowedCommand(command.Apply.String()),
+		AllowCancel:          e.isAllowedCommand(command.Cancel.String()),
 		AllowUnlock:          e.isAllowedCommand(command.Unlock.String()),
 		AllowApprovePolicies: e.isAllowedCommand(command.ApprovePolicies.String()),
 		AllowImport:          e.isAllowedCommand(command.Import.String()),
@@ -623,6 +625,10 @@ Commands:
 {{- if .AllowApply }}
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
+{{- end }}
+{{- if .AllowCancel }}
+  cancel   Cancels all queued commands for this pull request.
+           Already running commands are not interrupted.
 {{- end }}
 {{- if .AllowUnlock }}
   unlock   Removes all atlantis locks and discards all plans for this PR.
