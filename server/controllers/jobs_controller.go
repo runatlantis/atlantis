@@ -94,5 +94,5 @@ func (j *JobsController) respond(w http.ResponseWriter, lvl logging.LogLevel, re
 	response := fmt.Sprintf(format, args...)
 	j.Logger.Log(lvl, response)
 	w.WriteHeader(responseCode)
-	fmt.Fprintln(w, response)
+	fmt.Fprintln(w, response) // #nosec G705 -- plain-text response body, not rendered as HTML
 }

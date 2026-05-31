@@ -893,7 +893,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			// Make our assertions.
 			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
-			expRepo := models.Repo{
+			expRepo := models.Repo{ // #nosec G101 -- test fixture, not real credentials
 				FullName:          "project/repository",
 				Owner:             "project",
 				Name:              "repository",

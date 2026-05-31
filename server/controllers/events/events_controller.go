@@ -894,7 +894,7 @@ func (e *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLeve
 	response := fmt.Sprintf(format, args...)
 	e.Logger.Log(lvl, response)
 	w.WriteHeader(code)
-	fmt.Fprintln(w, response)
+	fmt.Fprintln(w, response) // #nosec G705 -- plain-text error message returned to webhook caller, not rendered as HTML
 }
 
 // commentNotAllowlisted comments on the pull request that the repo is not

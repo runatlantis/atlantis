@@ -25,7 +25,7 @@ import (
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
-var parser = events.EventParser{
+var parser = events.EventParser{ // #nosec G101 -- test fixture, not real credentials
 	GithubUser:         "github-user",
 	GithubToken:        "github-token",
 	GithubTokenFile:    "",
@@ -1324,7 +1324,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 }
 
 func TestParseAzureDevopsRepo_LowercasesOwner(t *testing.T) {
-	parser := events.EventParser{
+	parser := events.EventParser{ // #nosec G101 -- test fixture, not real credentials
 		AzureDevopsUser:  "azuredevops-user",
 		AzureDevopsToken: "azuredevops-token",
 	}
