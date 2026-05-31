@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 )
 
 type GithubClient struct {
