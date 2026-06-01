@@ -383,7 +383,11 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 		bucket := tx.Bucket(b.pullsBucketName)
 		currStatus, err := b.getPullFromBucket(bucket, key)
 		if err != nil {
-			return err
+			// Tolerate an unreadable prior entry (e.g. after a PullStatus
+			// schema change). It will be overwritten with fresh data below;
+			// in-flight policy approvals captured in the old blob are lost.
+			log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
+			currStatus = nil
 		}
 
 		// If there is no pull OR if the pull we have is out of date, we
@@ -392,6 +396,23 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 			var statuses []models.ProjectStatus
 			for _, r := range newResults {
 				statuses = append(statuses, b.projectResultToProject(r))
+			}
+			// Preserve policy status from the previous commit so approvals
+			// survive between the plan DB write and the subsequent policy
+			// check DB write. doPolicyCheck applies sticky filtering and
+			// overwrites these when it writes its own results.
+			if currStatus != nil {
+				for i := range statuses {
+					for _, old := range currStatus.Projects {
+						if statuses[i].Workspace == old.Workspace &&
+							statuses[i].RepoRelDir == old.RepoRelDir &&
+							statuses[i].ProjectName == old.ProjectName &&
+							len(old.PolicyStatus) > 0 {
+							statuses[i].PolicyStatus = old.PolicyStatus
+							break
+						}
+					}
+				}
 			}
 			newStatus = models.PullStatus{
 				Pull:     pull,

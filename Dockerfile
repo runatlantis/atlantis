@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1@sha256:2780b5c3bab67f1f76c781860de469442999ed1a0d7992a5efdf2cffc0e3d769
+# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
 # what distro is the image being built for
 ARG ALPINE_TAG=3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 ARG DEBIAN_TAG=12.13-slim@sha256:67b30a61dc87758f0caf819646104f29ecbda97d920aaf5edc834128ac8493d3
@@ -8,7 +8,7 @@ ARG GOLANG_TAG=1.25.8-alpine@sha256:8e02eb337d9e0ea459e041f1ee5eece41cbb61f1d83e
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.14.9
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.11.6
+ARG DEFAULT_OPENTOFU_VERSION=1.12.0
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.66.0
 
@@ -61,17 +61,17 @@ ENV DEBIAN_CA_CERTIFICATES_VERSION="20230311+deb12u1"
 # renovate: datasource=repology depName=debian_12/curl versioning=loose
 ENV DEBIAN_CURL_VERSION="7.88.1-10+deb12u14"
 # renovate: datasource=repology depName=debian_12/git versioning=loose
-ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u2"
+ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u3"
 # renovate: datasource=repology depName=debian_12/unzip versioning=loose
 ENV DEBIAN_UNZIP_VERSION="6.0-28"
 # renovate: datasource=repology depName=debian_12/openssh-server versioning=loose
-ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u9"
+ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u10"
 # renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
 ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
 # renovate: datasource=repology depName=debian_12/gnupg versioning=loose
 ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1+deb12u2"
 # renovate: datasource=repology depName=debian_12/openssl versioning=loose
-ENV DEBIAN_OPENSSL_VERSION="3.0.17-1~deb12u2"
+ENV DEBIAN_OPENSSL_VERSION="3.0.20-1~deb12u1"
 
 # Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
 RUN groupadd --gid 1000 atlantis && \
@@ -188,7 +188,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # renovate: datasource=repology depName=alpine_3_23/ca-certificates versioning=loose
 ENV CA_CERTIFICATES_VERSION="20260413-r0"
 # renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
-ENV CURL_VERSION="8.17.0-r1"
+ENV CURL_VERSION="8.19.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/git versioning=loose
 ENV GIT_VERSION="2.52.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/unzip versioning=loose
@@ -277,7 +277,7 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 # "path = cap_set" line under that scope, the build fails. Strip may use
 # 2>/dev/null and setcap || true; verification is the hard guarantee.
 # renovate: datasource=repology depName=debian_12/libcap2-bin versioning=loose
-ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u3+b1"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     apt-get update && \
