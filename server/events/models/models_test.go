@@ -43,7 +43,7 @@ func TestNewRepo_EmptyAzureDevopsProject(t *testing.T) {
 func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
 	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p", "")
 	Ok(t, err)
-	Equals(t, models.Repo{
+	Equals(t, models.Repo{ // #nosec G101 -- test fixture, not real credentials
 		FullName:          "owner/repo",
 		Owner:             "owner",
 		Name:              "repo",
@@ -120,7 +120,7 @@ func TestNewRepo_HTTPAuth(t *testing.T) {
 	// When the url has http the auth should be added.
 	repo, err := models.NewRepo(models.Github, "owner/repo", "http://github.com/owner/repo.git", "u", "p", "")
 	Ok(t, err)
-	Equals(t, models.Repo{
+	Equals(t, models.Repo{ // #nosec G101 -- test fixture, not real credentials
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
 			Type:     models.Github,
@@ -137,7 +137,7 @@ func TestNewRepo_HTTPSAuth(t *testing.T) {
 	// When the url has https the auth should be added.
 	repo, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/owner/repo.git", "u", "p", "")
 	Ok(t, err)
-	Equals(t, models.Repo{
+	Equals(t, models.Repo{ // #nosec G101 -- test fixture, not real credentials
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
 			Type:     models.Github,
