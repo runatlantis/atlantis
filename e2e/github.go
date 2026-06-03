@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 )
 
 type GithubClient struct {
@@ -63,10 +63,13 @@ func newGithubAppClient(appIDStr, ownerName, repoName string) *GithubClient {
 		log.Fatalf("creating GitHub App transport: %v", err)
 	}
 
-	appClient := github.NewClient(&http.Client{Transport: appTransport})
+	appClient, err := github.NewClient(github.WithHTTPClient(&http.Client{Transport: appTransport}))
+	if err != nil {
+		log.Fatalf("creating GitHub App client: %v", err)
+	}
 	ctx := context.Background()
 
-	installation, _, err := appClient.Apps.FindRepositoryInstallation(ctx, ownerName, repoName)
+	installation, _, err := appClient.Apps.GetRepositoryInstallation(ctx, ownerName, repoName)
 	if err != nil {
 		log.Fatalf("getting GitHub App installation for %s/%s: %v", ownerName, repoName, err)
 	}
@@ -77,7 +80,10 @@ func newGithubAppClient(appIDStr, ownerName, repoName string) *GithubClient {
 		log.Fatalf("creating GitHub App installation transport: %v", err)
 	}
 
-	ghClient := github.NewClient(&http.Client{Transport: itr})
+	ghClient, err := github.NewClient(github.WithHTTPClient(&http.Client{Transport: itr}))
+	if err != nil {
+		log.Fatalf("creating GitHub App installation client: %v", err)
+	}
 
 	// Derive bot username from app slug
 	username := ""
@@ -110,7 +116,10 @@ func newGithubPATClient(ownerName, repoName string) *GithubClient {
 		Username: strings.TrimSpace(githubUsername),
 		Password: strings.TrimSpace(githubToken),
 	}
-	ghClient := github.NewClient(tp.Client())
+	ghClient, err := github.NewClient(github.WithHTTPClient(tp.Client()))
+	if err != nil {
+		log.Fatalf("creating GitHub PAT client: %v", err)
+	}
 
 	return &GithubClient{
 		client:    ghClient,
