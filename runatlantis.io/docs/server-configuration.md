@@ -54,17 +54,17 @@ Values are chosen in this order:
 ### `--allow-commands` <Badge text="v0.27.0+" type="info"/>
 
 ```bash
-atlantis server --allow-commands=version,plan,apply,unlock,approve_policies
+atlantis server --allow-commands=version,plan,apply,unlock,approve_policies,cancel
 # or
-ATLANTIS_ALLOW_COMMANDS='version,plan,apply,unlock,approve_policies'
+ATLANTIS_ALLOW_COMMANDS='version,plan,apply,unlock,approve_policies,cancel'
 ```
 
-List of allowed commands to be run on the Atlantis server, Defaults to `version,plan,apply,unlock,approve_policies`
+List of allowed commands to be run on the Atlantis server, Defaults to `version,plan,apply,unlock,approve_policies,cancel`
 
 Notes:
 
 - Accepts a comma separated list, ex. `command1,command2`.
-- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state`, `policy_check` and `all` are available.
+- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `cancel`, `import`, `state`, `policy_check` and `all` are available.
 - `policy_check` is an internal command that runs automatically after `plan` when [policy checking](policy-checking.md) is enabled. It must be explicitly allowlisted when using [`--gh-team-allowlist`](#gh-team-allowlist).
 - `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
 

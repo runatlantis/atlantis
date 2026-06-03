@@ -4,7 +4,7 @@ go 1.25.4
 
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.18.0
-	github.com/google/go-github/v83 v83.0.0
+	github.com/google/go-github/v88 v88.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	gitlab.com/gitlab-org/api/client-go v0.118.0
 )
