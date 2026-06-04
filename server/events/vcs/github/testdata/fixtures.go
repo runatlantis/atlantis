@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 )
 
 var PullEvent = github.PullRequestEvent{

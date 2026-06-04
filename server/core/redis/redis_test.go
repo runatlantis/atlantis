@@ -50,6 +50,40 @@ var (
 	caPath string
 )
 
+func TestNewWithConfig_SingleNode(t *testing.T) {
+	t.Log("creating redis client with single-node mode")
+	s := miniredis.RunT(t)
+	r, err := redis.NewWithConfig(redis.Config{
+		Hostname: s.Host(),
+		Port:     s.Server().Addr().Port,
+	})
+	Ok(t, err)
+	Assert(t, r != nil, "expected redis client to be created")
+	r.Close()
+}
+
+func TestNewWithConfig_WithUsername(t *testing.T) {
+	t.Log("creating redis client with username")
+	s := miniredis.RunT(t)
+	r, err := redis.NewWithConfig(redis.Config{
+		Hostname: s.Host(),
+		Port:     s.Server().Addr().Port,
+		Username: "testuser",
+	})
+	Ok(t, err)
+	Assert(t, r != nil, "expected redis client to be created")
+	r.Close()
+}
+
+func TestNewWithConfig_ClusterEmptyAddresses(t *testing.T) {
+	t.Log("cluster mode with empty addresses should fail")
+	_, err := redis.NewWithConfig(redis.Config{
+		ClusterAddresses: []string{"", ""},
+	})
+	Assert(t, err != nil, "expected error when cluster addresses are all empty")
+	Assert(t, err.Error() == "redis cluster addresses provided but all are empty", "unexpected error: %v", err)
+}
+
 func TestRedisWithTLS(t *testing.T) {
 	t.Log("connecting to redis over TLS")
 
