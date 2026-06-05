@@ -39,6 +39,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.17.3
 	github.com/remeh/sizedwaitgroup v1.0.0
+	github.com/rivo/uniseg v0.4.7
 	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
 	github.com/slack-go/slack v0.23.1
 	github.com/spf13/cobra v1.10.2

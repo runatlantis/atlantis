@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	giteasdk "code.gitea.io/sdk/gitea"
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/google/go-github/v88/github"
 	"github.com/mohae/deepcopy"
@@ -147,6 +148,7 @@ func TestParseGithubPullEvent(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        githubtestdata.Pull.GetHTMLURL(),
 		Author:     githubtestdata.Pull.User.GetLogin(),
+		Body:       githubtestdata.Pull.GetBody(),
 		HeadBranch: githubtestdata.Pull.Head.GetRef(),
 		BaseBranch: githubtestdata.Pull.Base.GetRef(),
 		HeadCommit: githubtestdata.Pull.Head.GetSHA(),
@@ -320,6 +322,7 @@ func TestParseGithubPull(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        githubtestdata.Pull.GetHTMLURL(),
 		Author:     githubtestdata.Pull.User.GetLogin(),
+		Body:       githubtestdata.Pull.GetBody(),
 		HeadBranch: githubtestdata.Pull.Head.GetRef(),
 		BaseBranch: githubtestdata.Pull.Base.GetRef(),
 		HeadCommit: githubtestdata.Pull.Head.GetSHA(),
@@ -339,6 +342,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	var event *gitlab.MergeEvent
 	err = json.Unmarshal(bytes, &event)
 	Ok(t, err)
+	event.ObjectAttributes.Description = "merge request description"
 	pull, evType, actBaseRepo, actHeadRepo, actUser, err := parser.ParseGitlabMergeRequestEvent(*event)
 	Ok(t, err)
 
@@ -357,6 +361,7 @@ func TestParseGitlabMergeEvent(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        "https://gitlab.com/lkysow/atlantis-example/merge_requests/12",
 		Author:     "lkysow",
+		Body:       "merge request description",
 		Num:        12,
 		HeadCommit: "d2eae324ca26242abca45d7b49d582cddb2a4f15",
 		HeadBranch: "patch-1",
@@ -588,10 +593,12 @@ func TestParseGitlabMergeRequest(t *testing.T) {
 			Type:     models.Gitlab,
 		},
 	}
+	event.Description = "merge request description"
 	pull := parser.ParseGitlabMergeRequest(event, repo)
 	Equals(t, models.PullRequest{
 		URL:        "https://gitlab.com/lkysow/atlantis-example/merge_requests/8",
 		Author:     "lkysow",
+		Body:       "merge request description",
 		Num:        8,
 		HeadCommit: "0b4ac85ea3063ad5f2974d10cd68dd1f937aaac2",
 		HeadBranch: "abc",
@@ -859,6 +866,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 	Equals(t, expBaseRepo, baseRepo)
 	Equals(t, models.PullRequest{
 		Num:        2,
+		Body:       "main.tf edited online with Bitbucket",
 		HeadCommit: "e0624da46d3a",
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/2",
 		HeadBranch: "lkysow/maintf-edited-online-with-bitbucket-1532029690581",
@@ -945,6 +953,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 	Equals(t, expBaseRepo, baseRepo)
 	Equals(t, models.PullRequest{
 		Num:        16,
+		Body:       "main.tf edited online with Bitbucket",
 		HeadCommit: "1e69a602caef",
 		URL:        "https://bitbucket.org/lkysow/atlantis-example/pull-requests/16",
 		HeadBranch: "Luke/maintf-edited-online-with-bitbucket-1560433073473",
@@ -967,6 +976,17 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 	Equals(t, models.User{
 		Username: "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 	}, user)
+}
+
+func TestParseBitbucketCloudPullEvent_UsesSummaryRawWhenDescriptionMissing(t *testing.T) {
+	path := filepath.Join("testdata", "bitbucket-cloud-pull-event-created.json")
+	bytes, err := os.ReadFile(path)
+	Ok(t, err)
+	withoutDescription := strings.Replace(string(bytes), `    "description": "main.tf edited online with Bitbucket",`+"\n", "", 1)
+
+	pull, _, _, _, err := parser.ParseBitbucketCloudPullEvent([]byte(withoutDescription))
+	Ok(t, err)
+	Equals(t, "main.tf edited online with Bitbucket", pull.Body)
 }
 
 func TestParseBitbucketCloudPullEvent_States(t *testing.T) {
@@ -1195,6 +1215,7 @@ func TestParseBitbucketServerPullEvent_ValidEvent(t *testing.T) {
 	Equals(t, expBaseRepo, baseRepo)
 	Equals(t, models.PullRequest{
 		Num:        2,
+		Body:       "* Null resource\r\n* main.tf edited online with Bitbucket\r\n* Update 2\r\n* main.tf edited online with Bitbucket\r\n* kkj\r\n* main.tf edited online with Bitbucket",
 		HeadCommit: "86a574157f5a2dadaf595b9f06c70fdfdd039912",
 		URL:        "http://mycorp.com:7490/projects/AT/repos/atlantis-example/pull-requests/2",
 		HeadBranch: "branch",
@@ -1251,6 +1272,54 @@ func TestGetBitbucketServerEventType(t *testing.T) {
 			Equals(t, c.exp, act)
 		})
 	}
+}
+
+func TestParseGiteaPullRequestEvent(t *testing.T) {
+	giteaParser := events.EventParser{
+		GiteaUser:  "gitea-user",
+		GiteaToken: "gitea-token",
+	}
+	repo := giteasdk.Repository{
+		FullName: "owner/repo",
+		CloneURL: "https://gitea.example.com/owner/repo.git",
+	}
+	event := giteasdk.PullRequest{
+		Index:   2,
+		HTMLURL: "https://gitea.example.com/owner/repo/pulls/2",
+		Body:    "pull request description",
+		State:   giteasdk.StateOpen,
+		Poster:  &giteasdk.User{UserName: "lkysow"},
+		Head: &giteasdk.PRBranchInfo{
+			Ref:        "head-branch",
+			Sha:        "d2eae324ca26242abca45d7b49d582cddb2a4f15",
+			Repository: &repo,
+		},
+		Base: &giteasdk.PRBranchInfo{
+			Ref:        "main",
+			Repository: &repo,
+		},
+	}
+
+	pull, evType, actBaseRepo, _, actUser, err := giteaParser.ParseGiteaPullRequestEvent(event)
+	Ok(t, err)
+
+	expBaseRepo, err := models.NewRepo(models.Gitea, "owner/repo", "https://gitea.example.com/owner/repo.git", "gitea-user", "gitea-token", "")
+	Ok(t, err)
+
+	Equals(t, models.PullRequest{
+		URL:        "https://gitea.example.com/owner/repo/pulls/2",
+		Author:     "lkysow",
+		Body:       "pull request description",
+		Num:        2,
+		HeadCommit: "d2eae324ca26242abca45d7b49d582cddb2a4f15",
+		HeadBranch: "head-branch",
+		BaseBranch: "main",
+		State:      models.OpenPullState,
+		BaseRepo:   expBaseRepo,
+	}, pull)
+	Equals(t, models.OpenedPullEvent, evType)
+	Equals(t, expBaseRepo, actBaseRepo)
+	Equals(t, models.User{Username: "lkysow"}, actUser)
 }
 
 func TestParseAzureDevopsRepo(t *testing.T) {
@@ -1398,6 +1467,7 @@ func TestParseAzureDevopsPullEvent(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        azuredevopstestdata.Pull.GetURL(),
 		Author:     azuredevopstestdata.Pull.CreatedBy.GetUniqueName(),
+		Body:       azuredevopstestdata.Pull.GetDescription(),
 		HeadBranch: "feature/sourceBranch",
 		BaseBranch: "targetBranch",
 		HeadCommit: azuredevopstestdata.Pull.LastMergeSourceCommit.GetCommitID(),
@@ -1516,6 +1586,7 @@ func TestParseAzureDevopsPull(t *testing.T) {
 	Equals(t, models.PullRequest{
 		URL:        azuredevopstestdata.Pull.GetURL(),
 		Author:     azuredevopstestdata.Pull.CreatedBy.GetUniqueName(),
+		Body:       azuredevopstestdata.Pull.GetDescription(),
 		HeadBranch: "feature/sourceBranch",
 		BaseBranch: "targetBranch",
 		HeadCommit: azuredevopstestdata.Pull.LastMergeSourceCommit.GetCommitID(),

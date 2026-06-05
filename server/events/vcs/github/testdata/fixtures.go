@@ -40,6 +40,7 @@ var Pull = github.PullRequest{
 	User: &github.User{
 		Login: github.Ptr("user"),
 	},
+	Body:   github.Ptr("body"),
 	Number: github.Ptr(1),
 	State:  github.Ptr("open"),
 }
