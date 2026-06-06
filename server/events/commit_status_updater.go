@@ -44,7 +44,7 @@ type DefaultCommitStatusUpdater struct {
 var _ runtime.StatusUpdater = (*DefaultCommitStatusUpdater)(nil)
 
 func (d *DefaultCommitStatusUpdater) UpdateCombined(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name) error {
-	src := fmt.Sprintf("%s/%s", d.StatusName, cmdName.String())
+	src := truncateContext(fmt.Sprintf("%s/%s", d.StatusName, cmdName.String()))
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
@@ -58,7 +58,7 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(logger logging.SimpleLogging
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
-	src := fmt.Sprintf("%s/%s", d.StatusName, cmdName.String())
+	src := truncateContext(fmt.Sprintf("%s/%s", d.StatusName, cmdName.String()))
 	cmdVerb := "unknown"
 
 	switch cmdName {
@@ -78,7 +78,7 @@ func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, c
 	if projectID == "" {
 		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
 	}
-	src := fmt.Sprintf("%s/%s: %s", d.StatusName, cmdName.String(), projectID)
+	src := truncateContext(fmt.Sprintf("%s/%s: %s", d.StatusName, cmdName.String(), projectID))
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
@@ -99,6 +99,19 @@ func genProjectStatusDescription(cmdName, description string) string {
 	return fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName), description)
 }
 
+// maxStatusContext is the maximum number of characters allowed by the GitHub
+// Statuses API for the "context" field. Exceeding this limit causes a 422.
+// See https://docs.github.com/en/rest/commits/statuses
+const maxStatusContext = 255
+
+// truncateContext shortens s to maxStatusContext characters if needed.
+func truncateContext(s string) string {
+	if len(s) <= maxStatusContext {
+		return s
+	}
+	return s[:maxStatusContext]
+}
+
 func (d *DefaultCommitStatusUpdater) UpdatePreWorkflowHook(log logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
 	return d.updateWorkflowHook(log, pull, status, hookDescription, runtimeDescription, "pre_workflow_hook", url)
 }
@@ -108,7 +121,7 @@ func (d *DefaultCommitStatusUpdater) UpdatePostWorkflowHook(log logging.SimpleLo
 }
 
 func (d *DefaultCommitStatusUpdater) updateWorkflowHook(log logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, workflowType string, url string) error {
-	src := fmt.Sprintf("%s/%s: %s", d.StatusName, workflowType, hookDescription)
+	src := truncateContext(fmt.Sprintf("%s/%s: %s", d.StatusName, workflowType, hookDescription))
 
 	var descripWords string
 	if runtimeDescription != "" {

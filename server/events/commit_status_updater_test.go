@@ -242,6 +242,25 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 	}
 }
 
+// Test that the status context is truncated to 255 characters when the project
+// path is very long, to avoid a 422 from the GitHub Statuses API.
+func TestDefaultCommitStatusUpdater_UpdateProjectTruncatesLongContext(t *testing.T) {
+	RegisterMockTestingT(t)
+	client := mocks.NewMockClient()
+	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
+	// Build a directory name long enough to push the context over 255 chars.
+	longDir := fmt.Sprintf("%s/deeply/nested/path", fmt.Sprintf("%0250d", 0))
+	expSrc := fmt.Sprintf("atlantis/plan: %s/default", longDir)[:255]
+	err := s.UpdateProject(command.ProjectContext{
+		RepoRelDir: longDir,
+		Workspace:  "default",
+	}, command.Plan, models.PendingCommitStatus, "url", nil)
+	Ok(t, err)
+	client.VerifyWasCalledOnce().UpdateStatus(
+		Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}),
+		Eq(models.PendingCommitStatus), Eq(expSrc), Eq("Plan in progress..."), Eq("url"))
+}
+
 // Test that we can set the status name.
 func TestDefaultCommitStatusUpdater_UpdateProjectCustomStatusName(t *testing.T) {
 	RegisterMockTestingT(t)
