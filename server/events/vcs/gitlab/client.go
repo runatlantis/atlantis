@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -326,8 +327,12 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		return models.MergeableStatus{}, err
 	}
 
+	// Collect every blocking status (rather than returning on the first) so that
+	// a per-project command requirement check can tell whether the only blockers
+	// are plan statuses belonging to other projects in the same merge request.
+	// See DefaultCommandRequirementHandler.
+	blockingStatusState := make(map[string]string)
 	var blockingStatuses []string
-	var firstBlockReason string
 	for _, status := range statuses {
 		// Ignore Atlantis-owned commit statuses that can self-block apply.
 		// Keep plan statuses in this check: a later failed or running specific
@@ -336,20 +341,19 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
-			if firstBlockReason == "" {
-				firstBlockReason = fmt.Sprintf("Pipeline %s has status %s", status.Name, status.Status)
+			if _, seen := blockingStatusState[status.Name]; !seen {
+				blockingStatusState[status.Name] = status.Status
+				blockingStatuses = append(blockingStatuses, status.Name)
 			}
-			blockingStatuses = append(blockingStatuses, status.Name)
 		}
 	}
 	if len(blockingStatuses) > 0 {
-		// We collect every blocking status (rather than returning on the first)
-		// so that a per-project command requirement check can tell whether the
-		// only blockers are plan statuses belonging to other projects in the
-		// same merge request. See DefaultCommandRequirementHandler.
+		// Sort so the reported Reason and the BlockingStatuses slice are
+		// deterministic, independent of the order GitLab returns statuses in.
+		sort.Strings(blockingStatuses)
 		return models.MergeableStatus{
 			IsMergeable:      false,
-			Reason:           firstBlockReason,
+			Reason:           fmt.Sprintf("Pipeline %s has status %s", blockingStatuses[0], blockingStatusState[blockingStatuses[0]]),
 			BlockingStatuses: blockingStatuses,
 		}, nil
 	}

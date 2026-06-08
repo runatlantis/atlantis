@@ -859,8 +859,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			defaultMr,
 			models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s/plan: resource/default", vcsStatusName)},
 			},
 		},
 		{
@@ -869,8 +870,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			defaultMr,
 			models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s/plan", vcsStatusName)},
 			},
 		},
 		{
@@ -888,8 +890,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			defaultMr,
 			models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      "Pipeline ci/external-pipeline has status failed",
+				IsMergeable:      false,
+				Reason:           "Pipeline ci/external-pipeline has status failed",
+				BlockingStatuses: []string{"ci/external-pipeline"},
 			},
 		},
 		{
@@ -898,8 +901,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			defaultMr,
 			models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      "Pipeline ci/external-pipeline has status pending",
+				IsMergeable:      false,
+				Reason:           "Pipeline ci/external-pipeline has status pending",
+				BlockingStatuses: []string{"ci/external-pipeline"},
 			},
 		},
 		{
@@ -917,8 +921,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			ciMustPassMR,
 			models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s/plan", vcsStatusName)},
 			},
 		},
 		// This MR should be listed as not mergeable. However, in older versions they don't have detailed_merge_status,
@@ -966,8 +971,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			noHeadPipelineMR,
 			models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s/plan: resource/default has status failed", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s/plan: resource/default", vcsStatusName)},
 			},
 		},
 		{
@@ -976,8 +982,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			noHeadPipelineMR,
 			models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s/plan has status pending", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s/plan", vcsStatusName)},
 			},
 		},
 		{
@@ -986,8 +993,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			gitlabServerVersions,
 			noHeadPipelineMR,
 			models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s/plan", vcsStatusName)},
 			},
 		},
 		{
@@ -1118,16 +1126,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 					}, vcsStatusName, []string{})
 
 				Ok(t, err)
-				// A commit-status block (reason "Pipeline <name> has status
-				// <state>") records exactly the offending status name in
-				// BlockingStatuses. Derive it here so each fixture above doesn't
-				// have to repeat its own status name. Note this is distinct from
-				// other not-mergeable reasons such as "Pipeline was skipped".
-				expState := c.expState
-				if !expState.IsMergeable && strings.Contains(expState.Reason, " has status ") {
-					expState.BlockingStatuses = []string{c.statusName}
-				}
-				Equals(t, expState, mergeable)
+				Equals(t, c.expState, mergeable)
 			})
 		}
 	}
@@ -1291,6 +1290,20 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				IsMergeable:      false,
 				Reason:           fmt.Sprintf("Pipeline %s-extra/plan has status failed", vcsStatusName),
 				BlockingStatuses: []string{fmt.Sprintf("%s-extra/plan", vcsStatusName)},
+			},
+		},
+		{
+			description:   "multiple blockers are de-duplicated and sorted deterministically",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: "ci/zzz", Status: "failed"},
+				{Name: "ci/aaa", Status: "running"},
+				{Name: "ci/zzz", Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable:      false,
+				Reason:           "Pipeline ci/aaa has status running",
+				BlockingStatuses: []string{"ci/aaa", "ci/zzz"},
 			},
 		},
 	}
