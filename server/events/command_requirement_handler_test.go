@@ -229,6 +229,200 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 	}
 }
 
+// TestAggregateApplyRequirements_MergeableScopedToProject verifies that the
+// mergeable apply requirement is evaluated per project: a failing Atlantis plan
+// status for a different project (or the combined plan status) in the same pull
+// request must not block applying a project whose own plan succeeded, while the
+// project's own plan, external CI, and MR-level signals still block.
+func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
+	repoDir := "repoDir"
+	const vcsStatusName = "atlantis"
+	mergeableReq := []string{raw.MergeableRequirement}
+
+	tests := []struct {
+		name          string
+		vcsStatusName string
+		ctx           command.ProjectContext
+		wantFailure   string
+	}{
+		{
+			name:          "other project's plan failure does not block this project's apply",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				ProjectName:       "app",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           "Pipeline atlantis/plan: network has status failed",
+						BlockingStatuses: []string{"atlantis/plan: network"},
+					},
+				},
+			},
+			wantFailure: "",
+		},
+		{
+			name:          "this project's own plan failure still blocks",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				ProjectName:       "app",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           "Pipeline atlantis/plan: app has status failed",
+						BlockingStatuses: []string{"atlantis/plan: app"},
+					},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running apply (Pipeline atlantis/plan: app has status failed).",
+		},
+		{
+			name:          "combined plan status alone does not block a per-project apply",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				ProjectName:       "app",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           "Pipeline atlantis/plan has status failed",
+						BlockingStatuses: []string{"atlantis/plan"},
+					},
+				},
+			},
+			wantFailure: "",
+		},
+		{
+			name:          "external CI failure still blocks",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				ProjectName:       "app",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           "Pipeline ci/build has status failed",
+						BlockingStatuses: []string{"ci/build"},
+					},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running apply (Pipeline ci/build has status failed).",
+		},
+		{
+			name:          "other project's plan plus this project's own plan still blocks",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				ProjectName:       "app",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           "Pipeline atlantis/plan: network has status failed",
+						BlockingStatuses: []string{"atlantis/plan: network", "atlantis/plan: app"},
+					},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running apply (Pipeline atlantis/plan: network has status failed).",
+		},
+		{
+			name:          "other project's plan plus external CI still blocks",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				ProjectName:       "app",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           "Pipeline atlantis/plan: network has status failed",
+						BlockingStatuses: []string{"atlantis/plan: network", "ci/build"},
+					},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running apply (Pipeline atlantis/plan: network has status failed).",
+		},
+		{
+			name:          "not mergeable with no blocking statuses (e.g. approvals) still blocks",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				ProjectName:       "app",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable: false,
+						Reason:      "Still require 2 approvals",
+					},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running apply (Still require 2 approvals).",
+		},
+		{
+			name:          "project without a name ignores another project's plan failure",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				RepoRelDir:        "infra/staging",
+				Workspace:         "default",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           "Pipeline atlantis/plan: infra/production/default has status failed",
+						BlockingStatuses: []string{"atlantis/plan: infra/production/default"},
+					},
+				},
+			},
+			wantFailure: "",
+		},
+		{
+			name:          "project without a name is still blocked by its own plan",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				RepoRelDir:        "infra/staging",
+				Workspace:         "default",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           "Pipeline atlantis/plan: infra/staging/default has status failed",
+						BlockingStatuses: []string{"atlantis/plan: infra/staging/default"},
+					},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running apply (Pipeline atlantis/plan: infra/staging/default has status failed).",
+		},
+		{
+			name:          "empty vcs status name disables per-project scoping and stays blocked",
+			vcsStatusName: "",
+			ctx: command.ProjectContext{
+				ProjectName:       "app",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           "Pipeline atlantis/plan: network has status failed",
+						BlockingStatuses: []string{"atlantis/plan: network"},
+					},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running apply (Pipeline atlantis/plan: network has status failed).",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			workingDir := mocks.NewMockWorkingDir()
+			a := &events.DefaultCommandRequirementHandler{
+				WorkingDir:    workingDir,
+				VCSStatusName: tt.vcsStatusName,
+			}
+			gotFailure, err := a.ValidateApplyProject(repoDir, tt.ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantFailure, gotFailure)
+		})
+	}
+}
+
 func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 	tests := []struct {
 		name        string

@@ -326,6 +326,8 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		return models.MergeableStatus{}, err
 	}
 
+	var blockingStatuses []string
+	var firstBlockReason string
 	for _, status := range statuses {
 		// Ignore Atlantis-owned commit statuses that can self-block apply.
 		// Keep plan statuses in this check: a later failed or running specific
@@ -334,11 +336,22 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
-			return models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s has status %s", status.Name, status.Status),
-			}, nil
+			if firstBlockReason == "" {
+				firstBlockReason = fmt.Sprintf("Pipeline %s has status %s", status.Name, status.Status)
+			}
+			blockingStatuses = append(blockingStatuses, status.Name)
 		}
+	}
+	if len(blockingStatuses) > 0 {
+		// We collect every blocking status (rather than returning on the first)
+		// so that a per-project command requirement check can tell whether the
+		// only blockers are plan statuses belonging to other projects in the
+		// same merge request. See DefaultCommandRequirementHandler.
+		return models.MergeableStatus{
+			IsMergeable:      false,
+			Reason:           firstBlockReason,
+			BlockingStatuses: blockingStatuses,
+		}, nil
 	}
 
 	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus(logger)

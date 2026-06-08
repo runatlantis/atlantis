@@ -1118,7 +1118,16 @@ func TestClient_PullIsMergeable(t *testing.T) {
 					}, vcsStatusName, []string{})
 
 				Ok(t, err)
-				Equals(t, c.expState, mergeable)
+				// A commit-status block (reason "Pipeline <name> has status
+				// <state>") records exactly the offending status name in
+				// BlockingStatuses. Derive it here so each fixture above doesn't
+				// have to repeat its own status name. Note this is distinct from
+				// other not-mergeable reasons such as "Pipeline was skipped".
+				expState := c.expState
+				if !expState.IsMergeable && strings.Contains(expState.Reason, " has status ") {
+					expState.BlockingStatuses = []string{c.statusName}
+				}
+				Equals(t, expState, mergeable)
 			})
 		}
 	}
@@ -1168,8 +1177,9 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				{Name: fmt.Sprintf("%s/apply", vcsStatusName), Status: "failed"},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s/plan", vcsStatusName)},
 			},
 		},
 		{
@@ -1179,8 +1189,9 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				{Name: fmt.Sprintf("%s/plan: myproject/default", vcsStatusName), Status: "running"},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan: myproject/default has status running", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s/plan: myproject/default has status running", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s/plan: myproject/default", vcsStatusName)},
 			},
 		},
 		{
@@ -1191,8 +1202,9 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				{Name: "ci/build", Status: "failed"},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      "Pipeline ci/build has status failed",
+				IsMergeable:      false,
+				Reason:           "Pipeline ci/build has status failed",
+				BlockingStatuses: []string{"ci/build"},
 			},
 		},
 		{
@@ -1203,8 +1215,9 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				{Name: "ci/build", Status: "running"},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      "Pipeline ci/build has status running",
+				IsMergeable:      false,
+				Reason:           "Pipeline ci/build has status running",
+				BlockingStatuses: []string{"ci/build"},
 			},
 		},
 		{
@@ -1214,8 +1227,9 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				{Name: fmt.Sprintf("%s/security", vcsStatusName), Status: "failed"},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/security has status failed", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s/security has status failed", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s/security", vcsStatusName)},
 			},
 		},
 		{
@@ -1226,8 +1240,9 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				{Name: "ci/build", Status: "failed"},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      "Pipeline ci/build has status failed",
+				IsMergeable:      false,
+				Reason:           "Pipeline ci/build has status failed",
+				BlockingStatuses: []string{"ci/build"},
 			},
 		},
 		{
@@ -1251,8 +1266,9 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				{Name: fmt.Sprintf("%s/apply: infra/staging", vcsStatusName), Status: "success"},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan: infra/production has status running", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s/plan: infra/production has status running", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s/plan: infra/production", vcsStatusName)},
 			},
 		},
 		{
@@ -1272,8 +1288,9 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				{Name: fmt.Sprintf("%s-extra/plan", vcsStatusName), Status: "failed"},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s-extra/plan has status failed", vcsStatusName),
+				IsMergeable:      false,
+				Reason:           fmt.Sprintf("Pipeline %s-extra/plan has status failed", vcsStatusName),
+				BlockingStatuses: []string{fmt.Sprintf("%s-extra/plan", vcsStatusName)},
 			},
 		},
 	}

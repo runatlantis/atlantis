@@ -5,6 +5,7 @@ package events
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -27,6 +28,11 @@ type UndivergedProjectImpactResolver interface {
 type DefaultCommandRequirementHandler struct {
 	WorkingDir            WorkingDir
 	ProjectImpactResolver UndivergedProjectImpactResolver
+	// VCSStatusName is the prefix Atlantis uses for its commit statuses
+	// (the --vcs-status-name flag, "atlantis" by default). It is used to
+	// recognise Atlantis plan statuses when scoping the mergeable requirement
+	// to a single project.
+	VCSStatusName string
 }
 
 func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) (failure string, err error) {
@@ -69,10 +75,11 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 				return fmt.Sprintf("All policies must pass for project before running %s.", cmd), nil
 			}
 		case raw.MergeableRequirement:
-			if !ctx.PullReqStatus.MergeableStatus.IsMergeable {
+			mergeableStatus := ctx.PullReqStatus.MergeableStatus
+			if !mergeableStatus.IsMergeable && !a.mergeableIgnoringOtherProjectPlans(ctx, mergeableStatus) {
 				suffix := ""
-				if ctx.PullReqStatus.MergeableStatus.Reason != "" {
-					suffix = fmt.Sprintf(" (%s)", ctx.PullReqStatus.MergeableStatus.Reason)
+				if mergeableStatus.Reason != "" {
+					suffix = fmt.Sprintf(" (%s)", mergeableStatus.Reason)
 				}
 				return fmt.Sprintf("Pull request must be mergeable before running %s%s.", cmd, suffix), nil
 			}
@@ -89,6 +96,53 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 	}
 	// Passed all requirements configured.
 	return "", nil
+}
+
+// mergeableIgnoringOtherProjectPlans reports whether the merge request should be
+// treated as mergeable for THIS project's command even though the MR-wide
+// mergeable check failed, because every blocking commit status is an Atlantis
+// plan status that does not belong to this project (another project's
+// per-project plan status, or the combined plan status).
+//
+// A per-project apply only depends on that project's own plan. A failing plan
+// in an unrelated project in the same merge request must not block it. The
+// project's own plan is still enforced: its own plan status keeps blocking
+// here, and the plan file's existence/freshness is verified at apply time by
+// the project command runner.
+//
+// This is conservative: if the MR is blocked for any reason other than other
+// projects' plan statuses (approvals, conflicts, divergence, external CI, or a
+// provider that does not populate BlockingStatuses), it stays blocked.
+func (a *DefaultCommandRequirementHandler) mergeableIgnoringOtherProjectPlans(ctx command.ProjectContext, status models.MergeableStatus) bool {
+	// Only the GitLab client populates BlockingStatuses. An empty list means the
+	// MR is blocked for a reason we cannot (or must not) scope per project.
+	if len(status.BlockingStatuses) == 0 || a.VCSStatusName == "" {
+		return false
+	}
+	ownPlanStatus := fmt.Sprintf("%s/plan: %s", a.VCSStatusName, ctx.ProjectID())
+	for _, name := range status.BlockingStatuses {
+		switch {
+		case name == ownPlanStatus:
+			// This project's own plan is failing or incomplete: must block.
+			return false
+		case isAtlantisPlanStatus(name, a.VCSStatusName):
+			// Another project's per-project plan status, or the combined plan
+			// status: irrelevant to this project's command, ignore it.
+			continue
+		default:
+			// External CI or any other non-plan blocker: must block.
+			return false
+		}
+	}
+	return true
+}
+
+// isAtlantisPlanStatus reports whether statusName is an Atlantis plan commit
+// status, either the combined "<vcsStatusName>/plan" or a per-project
+// "<vcsStatusName>/plan: <project>".
+func isAtlantisPlanStatus(statusName, vcsStatusName string) bool {
+	combined := vcsStatusName + "/plan"
+	return statusName == combined || strings.HasPrefix(statusName, combined+": ")
 }
 
 func (a *DefaultCommandRequirementHandler) hasUndivergedImpact(repoDir string, ctx command.ProjectContext) (bool, error) {

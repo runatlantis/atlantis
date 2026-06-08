@@ -74,11 +74,7 @@ func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLo
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectCommandOutput) error {
-	projectID := ctx.ProjectName
-	if projectID == "" {
-		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
-	}
-	src := fmt.Sprintf("%s/%s: %s", d.StatusName, cmdName.String(), projectID)
+	src := fmt.Sprintf("%s/%s: %s", d.StatusName, cmdName.String(), ctx.ProjectID())
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:

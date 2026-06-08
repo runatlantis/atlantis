@@ -189,6 +189,13 @@ type MergeableStatus struct {
 	IsMergeable bool
 	// Short human readable explanation of why the PR is (or is not) mergeable
 	Reason string
+	// BlockingStatuses holds the names of the commit statuses that caused the
+	// pull request to be considered not mergeable because of the project's
+	// "Only allow merge if pipeline succeeds" setting. It lets per-project
+	// command requirement checks ignore statuses that belong to other projects
+	// in the same pull request (a failing plan in project B must not block an
+	// apply of project A). Currently only populated by the GitLab client.
+	BlockingStatuses []string
 }
 
 // PullRequest is a VCS pull request.
