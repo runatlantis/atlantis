@@ -17,7 +17,7 @@ import (
 	"testing"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/events/mocks"
@@ -893,7 +893,7 @@ func TestPost_BBServerPullClosed(t *testing.T) {
 			// Make our assertions.
 			ResponseContains(t, w, 200, "Pull request cleaned successfully")
 
-			expRepo := models.Repo{
+			expRepo := models.Repo{ // #nosec G101 -- test fixture, not real credentials
 				FullName:          "project/repository",
 				Owner:             "project",
 				Name:              "repository",
