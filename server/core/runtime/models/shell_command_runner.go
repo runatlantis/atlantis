@@ -5,6 +5,7 @@ package models
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -159,16 +160,22 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 			}
 			if err := scanner.Err(); err != nil {
 				// Don't fail the command over unreadable output, but
-				// surface the truncation instead of dropping it silently,
-				// and drain the stream so the child process can't block
-				// writing to a full pipe.
+				// surface what happened instead of dropping it silently.
 				ctx.Log.Err("reading %s of '%s': %v", name, s.command, err)
-				message := fmt.Sprintf("[atlantis] %s truncated: %v", name, err)
+				message := fmt.Sprintf("[atlantis] error reading %s: %v", name, err)
+				if errors.Is(err, bufio.ErrTooLong) {
+					message = fmt.Sprintf("[atlantis] %s truncated: %v", name, err)
+				}
 				outCh <- Line{Line: message}
 				if s.streamOutput {
 					s.outputHandler.Send(ctx, message, false)
 				}
-				io.Copy(io.Discard, r) //nolint:errcheck
+				if errors.Is(err, bufio.ErrTooLong) {
+					// The reader is still usable after an oversized token;
+					// drain it so the child process can't block writing to
+					// a full pipe.
+					io.Copy(io.Discard, r) //nolint:errcheck
+				}
 			}
 		}
 		go readOutput(stdout, "stdout")
