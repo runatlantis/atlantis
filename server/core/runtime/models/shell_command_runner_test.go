@@ -81,3 +81,46 @@ func TestShellCommandRunner_Run(t *testing.T) {
 		})
 	}
 }
+
+func TestShellCommandRunner_RunLongOutputLines(t *testing.T) {
+	// Regression test: lines longer than the default bufio.Scanner token
+	// size limit (64KiB) must not be silently dropped. Terraform writes
+	// its diagnostics to stderr, and some of them (e.g. dependency cycle
+	// errors) can exceed 64KiB on a single line.
+	longLen := 100 * 1024
+	cases := []struct {
+		name    string
+		command string
+	}{
+		{
+			name:    "stdout",
+			command: fmt.Sprintf(`awk 'BEGIN { for (i = 0; i < %d; i++) printf "x"; print "" }'`, longLen),
+		},
+		{
+			name:    "stderr",
+			command: fmt.Sprintf(`awk 'BEGIN { for (i = 0; i < %d; i++) printf "x"; print "" }' >&2`, longLen),
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			log := logmocks.NewMockSimpleLogging()
+			When(log.With(Any[string](), Any[any]())).ThenReturn(log)
+			ctx := command.ProjectContext{
+				Log:        log,
+				Workspace:  "default",
+				RepoRelDir: ".",
+			}
+			projectCmdOutputHandler := mocks.NewMockProjectCommandOutputHandler()
+
+			cwd, err := os.Getwd()
+			Ok(t, err)
+
+			runner := models.NewShellCommandRunner(nil, c.command, []string{}, cwd, false, projectCmdOutputHandler)
+			output, err := runner.Run(ctx)
+			Ok(t, err)
+			Equals(t, strings.Repeat("x", longLen)+"\n", output)
+		})
+	}
+}

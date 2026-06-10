@@ -138,9 +138,15 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 
 		wg := new(sync.WaitGroup)
 		wg.Add(2)
-		// Asynchronously copy from stdout/err to outCh.
-		go func() {
-			scanner := bufio.NewScanner(stdout)
+		// Asynchronously copy from stdout/err to outCh. Both scanners need
+		// the enlarged buffer: with the default 64KiB token size limit,
+		// bufio.Scanner stops scanning at the first longer line, silently
+		// dropping it and all subsequent output. Terraform writes its
+		// diagnostics to stderr, and some of them (e.g. dependency cycle
+		// errors) can easily exceed 64KiB on a single line.
+		readOutput := func(r io.Reader, name string) {
+			defer wg.Done()
+			scanner := bufio.NewScanner(r)
 			buf := []byte{}
 			scanner.Buffer(buf, BufioScannerBufferSize)
 
@@ -151,19 +157,22 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 					s.outputHandler.Send(ctx, message, false)
 				}
 			}
-			wg.Done()
-		}()
-		go func() {
-			scanner := bufio.NewScanner(stderr)
-			for scanner.Scan() {
-				message := scanner.Text()
+			if err := scanner.Err(); err != nil {
+				// Don't fail the command over unreadable output, but
+				// surface the truncation instead of dropping it silently,
+				// and drain the stream so the child process can't block
+				// writing to a full pipe.
+				ctx.Log.Err("reading %s of '%s': %v", name, s.command, err)
+				message := fmt.Sprintf("[atlantis] %s truncated: %v", name, err)
 				outCh <- Line{Line: message}
 				if s.streamOutput {
 					s.outputHandler.Send(ctx, message, false)
 				}
+				io.Copy(io.Discard, r) //nolint:errcheck
 			}
-			wg.Done()
-		}()
+		}
+		go readOutput(stdout, "stdout")
+		go readOutput(stderr, "stderr")
 
 		// Wait for our copying to complete. This *must* be done before
 		// calling cmd.Wait(). (see https://github.com/golang/go/issues/19685)
