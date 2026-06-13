@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/mitchellh/colorstring"
 )
 
@@ -99,7 +99,11 @@ Follow these instructions to create a token (we don't store any tokens):
 		Username: strings.TrimSpace(githubUsername),
 		Password: strings.TrimSpace(githubToken),
 	}
-	githubClient := &Client{client: github.NewClient(tp.Client()), ctx: context.Background()}
+	ghClient, err := github.NewClient(github.WithHTTPClient(tp.Client()))
+	if err != nil {
+		return fmt.Errorf("creating github client: %w", err)
+	}
+	githubClient := &Client{client: ghClient, ctx: context.Background()}
 
 	// Fork terraform example repo.
 	colorstring.Println("\n=> forking repo ")

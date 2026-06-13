@@ -6,11 +6,11 @@ package valid
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/utils"
 )
 
 const MergeableCommandReq = "mergeable"
@@ -492,32 +492,32 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		}
 	}
 	for _, p := range rCfg.Projects {
-		if p.WorkflowName != nil && !utils.SlicesContains(allowedOverrides, WorkflowKey) {
+		if p.WorkflowName != nil && !slices.Contains(allowedOverrides, WorkflowKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", WorkflowKey, AllowedOverridesKey, WorkflowKey)
 		}
-		if p.ApplyRequirements != nil && !utils.SlicesContains(allowedOverrides, ApplyRequirementsKey) {
+		if p.ApplyRequirements != nil && !slices.Contains(allowedOverrides, ApplyRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ApplyRequirementsKey, AllowedOverridesKey, ApplyRequirementsKey)
 		}
-		if p.PlanRequirements != nil && !utils.SlicesContains(allowedOverrides, PlanRequirementsKey) {
+		if p.PlanRequirements != nil && !slices.Contains(allowedOverrides, PlanRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", PlanRequirementsKey, AllowedOverridesKey, PlanRequirementsKey)
 		}
-		if p.ImportRequirements != nil && !utils.SlicesContains(allowedOverrides, ImportRequirementsKey) {
+		if p.ImportRequirements != nil && !slices.Contains(allowedOverrides, ImportRequirementsKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", ImportRequirementsKey, AllowedOverridesKey, ImportRequirementsKey)
 		}
-		if p.DeleteSourceBranchOnMerge != nil && !utils.SlicesContains(allowedOverrides, DeleteSourceBranchOnMergeKey) {
+		if p.DeleteSourceBranchOnMerge != nil && !slices.Contains(allowedOverrides, DeleteSourceBranchOnMergeKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", DeleteSourceBranchOnMergeKey, AllowedOverridesKey, DeleteSourceBranchOnMergeKey)
 		}
-		if p.RepoLocking != nil && !utils.SlicesContains(allowedOverrides, RepoLockingKey) {
+		if p.RepoLocking != nil && !slices.Contains(allowedOverrides, RepoLockingKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", RepoLockingKey, AllowedOverridesKey, RepoLockingKey)
 		}
-		if p.RepoLocks != nil && !utils.SlicesContains(allowedOverrides, RepoLocksKey) {
+		if p.RepoLocks != nil && !slices.Contains(allowedOverrides, RepoLocksKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", RepoLocksKey, AllowedOverridesKey, RepoLocksKey)
 		}
-		if p.CustomPolicyCheck != nil && !utils.SlicesContains(allowedOverrides, CustomPolicyCheckKey) {
+		if p.CustomPolicyCheck != nil && !slices.Contains(allowedOverrides, CustomPolicyCheckKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", CustomPolicyCheckKey, AllowedOverridesKey, CustomPolicyCheckKey)
 		}
 		if p.SilencePRComments != nil {
-			if !utils.SlicesContains(allowedOverrides, SilencePRCommentsKey) {
+			if !slices.Contains(allowedOverrides, SilencePRCommentsKey) {
 				return fmt.Errorf(
 					"repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'",
 					SilencePRCommentsKey,
@@ -526,7 +526,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 				)
 			}
 			for _, silenceStage := range p.SilencePRComments {
-				if !utils.SlicesContains(AllowedSilencePRComments, silenceStage) {
+				if !slices.Contains(AllowedSilencePRComments, silenceStage) {
 					return fmt.Errorf(
 						"repo config '%s' key value of '%s' is not supported, supported values are [%s]",
 						SilencePRCommentsKey,
@@ -584,7 +584,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 				}
 			}
 
-			if !utils.SlicesContains(allowedWorkflows, name) {
+			if !slices.Contains(allowedWorkflows, name) {
 				return fmt.Errorf("workflow '%s' is not allowed for this repo", name)
 			}
 		}
@@ -707,8 +707,7 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (pla
 // MatchingRepo returns an instance of Repo which matches a given repoID.
 // If multiple repos match, return the last one for consistency with getMatchingCfg.
 func (g GlobalCfg) MatchingRepo(repoID string) *Repo {
-	for i := len(g.Repos) - 1; i >= 0; i-- {
-		repo := g.Repos[i]
+	for _, repo := range slices.Backward(g.Repos) {
 		if repo.IDMatches(repoID) {
 			return &repo
 		}

@@ -166,7 +166,7 @@ func (l *StructuredLogger) saveToHistory(lvl LogLevel, format string, a ...any) 
 		return
 	}
 	msg := fmt.Sprintf(format, a...)
-	l.history.WriteString(fmt.Sprintf("[%s] %s\n", lvl.shortStr, msg))
+	fmt.Fprintf(&l.history, "[%s] %s\n", lvl.shortStr, msg)
 }
 
 // NewNoopLogger creates a logger instance that discards all logs and never

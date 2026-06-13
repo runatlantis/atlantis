@@ -4,7 +4,7 @@ go 1.25.4
 
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.18.0
-	github.com/google/go-github/v83 v83.0.0
+	github.com/google/go-github/v88 v88.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	gitlab.com/gitlab-org/api/client-go v0.118.0
 )
@@ -17,6 +17,6 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 )

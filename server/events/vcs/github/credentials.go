@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 )
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_credentials.go Credentials
@@ -137,8 +137,14 @@ func (c *AppCredentials) GetUser() (string, error) {
 		return "", fmt.Errorf("initializing client: %w", err)
 	}
 
-	ghClient := github.NewClient(client)
-	ghClient.BaseURL = c.getAPIURL()
+	apiURL := c.getAPIURL().String()
+	ghClient, err := github.NewClient(
+		github.WithHTTPClient(client),
+		github.WithURLs(&apiURL, nil),
+	)
+	if err != nil {
+		return "", fmt.Errorf("creating github client: %w", err)
+	}
 	ctx := context.Background()
 
 	app, _, err := ghClient.Apps.Get(ctx, c.AppSlug)
@@ -175,8 +181,14 @@ func (c *AppCredentials) getInstallationID() (int64, error) {
 	t.BaseURL = c.getAPIURL().String()
 
 	// Query github with the app's JWT
-	client := github.NewClient(&http.Client{Transport: t})
-	client.BaseURL = c.getAPIURL()
+	apiURL := c.getAPIURL().String()
+	client, err := github.NewClient(
+		github.WithHTTPClient(&http.Client{Transport: t}),
+		github.WithURLs(&apiURL, nil),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("creating github client: %w", err)
+	}
 	ctx := context.Background()
 
 	installations, _, err := client.Apps.ListInstallations(ctx, nil)
