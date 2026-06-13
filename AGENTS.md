@@ -18,7 +18,7 @@
 ⚠️ **Known failing test:** `TestNewServer_GitHubUser` in server/server_test.go - pre-existing, ignore it
 
 **Lint/Format:** `make check-fmt` (ALWAYS works) • `make fmt` (auto-format)
-⚠️ **Known issue:** `make lint` fail with Go 1.25+ version mismatch. Use `make check-fmt` locally, CI handles linting.
+⚠️ **Known issue:** `make lint` fails with Go 1.25+ version mismatch. Use `make check-fmt` locally, CI handles linting.
 
 **Mocks:** `make go-generate` (regenerate after interface changes) • `make regen-mocks` (delete & regenerate all)
 
