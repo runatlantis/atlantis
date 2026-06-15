@@ -317,16 +317,63 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		return models.MergeableStatus{}, err
 	}
 
-	// Get Commit Statuses
-	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, commit, nil)
-	if resp != nil {
-		logger.Debug("GET /projects/%d/commits/%s/statuses returned: %d", mr.ProjectID, commit, resp.StatusCode)
-	}
-	if err != nil {
-		return models.MergeableStatus{}, err
+	// Get Commit Statuses — paginate so the head-ref filter below cannot be
+	// defeated by a noisy MR pushing the MR-owned status past the first page.
+	const maxPerPage = 100
+	var statuses []*gitlab.CommitStatus
+	nextPage := 1
+	for {
+		statusOpts := &gitlab.GetCommitStatusesOptions{
+			ListOptions: gitlab.ListOptions{Page: nextPage, PerPage: maxPerPage},
+		}
+		page, statusResp, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, commit, statusOpts)
+		if statusResp != nil {
+			logger.Debug("GET /projects/%d/commits/%s/statuses page %d returned: %d", mr.ProjectID, commit, nextPage, statusResp.StatusCode)
+		}
+		if err != nil {
+			return models.MergeableStatus{}, err
+		}
+		statuses = append(statuses, page...)
+		if statusResp.NextPage == 0 {
+			break
+		}
+		nextPage = statusResp.NextPage
 	}
 
+	// GET /repository/commits/:sha/statuses returns every status posted against
+	// the SHA across all refs. When the same SHA appears in multiple MRs
+	// (force-pushed shared source branch, etc.) a status from another MR
+	// leaks here and can self-block the current MR.
+	//
+	// Filter strategy:
+	//   1. Statuses whose Ref equals refs/merge-requests/<iid>/head are
+	//      unambiguously owned by this MR.
+	//   2. If any such head-ref status exists for this SHA, restrict the
+	//      evaluation to head-ref + refless statuses. Statuses tagged with the
+	//      source_branch are dropped because the same branch may back several
+	//      MRs and a stale status could leak.
+	//   3. Otherwise fall back to source_branch + refless statuses, preserving
+	//      behaviour for external CIs that post against the branch ref.
+	// Empty Ref is always treated as MR-owned (backward-compat for callers
+	// that post refless statuses).
+	expectedHeadRef := fmt.Sprintf("refs/merge-requests/%d/head", mr.IID)
+	hasHeadRefStatus := false
 	for _, status := range statuses {
+		if status.Ref == expectedHeadRef {
+			hasHeadRefStatus = true
+			break
+		}
+	}
+	for _, status := range statuses {
+		if status.Ref != "" {
+			if hasHeadRefStatus {
+				if status.Ref != expectedHeadRef {
+					continue
+				}
+			} else if status.Ref != mr.SourceBranch {
+				continue
+			}
+		}
 		// Ignore Atlantis-owned commit statuses that can self-block apply.
 		// Keep plan statuses in this check: a later failed or running specific
 		// plan can leave an older .tfplan on disk, so it must still block apply.
