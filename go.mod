@@ -16,7 +16,7 @@ require (
 	github.com/go-test/deep v1.1.1
 	github.com/gofri/go-github-ratelimit v1.1.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/google/go-github/v83 v83.0.0
+	github.com/google/go-github/v88 v88.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1

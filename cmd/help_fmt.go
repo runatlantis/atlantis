@@ -127,12 +127,12 @@ func to80CharCols(s string) string {
 	var nextLine string
 	for i, spaceSplit := range splitSpaces {
 		if len(nextLine)+len(spaceSplit)+1 > 80 {
-			splitAt80.WriteString(fmt.Sprintf("      %s\n", strings.TrimSuffix(nextLine, " ")))
+			fmt.Fprintf(&splitAt80, "      %s\n", strings.TrimSuffix(nextLine, " "))
 			nextLine = ""
 		}
 		if i == len(splitSpaces)-1 {
 			nextLine += spaceSplit + " "
-			splitAt80.WriteString(fmt.Sprintf("      %s\n", strings.TrimSuffix(nextLine, " ")))
+			fmt.Fprintf(&splitAt80, "      %s\n", strings.TrimSuffix(nextLine, " "))
 			break
 		}
 		nextLine += spaceSplit + " "

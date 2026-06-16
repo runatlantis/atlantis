@@ -1032,7 +1032,7 @@ The locking database type to use for storing plan and apply locks. Defaults to `
 Notes:
 
 - If set to `boltdb`, only one process may have access to the boltdb instance.
-- If set to `redis`, then `--redis-host`, `--redis-port`, and `--redis-password` must be set.
+- If set to `redis`, use `--redis-host` and `--redis-port` for single-node mode, or `--redis-cluster-addresses` for Redis Cluster mode. Use `--redis-password` and (optionally) `--redis-username` only if your Redis deployment requires authentication.
 
 ### `--log-level` <Badge text="v0.1.3+" type="info"/>
 
@@ -1145,6 +1145,16 @@ ATLANTIS_QUIET_POLICY_CHECKS=true
 
 Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
 
+### `--redis-cluster-addresses`
+
+```bash
+atlantis server --redis-cluster-addresses="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
+# or
+ATLANTIS_REDIS_CLUSTER_ADDRESSES="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
+```
+
+Comma-delimited list of Redis cluster node addresses in the format `host:port`. When set, Atlantis uses Redis Cluster mode instead of single-node mode. This is mutually exclusive with `--redis-host`/`--redis-port` (which are used for single-node mode).
+
 ### `--redis-db` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
@@ -1208,6 +1218,16 @@ ATLANTIS_REDIS_TLS_ENABLED=false
 ```
 
 Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
+
+### `--redis-username`
+
+```bash
+atlantis server --redis-username="myuser"
+# or
+ATLANTIS_REDIS_USERNAME="myuser"
+```
+
+The Redis Username for when using a Locking DB type of `redis`. Useful when Redis is configured with ACL-based authentication.
 
 ### `--repo-allowlist` <Badge text="v0.13.0" type="info"/>
 
