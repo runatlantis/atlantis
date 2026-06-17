@@ -1611,6 +1611,41 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
         EOT
     }`,
 		},
+		{
+			// Regression test: changes inside a heredoc / multiline-string attribute.
+			// Terraform renders a line-by-line string diff with the marker in a gutter,
+			// preserving the line's own indentation after it. The marker must be pulled
+			// to column 0 so the diff highlighter colors it.
+			"heredoc multiline-string attribute diff",
+			`  # module.ogc.nomad_job.ogc will be updated in-place
+  ~ resource "nomad_job" "ogc" {
+        id      = "ogc"
+      ~ jobspec = <<-EOT
+            job "ogc" {
+              group "ogc" {
+                config {
+          -         image        = "registry/ogc:5.224.0"
+          +         image        = "registry/ogc:5.226.0"
+                  }
+              }
+            }
+        EOT
+    }`,
+			`# module.ogc.nomad_job.ogc will be updated in-place
+!   resource "nomad_job" "ogc" {
+        id      = "ogc"
+!       jobspec = <<-EOT
+            job "ogc" {
+              group "ogc" {
+                config {
+-                   image        = "registry/ogc:5.224.0"
++                   image        = "registry/ogc:5.226.0"
+                  }
+              }
+            }
+        EOT
+    }`,
+		},
 	}
 
 	for _, tt := range tests {
