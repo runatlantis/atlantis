@@ -16,7 +16,7 @@
   },
   "overrides": {
     "minimatch": "^10.2.1",
-    "markdown-it": "^14.1.1"
+    "markdown-it": "^14.2.0"
   },
   "scripts": {
     "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
