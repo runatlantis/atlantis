@@ -534,7 +534,13 @@ func (p *PlanSuccess) NoChanges() bool {
 
 // Diff Markdown regexes
 var (
-	diffKeywordRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(\s*[a-zA-Z_][\w]*\s*)(\s=\s|\s->\s|\(known after apply\)|\{)(.*)`)
+	// diffKeywordRegex matches an attribute-style diff line. Group 3 captures any
+	// indentation between the marker and the attribute name (preserved when the
+	// marker is moved to column 0); group 4 is the whitespace-free keyword/name.
+	// The leading indentation lets changes inside heredoc/multiline-string bodies
+	// (where Terraform keeps the line's own indentation after the gutter marker)
+	// still be matched and colored.
+	diffKeywordRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(\s*)([a-zA-Z_][\w]*\s*)(\s=\s|\s->\s|\(known after apply\)|\{)(.*)`)
 	diffResourceRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)((?:resource|data|module)\s+.+\{.*)`)
 	diffHeredocRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(<<)(.*)`)
 	diffColonRegex    = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {4,}[a-zA-Z_][\w-]*:.*)`)
@@ -544,7 +550,7 @@ var (
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
-	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5")
+	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5$6")
 	formattedTerraformOutput = diffResourceRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
 	formattedTerraformOutput = diffHeredocRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3$4")
 	formattedTerraformOutput = diffColonRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
