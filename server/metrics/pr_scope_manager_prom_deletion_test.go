@@ -11,9 +11,9 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
+	. "github.com/runatlantis/atlantis/testing"
 	tally "github.com/uber-go/tally/v4"
 	tallyprom "github.com/uber-go/tally/v4/prometheus"
-	. "github.com/runatlantis/atlantis/testing"
 )
 
 // TestPRScopeManager_PrometheusMetricDeletion verifies that Prometheus metrics
@@ -50,6 +50,7 @@ func TestPRScopeManager_PrometheusMetricDeletion(t *testing.T) {
 	updateStatusScope := scope.SubScope("update_status")
 	updateStatusScope.Counter(metrics.ExecutionSuccessMetric).Inc(5)
 	updateStatusScope.Counter(metrics.ExecutionErrorMetric).Inc(2)
+	updateStatusScope.Counter(metrics.ExecutionFailureMetric).Inc(1)
 	timer := updateStatusScope.Timer(metrics.ExecutionTimeMetric)
 	stopwatch := timer.Start()
 	time.Sleep(10 * time.Millisecond)
@@ -337,6 +338,50 @@ func TestPRScopeManager_OnlyCreatedSubscopesDeleted(t *testing.T) {
 	t.Log("✅ Test passed: Only the 2 subscopes that were created were targeted for cleanup")
 }
 
+// TestPRScopeManager_ExecutionFailureDeletion verifies execution_failure counters are
+// removed on PR close (emitted by InstrumentedProjectCommandRunner on plan/apply failures).
+func TestPRScopeManager_ExecutionFailureDeletion(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
+	registry := prometheus.NewRegistry()
+	reporter := tallyprom.NewReporter(tallyprom.Options{
+		Registerer: registry,
+	})
+
+	manager := metrics.NewPRScopeManager(
+		logger,
+		reporter,
+		tally.ScopeOptions{
+			Prefix:          "test_failure",
+			Separator:       tallyprom.DefaultSeparator,
+			SanitizeOptions: &tallyprom.DefaultSanitizerOpts,
+		},
+		100*time.Millisecond,
+		1*time.Hour,
+	)
+
+	scope := manager.GetOrCreatePRScope("owner/repo", 88, map[string]string{
+		"base_repo": "owner/repo",
+		"pr_number": "88",
+	})
+	scope.SubScope("plan").Counter(metrics.ExecutionFailureMetric).Inc(3)
+
+	time.Sleep(150 * time.Millisecond)
+
+	metricsFamilies, err := registry.Gather()
+	Ok(t, err)
+	beforeCount := countMetricsWithLabel(metricsFamilies, "pr_number", "88")
+	Assert(t, beforeCount > 0, "execution_failure metric should exist before deletion")
+
+	manager.MarkPRClosed("owner/repo", 88)
+	time.Sleep(50 * time.Millisecond)
+
+	metricsFamilies, err = registry.Gather()
+	Ok(t, err)
+	afterCount := countMetricsWithLabel(metricsFamilies, "pr_number", "88")
+	Equals(t, 0, afterCount)
+}
+
 // TestPRScopeManager_NonPrometheusReporter verifies that when using a non-Prometheus
 // reporter (like StatsD), the deletion code gracefully skips without errors.
 func TestPRScopeManager_NonPrometheusReporter(t *testing.T) {
@@ -372,9 +417,10 @@ func TestPRScopeManager_NonPrometheusReporter(t *testing.T) {
 // testStatsReporter is a simple test reporter for verifying non-Prometheus behavior.
 type testStatsReporter struct{}
 
-func (r *testStatsReporter) ReportCounter(name string, tags map[string]string, value int64)         {}
-func (r *testStatsReporter) ReportGauge(name string, tags map[string]string, value float64)         {}
-func (r *testStatsReporter) ReportTimer(name string, tags map[string]string, interval time.Duration) {}
+func (r *testStatsReporter) ReportCounter(name string, tags map[string]string, value int64) {}
+func (r *testStatsReporter) ReportGauge(name string, tags map[string]string, value float64) {}
+func (r *testStatsReporter) ReportTimer(name string, tags map[string]string, interval time.Duration) {
+}
 func (r *testStatsReporter) ReportHistogramValueSamples(name string, tags map[string]string, buckets tally.Buckets, bucketLowerBound, bucketUpperBound float64, samples int64) {
 }
 func (r *testStatsReporter) ReportHistogramDurationSamples(name string, tags map[string]string, buckets tally.Buckets, bucketLowerBound, bucketUpperBound time.Duration, samples int64) {

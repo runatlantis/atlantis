@@ -15,7 +15,7 @@ import (
 )
 
 // PRScopeManager manages separate root scopes for each PR, allowing them to be
-// individually closed when PRs are done, preventing exessive resource consumption over time.
+// individually closed when PRs are done, preventing excessive resource consumption over time.
 type PRScopeManager struct {
 	logger          logging.SimpleLogging
 	baseReporter    tally.BaseStatsReporter
@@ -292,8 +292,7 @@ func (m *PRScopeManager) deletePrometheusMetrics(prScopeEntry *prScopeEntry) {
 	}
 
 	for _, subscope := range subscopes {
-		// Delete counters: execution_success and execution_error
-		for _, metricName := range []string{ExecutionSuccessMetric, ExecutionErrorMetric} {
+		for _, metricName := range ExecutionCounterMetrics {
 			fullName := prefix
 			if fullName != "" {
 				fullName += separator

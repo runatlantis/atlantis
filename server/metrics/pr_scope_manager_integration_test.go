@@ -11,9 +11,9 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/scheduled"
+	. "github.com/runatlantis/atlantis/testing"
 	tally "github.com/uber-go/tally/v4"
 	tallyprom "github.com/uber-go/tally/v4/prometheus"
-	. "github.com/runatlantis/atlantis/testing"
 )
 
 // TestPRScopeManager_ScheduledCleanupIntegration is an end-to-end test that verifies

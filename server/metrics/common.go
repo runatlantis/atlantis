@@ -9,3 +9,10 @@ const (
 	ExecutionErrorMetric   = "execution_error"
 	ExecutionFailureMetric = "execution_failure"
 )
+
+// ExecutionCounterMetrics lists per-PR counter metrics that must be deleted when a PR scope closes.
+var ExecutionCounterMetrics = []string{
+	ExecutionSuccessMetric,
+	ExecutionErrorMetric,
+	ExecutionFailureMetric,
+}

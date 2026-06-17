@@ -28,7 +28,7 @@ func NewInstrumentedProjectCommandRunner(scope tally.Scope, projectCommandRunner
 	projectTags := command.ProjectScopeTags{}
 	scope = scope.SubScope("project").Tagged(projectTags.Loadtags())
 
-	for _, m := range []string{metrics.ExecutionSuccessMetric, metrics.ExecutionErrorMetric, metrics.ExecutionFailureMetric} {
+	for _, m := range metrics.ExecutionCounterMetrics {
 		metrics.InitCounter(scope, m)
 	}
 
