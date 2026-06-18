@@ -269,12 +269,17 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 		{
 			"git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
 		},
-		{
-			"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL,
-		},
-		{
-			"git", "remote", "update",
-		},
+	}
+	if w.usesPRSourceRemote(p) {
+		cmds = append(cmds,
+			[]string{"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL},
+			[]string{"git", "remote", "update"},
+		)
+	} else {
+		// On the GitHub App path the source (fork) remote isn't used to fetch the
+		// PR head, so only refresh origin. This avoids fetching a possibly
+		// inaccessible fork, which would fail and make us assume divergence.
+		cmds = append(cmds, []string{"git", "remote", "update", "origin"})
 	}
 
 	for _, args := range cmds {
@@ -467,8 +472,15 @@ func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedG
 // Locks are acquired by the caller.
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
-	// We use both `<prSourceRemote>` and `origin` remotes, update them both
-	if err := w.wrappedGit(logger, c, "fetch", "--all"); err != nil {
+	// We use both `<prSourceRemote>` and `origin` remotes, update them both.
+	// On the GitHub App path the source (fork) remote isn't used to fetch the PR
+	// head (mergeToBaseBranch fetches pull/<n>/head from origin), so only update
+	// origin and avoid fetching a possibly inaccessible fork.
+	fetchArgs := []string{"fetch", "--all"}
+	if !w.usesPRSourceRemote(c.pr) {
+		fetchArgs = []string{"fetch", "origin"}
+	}
+	if err := w.wrappedGit(logger, c, fetchArgs...); err != nil {
 		return err
 	}
 
@@ -529,6 +541,17 @@ func (w *FileWorkspace) isBranchAtTargetRef(logger logging.SimpleLogging, c wrap
 	return strings.HasPrefix(currCommit, targetRef), nil
 }
 
+// usesPRSourceRemote reports whether the "source" remote (the PR's head repo,
+// e.g. a fork) is actually used to fetch the PR head. On the GitHub App path
+// mergeToBaseBranch fetches "pull/<n>/head" from origin instead (see
+// GithubAppEnabled handling there), so the source remote is never used and we
+// skip creating/updating it. Fetching the head repo otherwise only slows down
+// "git remote update"/"git fetch --all" and, when the App installation can't
+// read the fork, fails and makes recheckDiverged spuriously assume divergence.
+func (w *FileWorkspace) usesPRSourceRemote(p models.PullRequest) bool {
+	return !w.GithubAppEnabled || p.Num <= 0
+}
+
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
 	err := os.RemoveAll(c.dir)
 	if err != nil {
@@ -569,8 +592,10 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 		}
 	}
 
-	if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
-		return err
+	if w.usesPRSourceRemote(c.pr) {
+		if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
+			return err
+		}
 	}
 	if w.GpgNoSigningEnabled {
 		if err := w.wrappedGit(logger, c, "config", "--local", "commit.gpgsign", "false"); err != nil {

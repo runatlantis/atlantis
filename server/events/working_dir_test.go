@@ -167,6 +167,66 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	Equals(t, expLsOutput, actLsOutput)
 }
 
+// Test that on the GitHub App path (GithubAppEnabled && pr.Num > 0) the merge
+// is performed by fetching pull/<n>/head from origin and the "source" (fork)
+// remote is never created, since it isn't used to fetch the PR head.
+func TestClone_CheckoutMergeGithubAppNoSourceRemote(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Add a commit to branch 'branch' that's not on main.
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
+	branchCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	// Now switch back to main and advance the main branch by another commit.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-file")
+	runCmd(t, repoDir, "git", "add", "main-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "main-commit")
+	mainCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	// On the GitHub App path the head is fetched as pull/<n>/head from origin,
+	// so expose the branch commit under that ref in the origin repo.
+	runCmd(t, repoDir, "git", "update-ref", "refs/pull/1/head", strings.TrimSpace(branchCommit))
+
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		CheckoutDepth:               50,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+		GithubAppEnabled:            true,
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+		Num:        1,
+	}, "default")
+	Ok(t, err)
+
+	// The merge should still produce a merge commit whose parents are the base
+	// (main) and the head (branch) commits.
+	actBaseCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD~1")
+	actHeadCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2")
+	Equals(t, mainCommit, actBaseCommit)
+	Equals(t, branchCommit, actHeadCommit)
+
+	// The "source" remote must not have been created on the GitHub App path.
+	remotes := runCmd(t, cloneDir, "git", "remote")
+	Assert(t, !strings.Contains(remotes, "source"), "expected no \"source\" remote on the GitHub App path, got remotes: %q", remotes)
+	Assert(t, strings.Contains(remotes, "origin"), "expected \"origin\" remote, got remotes: %q", remotes)
+}
+
 // Test that if we're using the merge method and the repo is already cloned at
 // the right commit, then we don't reclone.
 func TestClone_CheckoutMergeNoReclone(t *testing.T) {
