@@ -562,6 +562,83 @@ func TestRunPreHooks_Clone(t *testing.T) {
 			Eq(testHookWithPlanApplyCommands.RunCommand), Any[string](), Any[string](), Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
+
+	t.Run("VCS status posted when SilenceVCSStatusPreWorkflowHook is false", func(t *testing.T) {
+		preWorkflowHooksSetup(t)
+
+		var unlockCalled = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: testdata.GithubRepo.ID(),
+					PreWorkflowHooks: []*valid.WorkflowHook{
+						&testHook,
+					},
+				},
+			},
+		}
+
+		preWh.GlobalCfg = globalCfg
+		preWh.SilenceVCSStatusPreWorkflowHook = false
+
+		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
+			events.DefaultRepoRelDir, "", command.Plan)).ThenReturn(unlockFn, nil)
+		When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
+		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
+			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
+
+		err := preWh.RunPreHooks(ctx, planCmd)
+
+		Ok(t, err)
+		// pending + success = 2 calls
+		preCommitStatusUpdater.VerifyWasCalled(Times(2)).UpdatePreWorkflowHook(
+			Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.CommitStatus](),
+			Any[string](), Any[string](), Any[string]())
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
+
+	t.Run("VCS status not posted when SilenceVCSStatusPreWorkflowHook is true", func(t *testing.T) {
+		preWorkflowHooksSetup(t)
+
+		var unlockCalled = newBool(false)
+		unlockFn := func() {
+			unlockCalled = newBool(true)
+		}
+
+		globalCfg := valid.GlobalCfg{
+			Repos: []valid.Repo{
+				{
+					ID: testdata.GithubRepo.ID(),
+					PreWorkflowHooks: []*valid.WorkflowHook{
+						&testHook,
+					},
+				},
+			},
+		}
+
+		preWh.GlobalCfg = globalCfg
+		preWh.SilenceVCSStatusPreWorkflowHook = true
+
+		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
+			events.DefaultRepoRelDir, "", command.Plan)).ThenReturn(unlockFn, nil)
+		When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
+			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
+		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
+			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
+
+		err := preWh.RunPreHooks(ctx, planCmd)
+
+		Ok(t, err)
+		preCommitStatusUpdater.VerifyWasCalled(Never()).UpdatePreWorkflowHook(
+			Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.CommitStatus](),
+			Any[string](), Any[string](), Any[string]())
+		Assert(t, *unlockCalled == true, "unlock function called")
+	})
 }
 
 func TestRunPreHooksSuppressesVCSStatus(t *testing.T) {
