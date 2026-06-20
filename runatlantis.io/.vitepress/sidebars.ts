@@ -109,6 +109,10 @@ const en = [
             text: "Atlantis on Google Cloud Run",
             link: "/blog/2025/atlantis-on-google-cloud-run"
           },
+          {
+            text: "Introducing Atlantis 1.0.0!",
+            link: "/blog/2025/introducing-atlantis-1-0-0"
+          },
         ]
       },
       {
