@@ -419,6 +419,7 @@ autodiscover:
 Autodiscover can also be configured to skip over directories that match a path glob (as defined by the [doublestar path matching package](https://pkg.go.dev/github.com/bmatcuk/doublestar/v4)).
 
 When `ignore_paths` is set, it applies to:
+
 - Automatic project discovery during autoplan and `atlantis plan` (without `-d`)
 - `atlantis apply` (without `-d`) when filtering pending plans
 - All targeted `-d` commands (`plan`, `apply`, `import`, `state rm`, etc.) when autodiscovery is enabled, if the path has no explicit project configuration
