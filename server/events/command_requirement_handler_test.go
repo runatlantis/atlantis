@@ -211,6 +211,66 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			wantFailure: "Default branch must be rebased onto pull request before running apply.",
 			wantErr:     assert.NoError,
 		},
+		{
+			name: "pass approved requirement for API call without PR",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{raw.ApprovedRequirement},
+				API:               true,
+				Pull: models.PullRequest{
+					Num: 0, // No PR number
+				},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
+				},
+				Log: logging.NewNoopLogger(t),
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "fail approved requirement for API call with PR",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{raw.ApprovedRequirement},
+				API:               true,
+				Pull: models.PullRequest{
+					Num: 123, // Has PR number
+				},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
+				},
+			},
+			wantFailure: "Pull request must be approved according to the project's approval rules before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "pass mergeable requirement for API call without PR",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{raw.MergeableRequirement},
+				API:               true,
+				Pull: models.PullRequest{
+					Num: 0, // No PR number
+				},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
+				Log: logging.NewNoopLogger(t),
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "fail mergeable requirement for API call with PR",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{raw.MergeableRequirement},
+				API:               true,
+				Pull: models.PullRequest{
+					Num: 123, // Has PR number
+				},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running apply.",
+			wantErr:     assert.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
