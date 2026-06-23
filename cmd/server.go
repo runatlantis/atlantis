@@ -801,6 +801,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 		usage := f.description
 		if f.defaultValue != "" {
 			usage = fmt.Sprintf("%s (default %q)", usage, f.defaultValue)
+			s.Viper.SetDefault(name, f.defaultValue)
 		}
 		c.Flags().String(name, "", usage+"\n")
 		s.Viper.BindPFlag(name, c.Flags().Lookup(name)) // nolint: errcheck
@@ -814,6 +815,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 		usage := f.description
 		if f.defaultValue != 0 {
 			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
+			s.Viper.SetDefault(name, f.defaultValue)
 		}
 		c.Flags().Int(name, 0, usage+"\n")
 		if f.hidden {
@@ -827,8 +829,9 @@ func (s *ServerCmd) Init() *cobra.Command {
 		usage := f.description
 		if f.defaultValue != 0 {
 			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
+			s.Viper.SetDefault(name, f.defaultValue)
 		}
-		c.Flags().Int(name, 0, usage+"\n")
+		c.Flags().Int64(name, 0, usage+"\n")
 		if f.hidden {
 			c.Flags().MarkHidden(name) // nolint: errcheck
 		}
