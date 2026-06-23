@@ -34,11 +34,30 @@ config: |
        channel: my-channel-id
 ```
 
-### Filter on workspace/branch
+### Filter on workspace/branch/project/directory
 
-To limit notifications to particular workspaces or branches, use `workspace-regex` or `branch-regex` parameters.
-If the workspace **and** branch matches respective regex, an event will be sent. Note that empty regular expression
-(a result of unset parameter) matches every string.
+To limit notifications to particular workspaces or branches, use the following parameters:
+
+- `workspace-regex`
+- `branch-regex` 
+- `directory-regex`
+- `project-regex` 
+
+If **all of the conditions** match their respective regex, an event will be sent. 
+
+> Note that empty regular expression (a result of unset parameter) matches every string.
+
+The following example would send a slack notification for any apply working from the any directory nested within `production` or `staging` subfolders of the `environments` folder, with a project name ending with `-service`.
+
+```yaml
+webhooks:
+  - event: apply
+    workspace-regex: .*
+    branch-regex: .*
+    project-regex: .*-service
+    directory-regex: environments/(production|staging)/.*
+    kind: slack
+```
 
 ## Using HTTP webhooks
 

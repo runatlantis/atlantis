@@ -28,6 +28,8 @@ func TestSend_PostMessage(t *testing.T) {
 		Client:         client,
 		WorkspaceRegex: regex,
 		BranchRegex:    regex,
+		ProjectRegex:   regex,
+		DirectoryRegex: regex,
 		Channel:        channel,
 	}
 	result := webhooks.ApplyResult{
@@ -54,6 +56,8 @@ func TestSend_NoopSuccess(t *testing.T) {
 		Client:         client,
 		WorkspaceRegex: regex,
 		BranchRegex:    regex,
+		ProjectRegex:   regex,
+		DirectoryRegex: regex,
 		Channel:        channel,
 	}
 	result := webhooks.ApplyResult{
