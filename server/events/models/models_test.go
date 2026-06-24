@@ -1286,6 +1286,20 @@ func TestPlanSuccessStats(t *testing.T) {
 				Destroy: 1,
 			},
 		},
+		{
+			"with forget and no imports",
+			`Terraform will perform the following actions:
+      - null_resource.hi[1]
+    Plan: 31 to add, 20 to change, 1 to destroy, 7 to forget.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     31,
+				Change:  20,
+				Destroy: 1,
+				Forget:  7,
+			},
+		},
 	}
 
 	for _, tt := range tests {
