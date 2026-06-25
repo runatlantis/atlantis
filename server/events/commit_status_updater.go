@@ -26,9 +26,9 @@ type CommitStatusUpdater interface {
 	// UpdateCombined updates the combined status of the head commit of pull.
 	// A combined status represents all the projects modified in the pull.
 	UpdateCombined(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name) error
-	// UpdateCombinedCount updates the combined status to reflect the
-	// numSuccess out of numTotal.
-	UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error
+	// UpdateCombinedCount updates the combined status to reflect the counts
+	// of project outcomes. counts.NoChanges is only meaningful for command.Apply.
+	UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, counts models.ProjectCounts) error
 
 	UpdatePreWorkflowHook(logger logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
 	UpdatePostWorkflowHook(logger logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
@@ -59,20 +59,60 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(logger logging.SimpleLogging
 	return d.Client.UpdateStatus(logger, repo, pull, status, src, descripWords, "")
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
+func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, counts models.ProjectCounts) error {
 	src := truncateContext(fmt.Sprintf("%s/%s", d.StatusName, cmdName.String()))
-	cmdVerb := "unknown"
 
+	var descrip string
 	switch cmdName {
-	case command.Plan:
-		cmdVerb = "planned"
-	case command.PolicyCheck:
-		cmdVerb = "policies checked"
 	case command.Apply:
-		cmdVerb = "applied"
+		switch {
+		case status == models.FailedCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects failed to apply.", counts.Errored, counts.Total)
+		case status == models.PendingCommitStatus:
+			applied := counts.Success - counts.NoChanges
+			if counts.NoChanges > 0 {
+				descrip = fmt.Sprintf("%d/%d projects applied (%d up to date).", applied, counts.Total, counts.NoChanges)
+			} else {
+				descrip = fmt.Sprintf("%d/%d projects applied.", applied, counts.Total)
+			}
+		case counts.NoChanges > 0 && counts.NoChanges == counts.Total:
+			descrip = fmt.Sprintf("%d/%d projects up to date.", counts.NoChanges, counts.Total)
+		case counts.NoChanges > 0 && counts.Success > counts.NoChanges:
+			applied := counts.Success - counts.NoChanges
+			descrip = fmt.Sprintf("%d/%d projects applied successfully (%d up to date).", applied, counts.Total, counts.NoChanges)
+		default:
+			descrip = fmt.Sprintf("%d/%d projects applied successfully.", counts.Success, counts.Total)
+		}
+	case command.Plan:
+		switch status {
+		case models.FailedCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects failed to plan.", counts.Total-counts.Success, counts.Total)
+		case models.PendingCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects planned.", counts.Success, counts.Total)
+		default:
+			descrip = fmt.Sprintf("%d/%d projects planned successfully.", counts.Success, counts.Total)
+		}
+	case command.PolicyCheck:
+		switch status {
+		case models.FailedCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects failed policy checks.", counts.Errored, counts.Total)
+		case models.PendingCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects had policies checked.", counts.Success, counts.Total)
+		default:
+			descrip = fmt.Sprintf("%d/%d projects had policies checked successfully.", counts.Success, counts.Total)
+		}
+	default:
+		switch status {
+		case models.FailedCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects failed.", counts.Total-counts.Success, counts.Total)
+		case models.PendingCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects completed.", counts.Success, counts.Total)
+		default:
+			descrip = fmt.Sprintf("%d/%d projects succeeded.", counts.Success, counts.Total)
+		}
 	}
 
-	return d.Client.UpdateStatus(logger, repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
+	return d.Client.UpdateStatus(logger, repo, pull, status, src, descrip, "")
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectCommandOutput) error {

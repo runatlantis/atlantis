@@ -144,7 +144,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 				if pullStatus == nil {
 					// default to 0/0
 					ctx.Log.Debug("setting VCS status to 0/0 success as no previous state was found")
-					if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+					if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
 						ctx.Log.Warn("unable to update commit status: %s", err)
 					}
 					return
@@ -157,7 +157,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 				// the Atlantis status to be passing for all pull requests.
 				// Does not apply to skipped runs for specific projects
 				ctx.Log.Debug("setting VCS status to success with no projects found")
-				if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+				if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
 					ctx.Log.Warn("unable to update commit status: %s", err)
 				}
 			}
@@ -199,9 +199,11 @@ func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []command.ProjectCont
 func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
 	var numSuccess int
 	var numErrored int
+	var numNoChanges int
 	status := models.SuccessCommitStatus
 
-	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
+	numNoChanges = pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
+	numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + numNoChanges
 	numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
 	if numErrored > 0 {
@@ -218,8 +220,7 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 		ctx.Pull,
 		status,
 		command.Apply,
-		numSuccess,
-		len(pullStatus.Projects),
+		models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored, NoChanges: numNoChanges},
 	); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
