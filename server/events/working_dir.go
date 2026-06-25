@@ -688,14 +688,14 @@ func (w *FileWorkspace) GetPullDir(r models.Repo, p models.PullRequest) (string,
 // Delete deletes the workspace for this repo and pull.
 func (w *FileWorkspace) Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error {
 	repoPullDir := w.repoPullDir(r, p)
-	logger.Info("Deleting repo pull directory: " + repoPullDir)
+	logger.Info("Deleting repo pull directory: %s", repoPullDir)
 	return os.RemoveAll(repoPullDir)
 }
 
 // DeleteForWorkspace deletes the working dir for this workspace.
 func (w *FileWorkspace) DeleteForWorkspace(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) error {
 	workspaceDir := w.cloneDir(r, p, workspace)
-	logger.Info("Deleting workspace directory: " + workspaceDir)
+	logger.Info("Deleting workspace directory: %s", workspaceDir)
 	return os.RemoveAll(workspaceDir)
 }
 
@@ -734,7 +734,7 @@ func (w *FileWorkspace) SetCheckForUpstreamChanges() {
 
 func (w *FileWorkspace) DeletePlan(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string, projectPath string, projectName string) error {
 	planPath := filepath.Join(w.cloneDir(r, p, workspace), projectPath, runtime.GetPlanFilename(workspace, projectName))
-	logger.Info("Deleting plan: " + planPath)
+	logger.Info("Deleting plan: %s", planPath)
 	return utils.RemoveIgnoreNonExistent(planPath)
 }
 

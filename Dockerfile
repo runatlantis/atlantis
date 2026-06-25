@@ -3,7 +3,7 @@
 ARG ALPINE_TAG=3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 ARG DEBIAN_TAG=13.5-slim@sha256:28de0877c2189802884ccd20f15ee41c203573bd87bb6b883f5f46362d24c5c2
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.25.8-alpine@sha256:8e02eb337d9e0ea459e041f1ee5eece41cbb61f1d83e7d883a3e2fb4862063fa
+ARG GOLANG_TAG=1.26.4-alpine@sha256:3ad57304ad93bbec8548a0437ad9e06a455660655d9af011d58b993f6f615648
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.14.9
@@ -38,7 +38,7 @@ WORKDIR /app
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
 # renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
-ENV BUILDER_BASH_VERSION="5.3.3-r1"
+ENV BUILDER_BASH_VERSION="5.3.9-r1"
 
 RUN apk add --no-cache \
     bash=${BUILDER_BASH_VERSION}
