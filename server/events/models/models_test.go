@@ -559,6 +559,44 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 	}
 }
 
+func TestPlanSuccess_NoChanges(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		exp   bool
+	}{
+		{
+			name:  "no changes",
+			input: "dummy\nNo changes. Infrastructure is up-to-date.",
+			exp:   true,
+		},
+		{
+			name:  "changes",
+			input: "dummy\nPlan: 1 to add, 0 to change, 0 to destroy.",
+			exp:   false,
+		},
+		{
+			name:  "multiple units all no changes",
+			input: "unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nNo changes. Your infrastructure matches the configuration.",
+			exp:   true,
+		},
+		{
+			name:  "multiple units mixed changes and no changes",
+			input: "unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nPlan: 4 to add, 0 to change, 0 to destroy.",
+			exp:   false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			pcs := models.PlanSuccess{
+				TerraformOutput: c.input,
+			}
+			Equals(t, c.exp, pcs.NoChanges())
+		})
+	}
+}
+
 func TestPolicyCheckResults_Summary(t *testing.T) {
 	cases := []struct {
 		description      string

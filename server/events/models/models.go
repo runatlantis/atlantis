@@ -446,6 +446,9 @@ func (p *PlanSuccess) DiffSummary() string {
 
 // NoChanges returns true if the plan has no changes.
 func (p *PlanSuccess) NoChanges() bool {
+	if p.Stats().Changes {
+		return false
+	}
 	return reNoChanges.MatchString(p.TerraformOutput)
 }
 
