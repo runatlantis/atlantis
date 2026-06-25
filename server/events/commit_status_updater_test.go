@@ -40,7 +40,7 @@ func assertTruncatedStatusContext(t *testing.T, src string, original string) {
 		t.Fatalf("expected truncated context %q to include a hash suffix", src)
 	}
 	for _, char := range srcRunes[prefixLength+1:] {
-		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')) {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
 			t.Fatalf("expected truncated context suffix %q to be lowercase hex", string(srcRunes[prefixLength:]))
 		}
 	}
