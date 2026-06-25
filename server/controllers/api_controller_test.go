@@ -6,6 +6,7 @@ package controllers_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -360,6 +361,31 @@ func TestAPIController_PlanSkipsPullReqStatusWhenNoPR(t *testing.T) {
 	ResponseContains(t, w, http.StatusOK, "")
 
 	fetcher.VerifyWasCalled(Never()).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+}
+
+func TestAPIController_PlanContinuesWhenPullReqStatusFetchFails(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	fetcher := NewMockPullReqStatusFetcher()
+	When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())).
+		ThenReturn(models.PullReqStatus{}, errors.New("api error"))
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(1)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+	projectCommandBuilder.VerifyWasCalled(Times(1)).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Times(1)).Plan(Any[command.ProjectContext]())
 }
 
 func TestAPIController_ListLocksEmpty(t *testing.T) {

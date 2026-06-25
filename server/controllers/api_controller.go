@@ -402,9 +402,10 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	if request.PR > 0 && a.PullReqStatusFetcher != nil {
 		status, err := a.PullReqStatusFetcher.FetchPullStatus(a.Logger, pull)
 		if err != nil {
-			return nil, nil, http.StatusInternalServerError, fmt.Errorf("fetching pull status: %v", err)
+			ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+		} else {
+			ctx.PullRequestStatus = status
 		}
-		ctx.PullRequestStatus = status
 	}
 	return &request, ctx, http.StatusOK, nil
 }
