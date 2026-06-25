@@ -6,7 +6,9 @@ package events_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/events"
@@ -16,6 +18,37 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+const (
+	githubStatusContextLimit         = 255
+	truncatedContextHashSuffixLength = 13
+)
+
+func assertTruncatedStatusContext(t *testing.T, src string, original string) {
+	t.Helper()
+	if utf8.RuneCountInString(original) <= githubStatusContextLimit {
+		t.Fatalf("expected original context %q to exceed %d characters", original, githubStatusContextLimit)
+	}
+	Assert(t, utf8.ValidString(src), "expected truncated context to be valid UTF-8")
+	Equals(t, githubStatusContextLimit, utf8.RuneCountInString(src))
+
+	prefixLength := githubStatusContextLimit - truncatedContextHashSuffixLength
+	originalRunes := []rune(original)
+	srcRunes := []rune(src)
+	Equals(t, string(originalRunes[:prefixLength]), string(srcRunes[:prefixLength]))
+	if srcRunes[prefixLength] != '-' {
+		t.Fatalf("expected truncated context %q to include a hash suffix", src)
+	}
+	for _, char := range srcRunes[prefixLength+1:] {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
+			t.Fatalf("expected truncated context suffix %q to be lowercase hex", string(srcRunes[prefixLength:]))
+		}
+	}
+}
+
+func leadingRunes(s string, count int) string {
+	return string([]rune(s)[:count])
+}
 
 func TestUpdateCombined(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
@@ -68,6 +101,22 @@ func TestUpdateCombined(t *testing.T) {
 			client.VerifyWasCalledOnce().UpdateStatus(logger, models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
 		})
 	}
+}
+
+func TestUpdateCombinedTruncatesLongContext(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	client := mocks.NewMockClient()
+	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: strings.Repeat("a", 260)}
+	originalSrc := fmt.Sprintf("%s/%s", s.StatusName, command.Plan)
+
+	err := s.UpdateCombined(logger, models.Repo{}, models.PullRequest{}, models.PendingCommitStatus, command.Plan)
+	Ok(t, err)
+
+	_, _, _, _, src, _, _ := client.VerifyWasCalledOnce().UpdateStatus(
+		Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}),
+		Eq(models.PendingCommitStatus), Any[string](), Eq("Plan in progress..."), Eq("")).GetCapturedArguments()
+	assertTruncatedStatusContext(t, src, originalSrc)
 }
 
 func TestUpdateCombinedCount(t *testing.T) {
@@ -135,6 +184,22 @@ func TestUpdateCombinedCount(t *testing.T) {
 			client.VerifyWasCalledOnce().UpdateStatus(logger, models.Repo{}, models.PullRequest{}, c.status, expSrc, c.expDescrip, "")
 		})
 	}
+}
+
+func TestUpdateCombinedCountTruncatesLongContext(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	client := mocks.NewMockClient()
+	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: strings.Repeat("a", 260)}
+	originalSrc := fmt.Sprintf("%s/%s", s.StatusName, command.Plan)
+
+	err := s.UpdateCombinedCount(logger, models.Repo{}, models.PullRequest{}, models.PendingCommitStatus, command.Plan, 0, 2)
+	Ok(t, err)
+
+	_, _, _, _, src, _, _ := client.VerifyWasCalledOnce().UpdateStatus(
+		Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}),
+		Eq(models.PendingCommitStatus), Any[string](), Eq("0/2 projects planned successfully."), Eq("")).GetCapturedArguments()
+	assertTruncatedStatusContext(t, src, originalSrc)
 }
 
 // Test that it sets the "source" properly depending on if the project is
@@ -239,6 +304,109 @@ func TestDefaultCommitStatusUpdater_UpdateProject(t *testing.T) {
 			client.VerifyWasCalledOnce().UpdateStatus(Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}), Eq(c.status),
 				Eq(fmt.Sprintf("atlantis/%s: ./default", c.cmd.String())), Eq(c.expDescrip), Eq("url"))
 		})
+	}
+}
+
+// Test that the status context is truncated to 255 characters when the project
+// path is very long, to avoid a 422 from the GitHub Statuses API.
+func TestDefaultCommitStatusUpdater_UpdateProjectTruncatesLongContext(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	client := mocks.NewMockClient()
+	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
+	// Build a directory name long enough to push the context over 255 chars.
+	longDir := fmt.Sprintf("%s/deeply/nested/path", fmt.Sprintf("%0250d", 0))
+	originalSrc := fmt.Sprintf("atlantis/plan: %s/default", longDir)
+	err := s.UpdateProject(command.ProjectContext{
+		Log:        logger,
+		RepoRelDir: longDir,
+		Workspace:  "default",
+	}, command.Plan, models.PendingCommitStatus, "url", nil)
+	Ok(t, err)
+	_, _, _, _, src, _, _ := client.VerifyWasCalledOnce().UpdateStatus(
+		Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}),
+		Eq(models.PendingCommitStatus), Any[string](), Eq("Plan in progress..."), Eq("url")).GetCapturedArguments()
+	assertTruncatedStatusContext(t, src, originalSrc)
+}
+
+func TestDefaultCommitStatusUpdater_UpdateProjectTruncatesLongUTF8Context(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	client := mocks.NewMockClient()
+	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
+	longDir := strings.Repeat("工程", 130)
+	originalSrc := fmt.Sprintf("atlantis/plan: %s/default", longDir)
+
+	err := s.UpdateProject(command.ProjectContext{
+		Log:        logger,
+		RepoRelDir: longDir,
+		Workspace:  "default",
+	}, command.Plan, models.PendingCommitStatus, "url", nil)
+	Ok(t, err)
+
+	_, _, _, _, src, _, _ := client.VerifyWasCalledOnce().UpdateStatus(
+		Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}),
+		Eq(models.PendingCommitStatus), Any[string](), Eq("Plan in progress..."), Eq("url")).GetCapturedArguments()
+	assertTruncatedStatusContext(t, src, originalSrc)
+}
+
+func TestDefaultCommitStatusUpdater_UpdateProjectTruncatedContextsRemainUnique(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	client := mocks.NewMockClient()
+	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
+	commonDirPrefix := strings.Repeat("a", 260)
+	repoRelDirs := []string{
+		commonDirPrefix + "/project-a",
+		commonDirPrefix + "/project-b",
+	}
+	originalSrcs := make([]string, 0, len(repoRelDirs))
+
+	for _, repoRelDir := range repoRelDirs {
+		originalSrcs = append(originalSrcs, fmt.Sprintf("atlantis/plan: %s/default", repoRelDir))
+		err := s.UpdateProject(command.ProjectContext{
+			Log:        logger,
+			RepoRelDir: repoRelDir,
+			Workspace:  "default",
+		}, command.Plan, models.PendingCommitStatus, "url", nil)
+		Ok(t, err)
+	}
+
+	_, _, _, _, srcs, _, _ := client.VerifyWasCalled(Times(2)).UpdateStatus(
+		Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}),
+		Eq(models.PendingCommitStatus), Any[string](), Eq("Plan in progress..."), Eq("url")).GetAllCapturedArguments()
+	Equals(t, leadingRunes(originalSrcs[0], githubStatusContextLimit), leadingRunes(originalSrcs[1], githubStatusContextLimit))
+	Assert(t, srcs[0] != srcs[1], "expected truncated contexts to remain unique")
+	for i, src := range srcs {
+		assertTruncatedStatusContext(t, src, originalSrcs[i])
+	}
+}
+
+func TestDefaultCommitStatusUpdater_UpdateWorkflowHookTruncatedContextsRemainUnique(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	client := mocks.NewMockClient()
+	s := events.DefaultCommitStatusUpdater{Client: client, StatusName: "atlantis"}
+	commonHookDescription := strings.Repeat("a", 260)
+	hookDescriptions := []string{
+		commonHookDescription + " first hook",
+		commonHookDescription + " second hook",
+	}
+	originalSrcs := make([]string, 0, len(hookDescriptions))
+
+	for _, hookDescription := range hookDescriptions {
+		originalSrcs = append(originalSrcs, fmt.Sprintf("atlantis/pre_workflow_hook: %s", hookDescription))
+		err := s.UpdatePreWorkflowHook(logger, models.PullRequest{}, models.PendingCommitStatus, hookDescription, "", "url")
+		Ok(t, err)
+	}
+
+	_, _, _, _, srcs, _, _ := client.VerifyWasCalled(Times(2)).UpdateStatus(
+		Any[logging.SimpleLogging](), Eq(models.Repo{}), Eq(models.PullRequest{}),
+		Eq(models.PendingCommitStatus), Any[string](), Eq("in progress..."), Eq("url")).GetAllCapturedArguments()
+	Equals(t, leadingRunes(originalSrcs[0], githubStatusContextLimit), leadingRunes(originalSrcs[1], githubStatusContextLimit))
+	Assert(t, srcs[0] != srcs[1], "expected truncated workflow hook contexts to remain unique")
+	for i, src := range srcs {
+		assertTruncatedStatusContext(t, src, originalSrcs[i])
 	}
 }
 

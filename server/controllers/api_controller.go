@@ -40,6 +40,11 @@ type APIController struct {
 	WorkingDir                     events.WorkingDir                     `validate:"required"`
 	WorkingDirLocker               events.WorkingDirLocker               `validate:"required"`
 	CommitStatusUpdater            events.CommitStatusUpdater            `validate:"required"`
+	// PullReqStatusFetcher is optional. When set and the API request supplies a
+	// PR number, it is used to populate command.Context.PullRequestStatus so
+	// apply requirements like 'mergeable' and 'approved' evaluate against real
+	// VCS state instead of always failing.
+	PullReqStatusFetcher vcs.PullReqStatusFetcher
 	// SilenceVCSStatusNoProjects is whether API should set commit status if no projects are found
 	SilenceVCSStatusNoProjects bool
 }
@@ -148,6 +153,10 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+
+	// The API apply endpoint runs plan first. Refresh PR status afterward so
+	// apply requirements evaluate the VCS state the plan phase just produced.
+	a.populatePullRequestStatus(ctx)
 
 	// We can now prepare and run the apply step
 	result, err := a.apiApply(request, ctx)
@@ -376,19 +385,37 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusForbidden, fmt.Errorf("repo not allowlisted")
 	}
 
-	return &request, &command.Context{
+	pull := models.PullRequest{
+		Num:        request.PR,
+		BaseBranch: request.Ref,
+		HeadBranch: request.Ref,
+		HeadCommit: request.Ref,
+		BaseRepo:   baseRepo,
+	}
+	ctx := &command.Context{
 		HeadRepo: baseRepo,
-		Pull: models.PullRequest{
-			Num:        request.PR,
-			BaseBranch: request.Ref,
-			HeadBranch: request.Ref,
-			HeadCommit: request.Ref,
-			BaseRepo:   baseRepo,
-		},
-		Scope: a.Scope,
-		Log:   a.Logger,
-		API:   true,
-	}, http.StatusOK, nil
+		Pull:     pull,
+		Scope:    a.Scope,
+		Log:      a.Logger,
+		API:      true,
+	}
+	a.populatePullRequestStatus(ctx)
+	return &request, ctx, http.StatusOK, nil
+}
+
+func (a *APIController) populatePullRequestStatus(ctx *command.Context) {
+	if ctx.Pull.Num <= 0 || a.PullReqStatusFetcher == nil {
+		return
+	}
+
+	status, err := a.PullReqStatusFetcher.FetchPullStatus(ctx.Log, ctx.Pull)
+	if err != nil {
+		ctx.PullRequestStatus = models.PullReqStatus{}
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+		return
+	}
+
+	ctx.PullRequestStatus = status
 }
 
 func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {
