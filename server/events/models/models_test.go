@@ -1575,6 +1575,52 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
     }`,
 		},
 		{
+			// Regression test for https://github.com/runatlantis/atlantis/issues/6419
+			// Spaced YAML list scalars inside a heredoc must not be mistaken for
+			// Terraform diff markers.
+			"argocd application with spaced yaml key=value list item in heredoc",
+			`  # argocd_application.example will be updated in-place
+  ~ resource "argocd_application" "example" {
+        id   = "my-app"
+      ~ metadata {
+          ~ resource_version = "12345" -> (known after apply)
+        }
+        spec = <<-EOT
+            destination:
+              namespace: default
+              server: https://kubernetes.default.svc
+            source:
+              repoURL: https://github.com/example/repo
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              -   ServerSideApply = true
+        EOT
+    }`,
+			`# argocd_application.example will be updated in-place
+!   resource "argocd_application" "example" {
+        id   = "my-app"
+!       metadata {
+!           resource_version = "12345" -> (known after apply)
+        }
+        spec = <<-EOT
+            destination:
+              namespace: default
+              server: https://kubernetes.default.svc
+            source:
+              repoURL: https://github.com/example/repo
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              -   ServerSideApply = true
+        EOT
+    }`,
+		},
+		{
 			"cloudformation stack with extra-spaced yaml list items in heredoc",
 			`  + resource "aws_cloudformation_stack" "conditions" {
       + id            = (known after apply)
