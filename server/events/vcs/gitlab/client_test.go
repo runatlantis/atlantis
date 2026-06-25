@@ -1364,18 +1364,27 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			},
 		},
 		{
-			description:   "shared source_branch leak ignored when MR head-ref status exists",
+			description:   "source_branch CI failure still blocks when MR head-ref status exists",
 			vcsStatusName: vcsStatusName,
 			statuses: []testStatus{
-				// Stale failure tagged with the shared source_branch (e.g. an
-				// earlier MR that backed the same branch). Must be dropped.
 				{Name: "ci/build", Status: "failed", Ref: mrSourceBranch},
-				// Current MR has at least one head-ref status, which triggers
-				// the strict head-ref-only filter.
 				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success", Ref: mrHeadRef},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: true,
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
+			},
+		},
+		{
+			description:   "source_branch CI failure still blocks when MR merge-result status exists",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: "ci/build", Status: "failed", Ref: mrSourceBranch},
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success", Ref: mrMergeRef},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
 			},
 		},
 		{
@@ -1412,16 +1421,15 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			},
 		},
 		{
-			description:   "head-ref status alone is enough to gate evaluation strictly",
+			description:   "source_branch CI failure blocks even when same head-ref status succeeds",
 			vcsStatusName: vcsStatusName,
 			statuses: []testStatus{
-				// Branch-tagged failure that WOULD block under fallback...
 				{Name: "ci/build", Status: "failed", Ref: mrSourceBranch},
-				// ...but a separate head-ref entry exists, so the branch one is dropped.
 				{Name: "ci/build", Status: "success", Ref: mrHeadRef},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: true,
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
 			},
 		},
 	}
