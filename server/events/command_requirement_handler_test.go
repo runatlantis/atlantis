@@ -282,7 +282,7 @@ func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
 			wantFailure: "Pull request must be mergeable before running apply (Pipeline atlantis/plan: app has status failed).",
 		},
 		{
-			name:          "combined plan status alone does not block a per-project apply",
+			name:          "combined plan status still blocks a per-project apply",
 			vcsStatusName: vcsStatusName,
 			ctx: command.ProjectContext{
 				ProjectName:       "app",
@@ -295,7 +295,7 @@ func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
 					},
 				},
 			},
-			wantFailure: "",
+			wantFailure: "Pull request must be mergeable before running apply (Pipeline atlantis/plan has status failed).",
 		},
 		{
 			name:          "external CI failure still blocks",

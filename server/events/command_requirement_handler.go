@@ -101,8 +101,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 // mergeableIgnoringOtherProjectPlans reports whether the merge request should be
 // treated as mergeable for THIS project's command even though the MR-wide
 // mergeable check failed, because every blocking commit status is an Atlantis
-// plan status that does not belong to this project (another project's
-// per-project plan status, or the combined plan status).
+// per-project plan status that belongs to another project.
 //
 // A per-project apply only depends on that project's own plan. A failing plan
 // in an unrelated project in the same merge request must not block it. The
@@ -120,14 +119,19 @@ func (a *DefaultCommandRequirementHandler) mergeableIgnoringOtherProjectPlans(ct
 		return false
 	}
 	ownPlanStatus := truncateContext(fmt.Sprintf("%s/plan: %s", a.VCSStatusName, ctx.ProjectID()))
+	combinedPlanStatus := a.VCSStatusName + "/plan"
 	for _, name := range status.BlockingStatuses {
 		switch {
+		case name == combinedPlanStatus:
+			// The combined plan status can represent failures before per-project
+			// statuses exist, so it must keep blocking apply.
+			return false
 		case name == ownPlanStatus:
 			// This project's own plan is failing or incomplete: must block.
 			return false
-		case isAtlantisPlanStatus(name, a.VCSStatusName):
-			// Another project's per-project plan status, or the combined plan
-			// status: irrelevant to this project's command, ignore it.
+		case isAtlantisProjectPlanStatus(name, a.VCSStatusName):
+			// Another project's per-project plan status: irrelevant to this
+			// project's command, ignore it.
 			continue
 		default:
 			// External CI or any other non-plan blocker: must block.
@@ -137,12 +141,10 @@ func (a *DefaultCommandRequirementHandler) mergeableIgnoringOtherProjectPlans(ct
 	return true
 }
 
-// isAtlantisPlanStatus reports whether statusName is an Atlantis plan commit
-// status, either the combined "<vcsStatusName>/plan" or a per-project
-// "<vcsStatusName>/plan: <project>".
-func isAtlantisPlanStatus(statusName, vcsStatusName string) bool {
-	combined := vcsStatusName + "/plan"
-	return statusName == combined || strings.HasPrefix(statusName, combined+": ")
+// isAtlantisProjectPlanStatus reports whether statusName is an Atlantis
+// per-project plan commit status, "<vcsStatusName>/plan: <project>".
+func isAtlantisProjectPlanStatus(statusName, vcsStatusName string) bool {
+	return strings.HasPrefix(statusName, vcsStatusName+"/plan: ")
 }
 
 func (a *DefaultCommandRequirementHandler) hasUndivergedImpact(repoDir string, ctx command.ProjectContext) (bool, error) {
