@@ -349,9 +349,10 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	//   1. Statuses whose Ref equals refs/merge-requests/<iid>/head or
 	//      refs/merge-requests/<iid>/merge are unambiguously owned by this MR.
 	//   2. If any such MR-ref status exists for this SHA, restrict the
-	//      evaluation to MR-ref + refless statuses. Statuses tagged with the
-	//      source_branch are dropped because the same branch may back several
-	//      MRs and a stale status could leak.
+	//      evaluation to MR-ref + refless statuses + source_branch Atlantis plan
+	//      statuses. Other statuses tagged with the source_branch are dropped
+	//      because the same branch may back several MRs and a stale status could
+	//      leak.
 	//   3. Otherwise fall back to source_branch + refless statuses, preserving
 	//      behaviour for external CIs that post against the branch ref.
 	// Empty Ref is always treated as MR-owned (backward-compat for callers
@@ -360,6 +361,9 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	expectedMergeRef := fmt.Sprintf("refs/merge-requests/%d/merge", mr.IID)
 	isCurrentMRRef := func(ref string) bool {
 		return ref == expectedHeadRef || ref == expectedMergeRef
+	}
+	isSourceBranchAtlantisPlanStatus := func(status *gitlab.CommitStatus) bool {
+		return status.Ref == mr.SourceBranch && isAtlantisPlanCommitStatus(status.Name, vcsstatusname)
 	}
 	hasMRRefStatus := false
 	for _, status := range statuses {
@@ -371,7 +375,7 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	for _, status := range statuses {
 		if status.Ref != "" {
 			if hasMRRefStatus {
-				if !isCurrentMRRef(status.Ref) {
+				if !isCurrentMRRef(status.Ref) && !isSourceBranchAtlantisPlanStatus(status) {
 					continue
 				}
 			} else if status.Ref != mr.SourceBranch {
@@ -426,6 +430,17 @@ func isSkippableAtlantisCommitStatus(statusName string, vcsStatusName string) bo
 	default:
 		return false
 	}
+}
+
+func isAtlantisPlanCommitStatus(statusName string, vcsStatusName string) bool {
+	prefix := vcsStatusName + "/"
+	if !strings.HasPrefix(statusName, prefix) {
+		return false
+	}
+
+	statusContext := strings.TrimPrefix(statusName, prefix)
+	commandName, _, _ := strings.Cut(statusContext, ": ")
+	return commandName == "plan"
 }
 
 // gitlabIsMergeable a pure function that encapsulates the tricky logic behind determining whether a gitlab MR is mergeable
