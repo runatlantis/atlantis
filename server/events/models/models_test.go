@@ -1692,6 +1692,37 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
         EOT
     }`,
 		},
+		{
+			"heredoc multiline-string attribute diff with short indentation",
+			`  # module.ogc.nomad_job.ogc will be updated in-place
+  ~ resource "nomad_job" "ogc" {
+        id      = "ogc"
+      ~ jobspec = <<-EOT
+            syncOptions:
+              -   ServerSideApply = true
+            job "ogc" {
+              group "ogc" {
+          -   image = "registry/ogc:5.224.0"
+          +   image = "registry/ogc:5.226.0"
+              }
+            }
+        EOT
+    }`,
+			`# module.ogc.nomad_job.ogc will be updated in-place
+!   resource "nomad_job" "ogc" {
+        id      = "ogc"
+!       jobspec = <<-EOT
+            syncOptions:
+              -   ServerSideApply = true
+            job "ogc" {
+              group "ogc" {
+-             image = "registry/ogc:5.224.0"
++             image = "registry/ogc:5.226.0"
+              }
+            }
+        EOT
+    }`,
+		},
 	}
 
 	for _, tt := range tests {
