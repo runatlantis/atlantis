@@ -1,0 +1,19 @@
+server/events/commit_status_updater_test.go
+  s_243a1a1edc15e5::t_e09011b4631d51 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "92b5dc5c4f5d0cf80c30bb515c86f91269f62111",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
