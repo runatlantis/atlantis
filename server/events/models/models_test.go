@@ -1247,6 +1247,26 @@ func TestPlanSuccessStats(t *testing.T) {
 			},
 		},
 		{
+			"with forget",
+			`Terraform used the selected providers to generate the following execution
+			plan. Resource actions are indicated with the following symbols:
+			  + create
+			  ~ update in-place
+			  - destroy
+			Terraform will perform the following actions:
+			  - null_resource.hi[1]
+			Plan: 42 to import, 31 to add, 20 to change, 1 to destroy, 7 to forget.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  42,
+				Add:     31,
+				Change:  20,
+				Destroy: 1,
+				Forget:  7,
+			},
+		},
+		{
 			"changes and changes outside",
 			`Note: Objects have changed outside of Terraform
 					Terraform detected the following changes made outside of Terraform since the
@@ -1264,6 +1284,20 @@ func TestPlanSuccessStats(t *testing.T) {
 				Add:     3,
 				Change:  0,
 				Destroy: 1,
+			},
+		},
+		{
+			"with forget and no imports",
+			`Terraform will perform the following actions:
+      - null_resource.hi[1]
+    Plan: 31 to add, 20 to change, 1 to destroy, 7 to forget.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     31,
+				Change:  20,
+				Destroy: 1,
+				Forget:  7,
 			},
 		},
 	}

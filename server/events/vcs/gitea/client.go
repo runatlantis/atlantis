@@ -210,7 +210,7 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 
 		supersededComment := summaryHeader + lineFeed + comment.Body + lineFeed + summaryFooter + lineFeed
 
-		logger.Debug("Hiding comment %s", comment.ID)
+		logger.Debug("Hiding comment %d", comment.ID)
 		_, _, err := c.giteaClient.EditIssueComment(repo.Owner, repo.Name, comment.ID, gitea.EditIssueCommentOption{
 			Body: supersededComment,
 		})

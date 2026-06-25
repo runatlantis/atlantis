@@ -68,7 +68,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 			// with 0/0 projects approve_policies successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		}
@@ -104,7 +104,7 @@ func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *command.Context, 
 		status = models.FailedCommitStatus
 	}
 
-	if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, numSuccess, len(pullStatus.Projects)); err != nil {
+	if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored}); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 }

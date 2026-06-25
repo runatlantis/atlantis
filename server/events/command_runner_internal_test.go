@@ -14,11 +14,13 @@ import (
 
 func TestApplyUpdateCommitStatus(t *testing.T) {
 	cases := map[string]struct {
-		cmd           command.Name
-		pullStatus    models.PullStatus
-		expStatus     models.CommitStatus
-		expNumSuccess int
-		expNumTotal   int
+		cmd             command.Name
+		pullStatus      models.PullStatus
+		expStatus       models.CommitStatus
+		expNumSuccess   int
+		expNumTotal     int
+		expNumErrored   int
+		expNumNoChanges int
 	}{
 		"apply, one pending": {
 			cmd: command.Apply,
@@ -70,6 +72,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			expStatus:     models.FailedCommitStatus,
 			expNumSuccess: 1,
 			expNumTotal:   3,
+			expNumErrored: 1,
 		},
 		"apply, one planned no changes": {
 			cmd: command.Apply,
@@ -83,9 +86,27 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 					},
 				},
 			},
-			expStatus:     models.SuccessCommitStatus,
-			expNumSuccess: 2,
-			expNumTotal:   2,
+			expStatus:       models.SuccessCommitStatus,
+			expNumSuccess:   2,
+			expNumTotal:     2,
+			expNumNoChanges: 1,
+		},
+		"apply, one planned no changes and one pending": {
+			cmd: command.Apply,
+			pullStatus: models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Status: models.PlannedNoChangesPlanStatus,
+					},
+					{
+						Status: models.PlannedPlanStatus,
+					},
+				},
+			},
+			expStatus:       models.PendingCommitStatus,
+			expNumSuccess:   1,
+			expNumTotal:     2,
+			expNumNoChanges: 1,
 		},
 	}
 
@@ -100,8 +121,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
 			Equals(t, c.cmd, csu.CalledCommand)
-			Equals(t, c.expNumSuccess, csu.CalledNumSuccess)
-			Equals(t, c.expNumTotal, csu.CalledNumTotal)
+			Equals(t, models.ProjectCounts{Success: c.expNumSuccess, Total: c.expNumTotal, Errored: c.expNumErrored, NoChanges: c.expNumNoChanges}, csu.CalledCounts)
 		})
 	}
 }
@@ -113,6 +133,7 @@ func TestPlanUpdatePlanCommitStatus(t *testing.T) {
 		expStatus     models.CommitStatus
 		expNumSuccess int
 		expNumTotal   int
+		expNumErrored int
 	}{
 		"single plan success": {
 			cmd: command.Plan,
@@ -148,6 +169,7 @@ func TestPlanUpdatePlanCommitStatus(t *testing.T) {
 			expStatus:     models.FailedCommitStatus,
 			expNumSuccess: 3,
 			expNumTotal:   4,
+			expNumErrored: 1,
 		},
 	}
 
@@ -162,8 +184,7 @@ func TestPlanUpdatePlanCommitStatus(t *testing.T) {
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
 			Equals(t, c.cmd, csu.CalledCommand)
-			Equals(t, c.expNumSuccess, csu.CalledNumSuccess)
-			Equals(t, c.expNumTotal, csu.CalledNumTotal)
+			Equals(t, models.ProjectCounts{Success: c.expNumSuccess, Total: c.expNumTotal, Errored: c.expNumErrored}, csu.CalledCounts)
 		})
 	}
 }
@@ -176,6 +197,8 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 		doNotCallUpdateApply bool // In certain situations, we don't expect updateCommitStatus to call the underlying commitStatusUpdater code at all
 		expNumSuccess        int
 		expNumTotal          int
+		expNumErrored        int
+		expNumNoChanges      int
 	}{
 		"all plans success with no changes": {
 			cmd: command.Apply,
@@ -189,9 +212,10 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 					},
 				},
 			},
-			expStatus:     models.SuccessCommitStatus,
-			expNumSuccess: 2,
-			expNumTotal:   2,
+			expStatus:       models.SuccessCommitStatus,
+			expNumSuccess:   2,
+			expNumTotal:     2,
+			expNumNoChanges: 2,
 		},
 		"one plan, one plan success with no changes": {
 			cmd: command.Apply,
@@ -239,9 +263,31 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 					},
 				},
 			},
+			expStatus:       models.FailedCommitStatus,
+			expNumSuccess:   2,
+			expNumTotal:     3,
+			expNumErrored:   1,
+			expNumNoChanges: 1,
+		},
+		"one apply error, one pending plan": {
+			cmd: command.Apply,
+			pullStatus: models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Status: models.ErroredApplyStatus,
+					},
+					{
+						Status: models.AppliedPlanStatus,
+					},
+					{
+						Status: models.PlannedPlanStatus,
+					},
+				},
+			},
 			expStatus:     models.FailedCommitStatus,
-			expNumSuccess: 2,
+			expNumSuccess: 1,
 			expNumTotal:   3,
+			expNumErrored: 1,
 		},
 	}
 
@@ -260,31 +306,142 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 				Equals(t, models.PullRequest{}, csu.CalledPull)
 				Equals(t, c.expStatus, csu.CalledStatus)
 				Equals(t, c.cmd, csu.CalledCommand)
-				Equals(t, c.expNumSuccess, csu.CalledNumSuccess)
-				Equals(t, c.expNumTotal, csu.CalledNumTotal)
+				Equals(t, models.ProjectCounts{Success: c.expNumSuccess, Total: c.expNumTotal, Errored: c.expNumErrored, NoChanges: c.expNumNoChanges}, csu.CalledCounts)
 			}
 		})
 	}
 }
 
-type MockCSU struct {
-	CalledRepo       models.Repo
-	CalledPull       models.PullRequest
-	CalledStatus     models.CommitStatus
-	CalledCommand    command.Name
-	CalledNumSuccess int
-	CalledNumTotal   int
-	Called           bool
+func TestPlanUpdateApplyCommitStatus_GitLabPendingWithNoChanges(t *testing.T) {
+	csu := &MockCSU{}
+	runner := &PlanCommandRunner{
+		commitStatusUpdater: csu,
+		PendingApplyStatus:  true,
+	}
+	pullStatus := models.PullStatus{
+		Projects: []models.ProjectStatus{
+			{
+				Status: models.PlannedNoChangesPlanStatus,
+			},
+			{
+				Status: models.PlannedPlanStatus,
+			},
+		},
+	}
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Gitlab,
+				},
+			},
+		},
+	}
+
+	runner.updateCommitStatus(ctx, pullStatus, command.Apply)
+
+	Equals(t, true, csu.Called)
+	Equals(t, models.PendingCommitStatus, csu.CalledStatus)
+	Equals(t, command.Apply, csu.CalledCommand)
+	Equals(t, models.ProjectCounts{Success: 1, Total: 2, NoChanges: 1}, csu.CalledCounts)
 }
 
-func (m *MockCSU) UpdateCombinedCount(_ logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command command.Name, numSuccess int, numTotal int) error {
+func TestPolicyCheckUpdateCommitStatus(t *testing.T) {
+	cases := map[string]struct {
+		pullStatus    models.PullStatus
+		expStatus     models.CommitStatus
+		expNumSuccess int
+		expNumTotal   int
+		expNumErrored int
+	}{
+		"all policy checks passed": {
+			pullStatus: models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Status: models.PassedPolicyCheckStatus,
+					},
+					{
+						Status: models.PassedPolicyCheckStatus,
+					},
+				},
+			},
+			expStatus:     models.SuccessCommitStatus,
+			expNumSuccess: 2,
+			expNumTotal:   2,
+		},
+		"one policy check failed, one untouched project": {
+			pullStatus: models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Status: models.ErroredPolicyCheckStatus,
+					},
+					{
+						Status: models.PlannedPlanStatus,
+					},
+				},
+			},
+			expStatus:     models.FailedCommitStatus,
+			expNumTotal:   2,
+			expNumErrored: 1,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			csu := &MockCSU{}
+			runner := &PolicyCheckCommandRunner{
+				commitStatusUpdater: csu,
+			}
+			runner.updateCommitStatus(&command.Context{}, c.pullStatus)
+			Equals(t, models.Repo{}, csu.CalledRepo)
+			Equals(t, models.PullRequest{}, csu.CalledPull)
+			Equals(t, c.expStatus, csu.CalledStatus)
+			Equals(t, command.PolicyCheck, csu.CalledCommand)
+			Equals(t, models.ProjectCounts{Success: c.expNumSuccess, Total: c.expNumTotal, Errored: c.expNumErrored}, csu.CalledCounts)
+		})
+	}
+}
+
+func TestApprovePoliciesUpdateCommitStatus(t *testing.T) {
+	pullStatus := models.PullStatus{
+		Projects: []models.ProjectStatus{
+			{
+				Status: models.ErroredPolicyCheckStatus,
+			},
+			{
+				Status: models.PlannedPlanStatus,
+			},
+		},
+	}
+	csu := &MockCSU{}
+	runner := &ApprovePoliciesCommandRunner{
+		commitStatusUpdater: csu,
+	}
+
+	runner.updateCommitStatus(&command.Context{}, pullStatus)
+
+	Equals(t, models.FailedCommitStatus, csu.CalledStatus)
+	Equals(t, command.PolicyCheck, csu.CalledCommand)
+	Equals(t, models.ProjectCounts{Total: 2, Errored: 1}, csu.CalledCounts)
+}
+
+type MockCSU struct {
+	CalledRepo    models.Repo
+	CalledPull    models.PullRequest
+	CalledStatus  models.CommitStatus
+	CalledCommand command.Name
+	CalledCounts  models.ProjectCounts
+	Called        bool
+}
+
+func (m *MockCSU) UpdateCombinedCount(_ logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, command command.Name, counts models.ProjectCounts) error {
 	m.Called = true
 	m.CalledRepo = repo
 	m.CalledPull = pull
 	m.CalledStatus = status
 	m.CalledCommand = command
-	m.CalledNumSuccess = numSuccess
-	m.CalledNumTotal = numTotal
+	m.CalledCounts = counts
 	return nil
 }
 

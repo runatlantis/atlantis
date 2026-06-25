@@ -340,7 +340,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 			//We check whether the server configured value and repo-root level
 			//config is different. If it is then we change to the more granular.
 			if rCfg.DeleteSourceBranchOnMerge != nil && deleteSourceBranchOnMerge != *rCfg.DeleteSourceBranchOnMerge {
-				log.Debug("overriding server-defined %s with repo settings: [%t]", DeleteSourceBranchOnMergeKey, rCfg.DeleteSourceBranchOnMerge)
+				log.Debug("overriding server-defined %s with repo settings: [%t]", DeleteSourceBranchOnMergeKey, *rCfg.DeleteSourceBranchOnMerge)
 				deleteSourceBranchOnMerge = *rCfg.DeleteSourceBranchOnMerge
 			}
 			//Then we check whether the more granular project based config is
@@ -385,7 +385,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 			}
 		case SilencePRCommentsKey:
 			if proj.SilencePRComments != nil {
-				log.Debug("overriding repo-root-defined %s with repo settings: [%t]", SilencePRCommentsKey, strings.Join(proj.SilencePRComments, ","))
+				log.Debug("overriding repo-root-defined %s with repo settings: [%s]", SilencePRCommentsKey, strings.Join(proj.SilencePRComments, ","))
 				silencePRComments = proj.SilencePRComments
 			} else if rCfg.SilencePRComments != nil {
 				log.Debug("overriding server-defined %s with repo settings: [%s]", SilencePRCommentsKey, strings.Join(rCfg.SilencePRComments, ","))
@@ -695,7 +695,7 @@ func (g GlobalCfg) getMatchingCfg(log logging.SimpleLogging, repoID string) (pla
 		}
 	}
 	for _, l := range toLog {
-		log.Debug(l)
+		log.Debug("%s", l)
 	}
 	// repoLocking is deprecated and enabled by default, disable repo locks if it is explicitly disabled
 	if !repoLocking {

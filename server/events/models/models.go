@@ -506,8 +506,10 @@ func (pss *PolicySetStatus) OwnerHasFullyApproved(owner string) bool {
 // Summary regexes
 var (
 	reChangesOutside = regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
-	rePlanChanges    = regexp.MustCompile(`Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy.`)
-	reNoChanges      = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
+	rePlanChanges    = regexp.MustCompile(
+		`Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy(?:, (\d+) to forget)?\.`,
+	)
+	reNoChanges = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 )
 
 // Summary extracts summaries of plan changes from TerraformOutput.
@@ -701,6 +703,17 @@ func (p PullStatus) StatusCount(status ProjectPlanStatus) int {
 	return c
 }
 
+// ProjectCounts holds the success/failure counts for a set of project operations.
+// For command.Apply: Errored counts projects with apply errors. NoChanges is a
+// subset of Success (projects that were already up to date count as successful).
+// NoChanges is ignored for all other commands.
+type ProjectCounts struct {
+	Success   int
+	Total     int
+	Errored   int
+	NoChanges int
+}
+
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
 	Workspace   string
@@ -863,8 +876,8 @@ type WorkflowHookCommandContext struct {
 
 // PlanSuccessStats holds stats for a plan.
 type PlanSuccessStats struct {
-	Import, Add, Change, Destroy int
-	Changes, ChangesOutside      bool
+	Import, Add, Change, Destroy, Forget int
+	Changes, ChangesOutside              bool
 }
 
 func NewPlanSuccessStats(output string) PlanSuccessStats {
@@ -883,6 +896,10 @@ func NewPlanSuccessStats(output string) PlanSuccessStats {
 		s.Add, _ = strconv.Atoi(m[2])
 		s.Change, _ = strconv.Atoi(m[3])
 		s.Destroy, _ = strconv.Atoi(m[4])
+
+		if len(m) > 5 && m[5] != "" {
+			s.Forget, _ = strconv.Atoi(m[5])
+		}
 	}
 
 	return s
