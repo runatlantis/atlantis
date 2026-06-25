@@ -154,6 +154,10 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
 
+	// The API apply endpoint runs plan first. Refresh PR status afterward so
+	// apply requirements evaluate the VCS state the plan phase just produced.
+	a.populatePullRequestStatus(ctx)
+
 	// We can now prepare and run the apply step
 	result, err := a.apiApply(request, ctx)
 	if err != nil {
@@ -395,19 +399,22 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		Log:      a.Logger,
 		API:      true,
 	}
-	// When a real PR is supplied, populate PullRequestStatus so that apply
-	// requirements (e.g. 'mergeable', 'approved') evaluate against actual VCS
-	// state instead of defaulting to false. The comment-driven runners do the
-	// equivalent before building project commands.
-	if request.PR > 0 && a.PullReqStatusFetcher != nil {
-		status, err := a.PullReqStatusFetcher.FetchPullStatus(a.Logger, pull)
-		if err != nil {
-			ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
-		} else {
-			ctx.PullRequestStatus = status
-		}
-	}
+	a.populatePullRequestStatus(ctx)
 	return &request, ctx, http.StatusOK, nil
+}
+
+func (a *APIController) populatePullRequestStatus(ctx *command.Context) {
+	if ctx.Pull.Num <= 0 || a.PullReqStatusFetcher == nil {
+		return
+	}
+
+	status, err := a.PullReqStatusFetcher.FetchPullStatus(ctx.Log, ctx.Pull)
+	if err != nil {
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+		return
+	}
+
+	ctx.PullRequestStatus = status
 }
 
 func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {

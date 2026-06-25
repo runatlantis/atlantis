@@ -388,6 +388,43 @@ func TestAPIController_PlanContinuesWhenPullReqStatusFetchFails(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Times(1)).Plan(Any[command.ProjectContext]())
 }
 
+func TestAPIController_ApplyRefreshesPullReqStatusAfterPlan(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	fetcher := NewMockPullReqStatusFetcher()
+	mockCall := When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]()))
+	mockCall = mockCall.ThenReturn(models.PullReqStatus{
+		ApprovalStatus:  models.ApprovalStatus{IsApproved: false},
+		MergeableStatus: models.MergeableStatus{IsMergeable: false},
+	}, nil)
+	mockCall = mockCall.ThenReturn(models.PullReqStatus{
+		ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+		MergeableStatus: models.MergeableStatus{IsMergeable: true},
+	}, nil)
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(2)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+	applyCtx, _ := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Assert(t, applyCtx.PullRequestStatus.ApprovalStatus.IsApproved,
+		"expected apply commands to use refreshed approved status")
+	Assert(t, applyCtx.PullRequestStatus.MergeableStatus.IsMergeable,
+		"expected apply commands to use refreshed mergeable status")
+}
+
 func TestAPIController_ListLocksEmpty(t *testing.T) {
 	ac, _, _ := setup(t)
 
