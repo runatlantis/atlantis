@@ -349,8 +349,9 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	//   1. Statuses whose Ref equals refs/merge-requests/<iid>/head or
 	//      refs/merge-requests/<iid>/merge are unambiguously owned by this MR.
 	//   2. If any such MR-ref status exists for this SHA, restrict the
-	//      evaluation to MR-ref + refless statuses. Statuses tagged with the
-	//      source_branch are dropped because the same branch may back several
+	//      evaluation to MR-ref + refless statuses + branch-only source_branch
+	//      statuses. If the same status name appears on a current MR ref, the
+	//      source_branch copy is dropped because the same branch may back several
 	//      MRs and a stale status could leak.
 	//   3. Otherwise fall back to source_branch + refless statuses, preserving
 	//      behaviour for external CIs that post against the branch ref.
@@ -362,16 +363,24 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		return ref == expectedHeadRef || ref == expectedMergeRef
 	}
 	hasMRRefStatus := false
+	currentMRStatusNames := make(map[string]struct{})
 	for _, status := range statuses {
 		if isCurrentMRRef(status.Ref) {
 			hasMRRefStatus = true
-			break
+			currentMRStatusNames[status.Name] = struct{}{}
 		}
+	}
+	isBranchOnlySourceBranchStatus := func(status *gitlab.CommitStatus) bool {
+		if status.Ref != mr.SourceBranch {
+			return false
+		}
+		_, hasCurrentMRStatusWithSameName := currentMRStatusNames[status.Name]
+		return !hasCurrentMRStatusWithSameName
 	}
 	for _, status := range statuses {
 		if status.Ref != "" {
 			if hasMRRefStatus {
-				if !isCurrentMRRef(status.Ref) {
+				if !isCurrentMRRef(status.Ref) && !isBranchOnlySourceBranchStatus(status) {
 					continue
 				}
 			} else if status.Ref != mr.SourceBranch {
