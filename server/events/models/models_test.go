@@ -1763,6 +1763,35 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
         ]
     }`,
 		},
+		{
+			"collection element heredoc diff",
+			`  # terraform_data.example will be updated in-place
+  ~ resource "terraform_data" "example" {
+      ~ input = [
+          ~ <<-EOT
+              first
+            - old
+            + new
+            EOT,
+        ]
+      + triggers_replace = [
+          + "changed",
+        ]
+    }`,
+			`# terraform_data.example will be updated in-place
+!   resource "terraform_data" "example" {
+!       input = [
+!           <<-EOT
+              first
+-             old
++             new
+            EOT,
+        ]
++       triggers_replace = [
++           "changed",
+        ]
+    }`,
+		},
 	}
 
 	for _, tt := range tests {
