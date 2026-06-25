@@ -1,0 +1,21 @@
+server/events/apply_command_runner_test.go
+  s_12c46f3ee857ef::t_30793a810e0297 34,54,84
+server/events/apply_command_runner.go
+  s_12c46f3ee857ef::t_2af9ff3ed1a937 81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "109bfdaf2408366cef8d05d4afd998188d0164ad",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
