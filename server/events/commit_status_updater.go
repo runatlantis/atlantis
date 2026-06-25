@@ -7,6 +7,7 @@ package events
 import (
 	"crypto/sha256"
 	"fmt"
+	"unicode/utf8"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -112,12 +113,13 @@ const (
 // truncateContext shortens s to maxStatusContext characters if needed while
 // preserving uniqueness for contexts that share the same long prefix.
 func truncateContext(s string) string {
-	if len(s) <= maxStatusContext {
+	if utf8.RuneCountInString(s) <= maxStatusContext {
 		return s
 	}
 	hash := sha256.Sum256([]byte(s))
 	suffix := fmt.Sprintf("-%x", hash[:statusContextHashPrefixSize])
-	return s[:maxStatusContext-len(suffix)] + suffix
+	prefixLength := maxStatusContext - utf8.RuneCountInString(suffix)
+	return string([]rune(s)[:prefixLength]) + suffix
 }
 
 func (d *DefaultCommitStatusUpdater) UpdatePreWorkflowHook(log logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
