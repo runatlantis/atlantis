@@ -1,0 +1,226 @@
+server/events/commit_status_updater.go
+  s_1475eaaa18ac58::t_7368aa88ce2e50 8,10,49,63,123,144-164,174
+server/events/commit_status_updater_test.go
+  s_1475eaaa18ac58::t_7368aa88ce2e50 9,11,22-52,106-121,265-280,386-487
+  s_1475eaaa18ac58::t_c83f61a6942a6a 488
+.github/workflows/atlantis-image.yml
+  s_1475eaaa18ac58::t_350a4f26ece49e 39,43,76,80,89,94,100,114,146,160,220,224,226,230,263
+.github/workflows/clusterfuzzlite.yml
+  s_1475eaaa18ac58::t_3a1d490441464e 36,61
+.github/workflows/codeql.yml
+  s_1475eaaa18ac58::t_424fa5a015bec4 47,51,81,86,90,103,116,130
+.github/workflows/dependency-review.yml
+  s_1475eaaa18ac58::t_aee134b8c2d551 28,33
+.github/workflows/go-lint.yml
+  s_1475eaaa18ac58::t_4630ca10b39645 34,38,56,60,63,68,71,80
+.github/workflows/labeler.yml
+  s_1475eaaa18ac58::t_8f970cb543bc17 23
+.github/workflows/markdown-lint.yml
+  s_1475eaaa18ac58::t_5149faf5410983 33,37,55,59,62,64,87
+.github/workflows/pr-lint.yml
+  s_1475eaaa18ac58::t_0c2df78bfdf599 19
+.github/workflows/pr-size-labeler.yml
+  s_1475eaaa18ac58::t_6964d8248e330b 16
+.github/workflows/release.yml
+  s_1475eaaa18ac58::t_16dd2053553cfe 17,21,25,30
+.github/workflows/renovate-config.yml
+  s_1475eaaa18ac58::t_af5a3a6d046a25 23,27
+.github/workflows/scorecard.yml
+  s_1475eaaa18ac58::t_12487e493cd33b 28,51,59
+.github/workflows/stale.yml
+  s_1475eaaa18ac58::t_2a0bbca94315f0 16,20
+.github/workflows/test.yml
+  s_1475eaaa18ac58::t_130d48bb57a081 40,44,65,69,72,126,134-135,143,147-148,162,180-181,188,192-193,207
+.github/workflows/testing-env-image.yml
+  s_1475eaaa18ac58::t_a65d8ff2fe05de 32,36,54,58,61,67,70,78,96
+.github/workflows/website.yml
+  s_1475eaaa18ac58::t_94c02402b02f0b 34,38,60,64,67,84,127
+.golangci.yml
+  s_1475eaaa18ac58::t_575dcf84628528 15-17,29-34
+.lycheeignore
+  s_1475eaaa18ac58::t_3d274dfa146401 7-10
+.node-version
+  s_1475eaaa18ac58::t_754fd29d8900f3 1
+AGENTS.md
+  s_1475eaaa18ac58::t_70021e64219c76 21
+Dockerfile
+  s_1475eaaa18ac58::t_da1495823c90f9 1,4,6,11,41,59-74,189,279-280
+cmd/help_fmt.go
+  s_1475eaaa18ac58::t_e08175f6b23ee3 130,135
+cmd/server.go
+  s_1475eaaa18ac58::t_42b819ac1dad3c 129-130,424-430,862-875,877-878,1124-1135
+cmd/server_test.go
+  s_1475eaaa18ac58::t_6a693f31e54dd8 127-128,236,238,241,1207-1239
+e2e/github.go
+  s_1475eaaa18ac58::t_1599c0bbbf4da0 18,66-69,72,83-86,119-122
+e2e/go.mod
+  s_1475eaaa18ac58::t_fc1b42c841e4d0 3,7,20
+e2e/go.sum
+  s_1475eaaa18ac58::t_3d640842b24fc6 14-15,41-42
+go.mod
+  s_1475eaaa18ac58::t_3af7f8d43cfd16 3,19,53-54,140,143,146,148
+go.sum
+  s_1475eaaa18ac58::t_cb8d2d664ea49a 230-231,508-509,584-585,657-658,664-665,676-677,726-727
+package-lock.json
+  s_1475eaaa18ac58::t_23db803c2cd3f5 10,13,16,1627-1629,1661-1663,1710-1712,2271-2273,2277,2897-2899,2955-2957,3116-3118,3362-3364,3366-3375,3449-3451,3453-3462,3511-3513,3515-3524,3529,3546-3548,3560,3563,3570-3572,3576,3579,3582-3584,3586-3587,3593,4815-4817,4859-4861,4865-4866,4891-4893,4897,4954-4956,4961,4989-4991,5165-5167,5175,5223-5225
+package.json
+  s_1475eaaa18ac58::t_9a831773de5db7 6,9,12,19
+runatlantis.io/blog/2019/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage.md
+  s_1475eaaa18ac58::t_ed1d2c45f9a0e0 18
+runatlantis.io/docs/api-endpoints.md
+  s_1475eaaa18ac58::t_7c428a93bfdd3a 238,254-284
+runatlantis.io/docs/custom-workflows.md
+  s_1475eaaa18ac58::t_bc3a8a3ea9e245 583-585,628,703-707,745-751
+runatlantis.io/docs/policy-checking.md
+  s_1475eaaa18ac58::t_cadd44f2e89990 223-231
+runatlantis.io/docs/post-workflow-hooks.md
+  s_1475eaaa18ac58::t_24ea6bb68b8118 94-99
+runatlantis.io/docs/pre-workflow-hooks.md
+  s_1475eaaa18ac58::t_3b3ac653e2363d 91-96
+runatlantis.io/docs/repo-level-atlantis-yaml.md
+  s_1475eaaa18ac58::t_c1b5f4b1a80cd8 419
+runatlantis.io/docs/server-configuration.md
+  s_1475eaaa18ac58::t_2f021692bad0eb 57,59,62,67,320,1035,1148-1157,1222-1231
+runatlantis.io/docs/server-side-repo-config.md
+  s_1475eaaa18ac58::t_07f8d9c47eb914 532-550,599-606
+server/controllers/api_controller.go
+  s_1475eaaa18ac58::t_1ca8dd4ba63769 43-47,157-160,388-395,397-418
+server/controllers/api_controller_test.go
+  s_1475eaaa18ac58::t_59c810a6c24eb5 9,320-461
+server/controllers/events/events_controller.go
+  s_1475eaaa18ac58::t_3056d8ba081f92 19,896,898
+server/controllers/events/events_controller_e2e_test.go
+  s_1475eaaa18ac58::t_2d41885a0877ea 20
+server/controllers/events/events_controller_test.go
+  s_1475eaaa18ac58::t_3c596ff9c3896c 20,896
+server/controllers/events/github_request_validator.go
+  s_1475eaaa18ac58::t_3066d73fb787e3 13
+server/controllers/github_app_controller.go
+  s_1475eaaa18ac58::t_4c2ec983f9acc2 87,155
+server/controllers/jobs_controller.go
+  s_1475eaaa18ac58::t_6ecf96c79a691c 64,96,98
+server/controllers/locks_controller.go
+  s_1475eaaa18ac58::t_60c932633e868f 99,154,156
+server/core/boltdb/boltdb.go
+  s_1475eaaa18ac58::t_6c538c57713da7 600-606
+server/core/config/parser_validator.go
+  s_1475eaaa18ac58::t_bb32064f529b51 63-64,87-88,155-156,163-176
+server/core/config/parser_validator_test.go
+  s_1475eaaa18ac58::t_2d7d207c4306a7 85,90,95,98-102,110
+server/core/config/raw/global_cfg.go
+  s_1475eaaa18ac58::t_9fe93ddd9dcd68 10,110
+server/core/config/raw/step.go
+  s_1475eaaa18ac58::t_70f75d2dfe0e96 205,209,260
+server/core/config/valid/global_cfg.go
+  s_1475eaaa18ac58::t_3e491ddab1f935 9,343,388,495,498,501,504,507,510,513,516,520,529,587,698,710
+server/core/db/db.go
+  s_1475eaaa18ac58::t_19753add04b8a1 33-34
+server/core/db/mocks/mock_database.go
+  s_1475eaaa18ac58::t_996f52f3d1b13a 148-161
+server/core/redis/redis.go
+  s_1475eaaa18ac58::t_0f3eead0fe01ec 25,27,34-48,50-65,68,71,75-107,112-121,124-137,146,149,152-165,168-171,584-590,592-597
+server/core/redis/redis_test.go
+  s_1475eaaa18ac58::t_895751204c2b2c 53-86
+server/core/runtime/apply_step_runner.go
+  s_1475eaaa18ac58::t_f6d15863597b07 103-104,107,213-214,217
+server/core/runtime/models/shell_command_runner.go
+  s_1475eaaa18ac58::t_cce459f631e10a 121,134,181
+server/core/runtime/policy/conftest_client.go
+  s_1475eaaa18ac58::t_c832b6ff9a90bc 191
+server/core/terraform/tfclient/terraform_client.go
+  s_1475eaaa18ac58::t_da996cc8870572 373
+server/events/apply_command_runner.go
+  s_1475eaaa18ac58::t_a200da0d48057f 80-88,236-238
+server/events/apply_command_runner_test.go
+  s_1475eaaa18ac58::t_e48364ad4cba3d 10,33-34,49,52-54,84,88-104
+server/events/command_runner.go
+  s_1475eaaa18ac58::t_b26040b5dc6d6e 10,14,144,188,348,520
+server/events/command_runner_test.go
+  s_1475eaaa18ac58::t_366e28a99e01ea 22
+server/events/comment_parser.go
+  s_1475eaaa18ac58::t_70928b62ae52ce 390,575,585,629-632
+server/events/comment_parser_test.go
+  s_1475eaaa18ac58::t_ce7c4cd0821533 1076-1077
+server/events/event_parser.go
+  s_1475eaaa18ac58::t_a31a8de3857e9c 20
+server/events/event_parser_test.go
+  s_1475eaaa18ac58::t_5a21ca290a44ee 16,28,1327
+server/events/instrumented_pull_closed_executor.go
+  s_1475eaaa18ac58::t_4e0e3ed913fb6a 48
+server/events/markdown_renderer_test.go
+  s_1475eaaa18ac58::t_92567c3cc4302c 68,143,1509,1897,2106,2299,2358,2435,2547,2695,2850,2934,3175,3772,3914,4376,4432,4657
+server/events/mocks/mock_event_parsing.go
+  s_1475eaaa18ac58::t_1ac7572e5da62f 9
+server/events/mocks/mock_github_pull_getter.go
+  s_1475eaaa18ac58::t_4b66472b03136d 7
+server/events/models/models.go
+  s_1475eaaa18ac58::t_114ac3bdec5e12 509-512,879-880,899-902
+server/events/models/models_test.go
+  s_1475eaaa18ac58::t_64998fd66026b8 46,123,140,1249-1268,1289-1302
+server/events/plan_command_runner_test.go
+  s_1475eaaa18ac58::t_9b85ca39364b25 10
+server/events/project_command_runner.go
+  s_1475eaaa18ac58::t_7d585eb48b2692 194,202,209,657
+server/events/project_finder.go
+  s_1475eaaa18ac58::t_3420ebb74e4b1b 14,87,189
+server/events/pull_updater.go
+  s_1475eaaa18ac58::t_49b4a6f6657e1d 7-8,22,24,40
+server/events/vcs/bitbucketcloud/client.go
+  s_1475eaaa18ac58::t_71c651405db6d1 146,153
+server/events/vcs/common/git_cred_writer.go
+  s_1475eaaa18ac58::t_c4c599459fcf7a 100,124
+server/events/vcs/common/git_cred_writer_test.go
+  s_1475eaaa18ac58::t_ab76707d5aa7f1 27,48,62,80,86,99,105,124
+server/events/vcs/gitea/client.go
+  s_1475eaaa18ac58::t_f1246a5cd41334 213
+server/events/vcs/github/client.go
+  s_1475eaaa18ac58::t_35433bdf4e0f98 21,127-130,134-137,139
+server/events/vcs/github/client_internal_test.go
+  s_1475eaaa18ac58::t_1c8c4f0a3ce08b 18,25
+server/events/vcs/github/credentials.go
+  s_1475eaaa18ac58::t_bc86f85ac473c5 15,140-147,184-191
+server/events/vcs/github/instrumented_client.go
+  s_1475eaaa18ac58::t_df7c2ba6910cb1 7
+server/events/vcs/github/mocks/mock_github_pull_request_getter.go
+  s_1475eaaa18ac58::t_62ff38eeba740b 7
+server/events/vcs/github/testdata/fixtures.go
+  s_1475eaaa18ac58::t_87a2aba70b3829 16
+server/events/vcs/github/token_rotator.go
+  s_1475eaaa18ac58::t_5691b70999e23b 60
+server/events/vcs/gitlab/client.go
+  s_1475eaaa18ac58::t_3a6ce8309229fc 320-371,373-378,381-389,558,638
+server/events/vcs/gitlab/client_test.go
+  s_1475eaaa18ac58::t_a51f0f0419c3f2 1075,1077,1138-1141,1144-1148,1286-1435,1446-1449,1451-1452,1470
+server/events/working_dir.go
+  s_1475eaaa18ac58::t_7e3a3ae007ac23 272-282,475-483,544-554,595-598,716,723,762
+server/events/working_dir_test.go
+  s_1475eaaa18ac58::t_627520458bd4c2 170-229
+server/logging/simple_logger.go
+  s_1475eaaa18ac58::t_e35197ebb8779b 169
+server/server.go
+  s_1475eaaa18ac58::t_791145e049377c 490-515,1008,1097,1168,1178,1281,1328-1330,1336-1350
+server/user_config.go
+  s_1475eaaa18ac58::t_8bf18d3dae2f92 105-106
+testdrive/github.go
+  s_1475eaaa18ac58::t_25c70b908f5a9d 12
+testdrive/testdrive.go
+  s_1475eaaa18ac58::t_3428d9c0c0ff55 23,102-106
+testing/Dockerfile
+  s_1475eaaa18ac58::t_d0ce9bb25f0472 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "ea1ef5b8bd47a7ab2a2b01a3f20c3517873e1a53",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
