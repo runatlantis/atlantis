@@ -1,0 +1,22 @@
+server/events/commit_status_updater_test.go
+  s_243a1a1edc15e5::t_bb5e2380b98dfd 22-23,274,281,294,307
+  s_243a1a1edc15e5::t_0ee71e7144c02d 9,21,24-44,279,286,288-293,295-306,308-349
+server/events/commit_status_updater.go
+  s_243a1a1edc15e5::t_13251d493f5401 8,106-110,112-113,118-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "59c3315e1c3aaa7508e813efd4619d24754915a9",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
