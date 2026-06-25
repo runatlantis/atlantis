@@ -26,7 +26,17 @@ const prSourceRemote = "source"
 
 // gitLocks holds per-clone-dir locks: "repo-lock/<cloneDir>" -> *sync.RWMutex (read for steps, write for clone/reset/merge), "ref-lock/<cloneDir>" -> *sync.Mutex (serialize fetch).
 var gitLocks sync.Map
-var recheckRequiredMap sync.Map
+
+// pendingMerge coordinates parallel goroutines that all detect divergence at
+// the same time. The leader performs the actual merge while followers wait on
+// the done channel for the result — no write-lock contention between them.
+type pendingMerge struct {
+	done   chan struct{} // closed when the merge completes
+	merged bool          // whether a merge was actually performed
+	err    error         // error from the merge, if any
+}
+
+var pendingMerges sync.Map
 
 //go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_working_dir.go WorkingDir
 //go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package events WorkingDir
@@ -36,8 +46,10 @@ type WorkingDir interface {
 	// Clone git clones headRepo, checks out the branch and then returns the
 	// absolute path to the root of the cloned repo.
 	Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
-	// MergeAgain merges again with upstream if upstream has been modified, returns
-	// whether it actually did a new merge
+	// MergeAgain refreshes the working tree if the base branch has advanced since
+	// the last clone/merge. Returns true if the working tree was updated — either
+	// because this goroutine performed the merge or because a concurrent goroutine
+	// did so and the result was shared.
 	MergeAgain(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (bool, error)
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
@@ -165,13 +177,15 @@ func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wra
 	return true, nil
 }
 
-// MergeAgain merges again with upstream if we are using the merge checkout strategy,
-// and upstream has been modified since we last checked.
-// It returns a flag indicating whether we had to merge with upstream again.
+// MergeAgain refreshes the working tree with upstream changes if we are using
+// the merge checkout strategy and the base branch has advanced since the last
+// clone/merge. Returns true if the working tree was updated (whether by this
+// goroutine or a concurrent one that shared its result).
 //
-// Locking strategy: recheckDiverged uses the read and ref lock to serialize git metadata
-// operations (URL updates, fetch, status) without taking the repo write lock.
-// The write lock is only acquired when we actually need to merge.
+// Locking strategy: recheckDiverged runs under the read and ref locks so it
+// can run concurrently with runSteps. The write lock is only acquired by the
+// elected merge leader; concurrent goroutines wait on a done channel instead
+// of queuing on the write lock (which would serialize behind runSteps readers).
 func (w *FileWorkspace) MergeAgain(
 	logger logging.SimpleLogging,
 	headRepo models.Repo,
@@ -186,31 +200,37 @@ func (w *FileWorkspace) MergeAgain(
 	if err != nil {
 		return false, err
 	}
-	// We atomically set the recheckRequiredMap flag here before grabbing any lock.
-	// If the flag is cleared after we grab the write lock, it means some other
-	// thread did the necessary work late enough that we do not have to do it again.
-	recheckRequiredMap.Store(cloneDir, struct{}{})
-
 	c := wrappedGitContext{cloneDir, headRepo, p}
 
 	if !w.recheckDiverged(logger, p, headRepo, cloneDir) {
-		recheckRequiredMap.Delete(cloneDir)
 		return false, nil
 	}
 
-	// Diverged — acquire the write lock to perform the merge, which mutates the
-	// working tree (git reset --hard + git merge).
+	// Coordinate parallel goroutines: only the first to detect divergence acquires
+	// the write lock and performs the merge. Others wait on a done channel instead
+	// of queuing on the write lock (which would serialize behind runSteps read locks).
+	pm := &pendingMerge{done: make(chan struct{})}
+	if actual, loaded := pendingMerges.LoadOrStore(cloneDir, pm); loaded {
+		leader := actual.(*pendingMerge)
+		logger.Debug("Another goroutine is already merging, waiting for it to finish")
+		<-leader.done
+		return leader.merged, leader.err
+	}
+	// Leader: acquire the write lock, then register the broadcast defer.
+	// Defers run LIFO: pending entry closed/deleted first (while the write lock
+	// is still held), then write lock released. This prevents a new caller from
+	// observing and joining a stale completed merge in the window after unlock.
 	gitWriteUnlockFn := w.gitWriteLock(cloneDir)
 	defer gitWriteUnlockFn()
 
-	if _, exists := recheckRequiredMap.Load(cloneDir); !exists {
-		logger.Debug("Skipping upstream merge. Some other thread has done this for us")
-		return false, nil
-	}
-	recheckRequiredMap.Delete(cloneDir)
+	defer func() {
+		close(pm.done)
+		pendingMerges.Delete(cloneDir)
+	}()
 
 	logger.Info("base branch may have been updated, using merge strategy and will merge again")
-	return true, w.mergeAgain(logger, c)
+	pm.merged, pm.err = true, w.mergeAgain(logger, c)
+	return pm.merged, pm.err
 }
 
 // recheckDiverged returns true if the branch we're merging into has diverged
@@ -249,12 +269,17 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 		{
 			"git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
 		},
-		{
-			"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL,
-		},
-		{
-			"git", "remote", "update",
-		},
+	}
+	if w.usesPRSourceRemote(p) {
+		cmds = append(cmds,
+			[]string{"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL},
+			[]string{"git", "remote", "update"},
+		)
+	} else {
+		// On the GitHub App path the source (fork) remote isn't used to fetch the
+		// PR head, so only refresh origin. This avoids fetching a possibly
+		// inaccessible fork, which would fail and make us assume divergence.
+		cmds = append(cmds, []string{"git", "remote", "update", "origin"})
 	}
 
 	for _, args := range cmds {
@@ -447,8 +472,15 @@ func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedG
 // Locks are acquired by the caller.
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
-	// We use both `<prSourceRemote>` and `origin` remotes, update them both
-	if err := w.wrappedGit(logger, c, "fetch", "--all"); err != nil {
+	// We use both `<prSourceRemote>` and `origin` remotes, update them both.
+	// On the GitHub App path the source (fork) remote isn't used to fetch the PR
+	// head (mergeToBaseBranch fetches pull/<n>/head from origin), so only update
+	// origin and avoid fetching a possibly inaccessible fork.
+	fetchArgs := []string{"fetch", "--all"}
+	if !w.usesPRSourceRemote(c.pr) {
+		fetchArgs = []string{"fetch", "origin"}
+	}
+	if err := w.wrappedGit(logger, c, fetchArgs...); err != nil {
 		return err
 	}
 
@@ -509,6 +541,17 @@ func (w *FileWorkspace) isBranchAtTargetRef(logger logging.SimpleLogging, c wrap
 	return strings.HasPrefix(currCommit, targetRef), nil
 }
 
+// usesPRSourceRemote reports whether the "source" remote (the PR's head repo,
+// e.g. a fork) is actually used to fetch the PR head. On the GitHub App path
+// mergeToBaseBranch fetches "pull/<n>/head" from origin instead (see
+// GithubAppEnabled handling there), so the source remote is never used and we
+// skip creating/updating it. Fetching the head repo otherwise only slows down
+// "git remote update"/"git fetch --all" and, when the App installation can't
+// read the fork, fails and makes recheckDiverged spuriously assume divergence.
+func (w *FileWorkspace) usesPRSourceRemote(p models.PullRequest) bool {
+	return !w.GithubAppEnabled || p.Num <= 0
+}
+
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
 	err := os.RemoveAll(c.dir)
 	if err != nil {
@@ -549,8 +592,10 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 		}
 	}
 
-	if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
-		return err
+	if w.usesPRSourceRemote(c.pr) {
+		if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
+			return err
+		}
 	}
 	if w.GpgNoSigningEnabled {
 		if err := w.wrappedGit(logger, c, "config", "--local", "commit.gpgsign", "false"); err != nil {
@@ -668,14 +713,14 @@ func (w *FileWorkspace) GetPullDir(r models.Repo, p models.PullRequest) (string,
 // Delete deletes the workspace for this repo and pull.
 func (w *FileWorkspace) Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error {
 	repoPullDir := w.repoPullDir(r, p)
-	logger.Info("Deleting repo pull directory: " + repoPullDir)
+	logger.Info("Deleting repo pull directory: %s", repoPullDir)
 	return os.RemoveAll(repoPullDir)
 }
 
 // DeleteForWorkspace deletes the working dir for this workspace.
 func (w *FileWorkspace) DeleteForWorkspace(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) error {
 	workspaceDir := w.cloneDir(r, p, workspace)
-	logger.Info("Deleting workspace directory: " + workspaceDir)
+	logger.Info("Deleting workspace directory: %s", workspaceDir)
 	return os.RemoveAll(workspaceDir)
 }
 
@@ -714,7 +759,7 @@ func (w *FileWorkspace) SetCheckForUpstreamChanges() {
 
 func (w *FileWorkspace) DeletePlan(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string, projectPath string, projectName string) error {
 	planPath := filepath.Join(w.cloneDir(r, p, workspace), projectPath, runtime.GetPlanFilename(workspace, projectName))
-	logger.Info("Deleting plan: " + planPath)
+	logger.Info("Deleting plan: %s", planPath)
 	return utils.RemoveIgnoreNonExistent(planPath)
 }
 

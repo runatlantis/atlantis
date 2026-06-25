@@ -153,6 +153,8 @@ For pipelines, if the project requires that pipelines must succeed, all builds e
 
 For Jobs with allow_failure setting set to true, will be ignored. If the pipeline has been skipped and the project allows merging, it will be marked as mergeable.
 
+For per-project `atlantis apply` commands, Atlantis scopes GitLab's `mergeable` requirement to the project being applied when GitLab reports blocking commit statuses. Atlantis ignores blocking Atlantis plan statuses from other projects in the same merge request, but the project's own plan status and any non-Atlantis blocker still prevent the apply.
+
 #### Bitbucket.org (Bitbucket Cloud) and Bitbucket Server (Stash)
 
 For Bitbucket, we just check if there is a conflict that is preventing a

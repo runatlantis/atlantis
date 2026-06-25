@@ -4,3 +4,7 @@
 https://www.freepik.com/
 https://www.flaticon.com/
 https://medium.com/
+https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json
+
+# These sites intermittently time out for the link checker
+https://grafana.com/docs/pyroscope/

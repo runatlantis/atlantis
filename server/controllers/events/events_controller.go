@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -893,8 +893,9 @@ func (e *VCSEventsController) supportsHost(h models.VCSHostType) bool {
 func (e *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	e.Logger.Log(lvl, response)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(code)
-	fmt.Fprintln(w, response)
+	fmt.Fprintln(w, response) // #nosec G705 -- response body is served as text/plain, not interpreted as HTML
 }
 
 // commentNotAllowlisted comments on the pull request that the repo is not

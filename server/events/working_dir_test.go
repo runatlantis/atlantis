@@ -167,6 +167,66 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	Equals(t, expLsOutput, actLsOutput)
 }
 
+// Test that on the GitHub App path (GithubAppEnabled && pr.Num > 0) the merge
+// is performed by fetching pull/<n>/head from origin and the "source" (fork)
+// remote is never created, since it isn't used to fetch the PR head.
+func TestClone_CheckoutMergeGithubAppNoSourceRemote(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Add a commit to branch 'branch' that's not on main.
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
+	branchCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	// Now switch back to main and advance the main branch by another commit.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-file")
+	runCmd(t, repoDir, "git", "add", "main-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "main-commit")
+	mainCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	// On the GitHub App path the head is fetched as pull/<n>/head from origin,
+	// so expose the branch commit under that ref in the origin repo.
+	runCmd(t, repoDir, "git", "update-ref", "refs/pull/1/head", strings.TrimSpace(branchCommit))
+
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		CheckoutDepth:               50,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+		GithubAppEnabled:            true,
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+		Num:        1,
+	}, "default")
+	Ok(t, err)
+
+	// The merge should still produce a merge commit whose parents are the base
+	// (main) and the head (branch) commits.
+	actBaseCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD~1")
+	actHeadCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2")
+	Equals(t, mainCommit, actBaseCommit)
+	Equals(t, branchCommit, actHeadCommit)
+
+	// The "source" remote must not have been created on the GitHub App path.
+	remotes := runCmd(t, cloneDir, "git", "remote")
+	Assert(t, !strings.Contains(remotes, "source"), "expected no \"source\" remote on the GitHub App path, got remotes: %q", remotes)
+	Assert(t, strings.Contains(remotes, "origin"), "expected \"origin\" remote, got remotes: %q", remotes)
+}
+
 // Test that if we're using the merge method and the repo is already cloned at
 // the right commit, then we don't reclone.
 func TestClone_CheckoutMergeNoReclone(t *testing.T) {
@@ -807,6 +867,88 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	Ok(t, err)
 	Assert(t, mergedAgain == false, "Second clone with CheckoutMerge=true and initially diverged base should not merge again")
 	assert.FileExists(t, planFile, "Existing plan file should not have been deleted")
+}
+
+// TestMergeAgain_ConcurrentDiverged verifies that when multiple goroutines call
+// MergeAgain concurrently after the base branch has advanced, only one goroutine
+// acquires the write lock and performs the merge while the rest receive the shared
+// result — no errors, no serialization behind runSteps read locks.
+func TestMergeAgain_ConcurrentDiverged(t *testing.T) {
+	// Use the repo dir as both the "remote" and the Atlantis DataDir — same
+	// pattern as TestClone_MasterHasDiverged.
+	repoDir := initRepo(t)
+
+	// Create a PR branch with a PR-specific commit.
+	runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+	runCmd(t, repoDir, "touch", "pr-file.txt")
+	runCmd(t, repoDir, "git", "add", "pr-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "PR change")
+	prHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Build the Atlantis merge-checkout workspace: clone main, fetch the PR
+	// branch, and merge — exactly what Atlantis does on first clone.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	workspaceDir := filepath.Join(repoDir, "repos", "0", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "0", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/pr-branch")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Advance main after the initial clone so every concurrent MergeAgain
+	// goroutine observes divergence.
+	runCmd(t, repoDir, "touch", "base-update.txt")
+	runCmd(t, repoDir, "git", "add", "base-update.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "base update after clone")
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "pr-branch",
+		BaseBranch: "main",
+		HeadCommit: prHeadCommit,
+	}
+
+	const n = 5
+	errs := make([]error, n)
+	mergedFlags := make([]bool, n)
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := range n {
+		go func(idx int) {
+			defer wg.Done()
+			logger := logging.NewNoopLogger(t)
+			mergedFlags[idx], errs[idx] = wd.MergeAgain(logger, models.Repo{CloneURL: repoDir}, pullRequest, "default")
+		}(i)
+	}
+	wg.Wait()
+
+	for _, err := range errs {
+		Ok(t, err)
+	}
+
+	// At least one goroutine must report that the working tree was refreshed
+	// (the leader that performed the merge or a follower that received the result).
+	refreshed := 0
+	for _, m := range mergedFlags {
+		if m {
+			refreshed++
+		}
+	}
+	Assert(t, refreshed >= 1, "expected at least one goroutine to report merged=true, got %d/%d", refreshed, n)
+
+	// The file added to main after the initial clone must be present, confirming
+	// the upstream merge was applied to disk.
+	assert.FileExists(t, filepath.Join(workspaceDir, "base-update.txt"))
+	assert.FileExists(t, filepath.Join(workspaceDir, "pr-file.txt"))
 }
 
 func TestHasDiverged_MasterHasDiverged(t *testing.T) {

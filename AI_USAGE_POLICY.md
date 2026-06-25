@@ -31,16 +31,25 @@ Current AI tools are useful as coding assistants — but not as autonomous contr
 
 ## AI Tooling in Atlantis Workflows
 
-Atlantis maintainers use the following AI tools as part of the standard development workflow:
+Atlantis maintainers use several AI tools as part of the development workflow. These tools may change over time as the ecosystem evolves.
 
-* **GitHub Copilot / Claude** — Used to assist with code authorship, refactoring, and documentation. See [AGENTS.md](AGENTS.md) for guidance on how AI coding agents should interact with this repository.
-* **CodeRabbit** — Used as an automated AI code reviewer on pull requests. CodeRabbit comments are suggestions and starting points; contributors and maintainers apply human judgment to decide what to act on.
+### Dosu
 
-When responding to CodeRabbit review comments, contributors should:
+[Dosu](https://dosu.dev/) is used in Issues to help provide users with context to the codebase. Feel free to ask it follow-up questions via `@dosu`, but note that it is only basing its answers on the code and history, so may lack high-level goals of the project.
+
+### Copilot
+
+[GitHub Copilot](https://github.com/features/copilot) is used in Pull Requests to summarize, as well as add comments and suggestions.
+
+When responding to Copilot review comments, contributors should:
 
 * Evaluate each suggestion on its technical merits
 * Not blindly apply AI-suggested changes without understanding them
 * Feel free to dismiss suggestions that are incorrect or not applicable, with a brief explanation
+
+Reviewers will typically require that all comments be resolved before approving a pull request, including comments from Copilot. Contributors are expected to apply human judgment and may dismiss suggestions that are incorrect, irrelevant, or not useful, but comments should still be explicitly resolved. If these automated reviews stop providing enough value to justify the overhead, we may revisit this policy.
+
+See [AGENTS.md](AGENTS.md) for guidance on how AI coding agents should interact with this repository.
 
 ## Legal and Licensing Considerations
 

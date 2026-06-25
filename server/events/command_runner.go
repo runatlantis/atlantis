@@ -7,10 +7,11 @@ package events
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -19,7 +20,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
-	"github.com/runatlantis/atlantis/server/utils"
 	"github.com/uber-go/tally/v4"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -141,7 +141,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+		log.Err("Unable to fetch pull status, this is likely a bug: %s", err)
 	}
 
 	scope := c.StatsScope.SubScope("autoplan")
@@ -185,7 +185,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		labels, err := c.VCSClient.GetPullLabels(ctx.Log, baseRepo, pull)
 		if err != nil {
 			ctx.Log.Err("Unable to get VCS pull/merge request labels: %s. Proceeding with autoplan.", err)
-		} else if utils.SlicesContains(labels, c.DisableAutoplanLabel) {
+		} else if slices.Contains(labels, c.DisableAutoplanLabel) {
 			ctx.Log.Info("Pull/merge request has disable auto plan label '%s' so not running autoplan.", c.DisableAutoplanLabel)
 			return
 		}
@@ -345,7 +345,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+		log.Err("Unable to fetch pull status, this is likely a bug: %s", err)
 	}
 
 	ctx := &command.Context{
@@ -517,7 +517,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	}
 
 	if err != nil {
-		log.Err(err.Error())
+		log.Err("%s", err.Error())
 		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err), ""); commentErr != nil {
 			log.Err("unable to comment: %s", commentErr)
 		}

@@ -8,6 +8,8 @@
 package models
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
@@ -19,6 +21,34 @@ import (
 
 	"github.com/runatlantis/atlantis/server/logging"
 )
+
+// HashPolicyItem returns the SHA-256 hex digest of a policy output item.
+func HashPolicyItem(item string) string {
+	h := sha256.Sum256([]byte(item))
+	return hex.EncodeToString(h[:])
+}
+
+// policyItemHashes returns deduplicated SHA-256 hex digests of substrings
+// matched by re in policyOutput, in first-seen order. If the regex produces
+// no matches (including when policyOutput is empty), the raw policyOutput
+// itself is hashed so there is always at least one hash.
+func policyItemHashes(policyOutput string, re *regexp.Regexp) []string {
+	matches := re.FindAllString(policyOutput, -1)
+	hashes := make([]string, 0, len(matches))
+	seen := make(map[string]struct{}, len(matches))
+	for _, m := range matches {
+		h := HashPolicyItem(m)
+		if _, ok := seen[h]; ok {
+			continue
+		}
+		seen[h] = struct{}{}
+		hashes = append(hashes, h)
+	}
+	if len(hashes) == 0 {
+		hashes = append(hashes, HashPolicyItem(policyOutput))
+	}
+	return hashes
+}
 
 type PullReqStatus struct {
 	ApprovalStatus  ApprovalStatus
@@ -159,6 +189,13 @@ type MergeableStatus struct {
 	IsMergeable bool
 	// Short human readable explanation of why the PR is (or is not) mergeable
 	Reason string
+	// BlockingStatuses holds the names of the commit statuses that caused the
+	// pull request to be considered not mergeable because of the project's
+	// "Only allow merge if pipeline succeeds" setting. It lets per-project
+	// command requirement checks ignore statuses that belong to other projects
+	// in the same pull request (a failing plan in project B must not block an
+	// apply of project A). Currently only populated by the GitLab client.
+	BlockingStatuses []string
 }
 
 // PullRequest is a VCS pull request.
@@ -396,26 +433,90 @@ type PlanSuccess struct {
 	MergedAgain bool
 }
 
-type PolicySetResult struct {
-	PolicySetName string
-	PolicyOutput  string
-	Passed        bool
-	ReqApprovals  int
-	CurApprovals  int
+func NewPolicySetResult(policySetName string, policyOutput string, passed bool, reqApprovalCount int, policyItemRegex string) (*PolicySetResult, error) {
+	re, err := regexp.Compile(policyItemRegex)
+	if err != nil {
+		return nil, fmt.Errorf("compiling policy_item_regex %q for policy set %q: %w", policyItemRegex, policySetName, err)
+	}
+	hashes := policyItemHashes(policyOutput, re)
+	return &PolicySetResult{
+		PolicySetName:    policySetName,
+		PolicyOutput:     policyOutput,
+		Passed:           passed,
+		ReqApprovalCount: reqApprovalCount,
+		Hashes:           hashes,
+		PolicyItemRegex:  policyItemRegex,
+	}, nil
 }
 
-// PolicySetApproval tracks the number of approvals a given policy set has.
+type PolicySetResult struct {
+	PolicySetName    string
+	PolicyOutput     string
+	Passed           bool
+	ReqApprovalCount int
+	Approvals        []PolicySetApproval
+	Hashes           []string
+	PolicyItemRegex  string
+}
+
+type PolicySetApproval struct {
+	Approver string
+	Hashes   []string
+}
+
+// ApprovalCoversAllHashes reports whether approvalHashes contains every element of required.
+func ApprovalCoversAllHashes(approvalHashes, required []string) bool {
+	if len(required) == 0 {
+		return true
+	}
+	set := make(map[string]struct{}, len(approvalHashes))
+	for _, h := range approvalHashes {
+		set[h] = struct{}{}
+	}
+	for _, h := range required {
+		if _, ok := set[h]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// PolicySetStatus tracks the approval state for a given policy set.
 type PolicySetStatus struct {
-	PolicySetName string
-	Passed        bool
-	Approvals     int
+	PolicySetName   string
+	Passed          bool
+	Approvals       []PolicySetApproval
+	Hashes          []string
+	PolicyItemRegex string
+}
+
+// GetCurApprovals returns the number of approvals that cover all hashes in this policy set.
+func (pss *PolicySetStatus) GetCurApprovals() int {
+	n := 0
+	for _, approval := range pss.Approvals {
+		if ApprovalCoversAllHashes(approval.Hashes, pss.Hashes) {
+			n++
+		}
+	}
+	return n
+}
+
+func (pss *PolicySetStatus) OwnerHasFullyApproved(owner string) bool {
+	for _, approval := range pss.Approvals {
+		if approval.Approver == owner && ApprovalCoversAllHashes(approval.Hashes, pss.Hashes) {
+			return true
+		}
+	}
+	return false
 }
 
 // Summary regexes
 var (
 	reChangesOutside = regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
-	rePlanChanges    = regexp.MustCompile(`Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy.`)
-	reNoChanges      = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
+	rePlanChanges    = regexp.MustCompile(
+		`Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy(?:, (\d+) to forget)?\.`,
+	)
+	reNoChanges = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 )
 
 // Summary extracts summaries of plan changes from TerraformOutput.
@@ -542,7 +643,7 @@ func (p *PolicyCheckResults) Summary() string {
 func (p *PolicyCheckResults) PolicyCleared() bool {
 	passing := true
 	for _, policySetResult := range p.PolicySetResults {
-		if !policySetResult.Passed && (policySetResult.CurApprovals != policySetResult.ReqApprovals) {
+		if !policySetResult.Passed && (policySetResult.GetCurApprovals() < policySetResult.ReqApprovalCount) {
 			passing = false
 		}
 	}
@@ -555,13 +656,47 @@ func (p *PolicyCheckResults) PolicySummary() string {
 	for _, policySetResult := range p.PolicySetResults {
 		if policySetResult.Passed {
 			summary = append(summary, fmt.Sprintf("policy set: %s: passed.", policySetResult.PolicySetName))
-		} else if policySetResult.CurApprovals == policySetResult.ReqApprovals {
+		} else if policySetResult.GetCurApprovals() >= policySetResult.ReqApprovalCount {
 			summary = append(summary, fmt.Sprintf("policy set: %s: approved.", policySetResult.PolicySetName))
 		} else {
-			summary = append(summary, fmt.Sprintf("policy set: %s: requires: %d approval(s), have: %d.", policySetResult.PolicySetName, policySetResult.ReqApprovals, policySetResult.CurApprovals))
+			summary = append(summary, fmt.Sprintf("policy set: %s: requires: %d approval(s), have: %d.", policySetResult.PolicySetName, policySetResult.ReqApprovalCount, policySetResult.GetCurApprovals()))
 		}
 	}
 	return strings.Join(summary, "\n")
+}
+
+// GetCurApprovals returns the number of approvals that cover all hashes in this policy set result.
+func (p *PolicySetResult) GetCurApprovals() int {
+	n := 0
+	for _, approval := range p.Approvals {
+		if ApprovalCoversAllHashes(approval.Hashes, p.Hashes) {
+			n++
+		}
+	}
+	return n
+}
+
+// ApprovedHashes returns the deduplicated union of hashes across all approvals.
+func (p *PolicySetResult) ApprovedHashes() []string {
+	seen := make(map[string]struct{})
+	var result []string
+	for _, approval := range p.Approvals {
+		for _, h := range approval.Hashes {
+			if _, ok := seen[h]; !ok {
+				seen[h] = struct{}{}
+				result = append(result, h)
+			}
+		}
+	}
+	return result
+}
+
+func (p *PolicySetResult) PolicySetHashes(policyItemRegex string) ([]string, error) {
+	re, err := regexp.Compile(policyItemRegex)
+	if err != nil {
+		return nil, fmt.Errorf("compiling policy_item_regex %q: %w", policyItemRegex, err)
+	}
+	return policyItemHashes(p.PolicyOutput, re), nil
 }
 
 type VersionSuccess struct {
@@ -587,12 +722,23 @@ func (p PullStatus) StatusCount(status ProjectPlanStatus) int {
 	return c
 }
 
+// ProjectCounts holds the success/failure counts for a set of project operations.
+// For command.Apply: Errored counts projects with apply errors. NoChanges is a
+// subset of Success (projects that were already up to date count as successful).
+// NoChanges is ignored for all other commands.
+type ProjectCounts struct {
+	Success   int
+	Total     int
+	Errored   int
+	NoChanges int
+}
+
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
 	Workspace   string
 	RepoRelDir  string
 	ProjectName string
-	// PolicySetApprovals tracks the approval status of every PolicySet for a Project.
+	// PolicyStatus tracks the policy check status for each policy set.
 	PolicyStatus []PolicySetStatus
 	// Status is the status of where this project is at in the planning cycle.
 	Status ProjectPlanStatus
@@ -621,11 +767,11 @@ const (
 	// DiscardedPlanStatus means that there was an unapplied plan that was
 	// discarded due to a project being unlocked
 	DiscardedPlanStatus
-	// ErroredPolicyCheckStatus means that there was an unapplied plan that was
-	// discarded due to a project being unlocked
+	// ErroredPolicyCheckStatus means that the policy check errored or has
+	// failing policies.
 	ErroredPolicyCheckStatus
-	// PassedPolicyCheckStatus means that there was an unapplied plan that was
-	// discarded due to a project being unlocked
+	// PassedPolicyCheckStatus means that all policy checks passed or were
+	// approved.
 	PassedPolicyCheckStatus
 )
 
@@ -749,8 +895,8 @@ type WorkflowHookCommandContext struct {
 
 // PlanSuccessStats holds stats for a plan.
 type PlanSuccessStats struct {
-	Import, Add, Change, Destroy int
-	Changes, ChangesOutside      bool
+	Import, Add, Change, Destroy, Forget int
+	Changes, ChangesOutside              bool
 }
 
 func NewPlanSuccessStats(output string) PlanSuccessStats {
@@ -766,14 +912,17 @@ func NewPlanSuccessStats(output string) PlanSuccessStats {
 	// stats reflect the total across all units.
 	//
 	// m[1] is the optional "X to import" group: it is an empty string for
-	// plans without import blocks, so it must be parsed leniently. m[2..4]
-	// are always present in a match because rePlanChanges only matches the
-	// full "Plan: ... to add, ... to change, ... to destroy." form.
+	// plans without import blocks. m[5] is the optional "X to forget" group:
+	// it is absent or empty for plans without forget blocks. All captures must
+	// be parsed leniently.
 	for _, m := range matches {
 		s.Import += parsePlanCount(m[1])
 		s.Add += parsePlanCount(m[2])
 		s.Change += parsePlanCount(m[3])
 		s.Destroy += parsePlanCount(m[4])
+		if len(m) > 5 && m[5] != "" {
+			s.Forget += parsePlanCount(m[5])
+		}
 	}
 
 	return s
