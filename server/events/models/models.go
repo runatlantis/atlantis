@@ -703,6 +703,17 @@ func (p PullStatus) StatusCount(status ProjectPlanStatus) int {
 	return c
 }
 
+// ProjectCounts holds the success/failure counts for a set of project operations.
+// For command.Apply: Errored counts projects with apply errors. NoChanges is a
+// subset of Success (projects that were already up to date count as successful).
+// NoChanges is ignored for all other commands.
+type ProjectCounts struct {
+	Success   int
+	Total     int
+	Errored   int
+	NoChanges int
+}
+
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
 	Workspace   string

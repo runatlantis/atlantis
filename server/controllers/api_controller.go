@@ -257,13 +257,13 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		// When silence is enabled and no projects are found, don't set any VCS status
 		if !a.SilenceVCSStatusNoProjects {
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update plan status: %s", err)
 			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update policy check status: %s", err)
 			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update apply status: %s", err)
 			}
 		} else {
@@ -305,13 +305,13 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 		// When silence is enabled and no projects are found, don't set any VCS status
 		if !a.SilenceVCSStatusNoProjects {
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update plan status: %s", err)
 			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update policy check status: %s", err)
 			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update apply status: %s", err)
 			}
 		} else {
