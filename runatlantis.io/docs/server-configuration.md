@@ -1120,6 +1120,9 @@ This prevents merge requests from being merged until all Terraform applies are c
 
 When enabled, after running `atlantis plan`, the MR status will show as pending if there are changes
 to apply. Once all projects are successfully applied (or show no changes), the status will update to success.
+Projects with no Terraform changes are counted as up to date rather than applied. If a pull request has both
+up-to-date projects and projects still waiting to apply, the Atlantis apply commit status remains pending
+until all changed projects are applied.
 
 Defaults to `false`.
 

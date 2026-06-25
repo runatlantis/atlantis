@@ -18,7 +18,7 @@
 ⚠️ **Known failing test:** `TestNewServer_GitHubUser` in server/server_test.go - pre-existing, ignore it
 
 **Lint/Format:** `make check-fmt` (ALWAYS works) • `make fmt` (auto-format)
-⚠️ **Known issue:** `make lint` fails with Go 1.25+ version mismatch. Use `make check-fmt` locally, CI handles linting.
+⚠️ **Known issue:** `make lint` fails with Go 1.25+ version mismatch, and `check-lint` was removed. Use `make check-fmt` locally; CI handles linting.
 
 **Mocks:** `make go-generate` (regenerate after interface changes) • `make regen-mocks` (delete & regenerate all)
 
@@ -60,6 +60,20 @@
 **Config changes:** Edit `server/core/config/valid/` or `raw/` → Update `server/user_config.go` → Test in `server/core/config/*_test.go`
 
 **Terraform execution:** Modify `server/core/terraform/tfclient/terraform_client.go` or `server/core/runtime/*_step_runner.go` (uses `hashicorp/hc-install`)
+
+**Combined VCS statuses:** `server/events/commit_status_updater.go` uses `models.ProjectCounts`. For failed apply/policy status text, count actual errored projects with `Errored`, not `Total - Success`, because planned or untouched projects may still be pending. For apply status text, `NoChanges` is a subset of `Success` and should be reported as up to date, not applied.
+
+**VCS status contexts:** Always pass generated commit status contexts through `truncateContext` before calling `UpdateStatus`. GitHub rejects contexts longer than 255 characters, and project names or workflow hook descriptions can exceed that limit.
+
+**Apply requirements:** API apply requests must populate `command.Context.PullRequestStatus` before evaluating apply requirements, and refresh it after the API plan phase. If pull status cannot be fetched, keep the fail-closed behavior for `approved` and `mergeable`.
+
+**GitLab mergeable applies:** `mergeable` apply requirements are scoped per project only when GitLab reports blocking Atlantis per-project plan statuses for other projects. Preserve the conservative behavior: the current project's own plan, external CI, approvals, conflicts, and unknown blockers still fail the requirement.
+
+**GitLab mergeability status filtering:** GitLab `PullIsMergeable` must filter commit statuses to the merge request's current ref/SHA before deciding which statuses block mergeability. Do not let stale statuses from another branch, ref, or earlier commit contaminate the MR's mergeability result.
+
+**Apply locks:** Global apply lock check errors must reject `atlantis apply`, set the command as errored, update the apply status to failed, and comment that the lock backend must be reachable. Do not fall back to allowing applies when the lock backend is unavailable.
+
+**Plan statistics:** `models.NewPlanSuccessStats` parses Terraform/OpenTofu summary lines including `to forget`. Preserve import/add/change/destroy/forget counts when changing plan rendering or parser regexes.
 
 **GitHub App merge checkout:** In `server/events/working_dir.go`, `CheckoutMerge` with `GithubAppEnabled` and a PR number fetches `pull/<n>/head` from `origin` and intentionally skips the `source` remote. Preserve this fork-safe behavior when changing clone, fetch, or divergence logic.
 
