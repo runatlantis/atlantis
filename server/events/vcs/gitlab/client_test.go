@@ -1144,6 +1144,7 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 	// pipeline-success.json: iid=13, source_branch="patch-1-merger".
 	const mrSourceBranch = "patch-1-merger"
 	const mrHeadRef = "refs/merge-requests/13/head"
+	const mrMergeRef = "refs/merge-requests/13/merge"
 
 	cases := []struct {
 		description   string
@@ -1303,6 +1304,30 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			expState: models.MergeableStatus{
 				IsMergeable: false,
 				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+			},
+		},
+		{
+			description:   "own merge-result ref failed plan still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "failed", Ref: mrMergeRef},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+			},
+		},
+		{
+			description:   "own merge-result ref is kept when head-ref status exists",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success", Ref: mrHeadRef},
+				{Name: "ci/merged-result", Status: "failed", Ref: mrMergeRef},
+				{Name: "ci/shared-branch", Status: "failed", Ref: mrSourceBranch},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/merged-result has status failed",
 			},
 		},
 		{

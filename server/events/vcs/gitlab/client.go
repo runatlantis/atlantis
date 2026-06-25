@@ -346,10 +346,10 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	// leaks here and can self-block the current MR.
 	//
 	// Filter strategy:
-	//   1. Statuses whose Ref equals refs/merge-requests/<iid>/head are
-	//      unambiguously owned by this MR.
-	//   2. If any such head-ref status exists for this SHA, restrict the
-	//      evaluation to head-ref + refless statuses. Statuses tagged with the
+	//   1. Statuses whose Ref equals refs/merge-requests/<iid>/head or
+	//      refs/merge-requests/<iid>/merge are unambiguously owned by this MR.
+	//   2. If any such MR-ref status exists for this SHA, restrict the
+	//      evaluation to MR-ref + refless statuses. Statuses tagged with the
 	//      source_branch are dropped because the same branch may back several
 	//      MRs and a stale status could leak.
 	//   3. Otherwise fall back to source_branch + refless statuses, preserving
@@ -357,17 +357,21 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	// Empty Ref is always treated as MR-owned (backward-compat for callers
 	// that post refless statuses).
 	expectedHeadRef := fmt.Sprintf("refs/merge-requests/%d/head", mr.IID)
-	hasHeadRefStatus := false
+	expectedMergeRef := fmt.Sprintf("refs/merge-requests/%d/merge", mr.IID)
+	isCurrentMRRef := func(ref string) bool {
+		return ref == expectedHeadRef || ref == expectedMergeRef
+	}
+	hasMRRefStatus := false
 	for _, status := range statuses {
-		if status.Ref == expectedHeadRef {
-			hasHeadRefStatus = true
+		if isCurrentMRRef(status.Ref) {
+			hasMRRefStatus = true
 			break
 		}
 	}
 	for _, status := range statuses {
 		if status.Ref != "" {
-			if hasHeadRefStatus {
-				if status.Ref != expectedHeadRef {
+			if hasMRRefStatus {
+				if !isCurrentMRRef(status.Ref) {
 					continue
 				}
 			} else if status.Ref != mr.SourceBranch {
