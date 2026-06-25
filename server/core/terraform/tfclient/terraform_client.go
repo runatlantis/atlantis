@@ -370,7 +370,7 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 	log := ctx.Log.With("duration", dur)
 	if err != nil {
 		err = fmt.Errorf("running '%s' in '%s': %w", tfCmd, path, err)
-		log.Err(err.Error())
+		log.Err("%s", err.Error())
 		return ansi.Strip(string(out)), err
 	}
 	log.Info("Successfully ran '%s' in '%s'", tfCmd, path)
