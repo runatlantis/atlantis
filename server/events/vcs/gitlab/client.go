@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -377,6 +378,12 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		_, hasCurrentMRStatusWithSameName := currentMRStatusNames[status.Name]
 		return !hasCurrentMRStatusWithSameName
 	}
+	// Collect every blocking status (rather than returning on the first) so that
+	// a per-project command requirement check can tell whether the only blockers
+	// are plan statuses belonging to other projects in the same merge request.
+	// See DefaultCommandRequirementHandler.
+	blockingStatusState := make(map[string]string)
+	var blockingStatuses []string
 	for _, status := range statuses {
 		if status.Ref != "" {
 			if hasMRRefStatus {
@@ -394,13 +401,12 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
-			return models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s has status %s", status.Name, status.Status),
-			}, nil
+			if _, seen := blockingStatusState[status.Name]; !seen {
+				blockingStatusState[status.Name] = status.Status
+				blockingStatuses = append(blockingStatuses, status.Name)
+			}
 		}
 	}
-
 	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus(logger)
 	if err != nil {
 		return models.MergeableStatus{}, err
@@ -413,6 +419,20 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 
 	res := isMergeable(mr, project, supportsDetailedMergeStatus)
+	if !res.IsMergeable {
+		logger.Debug("Merge request is not mergeable")
+		return res, nil
+	}
+	if len(blockingStatuses) > 0 {
+		// Sort so the reported Reason and the BlockingStatuses slice are
+		// deterministic, independent of the order GitLab returns statuses in.
+		sort.Strings(blockingStatuses)
+		res = models.MergeableStatus{
+			IsMergeable:      false,
+			Reason:           fmt.Sprintf("Pipeline %s has status %s", blockingStatuses[0], blockingStatusState[blockingStatuses[0]]),
+			BlockingStatuses: blockingStatuses,
+		}
+	}
 	if res.IsMergeable {
 		logger.Debug("Merge request is mergeable")
 	} else {

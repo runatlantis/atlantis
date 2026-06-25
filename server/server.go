@@ -710,7 +710,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	applyRequirementHandler := &events.DefaultCommandRequirementHandler{
-		WorkingDir: workingDir,
+		WorkingDir:    workingDir,
+		VCSStatusName: userConfig.VCSStatusName,
 		ProjectImpactResolver: events.NewUndivergedProjectImpactResolver(
 			parserValidator,
 			projectFinder,
