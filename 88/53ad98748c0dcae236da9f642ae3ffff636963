@@ -1,0 +1,33 @@
+runatlantis.io/blog/2019/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage.md
+  s_8f7c2bca1dd5c7::t_78a4860eb6a80b 18
+runatlantis.io/docs/policy-checking.md
+  s_8f7c2bca1dd5c7::t_78a4860eb6a80b 223-231
+runatlantis.io/docs/repo-level-atlantis-yaml.md
+  s_8f7c2bca1dd5c7::t_78a4860eb6a80b 419
+runatlantis.io/docs/server-side-repo-config.md
+  s_8f7c2bca1dd5c7::t_78a4860eb6a80b 532-550,599-606
+runatlantis.io/docs/post-workflow-hooks.md
+  s_8f7c2bca1dd5c7::t_78a4860eb6a80b 94-99
+runatlantis.io/docs/server-configuration.md
+  s_8f7c2bca1dd5c7::t_78a4860eb6a80b 320
+runatlantis.io/docs/pre-workflow-hooks.md
+  s_8f7c2bca1dd5c7::t_78a4860eb6a80b 91-96
+runatlantis.io/docs/custom-workflows.md
+  s_8f7c2bca1dd5c7::t_78a4860eb6a80b 583-585,628,703-707,745-751
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "8853ad98748c0dcae236da9f642ae3ffff636963",
+  "prompts": {},
+  "sessions": {
+    "s_8f7c2bca1dd5c7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019efeec-2468-7b01-9d49-1210b76aa1d6",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
