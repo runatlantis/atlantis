@@ -1140,7 +1140,8 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 	projectSuccess, err := os.ReadFile("testdata/project-success.json")
 	Ok(t, err)
 
-	mrData := mustReadFile(t, "testdata/pipeline-success.json")
+	mergeableMRData := mustReadFile(t, "testdata/pipeline-success.json")
+	approvalsBlockedMRData := mustReadFile(t, "testdata/pipeline-remaining-approvals.json")
 
 	type testStatus struct {
 		Name     string
@@ -1157,6 +1158,7 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 	cases := []struct {
 		description   string
 		vcsStatusName string
+		mrData        []byte
 		statuses      []testStatus
 		expState      models.MergeableStatus
 	}{
@@ -1311,6 +1313,18 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				IsMergeable:      false,
 				Reason:           "Pipeline ci/aaa has status running",
 				BlockingStatuses: []string{"ci/aaa", "ci/zzz"},
+			},
+		},
+		{
+			description:   "MR-level blocker is not bypassed by unrelated plan blocker",
+			vcsStatusName: vcsStatusName,
+			mrData:        approvalsBlockedMRData,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan: other-project", vcsStatusName), Status: "failed"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Still require 2 approvals",
 			},
 		},
 		{
@@ -1480,6 +1494,10 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 	for _, c := range cases {
 		for _, serverVersion := range gitlabVersions {
 			t.Run(fmt.Sprintf("%s_%s", c.description, serverVersion), func(t *testing.T) {
+				mrData := c.mrData
+				if mrData == nil {
+					mrData = mergeableMRData
+				}
 				// Build the commit statuses JSON response
 				var statusEntries []string
 				for i, s := range c.statuses {

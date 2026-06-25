@@ -407,17 +407,6 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 			}
 		}
 	}
-	if len(blockingStatuses) > 0 {
-		// Sort so the reported Reason and the BlockingStatuses slice are
-		// deterministic, independent of the order GitLab returns statuses in.
-		sort.Strings(blockingStatuses)
-		return models.MergeableStatus{
-			IsMergeable:      false,
-			Reason:           fmt.Sprintf("Pipeline %s has status %s", blockingStatuses[0], blockingStatusState[blockingStatuses[0]]),
-			BlockingStatuses: blockingStatuses,
-		}, nil
-	}
-
 	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus(logger)
 	if err != nil {
 		return models.MergeableStatus{}, err
@@ -430,6 +419,20 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 
 	res := isMergeable(mr, project, supportsDetailedMergeStatus)
+	if !res.IsMergeable {
+		logger.Debug("Merge request is not mergeable")
+		return res, nil
+	}
+	if len(blockingStatuses) > 0 {
+		// Sort so the reported Reason and the BlockingStatuses slice are
+		// deterministic, independent of the order GitLab returns statuses in.
+		sort.Strings(blockingStatuses)
+		res = models.MergeableStatus{
+			IsMergeable:      false,
+			Reason:           fmt.Sprintf("Pipeline %s has status %s", blockingStatuses[0], blockingStatusState[blockingStatuses[0]]),
+			BlockingStatuses: blockingStatuses,
+		}
+	}
 	if res.IsMergeable {
 		logger.Debug("Merge request is mergeable")
 	} else {

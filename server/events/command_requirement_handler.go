@@ -119,7 +119,7 @@ func (a *DefaultCommandRequirementHandler) mergeableIgnoringOtherProjectPlans(ct
 	if len(status.BlockingStatuses) == 0 || a.VCSStatusName == "" {
 		return false
 	}
-	ownPlanStatus := fmt.Sprintf("%s/plan: %s", a.VCSStatusName, ctx.ProjectID())
+	ownPlanStatus := truncateContext(fmt.Sprintf("%s/plan: %s", a.VCSStatusName, ctx.ProjectID()))
 	for _, name := range status.BlockingStatuses {
 		switch {
 		case name == ownPlanStatus:

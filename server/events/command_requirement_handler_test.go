@@ -4,7 +4,9 @@
 package events_test
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"strings"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
@@ -238,6 +240,8 @@ func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
 	repoDir := "repoDir"
 	const vcsStatusName = "atlantis"
 	mergeableReq := []string{raw.MergeableRequirement}
+	longProjectName := strings.Repeat("very-long-project-name-", 20)
+	truncatedOwnPlanStatus := truncateStatusContextForTest(fmt.Sprintf("%s/plan: %s", vcsStatusName, longProjectName))
 
 	tests := []struct {
 		name          string
@@ -391,6 +395,22 @@ func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
 			wantFailure: "Pull request must be mergeable before running apply (Pipeline atlantis/plan: infra/staging/default has status failed).",
 		},
 		{
+			name:          "truncated own project plan status still blocks",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				ProjectName:       longProjectName,
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           fmt.Sprintf("Pipeline %s has status failed", truncatedOwnPlanStatus),
+						BlockingStatuses: []string{truncatedOwnPlanStatus},
+					},
+				},
+			},
+			wantFailure: fmt.Sprintf("Pull request must be mergeable before running apply (Pipeline %s has status failed).", truncatedOwnPlanStatus),
+		},
+		{
 			name:          "empty vcs status name disables per-project scoping and stays blocked",
 			vcsStatusName: "",
 			ctx: command.ProjectContext{
@@ -421,6 +441,16 @@ func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
 			assert.Equal(t, tt.wantFailure, gotFailure)
 		})
 	}
+}
+
+func truncateStatusContextForTest(s string) string {
+	const maxStatusContext = 255
+	if len(s) <= maxStatusContext {
+		return s
+	}
+	hash := sha256.Sum256([]byte(s))
+	suffix := fmt.Sprintf("-%x", hash[:6])
+	return s[:maxStatusContext-len(suffix)] + suffix
 }
 
 func TestRequirements_ValidateProjectDependencies(t *testing.T) {
