@@ -5,6 +5,7 @@
 package events
 
 import (
+	"crypto/sha256"
 	"fmt"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
@@ -102,14 +103,21 @@ func genProjectStatusDescription(cmdName, description string) string {
 // maxStatusContext is the maximum number of characters allowed by the GitHub
 // Statuses API for the "context" field. Exceeding this limit causes a 422.
 // See https://docs.github.com/en/rest/commits/statuses
-const maxStatusContext = 255
+const (
+	maxStatusContext            = 255
+	statusContextHashLength     = 12
+	statusContextHashPrefixSize = statusContextHashLength / 2
+)
 
-// truncateContext shortens s to maxStatusContext characters if needed.
+// truncateContext shortens s to maxStatusContext characters if needed while
+// preserving uniqueness for contexts that share the same long prefix.
 func truncateContext(s string) string {
 	if len(s) <= maxStatusContext {
 		return s
 	}
-	return s[:maxStatusContext]
+	hash := sha256.Sum256([]byte(s))
+	suffix := fmt.Sprintf("-%x", hash[:statusContextHashPrefixSize])
+	return s[:maxStatusContext-len(suffix)] + suffix
 }
 
 func (d *DefaultCommitStatusUpdater) UpdatePreWorkflowHook(log logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
