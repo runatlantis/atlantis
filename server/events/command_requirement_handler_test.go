@@ -19,6 +19,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
@@ -453,7 +454,7 @@ func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
 				VCSStatusName: tt.vcsStatusName,
 			}
 			gotFailure, err := a.ValidateApplyProject(repoDir, tt.ctx)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.wantFailure, gotFailure)
 		})
 	}
@@ -508,7 +509,7 @@ func TestAggregateCommandRequirements_MergeableScopingOnlyAppliesToApply(t *test
 				VCSStatusName: vcsStatusName,
 			}
 			gotFailure, err := tt.validate(a, repoDir, tt.ctx)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.wantFailure, gotFailure)
 		})
 	}
