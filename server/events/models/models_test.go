@@ -1742,6 +1742,27 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
         }
     }`,
 		},
+		{
+			"heredoc terminator with terraform suffix exits heredoc mode",
+			`  # terraform_data.example will be updated in-place
+  ~ resource "terraform_data" "example" {
+      ~ output = <<-EOT
+          old
+        EOT -> (known after apply)
+      + triggers_replace = [
+          + "changed",
+        ]
+    }`,
+			`# terraform_data.example will be updated in-place
+!   resource "terraform_data" "example" {
+!       output = <<-EOT
+          old
+        EOT -> (known after apply)
++       triggers_replace = [
++           "changed",
+        ]
+    }`,
+		},
 	}
 
 	for _, tt := range tests {

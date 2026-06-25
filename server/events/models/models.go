@@ -608,7 +608,8 @@ func diffMarkdownHeredocStart(line string) (string, int, int, bool) {
 }
 
 func isDiffMarkdownHeredocEnd(line string, delimiter string, indent int) bool {
-	return line == strings.Repeat(" ", indent)+delimiter
+	terminator := strings.Repeat(" ", indent) + delimiter
+	return line == terminator || strings.HasPrefix(line, terminator+" -> ")
 }
 
 func formatHeredocDiffMarkdownLine(line string, diffMarkerIndent int) string {
