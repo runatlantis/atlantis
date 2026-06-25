@@ -84,7 +84,7 @@ func (g *GithubAppController) ExchangeCode(w http.ResponseWriter, r *http.Reques
 		CleanedBasePath: g.AtlantisURL.Path,
 	})
 	if err != nil {
-		g.Logger.Err(err.Error())
+		g.Logger.Err("%s", err.Error())
 	}
 }
 
@@ -152,7 +152,7 @@ func (g *GithubAppController) New(w http.ResponseWriter, _ *http.Request) {
 		Manifest: string(jsonManifest),
 	})
 	if err != nil {
-		g.Logger.Err(err.Error())
+		g.Logger.Err("%s", err.Error())
 	}
 }
 

@@ -191,7 +191,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	// include a link to view the progress of atlantis plan command in real
 	// time
 	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus, nil); err != nil {
-		ctx.Log.Err("updating project PR status", err)
+		ctx.Log.Err("updating project PR status: %s", err)
 	}
 
 	// ensures we are differentiating between project level command and overall command
@@ -199,14 +199,14 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 
 	if result.Error != nil || result.Failure != "" {
 		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus, &result); err != nil {
-			ctx.Log.Err("updating project PR status", err)
+			ctx.Log.Err("updating project PR status: %s", err)
 		}
 
 		return result
 	}
 
 	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus, &result); err != nil {
-		ctx.Log.Err("updating project PR status", err)
+		ctx.Log.Err("updating project PR status: %s", err)
 	}
 
 	return result
@@ -654,7 +654,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// can be run after the conftest step.
 	// Only log outputs as errors if policies did not pass, otherwise log at debug level
 	if !result.PolicyCleared() {
-		ctx.Log.Err(strings.Join(outputs, "\n"))
+		ctx.Log.Err("%s", strings.Join(outputs, "\n"))
 		failure = "Some policy sets did not pass."
 	} else {
 		ctx.Log.Debug("policy check outputs %s", strings.Join(outputs, "\n"))

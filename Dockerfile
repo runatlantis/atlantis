@@ -38,7 +38,7 @@ WORKDIR /app
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
 # renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
-ENV BUILDER_BASH_VERSION="5.3.3-r1"
+ENV BUILDER_BASH_VERSION="5.3.9-r1"
 
 RUN apk add --no-cache \
     bash=${BUILDER_BASH_VERSION}

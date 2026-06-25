@@ -188,7 +188,7 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 }
 
 func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
-	ctx.Log.Debug("policy sets, %s ", ctx.PolicySets)
+	ctx.Log.Debug("policy sets, %v ", ctx.PolicySets)
 
 	inputFile := filepath.Join(workdir, ctx.GetShowResultFileName())
 	var policySetResults []models.PolicySetResult
