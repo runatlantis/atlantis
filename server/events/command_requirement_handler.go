@@ -76,7 +76,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 			}
 		case raw.MergeableRequirement:
 			mergeableStatus := ctx.PullReqStatus.MergeableStatus
-			if !mergeableStatus.IsMergeable && !a.mergeableIgnoringOtherProjectPlans(ctx, mergeableStatus) {
+			if !mergeableStatus.IsMergeable && (cmd != command.Apply || !a.mergeableIgnoringOtherProjectPlans(ctx, mergeableStatus)) {
 				suffix := ""
 				if mergeableStatus.Reason != "" {
 					suffix = fmt.Sprintf(" (%s)", mergeableStatus.Reason)
@@ -99,9 +99,10 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 }
 
 // mergeableIgnoringOtherProjectPlans reports whether the merge request should be
-// treated as mergeable for THIS project's command even though the MR-wide
-// mergeable check failed, because every blocking commit status is an Atlantis
-// per-project plan status that belongs to another project.
+// treated as mergeable for THIS project's apply even though the MR-wide
+// mergeable check failed, because every blocking commit status is either an
+// Atlantis per-project plan status that belongs to another project, or the
+// aggregate Atlantis plan status caused by one of those other project blockers.
 //
 // A per-project apply only depends on that project's own plan. A failing plan
 // in an unrelated project in the same merge request must not block it. The
@@ -110,8 +111,9 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 // the project command runner.
 //
 // This is conservative: if the MR is blocked for any reason other than other
-// projects' plan statuses (approvals, conflicts, divergence, external CI, or a
-// provider that does not populate BlockingStatuses), it stays blocked.
+// projects' plan statuses (approvals, conflicts, divergence, external CI, a
+// lone aggregate plan status, or a provider that does not populate
+// BlockingStatuses), it stays blocked.
 func (a *DefaultCommandRequirementHandler) mergeableIgnoringOtherProjectPlans(ctx command.ProjectContext, status models.MergeableStatus) bool {
 	// Only the GitLab client populates BlockingStatuses. An empty list means the
 	// MR is blocked for a reason we cannot (or must not) scope per project.
@@ -120,25 +122,29 @@ func (a *DefaultCommandRequirementHandler) mergeableIgnoringOtherProjectPlans(ct
 	}
 	ownPlanStatus := truncateContext(fmt.Sprintf("%s/plan: %s", a.VCSStatusName, ctx.ProjectID()))
 	combinedPlanStatus := a.VCSStatusName + "/plan"
+	otherProjectPlanBlocked := false
 	for _, name := range status.BlockingStatuses {
 		switch {
 		case name == combinedPlanStatus:
-			// The combined plan status can represent failures before per-project
-			// statuses exist, so it must keep blocking apply.
-			return false
+			// The combined plan status may be GitLab's aggregate of other project
+			// plan failures, but it can also represent failures before per-project
+			// statuses exist. Only ignore it if another blocking status proves this
+			// is an unrelated project failure.
+			continue
 		case name == ownPlanStatus:
 			// This project's own plan is failing or incomplete: must block.
 			return false
 		case isAtlantisProjectPlanStatus(name, a.VCSStatusName):
 			// Another project's per-project plan status: irrelevant to this
-			// project's command, ignore it.
+			// project's apply, ignore it.
+			otherProjectPlanBlocked = true
 			continue
 		default:
 			// External CI or any other non-plan blocker: must block.
 			return false
 		}
 	}
-	return true
+	return otherProjectPlanBlocked
 }
 
 // isAtlantisProjectPlanStatus reports whether statusName is an Atlantis

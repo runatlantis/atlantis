@@ -233,9 +233,9 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 
 // TestAggregateApplyRequirements_MergeableScopedToProject verifies that the
 // mergeable apply requirement is evaluated per project: a failing Atlantis plan
-// status for a different project (or the combined plan status) in the same pull
-// request must not block applying a project whose own plan succeeded, while the
-// project's own plan, external CI, and MR-level signals still block.
+// status for a different project in the same pull request must not block
+// applying a project whose own plan succeeded, while the project's own plan,
+// external CI, MR-level signals, and lone aggregate plan failures still block.
 func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
 	repoDir := "repoDir"
 	const vcsStatusName = "atlantis"
@@ -266,6 +266,22 @@ func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
 			wantFailure: "",
 		},
 		{
+			name:          "combined plan status with another project's plan failure does not block this project's apply",
+			vcsStatusName: vcsStatusName,
+			ctx: command.ProjectContext{
+				ProjectName:       "app",
+				ApplyRequirements: mergeableReq,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{
+						IsMergeable:      false,
+						Reason:           "Pipeline atlantis/plan has status failed",
+						BlockingStatuses: []string{"atlantis/plan", "atlantis/plan: network"},
+					},
+				},
+			},
+			wantFailure: "",
+		},
+		{
 			name:          "this project's own plan failure still blocks",
 			vcsStatusName: vcsStatusName,
 			ctx: command.ProjectContext{
@@ -282,7 +298,7 @@ func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
 			wantFailure: "Pull request must be mergeable before running apply (Pipeline atlantis/plan: app has status failed).",
 		},
 		{
-			name:          "combined plan status still blocks a per-project apply",
+			name:          "combined plan status alone still blocks a per-project apply",
 			vcsStatusName: vcsStatusName,
 			ctx: command.ProjectContext{
 				ProjectName:       "app",
@@ -437,6 +453,61 @@ func TestAggregateApplyRequirements_MergeableScopedToProject(t *testing.T) {
 				VCSStatusName: tt.vcsStatusName,
 			}
 			gotFailure, err := a.ValidateApplyProject(repoDir, tt.ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantFailure, gotFailure)
+		})
+	}
+}
+
+func TestAggregateCommandRequirements_MergeableScopingOnlyAppliesToApply(t *testing.T) {
+	repoDir := "repoDir"
+	const vcsStatusName = "atlantis"
+	mergeableReq := []string{raw.MergeableRequirement}
+	blockedByOtherProjectPlan := models.PullReqStatus{
+		MergeableStatus: models.MergeableStatus{
+			IsMergeable:      false,
+			Reason:           "Pipeline atlantis/plan: network has status failed",
+			BlockingStatuses: []string{"atlantis/plan: network"},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		ctx         command.ProjectContext
+		validate    func(*events.DefaultCommandRequirementHandler, string, command.ProjectContext) (string, error)
+		wantFailure string
+	}{
+		{
+			name: "plan command still requires MR-wide mergeability",
+			ctx: command.ProjectContext{
+				ProjectName:      "app",
+				PlanRequirements: mergeableReq,
+				PullReqStatus:    blockedByOtherProjectPlan,
+			},
+			validate:    (*events.DefaultCommandRequirementHandler).ValidatePlanProject,
+			wantFailure: "Pull request must be mergeable before running plan (Pipeline atlantis/plan: network has status failed).",
+		},
+		{
+			name: "import command still requires MR-wide mergeability",
+			ctx: command.ProjectContext{
+				ProjectName:        "app",
+				ImportRequirements: mergeableReq,
+				PullReqStatus:      blockedByOtherProjectPlan,
+			},
+			validate:    (*events.DefaultCommandRequirementHandler).ValidateImportProject,
+			wantFailure: "Pull request must be mergeable before running import (Pipeline atlantis/plan: network has status failed).",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			workingDir := mocks.NewMockWorkingDir()
+			a := &events.DefaultCommandRequirementHandler{
+				WorkingDir:    workingDir,
+				VCSStatusName: vcsStatusName,
+			}
+			gotFailure, err := tt.validate(a, repoDir, tt.ctx)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantFailure, gotFailure)
 		})
