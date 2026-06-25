@@ -1700,6 +1700,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
       ~ jobspec = <<-EOT
             syncOptions:
               -   ServerSideApply = true
+            EOT
             job "ogc" {
               group "ogc" {
           -   image = "registry/ogc:5.224.0"
@@ -1714,6 +1715,7 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
 !       jobspec = <<-EOT
             syncOptions:
               -   ServerSideApply = true
+            EOT
             job "ogc" {
               group "ogc" {
 -             image = "registry/ogc:5.224.0"
@@ -1721,6 +1723,23 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
               }
             }
         EOT
+    }`,
+		},
+		{
+			"quoted heredoc-like string does not enter heredoc mode",
+			`  # null_resource.example will be updated in-place
+  ~ resource "null_resource" "example" {
+      ~ cmd      = "cat <<EOF" -> "cat <<EOF --changed"
+      ~ triggers = {
+          + changed = "true"
+        }
+    }`,
+			`# null_resource.example will be updated in-place
+!   resource "null_resource" "example" {
+!       cmd      = "cat <<EOF" -> "cat <<EOF --changed"
+!       triggers = {
++           changed = "true"
+        }
     }`,
 		},
 	}

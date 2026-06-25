@@ -540,8 +540,7 @@ var (
 	diffColonRegex              = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {4,}[a-zA-Z_][\w-]*:.*)`)
 	diffListRegex               = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
 	diffTildeRegex              = regexp.MustCompile(`(?m)^~`)
-	diffLineMarkerRegex         = regexp.MustCompile(`^( +)([-+~])\s`)
-	diffHeredocStartRegex       = regexp.MustCompile(`<<-?([a-zA-Z_][\w]*)`)
+	diffHeredocStartRegex       = regexp.MustCompile(`^( *)([-+~]\s)?[a-zA-Z_][\w]*\s*=\s<<-?([a-zA-Z_][\w]*)\s*$`)
 	diffHeredocContentLineRegex = regexp.MustCompile(`^( +)([-+~]\s)(.*)`)
 )
 
@@ -549,12 +548,14 @@ var (
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 	lines := strings.Split(p.TerraformOutput, "\n")
 	heredocDelimiter := ""
+	heredocTerminatorIndent := -1
 	heredocDiffMarkerIndent := -1
 
 	for i, line := range lines {
 		if heredocDelimiter != "" {
-			if strings.TrimSpace(line) == heredocDelimiter {
+			if isDiffMarkdownHeredocEnd(line, heredocDelimiter, heredocTerminatorIndent) {
 				heredocDelimiter = ""
+				heredocTerminatorIndent = -1
 				heredocDiffMarkerIndent = -1
 				continue
 			}
@@ -565,8 +566,9 @@ func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
 			continue
 		}
 
-		if delimiter, diffMarkerIndent, ok := diffMarkdownHeredocStart(line); ok {
+		if delimiter, terminatorIndent, diffMarkerIndent, ok := diffMarkdownHeredocStart(line); ok {
 			heredocDelimiter = delimiter
+			heredocTerminatorIndent = terminatorIndent
 			heredocDiffMarkerIndent = diffMarkerIndent
 		}
 
@@ -587,21 +589,26 @@ func formatDiffMarkdownLine(line string) string {
 	return formattedLine
 }
 
-func diffMarkdownHeredocStart(line string) (string, int, bool) {
+func diffMarkdownHeredocStart(line string) (string, int, int, bool) {
 	heredocMatch := diffHeredocStartRegex.FindStringSubmatch(line)
 	if heredocMatch == nil {
-		return "", -1, false
+		return "", -1, -1, false
 	}
 
-	markerMatch := diffLineMarkerRegex.FindStringSubmatch(line)
-	if markerMatch == nil || markerMatch[2] != "~" {
-		return heredocMatch[1], -1, true
+	delimiter := heredocMatch[3]
+	terminatorIndent := len(heredocMatch[1]) + len(heredocMatch[2])
+	if !strings.HasPrefix(heredocMatch[2], "~") {
+		return delimiter, terminatorIndent, -1, true
 	}
 
 	// Terraform renders per-line diffs inside changed multiline strings four
 	// spaces deeper than the attribute marker. Added/deleted heredocs print their
 	// content normally, so only ~ heredocs should enable this inner gutter.
-	return heredocMatch[1], len(markerMatch[1]) + 4, true
+	return delimiter, terminatorIndent, len(heredocMatch[1]) + 4, true
+}
+
+func isDiffMarkdownHeredocEnd(line string, delimiter string, indent int) bool {
+	return line == strings.Repeat(" ", indent)+delimiter
 }
 
 func formatHeredocDiffMarkdownLine(line string, diffMarkerIndent int) string {
