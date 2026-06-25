@@ -1151,6 +1151,60 @@ func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Eq(modelPull), Eq(pullOptions))
 }
 
+func TestApplyWithAutoMerge_UsesGlobalMergeMethod(t *testing.T) {
+	t.Log("if \"atlantis apply\" is run with automerge and no --auto-merge-method" +
+		" comment flag, the server-side default merge method is used")
+
+	vcsClient := setup(t)
+	pull := &github.PullRequest{
+		State: github.Ptr("open"),
+	}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	autoMerger.GlobalAutomerge = true
+	autoMerger.GlobalAutomergeMethod = "squash"
+	defer func() {
+		autoMerger.GlobalAutomerge = false
+		autoMerger.GlobalAutomergeMethod = ""
+	}()
+
+	pullOptions := models.PullRequestOptions{
+		DeleteSourceBranchOnMerge: false,
+		MergeMethod:               "squash",
+	}
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Eq(modelPull), Eq(pullOptions))
+}
+
+func TestApplyWithAutoMerge_CommentFlagOverridesGlobalMergeMethod(t *testing.T) {
+	t.Log("if \"atlantis apply\" is run with automerge and a --auto-merge-method" +
+		" comment flag, the comment flag overrides the server-side default")
+
+	vcsClient := setup(t)
+	pull := &github.PullRequest{
+		State: github.Ptr("open"),
+	}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	autoMerger.GlobalAutomerge = true
+	autoMerger.GlobalAutomergeMethod = "squash"
+	defer func() {
+		autoMerger.GlobalAutomerge = false
+		autoMerger.GlobalAutomergeMethod = ""
+	}()
+
+	pullOptions := models.PullRequestOptions{
+		DeleteSourceBranchOnMerge: false,
+		MergeMethod:               "rebase",
+	}
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply, AutoMergeMethod: "rebase"})
+	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Eq(modelPull), Eq(pullOptions))
+}
+
 func TestRunApply_DiscardedProjects(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run with automerge and at least one project" +
 		" has a discarded plan, automerge should not take place")
