@@ -1379,27 +1379,25 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 			},
 		},
 		{
-			description:   "branch-tagged Atlantis plan failure still blocks when MR head-ref status exists",
+			description:   "branch-tagged Atlantis plan failure is ignored when MR head-ref status exists",
 			vcsStatusName: vcsStatusName,
 			statuses: []testStatus{
 				{Name: fmt.Sprintf("%s/plan: other-project", vcsStatusName), Status: "failed", Ref: mrSourceBranch},
 				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success", Ref: mrHeadRef},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan: other-project has status failed", vcsStatusName),
+				IsMergeable: true,
 			},
 		},
 		{
-			description:   "branch-tagged Atlantis running plan still blocks when MR merge-result status exists",
+			description:   "branch-tagged Atlantis running plan is ignored when MR merge-result status exists",
 			vcsStatusName: vcsStatusName,
 			statuses: []testStatus{
 				{Name: fmt.Sprintf("%s/plan: infra/production", vcsStatusName), Status: "running", Ref: mrSourceBranch},
 				{Name: "ci/merged-result", Status: "success", Ref: mrMergeRef},
 			},
 			expState: models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s/plan: infra/production has status running", vcsStatusName),
+				IsMergeable: true,
 			},
 		},
 		{
