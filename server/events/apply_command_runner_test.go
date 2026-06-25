@@ -31,6 +31,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 		ApplyLockError error
 		ExpComment     string
 		ExpFailStatus  bool
+		ExpHasErrors   bool
 	}{
 		{
 			Description:    "When global apply lock is present IsDisabled returns true",
@@ -50,6 +51,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			ApplyLocked:    false,
 			ExpComment:     "**Error:** Failed to check global apply lock. Running `atlantis apply` is not allowed until the lock backend is reachable.",
 			ExpFailStatus:  true,
+			ExpHasErrors:   true,
 		},
 	}
 
@@ -79,6 +81,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			}
 
 			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
+			Equals(t, c.ExpHasErrors, ctx.CommandHasErrors)
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
 				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(c.ExpComment), Eq("apply"))

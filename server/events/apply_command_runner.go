@@ -78,6 +78,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	locked, err := a.IsLocked()
 	if err != nil {
 		ctx.Log.Err("checking global apply lock: %s", err)
+		ctx.CommandHasErrors = true
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
