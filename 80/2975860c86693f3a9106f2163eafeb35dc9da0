@@ -1,0 +1,33 @@
+.github/workflows/atlantis-image.yml
+  s_12c46f3ee857ef::t_7f48b6469da66b 43,80,224
+.github/workflows/codeql.yml
+  s_12c46f3ee857ef::t_7fcff7c735502a 51,86
+.github/workflows/go-lint.yml
+  s_12c46f3ee857ef::t_79fef6eb0c5a79 38,60
+.github/workflows/release.yml
+  s_12c46f3ee857ef::t_cbe399e25352b1 21
+.github/workflows/renovate-config.yml
+  s_12c46f3ee857ef::t_3e36c261f7e3c5 27
+.github/workflows/test.yml
+  s_12c46f3ee857ef::t_1b9b9b8f9bedda 44,69,147,192
+.github/workflows/testing-env-image.yml
+  s_12c46f3ee857ef::t_77e71823d1b8bd 36,58
+.github/workflows/website.yml
+  s_12c46f3ee857ef::t_9eda7ee310c8d7 38,64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "802975860c86693f3a9106f2163eafeb35dc9da0",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
