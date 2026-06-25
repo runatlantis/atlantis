@@ -61,13 +61,15 @@
 
 **Terraform execution:** Modify `server/core/terraform/tfclient/terraform_client.go` or `server/core/runtime/*_step_runner.go` (uses `hashicorp/hc-install`)
 
+**GitHub App merge checkout:** In `server/events/working_dir.go`, `CheckoutMerge` with `GithubAppEnabled` and a PR number fetches `pull/<n>/head` from `origin` and intentionally skips the `source` remote. Preserve this fork-safe behavior when changing clone, fetch, or divergence logic.
+
 ## Known Issues
 
-2. **TestNewServer_GitHubUser fails:** Pre-existing in main. Ignore it.
-3. **E2E tests skip on forks:** Expected (no secrets). Maintainers run them.
-4. **Website needs npm install first:** Always run `npm install` before `npm run website:*` commands.
-5. **docker-compose needs atlantis.env:** Create file per CONTRIBUTING.md template for local webhook testing.
-6. **E2E GitHub tests require GitHub App secrets:** CI needs `ATLANTISBOT_GH_APP_ID`, `ATLANTISBOT_GH_APP_KEY`, `ATLANTISBOT_GH_APP_SLUG` secrets configured. PAT auth (`ATLANTISBOT_GITHUB_USERNAME`/`ATLANTISBOT_GITHUB_TOKEN`) is deprecated due to org 2FA requirements (#6311).
+1. **TestNewServer_GitHubUser fails:** Pre-existing in main. Ignore it.
+2. **E2E tests skip on forks:** Expected (no secrets). Maintainers run them.
+3. **Website needs npm install first:** Always run `npm install` before `npm run website:*` commands.
+4. **docker-compose needs atlantis.env:** Create file per CONTRIBUTING.md template for local webhook testing.
+5. **E2E GitHub tests require GitHub App secrets:** CI needs `ATLANTISBOT_GH_APP_ID`, `ATLANTISBOT_GH_APP_KEY`, `ATLANTISBOT_GH_APP_SLUG` secrets configured. PAT auth (`ATLANTISBOT_GITHUB_USERNAME`/`ATLANTISBOT_GITHUB_TOKEN`) is deprecated due to org 2FA requirements (#6311).
 
 ## Code Style
 
