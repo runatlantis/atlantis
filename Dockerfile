@@ -186,7 +186,7 @@ COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # renovate: datasource=repology depName=alpine_3_23/ca-certificates versioning=loose
-ENV CA_CERTIFICATES_VERSION="20260413-r0"
+ENV CA_CERTIFICATES_VERSION="20260611-r0"
 # renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
 ENV CURL_VERSION="8.19.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/git versioning=loose
