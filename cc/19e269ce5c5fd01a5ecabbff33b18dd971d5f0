@@ -1,0 +1,63 @@
+.golangci.yml
+  s_919a9ef5920ee1::t_d30ac63f1268a7 15-17
+Dockerfile
+  s_919a9ef5920ee1::t_20f5b36050e500 41
+cmd/server_test.go
+  s_919a9ef5920ee1::t_cb6948531201f2 236,238,241
+server/controllers/github_app_controller.go
+  s_919a9ef5920ee1::t_e14e83d2c2c83e 87,155
+server/controllers/jobs_controller.go
+  s_919a9ef5920ee1::t_2e0cc25ba1e545 64
+server/controllers/locks_controller.go
+  s_919a9ef5920ee1::t_5ca4e09dabfef1 99
+server/core/config/valid/global_cfg.go
+  s_919a9ef5920ee1::t_eb1e8a9d8aa392 343,388,698
+server/core/runtime/models/shell_command_runner.go
+  s_919a9ef5920ee1::t_19f2e9b1736b3c 121,134,181
+server/core/runtime/policy/conftest_client.go
+  s_919a9ef5920ee1::t_8ba8f692dc03aa 191
+server/core/terraform/tfclient/terraform_client.go
+  s_919a9ef5920ee1::t_d3bfa2e40be258 373
+server/events/command_runner.go
+  s_919a9ef5920ee1::t_0f36b4de1289b9 144,348,520
+server/events/instrumented_pull_closed_executor.go
+  s_919a9ef5920ee1::t_bb88328748dcd5 48
+server/events/markdown_renderer_test.go
+  s_919a9ef5920ee1::t_ccd47b1520909f 68,143,1509,1897,2106,2299,2358,2435,2547,2695,2850,2934,3175,3772,3914,4376,4432,4657
+server/events/project_command_runner.go
+  s_919a9ef5920ee1::t_7abbed79a1b04b 194,202,209,657
+server/events/project_finder.go
+  s_919a9ef5920ee1::t_3eed45da40d955 87
+server/events/pull_updater.go
+  s_919a9ef5920ee1::t_88456b87e523b3 22,24
+server/events/vcs/bitbucketcloud/client.go
+  s_919a9ef5920ee1::t_801c3377aefe1d 146,153
+server/events/vcs/gitea/client.go
+  s_919a9ef5920ee1::t_cc9c6712d25643 213
+server/events/vcs/github/token_rotator.go
+  s_919a9ef5920ee1::t_fcaabca4ab7b40 60
+server/events/vcs/gitlab/client.go
+  s_919a9ef5920ee1::t_184b1684b06010 498,578
+server/events/working_dir.go
+  s_919a9ef5920ee1::t_ddda379ebe3cb3 691,698,737
+server/server.go
+  s_919a9ef5920ee1::t_3dc6b031176ef6 502,504,1167,1177,1280
+testing/Dockerfile
+  s_919a9ef5920ee1::t_e29bbb5bbb61f1 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "cc19e269ce5c5fd01a5ecabbff33b18dd971d5f0",
+  "prompts": {},
+  "sessions": {
+    "s_919a9ef5920ee1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff33-5799-7281-bd85-5c11921b6235",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
