@@ -317,7 +317,7 @@ Bitbucket username (usually an email) used for API authentication with Bitbucket
 
 **Note:**
 
-- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026(see [here](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
+- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026 (see [Atlassian's Bitbucket app password deprecation notice](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
 
 **Config file key:**
 

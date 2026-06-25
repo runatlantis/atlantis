@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
@@ -62,7 +62,7 @@ jobs:
     container: ghcr.io/runatlantis/testing-env:latest@sha256:949bd6f67e6b110f8e497a0cebe695372069216c1e26d339f424273ac08f90a3
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
@@ -123,7 +123,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
@@ -131,8 +131,8 @@ jobs:
 
   e2e-github:
     runs-on: ubuntu-24.04
-    # dont run e2e tests on forked PRs
-    if: github.event.pull_request.head.repo.fork == false
+    # dont run e2e tests on forked PRs or Dependabot PRs, where repository secrets are unavailable
+    if: github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
     env:
       ATLANTIS_GH_APP_ID: ${{ secrets.ATLANTISBOT_GH_APP_ID }}
       ATLANTIS_GH_APP_KEY: ${{ secrets.ATLANTISBOT_GH_APP_KEY }}
@@ -140,7 +140,7 @@ jobs:
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
@@ -159,7 +159,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz ${NGROK_DOWNLOAD_URL}
+          wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
@@ -177,15 +177,15 @@ jobs:
           ./scripts/e2e.sh
   e2e-gitlab:
     runs-on: ubuntu-24.04
-    # dont run e2e tests on forked PRs
-    if: github.event.pull_request.head.repo.fork == false
+    # dont run e2e tests on forked PRs or Dependabot PRs, where repository secrets are unavailable
+    if: github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
     env:
       ATLANTIS_GITLAB_USER: ${{ secrets.ATLANTISBOT_GITLAB_USERNAME }}
       ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
@@ -204,7 +204,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz ${NGROK_DOWNLOAD_URL}
+          wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version

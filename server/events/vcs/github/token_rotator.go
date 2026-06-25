@@ -57,7 +57,7 @@ func (r *tokenRotator) Run() {
 	err := r.rotate()
 	if err != nil {
 		// at least log the error message here, as we want to notify the that user that the key rotation wasn't successful
-		r.log.Err(err.Error())
+		r.log.Err("%s", err.Error())
 	}
 }
 
