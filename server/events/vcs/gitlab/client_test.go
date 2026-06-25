@@ -1072,9 +1072,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v", projectID):
 							w.WriteHeader(http.StatusOK)
 							w.Write(projectSuccess) // nolint: errcheck
-						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
+						case r.URL.Path == fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
 							w.WriteHeader(http.StatusOK)
-							response := fmt.Sprintf(`[{"id":133702594,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"ApplySuccess","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}]`, c.status, c.statusName)
+							response := fmt.Sprintf(`[{"id":133702594,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1-merger","status":"%s","name":"%s","target_url":null,"description":"ApplySuccess","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}]`, c.status, c.statusName)
 							w.Write([]byte(response)) // nolint: errcheck
 						case r.RequestURI == "/api/v4/version":
 							w.WriteHeader(http.StatusOK)
@@ -1135,9 +1135,16 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 	mrData := mustReadFile(t, "testdata/pipeline-success.json")
 
 	type testStatus struct {
-		Name   string
-		Status string // GitLab API status string: "success", "failed", "running", "pending"
+		Name     string
+		Status   string // GitLab API status string: "success", "failed", "running", "pending"
+		Ref      string // GitLab API ref. Empty defaults to the MR's source_branch (mrSourceBranch) for backward compat.
+		EmptyRef bool   // When true, the status is serialised with an empty ref instead of defaulting.
 	}
+
+	// pipeline-success.json: iid=13, source_branch="patch-1-merger".
+	const mrSourceBranch = "patch-1-merger"
+	const mrHeadRef = "refs/merge-requests/13/head"
+	const mrMergeRef = "refs/merge-requests/13/merge"
 
 	cases := []struct {
 		description   string
@@ -1276,6 +1283,156 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				Reason:      fmt.Sprintf("Pipeline %s-extra/plan has status failed", vcsStatusName),
 			},
 		},
+		{
+			description:   "cross-ref failed plan from another MR sharing the SHA is ignored",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "failed", Ref: "refs/merge-requests/231/head"},
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success", Ref: mrHeadRef},
+				{Name: fmt.Sprintf("%s/plan: c-equity", vcsStatusName), Status: "success", Ref: mrSourceBranch},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			description:   "own-ref failed plan still blocks (refs/merge-requests head)",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "failed", Ref: mrHeadRef},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+			},
+		},
+		{
+			description:   "own merge-result ref failed plan still blocks",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "failed", Ref: mrMergeRef},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan has status failed", vcsStatusName),
+			},
+		},
+		{
+			description:   "own merge-result ref is kept when head-ref status exists",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success", Ref: mrHeadRef},
+				{Name: "ci/merged-result", Status: "failed", Ref: mrMergeRef},
+				{Name: "ci/shared-branch", Status: "failed", Ref: mrSourceBranch},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/merged-result has status failed",
+			},
+		},
+		{
+			description:   "status with empty ref is treated as MR-owned (fallback path)",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: "ci/build", Status: "failed", EmptyRef: true},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
+			},
+		},
+		{
+			description:   "empty ref is honored even when MR head-ref status exists (strict path)",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: "ci/build", Status: "failed", EmptyRef: true},
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success", Ref: mrHeadRef},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
+			},
+		},
+		{
+			description:   "cross-ref non-Atlantis failure is also ignored",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: "ci/build", Status: "failed", Ref: "refs/merge-requests/999/head"},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			description:   "source_branch-only CI failure still blocks when MR head-ref status exists",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: "ci/build", Status: "failed", Ref: mrSourceBranch},
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success", Ref: mrHeadRef},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
+			},
+		},
+		{
+			description:   "source_branch-only CI failure still blocks when MR merge-result status exists",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: "ci/build", Status: "failed", Ref: mrSourceBranch},
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success", Ref: mrMergeRef},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
+			},
+		},
+		{
+			description:   "branch-tagged Atlantis plan failure still blocks when no same-name MR status exists",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan: other-project", vcsStatusName), Status: "failed", Ref: mrSourceBranch},
+				{Name: fmt.Sprintf("%s/plan", vcsStatusName), Status: "success", Ref: mrHeadRef},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: other-project has status failed", vcsStatusName),
+			},
+		},
+		{
+			description:   "branch-tagged Atlantis running plan still blocks when no same-name MR status exists",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: fmt.Sprintf("%s/plan: infra/production", vcsStatusName), Status: "running", Ref: mrSourceBranch},
+				{Name: "ci/merged-result", Status: "success", Ref: mrMergeRef},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      fmt.Sprintf("Pipeline %s/plan: infra/production has status running", vcsStatusName),
+			},
+		},
+		{
+			description:   "fallback to source_branch when no head-ref status exists",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: "ci/build", Status: "failed", Ref: mrSourceBranch},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Pipeline ci/build has status failed",
+			},
+		},
+		{
+			description:   "source_branch CI failure is ignored when same head-ref status succeeds",
+			vcsStatusName: vcsStatusName,
+			statuses: []testStatus{
+				{Name: "ci/build", Status: "failed", Ref: mrSourceBranch},
+				{Name: "ci/build", Status: "success", Ref: mrHeadRef},
+			},
+			expState: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
 	}
 
 	gitlabVersions := []string{"15.8.3-ee", "15.6.0-ee", "15.3.2-ce"}
@@ -1286,9 +1443,13 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 				// Build the commit statuses JSON response
 				var statusEntries []string
 				for i, s := range c.statuses {
+					ref := s.Ref
+					if !s.EmptyRef && ref == "" {
+						ref = mrSourceBranch
+					}
 					statusEntries = append(statusEntries, fmt.Sprintf(
-						`{"id":%d,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"patch-1","status":"%s","name":"%s","target_url":null,"description":"test","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}`,
-						133702594+i, s.Status, s.Name))
+						`{"id":%d,"sha":"67cb91d3f6198189f433c045154a885784ba6977","ref":"%s","status":"%s","name":"%s","target_url":null,"description":"test","created_at":"2018-12-12T18:31:57.957Z","started_at":null,"finished_at":"2018-12-12T18:31:58.480Z","allow_failure":false,"coverage":null,"author":{"id":1755902,"username":"lkysow","name":"LukeKysow","state":"active","avatar_url":"https://secure.gravatar.com/avatar/25fd57e71590fe28736624ff24d41c5f?s=80&d=identicon","web_url":"https://gitlab.com/lkysow"}}`,
+						133702594+i, ref, s.Status, s.Name))
 				}
 				statusesJSON := "[" + strings.Join(statusEntries, ",") + "]"
 
@@ -1306,7 +1467,7 @@ func TestClient_PullIsMergeable_MultipleStatuses(t *testing.T) {
 							w.WriteHeader(http.StatusOK)
 							w.Write(projectSuccess) // nolint: errcheck
 
-						case r.RequestURI == fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
+						case r.URL.Path == fmt.Sprintf("/api/v4/projects/%v/repository/commits/67cb91d3f6198189f433c045154a885784ba6977/statuses", projectID):
 							w.WriteHeader(http.StatusOK)
 							w.Write([]byte(statusesJSON)) // nolint: errcheck
 
