@@ -1,0 +1,144 @@
+server/events/commit_status_updater.go
+  s_12c46f3ee857ef::t_17e6d40bf2abdc 8,10,49,63,79,100-120,130
+server/events/vcs/gitlab/client.go
+  s_12c46f3ee857ef::t_eb5cf53e632c9e 321-372,374-379,388-396,575,655
+server/events/vcs/gitlab/client_test.go
+  s_12c46f3ee857ef::t_eb7f3d69925c3b 1363
+  s_12c46f3ee857ef::t_f2757a01d23f1d 1083,1085,1146-1149,1152-1156,1316-1362,1364-1475,1486-1489,1491-1492,1510
+.github/workflows/atlantis-image.yml
+  s_12c46f3ee857ef::t_7abacb29e294b6 39,43,76,80,220,224,263
+.github/workflows/clusterfuzzlite.yml
+  s_12c46f3ee857ef::t_3ddbec2b6aafc8 36
+.github/workflows/codeql.yml
+  s_12c46f3ee857ef::t_94fd047083d931 47,51,81,86,130
+.github/workflows/dependency-review.yml
+  s_12c46f3ee857ef::t_b665d2916575bc 28
+.github/workflows/go-lint.yml
+  s_12c46f3ee857ef::t_65f28e61550f99 34,38,56,60,80
+.github/workflows/labeler.yml
+  s_12c46f3ee857ef::t_4021e0bd5e2486 23
+.github/workflows/markdown-lint.yml
+  s_12c46f3ee857ef::t_fd626c2ffe616c 33,55,87
+.github/workflows/pr-lint.yml
+  s_12c46f3ee857ef::t_2859db7ded3204 19
+.github/workflows/pr-size-labeler.yml
+  s_12c46f3ee857ef::t_16ef15dba528e8 16
+.github/workflows/release.yml
+  s_12c46f3ee857ef::t_215434c5341cb1 17,21
+.github/workflows/renovate-config.yml
+  s_12c46f3ee857ef::t_47b366ce55ca1f 23,27
+.github/workflows/stale.yml
+  s_12c46f3ee857ef::t_b5664f9eb7ae53 16
+.github/workflows/test.yml
+  s_12c46f3ee857ef::t_99c87e915d7ef6 40,44,65,69,126,134-135,143,147,162,180-181,188,192,207
+.github/workflows/testing-env-image.yml
+  s_12c46f3ee857ef::t_2fb70c5d6637c5 32,36,54,58,96
+.github/workflows/website.yml
+  s_12c46f3ee857ef::t_e55db90ef595c5 34,38,60,64,84,127
+.golangci.yml
+  s_12c46f3ee857ef::t_5cf37aecdea0a4 15-17
+AGENTS.md
+  s_12c46f3ee857ef::t_b8c88b8db7991e 21
+Dockerfile
+  s_12c46f3ee857ef::t_02bc3978505ed9 4,6,11,41,59-74,189,279-280
+cmd/server_test.go
+  s_12c46f3ee857ef::t_ddb85734e4423f 236,238,241
+e2e/go.mod
+  s_12c46f3ee857ef::t_655f4f629c2e94 3
+go.mod
+  s_12c46f3ee857ef::t_7848d0188e7839 3
+package-lock.json
+  s_12c46f3ee857ef::t_c954cfc871cae6 13,1627-1629,1661-1663,2271-2273,2277,2897-2899,2955-2957,3116-3118,3362-3364,3366-3375,3449-3451,3453-3462,3511-3513,3515-3524,3529,3546-3548,3560,3563,3570-3572,3576,3579,3582-3584,3586-3587,3593,4859-4861,4865-4866,4891-4893,4897,4954-4956,4961,4989-4991
+package.json
+  s_12c46f3ee857ef::t_719dc6a848887d 9,19
+runatlantis.io/blog/2019/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage.md
+  s_12c46f3ee857ef::t_ea1948fa1e751d 18
+runatlantis.io/docs/custom-workflows.md
+  s_12c46f3ee857ef::t_c93fb1bde424a6 583-585,628,703-707,745-751
+runatlantis.io/docs/policy-checking.md
+  s_12c46f3ee857ef::t_fa2785272f67c8 223-231
+runatlantis.io/docs/post-workflow-hooks.md
+  s_12c46f3ee857ef::t_67402893743084 94-99
+runatlantis.io/docs/pre-workflow-hooks.md
+  s_12c46f3ee857ef::t_47c4390188ba31 91-96
+runatlantis.io/docs/repo-level-atlantis-yaml.md
+  s_12c46f3ee857ef::t_a8ea108e729760 419
+runatlantis.io/docs/server-configuration.md
+  s_12c46f3ee857ef::t_af68cb19011993 320
+runatlantis.io/docs/server-side-repo-config.md
+  s_12c46f3ee857ef::t_d75d4aeb1a178a 532-550,599-606
+server/controllers/api_controller.go
+  s_12c46f3ee857ef::t_f6f1d2577d7b41 43-47,157-160,388-395,397-418
+server/controllers/api_controller_test.go
+  s_12c46f3ee857ef::t_6eefb3e8d1bcb8 9,320-461
+server/controllers/github_app_controller.go
+  s_12c46f3ee857ef::t_7e88a9debe8848 87,155
+server/controllers/jobs_controller.go
+  s_12c46f3ee857ef::t_a0b465c3bd75e5 64
+server/controllers/locks_controller.go
+  s_12c46f3ee857ef::t_d43cfeb68c257c 99
+server/core/config/parser_validator.go
+  s_12c46f3ee857ef::t_f60d4d93e47911 63-64,87-88,155-156,163-176
+server/core/config/parser_validator_test.go
+  s_12c46f3ee857ef::t_093e4e2c3eea08 85,90,95,98-102,110
+server/core/config/valid/global_cfg.go
+  s_12c46f3ee857ef::t_2e871900f1e108 343,388,698
+server/core/runtime/models/shell_command_runner.go
+  s_12c46f3ee857ef::t_43d03e548fec76 121,134,181
+server/core/runtime/policy/conftest_client.go
+  s_12c46f3ee857ef::t_3ecb96731bb937 191
+server/core/terraform/tfclient/terraform_client.go
+  s_12c46f3ee857ef::t_9c0e0b604a8517 373
+server/events/apply_command_runner.go
+  s_12c46f3ee857ef::t_a874bdc91e308a 80-88,235-237
+server/events/apply_command_runner_test.go
+  s_12c46f3ee857ef::t_16be54f5a9fbc9 33-34,49,52-54,84,88-104
+server/events/command_runner.go
+  s_12c46f3ee857ef::t_2f46374feb3afc 144,348,520
+server/events/commit_status_updater_test.go
+  s_12c46f3ee857ef::t_d7d8a5ba7a4d99 9,11,22-52,106-121,189-204,310-412
+server/events/instrumented_pull_closed_executor.go
+  s_12c46f3ee857ef::t_2fe013004f2987 48
+server/events/markdown_renderer_test.go
+  s_12c46f3ee857ef::t_a068a961fd7b3b 68,143,1509,1897,2106,2299,2358,2435,2547,2695,2850,2934,3175,3772,3914,4376,4432,4657
+server/events/models/models.go
+  s_12c46f3ee857ef::t_94291aa0f12f89 516-519,875-876,895-898
+server/events/models/models_test.go
+  s_12c46f3ee857ef::t_132d52c198a22b 1249-1268,1289-1302
+server/events/project_command_runner.go
+  s_12c46f3ee857ef::t_10b7a0af03e2ab 194,202,209,657
+server/events/project_finder.go
+  s_12c46f3ee857ef::t_53d4018eb97d0b 87
+server/events/pull_updater.go
+  s_12c46f3ee857ef::t_c86dcd05ac05f9 22,24
+server/events/vcs/bitbucketcloud/client.go
+  s_12c46f3ee857ef::t_c5e2aa0b73421e 146,153
+server/events/vcs/gitea/client.go
+  s_12c46f3ee857ef::t_dacdd495d1f411 213
+server/events/vcs/github/token_rotator.go
+  s_12c46f3ee857ef::t_b9fdc59a436496 60
+server/events/working_dir.go
+  s_12c46f3ee857ef::t_6cc3d6dfb88087 272-282,475-483,544-554,595-598,716,723,762
+server/events/working_dir_test.go
+  s_12c46f3ee857ef::t_3cad942fac9eb5 170-229
+server/server.go
+  s_12c46f3ee857ef::t_f1e84be357ac30 502,504,1009,1169,1179,1282
+testing/Dockerfile
+  s_12c46f3ee857ef::t_5a660c9f86cf09 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "d67610f6aab4af35c56baa6702d62b2acb4a2724",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
