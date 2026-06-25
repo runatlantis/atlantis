@@ -1,0 +1,47 @@
+.github/workflows/atlantis-image.yml
+  s_05c4fe9f61a438::t_bdff5169e22095 39,76,220,263
+.github/workflows/clusterfuzzlite.yml
+  s_05c4fe9f61a438::t_deb88bd2beee1c 36
+.github/workflows/codeql.yml
+  s_05c4fe9f61a438::t_c1074f0430894a 47,81,130
+.github/workflows/dependency-review.yml
+  s_05c4fe9f61a438::t_2193df7bc1ad24 28
+.github/workflows/go-lint.yml
+  s_05c4fe9f61a438::t_d48fe001dddf31 34,56,80
+.github/workflows/labeler.yml
+  s_05c4fe9f61a438::t_27ec19fa606601 23
+.github/workflows/markdown-lint.yml
+  s_05c4fe9f61a438::t_ae492abc435fe9 33,55,87
+.github/workflows/pr-lint.yml
+  s_05c4fe9f61a438::t_2a90a9fcacbbc4 19
+.github/workflows/pr-size-labeler.yml
+  s_05c4fe9f61a438::t_40d96f69f01d46 16
+.github/workflows/release.yml
+  s_05c4fe9f61a438::t_0765489e9fe318 17
+.github/workflows/renovate-config.yml
+  s_05c4fe9f61a438::t_884dbb9d4aeb10 23
+.github/workflows/stale.yml
+  s_05c4fe9f61a438::t_59d17972436d4a 16
+.github/workflows/test.yml
+  s_05c4fe9f61a438::t_57725f49070ec2 40,65,126,143,188
+.github/workflows/testing-env-image.yml
+  s_05c4fe9f61a438::t_f59ccb007bf3eb 32,54,96
+.github/workflows/website.yml
+  s_05c4fe9f61a438::t_fc7e8e72beb352 34,60,127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "03d811f24a0152eeddf847c0526cb0c6f48cee71",
+  "prompts": {},
+  "sessions": {
+    "s_05c4fe9f61a438": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019efeee-2b14-72e3-8f56-7bf722143a09",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
