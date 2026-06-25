@@ -1,0 +1,21 @@
+server/events/vcs/gitlab/client_test.go
+  s_243a1a1edc15e5::t_4864e3df2f93c5 1391,1398-1399,1403,1410-1411
+server/events/vcs/gitlab/client.go
+  s_243a1a1edc15e5::t_37127085227497 352-354,364-365,377
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "406c873236736a9c00d8e87ab080ccad904705e7",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
