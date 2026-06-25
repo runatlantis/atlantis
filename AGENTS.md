@@ -18,7 +18,7 @@
 ⚠️ **Known failing test:** `TestNewServer_GitHubUser` in server/server_test.go - pre-existing, ignore it
 
 **Lint/Format:** `make check-fmt` (ALWAYS works) • `make fmt` (auto-format)
-⚠️ **Known issue:** `make lint` and `make check-lint` fail with Go 1.25+ version mismatch. Use `make check-fmt` locally, CI handles linting.
+⚠️ **Known issue:** `make lint` fails with Go 1.25+ version mismatch. Use `make check-fmt` locally, CI handles linting.
 
 **Mocks:** `make go-generate` (regenerate after interface changes) • `make regen-mocks` (delete & regenerate all)
 
@@ -63,7 +63,6 @@
 
 ## Known Issues
 
-1. **golangci-lint Go 1.25+ incompatibility:** `make lint`/`make check-lint` fail. Use `make check-fmt` locally; CI handles linting.
 2. **TestNewServer_GitHubUser fails:** Pre-existing in main. Ignore it.
 3. **E2E tests skip on forks:** Expected (no secrets). Maintainers run them.
 4. **Website needs npm install first:** Always run `npm install` before `npm run website:*` commands.
