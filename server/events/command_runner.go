@@ -141,7 +141,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+		log.Err("Unable to fetch pull status, this is likely a bug: %s", err)
 	}
 
 	scope := c.StatsScope.SubScope("autoplan")
@@ -345,7 +345,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+		log.Err("Unable to fetch pull status, this is likely a bug: %s", err)
 	}
 
 	ctx := &command.Context{
@@ -517,7 +517,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	}
 
 	if err != nil {
-		log.Err(err.Error())
+		log.Err("%s", err.Error())
 		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err), ""); commentErr != nil {
 			log.Err("unable to comment: %s", commentErr)
 		}

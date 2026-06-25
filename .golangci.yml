@@ -12,6 +12,9 @@ linters:
     misspell:
       ignore-rules:
         - noteable
+    modernize:
+      disable:
+        - newexpr
     revive:
       rules:
         - name: dot-imports

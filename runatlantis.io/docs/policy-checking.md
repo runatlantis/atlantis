@@ -220,15 +220,15 @@ When the policy check workflow runs, a file is created in the working directory 
 ]
 ```
 
-| Field              | Type                | Description                                                                 |
-|--------------------|---------------------|-----------------------------------------------------------------------------|
-| `PolicySetName`    | string              | Name of the policy set.                                                     |
-| `PolicyOutput`     | string              | Raw output from the policy check.                                           |
-| `Passed`           | bool                | Whether the policy check passed.                                            |
-| `ReqApprovalCount` | int                 | Number of approvals required to bypass the failing policy.                  |
-| `Approvals`        | []PolicySetApproval | List of approvals, each with an `Approver` username and `Hashes` snapshot.  |
-| `Hashes`           | []string            | SHA-256 hex digests of items extracted from the policy output using `policy_item_regex`. |
-| `PolicyItemRegex`  | string              | The regex used to extract items from the policy output for hashing.         |
+| Field | Type | Description |
+| --- | --- | --- |
+| `PolicySetName` | string | Name of the policy set. |
+| `PolicyOutput` | string | Raw output from the policy check. |
+| `Passed` | bool | Whether the policy check passed. |
+| `ReqApprovalCount` | int | Number of approvals required to bypass the failing policy. |
+| `Approvals` | []PolicySetApproval | List of approvals, each with an `Approver` username and `Hashes` snapshot. |
+| `Hashes` | []string | SHA-256 hex digests of items extracted from the policy output using `policy_item_regex`. |
+| `PolicyItemRegex` | string | The regex used to extract items from the policy output for hashing. |
 
 ## Sticky Policy Approvals
 

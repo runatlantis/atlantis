@@ -546,7 +546,7 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 		attempt := int(pipelineRetryer.Attempt()) + 1
 		commit, resp, err = g.Client.Commits.GetCommit(repo.FullName, pull.HeadCommit, nil)
 		if resp != nil {
-			logger.Debug("GET /projects/%s/repository/commits/%d: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
+			logger.Debug("GET /projects/%s/repository/commits/%s: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
 		}
 		if err != nil {
 			return err
@@ -626,7 +626,7 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 
 		sleep := retryer.Duration()
 
-		logger.With("retry_in", sleep).Warn("GitLab errored when updating commit status: %w", err)
+		logger.With("retry_in", sleep).Warn("GitLab errored when updating commit status: %s", err)
 		time.Sleep(sleep)
 	}
 }
