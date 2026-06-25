@@ -81,7 +81,7 @@ jobs:
           /tmp/vale --glob='!*api-endpoints.md' runatlantis.io/docs/
 
       - name: markdown-lint
-        uses: DavidAnson/markdownlint-cli2-action@05f32210e84442804257b2a6f20b273450ec8265 # v19
+        uses: DavidAnson/markdownlint-cli2-action@07035fd053f7be764496c0f8d8f9f41f98305101 # v22
         with:
           config: .markdownlint.yaml
           globs: 'runatlantis.io/**/*.md'
