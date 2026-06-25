@@ -1,0 +1,22 @@
+server/controllers/api_controller.go
+  s_12c46f3ee857ef::t_25d4490aa46714 157-160,402,406-417
+  s_12c46f3ee857ef::t_30f50b986a279d 418-419
+server/controllers/api_controller_test.go
+  s_12c46f3ee857ef::t_32272b6775eea0 391-427
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "1741ffd6df887da23864ccf313939080e76cbfff",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
