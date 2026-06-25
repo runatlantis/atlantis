@@ -1,0 +1,24 @@
+server/core/config/parser_validator_test.go
+  s_05c4fe9f61a438::t_c8d98e12e32791 100,110
+  s_05c4fe9f61a438::t_5dd71be0b71e6a 85,90,95,98-99,101
+  s_05c4fe9f61a438::t_67fc85e6f31cbf 102
+server/core/config/parser_validator.go
+  s_05c4fe9f61a438::t_5c818981ff6078 63-64,87-88,155-156,163-174
+  s_05c4fe9f61a438::t_b8b67153546fb2 175-176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "634f14f0a35e19edbe0a0c5da3e3bb0d9899b3be",
+  "prompts": {},
+  "sessions": {
+    "s_05c4fe9f61a438": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019efeee-2b14-72e3-8f56-7bf722143a09",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
