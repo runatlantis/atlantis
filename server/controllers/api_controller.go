@@ -410,6 +410,7 @@ func (a *APIController) populatePullRequestStatus(ctx *command.Context) {
 
 	status, err := a.PullReqStatusFetcher.FetchPullStatus(ctx.Log, ctx.Pull)
 	if err != nil {
+		ctx.PullRequestStatus = models.PullReqStatus{}
 		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
 		return
 	}
