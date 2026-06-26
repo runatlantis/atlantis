@@ -1,0 +1,40 @@
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_a39ab04d970d9c 785-788,798-801,810-813,820-823,828-833,836-845,853-857,878-885,924-928
+server/events/project_command_runner_test.go
+  s_243a1a1edc15e5::t_b4e7fbee9c777e 2629
+  s_243a1a1edc15e5::t_9d0676ea443b83 2593,2604,2687,2698-2701,2715-2717
+  s_243a1a1edc15e5::t_f69ca7e7d5b560 12,2586-2592,2594-2603,2605-2628,2630-2686,2688-2697,2702-2714,2718-2720
+  s_243a1a1edc15e5::t_3080d66b274a58 2721
+server/events/project_command_runner.go
+  s_243a1a1edc15e5::t_9f60cee3a824c1 23,461-469,715-720,769-771,831-833,860-862,909-911
+server/events/working_dir_test.go
+  s_243a1a1edc15e5::t_ba74132695ef02 2170-2245
+server/core/config/raw/project.go
+  s_243a1a1edc15e5::t_f5da0b9d753007 127-138,152
+server/core/config/raw/project_test.go
+  s_243a1a1edc15e5::t_12e8e455e5a5b8 423-462
+server/events/models/models.go
+  s_243a1a1edc15e5::t_89d551bc71fbec 168-170
+server/events/models/models_test.go
+  s_243a1a1edc15e5::t_0da895c3626d75 101-113,122-130
+server/utils/filepath.go
+  s_243a1a1edc15e5::t_3ffe22ab5f40c7 1-24
+server/utils/filepath_test.go
+  s_243a1a1edc15e5::t_34fcfa8e5ebfea 1-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "f818d76c1f124c3900cd9041fc6ff872f882870d",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
