@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package main
@@ -24,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 )
 
 type GithubClient struct {
@@ -72,10 +63,13 @@ func newGithubAppClient(appIDStr, ownerName, repoName string) *GithubClient {
 		log.Fatalf("creating GitHub App transport: %v", err)
 	}
 
-	appClient := github.NewClient(&http.Client{Transport: appTransport})
+	appClient, err := github.NewClient(github.WithHTTPClient(&http.Client{Transport: appTransport}))
+	if err != nil {
+		log.Fatalf("creating GitHub App client: %v", err)
+	}
 	ctx := context.Background()
 
-	installation, _, err := appClient.Apps.FindRepositoryInstallation(ctx, ownerName, repoName)
+	installation, _, err := appClient.Apps.GetRepositoryInstallation(ctx, ownerName, repoName)
 	if err != nil {
 		log.Fatalf("getting GitHub App installation for %s/%s: %v", ownerName, repoName, err)
 	}
@@ -86,7 +80,10 @@ func newGithubAppClient(appIDStr, ownerName, repoName string) *GithubClient {
 		log.Fatalf("creating GitHub App installation transport: %v", err)
 	}
 
-	ghClient := github.NewClient(&http.Client{Transport: itr})
+	ghClient, err := github.NewClient(github.WithHTTPClient(&http.Client{Transport: itr}))
+	if err != nil {
+		log.Fatalf("creating GitHub App installation client: %v", err)
+	}
 
 	// Derive bot username from app slug
 	username := ""
@@ -119,7 +116,10 @@ func newGithubPATClient(ownerName, repoName string) *GithubClient {
 		Username: strings.TrimSpace(githubUsername),
 		Password: strings.TrimSpace(githubToken),
 	}
-	ghClient := github.NewClient(tp.Client())
+	ghClient, err := github.NewClient(github.WithHTTPClient(tp.Client()))
+	if err != nil {
+		log.Fatalf("creating GitHub PAT client: %v", err)
+	}
 
 	return &GithubClient{
 		client:    ghClient,

@@ -91,12 +91,12 @@ command](custom-workflows.md#custom-run-command).
 - run: custom-command
 ```
 
-| Key         | Type   | Default | Required | Description           |
-| ----------- | ------ | ------- | -------- | --------------------- |
-| run         | string | none    | no       | Run a custom command  |
-| description | string | none    | no       | Post hook description |
-| shell       | string | 'sh'    | no       | The shell to use for running the command |
-| shellArgs   | string | '-c'    | no       | The shell arguments to use for running the command |
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| run | string | none | no | Run a custom command |
+| description | string | none | no | Post hook description |
+| shell | string | 'sh' | no | The shell to use for running the command |
+| shellArgs | string | '-c' | no | The shell arguments to use for running the command |
 
 ::: tip Notes
 
@@ -118,4 +118,5 @@ command](custom-workflows.md#custom-run-command).
   * `COMMAND_NAME` - The name of the command that is being executed, i.e. `plan`, `apply` etc.
   * `COMMAND_HAS_ERRORS` - Indicates whether any errors occurred during the execution of the command (`plan`, `apply`). If set to `true`, at least one error was encountered; otherwise, it is `false`.
   * `OUTPUT_STATUS_FILE` - An output file to customize the success or failure status. ex. `echo 'failure' > $OUTPUT_STATUS_FILE`.
+  * `PROJECT_NAME` - Project name passed by the `-p` option. If `-p` is not provided, this value is empty.
 :::

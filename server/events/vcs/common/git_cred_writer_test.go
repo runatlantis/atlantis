@@ -24,7 +24,7 @@ func TestWriteGitCreds_WriteFile(t *testing.T) {
 	err := common.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
-	expContents := `https://user:token@hostname`
+	expContents := `https://user:token@hostname` // #nosec G101 -- test fixture, not real credentials
 
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
@@ -45,7 +45,7 @@ func TestWriteGitCreds_Appends(t *testing.T) {
 	err = common.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
 	Ok(t, err)
 
-	expContents := "contents\nhttps://user:token@hostname"
+	expContents := "contents\nhttps://user:token@hostname" // #nosec G101 -- test fixture, not real credentials
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
 	Equals(t, expContents, string(actContents))
@@ -59,7 +59,7 @@ func TestWriteGitCreds_NoModification(t *testing.T) {
 	t.Setenv("HOME", tmp)
 
 	credsFile := filepath.Join(tmp, ".git-credentials")
-	contents := "line1\nhttps://user:token@hostname\nline2"
+	contents := "line1\nhttps://user:token@hostname\nline2" // #nosec G101 -- test fixture, not real credentials
 	err := os.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
@@ -77,13 +77,13 @@ func TestWriteGitCreds_ReplaceApp(t *testing.T) {
 	t.Setenv("HOME", tmp)
 
 	credsFile := filepath.Join(tmp, ".git-credentials")
-	contents := "line1\nhttps://x-access-token:v1.87dddddddddddddddd@github.com\nline2"
+	contents := "line1\nhttps://x-access-token:v1.87dddddddddddddddd@github.com\nline2" // #nosec G101 -- test fixture, not real credentials
 	err := os.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
 	err = common.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
-	expContents := "line1\nhttps://x-access-token:token@github.com\nline2"
+	expContents := "line1\nhttps://x-access-token:token@github.com\nline2" // #nosec G101 -- test fixture, not real credentials
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
 	Equals(t, expContents, string(actContents))
@@ -96,13 +96,13 @@ func TestWriteGitCreds_AppendAppWhenFileNotEmpty(t *testing.T) {
 	t.Setenv("HOME", tmp)
 
 	credsFile := filepath.Join(tmp, ".git-credentials")
-	contents := "line1\nhttps://user:token@host.com\nline2"
+	contents := "line1\nhttps://user:token@host.com\nline2" // #nosec G101 -- test fixture, not real credentials
 	err := os.WriteFile(credsFile, []byte(contents), 0600)
 	Ok(t, err)
 
 	err = common.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
-	expContents := "line1\nhttps://user:token@host.com\nline2\nhttps://x-access-token:token@github.com"
+	expContents := "line1\nhttps://user:token@host.com\nline2\nhttps://x-access-token:token@github.com" // #nosec G101 -- test fixture, not real credentials
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
 	Equals(t, expContents, string(actContents))
@@ -121,7 +121,7 @@ func TestWriteGitCreds_AppendApp(t *testing.T) {
 
 	err = common.WriteGitCreds("x-access-token", "token", "github.com", tmp, logger, true)
 	Ok(t, err)
-	expContents := "https://x-access-token:token@github.com"
+	expContents := "https://x-access-token:token@github.com" // #nosec G101 -- test fixture, not real credentials
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".git-credentials"))
 	Ok(t, err)
 	Equals(t, expContents, string(actContents))

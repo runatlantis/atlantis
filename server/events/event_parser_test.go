@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -22,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -34,7 +25,7 @@ import (
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
-var parser = events.EventParser{
+var parser = events.EventParser{ // #nosec G101 -- test fixture, not real credentials
 	GithubUser:         "github-user",
 	GithubToken:        "github-token",
 	GithubTokenFile:    "",
@@ -1333,7 +1324,7 @@ func TestParseAzureDevopsRepo(t *testing.T) {
 }
 
 func TestParseAzureDevopsRepo_LowercasesOwner(t *testing.T) {
-	parser := events.EventParser{
+	parser := events.EventParser{ // #nosec G101 -- test fixture, not real credentials
 		AzureDevopsUser:  "azuredevops-user",
 		AzureDevopsToken: "azuredevops-token",
 	}
@@ -1420,32 +1411,50 @@ func TestParseAzureDevopsPullEvent(t *testing.T) {
 
 func TestParseAzureDevopsPullEvent_EventType(t *testing.T) {
 	cases := []struct {
-		action string
-		exp    models.PullRequestEventType
+		name          string
+		action        string
+		missingStatus bool
+		closedPull    bool
+		exp           models.PullRequestEventType
 	}{
 		{
+			name:   "updated active pull request",
 			action: "git.pullrequest.updated",
 			exp:    models.UpdatedPullEvent,
 		},
 		{
+			name:   "created pull request",
 			action: "git.pullrequest.created",
 			exp:    models.OpenedPullEvent,
 		},
 		{
-			action: "git.pullrequest.updated",
-			exp:    models.ClosedPullEvent,
+			name:       "updated closed pull request",
+			action:     "git.pullrequest.updated",
+			closedPull: true,
+			exp:        models.ClosedPullEvent,
 		},
 		{
+			name:   "other event type",
 			action: "anything_else",
 			exp:    models.OtherPullEvent,
+		},
+		{
+			name:          "updated pull request with missing status",
+			action:        "git.pullrequest.updated",
+			missingStatus: true,
+			exp:           models.UpdatedPullEvent,
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.action, func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			event := deepcopy.Copy(azuredevopstestdata.PullEvent).(azuredevops.Event)
-			if c.exp == models.ClosedPullEvent {
+			if c.closedPull {
 				event = deepcopy.Copy(azuredevopstestdata.PullClosedEvent).(azuredevops.Event)
+			} else if c.missingStatus {
+				resource := deepcopy.Copy(event.Resource).(*azuredevops.GitPullRequest)
+				resource.Status = nil
+				event.Resource = resource
 			}
 			event.EventType = c.action
 			_, actType, _, _, _, err := parser.ParseAzureDevopsPullEvent(event)
@@ -1516,6 +1525,15 @@ func TestParseAzureDevopsPull(t *testing.T) {
 	}, actPull)
 	Equals(t, expBaseRepo, actBaseRepo)
 	Equals(t, expBaseRepo, actHeadRepo)
+
+	// Regression test for #6492: a nil Status field used to panic with a
+	// nil-pointer dereference. Missing status in a webhook must not imply
+	// that an otherwise active pull request has closed.
+	testPull = deepcopy.Copy(azuredevopstestdata.Pull).(azuredevops.GitPullRequest)
+	testPull.Status = nil
+	actPull, _, _, err = parser.ParseAzureDevopsPull(&testPull)
+	Ok(t, err)
+	Equals(t, models.OpenPullState, actPull.State)
 }
 
 func TestParseAzureDevopsSelfHostedRepo(t *testing.T) {

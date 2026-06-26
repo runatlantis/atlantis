@@ -153,6 +153,8 @@ For pipelines, if the project requires that pipelines must succeed, all builds e
 
 For Jobs with allow_failure setting set to true, will be ignored. If the pipeline has been skipped and the project allows merging, it will be marked as mergeable.
 
+For per-project `atlantis apply` commands, Atlantis scopes GitLab's `mergeable` requirement to the project being applied when GitLab reports blocking commit statuses. Atlantis ignores blocking Atlantis plan statuses from other projects in the same merge request, but the project's own plan status and any non-Atlantis blocker still prevent the apply.
+
 #### Bitbucket.org (Bitbucket Cloud) and Bitbucket Server (Stash)
 
 For Bitbucket, we just check if there is a conflict that is preventing a
@@ -230,7 +232,12 @@ patterns to perform a **targeted** divergence check. Instead of failing when **a
 it only fails when files matching the project's `when_modified` patterns have changed. This is especially useful in
 monorepos where unrelated changes to other projects should not block your applies.
 
-If no `when_modified` patterns are configured (e.g. auto-discovered projects), `undiverged` falls back to checking all files.
+Targeted `undiverged` checks also follow Atlantis project selection for:
+
+* repo-configured projects affected through [module autoplanning](server-configuration.md#autoplan-modules)
+* auto-discovered projects selected by the default `autoplan-file-list` rules
+
+If Atlantis cannot determine project impact for a repository, `undiverged` falls back to checking all files.
 
 **Example scenario:**
 

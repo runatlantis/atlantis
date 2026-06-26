@@ -416,7 +416,7 @@ autodiscover:
       - dir/*
 ```
 
-Autodiscover can also be configured to skip over directories that match a path glob (as defined [here](https://pkg.go.dev/github.com/bmatcuk/doublestar/v4))
+Autodiscover can also be configured to skip over directories that match a path glob (as defined by the [doublestar path matching package](https://pkg.go.dev/github.com/bmatcuk/doublestar/v4)).
 
 ### Custom Backend Config
 
