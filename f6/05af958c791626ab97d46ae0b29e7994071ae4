@@ -1,0 +1,21 @@
+DEVELOPING.md
+  s_243a1a1edc15e5::t_2d7bed2ed92c1f 1-171
+CONTRIBUTING.md
+  s_243a1a1edc15e5::t_2d7bed2ed92c1f 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "f605af958c791626ab97d46ae0b29e7994071ae4",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
