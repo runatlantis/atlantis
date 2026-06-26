@@ -4,7 +4,7 @@
 package common_test
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -135,21 +135,39 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 	t.Setenv("HOME", tmp)
 
 	credsFile := filepath.Join(tmp, ".git-credentials")
-	err := os.WriteFile(credsFile, []byte("can't see me!"), 0000)
+	err := os.Mkdir(credsFile, 0700)
 	Ok(t, err)
 
-	expErr := fmt.Sprintf("open %s: permission denied", credsFile)
 	actErr := common.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
-	ErrContains(t, expErr, actErr)
+	ErrContains(t, "reading "+credsFile, actErr)
 }
 
 // Test that if we can't write, we error out.
 func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	credsFile := "/this/dir/does/not/exist/.git-credentials" // nolint: gosec
-	expErr := fmt.Sprintf("writing generated .git-credentials file with user, token and hostname to %s: open %s: no such file or directory", credsFile, credsFile)
-	actErr := common.WriteGitCreds("user", "token", "hostname", "/this/dir/does/not/exist", logger, false)
-	ErrEquals(t, expErr, actErr)
+
+	nonExistentDir := filepath.Join(
+		t.TempDir(),
+		"does",
+		"not",
+		"exist",
+	)
+
+	actErr := common.WriteGitCreds(
+		"user",
+		"token",
+		"hostname",
+		nonExistentDir,
+		logger,
+		false,
+	)
+
+	ErrContains(
+		t,
+		"writing generated .git-credentials file with user, token and hostname",
+		actErr,
+	)
+	Assert(t, errors.Is(actErr, os.ErrNotExist), "expected not-exist error, got %v", actErr)
 }
 
 // Test that git is actually configured to use the credentials

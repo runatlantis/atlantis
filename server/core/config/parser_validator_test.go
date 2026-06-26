@@ -88,17 +88,17 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 		{
 			"random characters",
 			[]byte("slkjds"),
-			"yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into",
+			"yaml: construct errors: line 1: cannot construct !!str `slkjds` into",
 		},
 		{
 			"just a colon",
 			[]byte(":"),
-			"yaml: did not find expected key",
+			"go-yaml load error in parser (while parsing a block mapping) at L1.C1: did not find expected key",
 		},
 		{
 			"invalid merge key from fuzzing",
 			[]byte("? [foo]\n: bar\n<<: {}\nversion: 3\n"),
-			"parsing yaml: runtime error: hash of unhashable type []interface {}",
+			"go-yaml load error in constructor at L1.C3: runtime error: hash of unhashable type []interface {}",
 		},
 	}
 
@@ -225,6 +225,32 @@ projects:
 							Enabled:      true,
 						},
 						ApplyRequirements: nil,
+					},
+				},
+				Workflows: map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "timestamp-like strings are preserved",
+			input: `
+version: 3
+projects:
+- dir: 2026-06-26
+  name: 2026-06-27
+  autoplan:
+    when_modified:
+    - 2026-06-28`,
+			exp: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:       "2026-06-26",
+						Workspace: "default",
+						Name:      String("2026-06-27"),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"2026-06-28"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: map[string]valid.Workflow{},
@@ -679,7 +705,7 @@ projects:
 version: 3
 projects:
 - unknown: value`,
-			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in type raw.Project",
+			expErr: "yaml: construct errors: line 4: field unknown not found in type raw.Project",
 		},
 		{
 			description: "referencing workflow that doesn't exist",
@@ -1282,7 +1308,7 @@ func TestParseGlobalCfg(t *testing.T) {
 		},
 		"invalid fields": {
 			input:  "invalid: key",
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.GlobalCfg",
+			expErr: "yaml: construct errors: line 1: field invalid not found in type raw.GlobalCfg",
 		},
 		"no id specified": {
 			input: `repos:

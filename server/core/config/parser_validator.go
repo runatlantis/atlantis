@@ -19,7 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	yaml "gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // ParserValidator parses and validates server-side repo config files and
@@ -167,11 +167,31 @@ func decodeYAML(decoder *yaml.Decoder, out any) (err error) {
 		}
 	}()
 
-	err = decoder.Decode(out)
+	var node yaml.Node
+	err = decoder.Decode(&node)
 	if errors.Is(err, io.EOF) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return err
+	}
+
+	stringifyTimestampScalars(&node)
+	return node.Load(out, yaml.WithKnownFields())
+}
+
+func stringifyTimestampScalars(node *yaml.Node) {
+	if node == nil {
+		return
+	}
+	// v3 decoded unquoted timestamp-like scalars into string fields. Preserve that
+	// Atlantis config compatibility before v4 constructs Go values from the node.
+	if node.Kind == yaml.ScalarNode && node.Tag == "!!timestamp" {
+		node.Tag = "!!str"
+	}
+	for _, child := range node.Content {
+		stringifyTimestampScalars(child)
+	}
 }
 
 // ParseGlobalCfgJSON parses a json string cfgJSON into global config.

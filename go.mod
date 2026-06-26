@@ -15,7 +15,7 @@ require (
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/go-test/deep v1.1.1
-	github.com/gofri/go-github-ratelimit v1.1.1
+	github.com/gofri/go-github-ratelimit/v2 v2.0.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/go-github/v88 v88.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
@@ -51,9 +51,9 @@ require (
 	go.etcd.io/bbolt v1.4.3
 	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.1
+	go.yaml.in/yaml/v4 v4.0.0-rc.6
 	golang.org/x/term v0.43.0
 	golang.org/x/text v0.37.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -148,6 +148,7 @@ require (
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 tool (

@@ -164,7 +164,9 @@ RUN ./download-release.sh \
 # Creating the individual distro builds using targets
 FROM alpine:${ALPINE_TAG} AS alpine
 
-EXPOSE ${ATLANTIS_PORT:-4141}
+ARG ATLANTIS_PORT=4141
+
+EXPOSE ${ATLANTIS_PORT}
 
 HEALTHCHECK --interval=5m --timeout=3s \
     CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
@@ -253,7 +255,9 @@ CMD ["server"]
 # Stage 2 - Debian
 FROM debian-base AS debian
 
-EXPOSE ${ATLANTIS_PORT:-4141}
+ARG ATLANTIS_PORT=4141
+
+EXPOSE ${ATLANTIS_PORT}
 
 HEALTHCHECK --interval=5m --timeout=3s \
     CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
