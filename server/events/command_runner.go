@@ -158,7 +158,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		}
 		directUserTeams := append([]string(nil), user.Teams...)
 
-		ok, err := c.checkUserPermissions(baseRepo, &user, "plan")
+		ok, err := c.checkUserPermissions(baseRepo, &user, "plan", nil)
 		if err != nil {
 			log.Err("Unable to check user permissions: %s", err)
 			return
@@ -321,6 +321,7 @@ func (c *DefaultCommandRunner) addHierarchyTeamsForCommandForTeams(repo models.R
 
 	ctx := models.TeamAllowlistCheckerContext{
 		BaseRepo:    repo,
+		CheckType:   "pre_flight",
 		CommandName: cmdName,
 		Log:         c.Logger,
 		Pull:        models.PullRequest{},
@@ -379,7 +380,7 @@ func (c *DefaultCommandRunner) addPolicyCheckHierarchyTeamsForPlan(repo models.R
 // When a match is found via hierarchy, the matched allowlisted parent team is appended to
 // user.Teams so that subsequent per-project allowlist checks (which use direct membership
 // only) also pass.
-func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *models.User, cmdName string) (bool, error) {
+func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *models.User, cmdName string, cmd *CommentCommand) (bool, error) {
 	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
 		return true, nil
 	}
@@ -387,17 +388,20 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *mode
 	ctx := models.TeamAllowlistCheckerContext{
 		BaseRepo:    repo,
 		CheckType:   "pre_flight",
-		CommandName: cmd.Name.String(),
+		CommandName: cmdName,
 		Log:         c.Logger,
 		Pull:        models.PullRequest{},
-		User:        user,
-		Verbose:     cmd.Verbose,
+		User:        *user,
 		API:         false,
-		// Workspace and ProjectName are only populated if the user explicitly
-		// specified them in the command (e.g. "atlantis apply -w prod -p myproject").
-		// For bare commands like "atlantis apply" these will be empty.
-		Workspace:   cmd.Workspace,
-		ProjectName: cmd.ProjectName,
+	}
+	// cmd is nil on the autoplan path (no comment command exists), so the
+	// workspace/project/verbose enrichment is only available for explicit
+	// comment commands. Workspace and ProjectName are only populated if the
+	// user explicitly specified them (e.g. "atlantis apply -w prod -p myproject").
+	if cmd != nil {
+		ctx.Verbose = cmd.Verbose
+		ctx.Workspace = cmd.Workspace
+		ctx.ProjectName = cmd.ProjectName
 	}
 
 	// Fast path: user is a direct member of an allowlisted team.
@@ -457,7 +461,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		}
 		directUserTeams := append([]string(nil), user.Teams...)
 
-		ok, err := c.checkUserPermissions(baseRepo, &user, cmd.Name.String())
+		ok, err := c.checkUserPermissions(baseRepo, &user, cmd.Name.String(), cmd)
 		if err != nil {
 			c.Logger.Err("Unable to check user permissions: %s", err)
 			return
