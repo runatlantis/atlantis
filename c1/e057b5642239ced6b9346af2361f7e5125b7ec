@@ -1,0 +1,583 @@
+.clusterfuzzlite/Dockerfile
+  s_243a1a1edc15e5::t_b4031f8b520446 1
+.clusterfuzzlite/build.sh
+  s_243a1a1edc15e5::t_3f866e18c1c1b3 7
+.github/renovate.json5
+  s_243a1a1edc15e5::t_a3a6bff75fa6a6 123-127,135-150
+.github/workflows/atlantis-image.yml
+  s_243a1a1edc15e5::t_ea5a492429d0c4 39,43,76,80,89,94,100,114,146,160,220,224,226,230,263
+.github/workflows/clusterfuzzlite.yml
+  s_243a1a1edc15e5::t_57c2127233b165 36,61
+.github/workflows/codeql.yml
+  s_243a1a1edc15e5::t_0e47cd82c7f744 47,51,81,86,90,103,116,130
+.github/workflows/dependency-review.yml
+  s_243a1a1edc15e5::t_84320af7420e7c 28,33
+.github/workflows/go-lint.yml
+  s_243a1a1edc15e5::t_18513f4d340e57 34,38,56,60,63,68,71,80
+.github/workflows/labeler.yml
+  s_243a1a1edc15e5::t_76bb9c0beb2c42 23
+.github/workflows/markdown-lint.yml
+  s_243a1a1edc15e5::t_9596438feceb05 1-91
+.github/workflows/pr-lint.yml
+  s_243a1a1edc15e5::t_c2a1db61388264 19
+.github/workflows/pr-size-labeler.yml
+  s_243a1a1edc15e5::t_cf949a8e4e712c 16
+.github/workflows/release.yml
+  s_243a1a1edc15e5::t_e91cbb9969a75e 17,21,25,30
+.github/workflows/renovate-config.yml
+  s_243a1a1edc15e5::t_88ced1f45ebe0a 23,27-28,32
+.github/workflows/scorecard.yml
+  s_243a1a1edc15e5::t_a3ab51ad2498c1 23,28,51,59
+.github/workflows/stale.yml
+  s_243a1a1edc15e5::t_29d2be29c4bf1d 16,20
+.github/workflows/test.yml
+  s_243a1a1edc15e5::t_4a4f9d00e5338b 40,44,62,65,69,72,126,134-135,143,147-148,162,180-181,188,192-193,207
+.github/workflows/testing-env-image.yml
+  s_243a1a1edc15e5::t_155eeb0a10fdab 32,36,54,58,61,67,70,78,96
+.github/workflows/website.yml
+  s_243a1a1edc15e5::t_bf2ba71bfca1ff 34,38,60,64,67,84,102,109,127
+.golangci.yml
+  s_243a1a1edc15e5::t_509599f3714b72 15-17,29-34
+.lycheeignore
+  s_243a1a1edc15e5::t_3848fca1b15b0f 7-10
+.node-version
+  s_243a1a1edc15e5::t_e60e424ddb6ecb 1
+.npmrc
+  s_243a1a1edc15e5::t_396dd6eaced036 1-11
+.tool-versions
+  s_243a1a1edc15e5::t_48da78e2f55118 2
+ADOPTERS.md
+  s_243a1a1edc15e5::t_1eece2dcb02b6d 14,16-17
+AGENTS.md
+  s_243a1a1edc15e5::t_def1f9b458e684 5,9-10,13,21,25,50,65-88,91-95,119
+AI_USAGE_POLICY.md
+  s_243a1a1edc15e5::t_081ae09fdbd68d 1-88
+CONTRIBUTING.md
+  s_243a1a1edc15e5::t_66278a111e93fd 1-5,10,12-13,33,35,37,39,41
+DEVELOPING.md
+  s_243a1a1edc15e5::t_ec18b0c5fde655 1-171
+Dockerfile
+  s_243a1a1edc15e5::t_44d73d79acb5fa 1,3-4,6,9,11,40-41,59-74,189,191,220-244,275-301
+Dockerfile.dev
+  s_243a1a1edc15e5::t_b0b548dfdaa79f 1
+RELEASE.md
+  s_243a1a1edc15e5::t_4c7344ee7373b5 5,9-11,17-19,23-25,29-31,37-42,48-51,55-58,60,64-169,173-175,181,183,186-187,190-191,195
+cmd/bootstrap.go
+  s_243a1a1edc15e5::t_717ab16bc6e02c 2
+cmd/cmd.go
+  s_243a1a1edc15e5::t_4b23074747f812 2
+cmd/help_fmt.go
+  s_243a1a1edc15e5::t_cd14711040f726 130,135
+cmd/root.go
+  s_243a1a1edc15e5::t_ee3fc6661ab60f 2
+cmd/server.go
+  s_243a1a1edc15e5::t_16e7a566a42168 2,49,129-130,168,228-233,424-430,862-875,877-878,938-940,1124-1135
+cmd/server_test.go
+  s_243a1a1edc15e5::t_c767c5d4ee8e20 2,58,127-128,236,238,241,1207-1239
+cmd/version.go
+  s_243a1a1edc15e5::t_72ade0197017f4 2
+docker-compose.yml
+  s_243a1a1edc15e5::t_11882ee1f5c5bc 4,15
+e2e/e2e.go
+  s_243a1a1edc15e5::t_9ffbe6d243e8ac 2
+e2e/github.go
+  s_243a1a1edc15e5::t_56997f191d9230 2,18,66-69,72,83-86,119-122
+e2e/gitlab.go
+  s_243a1a1edc15e5::t_ae012ae00e0762 2
+e2e/go.mod
+  s_243a1a1edc15e5::t_97c34defaa5e34 3,7,20
+e2e/go.sum
+  s_243a1a1edc15e5::t_88b10a1bf4af11 14-15,41-42
+e2e/main.go
+  s_243a1a1edc15e5::t_d23427dc4795b9 2
+e2e/vcs.go
+  s_243a1a1edc15e5::t_31010db52a6b46 2
+go.mod
+  s_243a1a1edc15e5::t_b21b22e09483c7 3,19,25,27,37,42,53-54,73,76-77,104,128,135,140,142-143,146,148,151-155
+go.sum
+  s_243a1a1edc15e5::t_974ad079d1a0e7 51-52,59-60,66-67,140-143,230-231,271-272,275-276,281-282,365-366,426-427,461-462,508-509,545-546,584-585,657-658,664-665,676-677,726-727
+kustomize/bundle.yaml
+  s_243a1a1edc15e5::t_fc64f3a3013c5a 25
+main.go
+  s_243a1a1edc15e5::t_d2b013bd956ea2 2
+package-lock.json
+  s_243a1a1edc15e5::t_de278f4103e323 10,13-14,16,19,309-311,347-349,898-900,904,962-964,976-978,990-992,1004-1006,1018-1020,1032-1034,1046-1048,1060-1062,1074-1076,1088-1090,1101-1118,1130-1146,1158-1160,1172-1174,1186-1188,1200-1202,1214-1216,1227-1240,1242-1244,1256-1258,1270-1272,1283-1296,1298-1300,1683-1685,1717-1719,1766-1768,1814-1824,1840-1842,1846-1847,1867-1869,1873-1874,1878-1880,1884-1888,1891,1896-1898,1902-1903,1943-1945,1949,1953-1955,1959-1960,1964-1966,1970-1972,1977-1979,1983-1984,1987,1991-1993,2327-2329,2333,2377-2379,2917-2919,2928-2930,2953-2955,3011-3013,3040-3050,3172-3174,3418-3420,3422-3431,3458-3460,3505-3507,3509-3518,3567-3569,3571-3580,3585,3602-3604,3616,3619,3626-3628,3632,3635,3638-3640,3642-3643,3649,3705-3707,3712-3713,3715-3716,3721-3725,3727,3731,4292-4294,4465-4467,4540-4542,4691-4693,4707-4731,4875-4877,4919-4921,4925-4926,4951-4953,4957,5014-5016,5021,5049-5051,5225-5227,5235,5283-5285,5965-5967,5971-5975
+package.json
+  s_243a1a1edc15e5::t_9a0a071b097159 6,9-10,12,15,19
+runatlantis.io/.vitepress/config.ts
+  s_243a1a1edc15e5::t_496da7ee8d1047 60
+runatlantis.io/blog/2019/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage.md
+  s_243a1a1edc15e5::t_18d66f4ed05e9e 18
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_be5d38303682f6 238,254-284
+runatlantis.io/docs/checkout-strategy.md
+  s_243a1a1edc15e5::t_66ea7a65bc3a01 52-60
+runatlantis.io/docs/command-requirements.md
+  s_243a1a1edc15e5::t_eac79172108b4b 156-157,235-240
+runatlantis.io/docs/custom-policy-checks.md
+  s_243a1a1edc15e5::t_c5e0b5afcc501f 7-10
+runatlantis.io/docs/custom-workflows.md
+  s_243a1a1edc15e5::t_4361b459bf5d4c 288,298,313,323,333,353,365,583-585,628,703-707,745-751
+runatlantis.io/docs/deployment.md
+  s_243a1a1edc15e5::t_97a83d8fbb75d3 693,703-704,732,737
+runatlantis.io/docs/locking.md
+  s_243a1a1edc15e5::t_957082ee93be2d 16-17
+runatlantis.io/docs/policy-checking.md
+  s_243a1a1edc15e5::t_ae6da7b5cda174 23,30,95-97,212-218,221-243,245-256,259-333
+runatlantis.io/docs/post-workflow-hooks.md
+  s_243a1a1edc15e5::t_147db03d1d3c61 94-99,121
+runatlantis.io/docs/pre-workflow-hooks.md
+  s_243a1a1edc15e5::t_489312ace6a916 91-96,117-118
+runatlantis.io/docs/repo-level-atlantis-yaml.md
+  s_243a1a1edc15e5::t_8d6f87429fb0d1 419
+runatlantis.io/docs/server-configuration.md
+  s_243a1a1edc15e5::t_7b82c60fccb902 57,59,62,67,320,379-395,557,565,579,742-743,1037,1125-1127,1153-1162,1227-1236,1256,1270
+runatlantis.io/docs/server-side-repo-config.md
+  s_243a1a1edc15e5::t_76d754d849668e 532-550,599-606,617-626
+runatlantis.io/docs/stats.md
+  s_243a1a1edc15e5::t_d8defebd8216eb 5-6
+scripts/fmt.sh
+  s_243a1a1edc15e5::t_b92c5f85b08aca 5
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_c284a3bf90f822 43-47,157-160,260,263,266,308,311,314,388-395,397-418
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_3988aaa7a8260b 9,320-461
+server/controllers/events/azuredevops_request_validator.go
+  s_243a1a1edc15e5::t_48342f4501442e 14
+server/controllers/events/events_controller.go
+  s_243a1a1edc15e5::t_cd45325448ab7a 2,19,36,146,292-298,345,896,898
+server/controllers/events/events_controller_e2e_test.go
+  s_243a1a1edc15e5::t_fff3ae6299d0f6 20,1217-1238
+server/controllers/events/events_controller_test.go
+  s_243a1a1edc15e5::t_171f347240c4e4 2,20,39,229,247,316,896,984-997
+server/controllers/events/github_request_validator.go
+  s_243a1a1edc15e5::t_87ae280bf45e68 2,13,16
+server/controllers/events/github_request_validator_test.go
+  s_243a1a1edc15e5::t_dd48edb892d6db 2
+server/controllers/events/gitlab_request_parser_validator.go
+  s_243a1a1edc15e5::t_1a71e8bf948d5e 2,19
+server/controllers/events/gitlab_request_parser_validator_test.go
+  s_243a1a1edc15e5::t_f0c83c4d7e8ba5 2
+server/controllers/events/mocks/mock_gitlab_request_parser_validator.go
+  s_243a1a1edc15e5::t_bf480ecfb393ae 28,33-34,38
+server/controllers/events/testdata/test-repos/policy-checks-custom-run-steps/exp-output-auto-policy-check.txt
+  s_243a1a1edc15e5::t_d5a82b17e645aa 19
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/atlantis.yaml
+  s_243a1a1edc15e5::t_3b0122210c93e6 1-4
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/exp-output-apply.txt
+  s_243a1a1edc15e5::t_cf6bbf40b0a8e1 1-12
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/exp-output-approve-policies.txt
+  s_243a1a1edc15e5::t_74bcf7eccc2ea4 1-3
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/exp-output-auto-policy-check.txt
+  s_243a1a1edc15e5::t_1d8011d0f3f5ae 1-38
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/exp-output-autoplan.txt
+  s_243a1a1edc15e5::t_056871abf6f722 1-43
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/exp-output-merge.txt
+  s_243a1a1edc15e5::t_8e836958652444 1-3
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/exp-output-plan.txt
+  s_243a1a1edc15e5::t_91638a36a8b6a1 1-43
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/exp-output-policy-check-approved.txt
+  s_243a1a1edc15e5::t_06555268e7fd40 1-33
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/main.tf
+  s_243a1a1edc15e5::t_fe326e410dc80a 1-7
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/policies/policy.rego
+  s_243a1a1edc15e5::t_21396860a83736 1-28
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/repos.yaml
+  s_243a1a1edc15e5::t_027d94da92c5de 1-9
+server/controllers/events/testdata/test-repos/policy-checks-sticky-approvals/versions.tf
+  s_243a1a1edc15e5::t_6c832015b27374 1-8
+server/controllers/github_app_controller.go
+  s_243a1a1edc15e5::t_6999aa87e58621 87,155
+server/controllers/jobs_controller.go
+  s_243a1a1edc15e5::t_e96adc4c2bdf3a 64,96,98
+server/controllers/locks_controller.go
+  s_243a1a1edc15e5::t_ab67b66674f442 99,154,156
+server/controllers/web_templates/mocks/mock_template_writer.go
+  s_243a1a1edc15e5::t_51432ff48b762b 28,80,91,96,106,108
+server/controllers/web_templates/web_templates.go
+  s_243a1a1edc15e5::t_17fcc86b91a6d6 2,17
+server/core/boltdb/boltdb.go
+  s_243a1a1edc15e5::t_cca4d52ec60dc2 386-390,400-416,600-606
+server/core/boltdb/boltdb_test.go
+  s_243a1a1edc15e5::t_da35c21acf543c 2,12,962-963,979-980,999-1001,1025,1037,1046-1206
+server/core/config/parser_validator.go
+  s_243a1a1edc15e5::t_992dd6fe721a9c 63-64,87-88,155-156,163-176,274,300,302,304
+server/core/config/parser_validator_test.go
+  s_243a1a1edc15e5::t_b8b851a1a32def 85,90,95,98-102,110,224,247,293,316,344,375,409,443,477,511,545,579,613,641,748,757,799,898,989,1082,1552-1554,1557-1561,1897-1899,1902-1906
+server/core/config/raw/autoplan.go
+  s_243a1a1edc15e5::t_104ef4a26b6206 7-8,12-19,22-27,38,59
+server/core/config/raw/autoplan_test.go
+  s_243a1a1edc15e5::t_a1a1c593ca7662 114,134,144,154-157
+server/core/config/raw/global_cfg.go
+  s_243a1a1edc15e5::t_8f8aeabbd3e690 10,110
+server/core/config/raw/policies.go
+  s_243a1a1edc15e5::t_8dd420425475d5 14-19,26,44-49,59-66,97-98,109,113,120,123-125
+server/core/config/raw/policies_test.go
+  s_243a1a1edc15e5::t_dc440c24329015 141,155-183,233-235,242-244,276-278,288-438,451-535
+server/core/config/raw/project.go
+  s_243a1a1edc15e5::t_23ef5808e43ecb 10,28-35,58-76
+server/core/config/raw/project_internal_test.go
+  s_243a1a1edc15e5::t_f062e68c697599 4,6-7,9-17
+server/core/config/raw/project_test.go
+  s_243a1a1edc15e5::t_b546bdfd6302f0 7-8,257,457,510,525,539,553,568,582,596,610,626,638-748
+server/core/config/raw/raw.go
+  s_243a1a1edc15e5::t_ae625c96df5a6e 11,29-42
+server/core/config/raw/repo_cfg_test.go
+  s_243a1a1edc15e5::t_83dfc147322e53 521
+server/core/config/raw/step.go
+  s_243a1a1edc15e5::t_bd76f3f3a3f331 205,209,260
+server/core/config/valid/global_cfg.go
+  s_243a1a1edc15e5::t_88c36cf8365bab 9,343,388,460-462,464-468,470,495,498,501,504,507,510,513,516,520,529,587,698,710
+server/core/config/valid/global_cfg_test.go
+  s_243a1a1edc15e5::t_1da7f5ddcb3843 559-561,564-568,610-612,615-619,1192-1243
+server/core/config/valid/policies.go
+  s_243a1a1edc15e5::t_426cdc49bfc382 18-22,27-32,45-46
+server/core/config/valid/repo_cfg.go
+  s_243a1a1edc15e5::t_4e9a3cd48472c7 129-132
+server/core/config/valid/repo_cfg_test.go
+  s_243a1a1edc15e5::t_dfbf4c3f40a105 36,59,78,89,119,130,153,164,183,206,231,236,241,246,248,252,254,258,260
+server/core/db/db.go
+  s_243a1a1edc15e5::t_b2ea8cf389af97 2,15,33-34
+server/core/db/mocks/mock_database.go
+  s_243a1a1edc15e5::t_189c9897686558 148-161
+server/core/locking/apply_locking.go
+  s_243a1a1edc15e5::t_47bb80adbd0182 14,22
+server/core/locking/locking.go
+  s_243a1a1edc15e5::t_e35c92d3642023 2,32
+server/core/locking/locking_test.go
+  s_243a1a1edc15e5::t_3baafe1b6d8646 2
+server/core/redis/redis.go
+  s_243a1a1edc15e5::t_05036071b4a762 12,25,27,34-48,50-65,68,71,75-107,112,115-137,146,149,152-165,168-171,429-433,443-459,584-590,592-597
+server/core/redis/redis_test.go
+  s_243a1a1edc15e5::t_30d52928dc3a8d 53-86,1016-1017,1033-1034,1053-1055,1079,1091,1099-1242
+server/core/runtime/apply_step_runner.go
+  s_243a1a1edc15e5::t_584fb4926f6543 103-104,107,213-214,217
+server/core/runtime/cache/version_path.go
+  s_243a1a1edc15e5::t_606469ca83f1b7 14-15
+server/core/runtime/executor.go
+  s_243a1a1edc15e5::t_14b1a9fded1013 12
+server/core/runtime/external_team_allowlist_runner.go
+  s_243a1a1edc15e5::t_c6528f006e02c2 16
+server/core/runtime/init_step_runner.go
+  s_243a1a1edc15e5::t_470dcb6ce9bb21 28,33,37
+server/core/runtime/models/exec.go
+  s_243a1a1edc15e5::t_7b2d9b8a8f46d7 13
+server/core/runtime/models/filepath.go
+  s_243a1a1edc15e5::t_cca4d970c6e0eb 11
+server/core/runtime/models/shell_command_runner.go
+  s_243a1a1edc15e5::t_78b9c1dd7ee406 8,122,135,142-150,161-168,173-178,180-182,197
+server/core/runtime/models/shell_command_runner_test.go
+  s_243a1a1edc15e5::t_18c982b9d65272 84-131
+server/core/runtime/policy/conftest_client.go
+  s_243a1a1edc15e5::t_668964d01c2156 7,9,14,83,111,191,230-255,265-268,271,275-277,279
+server/core/runtime/policy/conftest_client_test.go
+  s_243a1a1edc15e5::t_a6527fde8a7f0f 19,167-170,174-177,182-183,194-195,218-219,221-222,242,285-288,310-312,334-335,344-345
+server/core/runtime/post_workflow_hook_runner.go
+  s_243a1a1edc15e5::t_1920f5d12dd435 17,51
+server/core/runtime/post_workflow_hook_runner_test.go
+  s_243a1a1edc15e5::t_20113d9b143b2f 94,97,192
+server/core/runtime/pre_workflow_hook_runner.go
+  s_243a1a1edc15e5::t_eba94f677a4d39 17,50
+server/core/runtime/pre_workflow_hook_runner_test.go
+  s_243a1a1edc15e5::t_6da315590b11fd 114,117,203
+server/core/runtime/pull_approved_checker.go
+  s_243a1a1edc15e5::t_26de4802f4556d 11
+server/core/runtime/runtime.go
+  s_243a1a1edc15e5::t_908082f85b80cf 41,55,62
+server/core/terraform/downloader.go
+  s_243a1a1edc15e5::t_49ef881caf0a15 19
+server/core/terraform/tfclient/terraform_client.go
+  s_243a1a1edc15e5::t_524daadc759b31 2,33,373
+server/core/terraform/tfclient/terraform_client_test.go
+  s_243a1a1edc15e5::t_c433c8c947b1b9 2,251
+server/events/apply_command_runner.go
+  s_243a1a1edc15e5::t_42e18077a9af4a 80-88,147,160,202,205-206,223,236-238
+server/events/apply_command_runner_test.go
+  s_243a1a1edc15e5::t_49f3f93bccd93b 10,33-34,49,52-54,84,88-104,235,244,556-621
+server/events/approve_policies_command_runner.go
+  s_243a1a1edc15e5::t_20706a83966b6a 71,107
+server/events/cancel_command_runner.go
+  s_243a1a1edc15e5::t_0d29e0945bbe90 1-3
+server/events/cancellation_tracker.go
+  s_243a1a1edc15e5::t_73164471eaa595 1-3,6
+server/events/command/project_context.go
+  s_243a1a1edc15e5::t_9a8a91aa256af3 163-173,224
+server/events/command/project_context_test.go
+  s_243a1a1edc15e5::t_b263682bed130e 37,56,75,102,107,112,139,144,149
+server/events/command/project_result.go
+  s_243a1a1edc15e5::t_2c67776c453a8f 50-54
+server/events/command_requirement_handler.go
+  s_243a1a1edc15e5::t_17c1258db971ed 8,16,24-28,30-36,79-80,82-83,88-93,101-184
+server/events/command_requirement_handler_test.go
+  s_243a1a1edc15e5::t_73bdb2b47625c6 7,9,22,56,102,180,235-527
+server/events/command_runner.go
+  s_243a1a1edc15e5::t_9370d992598d4b 2,10,14,31,42,50,58,144,188,348,520
+server/events/command_runner_internal_test.go
+  s_243a1a1edc15e5::t_f86359d5524370 17-23,75,89-109,124,136,172,187,200-201,215-218,266-286,288,290,309-394,396-401,406-428,430-435,438,444
+server/events/command_runner_test.go
+  s_243a1a1edc15e5::t_f8d3eea7edb881 2,22,427,450,547
+server/events/command_type.go
+  s_243a1a1edc15e5::t_982fd0afe6408d 2
+server/events/comment_parser.go
+  s_243a1a1edc15e5::t_fe3ac980d481fb 2,45-56,64,73,94-97,100-101,113-120,326-330,390,421-429,433-443,575,585,629-632
+server/events/comment_parser_test.go
+  s_243a1a1edc15e5::t_930c9f1e536ca4 2,20-25,49-50,60-61,67,303,530-632,1076-1077
+server/events/commit_status_updater.go
+  s_243a1a1edc15e5::t_9d8447e07edc53 2,8,10,21,29-31,49,62-63,65,67-85,87-94,96-112,115,119,140-160,170
+server/events/commit_status_updater_test.go
+  s_243a1a1edc15e5::t_9ec015fa95d3e3 2,9,11,22-52,106-121,129,137,144,153-160,166-175,182,198,207-280,386-488
+server/events/delete_lock_command.go
+  s_243a1a1edc15e5::t_0d0ef4dc2bdf2b 13
+server/events/event_parser.go
+  s_243a1a1edc15e5::t_786b6e028f25c2 2,20,202,355,377,379,381,446-447,456-457,642,649,674,678,729,740,843-844,857-858,981-983,1057,1080,1093
+server/events/event_parser_test.go
+  s_243a1a1edc15e5::t_87782feae5a23b 2,16,28,1327,1414-1418,1421,1426,1431-1434,1437,1441-1446,1450,1452,1454-1457,1528-1536
+server/events/github_app_working_dir_test.go
+  s_243a1a1edc15e5::t_ac981d6f72d800 85,131
+server/events/instrumented_pull_closed_executor.go
+  s_243a1a1edc15e5::t_9bc9a2c85db163 48
+server/events/markdown_renderer.go
+  s_243a1a1edc15e5::t_17c645d0ef74a0 2
+server/events/markdown_renderer_test.go
+  s_243a1a1edc15e5::t_eb2633ed5ac172 2,68,143,391-392,397-399,470-471,1035-1038,1124-1374,1509,1569-1570,1573-1576,1647-1648,1808-1811,1897,2106,2299,2358,2435,2547,2695,2850,2934,3175,3772,3914,4376,4432,4657
+server/events/mock_workingdir_test.go
+  s_243a1a1edc15e5::t_58f930052c639f 93-130,188-202,218-232,483-564,688-728,746-798
+server/events/mocks/mock_commit_status_updater.go
+  s_243a1a1edc15e5::t_0c9ba801aea654 45,49,180-181,191-193,196,230,232
+server/events/mocks/mock_event_parsing.go
+  s_243a1a1edc15e5::t_d1f6bb85cce808 9
+server/events/mocks/mock_github_pull_getter.go
+  s_243a1a1edc15e5::t_582e75fa34f97c 7
+server/events/mocks/mock_working_dir.go
+  s_243a1a1edc15e5::t_2a7bb33b7f9b8d 10-11,93-130,188-202,218-232,483-564,688-728,746-798
+server/events/mocks/mock_working_dir_locker.go
+  s_243a1a1edc15e5::t_94826dd93bd95d 9-10,92-93,103-105,108,136,138-144
+server/events/models/commit_status.go
+  s_243a1a1edc15e5::t_e38833ba68d7ef 2
+server/events/models/gitlab_hostname.go
+  s_243a1a1edc15e5::t_714ffef075d406 1-36
+server/events/models/gitlab_hostname_test.go
+  s_243a1a1edc15e5::t_0afa60318aae84 1-56
+server/events/models/models.go
+  s_243a1a1edc15e5::t_c7222ee434fbf8 2,11-12,25-52,94-98,123-134,192-198,436-451,453-464,467-484,486-510,516-519,532-534,536-552,558-560,566-574,579-603,605-659,730,743,746,752-785,809-819,825,854-855,857-858,982-983,987,991,994-1009,1014-1026
+server/events/models/models_test.go
+  s_243a1a1edc15e5::t_449d6891c82556 2,17,22,27,32,37,44,46,61,66,105,113,121,123,138,140,153-245,487-498,531-562,574-611,671-673,683-685,695-698,708-710,713-716,719-721,733-736,739-742,745-747,767-1236,1315,1331-1350,1371-1459,1471-1997
+server/events/models/testdata/fixtures.go
+  s_243a1a1edc15e5::t_b84ea92051e8d1 2
+server/events/modules.go
+  s_243a1a1edc15e5::t_a2e7446da09d76 87-101,124-127,130,135
+server/events/modules_test.go
+  s_243a1a1edc15e5::t_3e0351828bd519 30-33,65-87
+server/events/pending_plan_finder.go
+  s_243a1a1edc15e5::t_1858d9118c5867 17,53-57,61-65,67-80,114-140
+server/events/pending_plan_finder_test.go
+  s_243a1a1edc15e5::t_1c4075c2cff42d 24,26-27,36,41-89
+server/events/plan_command_runner.go
+  s_243a1a1edc15e5::t_755c79748ccd95 132,135,138,236,249,252,255,317,334,349-350,380
+server/events/plan_command_runner_test.go
+  s_243a1a1edc15e5::t_83d4b4837c0415 10,150,159,563,566,602,640,717,786,795,860,967,1026,1103,1113
+server/events/policy_check_command_runner.go
+  s_243a1a1edc15e5::t_f959e8672b1e94 51,66,96
+server/events/post_workflow_hooks_command_runner.go
+  s_243a1a1edc15e5::t_f44e278fba05e6 18,25,87
+server/events/post_workflow_hooks_command_runner_test.go
+  s_243a1a1edc15e5::t_38c0e5dd820d45 234,263,364,382,385-387,391-392,394,400-406,411-416
+server/events/pre_workflow_hooks_command_runner.go
+  s_243a1a1edc15e5::t_2f21bb4427b890 18,25,86
+server/events/pre_workflow_hooks_command_runner_test.go
+  s_243a1a1edc15e5::t_e75ee3d6a3a994 190,292,312-314,318-319,321,329-335,340-345
+server/events/project_command_builder.go
+  s_243a1a1edc15e5::t_76ed43a049a21c 197,376-386,388-389,394-414,418,423,427-434,436-447,566,568,860,862,865-881,883
+server/events/project_command_builder_internal_test.go
+  s_243a1a1edc15e5::t_47c933492b12d9 1401-1422,1570-1590
+server/events/project_command_builder_test.go
+  s_243a1a1edc15e5::t_be539d5eb305ef 1535-1832
+server/events/project_command_pool_executor.go
+  s_243a1a1edc15e5::t_046922389cf521 1,13,39-40,46-53,56-66,68,74,78-92,133,138,174-179,186-198,230
+server/events/project_command_pool_executor_test.go
+  s_243a1a1edc15e5::t_7546974e342cb3 1-449
+server/events/project_command_runner.go
+  s_243a1a1edc15e5::t_9977fac6f1f01f 2,37,45,54,71,98,106,155,163,194,202,209,356,367-380,390,395-400,402,509-511,513-517,520-521,543-564,584-621,657,680-682,695,706-708,712-713,716-722
+server/events/project_command_runner_test.go
+  s_243a1a1edc15e5::t_3be0c9d55ad140 2,11,62,288-474,612,695,764,907,1079,1208,1373,1506,1600-1601,1626-1628,1631-1633,1658-1660,1663-1664,1689-1691,1694-1696,1722-1724,1727-1728,1750,1755-1757,1781,1786-1788,1819,1824,1830-1832,1835-1836,1867,1872,1878-1880,1883-1885,1916,1921,1927-1929,1932-1934,1966,1971,1977-1979,1982-1984,2016,2021,2027-2029,2032-2033,2039-2069,2104,2153-2584
+server/events/project_finder.go
+  s_243a1a1edc15e5::t_abf787675996ab 2,14,87,189
+server/events/project_finder_test.go
+  s_243a1a1edc15e5::t_48fbe79be84958 2,482
+server/events/project_locker.go
+  s_243a1a1edc15e5::t_d5328e4c9cf10f 2,16
+server/events/project_locker_test.go
+  s_243a1a1edc15e5::t_a1c9529a7626be 2
+server/events/pull_closed_executor.go
+  s_243a1a1edc15e5::t_cebca3cd217250 2,25,31
+server/events/pull_closed_executor_test.go
+  s_243a1a1edc15e5::t_7edbd671a1cfd8 2
+server/events/pull_updater.go
+  s_243a1a1edc15e5::t_a219d44dc7a0ba 7-8,22,24,40
+server/events/repo_allowlist_checker.go
+  s_243a1a1edc15e5::t_b29abfd8893e25 2
+server/events/repo_allowlist_checker_test.go
+  s_243a1a1edc15e5::t_c859288a214af0 2
+server/events/templates/policy_check.tmpl
+  s_243a1a1edc15e5::t_f59d3cf0e882a4 3,5-31,35
+server/events/testdata/fs/repoC/self/init.tf
+  s_243a1a1edc15e5::t_a3755094b3ceb1 1-3
+server/events/testdata/fs/repoD/a/init.tf
+  s_243a1a1edc15e5::t_59476b628521e5 1-3
+server/events/testdata/fs/repoD/b/init.tf
+  s_243a1a1edc15e5::t_05983872aa2318 1-3
+server/events/undiverged_project_impact.go
+  s_243a1a1edc15e5::t_942dd543c8db83 1-295
+server/events/undiverged_project_impact_test.go
+  s_243a1a1edc15e5::t_3b2edbed12950d 1-435
+server/events/vcs/azuredevops/testdata/fixtures.go
+  s_243a1a1edc15e5::t_f5d214da52860c 2
+server/events/vcs/bitbucketcloud/client.go
+  s_243a1a1edc15e5::t_6812065cc9591b 146,153
+server/events/vcs/bitbucketcloud/client_test.go
+  s_243a1a1edc15e5::t_90dafcf6705643 217
+server/events/vcs/client.go
+  s_243a1a1edc15e5::t_a0af0d3a1bcb9c 2,12
+server/events/vcs/client_test.go
+  s_243a1a1edc15e5::t_b6f975a8b335ab 2
+server/events/vcs/common/common_test.go
+  s_243a1a1edc15e5::t_954dccf7dc4dcf 2
+server/events/vcs/common/git_cred_writer.go
+  s_243a1a1edc15e5::t_cd7672ab413e54 100,124
+server/events/vcs/common/git_cred_writer_test.go
+  s_243a1a1edc15e5::t_8615180b2edc46 27,48,62,80,86,99,105,124
+server/events/vcs/gitea/client.go
+  s_243a1a1edc15e5::t_c7ecd212bc3bc5 2,79-86,109,113-117,147-151,167-171,197-201,216-220,240,271,276-280,353-357,383,426-430,460-464,516,522-526
+server/events/vcs/gitea/client_test.go
+  s_243a1a1edc15e5::t_915ae994003cd7 1-408
+server/events/vcs/gitea/models.go
+  s_243a1a1edc15e5::t_365b63d6ed5b61 2
+server/events/vcs/gitea/testdata/list-issue-labels-page-1.json
+  s_243a1a1edc15e5::t_d564da48a4d3c2 1-20
+server/events/vcs/gitea/testdata/list-issue-labels-page-2.json
+  s_243a1a1edc15e5::t_079843b69eaeab 1-11
+server/events/vcs/gitea/testdata/list-pull-request-files-page-1.json
+  s_243a1a1edc15e5::t_352ba74f40acab 1-28
+server/events/vcs/gitea/testdata/list-pull-request-files-page-2.json
+  s_243a1a1edc15e5::t_db82e48a04b429 1-15
+server/events/vcs/gitea/testdata/list-pull-reviews-page-1-comment.json
+  s_243a1a1edc15e5::t_ce5e674ee8c575 1-120
+server/events/vcs/gitea/testdata/list-pull-reviews-page-1.json
+  s_243a1a1edc15e5::t_547c41827618b7 1-44
+server/events/vcs/gitea/testdata/list-pull-reviews-page-2-approved.json
+  s_243a1a1edc15e5::t_bc699828a57b69 1-120
+server/events/vcs/gitea/testdata/list-pull-reviews-page-2.json
+  s_243a1a1edc15e5::t_cee1852fee0fd0 1-44
+server/events/vcs/gitea/testdata/version-response.json
+  s_243a1a1edc15e5::t_7066519d3c3235 1-3
+server/events/vcs/github/client.go
+  s_243a1a1edc15e5::t_2ecf0b37d2c58e 2,21,126-129,132-135,137,141-142,589,595-601,623-625,659,688-692,729-742,749,831,838-840,845-848,1166-1188
+server/events/vcs/github/client_internal_test.go
+  s_243a1a1edc15e5::t_ab3f2671ecbf2f 2,18,25
+server/events/vcs/github/client_test.go
+  s_243a1a1edc15e5::t_4bc2f64c89cfa0 1002-1019,1380-1469
+server/events/vcs/github/credentials.go
+  s_243a1a1edc15e5::t_6bfff9217240c1 9,16,19,136-152,157-164,175-194,210,258-288,296-303,310-324
+server/events/vcs/github/instrumented_client.go
+  s_243a1a1edc15e5::t_4f5cc1bb63f75b 1-3,7,34
+server/events/vcs/github/mocks/mock_github_pull_request_getter.go
+  s_243a1a1edc15e5::t_f3374d6b604597 7
+server/events/vcs/github/resolve_url_test.go
+  s_243a1a1edc15e5::t_838c9cd9b82258 1-60
+server/events/vcs/github/testdata/fixtures.go
+  s_243a1a1edc15e5::t_fb745cba695009 2,16
+server/events/vcs/github/testdata/pull-request-mergeability/ruleset-required-reviewer-approved.json
+  s_243a1a1edc15e5::t_97f9139d9f6d18 1-55
+server/events/vcs/github/testdata/pull-request-mergeability/ruleset-required-reviewer-pending.json
+  s_243a1a1edc15e5::t_c6e71f50a45339 1-51
+server/events/vcs/github/token_rotator.go
+  s_243a1a1edc15e5::t_22368eef08bebe 60
+server/events/vcs/gitlab/client.go
+  s_243a1a1edc15e5::t_3612f280b55a5d 2,14,321-372,374-379,381-386,388-400,404-407,422-435,444-459,578,658
+server/events/vcs/gitlab/client_test.go
+  s_243a1a1edc15e5::t_1cca4457ab9a4e 862-864,873-875,887-908,924-926,974-976,985-987,996-998,1083,1085,1135-1581
+server/events/vcs/not_configured_vcs_client.go
+  s_243a1a1edc15e5::t_4d19c4326a9d39 2
+server/events/vcs/proxy.go
+  s_243a1a1edc15e5::t_c5b98a11b374a3 2
+server/events/vcs/pull_status_fetcher.go
+  s_243a1a1edc15e5::t_1b63842263c550 13
+server/events/version_command_runner.go
+  s_243a1a1edc15e5::t_a0e0c2fc4f4db3 53
+server/events/webhooks/slack.go
+  s_243a1a1edc15e5::t_d7132c457c1ba8 2
+server/events/webhooks/slack_client.go
+  s_243a1a1edc15e5::t_1f34c2e657b5e0 2,18,27
+server/events/webhooks/slack_client_test.go
+  s_243a1a1edc15e5::t_3bfc0085e2f79e 2
+server/events/webhooks/slack_test.go
+  s_243a1a1edc15e5::t_6288c3ccdbfa66 2
+server/events/webhooks/webhooks.go
+  s_243a1a1edc15e5::t_7782d9617f122f 2,21
+server/events/webhooks/webhooks_test.go
+  s_243a1a1edc15e5::t_12865147d67399 2
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_0a6657d1352e47 2,30-42,49-52,57,62-71,118-122,124-138,174,186-194,205-213,215-228,232-235,237-239,249-250,260-268,278-288,312-316,320-332,336-338,340,342-374,378,404-408,410,412,416-419,421-427,429,466-467,479-539,555-563,569-572,597-603,633-643,684-687,805,812,824-836,851
+server/events/working_dir_locker.go
+  s_243a1a1edc15e5::t_ca32606e08a4e8 2,15
+server/events/working_dir_locker_test.go
+  s_243a1a1edc15e5::t_b0497b944ada8a 2
+server/events/working_dir_test.go
+  s_243a1a1edc15e5::t_6df436a2b82812 170-229,517-520,522,524-529,546-548,555-557,572-573,576,594-647,678,742-745,747,749-754,773-775,845,850,888-969,1138-1153,1225-1284,2169-2181
+server/jobs/job_url_setter.go
+  s_243a1a1edc15e5::t_401e1571495dbe 11,18
+server/jobs/project_command_output_handler.go
+  s_243a1a1edc15e5::t_f94d8109f98fa3 74
+server/logging/logging_test.go
+  s_243a1a1edc15e5::t_58fdc03d2ba17a 2
+server/logging/mocks/mock_simple_logging.go
+  s_243a1a1edc15e5::t_eee446a9a891af 28,39,80,91,110,121,139,194,208,213,222,224,227,235,249,254,263,265,268,310,324,329,338,340,343,351,365,370,385,387,390,427,441,446,455,457,460,468,482,487,490,492,495,503,517,522,525,527,530
+server/logging/simple_logger.go
+  s_243a1a1edc15e5::t_b52364401e3beb 2,17,169
+server/metrics/metricstest/scope.go
+  s_243a1a1edc15e5::t_9f71ecf2d7c0e6 1-3
+server/middleware.go
+  s_243a1a1edc15e5::t_2097a2cc2f5b8e 2
+server/recovery/recovery.go
+  s_243a1a1edc15e5::t_1bf8518b64680a 2
+server/recovery/recovery_test.go
+  s_243a1a1edc15e5::t_6cf6b7c09b533c 2
+server/scheduled/executor_service.go
+  s_243a1a1edc15e5::t_44b2fc67884184 106
+server/server.go
+  s_243a1a1edc15e5::t_6b1c67c3ee55d7 2,490-515,611,629,669,674,713-722,1009,1098,1169,1179,1282,1329-1331,1337-1351
+server/server_internal_test.go
+  s_243a1a1edc15e5::t_475983f7300d83 2
+server/server_test.go
+  s_243a1a1edc15e5::t_637d98648535a8 2
+server/user_config.go
+  s_243a1a1edc15e5::t_8098b4a862570c 11,22,105-106,170-184
+server/user_config_test.go
+  s_243a1a1edc15e5::t_b8a3ad8b00715c 11,77-119
+testdrive/github.go
+  s_243a1a1edc15e5::t_14308b5fa571a2 2,12
+testdrive/testdrive.go
+  s_243a1a1edc15e5::t_3de60ef551943e 2,23,102-106
+testdrive/utils.go
+  s_243a1a1edc15e5::t_5b3c48430731cf 2,28
+testing/Dockerfile
+  s_243a1a1edc15e5::t_b7950e799f2382 1,9
+testing/assertions.go
+  s_243a1a1edc15e5::t_77fe65576f27fa 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "c1e057b5642239ced6b9346af2361f7e5125b7ec",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
