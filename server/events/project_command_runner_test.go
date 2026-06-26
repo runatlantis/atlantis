@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -2580,5 +2581,141 @@ func TestDefaultProjectCommandRunner_ApprovePolicies_HashAwareApproval(t *testin
 				Assert(t, res.Error != nil, "expecting error")
 			}
 		})
+	}
+}
+
+func TestDefaultProjectCommandRunner_PathTraversal(t *testing.T) {
+	const defaultTraversalPattern = "../../../../etc"
+
+	cases := []struct {
+		name              string
+		traversalPatterns []string
+		expectUnlock      bool
+		runFn             func(runner *events.DefaultProjectCommandRunner, ctx command.ProjectContext) error
+		setupWorkingDir   func(mockWorkingDir *mocks.MockWorkingDir, repoDir string)
+	}{
+		{
+			name: "Plan",
+			traversalPatterns: []string{
+				"../../../../etc",
+				"../etc",
+				"sub/../../etc",
+			},
+			expectUnlock: true,
+			setupWorkingDir: func(mockWorkingDir *mocks.MockWorkingDir, repoDir string) {
+				When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+					ThenReturn(repoDir, nil)
+				When(mockWorkingDir.MergeAgain(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+					ThenReturn(false, nil)
+			},
+			runFn: func(runner *events.DefaultProjectCommandRunner, ctx command.ProjectContext) error {
+				return runner.Plan(ctx).Error
+			},
+		},
+		{
+			name:              "Apply",
+			traversalPatterns: []string{defaultTraversalPattern},
+			setupWorkingDir: func(mockWorkingDir *mocks.MockWorkingDir, repoDir string) {
+				When(mockWorkingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+					ThenReturn(repoDir, nil)
+			},
+			runFn: func(runner *events.DefaultProjectCommandRunner, ctx command.ProjectContext) error {
+				return runner.Apply(ctx).Error
+			},
+		},
+		{
+			name:              "PolicyCheck",
+			traversalPatterns: []string{defaultTraversalPattern},
+			expectUnlock:      true,
+			setupWorkingDir: func(mockWorkingDir *mocks.MockWorkingDir, repoDir string) {
+				When(mockWorkingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+					ThenReturn(repoDir, nil)
+			},
+			runFn: func(runner *events.DefaultProjectCommandRunner, ctx command.ProjectContext) error {
+				return runner.PolicyCheck(ctx).Error
+			},
+		},
+		{
+			name:              "Version",
+			traversalPatterns: []string{defaultTraversalPattern},
+			setupWorkingDir: func(mockWorkingDir *mocks.MockWorkingDir, repoDir string) {
+				When(mockWorkingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+					ThenReturn(repoDir, nil)
+			},
+			runFn: func(runner *events.DefaultProjectCommandRunner, ctx command.ProjectContext) error {
+				return runner.Version(ctx).Error
+			},
+		},
+		{
+			name:              "Import",
+			traversalPatterns: []string{defaultTraversalPattern},
+			setupWorkingDir: func(mockWorkingDir *mocks.MockWorkingDir, repoDir string) {
+				When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+					ThenReturn(repoDir, nil)
+			},
+			runFn: func(runner *events.DefaultProjectCommandRunner, ctx command.ProjectContext) error {
+				return runner.Import(ctx).Error
+			},
+		},
+		{
+			name:              "StateRm",
+			traversalPatterns: []string{defaultTraversalPattern},
+			setupWorkingDir: func(mockWorkingDir *mocks.MockWorkingDir, repoDir string) {
+				When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+					ThenReturn(repoDir, nil)
+			},
+			runFn: func(runner *events.DefaultProjectCommandRunner, ctx command.ProjectContext) error {
+				return runner.StateRm(ctx).Error
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		for _, pattern := range tc.traversalPatterns {
+			t.Run(tc.name+" rejects traversal pattern "+pattern, func(t *testing.T) {
+				RegisterMockTestingT(t)
+				mockWorkingDir := mocks.NewMockWorkingDir()
+				mockLocker := mocks.NewMockProjectLocker()
+				runner := &events.DefaultProjectCommandRunner{
+					Locker:           mockLocker,
+					LockURLGenerator: mockURLGenerator{},
+					WorkingDir:       mockWorkingDir,
+					WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+				}
+				repoDir := t.TempDir()
+				tc.setupWorkingDir(mockWorkingDir, repoDir)
+				unlockCalled := false
+				When(mockLocker.TryLock(
+					Any[logging.SimpleLogging](),
+					Any[models.PullRequest](),
+					Any[models.User](),
+					Any[string](),
+					Any[models.Project](),
+					AnyBool(),
+				)).ThenReturn(&events.TryLockResponse{
+					LockAcquired: true,
+					LockKey:      "lock-key",
+					UnlockFn: func() error {
+						unlockCalled = true
+						return nil
+					},
+				}, nil)
+				ctx := command.ProjectContext{
+					Log:        logging.NewNoopLogger(t),
+					Workspace:  "default",
+					RepoRelDir: pattern,
+					RePlanCmd:  "atlantis plan -d .",
+				}
+				err := tc.runFn(runner, ctx)
+				Assert(t, err != nil, "expected error for RepoRelDir %q in runner %q", pattern, tc.name)
+				Assert(t,
+					strings.Contains(err.Error(), "project path traversal detected"),
+					"expected traversal error for runner %q with RepoRelDir %q, got: %s", tc.name, pattern, err,
+				)
+				if tc.expectUnlock {
+					Assert(t, unlockCalled, "expected runner %q with RepoRelDir %q to release project lock", tc.name, pattern)
+				}
+			})
+		}
 	}
 }
