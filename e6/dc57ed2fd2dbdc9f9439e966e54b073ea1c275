@@ -1,0 +1,19 @@
+DEVELOPING.md
+  s_243a1a1edc15e5::t_e1d1dbbc0d211c 7,69,75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "e6dc57ed2fd2dbdc9f9439e966e54b073ea1c275",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
