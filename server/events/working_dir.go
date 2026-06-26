@@ -54,15 +54,21 @@ type WorkingDir interface {
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
-	// HasDiverged checks if the branch has diverged from the base branch.
+	// HasDiverged checks if the checkout has diverged from the base branch.
 	// When autoplanWhenModified patterns are provided, only divergence affecting
 	// files matching those patterns is considered. When patterns are empty,
 	// any divergence is reported.
 	HasDiverged(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool
+	// HasDivergedFromPullHead checks if the pull request head has diverged from
+	// the base branch.
+	HasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool
 	// GetDivergedFiles returns the files changed on the base branch since the
 	// current checkout. When merge checkout is disabled there is no divergence
 	// check, so this returns no files and no error.
 	GetDivergedFiles(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error)
+	// GetDivergedFilesFromPullHead returns the files changed on the base branch
+	// since the pull request head.
+	GetDivergedFilesFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error)
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error
@@ -312,9 +318,28 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	defer unlockGitRefLock()
 
 	if len(autoplanWhenModified) > 0 {
-		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest)
+		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest, w.getDivergedFiles)
 	}
 	return w.hasDiverged(logger, cloneDir)
+}
+
+func (w *FileWorkspace) HasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+	logger.Debug("HasDivergedFromPullHead: starting divergence check in %s", cloneDir)
+	if !w.CheckoutMerge {
+		logger.Debug("HasDivergedFromPullHead: CheckoutMerge is false, skipping divergence check")
+		return false
+	}
+
+	unlockGitReadLock := w.gitReadLock(cloneDir)
+	defer unlockGitReadLock()
+
+	unlockGitRefLock := w.gitRefLock(cloneDir)
+	defer unlockGitRefLock()
+
+	if len(autoplanWhenModified) > 0 {
+		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest, w.getDivergedFilesFromPullHead)
+	}
+	return w.hasDivergedFromPullHead(logger, cloneDir, pullRequest)
 }
 
 func (w *FileWorkspace) GetDivergedFiles(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error) {
@@ -331,6 +356,22 @@ func (w *FileWorkspace) GetDivergedFiles(logger logging.SimpleLogging, cloneDir 
 	defer unlockGitRefLock()
 
 	return w.getDivergedFiles(logger, cloneDir, pullRequest)
+}
+
+func (w *FileWorkspace) GetDivergedFilesFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error) {
+	logger.Debug("GetDivergedFilesFromPullHead: getting diverged files in %s", cloneDir)
+	if !w.CheckoutMerge {
+		logger.Debug("GetDivergedFilesFromPullHead: CheckoutMerge is false, skipping diverged file lookup")
+		return nil, nil
+	}
+
+	unlockGitReadLock := w.gitReadLock(cloneDir)
+	defer unlockGitReadLock()
+
+	unlockGitRefLock := w.gitRefLock(cloneDir)
+	defer unlockGitRefLock()
+
+	return w.getDivergedFilesFromPullHead(logger, cloneDir, pullRequest)
 }
 
 // hasDiverged runs fetch and git status to detect divergence. Caller must hold
@@ -360,13 +401,30 @@ func (w *FileWorkspace) hasDiverged(logger logging.SimpleLogging, cloneDir strin
 	return hasDiverged
 }
 
+func (w *FileWorkspace) hasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) bool {
+	if pullRequest.BaseBranch == "" {
+		logger.Debug("HasDiverged: pull request base branch is empty, using git status divergence check")
+		return w.hasDiverged(logger, cloneDir)
+	}
+
+	divergedFiles, err := w.getDivergedFilesFromPullHead(logger, cloneDir, pullRequest)
+	if err != nil {
+		logger.Warn("HasDiverged: getting changed files has failed: %s", err)
+		return true
+	}
+
+	hasDiverged := len(divergedFiles) > 0
+	logger.Debug("HasDiverged: result=%t", hasDiverged)
+	return hasDiverged
+}
+
 // hasDivergedForPatterns checks if the base branch has new commits that affect files
 // matching the given when_modified patterns. Caller must hold gitRefLock and gitReadLock.
-func (w *FileWorkspace) hasDivergedForPatterns(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+func (w *FileWorkspace) hasDivergedForPatterns(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest, getDivergedFiles func(logging.SimpleLogging, string, models.PullRequest) ([]string, error)) bool {
 	logger.Debug("HasDiverged: running targeted divergence check for project %s with %d patterns",
 		projectPath, len(autoplanWhenModified))
 
-	nonEmptyChangedFiles, err := w.getDivergedFiles(logger, cloneDir, pullRequest)
+	nonEmptyChangedFiles, err := getDivergedFiles(logger, cloneDir, pullRequest)
 	if err != nil {
 		logger.Warn("HasDiverged: getting changed files has failed: %s", err)
 		return true
@@ -427,6 +485,15 @@ func divergedFilesCommandError(action string, err error, output []byte) error {
 }
 
 func (w *FileWorkspace) getDivergedFiles(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error) {
+	return w.getDivergedFilesFromRef(logger, cloneDir, pullRequest, "HEAD")
+}
+
+func (w *FileWorkspace) getDivergedFilesFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error) {
+	pullHeadRef := w.pullHeadRef(logger, cloneDir)
+	return w.getDivergedFilesFromRef(logger, cloneDir, pullRequest, pullHeadRef)
+}
+
+func (w *FileWorkspace) getDivergedFilesFromRef(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest, startRef string) ([]string, error) {
 	logger.Debug("GetDivergedFiles: running git fetch")
 	fetchCmd := exec.Command("git", "fetch")
 	fetchCmd.Dir = cloneDir
@@ -436,7 +503,7 @@ func (w *FileWorkspace) getDivergedFiles(logger logging.SimpleLogging, cloneDir 
 	}
 
 	remoteRef := fmt.Sprintf("origin/%s", pullRequest.BaseBranch)
-	revisionRange := fmt.Sprintf("HEAD..%s", remoteRef)
+	revisionRange := fmt.Sprintf("%s..%s", startRef, remoteRef)
 
 	logger.Debug("GetDivergedFiles: getting changed files in %s", revisionRange)
 	changedFilesCmd := exec.Command("git", "log", revisionRange, "--name-only", "--format=") //nolint:gosec // remoteRef is from pullRequest.BaseBranch, a controlled VCS branch name
@@ -455,6 +522,19 @@ func (w *FileWorkspace) getDivergedFiles(logger logging.SimpleLogging, cloneDir 
 	}
 
 	return nonEmptyChangedFiles, nil
+}
+
+func (w *FileWorkspace) pullHeadRef(logger logging.SimpleLogging, cloneDir string) string {
+	headParentCmd := exec.Command("git", "rev-parse", "--verify", "HEAD^2")
+	headParentCmd.Dir = cloneDir
+	output, err := headParentCmd.CombinedOutput()
+	if err == nil {
+		logger.Debug("GetDivergedFiles: using pull request head ref %q", strings.TrimSpace(string(output)))
+		return "HEAD^2"
+	}
+
+	logger.Debug("GetDivergedFiles: HEAD^2 unavailable, using HEAD")
+	return "HEAD"
 }
 
 func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {

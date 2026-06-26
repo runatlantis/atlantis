@@ -285,6 +285,10 @@ func (s stubUndivergedProjectImpactResolver) HasUndivergedImpact(command.Project
 	return s.handled, s.impacted, s.err
 }
 
+func (s stubUndivergedProjectImpactResolver) HasUndivergedImpactFromPullHead(command.ProjectContext, string, WorkingDir) (bool, bool, error) {
+	return s.handled, s.impacted, s.err
+}
+
 func configuredProjectRepo(t *testing.T) string {
 	t.Helper()
 
