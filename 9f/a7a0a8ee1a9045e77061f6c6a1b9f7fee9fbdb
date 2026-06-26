@@ -1,0 +1,29 @@
+go.mod
+  s_1475eaaa18ac58::t_f5093e22f6f43c 18
+server/events/vcs/github/client_internal_test.go
+  s_1475eaaa18ac58::t_705c2f5edf62d1 8-11,13,34-95
+go.sum
+  s_1475eaaa18ac58::t_1e1601768260c6 176-177
+Dockerfile
+  s_1475eaaa18ac58::t_bea01ce1645097 167-169,258-260
+server/events/vcs/github/client.go
+  s_1475eaaa18ac58::t_4f915c2ac61c77 20
+  s_1475eaaa18ac58::t_7f9ec6e3bec885 119,161-164
+  s_1475eaaa18ac58::t_bc5d4e025da085 165-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "9fa7a0a8ee1a9045e77061f6c6a1b9f7fee9fbdb",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
