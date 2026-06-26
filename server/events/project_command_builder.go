@@ -844,7 +844,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		repoRelDir = cmd.RepoRelDir
 	}
 
-	if cmd.ProjectName == "" && p.shouldIgnoreTargetedDir(ctx, defaultRepoDir, repoRelDir) {
+	if cmd.ProjectName == "" && cmd.RepoRelDir != "" && p.shouldIgnoreTargetedDir(ctx, defaultRepoDir, repoRelDir) {
 		ctx.Log.Debug("ignoring targeted plan for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
 		return pcc, ErrIgnoredTargetedDir
 	}
@@ -1112,7 +1112,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		return projCtx, err
 	}
 
-	if cmd.ProjectName == "" && p.shouldIgnoreTargetedDir(ctx, repoDir, repoRelDir) {
+	if cmd.ProjectName == "" && cmd.RepoRelDir != "" && p.shouldIgnoreTargetedDir(ctx, repoDir, repoRelDir) {
 		ctx.Log.Debug("ignoring targeted command for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
 		return projCtx, ErrIgnoredTargetedDir
 	}

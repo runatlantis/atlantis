@@ -786,6 +786,77 @@ func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePaths(t *testin
 	Equals(t, "environments/nonprod", applyCtxs[0].RepoRelDir)
 }
 
+func TestDefaultProjectCommandBuilder_BuildWorkspaceOnlyCommand_IgnorePathsNotSkipped(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	tmpDir := DirStructure(t, map[string]any{
+		"main.tf": nil,
+	})
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"**"},
+	}
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+	repo := models.Repo{FullName: "runatlantis/atlantis", Owner: "runatlantis", Name: "atlantis"}
+	cmdCtx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		Pull:     models.PullRequest{BaseRepo: repo, Num: 1, HeadBranch: "feature", BaseBranch: "main"},
+		HeadRepo: repo,
+	}
+
+	planCtxs, err := builder.BuildPlanCommands(cmdCtx, &events.CommentCommand{
+		Name:      command.Plan,
+		Workspace: "staging",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(planCtxs))
+	Equals(t, events.DefaultRepoRelDir, planCtxs[0].RepoRelDir)
+	Equals(t, "staging", planCtxs[0].Workspace)
+
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:      command.Apply,
+		Workspace: "staging",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(applyCtxs))
+	Equals(t, events.DefaultRepoRelDir, applyCtxs[0].RepoRelDir)
+	Equals(t, "staging", applyCtxs[0].Workspace)
+}
+
 func TestDefaultProjectCommandBuilder_BuildTargetedNonPlanCommand_IgnorePathsWithoutWorkingDir(t *testing.T) {
 	RegisterMockTestingT(t)
 
