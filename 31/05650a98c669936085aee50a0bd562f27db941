@@ -1,0 +1,23 @@
+server/events/vcs/github/client.go
+  s_1475eaaa18ac58::t_4f915c2ac61c77 20
+go.mod
+  s_1475eaaa18ac58::t_f5093e22f6f43c 18
+go.sum
+  s_1475eaaa18ac58::t_1e1601768260c6 176-177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "3105650a98c669936085aee50a0bd562f27db941",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
