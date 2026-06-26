@@ -160,6 +160,17 @@ func (p ProjectContext) SetProjectScopeTags(scope tally.Scope) tally.Scope {
 	return scope.Tagged(tags.Loadtags())
 }
 
+// ProjectID returns the identifier used for this project in per-project commit
+// status names (e.g. "<vcs-status-name>/plan: <ProjectID>"). It must stay in
+// sync with DefaultCommitStatusUpdater.UpdateProject, which builds the status
+// name, so that consumers can match a commit status back to its project.
+func (p ProjectContext) ProjectID() string {
+	if p.ProjectName != "" {
+		return p.ProjectName
+	}
+	return fmt.Sprintf("%s/%s", p.RepoRelDir, p.Workspace)
+}
+
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
 func (p ProjectContext) GetShowResultFileName() string {
 	if p.ProjectName == "" {

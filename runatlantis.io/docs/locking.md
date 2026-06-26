@@ -13,6 +13,8 @@ Which links them to the pull request that holds the lock.
 Only the directory in the repo and Terraform workspace are locked, not the whole repo.
 :::
 
+Atlantis also checks the global apply lock before running `atlantis apply`. If Atlantis cannot reach the lock backend while checking that global lock, it fails closed and rejects the apply until the backend is reachable again.
+
 ## Why
 
 1. Because `atlantis apply` is being done before the pull request is merged, after

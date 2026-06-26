@@ -499,9 +499,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		}
 		switch {
 		case len(clusterAddrs) > 0:
-			logger.Info("Utilizing Redis DB in cluster mode, addresses: " + strings.Join(clusterAddrs, ", "))
+			logger.Info("Utilizing Redis DB in cluster mode, addresses: %s", strings.Join(clusterAddrs, ", "))
 		default:
-			logger.Info(fmt.Sprintf("Utilizing Redis DB in single-node mode, host: %s, port: %d", userConfig.RedisHost, userConfig.RedisPort))
+			logger.Info("Utilizing Redis DB in single-node mode, host: %s, port: %d", userConfig.RedisHost, userConfig.RedisPort)
 		}
 		database, err = redis.NewWithConfig(redis.Config{
 			Hostname:           userConfig.RedisHost,
@@ -710,7 +710,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	applyRequirementHandler := &events.DefaultCommandRequirementHandler{
-		WorkingDir: workingDir,
+		WorkingDir:    workingDir,
+		VCSStatusName: userConfig.VCSStatusName,
 		ProjectImpactResolver: events.NewUndivergedProjectImpactResolver(
 			parserValidator,
 			projectFinder,
@@ -1005,6 +1006,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:                     workingDir,
 		WorkingDirLocker:               workingDirLocker,
 		CommitStatusUpdater:            commitStatusUpdater,
+		PullReqStatusFetcher:           pullReqStatusFetcher,
 		SilenceVCSStatusNoProjects:     userConfig.SilenceVCSStatusNoProjects,
 	}
 
@@ -1164,7 +1166,7 @@ func (s *Server) Start() error {
 		}
 
 		if err != nil && err != http.ErrServerClosed {
-			s.Logger.Err(err.Error())
+			s.Logger.Err("%s", err.Error())
 		}
 	}()
 	<-stop
@@ -1174,7 +1176,7 @@ func (s *Server) Start() error {
 
 	// flush stats before shutdown
 	if err := s.StatsCloser.Close(); err != nil {
-		s.Logger.Err(err.Error())
+		s.Logger.Err("%s", err.Error())
 	}
 
 	// Attempt to close the database
@@ -1277,7 +1279,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		CleanedBasePath:  s.AtlantisURL.Path,
 	})
 	if err != nil {
-		s.Logger.Err(err.Error())
+		s.Logger.Err("%s", err.Error())
 	}
 }
 

@@ -978,9 +978,9 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 	if err != nil {
 		return
 	}
-	pullState := models.ClosedPullState
-	if *pull.Status == azuredevops.PullActive.String() {
-		pullState = models.OpenPullState
+	pullState := models.OpenPullState
+	if pull.Status != nil && *pull.Status != azuredevops.PullActive.String() {
+		pullState = models.ClosedPullState
 	}
 
 	pullModel = models.PullRequest{

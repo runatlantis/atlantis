@@ -119,7 +119,7 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 		err := s.cmd.Start()
 		if err != nil {
 			err = fmt.Errorf("running '%s %q' in '%s': %w", s.shell.String(), s.command, s.workingDir, err)
-			ctx.Log.Err(err.Error())
+			ctx.Log.Err("%s", err.Error())
 			outCh <- Line{Err: err}
 			return
 		}
@@ -132,7 +132,7 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 				_, err := io.WriteString(stdin, line)
 				if err != nil {
 					err = fmt.Errorf("writing %q to process: %w", line, err)
-					ctx.Log.Err(err.Error())
+					ctx.Log.Err("%s", err.Error())
 				}
 			}
 		}()
@@ -194,7 +194,7 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 		// We're done now. Send an error if there was one.
 		if err != nil {
 			err = fmt.Errorf("running '%s' '%s' in '%s': %w", s.shell.String(), s.command, s.workingDir, err)
-			log.Err(err.Error())
+			log.Err("%s", err.Error())
 			outCh <- Line{Err: err}
 		} else {
 			log.Info("successfully ran '%s' '%s' in '%s'",

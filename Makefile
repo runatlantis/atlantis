@@ -6,9 +6,6 @@ IMAGE_NAME := runatlantis/atlantis
 
 .DEFAULT_GOAL := help
 
-# renovate: datasource=github-releases depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION := v1.64.4
-
 .PHONY: help
 help: ## List targets & descriptions
 	@cat Makefile* | grep -E '^[a-zA-Z\/_-]+:.*?## .*$$' | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -93,11 +90,6 @@ fmt: ## Run goimports (which also formats)
 .PHONY: lint
 lint: ## Run linter locally
 	golangci-lint run
-
-.PHONY: check-lint
-check-lint: ## Run linter in CI/CD. If running locally use 'lint'
-	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin $(GOLANGCI_LINT_VERSION)
-	./bin/golangci-lint run -j 4 --timeout 5m
 
 .PHONY: check-fmt
 check-fmt: ## Fail if not formatted

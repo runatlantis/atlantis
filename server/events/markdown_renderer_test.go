@@ -65,7 +65,7 @@ func TestRenderErr(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -140,7 +140,7 @@ func TestRenderFailure(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -1506,7 +1506,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -1894,7 +1894,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2103,7 +2103,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2296,7 +2296,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2355,7 +2355,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2432,7 +2432,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2544,7 +2544,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 				)
 				logger := logging.NewNoopLogger(t).WithHistory()
 				logText := "log"
-				logger.Info(logText)
+				logger.Info("%s", logText)
 				ctx := &command.Context{
 					Log: logger,
 					Pull: models.PullRequest{
@@ -2692,7 +2692,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 					)
 					logger := logging.NewNoopLogger(t).WithHistory()
 					logText := "log"
-					logger.Info(logText)
+					logger.Info("%s", logText)
 					ctx := &command.Context{
 						Log: logger,
 						Pull: models.PullRequest{
@@ -2847,7 +2847,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2931,7 +2931,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -3172,7 +3172,7 @@ This plan was not saved because one or more projects failed and automerge requir
 			)
 			logger := logging.NewNoopLogger(t).WithHistory()
 			logText := "log"
-			logger.Info(logText)
+			logger.Info("%s", logText)
 			ctx := &command.Context{
 				Log: logger,
 				Pull: models.PullRequest{
@@ -3769,7 +3769,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -3911,7 +3911,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			ctx := &command.Context{
@@ -4373,7 +4373,7 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -4429,7 +4429,7 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 	)
 	logger := logging.NewNoopLogger(b).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		b.Run(c.Description, func(b *testing.B) {
@@ -4654,7 +4654,7 @@ Ran Plan for 3 projects:
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {

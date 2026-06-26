@@ -30,6 +30,8 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 		ApplyLocked    bool
 		ApplyLockError error
 		ExpComment     string
+		ExpFailStatus  bool
+		ExpHasErrors   bool
 	}{
 		{
 			Description:    "When global apply lock is present IsDisabled returns true",
@@ -44,10 +46,12 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			ExpComment:     "Ran Apply for 0 projects:",
 		},
 		{
-			Description:    "If ApplyLockChecker returns an error IsDisabled returns false",
+			Description:    "If ApplyLockChecker returns an error apply is rejected",
 			ApplyLockError: errors.New("error"),
 			ApplyLocked:    false,
-			ExpComment:     "Ran Apply for 0 projects:",
+			ExpComment:     "**Error:** Failed to check global apply lock. Running `atlantis apply` is not allowed until the lock backend is reachable.",
+			ExpFailStatus:  true,
+			ExpHasErrors:   true,
 		},
 	}
 
@@ -77,9 +81,27 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			}
 
 			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
+			Equals(t, c.ExpHasErrors, ctx.CommandHasErrors)
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
 				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(c.ExpComment), Eq("apply"))
+			if c.ExpFailStatus {
+				commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+					Any[logging.SimpleLogging](),
+					Eq(testdata.GithubRepo),
+					Eq(modelPull),
+					Eq(models.FailedCommitStatus),
+					Eq(command.Apply),
+				)
+			} else {
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+					Any[logging.SimpleLogging](),
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Any[models.CommitStatus](),
+					Eq(command.Apply),
+				)
+			}
 		})
 	}
 }
@@ -210,8 +232,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 					Any[models.PullRequest](),
 					Eq[models.CommitStatus](models.SuccessCommitStatus),
 					Eq[command.Name](command.Apply),
-					Eq(c.ExpVCSStatusSucc),
-					Eq(c.ExpVCSStatusTotal),
+					Eq(models.ProjectCounts{Success: c.ExpVCSStatusSucc, Total: c.ExpVCSStatusTotal}),
 				)
 			} else {
 				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
@@ -220,8 +241,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
 					Eq[command.Name](command.Apply),
-					Any[int](),
-					Any[int](),
+					Any[models.ProjectCounts](),
 				)
 			}
 		})
@@ -532,4 +552,70 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			)
 		})
 	}
+}
+
+func TestApplyCommandRunner_NoChangesCount(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() { db.Close() })
+	Ok(t, err)
+
+	setup(t, func(tc *TestConfig) {
+		tc.SilenceNoProjects = true
+		tc.database = db
+	})
+
+	scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+	// Seed the DB: one applied project and one project that planned with no changes.
+	_, err = db.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		{
+			Command:    command.Apply,
+			RepoRelDir: "dir1",
+			Workspace:  "default",
+		},
+		{
+			Command:    command.Plan,
+			RepoRelDir: "dir2",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "No changes. Infrastructure is up-to-date.",
+				},
+			},
+		},
+	})
+	Ok(t, err)
+
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	// Target a dir that has no new projects so the runner re-reads the existing pull status.
+	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "nomatch"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    scopeNull,
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{}, nil)
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	// Verify that NoChanges=1 is passed correctly (not Any[int]()).
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[models.CommitStatus](),
+		Eq[command.Name](command.Apply),
+		Eq(models.ProjectCounts{Success: 2, Total: 2, NoChanges: 1}),
+	)
 }
