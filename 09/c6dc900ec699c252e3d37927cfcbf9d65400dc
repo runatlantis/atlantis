@@ -1,0 +1,19 @@
+server/events/command_runner_internal_test.go
+  s_1475eaaa18ac58::t_cc0ca6e9e6381f 217
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "09c6dc900ec699c252e3d37927cfcbf9d65400dc",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
