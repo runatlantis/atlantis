@@ -465,15 +465,26 @@ func (p *DefaultProjectCommandBuilder) ShouldIgnoreTargetedDir(ctx *command.Cont
 	if cmd.ProjectName != "" || cmd.RepoRelDir == "" || valid.ContainsDirGlobPattern(cmd.RepoRelDir) {
 		return false
 	}
-	repoCfg := p.repoCfgForTargetedIgnore(ctx)
+	repoCfg, ok := p.repoCfgForTargetedIgnore(ctx)
+	if !ok {
+		return false
+	}
 	return p.shouldIgnoreTargetedDirFromCfg(ctx, repoCfg, cmd.RepoRelDir)
 }
 
-func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Context) valid.RepoCfg {
+func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Context) (valid.RepoCfg, bool) {
 	if ctx.PreferLocalRepoCfgForTargetedIgnore {
 		if repoCfg, ok := p.repoCfgFromWorkingDir(ctx); ok {
-			return repoCfg
+			return repoCfg, true
 		}
+	}
+
+	if p.needsLocalRepoCfgForTargetedIgnore(ctx) {
+		if repoCfg, ok := p.repoCfgFromWorkingDir(ctx); ok {
+			return repoCfg, true
+		}
+		ctx.Log.Debug("not checking remote repo config for targeted ignore because merge checkout needs the merged local config")
+		return valid.RepoCfg{}, false
 	}
 
 	if p.VCSClient != nil {
@@ -486,15 +497,15 @@ func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Con
 			if err != nil {
 				ctx.Log.Debug("unable to parse %s while checking autodiscover.ignore_paths: %s", repoCfgFile, err)
 			} else {
-				return repoCfg
+				return repoCfg, true
 			}
 		}
 	}
 
 	if repoCfg, ok := p.repoCfgFromWorkingDir(ctx); ok {
-		return repoCfg
+		return repoCfg, true
 	}
-	return valid.RepoCfg{}
+	return valid.RepoCfg{}, true
 }
 
 func (p *DefaultProjectCommandBuilder) repoCfgFromWorkingDir(ctx *command.Context) (valid.RepoCfg, bool) {
@@ -507,6 +518,17 @@ func (p *DefaultProjectCommandBuilder) repoCfgFromWorkingDir(ctx *command.Contex
 		return valid.RepoCfg{}, false
 	}
 	return repoCfg, true
+}
+
+func (p *DefaultProjectCommandBuilder) needsLocalRepoCfgForTargetedIgnore(ctx *command.Context) bool {
+	return ctx.Pull.Num > 0 && workingDirUsesMergeCheckout(p.WorkingDir)
+}
+
+func workingDirUsesMergeCheckout(workingDir WorkingDir) bool {
+	checkoutMerge, ok := workingDir.(interface {
+		CheckoutMergeEnabled() bool
+	})
+	return ok && checkoutMerge.CheckoutMergeEnabled()
 }
 
 func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDirFromCfg(ctx *command.Context, repoCfg valid.RepoCfg, repoRelDir string) bool {

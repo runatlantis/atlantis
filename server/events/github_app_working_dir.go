@@ -33,6 +33,13 @@ func (g *GithubAppWorkingDir) MergeAgain(logger logging.SimpleLogging, headRepo 
 	return g.WorkingDir.MergeAgain(logger, headRepo, p, workspace)
 }
 
+func (g *GithubAppWorkingDir) CheckoutMergeEnabled() bool {
+	checkoutMerge, ok := g.WorkingDir.(interface {
+		CheckoutMergeEnabled() bool
+	})
+	return ok && checkoutMerge.CheckoutMergeEnabled()
+}
+
 func (g *GithubAppWorkingDir) fixReposURL(p *models.PullRequest, headRepo *models.Repo) {
 	// Realistically, this is a super brittle way of supporting clones using gh app installation tokens
 	// This URL should be built during Repo creation and the struct should be immutable going forward.
