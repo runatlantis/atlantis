@@ -6,7 +6,6 @@
     "@types/node": "24.12.4",
     "@vueuse/core": "12.8.2",
     "markdown-it-footnote": "4.0.0",
-    "markdownlint-cli": "0.48.0",
     "mermaid": "11.15.0",
     "sitemap-ts": "1.10.1",
     "vite": "6.4.3",
@@ -16,12 +15,10 @@
   },
   "overrides": {
     "minimatch": "^10.2.1",
-    "markdown-it": "^14.1.1"
+    "markdown-it": "^14.2.0"
   },
   "scripts": {
     "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
-    "website:lint": "markdownlint runatlantis.io",
-    "website:lint-fix": "markdownlint --fix runatlantis.io",
     "website:build": "vitepress build runatlantis.io",
     "e2e": "playwright test"
   }

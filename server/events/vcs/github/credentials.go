@@ -6,6 +6,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -131,8 +132,24 @@ func (c *AppCredentials) GetUser() (string, error) {
 	if c.AppSlug == "" {
 		return "", nil
 	}
-	client, err := c.Client()
 
+	ctx := context.Background()
+
+	// GHE Cloud doesn't support the /apps/{slug} endpoint with installation
+	// tokens, so use the /app self-lookup which requires app-level JWT auth.
+	if isGHECloud(c.Hostname) {
+		ghClient, err := c.newJWTClient()
+		if err != nil {
+			return "", fmt.Errorf("initializing JWT client: %w", err)
+		}
+		app, _, err := ghClient.Apps.Get(ctx, "")
+		if err != nil {
+			return "", fmt.Errorf("getting app details: %w", err)
+		}
+		return fmt.Sprintf("%s[bot]", app.GetSlug()), nil
+	}
+
+	client, err := c.Client()
 	if err != nil {
 		return "", fmt.Errorf("initializing client: %w", err)
 	}
@@ -145,16 +162,34 @@ func (c *AppCredentials) GetUser() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("creating github client: %w", err)
 	}
-	ctx := context.Background()
 
 	app, _, err := ghClient.Apps.Get(ctx, c.AppSlug)
-
 	if err != nil {
 		return "", fmt.Errorf("getting app details: %w", err)
 	}
 	// Currently there is no way to get the bot's login info, so this is a
 	// hack until Github exposes that.
 	return fmt.Sprintf("%s[bot]", app.GetSlug()), nil
+}
+
+// newJWTClient returns a GitHub client authenticated with the app's JWT
+// (not an installation token). Needed for endpoints like /app that require
+// app-level auth.
+func (c *AppCredentials) newJWTClient() (*github.Client, error) {
+	t, err := ghinstallation.NewAppsTransport(http.DefaultTransport, c.AppID, c.Key)
+	if err != nil {
+		return nil, err
+	}
+	t.BaseURL = c.getAPIURL().String()
+	apiURL := c.getAPIURL().String()
+	client, err := github.NewClient(
+		github.WithHTTPClient(&http.Client{Transport: t}),
+		github.WithURLs(&apiURL, nil),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating github client: %w", err)
+	}
+	return client, nil
 }
 
 // GetToken returns a fresh installation token.
@@ -172,22 +207,9 @@ func (c *AppCredentials) getInstallationID() (int64, error) {
 		return c.InstallationID, nil
 	}
 
-	tr := http.DefaultTransport
-	// A non-installation transport
-	t, err := ghinstallation.NewAppsTransport(tr, c.AppID, c.Key)
+	client, err := c.newJWTClient()
 	if err != nil {
 		return 0, err
-	}
-	t.BaseURL = c.getAPIURL().String()
-
-	// Query github with the app's JWT
-	apiURL := c.getAPIURL().String()
-	client, err := github.NewClient(
-		github.WithHTTPClient(&http.Client{Transport: t}),
-		github.WithURLs(&apiURL, nil),
-	)
-	if err != nil {
-		return 0, fmt.Errorf("creating github client: %w", err)
 	}
 	ctx := context.Background()
 
@@ -233,20 +255,70 @@ func (c *AppCredentials) getAPIURL() *url.URL {
 	return c.apiURL
 }
 
+// stripPort returns the hostname portion of a host that may include a port
+// (e.g. "tenant.ghe.com:443" -> "tenant.ghe.com").
+func stripPort(hostname string) string {
+	host, _, err := net.SplitHostPort(hostname)
+	if err != nil {
+		// No port present.
+		return hostname
+	}
+	return host
+}
+
+// normalizeGHECloudHost strips port and any "api." prefix, returning the
+// bare tenancy hostname (e.g. "api.tenant.ghe.com:443" -> "tenant.ghe.com").
+func normalizeGHECloudHost(hostname string) string {
+	h := strings.ToLower(stripPort(hostname))
+	return strings.TrimPrefix(h, "api.")
+}
+
+// isGHECloud returns true if the hostname is a GitHub Enterprise Cloud
+// tenancy instance (*.ghe.com), which uses a different API URL pattern
+// than GitHub Enterprise Server. Handles host:port and api. prefixed inputs.
+func isGHECloud(hostname string) bool {
+	return strings.HasSuffix(normalizeGHECloudHost(hostname), ".ghe.com")
+}
+
+// resolveGithubAPIURL returns the REST API base URL for the given hostname.
+//   - github.com          -> https://api.github.com/
+//   - GHE Cloud (*.ghe.com) -> https://api.<tenant>.ghe.com/
+//   - GHE Server          -> https://<hostname>/api/v3/
+//
+// See: https://github.com/cli/cli/pull/9618
 func resolveGithubAPIURL(hostname string) *url.URL {
-	// If we're using github.com then we don't need to do any additional configuration
-	// for the client. It we're using Github Enterprise, then we need to manually
-	// set the base url for the API.
 	baseURL := &url.URL{
 		Scheme: "https",
 		Host:   "api.github.com",
 		Path:   "/",
 	}
 
-	if hostname != "github.com" {
+	if stripPort(hostname) == "github.com" {
+		return baseURL
+	}
+
+	if isGHECloud(hostname) {
+		baseURL.Host = "api." + normalizeGHECloudHost(hostname)
+		baseURL.Path = "/"
+	} else {
 		baseURL.Host = hostname
 		baseURL.Path = "/api/v3/"
 	}
 
 	return baseURL
+}
+
+// resolveGraphQLURL returns the GraphQL endpoint for the given hostname.
+//   - github.com          -> https://api.github.com/graphql
+//   - GHE Cloud (*.ghe.com) -> https://api.<tenant>.ghe.com/graphql
+//   - GHE Server          -> https://<hostname>/api/graphql
+func resolveGraphQLURL(hostname string) string {
+	if stripPort(hostname) == "github.com" {
+		return "https://api.github.com/graphql"
+	}
+	apiURL := resolveGithubAPIURL(hostname)
+	if isGHECloud(hostname) {
+		return fmt.Sprintf("https://%s/graphql", apiURL.Host)
+	}
+	return fmt.Sprintf("https://%s/api/graphql", apiURL.Host)
 }

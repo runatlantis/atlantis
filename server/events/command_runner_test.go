@@ -424,8 +424,7 @@ func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 		Any[models.PullRequest](),
 		Eq[models.CommitStatus](models.SuccessCommitStatus),
 		Eq[command.Name](command.Plan),
-		Eq(0),
-		Eq(0),
+		Eq(models.ProjectCounts{}),
 	)
 }
 
@@ -448,8 +447,7 @@ func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
 		Any[models.PullRequest](),
 		Eq[models.CommitStatus](models.SuccessCommitStatus),
 		Eq[command.Name](command.Plan),
-		Eq(0),
-		Eq(0),
+		Eq(models.ProjectCounts{}),
 	)
 }
 
@@ -546,7 +544,7 @@ func TestRunCommentCommand_DisableAutoplan(t *testing.T) {
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(commitUpdater.UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[int](), Any[int]())).ThenReturn(nil)
+	When(commitUpdater.UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())).ThenReturn(nil)
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
 }

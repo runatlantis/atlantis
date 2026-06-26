@@ -167,6 +167,66 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	Equals(t, expLsOutput, actLsOutput)
 }
 
+// Test that on the GitHub App path (GithubAppEnabled && pr.Num > 0) the merge
+// is performed by fetching pull/<n>/head from origin and the "source" (fork)
+// remote is never created, since it isn't used to fetch the PR head.
+func TestClone_CheckoutMergeGithubAppNoSourceRemote(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Add a commit to branch 'branch' that's not on main.
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
+	branchCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	// Now switch back to main and advance the main branch by another commit.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-file")
+	runCmd(t, repoDir, "git", "add", "main-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "main-commit")
+	mainCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	// On the GitHub App path the head is fetched as pull/<n>/head from origin,
+	// so expose the branch commit under that ref in the origin repo.
+	runCmd(t, repoDir, "git", "update-ref", "refs/pull/1/head", strings.TrimSpace(branchCommit))
+
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		CheckoutDepth:               50,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+		GithubAppEnabled:            true,
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+		Num:        1,
+	}, "default")
+	Ok(t, err)
+
+	// The merge should still produce a merge commit whose parents are the base
+	// (main) and the head (branch) commits.
+	actBaseCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD~1")
+	actHeadCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2")
+	Equals(t, mainCommit, actBaseCommit)
+	Equals(t, branchCommit, actHeadCommit)
+
+	// The "source" remote must not have been created on the GitHub App path.
+	remotes := runCmd(t, cloneDir, "git", "remote")
+	Assert(t, !strings.Contains(remotes, "source"), "expected no \"source\" remote on the GitHub App path, got remotes: %q", remotes)
+	Assert(t, strings.Contains(remotes, "origin"), "expected \"origin\" remote, got remotes: %q", remotes)
+}
+
 // Test that if we're using the merge method and the repo is already cloned at
 // the right commit, then we don't reclone.
 func TestClone_CheckoutMergeNoReclone(t *testing.T) {
@@ -454,12 +514,19 @@ func TestClone_ResetOnWrongCommit(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
-	// Pretend that terraform has created a plan file, we'll check for it later
-	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
+	// Pretend that terraform has created plan files, we'll check for them later.
+	worktreeDir := filepath.Join(dataDir, "repos/0/default")
+	ignorePlanFiles(t, worktreeDir)
+	planFile := filepath.Join(worktreeDir, "default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
+	nestedPlanFile := filepath.Join(worktreeDir, "project1/default.tfplan")
+	createPlanFile(t, nestedPlanFile)
+	assert.FileExists(t, nestedPlanFile)
+	terragruntCachePlanFile := filepath.Join(worktreeDir, ".terragrunt-cache/project1/default.tfplan")
+	createPlanFile(t, terragruntCachePlanFile)
+	assert.FileExists(t, terragruntCachePlanFile)
 
 	logger := logging.NewNoopLogger(t)
 
@@ -476,7 +543,9 @@ func TestClone_ResetOnWrongCommit(t *testing.T) {
 		BaseBranch: "main",
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
+	assert.NoFileExists(t, nestedPlanFile, "Nested stale plan file should be deleted after updating to new commit")
+	assert.FileExists(t, terragruntCachePlanFile, "Plan files in .terragrunt-cache should be preserved")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
@@ -500,11 +569,11 @@ func TestClone_DoNotReCloneOnBaseChangeForBranchStrategy(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
-	// Pretend that terraform has created a plan file, we'll check for it later
+	// Pretend that terraform has created a plan file, we'll check it is removed
+	// after updating the existing branch-strategy clone.
 	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
 
 	logger := logging.NewNoopLogger(t)
@@ -522,7 +591,7 @@ func TestClone_DoNotReCloneOnBaseChangeForBranchStrategy(t *testing.T) {
 		BaseBranch: "some-other-base-branch",
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not wiped out by the reclone")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
@@ -606,8 +675,7 @@ func TestClone_ReCloneOnErrorAttemptingReuse(t *testing.T) {
 	// Pretend that terraform has created a plan file, we'll check for it later
 	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
 
 	logger := logging.NewNoopLogger(t)
@@ -671,12 +739,19 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "anotherfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
-	// Pretend that terraform has created a plan file, we'll check for it later
-	planFile := filepath.Join(dataDir, "repos/1/default/default.tfplan")
+	// Pretend that terraform has created plan files, we'll check for them later.
+	worktreeDir := filepath.Join(dataDir, "repos/1/default")
+	ignorePlanFiles(t, worktreeDir)
+	planFile := filepath.Join(worktreeDir, "default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
+	nestedPlanFile := filepath.Join(worktreeDir, "project1/default.tfplan")
+	createPlanFile(t, nestedPlanFile)
+	assert.FileExists(t, nestedPlanFile)
+	terragruntCachePlanFile := filepath.Join(worktreeDir, ".terragrunt-cache/project1/default.tfplan")
+	createPlanFile(t, terragruntCachePlanFile)
+	assert.FileExists(t, terragruntCachePlanFile)
 
 	logger := logging.NewNoopLogger(t)
 
@@ -695,7 +770,9 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 		Num:        1,
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
+	assert.NoFileExists(t, nestedPlanFile, "Nested stale plan file should be deleted after updating to new commit")
+	assert.FileExists(t, terragruntCachePlanFile, "Plan files in .terragrunt-cache should be preserved")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2"))
@@ -765,13 +842,12 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	// Pretend terraform has created a plan file, we'll check for it later
 	planFile := filepath.Join(repoDir, "repos/0/default/default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
 
 	// Run MergeAgain without the checkout merge strategy. It should return
 	// false for mergedAgain
-	_, err = wd.Clone(logger, models.Repo{}, models.PullRequest{
+	_, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "second-pr",
 		BaseBranch: "main",
@@ -1144,6 +1220,66 @@ func TestHasDiverged_WithEmptyPatterns(t *testing.T) {
 	// With empty patterns, should fall back to regular HasDiverged which should return true.
 	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{}, pullRequest)
 	Equals(t, true, hasDiverged)
+}
+
+func TestHasDivergedFromPullHead_FreshMergeCheckoutUsesPullHead(t *testing.T) {
+	repoDir := initRepo(t)
+
+	Ok(t, os.MkdirAll(filepath.Join(repoDir, "project1"), 0o755))
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "project1", "main.tf"), []byte("resource initial\n"), 0o600))
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1")
+
+	runCmd(t, repoDir, "git", "checkout", "-b", "stale-pr")
+	Ok(t, os.MkdirAll(filepath.Join(repoDir, "project2"), 0o755))
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "project2", "main.tf"), []byte("resource pr\n"), 0o600))
+	runCmd(t, repoDir, "git", "add", "project2/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project2")
+	headCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	runCmd(t, repoDir, "git", "checkout", "main")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "project1", "variables.tf"), []byte("variable base\n"), 0o600))
+	runCmd(t, repoDir, "git", "add", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "update project1")
+
+	prDir := filepath.Join(repoDir, "repos", "0", "default")
+	Ok(t, os.MkdirAll(prDir, 0o755))
+	runCmd(t, prDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, prDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, prDir, "git", "fetch", "source", "+refs/heads/stale-pr")
+	runCmd(t, prDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, prDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, prDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, prDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	logger := logging.NewNoopLogger(t)
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "stale-pr",
+		BaseBranch: "main",
+		HeadCommit: headCommit,
+	}
+
+	hasDiverged := wd.HasDiverged(logger, prDir, ".", []string{}, pullRequest)
+	Equals(t, false, hasDiverged)
+
+	hasDiverged = wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+
+	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{}, pullRequest)
+	Equals(t, true, hasDiverged)
+
+	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	Equals(t, true, hasDiverged)
+
+	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project2/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
 }
 
 func TestHasDiverged_PatternHasDiverged(t *testing.T) {
@@ -2029,4 +2165,17 @@ func initRepo(t *testing.T) string {
 	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, repoDir, "git", "branch", "branch")
 	return repoDir
+}
+
+func createPlanFile(t *testing.T, path string) {
+	t.Helper()
+
+	Ok(t, os.MkdirAll(filepath.Dir(path), 0700))
+	Ok(t, os.WriteFile(path, []byte("plan"), 0600))
+}
+
+func ignorePlanFiles(t *testing.T, cloneDir string) {
+	t.Helper()
+
+	Ok(t, os.WriteFile(filepath.Join(cloneDir, ".git/info/exclude"), []byte("*.tfplan\n"), 0600))
 }

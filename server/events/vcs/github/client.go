@@ -121,14 +121,12 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		return nil, fmt.Errorf("error initializing github rate limit transport: %w", err)
 	}
 
-	var graphqlURL string
 	var client *github.Client
 	if hostname == "github.com" {
 		client, err = github.NewClient(github.WithHTTPClient(transportWithRateLimit))
 		if err != nil {
 			return nil, fmt.Errorf("creating github client: %w", err)
 		}
-		graphqlURL = "https://api.github.com/graphql"
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
 		client, err = github.NewClient(
@@ -138,8 +136,9 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		if err != nil {
 			return nil, fmt.Errorf("creating github enterprise client: %w", err)
 		}
-		graphqlURL = fmt.Sprintf("https://%s/api/graphql", apiURL.Host)
 	}
+
+	graphqlURL := resolveGraphQLURL(hostname)
 
 	// Use the client from shurcooL's githubv4 library for queries.
 	v4Client := githubv4.NewEnterpriseClient(graphqlURL, transportWithRateLimit)
