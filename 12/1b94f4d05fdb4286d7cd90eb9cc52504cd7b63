@@ -1,0 +1,36 @@
+server/events/vcs/gitlab/client.go
+  s_243a1a1edc15e5::t_120df9eb683df7 9,46-69,146-154,160,306-312,319,434,437,478,484,487,496,523,530
+server/events/vcs/gitlab/testdata/pipeline-remaining-approvals.json
+  s_243a1a1edc15e5::t_e5ca157933238a 36
+runatlantis.io/docs/requirements.md
+  s_243a1a1edc15e5::t_f4a9c550325cd9 17-24
+server/events/vcs/gitlab/client_test.go
+  s_243a1a1edc15e5::t_6846d0b644fe90 160-163,168,170-175,177,179-182,184-198,201,203-210
+  s_243a1a1edc15e5::t_37f383008e9b11 1594-1597,1599-1601,1610-1613,1615-1616,1625-1629,1631-1648,1657-1661,1666,1675-1679,1692-1719,1728-1731,1743-1746,1758-1761,1773-1787,1789-1791,1796-1798,1800
+  s_243a1a1edc15e5::t_5d9474e35dc89b 152-158,164-167,169,200
+  s_243a1a1edc15e5::t_b4179ba6fe6fd1 159,1587-1588,1801,1811
+e2e/go.mod
+  s_243a1a1edc15e5::t_07d508274d7faf 9,18-20,22
+e2e/go.sum
+  s_243a1a1edc15e5::t_e9219c60c47f8c 27-28,35-42,45-46
+go.mod
+  s_243a1a1edc15e5::t_1d37736be74e38 49,141,144,147,149
+go.sum
+  s_243a1a1edc15e5::t_666847ba921190 474-475,520-521,594-595,681-682,807-808
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "121b94f4d05fdb4286d7cd90eb9cc52504cd7b63",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
