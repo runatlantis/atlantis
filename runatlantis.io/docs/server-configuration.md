@@ -576,7 +576,7 @@ ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
 
 Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 
-Useful to enable for use with GitHub.
+Useful to enable for use with GitHub. Changed lines inside Terraform heredoc and multiline-string diffs are also formatted so diff-aware markdown renderers can color them.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
@@ -738,6 +738,8 @@ ATLANTIS_GH_HOSTNAME="my.github.enterprise.com"
 
 Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
 don't set. Defaults to `github.com`.
+
+For GitHub Enterprise Cloud, use the tenant hostname, for example `tenant.ghe.com`. Do not include a scheme or an `api.` prefix; Atlantis derives the REST and GraphQL API endpoints from the hostname.
 
 ### `--gh-org` <Badge text="v0.1.3+" type="info"/>
 
