@@ -1609,6 +1609,52 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
     }`,
 		},
 		{
+			// Regression test for https://github.com/runatlantis/atlantis/issues/6419
+			// Spaced YAML list scalars inside a heredoc must not be mistaken for
+			// Terraform diff markers.
+			"argocd application with spaced yaml key=value list item in heredoc",
+			`  # argocd_application.example will be updated in-place
+  ~ resource "argocd_application" "example" {
+        id   = "my-app"
+      ~ metadata {
+          ~ resource_version = "12345" -> (known after apply)
+        }
+        spec = <<-EOT
+            destination:
+              namespace: default
+              server: https://kubernetes.default.svc
+            source:
+              repoURL: https://github.com/example/repo
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              -   ServerSideApply = true
+        EOT
+    }`,
+			`# argocd_application.example will be updated in-place
+!   resource "argocd_application" "example" {
+        id   = "my-app"
+!       metadata {
+!           resource_version = "12345" -> (known after apply)
+        }
+        spec = <<-EOT
+            destination:
+              namespace: default
+              server: https://kubernetes.default.svc
+            source:
+              repoURL: https://github.com/example/repo
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              -   ServerSideApply = true
+        EOT
+    }`,
+		},
+		{
 			"cloudformation stack with extra-spaced yaml list items in heredoc",
 			`  + resource "aws_cloudformation_stack" "conditions" {
       + id            = (known after apply)
@@ -1643,6 +1689,141 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
                   -   !Ref Environment
                   -   production
         EOT
+    }`,
+		},
+		{
+			// Regression test: changes inside a heredoc / multiline-string attribute.
+			// Terraform renders a line-by-line string diff with the marker in a gutter,
+			// preserving the line's own indentation after it. The marker must be pulled
+			// to column 0 so the diff highlighter colors it.
+			"heredoc multiline-string attribute diff",
+			`  # module.ogc.nomad_job.ogc will be updated in-place
+  ~ resource "nomad_job" "ogc" {
+        id      = "ogc"
+      ~ jobspec = <<-EOT
+            job "ogc" {
+              group "ogc" {
+                config {
+          -         image        = "registry/ogc:5.224.0"
+          +         image        = "registry/ogc:5.226.0"
+                  }
+              }
+            }
+        EOT
+    }`,
+			`# module.ogc.nomad_job.ogc will be updated in-place
+!   resource "nomad_job" "ogc" {
+        id      = "ogc"
+!       jobspec = <<-EOT
+            job "ogc" {
+              group "ogc" {
+                config {
+-                   image        = "registry/ogc:5.224.0"
++                   image        = "registry/ogc:5.226.0"
+                  }
+              }
+            }
+        EOT
+    }`,
+		},
+		{
+			"heredoc multiline-string attribute diff with short indentation",
+			`  # module.ogc.nomad_job.ogc will be updated in-place
+  ~ resource "nomad_job" "ogc" {
+        id      = "ogc"
+      ~ jobspec = <<-EOT
+            syncOptions:
+              -   ServerSideApply = true
+            EOT
+            job "ogc" {
+              group "ogc" {
+          -   image = "registry/ogc:5.224.0"
+          +   image = "registry/ogc:5.226.0"
+              }
+            }
+        EOT
+    }`,
+			`# module.ogc.nomad_job.ogc will be updated in-place
+!   resource "nomad_job" "ogc" {
+        id      = "ogc"
+!       jobspec = <<-EOT
+            syncOptions:
+              -   ServerSideApply = true
+            EOT
+            job "ogc" {
+              group "ogc" {
+-             image = "registry/ogc:5.224.0"
++             image = "registry/ogc:5.226.0"
+              }
+            }
+        EOT
+    }`,
+		},
+		{
+			"quoted heredoc-like string does not enter heredoc mode",
+			`  # null_resource.example will be updated in-place
+  ~ resource "null_resource" "example" {
+      ~ cmd      = "cat <<EOF" -> "cat <<EOF --changed"
+      ~ triggers = {
+          + changed = "true"
+        }
+    }`,
+			`# null_resource.example will be updated in-place
+!   resource "null_resource" "example" {
+!       cmd      = "cat <<EOF" -> "cat <<EOF --changed"
+!       triggers = {
++           changed = "true"
+        }
+    }`,
+		},
+		{
+			"heredoc terminator with terraform suffix exits heredoc mode",
+			`  # terraform_data.example will be updated in-place
+  ~ resource "terraform_data" "example" {
+      ~ output = <<-EOT
+          old
+        EOT -> (known after apply)
+      + triggers_replace = [
+          + "changed",
+        ]
+    }`,
+			`# terraform_data.example will be updated in-place
+!   resource "terraform_data" "example" {
+!       output = <<-EOT
+          old
+        EOT -> (known after apply)
++       triggers_replace = [
++           "changed",
+        ]
+    }`,
+		},
+		{
+			"collection element heredoc diff",
+			`  # terraform_data.example will be updated in-place
+  ~ resource "terraform_data" "example" {
+      ~ input = [
+          ~ <<-EOT
+              first
+              - old
+              + new
+            EOT,
+        ]
+      + triggers_replace = [
+          + "changed",
+        ]
+    }`,
+			`# terraform_data.example will be updated in-place
+!   resource "terraform_data" "example" {
+!       input = [
+!           <<-EOT
+              first
+-               old
++               new
+            EOT,
+        ]
++       triggers_replace = [
++           "changed",
+        ]
     }`,
 		},
 	}

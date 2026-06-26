@@ -543,24 +543,100 @@ func (p *PlanSuccess) NoChanges() bool {
 
 // Diff Markdown regexes
 var (
-	diffKeywordRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)([a-zA-Z_][\w]*\s*)(\s=\s|\s->\s|\(known after apply\)|\{)(.*)`)
-	diffResourceRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)((?:resource|data|module)\s+.+\{.*)`)
-	diffHeredocRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(<<)(.*)`)
-	diffColonRegex    = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {4,}[a-zA-Z_][\w-]*:.*)`)
-	diffListRegex     = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
-	diffTildeRegex    = regexp.MustCompile(`(?m)^~`)
+	diffKeywordRegex                  = regexp.MustCompile(`(?m)^( +)([-+~]\s)([a-zA-Z_][\w]*\s*)(\s=\s|\s->\s|\(known after apply\)|\{)(.*)`)
+	diffResourceRegex                 = regexp.MustCompile(`(?m)^( +)([-+~]\s)((?:resource|data|module)\s+.+\{.*)`)
+	diffHeredocRegex                  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(<<)(.*)`)
+	diffColonRegex                    = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {4,}[a-zA-Z_][\w-]*:.*)`)
+	diffListRegex                     = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
+	diffTildeRegex                    = regexp.MustCompile(`(?m)^~`)
+	diffHeredocAttributeStartRegex    = regexp.MustCompile(`^( *)([-+~]\s)?[a-zA-Z_][\w]*\s*=\s<<-?([a-zA-Z_][\w]*)\s*$`)
+	diffHeredocCollectionElementRegex = regexp.MustCompile(`^( *)([-+~]\s)<<-?([a-zA-Z_][\w]*)\s*$`)
+	diffHeredocContentLineRegex       = regexp.MustCompile(`^( +)([-+~]\s)(.*)`)
 )
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
-	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5")
-	formattedTerraformOutput = diffResourceRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
-	formattedTerraformOutput = diffHeredocRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3$4")
-	formattedTerraformOutput = diffColonRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
-	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
-	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
+	lines := strings.Split(p.TerraformOutput, "\n")
+	heredocDelimiter := ""
+	heredocTerminatorIndent := -1
+	heredocDiffMarkerIndent := -1
 
-	return strings.TrimSpace(formattedTerraformOutput)
+	for i, line := range lines {
+		if heredocDelimiter != "" {
+			if isDiffMarkdownHeredocEnd(line, heredocDelimiter, heredocTerminatorIndent) {
+				heredocDelimiter = ""
+				heredocTerminatorIndent = -1
+				heredocDiffMarkerIndent = -1
+				continue
+			}
+
+			if heredocDiffMarkerIndent >= 0 {
+				lines[i] = formatHeredocDiffMarkdownLine(line, heredocDiffMarkerIndent)
+			}
+			continue
+		}
+
+		if delimiter, terminatorIndent, diffMarkerIndent, ok := diffMarkdownHeredocStart(line); ok {
+			heredocDelimiter = delimiter
+			heredocTerminatorIndent = terminatorIndent
+			heredocDiffMarkerIndent = diffMarkerIndent
+		}
+
+		lines[i] = formatDiffMarkdownLine(line)
+	}
+
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func formatDiffMarkdownLine(line string) string {
+	formattedLine := diffKeywordRegex.ReplaceAllString(line, "$2$1$3$4$5")
+	formattedLine = diffResourceRegex.ReplaceAllString(formattedLine, "$2$1$3")
+	formattedLine = diffHeredocRegex.ReplaceAllString(formattedLine, "$2$1$3$4")
+	formattedLine = diffColonRegex.ReplaceAllString(formattedLine, "$2$1$3")
+	formattedLine = diffListRegex.ReplaceAllString(formattedLine, "$2$1$3")
+	formattedLine = diffTildeRegex.ReplaceAllString(formattedLine, "!")
+
+	return formattedLine
+}
+
+func diffMarkdownHeredocStart(line string) (string, int, int, bool) {
+	if heredocMatch := diffHeredocAttributeStartRegex.FindStringSubmatch(line); heredocMatch != nil {
+		return diffMarkdownHeredocState(heredocMatch[1], heredocMatch[2], heredocMatch[3], len(heredocMatch[1])+4)
+	}
+
+	if heredocMatch := diffHeredocCollectionElementRegex.FindStringSubmatch(line); heredocMatch != nil {
+		return diffMarkdownHeredocState(heredocMatch[1], heredocMatch[2], heredocMatch[3], len(heredocMatch[1])+len(heredocMatch[2])+2)
+	}
+
+	return "", -1, -1, false
+}
+
+func diffMarkdownHeredocState(indent string, marker string, delimiter string, diffMarkerIndent int) (string, int, int, bool) {
+	terminatorIndent := len(indent) + len(marker)
+	if !strings.HasPrefix(marker, "~") {
+		return delimiter, terminatorIndent, -1, true
+	}
+
+	// Terraform renders changed heredoc content diff markers two spaces deeper
+	// than the heredoc terminator.
+	return delimiter, terminatorIndent, diffMarkerIndent, true
+}
+
+func isDiffMarkdownHeredocEnd(line string, delimiter string, indent int) bool {
+	terminator := strings.Repeat(" ", indent) + delimiter
+	return line == terminator ||
+		line == terminator+"," ||
+		strings.HasPrefix(line, terminator+" -> ") ||
+		strings.HasPrefix(line, terminator+", -> ")
+}
+
+func formatHeredocDiffMarkdownLine(line string, diffMarkerIndent int) string {
+	matches := diffHeredocContentLineRegex.FindStringSubmatch(line)
+	if matches == nil || len(matches[1]) != diffMarkerIndent {
+		return line
+	}
+
+	return diffTildeRegex.ReplaceAllString(matches[2]+matches[1]+matches[3], "!")
 }
 
 // Stats returns plan change stats and contextual information.
