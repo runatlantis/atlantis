@@ -1,0 +1,27 @@
+server/events/command_runner.go
+  s_12c46f3ee857ef::t_6d80c4161fa1a5 331-332
+  s_12c46f3ee857ef::t_1cc4615d9ac636 328-330
+  s_12c46f3ee857ef::t_e9710c5abe2fe5 333-335
+  s_12c46f3ee857ef::t_0e4b5daa04a8d4 307-327
+server/events/command_runner_test.go
+  s_12c46f3ee857ef::t_8fe44bc597429b 539,542-615
+  s_12c46f3ee857ef::t_e6da370c805e10 536-538
+  s_12c46f3ee857ef::t_0feca974b1f33c 540-541
+  s_12c46f3ee857ef::t_6819e9cd8c55ae 535
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "cb5833d192bb8a3b22d1b887eab618c461dfe76d",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
