@@ -320,7 +320,7 @@ func ParseDriftFromPlan(planOutput string) DriftSummary {
         ToDestroy:      stats.Destroy,
         ToForget:       stats.Forget,
         ChangesOutside: stats.ChangesOutside,
-        Summary:        PlanSuccess{TerraformOutput: planOutput}.Summary(),
+        Summary:        (&PlanSuccess{TerraformOutput: planOutput}).Summary(),
     }
 }
 ```
@@ -336,7 +336,7 @@ type DriftStatusResponse struct {
 }
 
 type ProjectDrift struct {
-    ProjectName string       `json:"project_name"`
+    ProjectName string       `json:"project_name,omitempty"`
     Path        string       `json:"path"`
     Workspace   string       `json:"workspace"`
     Drift       DriftSummary `json:"drift"`
@@ -349,16 +349,25 @@ type ProjectDrift struct {
 ```go
 // server/core/drift/storage.go
 
+// DriftProjectKey identifies an Atlantis project. ProjectName is optional in
+// atlantis.yaml, so Path and Workspace must be part of the storage key to avoid
+// collisions between unnamed projects in the same repository.
+type DriftProjectKey struct {
+    ProjectName string `json:"project_name,omitempty"`
+    Path        string `json:"path"`
+    Workspace   string `json:"workspace"`
+}
+
 type DriftStorage interface {
-    StoreDriftStatus(repo string, project string, drift DriftSummary) error
-    GetDriftStatus(repo string, project string) (*ProjectDrift, error)
+    StoreDriftStatus(repo string, key DriftProjectKey, drift DriftSummary) error
+    GetDriftStatus(repo string, key DriftProjectKey) (*ProjectDrift, error)
     ListDriftStatus(repo string) ([]ProjectDrift, error)
 }
 
 // In-memory implementation for initial version
 type InMemoryDriftStorage struct {
     mu     sync.RWMutex
-    status map[string]map[string]ProjectDrift // repo -> project -> drift
+    status map[string]map[DriftProjectKey]ProjectDrift // repo -> project key -> drift
 }
 ```
 
@@ -486,12 +495,13 @@ func (g *GitlabClient) CreatePullRequest(
     repo models.Repo,
     opts vcs.CreatePullRequestOptions,
 ) (models.PullRequest, error) {
+    labels := gitlab.Labels(opts.Labels)
     mr, _, err := g.Client.MergeRequests.CreateMergeRequest(repo.FullName, &gitlab.CreateMergeRequestOptions{
         Title:        gitlab.String(opts.Title),
         Description:  gitlab.String(opts.Body),
         SourceBranch: gitlab.String(opts.HeadBranch),
         TargetBranch: gitlab.String(opts.BaseBranch),
-        Labels:       &gitlab.Labels{opts.Labels...},
+        Labels:       &labels,
     })
     if err != nil {
         return models.PullRequest{}, err
@@ -511,16 +521,21 @@ func (g *GitlabClient) CreatePullRequest(
 
 ```go
 // POST /api/drift/remediate
+type DriftRemediatePath struct {
+    Directory string `json:"directory" validate:"required"`
+    Workspace string `json:"workspace,omitempty"`
+}
+
 type DriftRemediateRequest struct {
-    Repository  string   `json:"repository" validate:"required"`
-    Ref         string   `json:"ref" validate:"required"`          // Base branch
-    Type        string   `json:"type" validate:"required"`         // VCS type
-    Projects    []string `json:"projects,omitempty"`               // Projects to remediate
-    Paths       []Path   `json:"paths,omitempty"`
-    Title       string   `json:"title,omitempty"`                  // PR title
-    Description string   `json:"description,omitempty"`            // PR body
-    Draft       bool     `json:"draft,omitempty"`
-    AutoMerge   bool     `json:"auto_merge,omitempty"`             // Enable auto-merge after approval
+    Repository  string                `json:"repository" validate:"required"`
+    Ref         string                `json:"ref" validate:"required"`  // Base branch
+    Type        string                `json:"type" validate:"required"` // VCS type
+    Projects    []string              `json:"projects,omitempty"`       // Projects to remediate
+    Paths       []DriftRemediatePath  `json:"paths,omitempty"`
+    Title       string                `json:"title,omitempty"`       // PR title
+    Description string                `json:"description,omitempty"` // PR body
+    Draft       bool                  `json:"draft,omitempty"`
+    AutoMerge   bool                  `json:"auto_merge,omitempty"` // Enable auto-merge after approval
 }
 
 type DriftRemediateResponse struct {
