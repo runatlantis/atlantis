@@ -56,8 +56,8 @@ func TestWriteGitCreds_Appends(t *testing.T) {
 // we do nothing.
 func TestWriteGitCreds_NoModification(t *testing.T) {
 	if runtime.GOOS == "windows" {
-        t.Skip("file permission semantics differ on Windows")
-    }
+		t.Skip("file permission semantics differ on Windows")
+	}
 
 	logger := logging.NewNoopLogger(t)
 	tmp := t.TempDir()
@@ -136,7 +136,7 @@ func TestWriteGitCreds_AppendApp(t *testing.T) {
 // the same that we just error out.
 func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 	if runtime.GOOS == "windows" {
-    t.Skip("file permission semantics differ on Windows")
+		t.Skip("file permission semantics differ on Windows")
 	}
 
 	logger := logging.NewNoopLogger(t)
@@ -154,9 +154,9 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 
 // Test that if we can't write, we error out.
 func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
-	 if runtime.GOOS == "windows" {
-        t.Skip("filesystem error messages differ on Windows")
-    }
+	if runtime.GOOS == "windows" {
+		t.Skip("filesystem error messages differ on Windows")
+	}
 
 	logger := logging.NewNoopLogger(t)
 	credsFile := "/this/dir/does/not/exist/.git-credentials" // nolint: gosec
