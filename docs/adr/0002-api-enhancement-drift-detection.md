@@ -328,7 +328,9 @@ func ParseDriftFromPlan(planOutput string) DriftSummary {
 **New Drift Status Endpoint**:
 
 ```go
-// GET /api/drift/status?repository=org/repo&project=myproject
+// GET /api/drift/status?repository=org/repo&project=myproject&path=.&workspace=default
+// project, path, and workspace are optional filters; path and workspace identify
+// unnamed Atlantis projects.
 type DriftStatusResponse struct {
     Repository string        `json:"repository"`
     Projects   []ProjectDrift `json:"projects"`
@@ -339,12 +341,27 @@ type ProjectDrift struct {
     ProjectName string       `json:"project_name,omitempty"`
     Path        string       `json:"path"`
     Workspace   string       `json:"workspace"`
+    Ref         string       `json:"ref"`
+    VCSHostType string       `json:"type"`
     Drift       DriftSummary `json:"drift"`
     LastChecked time.Time    `json:"last_checked"`
 }
 ```
 
-**Drift Storage** (optional, for caching drift status):
+**Drift Storage**:
+
+The status endpoint is a read endpoint, not a recomputation endpoint. Each
+successful drift-detection `/api/plan` run must parse every project plan result
+with `ParseDriftFromPlan` and persist one `ProjectDrift` record per project.
+That record must include the request source metadata (`Ref` and VCS `Type`),
+the project identity (`ProjectName`, `Path`, `Workspace`), the parsed drift
+summary, and `LastChecked`. `GET /api/drift/status` then filters and returns
+the persisted records for the requested repository/project key.
+
+If the implementation instead chooses to compute drift on demand, the status
+endpoint request shape must change to include the required `Ref`, VCS `Type`,
+and `Paths` inputs and must run a plan synchronously. With the endpoint shape
+above, storage is required.
 
 ```go
 // server/core/drift/storage.go
@@ -359,7 +376,7 @@ type DriftProjectKey struct {
 }
 
 type DriftStorage interface {
-    StoreDriftStatus(repo string, key DriftProjectKey, drift DriftSummary) error
+    StoreDriftStatus(repo string, status ProjectDrift) error
     GetDriftStatus(repo string, key DriftProjectKey) (*ProjectDrift, error)
     ListDriftStatus(repo string) ([]ProjectDrift, error)
 }
@@ -375,7 +392,7 @@ type InMemoryDriftStorage struct {
 
 - `server/events/models/drift.go` - New drift response models
 - `server/events/models/models.go` - Reuse or extend `NewPlanSuccessStats` for any new drift counters
-- `server/core/drift/storage.go` - Optional drift status storage
+- `server/core/drift/storage.go` - Required drift status storage for `/api/drift/status`
 - `server/controllers/api_controller.go` - Add drift status endpoint
 
 ---
@@ -556,8 +573,14 @@ type PullRequestInfo struct {
 
 1. Run plan for each specified project (detect what needs to be applied)
 2. Create a new branch (e.g., `atlantis-drift-remediation-{timestamp}`)
-3. Create PR/MR with drift summary in description
-4. Return PR details for user to review and merge
+3. Materialize a non-empty branch change before opening a PR/MR. This can be a
+   generated drift-remediation manifest/report, proposed configuration edits
+   from a remediation engine, or another reviewable artifact committed to the
+   branch. If Atlantis cannot create a commit that makes the head differ from
+   the base, return an error with the drift summary instead of calling
+   `CreatePullRequest`.
+4. Create PR/MR with drift summary in description
+5. Return PR details for user to review and merge
 
 **Files to Create/Modify**:
 
@@ -642,7 +665,8 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 
 - [ ] Create drift response models that reuse or extend `models.NewPlanSuccessStats`
 - [ ] Add `DriftSummary` to plan response (optional enhancement)
-- [ ] Implement drift status storage (in-memory)
+- [ ] Implement required drift status storage (in-memory)
+- [ ] Persist parsed drift status from each successful drift-detection `/api/plan` project result
 - [ ] Add `/api/drift/status` endpoint
 - [ ] Add documentation for drift detection usage
 
@@ -656,6 +680,7 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 - [ ] Implement or explicitly return unsupported errors for Bitbucket Server
 - [ ] Implement for Azure DevOps
 - [ ] Implement or explicitly return unsupported errors for Gitea
+- [ ] Define and test the branch materialization step that creates at least one commit before PR/MR creation
 - [ ] Add `/api/drift/remediate` endpoint
 - [ ] Add comprehensive tests
 
@@ -701,7 +726,7 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 | File | Phase | Purpose |
 | ------ | ------- | --------- |
 | `server/events/models/drift.go` | 3 | Drift models |
-| `server/core/drift/storage.go` | 3 | Drift status storage |
+| `server/core/drift/storage.go` | 3 | Required drift status storage |
 | `runatlantis.io/docs/api-endpoints.md` | 5 | Documentation updates |
 
 ---
