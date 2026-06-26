@@ -108,6 +108,8 @@ var testFlags = map[string]any{
 	HideUnchangedPlanComments:        false,
 	HidePrevPlanComments:             false,
 	IncludeGitUntrackedFiles:         false,
+	LanguageFlag:                     "es",
+	LanguageConfigFileFlag:           "",
 	LockingDBType:                    "boltdb",
 	LogLevelFlag:                     "debug",
 	MarkdownTemplateOverridesDirFlag: "/path2",
@@ -1157,6 +1159,88 @@ func TestExecute_ValidateDefaultTFDistribution(t *testing.T) {
 			Ok(t, err)
 		}
 	}
+}
+
+func TestExecute_ValidateLanguage(t *testing.T) {
+	cases := []struct {
+		description string
+		flags       map[string]any
+		expectErr   string
+	}{
+		{
+			"english",
+			map[string]any{
+				LanguageFlag: "en",
+			},
+			"",
+		},
+		{
+			"spanish",
+			map[string]any{
+				LanguageFlag: "es",
+			},
+			"",
+		},
+		{
+			"language variant normalizes",
+			map[string]any{
+				LanguageFlag: "es-MX",
+			},
+			"",
+		},
+		{
+			"errs on unsupported language",
+			map[string]any{
+				LanguageFlag: "de",
+			},
+			`unsupported language "de": supported languages are en, es`,
+		},
+		{
+			"unsupported language with custom config file",
+			map[string]any{
+				LanguageFlag:           "de",
+				LanguageConfigFileFlag: writeTempLanguageConfig(t, "command_titles:\n  apply: Anwenden\n"),
+			},
+			"",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Log("Should validate language when " + testCase.description)
+		c := setupWithDefaults(testCase.flags, t)
+		err := c.Execute()
+		if testCase.expectErr != "" {
+			ErrEquals(t, testCase.expectErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
+func TestExecute_ValidateLanguageConfigFileInvalid(t *testing.T) {
+	c := setupWithDefaults(map[string]any{
+		LanguageFlag:           "de",
+		LanguageConfigFileFlag: writeTempLanguageConfig(t, ":\n"),
+	}, t)
+	err := c.Execute()
+	if err == nil {
+		t.Fatalf("expected error for invalid language config file")
+	}
+	if !strings.Contains(err.Error(), "invalid language-config-file") {
+		t.Fatalf("expected language config validation error, got: %s", err.Error())
+	}
+}
+
+func writeTempLanguageConfig(t *testing.T, contents string) string {
+	f, err := os.CreateTemp("", "atlantis-language-*.yaml")
+	Ok(t, err)
+	t.Cleanup(func() {
+		_ = os.Remove(f.Name())
+	})
+	_, err = f.WriteString(contents)
+	Ok(t, err)
+	Ok(t, f.Close())
+	return f.Name()
 }
 
 func setup(flags map[string]any, t *testing.T) *cobra.Command {

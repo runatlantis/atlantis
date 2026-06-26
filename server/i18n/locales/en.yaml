@@ -1,0 +1,12 @@
+pull_request_label: Pull Request
+merge_request_label: Merge Request
+command_titles:
+  apply: Apply
+  plan: Plan
+  unlock: Unlock
+  policy_check: Policy Check
+  approve_policies: Approve Policies
+  version: Version
+  import: Import
+  state: State
+  cancel: Cancel

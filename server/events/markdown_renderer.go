@@ -8,29 +8,29 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
+	"io/fs"
 	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
+	"github.com/runatlantis/atlantis/server/i18n"
 )
 
 var (
-	planCommandTitle            = command.Plan.TitleString()
-	applyCommandTitle           = command.Apply.TitleString()
-	policyCheckCommandTitle     = command.PolicyCheck.TitleString()
-	approvePoliciesCommandTitle = command.ApprovePolicies.TitleString()
-	versionCommandTitle         = command.Version.TitleString()
-	importCommandTitle          = command.Import.TitleString()
-	stateCommandTitle           = command.State.TitleString()
+	planCommandTitle            = command.Plan.String()
+	applyCommandTitle           = command.Apply.String()
+	policyCheckCommandTitle     = command.PolicyCheck.String()
+	approvePoliciesCommandTitle = command.ApprovePolicies.String()
+	versionCommandTitle         = command.Version.String()
+	importCommandTitle          = command.Import.String()
+	stateCommandTitle           = command.State.String()
 	// maxUnwrappedLines is the maximum number of lines the Terraform output
 	// can be before we wrap it in an expandable template.
 	maxUnwrappedLines = 12
 
-	//go:embed templates/*
+	//go:embed templates/*.tmpl templates/i18n/*/*.tmpl
 	templatesFS embed.FS
 )
 
@@ -49,11 +49,13 @@ type MarkdownRenderer struct {
 	executableName            string
 	hideUnchangedPlanComments bool
 	quietPolicyChecks         bool
+	translator                *i18n.Translator
 }
 
 // commonData is data that all responses have.
 type commonData struct {
 	Command                   string
+	CommandName               string
 	SubCommand                string
 	Verbose                   bool
 	Log                       string
@@ -144,9 +146,31 @@ func NewMarkdownRenderer(
 	executableName string,
 	hideUnchangedPlanComments bool,
 	quietPolicyChecks bool,
+	localizationConfigs ...i18n.TranslatorConfig,
 ) *MarkdownRenderer {
+	localizationConfig := i18n.TranslatorConfig{LanguageCode: i18n.DefaultLanguage}
+	if len(localizationConfigs) > 0 {
+		localizationConfig = localizationConfigs[0]
+	}
+
+	languageCode := i18n.DefaultLanguage
+	customLanguageConfigFile := localizationConfig.CatalogPath
+	if localizationConfig.LanguageCode != "" {
+		languageCode = localizationConfig.LanguageCode
+	}
+	translator := i18n.NewTranslatorOrDefault(i18n.TranslatorConfig{
+		LanguageCode: languageCode,
+		CatalogPath:  customLanguageConfigFile,
+	})
+
 	var templates *template.Template
 	templates, _ = template.New("").Funcs(sprig.TxtFuncMap()).ParseFS(templatesFS, "templates/*.tmpl")
+	localizedPattern := fmt.Sprintf("templates/i18n/%s/*.tmpl", translator.LanguageCode())
+	if localizedTemplates, err := fs.Glob(templatesFS, localizedPattern); err == nil && len(localizedTemplates) > 0 {
+		if localized, localizedErr := templates.ParseFS(templatesFS, localizedPattern); localizedErr == nil {
+			templates = localized
+		}
+	}
 	if overrides, err := templates.ParseGlob(fmt.Sprintf("%s/*.tmpl", markdownTemplateOverridesDir)); err == nil {
 		// doesn't override if templates directory doesn't exist
 		templates = overrides
@@ -162,22 +186,25 @@ func NewMarkdownRenderer(
 		executableName:            executableName,
 		hideUnchangedPlanComments: hideUnchangedPlanComments,
 		quietPolicyChecks:         quietPolicyChecks,
+		translator:                translator,
 	}
 }
 
 // Render formats the data into a markdown string.
 // nolint: interfacer
 func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd PullCommand) string {
-	commandStr := cases.Title(language.English).String(strings.ReplaceAll(cmd.CommandName().String(), "_", " "))
+	commandNameStr := cmd.CommandName().String()
+	commandStr := m.translator.CommandTitle(commandNameStr)
 	var vcsRequestType string
 	if ctx.Pull.BaseRepo.VCSHost.Type == models.Gitlab {
-		vcsRequestType = "Merge Request"
+		vcsRequestType = m.translator.MergeRequestLabel()
 	} else {
-		vcsRequestType = "Pull Request"
+		vcsRequestType = m.translator.PullRequestLabel()
 	}
 
 	common := commonData{
 		Command:                   commandStr,
+		CommandName:               commandNameStr,
 		SubCommand:                cmd.SubCommandName(),
 		Verbose:                   cmd.IsVerbose(),
 		Log:                       ctx.Log.GetHistory(),
@@ -249,7 +276,7 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 				numPlansWithChanges++
 			}
 			numPlanSuccesses++
-		} else if result.PolicyCheckResults != nil && common.Command == policyCheckCommandTitle {
+		} else if result.PolicyCheckResults != nil && common.CommandName == policyCheckCommandTitle {
 			policyCheckResults := policyCheckResultsData{
 				PreConftestOutput:     result.PolicyCheckResults.PreConftestOutput,
 				PostConftestOutput:    result.PolicyCheckResults.PostConftestOutput,
@@ -267,7 +294,7 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 			if result.Error == nil && result.Failure == "" {
 				numPolicyCheckSuccesses++
 			}
-		} else if result.PolicyCheckResults != nil && common.Command == approvePoliciesCommandTitle {
+		} else if result.PolicyCheckResults != nil && common.CommandName == approvePoliciesCommandTitle {
 			policyCheckResults := policyCheckResultsData{
 				PolicyCheckResults:    *result.PolicyCheckResults,
 				PolicyCheckSummary:    result.PolicyCheckResults.Summary(),
@@ -325,12 +352,12 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 				tmpl = templates.Lookup("wrappedErr")
 			}
 			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), resultData.Rendered, common})
-			if common.Command == applyCommandTitle {
+			if common.CommandName == applyCommandTitle {
 				numApplyErrors++
 			}
 		} else if result.Failure != "" {
 			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("failure"), failureData{result.Failure, resultData.Rendered, common})
-			if common.Command == applyCommandTitle {
+			if common.CommandName == applyCommandTitle {
 				numApplyFailures++
 			}
 		}
@@ -339,61 +366,61 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 
 	var tmpl *template.Template
 	switch {
-	case len(resultsTmplData) == 1 && common.Command == planCommandTitle && numPlanSuccesses > 0:
+	case len(resultsTmplData) == 1 && common.CommandName == planCommandTitle && numPlanSuccesses > 0:
 		tmpl = templates.Lookup("singleProjectPlanSuccess")
-	case len(resultsTmplData) == 1 && common.Command == planCommandTitle && numPlanSuccesses == 0:
+	case len(resultsTmplData) == 1 && common.CommandName == planCommandTitle && numPlanSuccesses == 0:
 		tmpl = templates.Lookup("singleProjectPlanUnsuccessful")
-	case len(resultsTmplData) == 1 && common.Command == policyCheckCommandTitle && numPolicyCheckSuccesses > 0:
+	case len(resultsTmplData) == 1 && common.CommandName == policyCheckCommandTitle && numPolicyCheckSuccesses > 0:
 		tmpl = templates.Lookup("singleProjectPlanSuccess")
-	case len(resultsTmplData) == 1 && common.Command == policyCheckCommandTitle && numPolicyCheckSuccesses == 0:
+	case len(resultsTmplData) == 1 && common.CommandName == policyCheckCommandTitle && numPolicyCheckSuccesses == 0:
 		tmpl = templates.Lookup("singleProjectPolicyUnsuccessful")
-	case len(resultsTmplData) == 1 && common.Command == versionCommandTitle && numVersionSuccesses > 0:
+	case len(resultsTmplData) == 1 && common.CommandName == versionCommandTitle && numVersionSuccesses > 0:
 		tmpl = templates.Lookup("singleProjectVersionSuccess")
-	case len(resultsTmplData) == 1 && common.Command == versionCommandTitle && numVersionSuccesses == 0:
+	case len(resultsTmplData) == 1 && common.CommandName == versionCommandTitle && numVersionSuccesses == 0:
 		tmpl = templates.Lookup("singleProjectVersionUnsuccessful")
-	case len(resultsTmplData) == 1 && common.Command == applyCommandTitle:
+	case len(resultsTmplData) == 1 && common.CommandName == applyCommandTitle:
 		tmpl = templates.Lookup("singleProjectApply")
-	case len(resultsTmplData) == 1 && common.Command == importCommandTitle:
+	case len(resultsTmplData) == 1 && common.CommandName == importCommandTitle:
 		tmpl = templates.Lookup("singleProjectImport")
-	case len(resultsTmplData) == 1 && common.Command == stateCommandTitle:
+	case len(resultsTmplData) == 1 && common.CommandName == stateCommandTitle:
 		switch common.SubCommand {
 		case "rm":
 			tmpl = templates.Lookup("singleProjectStateRm")
 		default:
-			return fmt.Sprintf("no template matched–this is a bug: command=%s, subcommand=%s", common.Command, common.SubCommand)
+			return fmt.Sprintf("no template matched–this is a bug: command=%s, command_name=%s, subcommand=%s", common.Command, common.CommandName, common.SubCommand)
 		}
-	case common.Command == planCommandTitle:
+	case common.CommandName == planCommandTitle:
 		tmpl = templates.Lookup("multiProjectPlan")
-	case common.Command == policyCheckCommandTitle:
+	case common.CommandName == policyCheckCommandTitle:
 		if numPolicyCheckSuccesses == len(results) {
 			tmpl = templates.Lookup("multiProjectPolicy")
 		} else {
 			tmpl = templates.Lookup("multiProjectPolicyUnsuccessful")
 		}
-	case common.Command == approvePoliciesCommandTitle:
+	case common.CommandName == approvePoliciesCommandTitle:
 		if numPolicyApprovalSuccesses == len(results) {
 			tmpl = templates.Lookup("approveAllProjects")
 		} else {
 			tmpl = templates.Lookup("multiProjectPolicyUnsuccessful")
 		}
-	case common.Command == applyCommandTitle:
+	case common.CommandName == applyCommandTitle:
 		tmpl = templates.Lookup("multiProjectApply")
-	case common.Command == versionCommandTitle:
+	case common.CommandName == versionCommandTitle:
 		tmpl = templates.Lookup("multiProjectVersion")
-	case common.Command == importCommandTitle:
+	case common.CommandName == importCommandTitle:
 		tmpl = templates.Lookup("multiProjectImport")
-	case common.Command == stateCommandTitle:
+	case common.CommandName == stateCommandTitle:
 		switch common.SubCommand {
 		case "rm":
 			tmpl = templates.Lookup("multiProjectStateRm")
 		default:
-			return fmt.Sprintf("no template matched–this is a bug: command=%s, subcommand=%s", common.Command, common.SubCommand)
+			return fmt.Sprintf("no template matched–this is a bug: command=%s, command_name=%s, subcommand=%s", common.Command, common.CommandName, common.SubCommand)
 		}
 	default:
-		return fmt.Sprintf("no template matched–this is a bug: command=%s", common.Command)
+		return fmt.Sprintf("no template matched–this is a bug: command=%s, command_name=%s", common.Command, common.CommandName)
 	}
 
-	switch common.Command {
+	switch common.CommandName {
 	case planCommandTitle:
 		numPlanFailures := len(results) - numPlanSuccesses
 		return m.renderTemplateTrimSpace(tmpl, planResultData{resultsTmplData, common, numPlansWithChanges, numPlansWithNoChanges, numPlanFailures})
