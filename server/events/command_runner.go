@@ -93,6 +93,11 @@ func shouldSkipPreWorkflowHooks(ctx *command.Context, cmdRunner CommentCommandRu
 	return ok && skipper.ShouldSkipPreWorkflowHooks(ctx, cmd)
 }
 
+func preWorkflowHooksConfigured(runner PreWorkflowHooksCommandRunner, ctx *command.Context) bool {
+	checker, ok := runner.(PreWorkflowHooksConfiguredChecker)
+	return ok && checker.HasPreWorkflowHooks(ctx)
+}
+
 // DefaultCommandRunner is the first step when processing a comment command.
 type DefaultCommandRunner struct {
 	VCSClient                vcs.Client `validate:"required"`
@@ -514,9 +519,13 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	preWorkflowHooksMayUpdateRepo := preWorkflowHooksConfigured(c.PreWorkflowHooksCommandRunner, ctx)
 	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 	if targetInitiallyIgnored {
 		ctx.CommandSkipped = false
+		if !preWorkflowHooksMayUpdateRepo || preWorkflowHooksErr != nil {
+			return
+		}
 		ctx.PreferLocalRepoCfgForTargetedIgnore = true
 		if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
 			return

@@ -78,6 +78,21 @@ type TestConfig struct {
 	applyLockCheckerErr        error
 }
 
+type configuredPreWorkflowHooksCommandRunner struct {
+	hasHooks bool
+	err      error
+	calls    int
+}
+
+func (r *configuredPreWorkflowHooksCommandRunner) RunPreHooks(_ *command.Context, _ *events.CommentCommand) error {
+	r.calls++
+	return r.err
+}
+
+func (r *configuredPreWorkflowHooksCommandRunner) HasPreWorkflowHooks(_ *command.Context) bool {
+	return r.hasHooks
+}
+
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
 	RegisterMockTestingT(t)
 
@@ -683,8 +698,33 @@ func TestRunCommentCommand_IgnoredTargetedDirValidatesPullBeforeIgnoreCheck(t *t
 	}
 }
 
+func TestRunCommentCommand_IgnoredTargetedDirNoHooksDoesNotUseLocalConfig(t *testing.T) {
+	setup(t)
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "ignored"}
+	ignoreChecks := 0
+
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
+		ignoreChecks++
+		return ReturnValues{ignoreChecks == 1}
+	})
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
+
+	Equals(t, 1, ignoreChecks)
+	preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalledOnce().RunPreHooks(Any[*command.Context](), Eq(cmd))
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+}
+
 func TestRunCommentCommand_IgnoredTargetedDirPreHooksCanGenerateExplicitConfig(t *testing.T) {
 	setup(t)
+	configuredPreHooks := &configuredPreWorkflowHooksCommandRunner{hasHooks: true}
+	preWorkflowHooksCommandRunner = configuredPreHooks
+	ch.PreWorkflowHooksCommandRunner = configuredPreHooks
 	pull := &github.PullRequest{State: github.Ptr("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"}
@@ -708,7 +748,7 @@ func TestRunCommentCommand_IgnoredTargetedDirPreHooksCanGenerateExplicitConfig(t
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
 
-	preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalledOnce().RunPreHooks(Any[*command.Context](), Eq(cmd))
+	Equals(t, 1, configuredPreHooks.calls)
 	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Eq(cmd))
 	projectCommandRunner.VerifyWasCalledOnce().Plan(projectCtx)
 }
