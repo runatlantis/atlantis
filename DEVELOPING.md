@@ -4,7 +4,7 @@ This document contains information on how to develop Atlantis locally. For the c
 
 ## Updating The Website
 
-* To view the generated website locally, run `npm run website:dev` and then open your browser to http://localhost:8080.
+* To view the generated website locally, run `npm install`, then `npm run website:dev` and open your browser to http://localhost:8080.
 * The website will be regenerated when your pull request is merged to main.
 
 ## Running Atlantis Locally
@@ -66,13 +66,13 @@ docker-compose up --detach --build
 ## Running Tests In Docker
 
 ```sh
-docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis ghcr.io/runatlantis/testing-env:latest make test
+docker run --rm -v $(pwd):/atlantis -w /atlantis ghcr.io/runatlantis/testing-env:latest make test
 ```
 
 Or to run the integration tests
 
 ```sh
-docker run --rm -v $(pwd):/go/src/github.com/runatlantis/atlantis -w /go/src/github.com/runatlantis/atlantis ghcr.io/runatlantis/testing-env:latest make test-all
+docker run --rm -v $(pwd):/atlantis -w /atlantis ghcr.io/runatlantis/testing-env:latest make test-all
 ```
 
 ## Calling Your Local Atlantis From GitHub
