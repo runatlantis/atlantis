@@ -572,25 +572,12 @@ func TestRunCommentCommand_IgnoredTargetedDirSkipsValidationComments(t *testing.
 				ch.VarFileAllowlistChecker = checker
 			},
 		},
-		{
-			name: "fork pull request",
-			cmd:  &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"},
-			headRepo: models.Repo{
-				Owner:    "forkrepo",
-				FullName: "forkrepo/atlantis",
-			},
-		},
-		{
-			name:      "closed pull request",
-			cmd:       &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"},
-			modelPull: models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.ClosedPullState, Num: testdata.Pull.Num},
-		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			vcsClient := setup(t)
-			if c.modelPull.BaseRepo.ID() == "" {
+			if c.modelPull.BaseRepo.FullName == "" {
 				c.modelPull = models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			}
 			if c.headRepo.FullName == "" {
@@ -619,6 +606,79 @@ func TestRunCommentCommand_IgnoredTargetedDirSkipsValidationComments(t *testing.
 			commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
 			postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+		})
+	}
+}
+
+func TestRunCommentCommand_IgnoredTargetedDirValidatesPullBeforeIgnoreCheck(t *testing.T) {
+	cases := []struct {
+		name        string
+		modelPull   models.PullRequest
+		headRepo    models.Repo
+		setup       func()
+		wantComment string
+	}{
+		{
+			name: "fork pull request",
+			modelPull: models.PullRequest{
+				BaseRepo: testdata.GithubRepo,
+				State:    models.OpenPullState,
+				Num:      testdata.Pull.Num,
+			},
+			headRepo: models.Repo{
+				Owner:    "forkrepo",
+				FullName: "forkrepo/atlantis",
+			},
+			wantComment: fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", "allow-fork-prs-flag", ""),
+		},
+		{
+			name: "closed pull request",
+			modelPull: models.PullRequest{
+				BaseRepo: testdata.GithubRepo,
+				State:    models.ClosedPullState,
+				Num:      testdata.Pull.Num,
+			},
+			headRepo:    testdata.GithubRepo,
+			wantComment: "Atlantis commands can't be run on closed pull requests",
+		},
+		{
+			name: "base branch mismatch",
+			modelPull: models.PullRequest{
+				BaseRepo:   testdata.GithubRepo,
+				State:      models.OpenPullState,
+				Num:        testdata.Pull.Num,
+				BaseBranch: "release",
+			},
+			headRepo: testdata.GithubRepo,
+			setup: func() {
+				ch.GlobalCfg.Repos[0].BranchRegex = regexp.MustCompile("^main$")
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			vcsClient := setup(t)
+			if c.setup != nil {
+				c.setup()
+			}
+
+			pull := &github.PullRequest{State: github.Ptr("open")}
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(c.modelPull, c.modelPull.BaseRepo, c.headRepo, nil)
+			When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(true)
+
+			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"})
+
+			projectCommandBuilder.VerifyWasCalled(Never()).ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())
+			preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+			if c.wantComment == "" {
+				vcsClient.VerifyWasCalled(Never()).CreateComment(
+					Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			} else {
+				vcsClient.VerifyWasCalledOnce().CreateComment(
+					Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(c.modelPull.Num), Eq(c.wantComment), Eq(""))
+			}
 		})
 	}
 }

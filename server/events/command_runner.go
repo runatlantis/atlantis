@@ -448,7 +448,7 @@ func (c *DefaultCommandRunner) validateCommentCommand(ctx *command.Context, base
 		return false
 	}
 
-	return c.validateCtxAndComment(ctx, cmd.Name, shouldComment)
+	return true
 }
 
 // RunCommentCommand executes the command.
@@ -498,6 +498,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		PolicySet:            cmd.PolicySet,
 		ClearPolicyApproval:  cmd.ClearPolicyApproval,
 		TeamAllowlistChecker: c.TeamAllowlistChecker,
+	}
+
+	if !c.validateCtxAndComment(ctx, cmd.Name, true) {
+		return
 	}
 
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())

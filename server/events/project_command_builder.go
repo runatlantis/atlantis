@@ -489,7 +489,7 @@ func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Con
 
 	if p.VCSClient != nil {
 		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.HeadRepo, ctx.Pull.HeadBranch, repoCfgFile)
+		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.HeadRepo, targetedIgnoreConfigRef(ctx.Pull), repoCfgFile)
 		if err != nil {
 			ctx.Log.Debug("unable to fetch %s while checking autodiscover.ignore_paths: %s", repoCfgFile, err)
 		} else if hasRepoCfg {
@@ -506,6 +506,13 @@ func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Con
 		return repoCfg, true
 	}
 	return valid.RepoCfg{}, true
+}
+
+func targetedIgnoreConfigRef(pull models.PullRequest) string {
+	if pull.HeadCommit != "" {
+		return pull.HeadCommit
+	}
+	return pull.HeadBranch
 }
 
 func (p *DefaultProjectCommandBuilder) repoCfgFromWorkingDir(ctx *command.Context) (valid.RepoCfg, bool) {
