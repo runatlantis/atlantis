@@ -6,6 +6,7 @@ server/events/command_runner.go
   s_12c46f3ee857ef::t_b4fe66fb92a42f 190,504-505,509,513-519
   s_12c46f3ee857ef::t_1235e17dfacff0 673,675,687-690
   s_12c46f3ee857ef::t_52017336f8072f 415-422,424,426-435,438-453
+  s_12c46f3ee857ef::t_846b93a1b8fae2 423,425,436-437
 server/events/command_runner_test.go
   s_12c46f3ee857ef::t_3e2a6fb904ba6a 560,563,614
 server/events/project_command_builder_test.go
