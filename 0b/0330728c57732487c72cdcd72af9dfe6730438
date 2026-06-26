@@ -1,0 +1,42 @@
+go.mod
+  s_243a1a1edc15e5::t_4b5964b161c6d0 54,151
+server/core/config/raw/step_test.go
+  s_243a1a1edc15e5::t_79c3a319933532 13,155
+cmd/server_test.go
+  s_243a1a1edc15e5::t_ba2c4dd3702a41 18-19
+server/core/config/parser_validator_test.go
+  s_243a1a1edc15e5::t_c81a86d06ae19f 234-235,243-258
+  s_243a1a1edc15e5::t_74de16629cd31d 236-242
+  s_243a1a1edc15e5::t_4a75f5e9367d45 91,96,101,708,1311
+  s_243a1a1edc15e5::t_0d3124a9758e07 233
+server/core/config/raw/raw_test.go
+  s_243a1a1edc15e5::t_87ab7e8a69ee4e 7,11
+server/core/config/raw/repo_cfg_test.go
+  s_243a1a1edc15e5::t_bb15ef38240ae5 51,97,107,117,127
+server/core/config/raw/policies_test.go
+  s_243a1a1edc15e5::t_d95455b778ff5d 13
+server/core/config/parser_validator.go
+  s_243a1a1edc15e5::t_dfd5e567fbd2f8 187-188
+  s_243a1a1edc15e5::t_38413560b45078 22
+  s_243a1a1edc15e5::t_c217fffee2eeed 170-171,175-186,189-194
+server/core/config/raw/workflow_step_test.go
+  s_243a1a1edc15e5::t_9066191d151fb8 12,53
+go.sum
+  s_243a1a1edc15e5::t_e5dd6281a56966 499-500
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0b0330728c57732487c72cdcd72af9dfe6730438",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
