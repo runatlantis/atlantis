@@ -39,6 +39,7 @@ The current Atlantis API (`/api/plan`, `/api/apply`, `/api/locks`) provides basi
 | `/api/apply` | POST | Yes | Trigger terraform apply |
 | `/api/locks` | GET | No | List active locks |
 | `/status` | GET | No | Server status |
+| `/readyz` | GET | No | Readiness check |
 | `/healthz` | GET | No | Health check |
 
 ### Current API Response Structure (must be preserved)
