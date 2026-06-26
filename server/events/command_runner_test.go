@@ -59,6 +59,7 @@ var lockingLocker *lockingmocks.MockLocker
 var applyCommandRunner *events.ApplyCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
+var stateCommandRunner *events.StateCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 var cancellationTracker *mocks.MockCancellationTracker
@@ -75,6 +76,21 @@ type TestConfig struct {
 	PendingApplyStatus         bool
 	applyLockCheckerReturn     locking.ApplyCommandLock
 	applyLockCheckerErr        error
+}
+
+type configuredPreWorkflowHooksCommandRunner struct {
+	hasHooks bool
+	err      error
+	calls    int
+}
+
+func (r *configuredPreWorkflowHooksCommandRunner) RunPreHooks(_ *command.Context, _ *events.CommentCommand) error {
+	r.calls++
+	return r.err
+}
+
+func (r *configuredPreWorkflowHooksCommandRunner) HasPreWorkflowHooks(_ *command.Context) bool {
+	return r.hasHooks
 }
 
 func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.MockClient {
@@ -226,6 +242,12 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.SilenceNoProjects,
 	)
 
+	stateCommandRunner = events.NewStateCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
@@ -233,6 +255,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
+		command.State:           stateCommandRunner,
 	}
 
 	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
@@ -463,8 +486,305 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
-		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.PendingCommitStatus), Eq(command.Apply))
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.Apply),
+		Eq(models.ProjectCounts{}),
+	)
+}
+
+func TestRunCommentCommand_IgnoredTargetedDirNoOp(t *testing.T) {
+	cases := []struct {
+		name        string
+		commandName command.Name
+		subName     string
+	}{
+		{
+			name:        "plan",
+			commandName: command.Plan,
+		},
+		{
+			name:        "apply",
+			commandName: command.Apply,
+		},
+		{
+			name:        "approve_policies",
+			commandName: command.ApprovePolicies,
+		},
+		{
+			name:        "import",
+			commandName: command.Import,
+		},
+		{
+			name:        "version",
+			commandName: command.Version,
+		},
+		{
+			name:        "state rm",
+			commandName: command.State,
+			subName:     "rm",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			vcsClient := setup(t)
+			ch.FailOnPreWorkflowHookError = true
+			pull := &github.PullRequest{State: github.Ptr("open")}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			cmd := &events.CommentCommand{Name: c.commandName, SubName: c.subName, RepoRelDir: "ignored"}
+
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(true)
+			When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(errors.New("err"))
+
+			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
+
+			preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalledOnce().RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+			vcsClient.VerifyWasCalled(Never()).CreateComment(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+			commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+			postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+		})
+	}
+}
+
+func TestRunCommentCommand_IgnoredTargetedDirSkipsValidationComments(t *testing.T) {
+	cases := []struct {
+		name      string
+		cmd       *events.CommentCommand
+		modelPull models.PullRequest
+		headRepo  models.Repo
+		setup     func(t *testing.T, vcsClient *vcsmocks.MockClient)
+		verify    func(t *testing.T, vcsClient *vcsmocks.MockClient)
+	}{
+		{
+			name: "team allowlist",
+			cmd:  &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"},
+			setup: func(t *testing.T, vcsClient *vcsmocks.MockClient) {
+				checker, err := command.NewTeamAllowlistChecker("allowed-team:apply")
+				Ok(t, err)
+				ch.TeamAllowlistChecker = checker
+				When(vcsClient.GetTeamNamesForUser(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.User))).ThenReturn([]string{"blocked-team"}, nil)
+			},
+			verify: func(t *testing.T, vcsClient *vcsmocks.MockClient) {
+				vcsClient.VerifyWasCalledOnce().GetTeamNamesForUser(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.User))
+			},
+		},
+		{
+			name: "var file allowlist",
+			cmd:  &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored", Flags: []string{"-var-file", "/tmp/outside.tfvars"}},
+			setup: func(t *testing.T, vcsClient *vcsmocks.MockClient) {
+				checker, err := events.NewVarFileAllowlistChecker("")
+				Ok(t, err)
+				ch.VarFileAllowlistChecker = checker
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			vcsClient := setup(t)
+			if c.modelPull.BaseRepo.FullName == "" {
+				c.modelPull = models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			}
+			if c.headRepo.FullName == "" {
+				c.headRepo = testdata.GithubRepo
+			}
+
+			if c.setup != nil {
+				c.setup(t, vcsClient)
+			}
+
+			pull := &github.PullRequest{State: github.Ptr("open")}
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(c.modelPull, c.modelPull.BaseRepo, c.headRepo, nil)
+			When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(true)
+
+			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, c.cmd)
+
+			if c.verify != nil {
+				c.verify(t, vcsClient)
+			}
+			preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+			vcsClient.VerifyWasCalled(Never()).CreateComment(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+			commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+			postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+		})
+	}
+}
+
+func TestRunCommentCommand_IgnoredTargetedDirValidatesPullBeforeIgnoreCheck(t *testing.T) {
+	cases := []struct {
+		name        string
+		modelPull   models.PullRequest
+		headRepo    models.Repo
+		setup       func()
+		wantComment string
+	}{
+		{
+			name: "fork pull request",
+			modelPull: models.PullRequest{
+				BaseRepo: testdata.GithubRepo,
+				State:    models.OpenPullState,
+				Num:      testdata.Pull.Num,
+			},
+			headRepo: models.Repo{
+				Owner:    "forkrepo",
+				FullName: "forkrepo/atlantis",
+			},
+			wantComment: fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", "allow-fork-prs-flag", ""),
+		},
+		{
+			name: "closed pull request",
+			modelPull: models.PullRequest{
+				BaseRepo: testdata.GithubRepo,
+				State:    models.ClosedPullState,
+				Num:      testdata.Pull.Num,
+			},
+			headRepo:    testdata.GithubRepo,
+			wantComment: "Atlantis commands can't be run on closed pull requests",
+		},
+		{
+			name: "base branch mismatch",
+			modelPull: models.PullRequest{
+				BaseRepo:   testdata.GithubRepo,
+				State:      models.OpenPullState,
+				Num:        testdata.Pull.Num,
+				BaseBranch: "release",
+			},
+			headRepo: testdata.GithubRepo,
+			setup: func() {
+				ch.GlobalCfg.Repos[0].BranchRegex = regexp.MustCompile("^main$")
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			vcsClient := setup(t)
+			if c.setup != nil {
+				c.setup()
+			}
+
+			pull := &github.PullRequest{State: github.Ptr("open")}
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(c.modelPull, c.modelPull.BaseRepo, c.headRepo, nil)
+			When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(true)
+
+			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"})
+
+			projectCommandBuilder.VerifyWasCalled(Never()).ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())
+			preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+			if c.wantComment == "" {
+				vcsClient.VerifyWasCalled(Never()).CreateComment(
+					Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			} else {
+				vcsClient.VerifyWasCalledOnce().CreateComment(
+					Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(c.modelPull.Num), Eq(c.wantComment), Eq(""))
+			}
+		})
+	}
+}
+
+func TestRunCommentCommand_IgnoredTargetedDirNoHooksDoesNotUseLocalConfig(t *testing.T) {
+	setup(t)
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "ignored"}
+	ignoreChecks := 0
+
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
+		ignoreChecks++
+		return ReturnValues{ignoreChecks == 1}
+	})
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
+
+	Equals(t, 1, ignoreChecks)
+	preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalledOnce().RunPreHooks(Any[*command.Context](), Eq(cmd))
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+}
+
+func TestRunCommentCommand_IgnoredTargetedDirPreHooksCanGenerateExplicitConfig(t *testing.T) {
+	setup(t)
+	configuredPreHooks := &configuredPreWorkflowHooksCommandRunner{hasHooks: true}
+	preWorkflowHooksCommandRunner = configuredPreHooks
+	ch.PreWorkflowHooksCommandRunner = configuredPreHooks
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "ignored",
+		Workspace:   events.DefaultWorkspace,
+		BaseRepo:    testdata.GithubRepo,
+		Pull:        modelPull,
+	}
+	ignoreChecks := 0
+
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
+		ignoreChecks++
+		return ReturnValues{ignoreChecks == 1}
+	})
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
+
+	Equals(t, 1, configuredPreHooks.calls)
+	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Eq(cmd))
+	projectCommandRunner.VerifyWasCalledOnce().Plan(projectCtx)
+}
+
+func TestRunCommentCommand_IgnoredTargetedDirNonFatalPreHookErrorCanGenerateExplicitConfig(t *testing.T) {
+	setup(t)
+	configuredPreHooks := &configuredPreWorkflowHooksCommandRunner{hasHooks: true, err: errors.New("hook error")}
+	preWorkflowHooksCommandRunner = configuredPreHooks
+	ch.PreWorkflowHooksCommandRunner = configuredPreHooks
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "ignored",
+		Workspace:   events.DefaultWorkspace,
+		BaseRepo:    testdata.GithubRepo,
+		Pull:        modelPull,
+	}
+	ignoreChecks := 0
+
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
+		ignoreChecks++
+		return ReturnValues{ignoreChecks == 1}
+	})
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
+
+	Equals(t, 1, configuredPreHooks.calls)
+	Equals(t, 2, ignoreChecks)
+	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Eq(cmd))
+	projectCommandRunner.VerifyWasCalledOnce().Plan(projectCtx)
 }
 
 func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) {
@@ -874,7 +1194,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(Any[string]())
 	// gomock will fail if lockingLocker.UnlockByPull is called unexpectedly (no EXPECT set)
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Eq(models.PendingCommitStatus), Eq(command.Plan))
+		Eq(models.FailedCommitStatus), Eq(command.Plan))
 
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()

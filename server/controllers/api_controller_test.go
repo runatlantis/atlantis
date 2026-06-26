@@ -237,6 +237,134 @@ func TestAPIController_Plan_PreWorkflowHooksReceiveCorrectCommand(t *testing.T) 
 		command.Plan, capturedCmd.Name.String(), capturedCmd.Name)
 }
 
+func TestAPIController_Plan_SkipsIgnoredPathsWithoutShiftingHookCommands(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	preWorkflowHooksRunner := ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner)
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
+		commentCommand := args[1].(*events.CommentCommand)
+		if commentCommand.RepoRelDir == "ignored" {
+			return ReturnValues{[]command.ProjectContext{}, events.ErrIgnoredTargetedDir}
+		}
+		return ReturnValues{[]command.ProjectContext{{
+			CommandName: command.Plan,
+			RepoRelDir:  commentCommand.RepoRelDir,
+			Workspace:   commentCommand.Workspace,
+		}}, nil}
+	})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Paths: []struct {
+			Directory string
+			Workspace string
+		}{
+			{
+				Directory: "ignored",
+				Workspace: "ignored-workspace",
+			},
+			{
+				Directory: "kept",
+				Workspace: "kept-workspace",
+			},
+		},
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
+	_, capturedCmd := preWorkflowHooksRunner.VerifyWasCalledOnce().
+		RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+
+	Equals(t, "kept", capturedCmd.RepoRelDir)
+	Equals(t, "kept-workspace", capturedCmd.Workspace)
+}
+
+func TestAPIController_Plan_AllIgnoredPathsNoOp(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
+		config.allowUnlockByPull = false
+	})
+	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Paths: []struct {
+			Directory string
+			Workspace string
+		}{
+			{
+				Directory: "ignored",
+				Workspace: "default",
+			},
+		},
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+}
+
+func TestAPIController_Apply_AllIgnoredPathsNoOp(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
+		config.allowUnlockByPull = false
+	})
+	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Paths: []struct {
+			Directory string
+			Workspace string
+		}{
+			{
+				Directory: "ignored",
+				Workspace: "default",
+			},
+		},
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+}
+
 // TestAPIController_Apply_PreWorkflowHooksReceiveCorrectCommand verifies that when
 // calling the Apply API endpoint, the pre-workflow hooks receive a CommentCommand
 // with Name set to command.Apply for the apply phase (and command.Plan for the
@@ -476,12 +604,25 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 	Equals(t, expected, result)
 }
 
-func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
+type apiControllerTestConfig struct {
+	allowUnlockByPull bool
+}
+
+func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
 	RegisterMockTestingT(t)
+	config := &apiControllerTestConfig{
+		allowUnlockByPull: true,
+	}
+	for _, option := range options {
+		option(config)
+	}
+
 	gmockCtrl := gomock.NewController(t)
 	locker := NewMockLocker(gmockCtrl)
-	// Allow incidental calls to UnlockByPull (called internally during plan/apply operations)
-	locker.EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	if config.allowUnlockByPull {
+		// Allow incidental calls to UnlockByPull (called internally during plan/apply operations)
+		locker.EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	}
 	logger := logging.NewNoopLogger(t)
 	parser := NewMockEventParsing()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")

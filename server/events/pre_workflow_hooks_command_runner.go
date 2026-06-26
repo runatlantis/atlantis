@@ -28,6 +28,10 @@ type PreWorkflowHooksCommandRunner interface {
 	RunPreHooks(ctx *command.Context, cmd *CommentCommand) error
 }
 
+type PreWorkflowHooksConfiguredChecker interface {
+	HasPreWorkflowHooks(ctx *command.Context) bool
+}
+
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
 type DefaultPreWorkflowHooksCommandRunner struct {
 	VCSClient             vcs.Client                    `validate:"required"`
@@ -41,12 +45,7 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
 func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context, cmd *CommentCommand) error {
-	preWorkflowHooks := make([]*valid.WorkflowHook, 0)
-	for _, repo := range w.GlobalCfg.Repos {
-		if repo.IDMatches(ctx.Pull.BaseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
-			preWorkflowHooks = append(preWorkflowHooks, repo.PreWorkflowHooks...)
-		}
-	}
+	preWorkflowHooks := w.preWorkflowHooks(ctx)
 
 	// short circuit any other calls if there are no pre-hooks configured
 	if len(preWorkflowHooks) == 0 {
@@ -95,6 +94,20 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 	ctx.Log.Info("Pre-workflow hooks completed successfully")
 
 	return nil
+}
+
+func (w *DefaultPreWorkflowHooksCommandRunner) HasPreWorkflowHooks(ctx *command.Context) bool {
+	return len(w.preWorkflowHooks(ctx)) > 0
+}
+
+func (w *DefaultPreWorkflowHooksCommandRunner) preWorkflowHooks(ctx *command.Context) []*valid.WorkflowHook {
+	preWorkflowHooks := make([]*valid.WorkflowHook, 0)
+	for _, repo := range w.GlobalCfg.Repos {
+		if repo.IDMatches(ctx.Pull.BaseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
+			preWorkflowHooks = append(preWorkflowHooks, repo.PreWorkflowHooks...)
+		}
+	}
+	return preWorkflowHooks
 }
 
 func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
