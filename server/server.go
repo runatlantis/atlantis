@@ -820,6 +820,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		database,
 		lockingClient,
 		userConfig.DiscardApprovalOnPlanFlag,
+		userConfig.DiscardApprovalAfterPlanFlag,
 		pullReqStatusFetcher,
 		userConfig.PendingApplyStatus,
 	)
