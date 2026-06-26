@@ -147,13 +147,15 @@ ENV DEFAULT_OPENTOFU_VERSION=${DEFAULT_OPENTOFU_VERSION}
 # COPY scripts/download-release.sh .
 COPY --from=builder /app/scripts/download-release.sh download-release.sh
 
-# In the official Atlantis image, we only have the latest of each Terraform version.
-# Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
+# We only bake in the default Terraform version. Older versions still EOL'd with a
+# vulnerable hashicorp/go-getter (CVE-2024-6257, CVE-2025-8959), so bundling them
+# fails the container CVE scan. Any project pinning another version downloads it
+# on demand at runtime (--tf-download defaults to true).
 RUN ./download-release.sh \
         "terraform" \
         "${TARGETPLATFORM}" \
         "${DEFAULT_TERRAFORM_VERSION}" \
-        "1.8.5 1.9.8 1.10.5 ${DEFAULT_TERRAFORM_VERSION}" \
+        "${DEFAULT_TERRAFORM_VERSION}" \
     && ./download-release.sh \
         "tofu" \
         "${TARGETPLATFORM}" \
