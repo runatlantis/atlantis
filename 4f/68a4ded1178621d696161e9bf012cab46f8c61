@@ -1,0 +1,21 @@
+server/events/vcs/gitea/client.go
+  s_1475eaaa18ac58::t_9aa2ca791d22f8 79-86,113-117,147-151,167-171,197-201,216-220,276-280,353-357,426-430,460-464,522-526
+server/events/vcs/gitea/client_test.go
+  s_1475eaaa18ac58::t_d4e904b334675a 206-304,370-387
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "4f68a4ded1178621d696161e9bf012cab46f8c61",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
