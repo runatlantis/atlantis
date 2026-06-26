@@ -1,0 +1,37 @@
+server/core/config/raw/repo_cfg_test.go
+  s_243a1a1edc15e5::t_bb15ef38240ae5 51,97,107,117,127
+server/core/config/raw/step_test.go
+  s_243a1a1edc15e5::t_79c3a319933532 13,155
+server/core/config/parser_validator_test.go
+  s_243a1a1edc15e5::t_4a75f5e9367d45 91,96,101,682,1285
+server/core/config/raw/workflow_step_test.go
+  s_243a1a1edc15e5::t_9066191d151fb8 12,53
+cmd/server_test.go
+  s_243a1a1edc15e5::t_ba2c4dd3702a41 18-19
+go.mod
+  s_243a1a1edc15e5::t_4b5964b161c6d0 54,151
+go.sum
+  s_243a1a1edc15e5::t_e5dd6281a56966 499-500
+server/core/config/parser_validator.go
+  s_243a1a1edc15e5::t_38413560b45078 22
+server/core/config/raw/policies_test.go
+  s_243a1a1edc15e5::t_d95455b778ff5d 13
+server/core/config/raw/raw_test.go
+  s_243a1a1edc15e5::t_87ab7e8a69ee4e 7,11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0f54bd231f732600913c035c582d6efa3d2deb00",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
