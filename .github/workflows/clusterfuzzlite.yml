@@ -18,8 +18,34 @@ concurrency:
 permissions: read-all
 
 jobs:
-  Fuzzing:
+  changes:
+    permissions:
+      contents: read  # for dorny/paths-filter to fetch a list of changed files
+      pull-requests: read  # for dorny/paths-filter to read pull requests
+    outputs:
+      should-run-fuzzing: ${{ steps.changes.outputs.go == 'true' }}
     if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
+        id: changes
+        with:
+          filters: |
+            go:
+              - '**.go'
+              - 'go.*'
+              - '.clusterfuzzlite/**'
+              - '.github/workflows/clusterfuzzlite.yml'
+
+  Fuzzing:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-fuzzing == 'true'
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -61,3 +87,15 @@ jobs:
         uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
           sarif_file: ${{ steps.run.outputs.sarif-path }}
+
+  skip-fuzzing:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-fuzzing == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        with:
+          egress-policy: audit
+
+      - run: 'echo "No Go changes - skipping fuzzing"'
