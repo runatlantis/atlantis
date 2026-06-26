@@ -1034,6 +1034,57 @@ Include git untracked files in the Atlantis modified file list.
 Used for example with CDKTF pre-workflow hooks that dynamically generate
 Terraform files.
 
+### `--language` <Badge text="v0.45.0+" type="info"/>
+
+```bash
+atlantis server --language="en"
+# or
+ATLANTIS_LANGUAGE="en"
+```
+
+Language used for Atlantis pull request comments. Defaults to `en`.
+
+Supported values:
+
+- `en` (English)
+- `es` (Spanish)
+
+Atlantis normalizes locale-style values (for example `es-MX` resolves to `es`).
+If an unsupported language is configured and `--language-config-file` is not set,
+Atlantis returns a validation error at startup.
+
+Built-in language strings are loaded from:
+
+- `server/i18n/locales/en.yaml`
+- `server/i18n/locales/es.yaml`
+
+### `--language-config-file` <Badge text="v0.45.0+" type="info"/>
+
+```bash
+atlantis server --language="de" --language-config-file="/etc/atlantis/language.yaml"
+# or
+ATLANTIS_LANGUAGE_CONFIG_FILE="/etc/atlantis/language.yaml"
+```
+
+Optional path to a custom YAML language catalog. Values in this file override
+the selected built-in language, and partial overrides are supported.
+
+When `--language-config-file` is set, unsupported `--language` values are allowed
+and Atlantis falls back to built-in English for unspecified strings.
+
+Expected YAML schema:
+
+```yaml
+pull_request_label: Pull Request (custom)
+merge_request_label: Merge Request (custom)
+command_titles:
+  plan: Plan (custom)
+  apply: Apply (custom)
+```
+
+For complete markdown wording customization, keep using
+`--markdown-template-overrides-dir`.
+
 ### `--locking-db-type` <Badge text="v0.19.9+" type="info"/>
 
 ```bash

@@ -1,0 +1,12 @@
+{{ define "wrappedErr" -}}
+**Error en {{ .Command }}**
+<details><summary>Mostrar salida</summary>
+
+```
+{{ .Error }}
+```
+{{- if ne .RenderedContext "" }}
+{{ .RenderedContext }}
+{{- end }}
+</details>
+{{ end -}}

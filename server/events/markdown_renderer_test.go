@@ -8,12 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -172,6 +174,333 @@ func TestRenderFailure(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestRenderSpanishLocalization(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "es", // language
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	planResult := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+	planOutput := r.Render(ctx, planResult, &events.CommentCommand{Name: command.Plan})
+	if !strings.Contains(planOutput, "Se ejecutó Planificar para directorio:") {
+		t.Fatalf("expected Spanish plan header, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **aplicar**") {
+		t.Fatalf("expected Spanish plan apply instruction, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **aplicar** este plan") {
+		t.Fatalf("expected Spanish nested plan apply instruction, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **eliminar** este plan y bloqueo") {
+		t.Fatalf("expected Spanish nested plan delete instruction, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **planificar** este proyecto de nuevo") {
+		t.Fatalf("expected Spanish nested plan rerun instruction, got: %s", planOutput)
+	}
+	if strings.Contains(planOutput, "To **apply** this plan") || strings.Contains(planOutput, "To **delete** this plan and lock") || strings.Contains(planOutput, "To **plan** this project again") {
+		t.Fatalf("expected no English nested plan instructions, got: %s", planOutput)
+	}
+
+	wrappedPlanResult := planResult
+	wrappedPlanResult.ProjectResults[0].PlanSuccess = &models.PlanSuccess{
+		TerraformOutput: strings.Repeat("terraform-output\n", 14),
+		LockURL:         "lock-url",
+		RePlanCmd:       "atlantis plan -d path -w workspace",
+		ApplyCmd:        "atlantis apply -d path -w workspace",
+	}
+	wrappedPlanOutput := r.Render(ctx, wrappedPlanResult, &events.CommentCommand{Name: command.Plan})
+	if !strings.Contains(wrappedPlanOutput, "<details><summary>Mostrar salida</summary>") {
+		t.Fatalf("expected Spanish wrapped plan output summary, got: %s", wrappedPlanOutput)
+	}
+	if !strings.Contains(wrappedPlanOutput, "Para **aplicar** este plan") {
+		t.Fatalf("expected Spanish wrapped plan apply instruction, got: %s", wrappedPlanOutput)
+	}
+	if strings.Contains(wrappedPlanOutput, "Show Output") || strings.Contains(wrappedPlanOutput, "To **apply** this plan") {
+		t.Fatalf("expected no English wrapped plan text, got: %s", wrappedPlanOutput)
+	}
+
+	failureOutput := r.Render(ctx, command.Result{Failure: "fallo"}, &events.CommentCommand{Name: command.Apply})
+	if !strings.Contains(failureOutput, "**Aplicar falló**: fallo") {
+		t.Fatalf("expected Spanish failure rendering, got: %s", failureOutput)
+	}
+
+	importResult := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ImportSuccess: &models.ImportSuccess{
+						Output:    "import-output",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
+				},
+				Workspace:   "workspace",
+				RepoRelDir:  "path",
+				ProjectName: "projectname",
+			},
+		},
+	}
+	importOutput := r.Render(ctx, importResult, &events.CommentCommand{Name: command.Import})
+	if !strings.Contains(importOutput, "Se ejecutó Importar para proyecto:") {
+		t.Fatalf("expected Spanish import header, got: %s", importOutput)
+	}
+	if !strings.Contains(importOutput, "Se descartó un archivo de plan") {
+		t.Fatalf("expected Spanish import discarded-plan message, got: %s", importOutput)
+	}
+	if !strings.Contains(importOutput, "Para **planificar** este proyecto de nuevo") {
+		t.Fatalf("expected Spanish import re-plan instruction, got: %s", importOutput)
+	}
+	if strings.Contains(importOutput, "Ran Importar") || strings.Contains(importOutput, "A plan file was discarded") || strings.Contains(importOutput, "To **plan** this project again") {
+		t.Fatalf("expected no English import fallback text, got: %s", importOutput)
+	}
+}
+
+func TestRenderCustomLanguageConfigOverride(t *testing.T) {
+	tempDir := t.TempDir()
+	customCatalogPath := filepath.Join(tempDir, "custom-language.yaml")
+	err := os.WriteFile(customCatalogPath, []byte(`
+pull_request_label: Pull Request (custom)
+command_titles:
+  plan: Plan (custom)
+`), 0o600)
+	Ok(t, err)
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "de",              // unsupported without custom file
+			CatalogPath:  customCatalogPath, // custom language config file
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	output := r.Render(ctx, res, &events.CommentCommand{Name: command.Plan})
+	if !strings.Contains(output, "Ran Plan (custom) for dir: `path` workspace: `workspace`") {
+		t.Fatalf("expected command title override, got: %s", output)
+	}
+	if !strings.Contains(output, "Pull Request (custom)") {
+		t.Fatalf("expected pull request label override, got: %s", output)
+	}
+}
+
+func TestRenderUsesStableCommandIdentifierWhenTitlesCollide(t *testing.T) {
+	tempDir := t.TempDir()
+	customCatalogPath := filepath.Join(tempDir, "colliding-language.yaml")
+	err := os.WriteFile(customCatalogPath, []byte(`
+command_titles:
+  plan: Run
+  apply: Run
+`), 0o600)
+	Ok(t, err)
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "de",
+			CatalogPath:  customCatalogPath,
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "apply-success-output",
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	output := r.Render(ctx, res, &events.CommentCommand{Name: command.Apply})
+	if !strings.Contains(output, "Ran Run for dir: `path` workspace: `workspace`") {
+		t.Fatalf("expected localized custom command title in output, got: %s", output)
+	}
+	if strings.Contains(output, "To **apply** all unapplied plans") {
+		t.Fatalf("expected apply template selection despite colliding titles, got: %s", output)
+	}
+}
+
+func TestRenderPolicyCheckIncludesPolicyOutputForLocalizedCommand(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "es",
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PreConftestOutput: "pre-policy-output",
+						PolicySetResults: []models.PolicySetResult{
+							{PolicySetName: "set-a", PolicyOutput: "1 test, 1 passed, 0 warnings, 0 failures, 0 exceptions", Passed: true},
+						},
+						PostConftestOutput: "post-policy-output",
+						LockURL:            "lock-url",
+						RePlanCmd:          "atlantis plan -d path -w workspace",
+						ApplyCmd:           "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	output := r.Render(ctx, res, &events.CommentCommand{Name: command.PolicyCheck})
+	if !strings.Contains(output, "pre-policy-output") {
+		t.Fatalf("expected policy pre-conftest output in localized rendering, got: %s", output)
+	}
+	if !strings.Contains(output, "post-policy-output") {
+		t.Fatalf("expected policy post-conftest output in localized rendering, got: %s", output)
+	}
+
+	wrappedRes := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "set-a",
+								PolicyOutput:  strings.Repeat("policy-output\n", 14) + "1 test, 1 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
+							},
+						},
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	wrappedOutput := r.Render(ctx, wrappedRes, &events.CommentCommand{Name: command.PolicyCheck})
+	if strings.Count(wrappedOutput, "<details") != strings.Count(wrappedOutput, "</details>") {
+		t.Fatalf("expected balanced details tags in wrapped localized policy output, got: %s", wrappedOutput)
+	}
+	closeDetailsIndex := strings.Index(wrappedOutput, "</details>")
+	applyInstructionIndex := strings.Index(wrappedOutput, "Para **aplicar** este plan")
+	if closeDetailsIndex == -1 || applyInstructionIndex == -1 || closeDetailsIndex > applyInstructionIndex {
+		t.Fatalf("expected Spanish policy apply instruction after closed output details block, got: %s", wrappedOutput)
 	}
 }
 

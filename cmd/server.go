@@ -19,6 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -149,6 +150,8 @@ const (
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
 	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
+	LanguageFlag                     = "language"
+	LanguageConfigFileFlag           = "language-config-file"
 	TFEHostnameFlag                  = "tfe-hostname"
 	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
 	TFETokenFlag                     = "tfe-token"
@@ -179,6 +182,7 @@ const (
 	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
+	DefaultLanguage                     = i18n.DefaultLanguage
 	DefaultLogLevel                     = "info"
 	DefaultIgnoreVCSStatusNames         = ""
 	DefaultMaxCommentsPerCommand        = 100
@@ -489,6 +493,14 @@ var stringFlags = map[string]stringFlag{
 			" When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) from other Atlantis services when checking if the PR is mergeable." +
 			" Currently only implemented for GitHub.",
 		defaultValue: DefaultIgnoreVCSStatusNames,
+	},
+	LanguageFlag: {
+		description:  "Language used for Atlantis pull request comments. Supported values: " + i18n.SupportedLanguagesDescription() + ".",
+		defaultValue: DefaultLanguage,
+	},
+	LanguageConfigFileFlag: {
+		description: "Optional path to a custom YAML language catalog that overrides built-in localized strings. " +
+			"Supports partial overrides and can be combined with --language.",
 	},
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
@@ -978,6 +990,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.LockingDBType == "" {
 		c.LockingDBType = DefaultLockingDBType
 	}
+	if c.Language == "" {
+		c.Language = DefaultLanguage
+	}
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
 	}
@@ -1035,6 +1050,17 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)
 	if !isValidLogLevel(userConfig.LogLevel) {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
+	}
+	// Intentionally allow unsupported --language values when a custom language
+	// catalog is provided, so operators can define their own locale codes.
+	if strings.TrimSpace(userConfig.LanguageConfigFile) == "" {
+		if err := i18n.ValidateLanguage(userConfig.Language); err != nil {
+			return err
+		}
+	} else {
+		if err := i18n.ValidateCustomCatalog(userConfig.LanguageConfigFile); err != nil {
+			return err
+		}
 	}
 
 	if userConfig.DefaultTFDistribution != TFDistributionTerraform && userConfig.DefaultTFDistribution != TFDistributionOpenTofu {

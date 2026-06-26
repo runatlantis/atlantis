@@ -1,0 +1,31 @@
+{{ define "multiProjectPolicyUnsuccessful" -}}
+{{ template "multiProjectHeader" . -}}
+{{ $disableApplyAll := .DisableApplyAll -}}
+{{ $quietPolicyChecks := .QuietPolicyChecks -}}
+{{ range $i, $result := .Results -}}
+{{ if (and $quietPolicyChecks $result.IsSuccessful) }}{{continue}}{{end -}}
+### {{ add $i 1 }}. {{ if $result.ProjectName }}proyecto: `{{ $result.ProjectName }}` {{ end }}directorio: `{{ $result.RepoRelDir }}` espacio de trabajo: `{{ $result.Workspace }}`
+{{ $result.Rendered }}
+
+{{ if ne $disableApplyAll true -}}
+---
+{{ end -}}
+{{ end -}}
+{{ if ne .DisableApplyAll true -}}
+{{ if and (gt (len .Results) 0) (not .PlansDeleted) -}}
+* :heavy_check_mark: Para **aprobar** todos los planes pendientes de esta {{ .VcsRequestType }}, comenta:
+  ```shell
+  {{ .ExecutableName }} approve_policies
+  ```
+* :put_litter_in_its_place: Para **eliminar** todos los planes y bloqueos de esta {{ .VcsRequestType }}, comenta:
+  ```shell
+  {{ .ExecutableName }} unlock
+  ```
+* :repeat: Para volver a ejecutar las políticas, **planifica** este proyecto de nuevo comentando:
+  ```shell
+  {{ .ExecutableName }} plan
+  ```
+{{ end -}}
+{{ end -}}
+{{- template "log" . -}}
+{{ end -}}

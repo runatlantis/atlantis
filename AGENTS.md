@@ -33,6 +33,7 @@
 **Key paths:** `main.go` (entry) • `cmd/server.go` • `server/server.go` (init) • `server/router.go` • `server/controllers/events/events_controller.go` (webhooks)
 
 **Core logic:** `server/core/config/` (parsing), `server/core/runtime/` (Terraform execution), `server/core/terraform/tfclient/` (TF client)
+**Localization:** `server/i18n/` (embedded YAML catalogs and runtime overrides), `server/events/templates/i18n/<lang>/` (localized markdown template overrides)
 
 **VCS providers:** `server/events/vcs/{github,gitlab,bitbucketcloud,bitbucketserver,azuredevops,gitea}/`
 
@@ -60,6 +61,7 @@
 **VCS provider:** Create `server/events/vcs/<provider>/` → Implement `Client` interface (`server/events/vcs/common/common.go`) → Update `server/server.go`
 
 **Config changes:** Edit `server/core/config/valid/` or `raw/` → Update `server/user_config.go` → Test in `server/core/config/*_test.go`
+**i18n changes:** Keep command routing/template selection keyed on stable command identifiers (`command.Name`), and use localized titles only for display text.
 
 **Terraform execution:** Modify `server/core/terraform/tfclient/terraform_client.go` or `server/core/runtime/*_step_runner.go` (uses `hashicorp/hc-install`)
 

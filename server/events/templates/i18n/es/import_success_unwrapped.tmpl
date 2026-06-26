@@ -1,0 +1,12 @@
+{{ define "importSuccessUnwrapped" -}}
+```diff
+{{ .Output }}
+```
+
+:put_litter_in_its_place: Se descartó un archivo de plan. Se requiere volver a planificar antes de aplicar.
+
+* :repeat: Para **planificar** este proyecto de nuevo, comenta:
+  ```shell
+  {{ .RePlanCmd }}
+  ```
+{{ end -}}
