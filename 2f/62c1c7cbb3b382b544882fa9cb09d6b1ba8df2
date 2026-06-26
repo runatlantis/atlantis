@@ -1,0 +1,29 @@
+server/metrics/scope.go
+  s_243a1a1edc15e5::t_4495b622879ef8 77
+server/metrics/statsd_adapter.go
+  s_243a1a1edc15e5::t_4495b622879ef8 1-113
+server/metrics/scope_test.go
+  s_243a1a1edc15e5::t_483a202857fca9 86
+  s_243a1a1edc15e5::t_01a6344baab100 7-10,12,43-73,75-81,84-85,87-91,93
+  s_243a1a1edc15e5::t_bbf32a74b8c412 83
+  s_243a1a1edc15e5::t_5fad26ad2a4e24 74,82,92
+  s_243a1a1edc15e5::t_43d1aa477682e0 94
+go.mod
+  s_243a1a1edc15e5::t_9348e811a10e4d 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "2f62c1c7cbb3b382b544882fa9cb09d6b1ba8df2",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
