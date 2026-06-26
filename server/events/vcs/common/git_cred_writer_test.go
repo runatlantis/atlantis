@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -55,10 +54,6 @@ func TestWriteGitCreds_Appends(t *testing.T) {
 // Test that if the file already exists and it already has the line expected
 // we do nothing.
 func TestWriteGitCreds_NoModification(t *testing.T) {
-	if runtime.GOOS == "windows" {
-        t.Skip("file permission semantics differ on Windows")
-    }
-
 	logger := logging.NewNoopLogger(t)
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
@@ -135,10 +130,6 @@ func TestWriteGitCreds_AppendApp(t *testing.T) {
 // Test that if we can't read the existing file to see if the contents will be
 // the same that we just error out.
 func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
-	if runtime.GOOS == "windows" {
-    t.Skip("file permission semantics differ on Windows")
-	}
-
 	logger := logging.NewNoopLogger(t)
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
@@ -147,22 +138,35 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 	err := os.WriteFile(credsFile, []byte("can't see me!"), 0000)
 	Ok(t, err)
 
-	expErr := fmt.Sprintf("open %s: permission denied", credsFile)
 	actErr := common.WriteGitCreds("user", "token", "hostname", tmp, logger, false)
-	ErrContains(t, expErr, actErr)
+	ErrContains(t, fmt.Sprintf("open %s", credsFile), actErr)
 }
 
 // Test that if we can't write, we error out.
 func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
-	 if runtime.GOOS == "windows" {
-        t.Skip("filesystem error messages differ on Windows")
-    }
-
 	logger := logging.NewNoopLogger(t)
-	credsFile := "/this/dir/does/not/exist/.git-credentials" // nolint: gosec
-	expErr := fmt.Sprintf("writing generated .git-credentials file with user, token and hostname to %s: open %s: no such file or directory", credsFile, credsFile)
-	actErr := common.WriteGitCreds("user", "token", "hostname", "/this/dir/does/not/exist", logger, false)
-	ErrEquals(t, expErr, actErr)
+
+	nonExistentDir := filepath.Join(
+		t.TempDir(),
+		"does",
+		"not",
+		"exist",
+	)
+
+	actErr := common.WriteGitCreds(
+		"user",
+		"token",
+		"hostname",
+		nonExistentDir,
+		logger,
+		false,
+	)
+
+	ErrContains(
+		t,
+		"writing generated .git-credentials file with user, token and hostname",
+		actErr,
+	)
 }
 
 // Test that git is actually configured to use the credentials
