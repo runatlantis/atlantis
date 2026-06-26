@@ -109,6 +109,10 @@ type FileWorkspace struct {
 	CheckForUpstreamChanges bool
 }
 
+func (w *FileWorkspace) CheckoutMergeEnabled() bool {
+	return w.CheckoutMerge
+}
+
 // Clone git clones headRepo, checks out the branch and then returns the absolute
 // path to the root of the cloned repo.
 // If the repo already exists and is at
