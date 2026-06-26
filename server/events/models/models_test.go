@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package models_test
@@ -23,36 +14,36 @@ import (
 )
 
 func TestNewRepo_EmptyRepoFullName(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "", "https://github.com/notowner/repo.git", "u", "p")
+	_, err := models.NewRepo(models.Github, "", "https://github.com/notowner/repo.git", "u", "p", "")
 	ErrEquals(t, "repoFullName can't be empty", err)
 }
 
 func TestNewRepo_EmptyCloneURL(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", "", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", "", "u", "p", "")
 	ErrEquals(t, "cloneURL can't be empty", err)
 }
 
 func TestNewRepo_InvalidCloneURL(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", ":", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", ":", "u", "p", "")
 	ErrEquals(t, "invalid clone url: parse \":.git\": missing protocol scheme", err)
 }
 
 func TestNewRepo_CloneURLWrongRepo(t *testing.T) {
-	_, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/notowner/repo.git", "u", "p")
+	_, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/notowner/repo.git", "u", "p", "")
 	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/notowner/repo.git"`, err)
 }
 
 func TestNewRepo_EmptyAzureDevopsProject(t *testing.T) {
-	_, err := models.NewRepo(models.AzureDevops, "", "https://dev.azure.com/notowner/project/_git/repo", "u", "p")
+	_, err := models.NewRepo(models.AzureDevops, "", "https://dev.azure.com/notowner/project/_git/repo", "u", "p", "")
 	ErrEquals(t, "repoFullName can't be empty", err)
 }
 
 // For bitbucket server we don't validate the clone URL because the callers
 // are actually constructing it.
 func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
-	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p")
+	repo, err := models.NewRepo(models.BitbucketServer, "owner/repo", "http://mycorp.com:7990/scm/at/atlantis-example.git", "u", "p", "")
 	Ok(t, err)
-	Equals(t, models.Repo{
+	Equals(t, models.Repo{ // #nosec G101 -- test fixture, not real credentials
 		FullName:          "owner/repo",
 		Owner:             "owner",
 		Name:              "repo",
@@ -67,12 +58,12 @@ func TestNewRepo_CloneURLBitbucketServer(t *testing.T) {
 
 // If the clone URL contains a space, NewRepo() should encode it
 func TestNewRepo_CloneURLContainsSpace(t *testing.T) {
-	repo, err := models.NewRepo(models.AzureDevops, "owner/project space/repo", "https://dev.azure.com/owner/project space/repo", "u", "p")
+	repo, err := models.NewRepo(models.AzureDevops, "owner/project space/repo", "https://dev.azure.com/owner/project space/repo", "u", "p", "")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@dev.azure.com/owner/project%20space/repo")
 	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@dev.azure.com/owner/project%20space/repo")
 
-	repo, err = models.NewRepo(models.BitbucketCloud, "owner/repo space", "https://bitbucket.org/owner/repo space", "u", "p")
+	repo, err = models.NewRepo(models.BitbucketCloud, "owner/repo space", "https://bitbucket.org/owner/repo space", "u", "p", "")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo%20space.git")
 	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@bitbucket.org/owner/repo%20space.git")
@@ -111,7 +102,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.repoFullName, func(t *testing.T) {
 			cloneURL := fmt.Sprintf("https://github.com/%s.git", c.repoFullName)
-			_, err := models.NewRepo(models.Github, c.repoFullName, cloneURL, "u", "p")
+			_, err := models.NewRepo(models.Github, c.repoFullName, cloneURL, "u", "p", "")
 			ErrEquals(t, c.expErr, err)
 		})
 	}
@@ -119,7 +110,7 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 
 // If the clone url doesn't end with .git, and VCS is not Azure DevOps, it is appended
 func TestNewRepo_MissingDotGit(t *testing.T) {
-	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p")
+	repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo", "u", "p", "")
 	Ok(t, err)
 	Equals(t, repo.CloneURL, "https://u:p@bitbucket.org/owner/repo.git")
 	Equals(t, repo.SanitizedCloneURL, "https://u:<redacted>@bitbucket.org/owner/repo.git")
@@ -127,9 +118,9 @@ func TestNewRepo_MissingDotGit(t *testing.T) {
 
 func TestNewRepo_HTTPAuth(t *testing.T) {
 	// When the url has http the auth should be added.
-	repo, err := models.NewRepo(models.Github, "owner/repo", "http://github.com/owner/repo.git", "u", "p")
+	repo, err := models.NewRepo(models.Github, "owner/repo", "http://github.com/owner/repo.git", "u", "p", "")
 	Ok(t, err)
-	Equals(t, models.Repo{
+	Equals(t, models.Repo{ // #nosec G101 -- test fixture, not real credentials
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
 			Type:     models.Github,
@@ -144,9 +135,9 @@ func TestNewRepo_HTTPAuth(t *testing.T) {
 
 func TestNewRepo_HTTPSAuth(t *testing.T) {
 	// When the url has https the auth should be added.
-	repo, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/owner/repo.git", "u", "p")
+	repo, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/owner/repo.git", "u", "p", "")
 	Ok(t, err)
-	Equals(t, models.Repo{
+	Equals(t, models.Repo{ // #nosec G101 -- test fixture, not real credentials
 		VCSHost: models.VCSHost{
 			Hostname: "github.com",
 			Type:     models.Github,
@@ -157,6 +148,99 @@ func TestNewRepo_HTTPSAuth(t *testing.T) {
 		Owner:             "owner",
 		Name:              "repo",
 	}, repo)
+}
+
+// TestNewRepo_Gitlab_HostAndSubpath exercises the GitLab-specific host and
+// subpath validation introduced for subpath-hosted GitLab instances.
+func TestNewRepo_Gitlab_SaaS_Valid(t *testing.T) {
+	repo, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://gitlab.com/owner/repo.git",
+		"u", "p", "gitlab.com")
+	Ok(t, err)
+	Equals(t, "owner/repo", repo.FullName)
+	Equals(t, "gitlab.com", repo.VCSHost.Hostname)
+}
+
+func TestNewRepo_Gitlab_SaaS_WrongHost(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://evil.com/owner/repo.git",
+		"u", "p", "gitlab.com")
+	ErrEquals(t, `expected clone url host "gitlab.com" but had "evil.com"`, err)
+}
+
+func TestNewRepo_Gitlab_SaaS_UnexpectedSubpath(t *testing.T) {
+	// gitlab.com configured with no subpath — a URL carrying a subpath must
+	// still be rejected (regression guard against the suffix-match approach).
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://gitlab.com/x/owner/repo.git",
+		"u", "p", "gitlab.com")
+	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/x/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_Valid(t *testing.T) {
+	repo, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	Ok(t, err)
+	Equals(t, "owner/repo", repo.FullName)
+}
+
+func TestNewRepo_Gitlab_Subpath_MissingSubpath(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url to have path "/gitlab/owner/repo.git" but had "/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_WrongSubpath(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/other/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url to have path "/gitlab/owner/repo.git" but had "/other/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_Subpath_WrongHost(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://evil.com/gitlab/owner/repo.git",
+		"u", "p", "acme.com/gitlab")
+	ErrEquals(t, `expected clone url host "acme.com" but had "evil.com"`, err)
+}
+
+func TestNewRepo_Gitlab_Host_CaseInsensitive(t *testing.T) {
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "ACME.com/gitlab")
+	Ok(t, err)
+}
+
+func TestNewRepo_Gitlab_EmptyHostname_SkipsEnhancedCheck(t *testing.T) {
+	// When vcsHostname is empty, NewRepo falls back to the pre-change
+	// strict-path-equality behavior. cmd/server.go defaults GitlabHostname to
+	// "gitlab.com" in production, so this path guards direct-API callers and
+	// test helpers that construct EventParser without setting a hostname.
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "")
+	ErrEquals(t, `expected clone url to have path "/owner/repo.git" but had "/gitlab/owner/repo.git"`, err)
+}
+
+func TestNewRepo_Gitlab_InvalidConfiguredHostname(t *testing.T) {
+	// If the configured hostname is itself malformed, NewRepo must surface a
+	// wrapping error rather than silently skipping validation.
+	_, err := models.NewRepo(
+		models.Gitlab, "owner/repo",
+		"https://acme.com/gitlab/owner/repo.git",
+		"u", "p", "https:///no/host/here")
+	ErrContains(t, "parsing configured gitlab hostname", err)
 }
 
 func TestProject_String(t *testing.T) {
@@ -400,6 +484,18 @@ func TestPlanSuccess_Summary(t *testing.T) {
 			"dummy\nNo changes. Your infrastructure matches the configuration.",
 			"No changes. Your infrastructure matches the configuration.",
 		},
+		{
+			"unit1\nPlan: 5 to add, 0 to change, 0 to destroy.\nunit2\nPlan: 3 to add, 2 to change, 1 to destroy.",
+			"Plan: 8 to add, 2 to change, 1 to destroy.",
+		},
+		{
+			"Note: Objects have changed outside of Terraform\nunit1\nPlan: 1 to add, 0 to change, 0 to destroy.\nunit2\nPlan: 2 to add, 3 to change, 0 to destroy.",
+			"\n**Note: Objects have changed outside of Terraform**\nPlan: 3 to add, 3 to change, 0 to destroy.",
+		},
+		{
+			"unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nNo changes. Your infrastructure matches the configuration.",
+			"No changes. Infrastructure is up-to-date.",
+		},
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("summary %d", i), func(t *testing.T) {
@@ -432,6 +528,38 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 			"dummy\nNo changes. Your infrastructure matches the configuration.",
 			"No changes. Your infrastructure matches the configuration.",
 		},
+		{
+			"unit1\nPlan: 5 to add, 0 to change, 0 to destroy.\nunit2\nPlan: 3 to add, 2 to change, 1 to destroy.",
+			"Plan: 8 to add, 2 to change, 1 to destroy.",
+		},
+		{
+			"unit1\nPlan: 1 to import, 2 to add, 3 to change, 4 to destroy.\nunit2\nPlan: 5 to import, 6 to add, 7 to change, 8 to destroy.",
+			"Plan: 6 to import, 8 to add, 10 to change, 12 to destroy.",
+		},
+		{
+			"dummy\nPlan: 0 to add, 0 to change, 0 to destroy, 2 to forget.",
+			"Plan: 0 to add, 0 to change, 0 to destroy, 2 to forget.",
+		},
+		{
+			"dummy\nPlan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.",
+			"Plan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.",
+		},
+		{
+			"unit1\nPlan: 5 to add, 0 to change, 0 to destroy.\nunit2\nNo changes. Infrastructure is up-to-date.",
+			"Plan: 5 to add, 0 to change, 0 to destroy.",
+		},
+		{
+			"unit1\nPlan: 2 to add, 0 to change, 0 to destroy, 3 to forget.\nunit2\nPlan: 4 to add, 1 to change, 0 to destroy, 5 to forget.",
+			"Plan: 6 to add, 1 to change, 0 to destroy, 8 to forget.",
+		},
+		{
+			"unit1\nPlan: 2 to add, 1 to change, 0 to destroy.\nunit2\nPlan: 3 to add, 0 to change, 1 to destroy.\nunit3\nPlan: 1 to add, 4 to change, 2 to destroy.",
+			"Plan: 6 to add, 5 to change, 3 to destroy.",
+		},
+		{
+			"unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nPlan: 4 to add, 0 to change, 0 to destroy.\nunit3\nNo changes. Your infrastructure matches the configuration.",
+			"Plan: 4 to add, 0 to change, 0 to destroy.",
+		},
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("summary %d", i), func(t *testing.T) {
@@ -439,6 +567,44 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 				TerraformOutput: c.input,
 			}
 			Equals(t, c.exp, pcs.DiffSummary())
+		})
+	}
+}
+
+func TestPlanSuccess_NoChanges(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		exp   bool
+	}{
+		{
+			name:  "no changes",
+			input: "dummy\nNo changes. Infrastructure is up-to-date.",
+			exp:   true,
+		},
+		{
+			name:  "changes",
+			input: "dummy\nPlan: 1 to add, 0 to change, 0 to destroy.",
+			exp:   false,
+		},
+		{
+			name:  "multiple units all no changes",
+			input: "unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nNo changes. Your infrastructure matches the configuration.",
+			exp:   true,
+		},
+		{
+			name:  "multiple units mixed changes and no changes",
+			input: "unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nPlan: 4 to add, 0 to change, 0 to destroy.",
+			exp:   false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			pcs := models.PlanSuccess{
+				TerraformOutput: c.input,
+			}
+			Equals(t, c.exp, pcs.NoChanges())
 		})
 	}
 }
@@ -502,9 +668,9 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 			description: "single policy set, not passed",
 			policysetResults: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					Passed:        false,
-					ReqApprovals:  1,
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 1,
 				},
 			},
 			policyClearedExp: false,
@@ -514,9 +680,9 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 			description: "single policy set, passed",
 			policysetResults: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					Passed:        true,
-					ReqApprovals:  1,
+					PolicySetName:    "policy1",
+					Passed:           true,
+					ReqApprovalCount: 1,
 				},
 			},
 			policyClearedExp: true,
@@ -526,10 +692,10 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 			description: "single policy set, fully approved",
 			policysetResults: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					Passed:        false,
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: "approver1"}},
 				},
 			},
 			policyClearedExp: true,
@@ -539,22 +705,20 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 			description: "multiple policy sets, different states.",
 			policysetResults: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					Passed:        false,
-					ReqApprovals:  2,
-					CurApprovals:  0,
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 2,
 				},
 				{
-					PolicySetName: "policy2",
-					Passed:        false,
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy2",
+					Passed:           false,
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: "approver1"}},
 				},
 				{
-					PolicySetName: "policy3",
-					Passed:        true,
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy3",
+					Passed:           true,
+					ReqApprovalCount: 1,
 				},
 			},
 			policyClearedExp: false,
@@ -566,22 +730,21 @@ policy set: policy3: passed.`,
 			description: "multiple policy sets, all cleared.",
 			policysetResults: []models.PolicySetResult{
 				{
-					PolicySetName: "policy1",
-					Passed:        false,
-					ReqApprovals:  2,
-					CurApprovals:  2,
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 2,
+					Approvals:        []models.PolicySetApproval{{Approver: "approver1"}, {Approver: "approver2"}},
 				},
 				{
-					PolicySetName: "policy2",
-					Passed:        false,
-					ReqApprovals:  1,
-					CurApprovals:  1,
+					PolicySetName:    "policy2",
+					Passed:           false,
+					ReqApprovalCount: 1,
+					Approvals:        []models.PolicySetApproval{{Approver: "approver1"}},
 				},
 				{
-					PolicySetName: "policy3",
-					Passed:        true,
-					ReqApprovals:  1,
-					CurApprovals:  0,
+					PolicySetName:    "policy3",
+					Passed:           true,
+					ReqApprovalCount: 1,
 				},
 			},
 			policyClearedExp: true,
@@ -597,6 +760,476 @@ policy set: policy3: passed.`,
 			}
 			Equals(t, summary.policyClearedExp, pcs.PolicyCleared())
 			Equals(t, summary.policySummaryExp, pcs.PolicySummary())
+		})
+	}
+}
+
+func TestApprovalCoversAllHashes(t *testing.T) {
+	cases := []struct {
+		description    string
+		approvalHashes []string
+		required       []string
+		expected       bool
+	}{
+		{
+			description:    "empty required always covered",
+			approvalHashes: nil,
+			required:       nil,
+			expected:       true,
+		},
+		{
+			description:    "empty required with non-empty approval",
+			approvalHashes: []string{"a", "b"},
+			required:       nil,
+			expected:       true,
+		},
+		{
+			description:    "exact match",
+			approvalHashes: []string{"hash1", "hash2"},
+			required:       []string{"hash1", "hash2"},
+			expected:       true,
+		},
+		{
+			description:    "superset covers required",
+			approvalHashes: []string{"hash1", "hash2", "hash3"},
+			required:       []string{"hash1", "hash2"},
+			expected:       true,
+		},
+		{
+			description:    "missing hash fails",
+			approvalHashes: []string{"hash1"},
+			required:       []string{"hash1", "hash2"},
+			expected:       false,
+		},
+		{
+			description:    "empty approval with non-empty required fails",
+			approvalHashes: nil,
+			required:       []string{"hash1"},
+			expected:       false,
+		},
+		{
+			description:    "completely disjoint fails",
+			approvalHashes: []string{"a", "b"},
+			required:       []string{"c", "d"},
+			expected:       false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.expected, models.ApprovalCoversAllHashes(c.approvalHashes, c.required))
+		})
+	}
+}
+
+func TestPolicySetStatus_GetCurApprovals(t *testing.T) {
+	cases := []struct {
+		description string
+		status      models.PolicySetStatus
+		expected    int
+	}{
+		{
+			description: "nil approvals returns 0",
+			status:      models.PolicySetStatus{Hashes: []string{"h1"}},
+			expected:    0,
+		},
+		{
+			description: "empty approvals returns 0",
+			status:      models.PolicySetStatus{Approvals: []models.PolicySetApproval{}, Hashes: []string{"h1"}},
+			expected:    0,
+		},
+		{
+			description: "all approvals cover hashes",
+			status: models.PolicySetStatus{
+				Hashes: []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{
+					{Approver: "user1", Hashes: []string{"h1", "h2"}},
+					{Approver: "user2", Hashes: []string{"h1", "h2", "h3"}},
+				},
+			},
+			expected: 2,
+		},
+		{
+			description: "only matching approvals counted",
+			status: models.PolicySetStatus{
+				Hashes: []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{
+					{Approver: "user1", Hashes: []string{"h1", "h2"}},
+					{Approver: "user2", Hashes: []string{"h1"}},
+				},
+			},
+			expected: 1,
+		},
+		{
+			description: "nil hashes means all approvals count",
+			status: models.PolicySetStatus{
+				Hashes: nil,
+				Approvals: []models.PolicySetApproval{
+					{Approver: "user1", Hashes: nil},
+					{Approver: "user2", Hashes: []string{"h1"}},
+				},
+			},
+			expected: 2,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.expected, c.status.GetCurApprovals())
+		})
+	}
+}
+
+func TestPolicySetStatus_OwnerHasFullyApproved(t *testing.T) {
+	cases := []struct {
+		description string
+		status      models.PolicySetStatus
+		owner       string
+		expected    bool
+	}{
+		{
+			description: "owner not in approvals",
+			status: models.PolicySetStatus{
+				Hashes:    []string{"h1"},
+				Approvals: []models.PolicySetApproval{{Approver: "other", Hashes: []string{"h1"}}},
+			},
+			owner:    "user1",
+			expected: false,
+		},
+		{
+			description: "owner approved but hashes stale",
+			status: models.PolicySetStatus{
+				Hashes:    []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{{Approver: "user1", Hashes: []string{"h1"}}},
+			},
+			owner:    "user1",
+			expected: false,
+		},
+		{
+			description: "owner approved with matching hashes",
+			status: models.PolicySetStatus{
+				Hashes:    []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{{Approver: "user1", Hashes: []string{"h1", "h2"}}},
+			},
+			owner:    "user1",
+			expected: true,
+		},
+		{
+			description: "empty approvals returns false",
+			status: models.PolicySetStatus{
+				Hashes:    []string{"h1"},
+				Approvals: nil,
+			},
+			owner:    "user1",
+			expected: false,
+		},
+		{
+			description: "nil hashes means any approval covers",
+			status: models.PolicySetStatus{
+				Hashes:    nil,
+				Approvals: []models.PolicySetApproval{{Approver: "user1", Hashes: nil}},
+			},
+			owner:    "user1",
+			expected: true,
+		},
+		{
+			description: "stale approval followed by valid approval from same owner",
+			status: models.PolicySetStatus{
+				Hashes: []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{
+					{Approver: "user1", Hashes: []string{"h1"}},
+					{Approver: "user1", Hashes: []string{"h1", "h2"}},
+				},
+			},
+			owner:    "user1",
+			expected: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.expected, c.status.OwnerHasFullyApproved(c.owner))
+		})
+	}
+}
+
+func TestNewPolicySetResult(t *testing.T) {
+	cases := []struct {
+		description      string
+		name             string
+		output           string
+		passed           bool
+		reqApprovalCount int
+		regex            string
+		expHashes        []string
+	}{
+		{
+			description:      "dot-star regex includes empty-string hash",
+			name:             "policy1",
+			output:           "FAIL - plan.json - deny\n\n2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions\n",
+			passed:           false,
+			reqApprovalCount: 1,
+			regex:            `.*`,
+			expHashes: []string{
+				models.HashPolicyItem("FAIL - plan.json - deny"),
+				models.HashPolicyItem(""),
+				models.HashPolicyItem("2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions"),
+			},
+		},
+		{
+			description:      "custom multiline regex extracts only FAIL lines",
+			name:             "policy1",
+			output:           "FAIL - plan.json - deny\nOK - plan.json - allow\nFAIL - plan.json - other",
+			passed:           false,
+			reqApprovalCount: 1,
+			regex:            `(?m)^FAIL.*`,
+			expHashes: []string{
+				models.HashPolicyItem("FAIL - plan.json - deny"),
+				models.HashPolicyItem("FAIL - plan.json - other"),
+			},
+		},
+		{
+			description:      "empty output with dot-star regex yields hash of empty string",
+			name:             "policy1",
+			output:           "",
+			passed:           true,
+			reqApprovalCount: 1,
+			regex:            `.*`,
+			expHashes:        []string{models.HashPolicyItem("")},
+		},
+		{
+			description:      "default regex matches entire output as one item",
+			name:             "policy1",
+			output:           "FAIL - plan.json - deny\n\n2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions\n",
+			passed:           false,
+			reqApprovalCount: 1,
+			regex:            `(?s).+`,
+			expHashes: []string{
+				models.HashPolicyItem("FAIL - plan.json - deny\n\n2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions\n"),
+			},
+		},
+		{
+			description:      "default regex on empty output yields hash of empty string",
+			name:             "policy1",
+			output:           "",
+			passed:           true,
+			reqApprovalCount: 1,
+			regex:            `(?s).+`,
+			expHashes:        []string{models.HashPolicyItem("")},
+		},
+		{
+			description:      "no matches with specific regex falls back to hash of raw output",
+			name:             "policy1",
+			output:           "all good here",
+			passed:           true,
+			reqApprovalCount: 0,
+			regex:            `^FAIL.*`,
+			expHashes:        []string{models.HashPolicyItem("all good here")},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			result, err := models.NewPolicySetResult(c.name, c.output, c.passed, c.reqApprovalCount, c.regex)
+			Ok(t, err)
+			Equals(t, c.name, result.PolicySetName)
+			Equals(t, c.output, result.PolicyOutput)
+			Equals(t, c.passed, result.Passed)
+			Equals(t, c.reqApprovalCount, result.ReqApprovalCount)
+			Equals(t, c.expHashes, result.Hashes)
+			Assert(t, result.Approvals == nil, "new result should have nil approvals")
+		})
+	}
+}
+
+func TestNewPolicySetResult_InvalidRegex(t *testing.T) {
+	result, err := models.NewPolicySetResult("policy1", "output", true, 1, `[invalid`)
+	Assert(t, err != nil, "expected error for invalid regex")
+	Assert(t, result == nil, "expected nil result for invalid regex")
+}
+
+func TestPolicySetResult_GetCurApprovals(t *testing.T) {
+	cases := []struct {
+		description string
+		result      models.PolicySetResult
+		expected    int
+	}{
+		{
+			description: "nil approvals",
+			result:      models.PolicySetResult{Hashes: []string{"h1"}},
+			expected:    0,
+		},
+		{
+			description: "approval covers all hashes",
+			result: models.PolicySetResult{
+				Hashes:    []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{{Approver: "u", Hashes: []string{"h1", "h2"}}},
+			},
+			expected: 1,
+		},
+		{
+			description: "stale approval not counted",
+			result: models.PolicySetResult{
+				Hashes:    []string{"h1", "h2"},
+				Approvals: []models.PolicySetApproval{{Approver: "u", Hashes: []string{"h1"}}},
+			},
+			expected: 0,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.expected, c.result.GetCurApprovals())
+		})
+	}
+}
+
+func TestPolicySetResult_ApprovedHashes(t *testing.T) {
+	cases := []struct {
+		description string
+		result      models.PolicySetResult
+		expected    []string
+	}{
+		{
+			description: "no approvals returns empty",
+			result:      models.PolicySetResult{},
+			expected:    nil,
+		},
+		{
+			description: "single approval returns its hashes",
+			result: models.PolicySetResult{
+				Approvals: []models.PolicySetApproval{
+					{Approver: "u1", Hashes: []string{"a", "b"}},
+				},
+			},
+			expected: []string{"a", "b"},
+		},
+		{
+			description: "multiple approvals deduplicates",
+			result: models.PolicySetResult{
+				Approvals: []models.PolicySetApproval{
+					{Approver: "u1", Hashes: []string{"a", "b"}},
+					{Approver: "u2", Hashes: []string{"b", "c"}},
+				},
+			},
+			expected: []string{"a", "b", "c"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.expected, c.result.ApprovedHashes())
+		})
+	}
+}
+
+func TestNewPolicySetResult_StoresPolicyItemRegex(t *testing.T) {
+	result, err := models.NewPolicySetResult("test", "line1\nline2", true, 1, `line\d`)
+	Ok(t, err)
+	Equals(t, `line\d`, result.PolicyItemRegex)
+	Equals(t, []string{models.HashPolicyItem("line1"), models.HashPolicyItem("line2")}, result.Hashes)
+}
+
+func TestPolicySetResult_PolicySetHashes(t *testing.T) {
+	result := models.PolicySetResult{
+		PolicyOutput: "FAIL - plan.json - deny\nOK - plan.json - allow\nFAIL - plan.json - other",
+	}
+
+	allLines, err := result.PolicySetHashes(`.*`)
+	Ok(t, err)
+	Equals(t, 3, len(allLines))
+
+	failOnly, err := result.PolicySetHashes(`(?m)^FAIL.*`)
+	Ok(t, err)
+	Equals(t, 2, len(failOnly))
+	Equals(t, models.HashPolicyItem("FAIL - plan.json - deny"), failOnly[0])
+	Equals(t, models.HashPolicyItem("FAIL - plan.json - other"), failOnly[1])
+
+	noMatch, err := result.PolicySetHashes(`(?m)^WARN.*`)
+	Ok(t, err)
+	Equals(t, 1, len(noMatch))
+	Equals(t, models.HashPolicyItem(result.PolicyOutput), noMatch[0])
+
+	_, err = result.PolicySetHashes(`[invalid`)
+	Assert(t, err != nil, "expected error for invalid regex")
+}
+
+func TestHashPolicyItem(t *testing.T) {
+	h := models.HashPolicyItem("FAIL - plan.json - deny")
+	Equals(t, 64, len(h))
+	Assert(t, h == models.HashPolicyItem("FAIL - plan.json - deny"), "same input should produce same hash")
+	Assert(t, h != models.HashPolicyItem("FAIL - plan.json - other"), "different input should produce different hash")
+	Assert(t, models.HashPolicyItem("") != "", "empty string should still produce a hash")
+}
+
+func TestPolicySetResult_PolicySetHashes_DefaultRegex(t *testing.T) {
+	result := models.PolicySetResult{
+		PolicyOutput: "FAIL - plan.json - deny\nOK\nFAIL - other",
+	}
+	hashes, err := result.PolicySetHashes(`(?s).+`)
+	Ok(t, err)
+	Equals(t, 1, len(hashes))
+	Equals(t, models.HashPolicyItem("FAIL - plan.json - deny\nOK\nFAIL - other"), hashes[0])
+}
+
+func TestPolicyCheckResults_PolicyFuncs_WithHashes(t *testing.T) {
+	cases := []struct {
+		description      string
+		policysetResults []models.PolicySetResult
+		policyClearedExp bool
+		policySummaryExp string
+	}{
+		{
+			description: "approval with matching hashes clears policy",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 1,
+					Hashes:           []string{"h1", "h2"},
+					Approvals: []models.PolicySetApproval{
+						{Approver: "user1", Hashes: []string{"h1", "h2"}},
+					},
+				},
+			},
+			policyClearedExp: true,
+			policySummaryExp: "policy set: policy1: approved.",
+		},
+		{
+			description: "approval with stale hashes does not clear",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 1,
+					Hashes:           []string{"h1", "h2", "h3"},
+					Approvals: []models.PolicySetApproval{
+						{Approver: "user1", Hashes: []string{"h1", "h2"}},
+					},
+				},
+			},
+			policyClearedExp: false,
+			policySummaryExp: "policy set: policy1: requires: 1 approval(s), have: 0.",
+		},
+		{
+			description: "mixed: one stale and one fresh among two required",
+			policysetResults: []models.PolicySetResult{
+				{
+					PolicySetName:    "policy1",
+					Passed:           false,
+					ReqApprovalCount: 2,
+					Hashes:           []string{"h1"},
+					Approvals: []models.PolicySetApproval{
+						{Approver: "user1", Hashes: []string{"h1"}},
+						{Approver: "user2", Hashes: []string{"old_h1"}},
+					},
+				},
+			},
+			policyClearedExp: false,
+			policySummaryExp: "policy set: policy1: requires: 2 approval(s), have: 1.",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			pcs := models.PolicyCheckResults{
+				PolicySetResults: c.policysetResults,
+			}
+			Equals(t, c.policyClearedExp, pcs.PolicyCleared())
+			Equals(t, c.policySummaryExp, pcs.PolicySummary())
 		})
 	}
 }
@@ -696,6 +1329,26 @@ func TestPlanSuccessStats(t *testing.T) {
 			},
 		},
 		{
+			"with forget",
+			`Terraform used the selected providers to generate the following execution
+			plan. Resource actions are indicated with the following symbols:
+			  + create
+			  ~ update in-place
+			  - destroy
+			Terraform will perform the following actions:
+			  - null_resource.hi[1]
+			Plan: 42 to import, 31 to add, 20 to change, 1 to destroy, 7 to forget.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  42,
+				Add:     31,
+				Change:  20,
+				Destroy: 1,
+				Forget:  7,
+			},
+		},
+		{
 			"changes and changes outside",
 			`Note: Objects have changed outside of Terraform
 					Terraform detected the following changes made outside of Terraform since the
@@ -713,6 +1366,95 @@ func TestPlanSuccessStats(t *testing.T) {
 				Add:     3,
 				Change:  0,
 				Destroy: 1,
+			},
+		},
+		{
+			"multiple units aggregated",
+			`unit1
+					Plan: 5 to add, 0 to change, 0 to destroy.
+					unit2
+					Plan: 3 to add, 2 to change, 1 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     8,
+				Change:  2,
+				Destroy: 1,
+			},
+		},
+		{
+			"multiple units with imports aggregated",
+			`unit1
+					Plan: 1 to import, 2 to add, 3 to change, 4 to destroy.
+					unit2
+					Plan: 5 to import, 6 to add, 7 to change, 8 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  6,
+				Add:     8,
+				Change:  10,
+				Destroy: 12,
+			},
+		},
+		{
+			"multiple units with forget aggregated",
+			`unit1
+					Plan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.
+					unit2
+					Plan: 6 to add, 7 to change, 8 to destroy, 9 to forget.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  1,
+				Add:     8,
+				Change:  10,
+				Destroy: 12,
+				Forget:  14,
+			},
+		},
+		{
+			"three units aggregated",
+			`unit1
+					Plan: 2 to add, 1 to change, 0 to destroy.
+					unit2
+					Plan: 3 to add, 0 to change, 1 to destroy.
+					unit3
+					Plan: 1 to add, 4 to change, 2 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     6,
+				Change:  5,
+				Destroy: 3,
+			},
+		},
+		{
+			"mix of changing and no-changes units",
+			`unit1
+					No changes. Infrastructure is up-to-date.
+					unit2
+					Plan: 4 to add, 0 to change, 0 to destroy.
+					unit3
+					No changes. Your infrastructure matches the configuration.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add: 4,
+			},
+		},
+		{
+			"with forget and no imports",
+			`Terraform will perform the following actions:
+      - null_resource.hi[1]
+    Plan: 31 to add, 20 to change, 1 to destroy, 7 to forget.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     31,
+				Change:  20,
+				Destroy: 1,
+				Forget:  7,
 			},
 		},
 	}
@@ -1024,6 +1766,52 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
     }`,
 		},
 		{
+			// Regression test for https://github.com/runatlantis/atlantis/issues/6419
+			// Spaced YAML list scalars inside a heredoc must not be mistaken for
+			// Terraform diff markers.
+			"argocd application with spaced yaml key=value list item in heredoc",
+			`  # argocd_application.example will be updated in-place
+  ~ resource "argocd_application" "example" {
+        id   = "my-app"
+      ~ metadata {
+          ~ resource_version = "12345" -> (known after apply)
+        }
+        spec = <<-EOT
+            destination:
+              namespace: default
+              server: https://kubernetes.default.svc
+            source:
+              repoURL: https://github.com/example/repo
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              -   ServerSideApply = true
+        EOT
+    }`,
+			`# argocd_application.example will be updated in-place
+!   resource "argocd_application" "example" {
+        id   = "my-app"
+!       metadata {
+!           resource_version = "12345" -> (known after apply)
+        }
+        spec = <<-EOT
+            destination:
+              namespace: default
+              server: https://kubernetes.default.svc
+            source:
+              repoURL: https://github.com/example/repo
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              -   ServerSideApply = true
+        EOT
+    }`,
+		},
+		{
 			"cloudformation stack with extra-spaced yaml list items in heredoc",
 			`  + resource "aws_cloudformation_stack" "conditions" {
       + id            = (known after apply)
@@ -1058,6 +1846,141 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
                   -   !Ref Environment
                   -   production
         EOT
+    }`,
+		},
+		{
+			// Regression test: changes inside a heredoc / multiline-string attribute.
+			// Terraform renders a line-by-line string diff with the marker in a gutter,
+			// preserving the line's own indentation after it. The marker must be pulled
+			// to column 0 so the diff highlighter colors it.
+			"heredoc multiline-string attribute diff",
+			`  # module.ogc.nomad_job.ogc will be updated in-place
+  ~ resource "nomad_job" "ogc" {
+        id      = "ogc"
+      ~ jobspec = <<-EOT
+            job "ogc" {
+              group "ogc" {
+                config {
+          -         image        = "registry/ogc:5.224.0"
+          +         image        = "registry/ogc:5.226.0"
+                  }
+              }
+            }
+        EOT
+    }`,
+			`# module.ogc.nomad_job.ogc will be updated in-place
+!   resource "nomad_job" "ogc" {
+        id      = "ogc"
+!       jobspec = <<-EOT
+            job "ogc" {
+              group "ogc" {
+                config {
+-                   image        = "registry/ogc:5.224.0"
++                   image        = "registry/ogc:5.226.0"
+                  }
+              }
+            }
+        EOT
+    }`,
+		},
+		{
+			"heredoc multiline-string attribute diff with short indentation",
+			`  # module.ogc.nomad_job.ogc will be updated in-place
+  ~ resource "nomad_job" "ogc" {
+        id      = "ogc"
+      ~ jobspec = <<-EOT
+            syncOptions:
+              -   ServerSideApply = true
+            EOT
+            job "ogc" {
+              group "ogc" {
+          -   image = "registry/ogc:5.224.0"
+          +   image = "registry/ogc:5.226.0"
+              }
+            }
+        EOT
+    }`,
+			`# module.ogc.nomad_job.ogc will be updated in-place
+!   resource "nomad_job" "ogc" {
+        id      = "ogc"
+!       jobspec = <<-EOT
+            syncOptions:
+              -   ServerSideApply = true
+            EOT
+            job "ogc" {
+              group "ogc" {
+-             image = "registry/ogc:5.224.0"
++             image = "registry/ogc:5.226.0"
+              }
+            }
+        EOT
+    }`,
+		},
+		{
+			"quoted heredoc-like string does not enter heredoc mode",
+			`  # null_resource.example will be updated in-place
+  ~ resource "null_resource" "example" {
+      ~ cmd      = "cat <<EOF" -> "cat <<EOF --changed"
+      ~ triggers = {
+          + changed = "true"
+        }
+    }`,
+			`# null_resource.example will be updated in-place
+!   resource "null_resource" "example" {
+!       cmd      = "cat <<EOF" -> "cat <<EOF --changed"
+!       triggers = {
++           changed = "true"
+        }
+    }`,
+		},
+		{
+			"heredoc terminator with terraform suffix exits heredoc mode",
+			`  # terraform_data.example will be updated in-place
+  ~ resource "terraform_data" "example" {
+      ~ output = <<-EOT
+          old
+        EOT -> (known after apply)
+      + triggers_replace = [
+          + "changed",
+        ]
+    }`,
+			`# terraform_data.example will be updated in-place
+!   resource "terraform_data" "example" {
+!       output = <<-EOT
+          old
+        EOT -> (known after apply)
++       triggers_replace = [
++           "changed",
+        ]
+    }`,
+		},
+		{
+			"collection element heredoc diff",
+			`  # terraform_data.example will be updated in-place
+  ~ resource "terraform_data" "example" {
+      ~ input = [
+          ~ <<-EOT
+              first
+              - old
+              + new
+            EOT,
+        ]
+      + triggers_replace = [
+          + "changed",
+        ]
+    }`,
+			`# terraform_data.example will be updated in-place
+!   resource "terraform_data" "example" {
+!       input = [
+!           <<-EOT
+              first
+-               old
++               new
+            EOT,
+        ]
++       triggers_replace = [
++           "changed",
+        ]
     }`,
 		},
 	}

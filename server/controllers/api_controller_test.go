@@ -6,6 +6,7 @@ package controllers_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -314,6 +315,148 @@ func TestAPIController_ListLocks(t *testing.T) {
 	err := json.Unmarshal(response, &result)
 	Ok(t, err)
 	Equals(t, expected, result)
+}
+
+func TestAPIController_PlanFetchesPullReqStatus(t *testing.T) {
+	ac, _, _ := setup(t)
+	fetcher := NewMockPullReqStatusFetcher()
+	When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())).
+		ThenReturn(models.PullReqStatus{
+			ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
+		}, nil)
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(1)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+}
+
+func TestAPIController_PlanSkipsPullReqStatusWhenNoPR(t *testing.T) {
+	ac, _, _ := setup(t)
+	fetcher := NewMockPullReqStatusFetcher()
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Never()).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+}
+
+func TestAPIController_PlanContinuesWhenPullReqStatusFetchFails(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	fetcher := NewMockPullReqStatusFetcher()
+	When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())).
+		ThenReturn(models.PullReqStatus{}, errors.New("api error"))
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(1)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+	projectCommandBuilder.VerifyWasCalled(Times(1)).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Times(1)).Plan(Any[command.ProjectContext]())
+}
+
+func TestAPIController_ApplyRefreshesPullReqStatusAfterPlan(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	fetcher := NewMockPullReqStatusFetcher()
+	mockCall := When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]()))
+	mockCall = mockCall.ThenReturn(models.PullReqStatus{
+		ApprovalStatus:  models.ApprovalStatus{IsApproved: false},
+		MergeableStatus: models.MergeableStatus{IsMergeable: false},
+	}, nil)
+	mockCall.ThenReturn(models.PullReqStatus{
+		ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+		MergeableStatus: models.MergeableStatus{IsMergeable: true},
+	}, nil)
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(2)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+	applyCtx, _ := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Assert(t, applyCtx.PullRequestStatus.ApprovalStatus.IsApproved,
+		"expected apply commands to use refreshed approved status")
+	Assert(t, applyCtx.PullRequestStatus.MergeableStatus.IsMergeable,
+		"expected apply commands to use refreshed mergeable status")
+}
+
+func TestAPIController_ApplyClearsPullReqStatusWhenPostPlanRefreshFails(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	fetcher := NewMockPullReqStatusFetcher()
+	mockCall := When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]()))
+	mockCall = mockCall.ThenReturn(models.PullReqStatus{
+		ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+		MergeableStatus: models.MergeableStatus{IsMergeable: true},
+	}, nil)
+	mockCall.ThenReturn(models.PullReqStatus{}, errors.New("api error"))
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(2)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+	applyCtx, _ := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Assert(t, !applyCtx.PullRequestStatus.ApprovalStatus.IsApproved,
+		"expected apply commands to clear stale approved status")
+	Assert(t, !applyCtx.PullRequestStatus.MergeableStatus.IsMergeable,
+		"expected apply commands to clear stale mergeable status")
 }
 
 func TestAPIController_ListLocksEmpty(t *testing.T) {

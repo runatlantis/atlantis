@@ -83,6 +83,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 			EscapedCommentArgs: escapedArgs,
 			CommandName:        cmd.Name.String(),
 			API:                ctx.API,
+			ProjectName:        cmd.ProjectName,
 		},
 		preWorkflowHooks, repoDir)
 

@@ -518,7 +518,7 @@ func TestConfig_ToValid(t *testing.T) {
 						Dir:       "mydir",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},

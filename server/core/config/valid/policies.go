@@ -15,14 +15,21 @@ const (
 	GithubPolicySet string = "github"
 )
 
+// DefaultPolicyItemRegex matches the entire non-empty policy output as a
+// single item ((?s) makes . match newlines). Any change invalidates the
+// approval. Override with `.+` for per-line matching.
+const DefaultPolicyItemRegex = `(?s).+`
+
 // PolicySets defines version of policy checker binary(conftest) and a list of
 // PolicySet objects. PolicySets struct is used by PolicyCheck workflow to build
 // context to enforce policies.
 type PolicySets struct {
-	Version      *version.Version
-	Owners       PolicyOwners
-	ApproveCount int
-	PolicySets   []PolicySet
+	Version         *version.Version
+	Owners          PolicyOwners
+	ApproveCount    int
+	StickyApprovals bool
+	PolicyItemRegex string
+	PolicySets      []PolicySet
 }
 
 type PolicyOwners struct {
@@ -35,6 +42,8 @@ type PolicySet struct {
 	Path               string
 	Name               string
 	ApproveCount       int
+	StickyApprovals    bool
+	PolicyItemRegex    string
 	Owners             PolicyOwners
 	PreventSelfApprove bool
 }

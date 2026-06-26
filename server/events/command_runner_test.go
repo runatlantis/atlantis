@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -28,7 +19,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -433,8 +424,7 @@ func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 		Any[models.PullRequest](),
 		Eq[models.CommitStatus](models.SuccessCommitStatus),
 		Eq[command.Name](command.Plan),
-		Eq(0),
-		Eq(0),
+		Eq(models.ProjectCounts{}),
 	)
 }
 
@@ -457,8 +447,7 @@ func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
 		Any[models.PullRequest](),
 		Eq[models.CommitStatus](models.SuccessCommitStatus),
 		Eq[command.Name](command.Plan),
-		Eq(0),
-		Eq(0),
+		Eq(models.ProjectCounts{}),
 	)
 }
 
@@ -555,7 +544,7 @@ func TestRunCommentCommand_DisableAutoplan(t *testing.T) {
 				CommandName: command.Plan,
 			},
 		}, nil)
-	When(commitUpdater.UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[int](), Any[int]())).ThenReturn(nil)
+	When(commitUpdater.UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())).ThenReturn(nil)
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
 }

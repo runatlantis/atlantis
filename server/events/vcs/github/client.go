@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package github
@@ -27,7 +18,7 @@ import (
 	"time"
 
 	"github.com/gofri/go-github-ratelimit/github_ratelimit"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -130,20 +121,24 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		return nil, fmt.Errorf("error initializing github rate limit transport: %w", err)
 	}
 
-	var graphqlURL string
 	var client *github.Client
 	if hostname == "github.com" {
-		client = github.NewClient(transportWithRateLimit)
-		graphqlURL = "https://api.github.com/graphql"
+		client, err = github.NewClient(github.WithHTTPClient(transportWithRateLimit))
+		if err != nil {
+			return nil, fmt.Errorf("creating github client: %w", err)
+		}
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
-		// TODO: Deprecated: Use NewClient(httpClient).WithEnterpriseURLs(baseURL, uploadURL) instead
-		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transportWithRateLimit) //nolint:staticcheck
+		client, err = github.NewClient(
+			github.WithHTTPClient(transportWithRateLimit),
+			github.WithEnterpriseURLs(apiURL.String(), apiURL.String()),
+		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("creating github enterprise client: %w", err)
 		}
-		graphqlURL = fmt.Sprintf("https://%s/api/graphql", apiURL.Host)
 	}
+
+	graphqlURL := resolveGraphQLURL(hostname)
 
 	// Use the client from shurcooL's githubv4 library for queries.
 	v4Client := githubv4.NewEnterpriseClient(graphqlURL, transportWithRateLimit)

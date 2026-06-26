@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/events"
@@ -147,8 +147,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 					Any[models.PullRequest](),
 					Eq[models.CommitStatus](models.SuccessCommitStatus),
 					Eq[command.Name](command.Plan),
-					Eq(c.ExpVCSStatusSucc),
-					Eq(c.ExpVCSStatusTotal),
+					Eq(models.ProjectCounts{Success: c.ExpVCSStatusSucc, Total: c.ExpVCSStatusTotal}),
 				)
 			} else {
 				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
@@ -157,8 +156,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
 					Eq[command.Name](command.Plan),
-					Any[int](),
-					Any[int](),
+					Any[models.ProjectCounts](),
 				)
 			}
 		})
@@ -562,9 +560,10 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 		ProjectContexts        []command.ProjectContext
 		ProjectCommandOutput   []command.ProjectCommandOutput
 		PrevPlanStored         bool // stores a previous "No changes" plan in the database
-		DoNotUpdateApply       bool // certain circumtances we want to skip the call to update apply
+		DoNotUpdateApply       bool // certain circumstances we want to skip the call to update apply
 		ExpVCSApplyStatusTotal int
 		ExpVCSApplyStatusSucc  int
+		ExpVCSApplyNoChanges   int
 	}{
 		{
 			Description: "When planning with changes, do not change the apply status",
@@ -600,6 +599,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			},
 			ExpVCSApplyStatusTotal: 1,
 			ExpVCSApplyStatusSucc:  1,
+			ExpVCSApplyNoChanges:   1,
 		},
 		{
 			Description: "When planning with no changes and previous plan with no changes do not set the apply status",
@@ -637,6 +637,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			PrevPlanStored:         true,
 			ExpVCSApplyStatusTotal: 2,
 			ExpVCSApplyStatusSucc:  2,
+			ExpVCSApplyNoChanges:   2,
 		},
 		{
 			Description: "When planning again with changes following a previous 'No changes' plan do not set the apply status",
@@ -713,6 +714,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			PrevPlanStored:         true,
 			ExpVCSApplyStatusTotal: 2,
 			ExpVCSApplyStatusSucc:  2,
+			ExpVCSApplyNoChanges:   2,
 		},
 	}
 
@@ -781,8 +783,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
 					Eq[command.Name](command.Apply),
-					AnyInt(),
-					AnyInt(),
+					Any[models.ProjectCounts](),
 				)
 			} else {
 				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
@@ -791,8 +792,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					Any[models.PullRequest](),
 					Eq[models.CommitStatus](ExpCommitStatus),
 					Eq[command.Name](command.Apply),
-					Eq(c.ExpVCSApplyStatusSucc),
-					Eq(c.ExpVCSApplyStatusTotal),
+					Eq(models.ProjectCounts{Success: c.ExpVCSApplyStatusSucc, Total: c.ExpVCSApplyStatusTotal, NoChanges: c.ExpVCSApplyNoChanges}),
 				)
 			}
 		})
@@ -857,8 +857,7 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 			Any[models.PullRequest](),
 			Any[models.CommitStatus](),
 			Any[command.Name](),
-			Any[int](),
-			Any[int](),
+			Any[models.ProjectCounts](),
 		)
 	})
 }
@@ -965,6 +964,7 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 		ExpApplyStatus         models.CommitStatus
 		ExpVCSApplyStatusTotal int
 		ExpVCSApplyStatusSucc  int
+		ExpVCSApplyNoChanges   int
 		ExpShouldUpdateStatus  bool
 	}{
 		{
@@ -1023,6 +1023,7 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			ExpApplyStatus:         models.SuccessCommitStatus,
 			ExpVCSApplyStatusTotal: 1,
 			ExpVCSApplyStatusSucc:  1,
+			ExpVCSApplyNoChanges:   1,
 			ExpShouldUpdateStatus:  true,
 		},
 		{
@@ -1099,8 +1100,7 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 					Any[models.PullRequest](),
 					Eq[models.CommitStatus](c.ExpApplyStatus),
 					Eq[command.Name](command.Apply),
-					Eq(c.ExpVCSApplyStatusSucc),
-					Eq(c.ExpVCSApplyStatusTotal),
+					Eq(models.ProjectCounts{Success: c.ExpVCSApplyStatusSucc, Total: c.ExpVCSApplyStatusTotal, NoChanges: c.ExpVCSApplyNoChanges}),
 				)
 			} else {
 				// Verify that UpdateCombinedCount was NOT called for Apply command
@@ -1110,8 +1110,7 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
 					Eq[command.Name](command.Apply),
-					Any[int](),
-					Any[int](),
+					Any[models.ProjectCounts](),
 				)
 			}
 		})
