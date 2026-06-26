@@ -569,7 +569,8 @@ func TestClone_DoNotReCloneOnBaseChangeForBranchStrategy(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
-	// Pretend that terraform has created a plan file, we'll check for it later
+	// Pretend that terraform has created a plan file, we'll check it is removed
+	// after updating the existing branch-strategy clone.
 	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
 	assert.NoFileExists(t, planFile)
 	createPlanFile(t, planFile)
@@ -590,7 +591,7 @@ func TestClone_DoNotReCloneOnBaseChangeForBranchStrategy(t *testing.T) {
 		BaseBranch: "some-other-base-branch",
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not wiped out by the reclone")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
