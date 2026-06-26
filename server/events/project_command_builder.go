@@ -466,16 +466,17 @@ func (p *DefaultProjectCommandBuilder) ShouldIgnoreTargetedDir(ctx *command.Cont
 	if cmd.ProjectName != "" || cmd.RepoRelDir == "" || valid.ContainsDirGlobPattern(cmd.RepoRelDir) {
 		return false
 	}
-	repoCfg, ok := p.repoCfgForTargetedIgnore(ctx, cmd.RepoRelDir)
+	repoCfg, ok := p.repoCfgForTargetedIgnore(ctx, cmd)
 	if !ok {
 		return false
 	}
 	return p.shouldIgnoreTargetedDirFromCfg(ctx, repoCfg, cmd.RepoRelDir)
 }
 
-func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Context, repoRelDir string) (valid.RepoCfg, bool) {
+func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Context, cmd *CommentCommand) (valid.RepoCfg, bool) {
+	repoRelDir := cmd.RepoRelDir
 	if ctx.PreferLocalRepoCfgForTargetedIgnore {
-		if repoCfg, ok := p.repoCfgFromWorkingDir(ctx); ok {
+		if repoCfg, ok, _ := p.repoCfgFromWorkingDir(ctx); ok {
 			return repoCfg, true
 		}
 	}
@@ -491,6 +492,16 @@ func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Con
 		if err != nil {
 			ctx.Log.Debug("unable to fetch %s while checking autodiscover.ignore_paths: %s", repoCfgFile, err)
 			if !p.VCSClient.SupportsSingleFileDownload(ctx.HeadRepo) && p.shouldIgnoreTargetedDirFromGlobalCfg(ctx, repoRelDir) {
+				// Do not let global ignore_paths hide an explicit project that only the
+				// cloned repo config can prove.
+				if cmd.Name == command.Plan {
+					return valid.RepoCfg{}, false
+				}
+				if repoCfg, ok, missing := p.repoCfgFromWorkingDir(ctx); ok {
+					return repoCfg, true
+				} else if !missing {
+					return valid.RepoCfg{}, false
+				}
 				return valid.RepoCfg{}, true
 			}
 			return valid.RepoCfg{}, false
@@ -522,16 +533,16 @@ func targetedIgnoreConfigRef(pull models.PullRequest) string {
 	return pull.HeadBranch
 }
 
-func (p *DefaultProjectCommandBuilder) repoCfgFromWorkingDir(ctx *command.Context) (valid.RepoCfg, bool) {
+func (p *DefaultProjectCommandBuilder) repoCfgFromWorkingDir(ctx *command.Context) (valid.RepoCfg, bool, bool) {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
 	if err != nil {
-		return valid.RepoCfg{}, false
+		return valid.RepoCfg{}, false, errors.Is(err, os.ErrNotExist)
 	}
 	repoCfg, _, err := p.parseRepoCfg(ctx, repoDir)
 	if err != nil {
-		return valid.RepoCfg{}, false
+		return valid.RepoCfg{}, false, false
 	}
-	return repoCfg, true
+	return repoCfg, true, false
 }
 
 func (p *DefaultProjectCommandBuilder) needsLocalRepoCfgForTargetedIgnore(ctx *command.Context) bool {
