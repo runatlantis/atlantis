@@ -114,6 +114,7 @@ const (
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
+	MarkdownTemplateLiveReloadFlag   = "markdown-template-live-reload"
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
 	PendingApplyStatusFlag           = "pending-apply-status"
@@ -661,6 +662,10 @@ var boolFlags = map[string]boolFlag{
 	UseTFPluginCache: {
 		description:  "Enable the use of the Terraform plugin cache",
 		defaultValue: true,
+	},
+	MarkdownTemplateLiveReloadFlag: {
+		description:  "Enable live reloading of markdown templates from the override directory on each render call.",
+		defaultValue: false,
 	},
 }
 var intFlags = map[string]intFlag{
