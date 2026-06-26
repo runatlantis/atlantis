@@ -328,23 +328,25 @@ func ParseDriftFromPlan(planOutput string) DriftSummary {
 **New Drift Status Endpoint**:
 
 ```go
-// GET /api/drift/status?repository=org/repo&project=myproject&path=.&workspace=default
-// project, path, and workspace are optional filters; path and workspace identify
-// unnamed Atlantis projects.
+// GET /api/drift/status?type=github&hostname=github.com&repository=org/repo
+//   &project=myproject&path=.&workspace=default
+// type, hostname, and repository identify the VCS repository. Project, path,
+// and workspace are optional filters; path and workspace identify unnamed
+// Atlantis projects.
 type DriftStatusResponse struct {
-    Repository string        `json:"repository"`
-    Projects   []ProjectDrift `json:"projects"`
-    CheckedAt  time.Time     `json:"checked_at"`
+    Repository DriftRepositoryKey `json:"repository"`
+    Projects   []ProjectDrift    `json:"projects"`
+    CheckedAt  time.Time         `json:"checked_at"`
 }
 
 type ProjectDrift struct {
-    ProjectName string       `json:"project_name,omitempty"`
-    Path        string       `json:"path"`
-    Workspace   string       `json:"workspace"`
-    Ref         string       `json:"ref"`
-    VCSHostType string       `json:"type"`
-    Drift       DriftSummary `json:"drift"`
-    LastChecked time.Time    `json:"last_checked"`
+    Repository  DriftRepositoryKey `json:"repository"`
+    ProjectName string             `json:"project_name,omitempty"`
+    Path        string             `json:"path"`
+    Workspace   string             `json:"workspace"`
+    Ref         string             `json:"ref"`
+    Drift       DriftSummary       `json:"drift"`
+    LastChecked time.Time          `json:"last_checked"`
 }
 ```
 
@@ -353,18 +355,32 @@ type ProjectDrift struct {
 The status endpoint is a read endpoint, not a recomputation endpoint. Each
 successful drift-detection `/api/plan` run must parse every project plan result
 with `ParseDriftFromPlan` and persist one `ProjectDrift` record per project.
-That record must include the request source metadata (`Ref` and VCS `Type`),
-the project identity (`ProjectName`, `Path`, `Workspace`), the parsed drift
-summary, and `LastChecked`. `GET /api/drift/status` then filters and returns
-the persisted records for the requested repository/project key.
+That record must include the VCS repository identity (VCS type, hostname, and
+repository full name), the request source metadata (`Ref`), the project
+identity (`ProjectName`, `Path`, `Workspace`), the parsed drift summary, and
+`LastChecked`. `GET /api/drift/status` then filters and returns the persisted
+records for the requested VCS repository/project key.
 
 If the implementation instead chooses to compute drift on demand, the status
-endpoint request shape must change to include the required `Ref`, VCS `Type`,
-and `Paths` inputs and must run a plan synchronously. With the endpoint shape
-above, storage is required.
+endpoint request shape must change to include the required `Ref`, VCS type,
+hostname, repository, and `Paths` inputs and must run a plan synchronously.
+With the endpoint shape above, storage is required.
 
 ```go
 // server/core/drift/storage.go
+
+// DriftRepositoryKey identifies the VCS repository that owns drift status.
+// RepoID should match models.Repo.ID(), which includes the VCS hostname and
+// repository full name; VCSHostType should be models.Repo.VCSHost.Type.String()
+// to prevent collisions if different VCS providers are configured with the
+// same hostname string. Hostname and Repository are kept separately so API
+// queries do not have to rebuild RepoID.
+type DriftRepositoryKey struct {
+    VCSHostType string `json:"type"`
+    Hostname    string `json:"hostname"`
+    Repository  string `json:"repository"`
+    RepoID      string `json:"repo_id"`
+}
 
 // DriftProjectKey identifies an Atlantis project. ProjectName is optional in
 // atlantis.yaml, so Path and Workspace must be part of the storage key to avoid
@@ -376,15 +392,15 @@ type DriftProjectKey struct {
 }
 
 type DriftStorage interface {
-    StoreDriftStatus(repo string, status ProjectDrift) error
-    GetDriftStatus(repo string, key DriftProjectKey) (*ProjectDrift, error)
-    ListDriftStatus(repo string) ([]ProjectDrift, error)
+    StoreDriftStatus(repo DriftRepositoryKey, status ProjectDrift) error
+    GetDriftStatus(repo DriftRepositoryKey, key DriftProjectKey) (*ProjectDrift, error)
+    ListDriftStatus(repo DriftRepositoryKey) ([]ProjectDrift, error)
 }
 
 // In-memory implementation for initial version
 type InMemoryDriftStorage struct {
     mu     sync.RWMutex
-    status map[string]map[DriftProjectKey]ProjectDrift // repo -> project key -> drift
+    status map[DriftRepositoryKey]map[DriftProjectKey]ProjectDrift
 }
 ```
 
@@ -447,7 +463,7 @@ type CreatePullRequestOptions struct {
 ```go
 // server/events/vcs/github/client.go
 
-func (g *GithubClient) CreatePullRequest(
+func (g *Client) CreatePullRequest(
     logger logging.SimpleLogging,
     repo models.Repo,
     opts vcs.CreatePullRequestOptions,
@@ -475,7 +491,7 @@ func (g *GithubClient) CreatePullRequest(
     }, nil
 }
 
-func (g *GithubClient) CreateBranch(
+func (g *Client) CreateBranch(
     logger logging.SimpleLogging,
     repo models.Repo,
     branchName string,
@@ -507,12 +523,12 @@ func (g *GithubClient) CreateBranch(
 ```go
 // server/events/vcs/gitlab/client.go
 
-func (g *GitlabClient) CreatePullRequest(
+func (g *Client) CreatePullRequest(
     logger logging.SimpleLogging,
     repo models.Repo,
     opts vcs.CreatePullRequestOptions,
 ) (models.PullRequest, error) {
-    labels := gitlab.Labels(opts.Labels)
+    labels := gitlab.LabelOptions(opts.Labels)
     mr, _, err := g.Client.MergeRequests.CreateMergeRequest(repo.FullName, &gitlab.CreateMergeRequestOptions{
         Title:        gitlab.String(opts.Title),
         Description:  gitlab.String(opts.Body),
