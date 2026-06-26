@@ -470,6 +470,12 @@ func (p *DefaultProjectCommandBuilder) ShouldIgnoreTargetedDir(ctx *command.Cont
 }
 
 func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Context) valid.RepoCfg {
+	if ctx.PreferLocalRepoCfgForTargetedIgnore {
+		if repoCfg, ok := p.repoCfgFromWorkingDir(ctx); ok {
+			return repoCfg
+		}
+	}
+
 	if p.VCSClient != nil {
 		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
 		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.HeadRepo, ctx.Pull.HeadBranch, repoCfgFile)
@@ -485,15 +491,22 @@ func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Con
 		}
 	}
 
+	if repoCfg, ok := p.repoCfgFromWorkingDir(ctx); ok {
+		return repoCfg
+	}
+	return valid.RepoCfg{}
+}
+
+func (p *DefaultProjectCommandBuilder) repoCfgFromWorkingDir(ctx *command.Context) (valid.RepoCfg, bool) {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
 	if err != nil {
-		return valid.RepoCfg{}
+		return valid.RepoCfg{}, false
 	}
 	repoCfg, _, err := p.parseRepoCfg(ctx, repoDir)
 	if err != nil {
-		return valid.RepoCfg{}
+		return valid.RepoCfg{}, false
 	}
-	return repoCfg
+	return repoCfg, true
 }
 
 func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDirFromCfg(ctx *command.Context, repoCfg valid.RepoCfg, repoRelDir string) bool {

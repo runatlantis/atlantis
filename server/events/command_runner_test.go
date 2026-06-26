@@ -557,9 +557,10 @@ func TestRunCommentCommand_IgnoredTargetedDirSkipsValidationComments(t *testing.
 				checker, err := command.NewTeamAllowlistChecker("allowed-team:apply")
 				Ok(t, err)
 				ch.TeamAllowlistChecker = checker
+				When(vcsClient.GetTeamNamesForUser(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.User))).ThenReturn([]string{"blocked-team"}, nil)
 			},
 			verify: func(t *testing.T, vcsClient *vcsmocks.MockClient) {
-				vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.User))
+				vcsClient.VerifyWasCalledOnce().GetTeamNamesForUser(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.User))
 			},
 		},
 		{
@@ -610,7 +611,7 @@ func TestRunCommentCommand_IgnoredTargetedDirSkipsValidationComments(t *testing.
 			if c.verify != nil {
 				c.verify(t, vcsClient)
 			}
-			preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalledOnce().RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+			preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
 			vcsClient.VerifyWasCalled(Never()).CreateComment(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 			commitUpdater.VerifyWasCalled(Never()).UpdateCombined(

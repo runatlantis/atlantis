@@ -187,7 +187,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		PullStatus: status,
 		Trigger:    command.AutoTrigger,
 	}
-	if !c.validateCtxAndComment(ctx, command.Autoplan) {
+	if !c.validateCtxAndComment(ctx, command.Autoplan, true) {
 		return
 	}
 	if c.DisableAutoplan {
@@ -412,6 +412,45 @@ func (c *DefaultCommandRunner) checkVarFilesInPlanCommandAllowlisted(cmd *Commen
 	return c.VarFileAllowlistChecker.Check(cmd.Flags)
 }
 
+func (c *DefaultCommandRunner) validateCommentCommand(ctx *command.Context, baseRepo models.Repo, pullNum int, user models.User, cmd *CommentCommand, shouldComment bool) bool {
+	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
+	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
+		err := c.fetchUserTeams(ctx.Log, baseRepo, &user)
+		if err != nil {
+			c.Logger.Err("Unable to fetch user teams: %s", err)
+			return false
+		}
+		directUserTeams := append([]string(nil), user.Teams...)
+
+		ok, err := c.checkUserPermissions(baseRepo, &user, cmd.Name.String())
+		if err != nil {
+			c.Logger.Err("Unable to check user permissions: %s", err)
+			return false
+		}
+		if !ok {
+			if shouldComment {
+				c.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, cmd)
+			}
+			return false
+		}
+		c.addPolicyCheckHierarchyTeamsForPlan(baseRepo, &user, cmd.Name, directUserTeams)
+		ctx.User = user
+	}
+
+	// Check if the provided var files in a 'plan' command are allowlisted
+	if err := c.checkVarFilesInPlanCommandAllowlisted(cmd); err != nil {
+		if shouldComment {
+			errMsg := fmt.Sprintf("```\n%s\n```", err.Error())
+			if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, errMsg, ""); commentErr != nil {
+				c.Logger.Err("unable to comment on pull request: %s", commentErr)
+			}
+		}
+		return false
+	}
+
+	return c.validateCtxAndComment(ctx, cmd.Name, shouldComment)
+}
+
 // RunCommentCommand executes the command.
 // We take in a pointer for maybeHeadRepo because for some events there isn't
 // enough data to construct the Repo model and callers might want to wait until
@@ -462,56 +501,23 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
-	preWorkflowHooksRan := false
-	var preWorkflowHooksErr error
-	if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
+	targetInitiallyIgnored := shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd)
+	if targetInitiallyIgnored {
 		ctx.CommandSkipped = false
-		preWorkflowHooksErr = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
-		preWorkflowHooksRan = true
+	}
+
+	if !c.validateCommentCommand(ctx, baseRepo, pullNum, user, cmd, !targetInitiallyIgnored) {
+		return
+	}
+
+	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	if targetInitiallyIgnored {
 		ctx.CommandSkipped = false
+		ctx.PreferLocalRepoCfgForTargetedIgnore = true
 		if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
 			return
 		}
 	}
-
-	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
-	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
-		err := c.fetchUserTeams(log, baseRepo, &user)
-		if err != nil {
-			c.Logger.Err("Unable to fetch user teams: %s", err)
-			return
-		}
-		directUserTeams := append([]string(nil), user.Teams...)
-
-		ok, err := c.checkUserPermissions(baseRepo, &user, cmd.Name.String())
-		if err != nil {
-			c.Logger.Err("Unable to check user permissions: %s", err)
-			return
-		}
-		if !ok {
-			c.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, cmd)
-			return
-		}
-		c.addPolicyCheckHierarchyTeamsForPlan(baseRepo, &user, cmd.Name, directUserTeams)
-	}
-
-	// Check if the provided var files in a 'plan' command are allowlisted
-	if err := c.checkVarFilesInPlanCommandAllowlisted(cmd); err != nil {
-		errMsg := fmt.Sprintf("```\n%s\n```", err.Error())
-		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, errMsg, ""); commentErr != nil {
-			c.Logger.Err("unable to comment on pull request: %s", commentErr)
-		}
-		return
-	}
-
-	if !c.validateCtxAndComment(ctx, cmd.Name) {
-		return
-	}
-
-	if !preWorkflowHooksRan {
-		preWorkflowHooksErr = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
-	}
-
 	if preWorkflowHooksErr != nil {
 		if c.FailOnPreWorkflowHookError {
 			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
@@ -664,9 +670,9 @@ func (c *DefaultCommandRunner) fetchUserTeams(logger logging.SimpleLogging, repo
 	return nil
 }
 
-func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, commandName command.Name) bool {
+func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, commandName command.Name, shouldComment bool) bool {
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
-		if c.SilenceForkPRErrors {
+		if c.SilenceForkPRErrors || !shouldComment {
 			return false
 		}
 		ctx.Log.Info("command was run on a fork pull request which is disallowed")
@@ -678,8 +684,10 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 
 	if ctx.Pull.State != models.OpenPullState && commandName != command.Unlock {
 		ctx.Log.Info("command was run on closed pull request")
-		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
-			ctx.Log.Err("unable to comment: %s", err)
+		if shouldComment {
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
+				ctx.Log.Err("unable to comment: %s", err)
+			}
 		}
 		return false
 	}

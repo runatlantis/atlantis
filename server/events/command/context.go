@@ -58,4 +58,9 @@ type Context struct {
 
 	// Set true if the command was intentionally skipped without executing work.
 	CommandSkipped bool
+
+	// PreferLocalRepoCfgForTargetedIgnore makes targeted ignore checks read a
+	// cloned repo config before falling back to VCS content. This is used after
+	// pre-workflow hooks may have generated or updated atlantis.yaml.
+	PreferLocalRepoCfgForTargetedIgnore bool
 }
