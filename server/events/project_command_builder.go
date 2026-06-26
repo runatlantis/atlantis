@@ -492,20 +492,20 @@ func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Con
 		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.HeadRepo, targetedIgnoreConfigRef(ctx.Pull), repoCfgFile)
 		if err != nil {
 			ctx.Log.Debug("unable to fetch %s while checking autodiscover.ignore_paths: %s", repoCfgFile, err)
+			return valid.RepoCfg{}, false
 		} else if hasRepoCfg {
 			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
 			if err != nil {
 				ctx.Log.Debug("unable to parse %s while checking autodiscover.ignore_paths: %s", repoCfgFile, err)
+				return valid.RepoCfg{}, false
 			} else {
 				return repoCfg, true
 			}
 		}
+		return valid.RepoCfg{}, true
 	}
 
-	if repoCfg, ok := p.repoCfgFromWorkingDir(ctx); ok {
-		return repoCfg, true
-	}
-	return valid.RepoCfg{}, true
+	return valid.RepoCfg{}, false
 }
 
 func targetedIgnoreConfigRef(pull models.PullRequest) string {
