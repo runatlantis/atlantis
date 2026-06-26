@@ -1,0 +1,23 @@
+docs/adr/0002-api-enhancement-drift-detection.md
+  s_243a1a1edc15e5::t_77eab03bcf4225 24,31,39,87,101,173,180,194,206-207,218-219,246,252,266-267,269,366,379,541,548,570,611,619,627,635,648,662,687,697,707
+  s_243a1a1edc15e5::t_b076ee478b4ed1 290-294,301-308,313-324
+  s_243a1a1edc15e5::t_592df7ee7823cf 670-673,677,679-680
+  s_243a1a1edc15e5::t_7c7addb69dbd3a 367-368,550-551,554-555,557-558,628,637,641,643
+  s_243a1a1edc15e5::t_91c5e1415fcefd 268
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "cc81f5df442060edd12380a529ace8a68220638d",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
