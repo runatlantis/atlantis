@@ -514,12 +514,19 @@ func TestClone_ResetOnWrongCommit(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
-	// Pretend that terraform has created a plan file, we'll check for it later
-	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
+	// Pretend that terraform has created plan files, we'll check for them later.
+	worktreeDir := filepath.Join(dataDir, "repos/0/default")
+	ignorePlanFiles(t, worktreeDir)
+	planFile := filepath.Join(worktreeDir, "default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
+	nestedPlanFile := filepath.Join(worktreeDir, "project1/default.tfplan")
+	createPlanFile(t, nestedPlanFile)
+	assert.FileExists(t, nestedPlanFile)
+	terragruntCachePlanFile := filepath.Join(worktreeDir, ".terragrunt-cache/project1/default.tfplan")
+	createPlanFile(t, terragruntCachePlanFile)
+	assert.FileExists(t, terragruntCachePlanFile)
 
 	logger := logging.NewNoopLogger(t)
 
@@ -536,7 +543,9 @@ func TestClone_ResetOnWrongCommit(t *testing.T) {
 		BaseBranch: "main",
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
+	assert.NoFileExists(t, nestedPlanFile, "Nested stale plan file should be deleted after updating to new commit")
+	assert.FileExists(t, terragruntCachePlanFile, "Plan files in .terragrunt-cache should be preserved")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
@@ -560,11 +569,11 @@ func TestClone_DoNotReCloneOnBaseChangeForBranchStrategy(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
-	// Pretend that terraform has created a plan file, we'll check for it later
+	// Pretend that terraform has created a plan file, we'll check it is removed
+	// after updating the existing branch-strategy clone.
 	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
 
 	logger := logging.NewNoopLogger(t)
@@ -582,7 +591,7 @@ func TestClone_DoNotReCloneOnBaseChangeForBranchStrategy(t *testing.T) {
 		BaseBranch: "some-other-base-branch",
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not wiped out by the reclone")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
@@ -666,8 +675,7 @@ func TestClone_ReCloneOnErrorAttemptingReuse(t *testing.T) {
 	// Pretend that terraform has created a plan file, we'll check for it later
 	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
 
 	logger := logging.NewNoopLogger(t)
@@ -731,12 +739,19 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "anotherfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
-	// Pretend that terraform has created a plan file, we'll check for it later
-	planFile := filepath.Join(dataDir, "repos/1/default/default.tfplan")
+	// Pretend that terraform has created plan files, we'll check for them later.
+	worktreeDir := filepath.Join(dataDir, "repos/1/default")
+	ignorePlanFiles(t, worktreeDir)
+	planFile := filepath.Join(worktreeDir, "default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
+	nestedPlanFile := filepath.Join(worktreeDir, "project1/default.tfplan")
+	createPlanFile(t, nestedPlanFile)
+	assert.FileExists(t, nestedPlanFile)
+	terragruntCachePlanFile := filepath.Join(worktreeDir, ".terragrunt-cache/project1/default.tfplan")
+	createPlanFile(t, terragruntCachePlanFile)
+	assert.FileExists(t, terragruntCachePlanFile)
 
 	logger := logging.NewNoopLogger(t)
 
@@ -755,7 +770,9 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 		Num:        1,
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
+	assert.NoFileExists(t, nestedPlanFile, "Nested stale plan file should be deleted after updating to new commit")
+	assert.FileExists(t, terragruntCachePlanFile, "Plan files in .terragrunt-cache should be preserved")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2"))
@@ -825,13 +842,12 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	// Pretend terraform has created a plan file, we'll check for it later
 	planFile := filepath.Join(repoDir, "repos/0/default/default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
 
 	// Run MergeAgain without the checkout merge strategy. It should return
 	// false for mergedAgain
-	_, err = wd.Clone(logger, models.Repo{}, models.PullRequest{
+	_, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "second-pr",
 		BaseBranch: "main",
@@ -2149,4 +2165,17 @@ func initRepo(t *testing.T) string {
 	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, repoDir, "git", "branch", "branch")
 	return repoDir
+}
+
+func createPlanFile(t *testing.T, path string) {
+	t.Helper()
+
+	Ok(t, os.MkdirAll(filepath.Dir(path), 0700))
+	Ok(t, os.WriteFile(path, []byte("plan"), 0600))
+}
+
+func ignorePlanFiles(t *testing.T, cloneDir string) {
+	t.Helper()
+
+	Ok(t, os.WriteFile(filepath.Join(cloneDir, ".git/info/exclude"), []byte("*.tfplan\n"), 0600))
 }
