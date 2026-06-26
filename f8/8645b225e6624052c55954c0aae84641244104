@@ -1,0 +1,21 @@
+RELEASE.md
+  s_1475eaaa18ac58::t_cb4f2f421a44d9 66,69-71,81-86,88,97
+  s_1475eaaa18ac58::t_8d23c7def44b2e 5,9-11,17-19,23-25,29-31,48-51,55-58,60,64-65,67-68,72-80,87,89-96,98-159,163-165,171,173,176-177,180-181,185
+  s_1475eaaa18ac58::t_cb6789825225dd 37-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "f88645b225e6624052c55954c0aae84641244104",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
