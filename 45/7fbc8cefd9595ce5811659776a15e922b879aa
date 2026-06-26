@@ -1,0 +1,21 @@
+AGENTS.md
+  s_1475eaaa18ac58::t_4abe5190786689 25,27,45,114
+package-lock.json
+  s_1475eaaa18ac58::t_b2940687c01f3d 2,3377-3380,3398-3401,3413,3415-3418,3420-3429,3433-3434
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "457fbc8cefd9595ce5811659776a15e922b879aa",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
