@@ -131,7 +131,9 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+	if !ctx.CommandSkipped {
+		defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+	}
 	if result.HasErrors() {
 		code = http.StatusInternalServerError
 	}
@@ -161,9 +163,18 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// We must first make the plan for all projects
-	_, err = a.apiPlan(request, ctx)
+	result, err := a.apiPlan(request, ctx)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if ctx.CommandSkipped {
+		response, err := json.Marshal(result)
+		if err != nil {
+			a.apiReportError(w, http.StatusInternalServerError, err)
+			return
+		}
+		a.respond(w, logging.Warn, code, "%s", string(response))
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
@@ -173,7 +184,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	a.populatePullRequestStatus(ctx)
 
 	// We can now prepare and run the apply step
-	result, err := a.apiApply(request, ctx)
+	result, err = a.apiApply(request, ctx)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return

@@ -288,7 +288,9 @@ func TestAPIController_Plan_SkipsIgnoredPathsWithoutShiftingHookCommands(t *test
 }
 
 func TestAPIController_Plan_AllIgnoredPathsNoOp(t *testing.T) {
-	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
+		config.allowUnlockByPull = false
+	})
 	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
 
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -323,7 +325,9 @@ func TestAPIController_Plan_AllIgnoredPathsNoOp(t *testing.T) {
 }
 
 func TestAPIController_Apply_AllIgnoredPathsNoOp(t *testing.T) {
-	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
+		config.allowUnlockByPull = false
+	})
 	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
 
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -354,6 +358,7 @@ func TestAPIController_Apply_AllIgnoredPathsNoOp(t *testing.T) {
 
 	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombined(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
 	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
@@ -599,12 +604,25 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 	Equals(t, expected, result)
 }
 
-func setup(t *testing.T) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
+type apiControllerTestConfig struct {
+	allowUnlockByPull bool
+}
+
+func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (controllers.APIController, *MockProjectCommandBuilder, *MockProjectCommandRunner) {
 	RegisterMockTestingT(t)
+	config := &apiControllerTestConfig{
+		allowUnlockByPull: true,
+	}
+	for _, option := range options {
+		option(config)
+	}
+
 	gmockCtrl := gomock.NewController(t)
 	locker := NewMockLocker(gmockCtrl)
-	// Allow incidental calls to UnlockByPull (called internally during plan/apply operations)
-	locker.EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	if config.allowUnlockByPull {
+		// Allow incidental calls to UnlockByPull (called internally during plan/apply operations)
+		locker.EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	}
 	logger := logging.NewNoopLogger(t)
 	parser := NewMockEventParsing()
 	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("*")

@@ -462,8 +462,16 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
+	preWorkflowHooksRan := false
+	var preWorkflowHooksErr error
 	if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
-		return
+		ctx.CommandSkipped = false
+		preWorkflowHooksErr = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+		preWorkflowHooksRan = true
+		ctx.CommandSkipped = false
+		if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
+			return
+		}
 	}
 
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
@@ -500,7 +508,9 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	if !preWorkflowHooksRan {
+		preWorkflowHooksErr = c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	}
 
 	if preWorkflowHooksErr != nil {
 		if c.FailOnPreWorkflowHookError {
