@@ -53,3 +53,7 @@ func (v *StateCommandRunner) runRm(ctx *command.Context, cmd *CommentCommand) co
 	}
 	return runProjectCmds(projectCmds, v.prjCmdRunner.StateRm)
 }
+
+func (v *StateCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
+	return MarkCommandSkippedIfIgnoredTarget(ctx, cmd.CommandName(), cmd, v.prjCmdBuilder)
+}

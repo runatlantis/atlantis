@@ -69,6 +69,10 @@ type CommentCommandRunner interface {
 	Run(*command.Context, *CommentCommand)
 }
 
+type PreWorkflowHooksSkipper interface {
+	ShouldSkipPreWorkflowHooks(*command.Context, *CommentCommand) bool
+}
+
 func buildCommentCommandRunner(
 	cmdRunner *DefaultCommandRunner,
 	cmdName command.Name,
@@ -82,6 +86,11 @@ func buildCommentCommandRunner(
 	}
 
 	return runner
+}
+
+func shouldSkipPreWorkflowHooks(ctx *command.Context, cmdRunner CommentCommandRunner, cmd *CommentCommand) bool {
+	skipper, ok := cmdRunner.(PreWorkflowHooksSkipper)
+	return ok && skipper.ShouldSkipPreWorkflowHooks(ctx, cmd)
 }
 
 // DefaultCommandRunner is the first step when processing a comment command.
@@ -197,6 +206,11 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	ctx.Log.Info("Running autoplan...")
 	cmd := &CommentCommand{
 		Name: command.Autoplan,
+	}
+
+	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
+	if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
+		return
 	}
 
 	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
@@ -481,6 +495,11 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
+	if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
+		return
+	}
+
 	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if preWorkflowHooksErr != nil {
@@ -510,8 +529,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 
 		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", cmd.Name.String())
 	}
-
-	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
 
 	cmdRunner.Run(ctx, cmd)
 	if ctx.CommandSkipped {

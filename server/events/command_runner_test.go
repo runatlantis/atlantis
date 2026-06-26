@@ -523,23 +523,11 @@ func TestRunCommentCommand_IgnoredTargetedDirNoOp(t *testing.T) {
 
 			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-			switch c.commandName {
-			case command.Plan:
-				When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
-			case command.Apply:
-				When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
-			case command.ApprovePolicies:
-				When(projectCommandBuilder.BuildApprovePoliciesCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
-			case command.Import:
-				When(projectCommandBuilder.BuildImportCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
-			case command.Version:
-				When(projectCommandBuilder.BuildVersionCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
-			case command.State:
-				When(projectCommandBuilder.BuildStateRmCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
-			}
+			When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(true)
 
 			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
 
+			preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
 			vcsClient.VerifyWasCalled(Never()).CreateComment(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 			commitUpdater.VerifyWasCalled(Never()).UpdateCombined(

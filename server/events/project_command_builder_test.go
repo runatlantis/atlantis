@@ -786,6 +786,100 @@ func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePaths(t *testin
 	Equals(t, "environments/nonprod", applyCtxs[0].RepoRelDir)
 }
 
+func TestDefaultProjectCommandBuilder_BuildTargetedNonPlanCommand_IgnorePathsWithoutWorkingDir(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn("", os.ErrNotExist)
+	vcsClient := vcsmocks.NewMockClient()
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"environments/prod/**"},
+	}
+
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	repo := models.Repo{FullName: "runatlantis/atlantis", Owner: "runatlantis", Name: "atlantis"}
+	cmdCtx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		Pull:     models.PullRequest{BaseRepo: repo, Num: 1, HeadBranch: "feature", BaseBranch: "main"},
+		HeadRepo: repo,
+	}
+
+	cases := []struct {
+		description string
+		cmd         events.CommentCommand
+		build       func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)
+	}{
+		{
+			description: "apply",
+			cmd:         events.CommentCommand{Name: command.Apply, RepoRelDir: "environments/prod", Workspace: "default"},
+			build:       builder.BuildApplyCommands,
+		},
+		{
+			description: "approve policies",
+			cmd:         events.CommentCommand{Name: command.ApprovePolicies, RepoRelDir: "environments/prod", Workspace: "default"},
+			build:       builder.BuildApprovePoliciesCommands,
+		},
+		{
+			description: "import",
+			cmd:         events.CommentCommand{Name: command.Import, RepoRelDir: "environments/prod", Workspace: "default"},
+			build:       builder.BuildImportCommands,
+		},
+		{
+			description: "version",
+			cmd:         events.CommentCommand{Name: command.Version, RepoRelDir: "environments/prod", Workspace: "default"},
+			build:       builder.BuildVersionCommands,
+		},
+		{
+			description: "state rm",
+			cmd:         events.CommentCommand{Name: command.State, SubName: "rm", RepoRelDir: "environments/prod", Workspace: "default"},
+			build:       builder.BuildStateRmCommands,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			ctxs, err := c.build(cmdCtx, &c.cmd)
+			Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+			Equals(t, 0, len(ctxs))
+		})
+	}
+}
+
 // Test that autodiscover.ignore_paths set in repo-level atlantis.yaml blocks
 // targeted plan/apply -d commands for non-configured projects.
 func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePathsRepoCfg(t *testing.T) {

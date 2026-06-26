@@ -221,6 +221,10 @@ func (a *ApplyCommandRunner) updatePendingCommitStatus(ctx *command.Context) {
 	}
 }
 
+func (a *ApplyCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
+	return MarkCommandSkippedIfIgnoredTarget(ctx, command.Apply, cmd, a.prjCmdBuilder)
+}
+
 func (a *ApplyCommandRunner) IsLocked() (bool, error) {
 	lock, err := a.locker.CheckApplyLock()
 

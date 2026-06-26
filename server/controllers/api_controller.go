@@ -80,18 +80,25 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 
 	cmds := make([]command.ProjectContext, 0)
 	keptCommentCommands := make([]*events.CommentCommand, 0)
+	ignoredCommands := 0
+	nonIgnoredCommands := 0
 	for _, commentCommand := range cc {
 		projectCmds, err := cmdBuilder(ctx, commentCommand)
 		if err != nil {
 			if events.IsIgnoredTargetedDir(err) {
+				ignoredCommands++
 				continue
 			}
 			return nil, nil, fmt.Errorf("failed to build command: %w", err)
 		}
+		nonIgnoredCommands++
 		for _, projectCmd := range projectCmds {
 			cmds = append(cmds, projectCmd)
 			keptCommentCommands = append(keptCommentCommands, commentCommand)
 		}
+	}
+	if ignoredCommands > 0 && nonIgnoredCommands == 0 {
+		return nil, nil, events.ErrIgnoredTargetedDir
 	}
 
 	return cmds, keptCommentCommands, nil
@@ -255,6 +262,10 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) err
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
 	cmds, cc, err := request.getCommands(ctx, command.Plan, a.ProjectCommandBuilder.BuildPlanCommands)
+	if events.IsIgnoredTargetedDir(err) {
+		ctx.CommandSkipped = true
+		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -303,6 +314,10 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
 	cmds, cc, err := request.getCommands(ctx, command.Apply, a.ProjectCommandBuilder.BuildApplyCommands)
+	if events.IsIgnoredTargetedDir(err) {
+		ctx.CommandSkipped = true
+		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
