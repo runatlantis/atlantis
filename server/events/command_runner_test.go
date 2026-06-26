@@ -539,6 +539,87 @@ func TestRunCommentCommand_IgnoredTargetedDirNoOp(t *testing.T) {
 	}
 }
 
+func TestRunCommentCommand_IgnoredTargetedDirSkipsValidationComments(t *testing.T) {
+	cases := []struct {
+		name      string
+		cmd       *events.CommentCommand
+		modelPull models.PullRequest
+		headRepo  models.Repo
+		setup     func(t *testing.T, vcsClient *vcsmocks.MockClient)
+		verify    func(t *testing.T, vcsClient *vcsmocks.MockClient)
+	}{
+		{
+			name: "team allowlist",
+			cmd:  &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"},
+			setup: func(t *testing.T, vcsClient *vcsmocks.MockClient) {
+				checker, err := command.NewTeamAllowlistChecker("allowed-team:apply")
+				Ok(t, err)
+				ch.TeamAllowlistChecker = checker
+			},
+			verify: func(t *testing.T, vcsClient *vcsmocks.MockClient) {
+				vcsClient.VerifyWasCalled(Never()).GetTeamNamesForUser(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.User))
+			},
+		},
+		{
+			name: "var file allowlist",
+			cmd:  &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored", Flags: []string{"-var-file", "/tmp/outside.tfvars"}},
+			setup: func(t *testing.T, vcsClient *vcsmocks.MockClient) {
+				checker, err := events.NewVarFileAllowlistChecker("")
+				Ok(t, err)
+				ch.VarFileAllowlistChecker = checker
+			},
+		},
+		{
+			name: "fork pull request",
+			cmd:  &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"},
+			headRepo: models.Repo{
+				Owner:    "forkrepo",
+				FullName: "forkrepo/atlantis",
+			},
+		},
+		{
+			name:      "closed pull request",
+			cmd:       &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"},
+			modelPull: models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.ClosedPullState, Num: testdata.Pull.Num},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			vcsClient := setup(t)
+			if c.modelPull.BaseRepo.ID() == "" {
+				c.modelPull = models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			}
+			if c.headRepo.FullName == "" {
+				c.headRepo = testdata.GithubRepo
+			}
+
+			if c.setup != nil {
+				c.setup(t, vcsClient)
+			}
+
+			pull := &github.PullRequest{State: github.Ptr("open")}
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(c.modelPull, c.modelPull.BaseRepo, c.headRepo, nil)
+			When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(true)
+
+			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, c.cmd)
+
+			if c.verify != nil {
+				c.verify(t, vcsClient)
+			}
+			preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+			vcsClient.VerifyWasCalled(Never()).CreateComment(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+			commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+			postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+		})
+	}
+}
+
 func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) {
 	t.Log("if an approve_policy command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
 	vcsClient := setup(t)

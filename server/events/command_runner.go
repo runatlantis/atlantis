@@ -437,6 +437,35 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	timer := scope.Timer(metrics.ExecutionTimeMetric).Start()
 	defer timer.Stop()
 
+	headRepo, pull, err := c.ensureValidRepoMetadata(baseRepo, maybeHeadRepo, maybePull, user, pullNum, log)
+	if err != nil {
+		return
+	}
+
+	status, err := c.PullStatusFetcher.GetPullStatus(pull)
+
+	if err != nil {
+		log.Err("Unable to fetch pull status, this is likely a bug: %s", err)
+	}
+
+	ctx := &command.Context{
+		User:                 user,
+		Log:                  log,
+		Pull:                 pull,
+		PullStatus:           status,
+		HeadRepo:             headRepo,
+		Scope:                scope,
+		Trigger:              command.CommentTrigger,
+		PolicySet:            cmd.PolicySet,
+		ClearPolicyApproval:  cmd.ClearPolicyApproval,
+		TeamAllowlistChecker: c.TeamAllowlistChecker,
+	}
+
+	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
+	if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
+		return
+	}
+
 	// Check if the user who commented has the permissions to execute the 'plan' or 'apply' commands
 	if c.TeamAllowlistChecker != nil && c.TeamAllowlistChecker.HasRules() {
 		err := c.fetchUserTeams(log, baseRepo, &user)
@@ -467,36 +496,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	headRepo, pull, err := c.ensureValidRepoMetadata(baseRepo, maybeHeadRepo, maybePull, user, pullNum, log)
-	if err != nil {
-		return
-	}
-
-	status, err := c.PullStatusFetcher.GetPullStatus(pull)
-
-	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug: %s", err)
-	}
-
-	ctx := &command.Context{
-		User:                 user,
-		Log:                  log,
-		Pull:                 pull,
-		PullStatus:           status,
-		HeadRepo:             headRepo,
-		Scope:                scope,
-		Trigger:              command.CommentTrigger,
-		PolicySet:            cmd.PolicySet,
-		ClearPolicyApproval:  cmd.ClearPolicyApproval,
-		TeamAllowlistChecker: c.TeamAllowlistChecker,
-	}
-
 	if !c.validateCtxAndComment(ctx, cmd.Name) {
-		return
-	}
-
-	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
-	if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
 		return
 	}
 
