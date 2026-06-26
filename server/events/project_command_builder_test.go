@@ -4,6 +4,7 @@
 package events_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -752,7 +753,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePaths(t *testin
 		RepoRelDir: "environments/prod",
 		Workspace:  "default",
 	})
-	Ok(t, err)
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
 	Equals(t, 0, len(planCtxs))
 
 	// Targeted plan -d to non-ignored path should succeed
@@ -771,7 +772,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePaths(t *testin
 		RepoRelDir: "environments/prod",
 		Workspace:  "default",
 	})
-	Ok(t, err)
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
 	Equals(t, 0, len(applyCtxs))
 
 	// Targeted apply -d to non-ignored path should succeed
@@ -860,7 +861,7 @@ autodiscover:
 		RepoRelDir: "environments/prod",
 		Workspace:  "default",
 	})
-	Ok(t, err)
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
 	Equals(t, 0, len(planCtxs))
 
 	// Non-ignored path should work
@@ -879,7 +880,7 @@ autodiscover:
 		RepoRelDir: "environments/prod",
 		Workspace:  "default",
 	})
-	Ok(t, err)
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
 	Equals(t, 0, len(applyCtxs))
 
 	// Targeted apply -d to non-ignored path should work
@@ -1171,18 +1172,19 @@ projects:
 				Scope: scope,
 			}, &cmd)
 
-			if c.ExpErr != "" {
-				ErrEquals(t, c.ExpErr, err)
-				return
-			}
-			Ok(t, err)
 			if c.ExpNoProjects {
+				Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
 				Equals(t, 0, len(actCtxs))
 				if c.ExpSkipFileList {
 					vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 				}
 				return
 			}
+			if c.ExpErr != "" {
+				ErrEquals(t, c.ExpErr, err)
+				return
+			}
+			Ok(t, err)
 			Equals(t, 1, len(actCtxs))
 		})
 	}

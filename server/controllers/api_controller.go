@@ -82,7 +82,10 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 	for _, commentCommand := range cc {
 		projectCmds, err := cmdBuilder(ctx, commentCommand)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to build command: %v", err)
+			if events.IsIgnoredTargetedDir(err) {
+				continue
+			}
+			return nil, nil, fmt.Errorf("failed to build command: %w", err)
 		}
 		cmds = append(cmds, projectCmds...)
 	}

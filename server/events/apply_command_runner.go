@@ -123,6 +123,11 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	var projectCmds []command.ProjectContext
 	projectCmds, err = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
 	if err != nil {
+		if IsIgnoredTargetedDir(err) {
+			ctx.Log.Debug("ignoring targeted apply because the directory matches autodiscover.ignore_paths")
+			ctx.CommandSkipped = true
+			return
+		}
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
@@ -164,6 +169,9 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		}
 		return
 	}
+	if len(projectCmds) > 0 {
+		a.updatePendingCommitStatus(ctx)
+	}
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
 	ctx.CommandHasErrors = result.HasErrors()
@@ -183,6 +191,16 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	if a.autoMerger.automergeEnabled(projectCmds) && !cmd.AutoMergeDisabled {
 		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
+	}
+}
+
+func (a *ApplyCommandRunner) updatePendingCommitStatus(ctx *command.Context) {
+	if a.silenceVCSStatusNoProjects {
+		ctx.Log.Debug("silence enabled - not setting pending VCS status")
+		return
+	}
+	if err := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 }
 

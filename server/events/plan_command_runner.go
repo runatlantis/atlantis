@@ -144,6 +144,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		}
 		return
 	}
+	p.updatePendingCommitStatus(ctx, command.Plan)
 
 	// discard previous plans that might not be relevant anymore
 	ctx.Log.Debug("deleting previous plans and locks")
@@ -213,6 +214,11 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
 	if err != nil {
+		if IsIgnoredTargetedDir(err) {
+			ctx.Log.Debug("ignoring targeted plan because the directory matches autodiscover.ignore_paths")
+			ctx.CommandSkipped = true
+			return
+		}
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
@@ -262,8 +268,10 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		}
 		return
 	}
-
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
+	if len(projectCmds) > 0 {
+		p.updatePendingCommitStatus(ctx, command.Plan)
+	}
 
 	// if the plan is generic, new plans will be generated based on changes
 	// discard previous plans that might not be relevant anymore
@@ -325,6 +333,16 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		p.runAutoplan(ctx)
 	} else {
 		p.run(ctx, cmd)
+	}
+}
+
+func (p *PlanCommandRunner) updatePendingCommitStatus(ctx *command.Context, commandName command.Name) {
+	if p.silenceVCSStatusNoProjects {
+		ctx.Log.Debug("silence enabled - not setting pending VCS status")
+		return
+	}
+	if err := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, commandName); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 }
 

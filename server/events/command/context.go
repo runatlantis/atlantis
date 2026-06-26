@@ -55,4 +55,7 @@ type Context struct {
 
 	// Set true if there were any errors during the command execution
 	CommandHasErrors bool
+
+	// Set true if the command was intentionally skipped without executing work.
+	CommandSkipped bool
 }

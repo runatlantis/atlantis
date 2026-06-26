@@ -38,6 +38,12 @@ const (
 	DefaultAbortOnExecutionOrderFail = false
 )
 
+var ErrIgnoredTargetedDir = errors.New("targeted dir ignored by autodiscover.ignore_paths")
+
+func IsIgnoredTargetedDir(err error) bool {
+	return errors.Is(err, ErrIgnoredTargetedDir)
+}
+
 func NewInstrumentedProjectCommandBuilder(
 	logger logging.SimpleLogging,
 	policyChecksSupported bool,
@@ -702,7 +708,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 
 	if cmd.ProjectName == "" && p.shouldIgnoreTargetedDir(ctx, defaultRepoDir, repoRelDir) {
 		ctx.Log.Debug("ignoring targeted plan for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
-		return pcc, nil
+		return pcc, ErrIgnoredTargetedDir
 	}
 
 	if p.RestrictFileList {
@@ -965,7 +971,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 
 	if cmd.ProjectName == "" && p.shouldIgnoreTargetedDir(ctx, repoDir, repoRelDir) {
 		ctx.Log.Debug("ignoring targeted command for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
-		return projCtx, nil
+		return projCtx, ErrIgnoredTargetedDir
 	}
 
 	return p.buildProjectCommandCtx(

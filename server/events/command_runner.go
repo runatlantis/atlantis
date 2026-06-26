@@ -199,17 +199,6 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		Name: command.Autoplan,
 	}
 
-	// Only set pending status if silence is not enabled
-	// The PlanCommandRunner will handle the final status decision based on project results
-	if !c.SilenceVCSStatusNoProjects {
-		// Update the combined plan commit status to pending
-		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-			ctx.Log.Warn("unable to update plan commit status: %s", err)
-		}
-	} else {
-		ctx.Log.Debug("silence enabled - not setting pending VCS status")
-	}
-
 	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if preWorkflowHooksErr != nil {
@@ -500,24 +489,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	// Only set pending status if silence is not enabled
-	// The command runners will handle the final status decision based on project results
-	if !c.SilenceVCSStatusNoProjects {
-		// Update the combined plan or apply commit status to pending
-		switch cmd.Name {
-		case command.Plan:
-			if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-				ctx.Log.Warn("unable to update plan commit status: %s", err)
-			}
-		case command.Apply:
-			if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
-				ctx.Log.Warn("unable to update apply commit status: %s", err)
-			}
-		}
-	} else {
-		ctx.Log.Debug("silence enabled - not setting pending VCS status")
-	}
-
 	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
 	if preWorkflowHooksErr != nil {
@@ -551,6 +522,9 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
 
 	cmdRunner.Run(ctx, cmd)
+	if ctx.CommandSkipped {
+		return
+	}
 
 	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
 }
