@@ -529,15 +529,35 @@ func (p *PlanSuccess) Summary() string {
 }
 
 // DiffSummary extracts one line summary of plan changes from TerraformOutput.
+// When the output contains multiple "Plan:" lines (e.g. terragrunt stack run
+// plan, which prints one summary per unit), the counters are aggregated so the
+// rendered summary reflects the total across all units.
 func (p *PlanSuccess) DiffSummary() string {
-	if match := rePlanChanges.FindString(p.TerraformOutput); match != "" {
-		return match
+	stats := NewPlanSuccessStats(p.TerraformOutput)
+	if !stats.Changes {
+		return reNoChanges.FindString(p.TerraformOutput)
 	}
-	return reNoChanges.FindString(p.TerraformOutput)
+	switch {
+	case stats.Import > 0 && stats.Forget > 0:
+		return fmt.Sprintf("Plan: %d to import, %d to add, %d to change, %d to destroy, %d to forget.",
+			stats.Import, stats.Add, stats.Change, stats.Destroy, stats.Forget)
+	case stats.Import > 0:
+		return fmt.Sprintf("Plan: %d to import, %d to add, %d to change, %d to destroy.",
+			stats.Import, stats.Add, stats.Change, stats.Destroy)
+	case stats.Forget > 0:
+		return fmt.Sprintf("Plan: %d to add, %d to change, %d to destroy, %d to forget.",
+			stats.Add, stats.Change, stats.Destroy, stats.Forget)
+	default:
+		return fmt.Sprintf("Plan: %d to add, %d to change, %d to destroy.",
+			stats.Add, stats.Change, stats.Destroy)
+	}
 }
 
 // NoChanges returns true if the plan has no changes.
 func (p *PlanSuccess) NoChanges() bool {
+	if p.Stats().Changes {
+		return false
+	}
 	return reNoChanges.MatchString(p.TerraformOutput)
 }
 
@@ -964,26 +984,43 @@ type PlanSuccessStats struct {
 }
 
 func NewPlanSuccessStats(output string) PlanSuccessStats {
-	m := rePlanChanges.FindStringSubmatch(output)
+	matches := rePlanChanges.FindAllStringSubmatch(output, -1)
 
 	s := PlanSuccessStats{
 		ChangesOutside: reChangesOutside.MatchString(output),
-		Changes:        len(m) > 0,
+		Changes:        len(matches) > 0,
 	}
 
-	if s.Changes {
-		// We can skip checking the error here as we can assume
-		// Terraform output will always render an integer on these
-		// blocks.
-		s.Import, _ = strconv.Atoi(m[1])
-		s.Add, _ = strconv.Atoi(m[2])
-		s.Change, _ = strconv.Atoi(m[3])
-		s.Destroy, _ = strconv.Atoi(m[4])
-
+	// When the output contains multiple "Plan:" lines (e.g. terragrunt stack
+	// run plan produces one summary per unit), aggregate the counters so the
+	// stats reflect the total across all units.
+	//
+	// m[1] is the optional "X to import" group: it is an empty string for
+	// plans without import blocks. m[5] is the optional "X to forget" group:
+	// it is absent or empty for plans without forget blocks. All captures must
+	// be parsed leniently.
+	for _, m := range matches {
+		s.Import += parsePlanCount(m[1])
+		s.Add += parsePlanCount(m[2])
+		s.Change += parsePlanCount(m[3])
+		s.Destroy += parsePlanCount(m[4])
 		if len(m) > 5 && m[5] != "" {
-			s.Forget, _ = strconv.Atoi(m[5])
+			s.Forget += parsePlanCount(m[5])
 		}
 	}
 
 	return s
+}
+
+// parsePlanCount converts a numeric capture group from rePlanChanges into an
+// int. The "to import" group is optional in the regexp, so an empty string is
+// a normal case (no import block) and must produce 0 rather than be treated
+// as a parse failure. A non-empty value that fails to parse is unreachable
+// given the (\d+) capture, but we return 0 defensively rather than panic.
+func parsePlanCount(s string) int {
+	if s == "" {
+		return 0
+	}
+	n, _ := strconv.Atoi(s)
+	return n
 }

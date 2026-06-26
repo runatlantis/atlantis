@@ -484,6 +484,18 @@ func TestPlanSuccess_Summary(t *testing.T) {
 			"dummy\nNo changes. Your infrastructure matches the configuration.",
 			"No changes. Your infrastructure matches the configuration.",
 		},
+		{
+			"unit1\nPlan: 5 to add, 0 to change, 0 to destroy.\nunit2\nPlan: 3 to add, 2 to change, 1 to destroy.",
+			"Plan: 8 to add, 2 to change, 1 to destroy.",
+		},
+		{
+			"Note: Objects have changed outside of Terraform\nunit1\nPlan: 1 to add, 0 to change, 0 to destroy.\nunit2\nPlan: 2 to add, 3 to change, 0 to destroy.",
+			"\n**Note: Objects have changed outside of Terraform**\nPlan: 3 to add, 3 to change, 0 to destroy.",
+		},
+		{
+			"unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nNo changes. Your infrastructure matches the configuration.",
+			"No changes. Infrastructure is up-to-date.",
+		},
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("summary %d", i), func(t *testing.T) {
@@ -516,6 +528,38 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 			"dummy\nNo changes. Your infrastructure matches the configuration.",
 			"No changes. Your infrastructure matches the configuration.",
 		},
+		{
+			"unit1\nPlan: 5 to add, 0 to change, 0 to destroy.\nunit2\nPlan: 3 to add, 2 to change, 1 to destroy.",
+			"Plan: 8 to add, 2 to change, 1 to destroy.",
+		},
+		{
+			"unit1\nPlan: 1 to import, 2 to add, 3 to change, 4 to destroy.\nunit2\nPlan: 5 to import, 6 to add, 7 to change, 8 to destroy.",
+			"Plan: 6 to import, 8 to add, 10 to change, 12 to destroy.",
+		},
+		{
+			"dummy\nPlan: 0 to add, 0 to change, 0 to destroy, 2 to forget.",
+			"Plan: 0 to add, 0 to change, 0 to destroy, 2 to forget.",
+		},
+		{
+			"dummy\nPlan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.",
+			"Plan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.",
+		},
+		{
+			"unit1\nPlan: 5 to add, 0 to change, 0 to destroy.\nunit2\nNo changes. Infrastructure is up-to-date.",
+			"Plan: 5 to add, 0 to change, 0 to destroy.",
+		},
+		{
+			"unit1\nPlan: 2 to add, 0 to change, 0 to destroy, 3 to forget.\nunit2\nPlan: 4 to add, 1 to change, 0 to destroy, 5 to forget.",
+			"Plan: 6 to add, 1 to change, 0 to destroy, 8 to forget.",
+		},
+		{
+			"unit1\nPlan: 2 to add, 1 to change, 0 to destroy.\nunit2\nPlan: 3 to add, 0 to change, 1 to destroy.\nunit3\nPlan: 1 to add, 4 to change, 2 to destroy.",
+			"Plan: 6 to add, 5 to change, 3 to destroy.",
+		},
+		{
+			"unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nPlan: 4 to add, 0 to change, 0 to destroy.\nunit3\nNo changes. Your infrastructure matches the configuration.",
+			"Plan: 4 to add, 0 to change, 0 to destroy.",
+		},
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("summary %d", i), func(t *testing.T) {
@@ -523,6 +567,44 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 				TerraformOutput: c.input,
 			}
 			Equals(t, c.exp, pcs.DiffSummary())
+		})
+	}
+}
+
+func TestPlanSuccess_NoChanges(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		exp   bool
+	}{
+		{
+			name:  "no changes",
+			input: "dummy\nNo changes. Infrastructure is up-to-date.",
+			exp:   true,
+		},
+		{
+			name:  "changes",
+			input: "dummy\nPlan: 1 to add, 0 to change, 0 to destroy.",
+			exp:   false,
+		},
+		{
+			name:  "multiple units all no changes",
+			input: "unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nNo changes. Your infrastructure matches the configuration.",
+			exp:   true,
+		},
+		{
+			name:  "multiple units mixed changes and no changes",
+			input: "unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nPlan: 4 to add, 0 to change, 0 to destroy.",
+			exp:   false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			pcs := models.PlanSuccess{
+				TerraformOutput: c.input,
+			}
+			Equals(t, c.exp, pcs.NoChanges())
 		})
 	}
 }
@@ -1284,6 +1366,81 @@ func TestPlanSuccessStats(t *testing.T) {
 				Add:     3,
 				Change:  0,
 				Destroy: 1,
+			},
+		},
+		{
+			"multiple units aggregated",
+			`unit1
+					Plan: 5 to add, 0 to change, 0 to destroy.
+					unit2
+					Plan: 3 to add, 2 to change, 1 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     8,
+				Change:  2,
+				Destroy: 1,
+			},
+		},
+		{
+			"multiple units with imports aggregated",
+			`unit1
+					Plan: 1 to import, 2 to add, 3 to change, 4 to destroy.
+					unit2
+					Plan: 5 to import, 6 to add, 7 to change, 8 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  6,
+				Add:     8,
+				Change:  10,
+				Destroy: 12,
+			},
+		},
+		{
+			"multiple units with forget aggregated",
+			`unit1
+					Plan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.
+					unit2
+					Plan: 6 to add, 7 to change, 8 to destroy, 9 to forget.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  1,
+				Add:     8,
+				Change:  10,
+				Destroy: 12,
+				Forget:  14,
+			},
+		},
+		{
+			"three units aggregated",
+			`unit1
+					Plan: 2 to add, 1 to change, 0 to destroy.
+					unit2
+					Plan: 3 to add, 0 to change, 1 to destroy.
+					unit3
+					Plan: 1 to add, 4 to change, 2 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     6,
+				Change:  5,
+				Destroy: 3,
+			},
+		},
+		{
+			"mix of changing and no-changes units",
+			`unit1
+					No changes. Infrastructure is up-to-date.
+					unit2
+					Plan: 4 to add, 0 to change, 0 to destroy.
+					unit3
+					No changes. Your infrastructure matches the configuration.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add: 4,
 			},
 		},
 		{
