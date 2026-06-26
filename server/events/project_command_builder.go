@@ -695,6 +695,16 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		return pcc, err
 	}
 
+	repoRelDir := DefaultRepoRelDir
+	if cmd.RepoRelDir != "" {
+		repoRelDir = cmd.RepoRelDir
+	}
+
+	if cmd.ProjectName == "" && p.shouldIgnoreTargetedDir(ctx, defaultRepoDir, repoRelDir) {
+		ctx.Log.Debug("ignoring targeted plan for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
+		return pcc, nil
+	}
+
 	if p.RestrictFileList {
 		ctx.Log.Debug("'restrict-file-list' option is set, checking modified files")
 		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
@@ -765,16 +775,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		if err != nil {
 			return pcc, err
 		}
-	}
-
-	repoRelDir := DefaultRepoRelDir
-	if cmd.RepoRelDir != "" {
-		repoRelDir = cmd.RepoRelDir
-	}
-
-	if cmd.ProjectName == "" && p.shouldIgnoreTargetedDir(ctx, defaultRepoDir, repoRelDir) {
-		ctx.Log.Debug("ignoring targeted plan for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
-		return pcc, nil
 	}
 
 	return p.buildProjectCommandCtx(

@@ -993,6 +993,8 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 		ModifiedFiles      []string
 		Cmd                events.CommentCommand
 		ExpErr             string
+		ExpNoProjects      bool
+		ExpSkipFileList    bool
 	}{
 		{
 			Description: "planning a file outside of the changed files",
@@ -1028,6 +1030,32 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 				},
 			},
 			ModifiedFiles: []string{"directory-1/main.tf"},
+		},
+		{
+			Description: "planning an ignored targeted dir outside of the changed files",
+			Cmd: events.CommentCommand{
+				Name:       command.Plan,
+				RepoRelDir: "ignored",
+				Workspace:  "default",
+			},
+			AtlantisYAML: `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - ignored/**
+`,
+			DirectoryStructure: map[string]any{
+				"ignored": map[string]any{
+					"main.tf": nil,
+				},
+				"directory-2": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles:   []string{"directory-2/main.tf"},
+			ExpNoProjects:   true,
+			ExpSkipFileList: true,
 		},
 		{
 			Description: "planning a project outside of the requested changed files",
@@ -1148,6 +1176,13 @@ projects:
 				return
 			}
 			Ok(t, err)
+			if c.ExpNoProjects {
+				Equals(t, 0, len(actCtxs))
+				if c.ExpSkipFileList {
+					vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+				}
+				return
+			}
 			Equals(t, 1, len(actCtxs))
 		})
 	}
