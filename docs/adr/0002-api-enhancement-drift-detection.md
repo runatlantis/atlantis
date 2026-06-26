@@ -21,12 +21,14 @@ The current Atlantis API (`/api/plan`, `/api/apply`, `/api/locks`) provides basi
 ### Analysis of PRs #6093 and #6095
 
 **PR #6093 (Error Serialization):**
+
 - Goal: Fix error fields serializing as `{}` instead of error messages
 - Issue: The implementation changes `ProjectResult` from embedding `ProjectCommandOutput` to a named field
 - Problem: This **breaks the API response structure** by wrapping fields in `"ProjectCommandOutput": {...}`
 - Correct approach: Use custom `MarshalJSON` on `ProjectResult` that handles the embedded struct while converting errors to strings
 
 **PR #6095 (API Non-PR Support):**
+
 - Goal: Allow API applies without PR to bypass `approved`/`mergeable` requirements
 - Approach: Add `API` flag to `ProjectContext` and skip PR-specific requirements when `ctx.API && ctx.Pull.Num == 0`
 - Status: Good approach, but should be integrated into a larger design
@@ -34,7 +36,7 @@ The current Atlantis API (`/api/plan`, `/api/apply`, `/api/locks`) provides basi
 ### Current API Endpoints
 
 | Endpoint | Method | Auth Required | Description |
-|----------|--------|---------------|-------------|
+| ---------- | -------- | --------------- | ------------- |
 | `/api/plan` | POST | Yes | Trigger terraform plan |
 | `/api/apply` | POST | Yes | Trigger terraform apply |
 | `/api/locks` | GET | No | List active locks |
@@ -82,6 +84,7 @@ We will enhance the Atlantis API in five phases, implementing the fixes from PRs
 
 **Problem Analysis**:
 The current `ProjectResult` struct embeds `ProjectCommandOutput`:
+
 ```go
 type ProjectResult struct {
     ProjectCommandOutput  // embedded
@@ -95,6 +98,7 @@ PR #6093's approach changes this to a named field, which changes JSON output fro
 **Correct Implementation**:
 
 Add `MarshalJSON` to `ProjectResult` that:
+
 1. Keeps the embedded struct (no structural changes)
 2. Manually serializes fields with error converted to string
 3. Maintains exact same JSON structure
@@ -166,12 +170,14 @@ func (c Result) MarshalJSON() ([]byte, error) {
 ```
 
 **Why This Approach**:
+
 1. **No structural changes**: Keeps embedded struct, no changes to how code accesses fields
 2. **Backwards compatible**: JSON output structure remains identical
 3. **Explicit field listing**: The reviewer's concern about "manually listing all 14 fields" is valid - add a comment warning future maintainers
 4. **Testable**: Easy to verify JSON output matches expected format
 
 **Files to Modify**:
+
 - `server/events/command/project_result.go` - Add `MarshalJSON` methods
 - `server/events/command/result.go` - Add `MarshalJSON` method
 - `server/events/command/result_test.go` - Add comprehensive tests
@@ -185,6 +191,7 @@ func (c Result) MarshalJSON() ([]byte, error) {
 **Implementation** (based on PR #6095 with enhancements):
 
 1. **Add `API` flag to `ProjectContext`**:
+
 ```go
 // server/events/command/project_context.go
 type ProjectContext struct {
@@ -196,7 +203,8 @@ type ProjectContext struct {
 }
 ```
 
-2. **Propagate API flag in command builder**:
+1. **Propagate API flag in command builder**:
+
 ```go
 // server/events/project_command_context_builder.go
 func newProjectCommandContext(...) command.ProjectContext {
@@ -207,7 +215,8 @@ func newProjectCommandContext(...) command.ProjectContext {
 }
 ```
 
-3. **Skip PR-specific requirements for non-PR API calls**:
+1. **Skip PR-specific requirements for non-PR API calls**:
+
 ```go
 // server/events/command_requirement_handler.go
 func (a *DefaultCommandRequirementHandler) validateCommandRequirement(...) (string, error) {
@@ -234,11 +243,13 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(...) (stri
 ```
 
 **Design Rationale**:
+
 - `approved` and `mergeable` requirements are **PR-specific checks** - they have no meaning outside a PR context
 - Non-PR API calls (drift detection, emergency applies) should still respect other requirements like `undiverged`
 - API calls WITH a PR number should still enforce all requirements (maintains security for PR-based workflows)
 
 **Files to Modify**:
+
 - `server/events/command/project_context.go` - Add `API` field
 - `server/events/project_command_context_builder.go` - Propagate `API` flag
 - `server/events/command_requirement_handler.go` - Skip PR-specific requirements
@@ -252,10 +263,10 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(...) (stri
 
 **New Endpoints**:
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `POST /api/plan` | Enhanced | Support `PR: 0` or omitted for drift detection |
-| `GET /api/drift/status` | New | Get drift status for repository/projects |
+| Endpoint                | Method   | Description                                      |
+| ----------------------- | -------- | ------------------------------------------------ |
+| `POST /api/plan`        | Enhanced | Support `PR: 0` or omitted for drift detection   |
+| `GET /api/drift/status` | New      | Get drift status for repository/projects         |
 
 **Enhanced Plan Endpoint for Drift Detection**:
 
@@ -276,26 +287,41 @@ curl -X POST 'https://atlantis/api/plan' \
 
 **Response Enhancement for Drift Detection**:
 
-Add drift detection helpers to parse plan output:
+Add drift detection helpers to expose plan output as structured drift status.
+These helpers must reuse `models.NewPlanSuccessStats` (or extend it if
+Terraform/OpenTofu adds new counters) instead of adding a separate regex parser,
+so drift API responses stay consistent with PR plan comments and existing
+summary rendering.
 
 ```go
 // server/events/models/drift.go
 
 // DriftSummary represents detected infrastructure drift
 type DriftSummary struct {
-    HasDrift    bool   `json:"has_drift"`
-    ToAdd       int    `json:"to_add"`
-    ToChange    int    `json:"to_change"`
-    ToDestroy   int    `json:"to_destroy"`
-    Summary     string `json:"summary"`       // e.g., "2 to add, 1 to change, 0 to destroy"
+    HasDrift       bool   `json:"has_drift"`
+    ToImport       int    `json:"to_import"`
+    ToAdd          int    `json:"to_add"`
+    ToChange       int    `json:"to_change"`
+    ToDestroy      int    `json:"to_destroy"`
+    ToForget       int    `json:"to_forget"`
+    ChangesOutside bool   `json:"changes_outside"`
+    Summary        string `json:"summary"` // e.g., "2 to import, 2 to add, 1 to change, 0 to destroy, 1 to forget"
 }
 
 // ParseDriftFromPlan extracts drift information from terraform plan output
 func ParseDriftFromPlan(planOutput string) DriftSummary {
-    // Parse lines like:
-    // "Plan: 2 to add, 1 to change, 0 to destroy."
-    // or "No changes. Your infrastructure matches the configuration."
-    // ...
+    stats := NewPlanSuccessStats(planOutput)
+
+    return DriftSummary{
+        HasDrift:       stats.Changes || stats.ChangesOutside,
+        ToImport:       stats.Import,
+        ToAdd:          stats.Add,
+        ToChange:       stats.Change,
+        ToDestroy:      stats.Destroy,
+        ToForget:       stats.Forget,
+        ChangesOutside: stats.ChangesOutside,
+        Summary:        PlanSuccess{TerraformOutput: planOutput}.Summary(),
+    }
 }
 ```
 
@@ -337,8 +363,9 @@ type InMemoryDriftStorage struct {
 ```
 
 **Files to Create/Modify**:
-- `server/events/models/drift.go` - New drift models
-- `server/core/drift/parser.go` - Plan output parser for drift detection
+
+- `server/events/models/drift.go` - New drift response models
+- `server/events/models/models.go` - Reuse or extend `NewPlanSuccessStats` for any new drift counters
 - `server/core/drift/storage.go` - Optional drift status storage
 - `server/controllers/api_controller.go` - Add drift status endpoint
 
@@ -349,6 +376,7 @@ type InMemoryDriftStorage struct {
 **Goal**: Enable automated PR/MR creation to consolidate drift fixes.
 
 **Prerequisites**:
+
 - VCS Client interface must support PR/MR creation
 - Currently, PR creation only exists in E2E test code
 
@@ -510,17 +538,24 @@ type PullRequestInfo struct {
 ```
 
 **Remediation Workflow**:
+
 1. Run plan for each specified project (detect what needs to be applied)
 2. Create a new branch (e.g., `atlantis-drift-remediation-{timestamp}`)
 3. Create PR/MR with drift summary in description
 4. Return PR details for user to review and merge
 
 **Files to Create/Modify**:
+
 - `server/events/vcs/client.go` - Add `CreatePullRequest`, `CreateBranch` interface methods
+- `server/events/vcs/proxy.go` - Proxy new methods to the concrete VCS client
+- `server/events/vcs/not_configured_vcs_client.go` - Return explicit unsupported errors for unconfigured providers
 - `server/events/vcs/github/client.go` - Implement for GitHub
 - `server/events/vcs/gitlab/client.go` - Implement for GitLab
-- `server/events/vcs/bitbucketcloud/client.go` - Implement for Bitbucket
+- `server/events/vcs/bitbucketcloud/client.go` - Implement for Bitbucket Cloud
+- `server/events/vcs/bitbucketserver/client.go` - Implement for Bitbucket Server or return explicit unsupported errors
 - `server/events/vcs/azuredevops/client.go` - Implement for Azure DevOps
+- `server/events/vcs/gitea/client.go` - Implement for Gitea or return explicit unsupported errors
+- `server/events/vcs/mocks/mock_client.go` - Regenerate after changing `vcs.Client`
 - `server/controllers/api_controller.go` - Add remediation endpoint
 
 ---
@@ -532,7 +567,7 @@ type PullRequestInfo struct {
 **New Endpoints**:
 
 | Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
+| ---------- | -------- | ------ | ------------- |
 | `GET /api/projects` | GET | Yes | List configured projects |
 | `GET /api/runs` | GET | Yes | List recent plan/apply runs |
 | `DELETE /api/locks/{id}` | DELETE | Yes | Force unlock a specific lock |
@@ -573,6 +608,7 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 ## Implementation Plan
 
 ### Stage 1: Error Serialization (1-2 weeks)
+
 - [ ] Add `MarshalJSON` to `ProjectResult` with explicit field listing
 - [ ] Add `MarshalJSON` to `Result`
 - [ ] Add comprehensive unit tests for JSON serialization
@@ -580,6 +616,7 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 - [ ] Add maintainer warning comment about field synchronization
 
 ### Stage 2: Non-PR Workflow Support (1-2 weeks)
+
 - [ ] Add `API` field to `ProjectContext`
 - [ ] Propagate `API` flag in command builder
 - [ ] Modify requirement handler to skip PR-specific requirements
@@ -587,22 +624,28 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 - [ ] Add integration tests for drift detection workflow
 
 ### Stage 3: Drift Detection (2-3 weeks)
-- [ ] Create drift models and parser
+
+- [ ] Create drift response models that reuse or extend `models.NewPlanSuccessStats`
 - [ ] Add `DriftSummary` to plan response (optional enhancement)
 - [ ] Implement drift status storage (in-memory)
 - [ ] Add `/api/drift/status` endpoint
 - [ ] Add documentation for drift detection usage
 
 ### Stage 4: Drift Remediation (3-4 weeks)
+
 - [ ] Add `CreatePullRequest` and `CreateBranch` to VCS Client interface
+- [ ] Update `ClientProxy`, `NotConfiguredVCSClient`, and generated VCS mocks
 - [ ] Implement for GitHub
 - [ ] Implement for GitLab
 - [ ] Implement for Bitbucket Cloud
+- [ ] Implement or explicitly return unsupported errors for Bitbucket Server
 - [ ] Implement for Azure DevOps
+- [ ] Implement or explicitly return unsupported errors for Gitea
 - [ ] Add `/api/drift/remediate` endpoint
 - [ ] Add comprehensive tests
 
 ### Stage 5: Additional Features (1-2 weeks)
+
 - [ ] Add `/api/projects` endpoint
 - [ ] Add `/api/runs` endpoint (if run history available)
 - [ ] Add `DELETE /api/locks/{id}` endpoint
@@ -616,7 +659,7 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 ### Modified Files
 
 | File | Phase | Changes |
-|------|-------|---------|
+| ------ | ------- | --------- |
 | `server/events/command/project_result.go` | 1 | Add `MarshalJSON` method |
 | `server/events/command/result.go` | 1 | Add `MarshalJSON` method |
 | `server/events/command/result_test.go` | 1 | Add serialization tests |
@@ -624,20 +667,25 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 | `server/events/project_command_context_builder.go` | 2 | Propagate `API` flag |
 | `server/events/command_requirement_handler.go` | 2 | Skip PR-specific requirements |
 | `server/events/command_requirement_handler_test.go` | 2 | Add test cases |
-| `server/events/vcs/client.go` | 4 | Add `CreatePullRequest`, `CreateBranch` |
+| `server/events/models/models.go` | 3 | Reuse or extend `NewPlanSuccessStats` for drift counters |
+| `server/events/vcs/client.go` | 4 | Add `CreatePullRequest`, `CreateBranch` and shared option types |
+| `server/events/vcs/proxy.go` | 4 | Proxy branch and PR creation calls |
+| `server/events/vcs/not_configured_vcs_client.go` | 4 | Return unsupported errors for unconfigured clients |
 | `server/events/vcs/github/client.go` | 4 | Implement PR creation |
 | `server/events/vcs/gitlab/client.go` | 4 | Implement MR creation |
 | `server/events/vcs/bitbucketcloud/client.go` | 4 | Implement PR creation |
+| `server/events/vcs/bitbucketserver/client.go` | 4 | Implement PR creation or explicit unsupported errors |
 | `server/events/vcs/azuredevops/client.go` | 4 | Implement PR creation |
+| `server/events/vcs/gitea/client.go` | 4 | Implement PR creation or explicit unsupported errors |
+| `server/events/vcs/mocks/mock_client.go` | 4 | Regenerate after `vcs.Client` changes |
 | `server/controllers/api_controller.go` | 3,4,5 | Add new endpoints |
 | `server/server.go` | 3,4,5 | Register new routes |
 
 ### New Files
 
 | File | Phase | Purpose |
-|------|-------|---------|
+| ------ | ------- | --------- |
 | `server/events/models/drift.go` | 3 | Drift models |
-| `server/core/drift/parser.go` | 3 | Plan output parser |
 | `server/core/drift/storage.go` | 3 | Drift status storage |
 | `runatlantis.io/docs/api-endpoints.md` | 5 | Documentation updates |
 
@@ -646,6 +694,7 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 ## Consequences
 
 ### Benefits
+
 1. **Error Visibility**: Proper error messages in API responses
 2. **Drift Detection**: Proactive infrastructure monitoring capability
 3. **Backwards Compatible**: No breaking changes to existing API
@@ -655,7 +704,7 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 ### Risks and Mitigations
 
 | Risk | Mitigation |
-|------|------------|
+| ------ | ------------ |
 | Field synchronization in MarshalJSON | Add maintainer warning comment, add linter check |
 | VCS provider differences | Abstract through interface, comprehensive testing |
 | Security (non-PR applies) | Keep other requirements enforced, audit logging |
