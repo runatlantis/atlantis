@@ -1,0 +1,59 @@
+server/events/state_command_runner.go
+  s_12c46f3ee857ef::t_132def50be8618 56-59
+server/controllers/api_controller.go
+  s_12c46f3ee857ef::t_9da802e5bd1342 83-84,89,94,100-102,265-268,317-320
+server/events/project_command_builder_test.go
+  s_12c46f3ee857ef::t_05ac76b55a1f8b 825
+  s_12c46f3ee857ef::t_5a8ef9f104f52d 834-840
+  s_12c46f3ee857ef::t_f6aae3833a7f05 789-824,826-833,841-882
+server/events/import_command_runner.go
+  s_12c46f3ee857ef::t_d43d2f8b28aed4 76-79
+server/events/apply_command_runner.go
+  s_12c46f3ee857ef::t_d58d7e8450e984 224-227
+server/events/command_runner_test.go
+  s_12c46f3ee857ef::t_db4c470199ef2f 526,530
+server/events/project_command_builder.go
+  s_12c46f3ee857ef::t_29e5c6db121e50 1019-1028
+  s_12c46f3ee857ef::t_e67748cdad7f5e 179,190,198,204,212,220,227-228
+  s_12c46f3ee857ef::t_d927026569f951 56-64
+  s_12c46f3ee857ef::t_01e5f454deb314 229,461-499
+  s_bbd3af077a8e9c::t_a25b1597660097 230
+server/events/command_runner.go
+  s_12c46f3ee857ef::t_1697d38c21c763 214,498-502
+  s_12c46f3ee857ef::t_8fabf8f1bdb1c9 72-75,91-95,211-213
+  s_12c46f3ee857ef::t_e9829ef73fa748 215
+server/events/approve_policies_command_runner.go
+  s_12c46f3ee857ef::t_713cbb56f2fccc 98-101
+server/events/version_command_runner.go
+  s_12c46f3ee857ef::t_b7461a00733da7 64-67
+server/controllers/api_controller_test.go
+  s_12c46f3ee857ef::t_e2be088ba905dc 290-362
+server/events/plan_command_runner.go
+  s_12c46f3ee857ef::t_15ece209395ab1 338-341
+server/events/mocks/mock_project_command_builder.go
+  s_12c46f3ee857ef::t_2e1eeeab3e62ed 162-176,452-486
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "ad3f98a7bb1bf7a0a86cd7393955e4417033e0ca",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_bbd3af077a8e9c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019efee8-39a4-7ca1-908b-38326a7fae50",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
