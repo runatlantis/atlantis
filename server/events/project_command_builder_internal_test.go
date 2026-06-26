@@ -64,15 +64,16 @@ workflows:
       - apply`,
 			repoCfg: "",
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   false,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     false,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -121,15 +122,16 @@ projects:
   terraform_version: v10.0
   `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -182,15 +184,16 @@ projects:
   terraform_version: v10.0
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -251,15 +254,16 @@ projects:
   terraform_version: v10.0
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -407,15 +411,16 @@ workflows:
       - apply
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -470,15 +475,16 @@ projects:
   workflow: custom
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -536,15 +542,16 @@ workflows:
       steps: []
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -588,15 +595,16 @@ projects:
   workspace: myworkspace
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   false,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     false,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"**/*.tf*", "**/terragrunt.hcl", "**/.terraform.lock.hcl"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -802,15 +810,16 @@ projects:
   terraform_version: v10.0
   `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -p myproject_1",
-				ApprovePoliciesCmd: "atlantis approve_policies -p myproject_1",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logging.NewNoopLogger(t),
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -p myproject_1",
+				ApprovePoliciesCmd:   "atlantis approve_policies -p myproject_1",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logging.NewNoopLogger(t),
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -985,15 +994,16 @@ repos:
 `,
 			repoCfg: "",
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   false,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     false,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -1047,15 +1057,16 @@ workflows:
       - policy_check
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
@@ -1387,7 +1398,28 @@ autodiscover:
   mode: disabled
 `,
 			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
-			expLen:        1,
+			expLen:        3,
+		},
+		"autodiscover inherited from broad global config, disabled at repo level": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+- id: /.*/
+  allowed_overrides: [workflow]
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: disabled
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        3,
 		},
 		"autodiscover respects ignore_paths in repo config": {
 			globalCfg: `
@@ -1533,6 +1565,27 @@ autodiscover:
 
 		})
 	}
+}
+
+func TestDefaultProjectCommandBuilder_AutoDiscoverModeEnabledDefaultsEmptyToAuto(t *testing.T) {
+	builder := &DefaultProjectCommandBuilder{
+		GlobalCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+	}
+	ctx := &command.Context{
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				FullName: "owner/repo",
+				VCSHost: models.VCSHost{
+					Hostname: "github.com",
+				},
+			},
+		},
+	}
+
+	Equals(t, true, builder.autoDiscoverModeEnabled(ctx, valid.RepoCfg{}))
+	Equals(t, false, builder.autoDiscoverModeEnabled(ctx, valid.RepoCfg{
+		Projects: []valid.Project{{Dir: "project1"}},
+	}))
 }
 
 func mustVersion(v string) *version.Version {

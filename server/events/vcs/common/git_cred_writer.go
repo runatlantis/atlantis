@@ -97,7 +97,7 @@ func fileAppend(line string, filename string) error {
 	if len(currContents) > 0 && !strings.HasSuffix(string(currContents), "\n") {
 		line = "\n" + line
 	}
-	return os.WriteFile(filename, []byte(string(currContents)+line), 0600)
+	return os.WriteFile(filename, []byte(string(currContents)+line), 0600) // #nosec G703 -- filename comes from trusted caller-supplied $HOME path
 }
 
 func fileLineReplace(line, user, host, filename string) error {
@@ -121,7 +121,7 @@ func fileLineReplace(line, user, host, filename string) error {
 		return fileAppend(line, filename)
 	}
 
-	return os.WriteFile(filename, []byte(toWrite), 0600)
+	return os.WriteFile(filename, []byte(toWrite), 0600) // #nosec G703 -- filename comes from trusted caller-supplied $HOME path
 }
 
 func fileHasGHToken(user, host, filename string) (bool, error) {

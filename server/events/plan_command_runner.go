@@ -101,6 +101,16 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
+	var err error
+	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
+	if err != nil {
+		// On error we continue the request with mergeable assumed false.
+		// We want to continue because not all plan's will need this status,
+		// only if they rely on the mergeability requirement.
+		// All PullRequestStatus fields are set to false by default when error.
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+	}
+
 	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
@@ -119,13 +129,13 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 			// with 0/0 projects planned/policy_checked/applied successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		} else {
@@ -223,7 +233,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 				if pullStatus == nil {
 					// default to 0/0
 					ctx.Log.Debug("setting VCS status to 0/0 success as no previous state was found")
-					if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+					if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
 						ctx.Log.Warn("unable to update commit status: %s", err)
 					}
 					return
@@ -236,13 +246,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 				// the Atlantis status to be passing for all pull requests.
 				// Does not apply to skipped runs for specific projects
 				ctx.Log.Debug("setting VCS status to success with no projects found")
-				if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+				if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
 					ctx.Log.Warn("unable to update commit status: %s", err)
 				}
-				if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+				if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
 					ctx.Log.Warn("unable to update commit status: %s", err)
 				}
-				if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+				if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
 					ctx.Log.Warn("unable to update commit status: %s", err)
 				}
 			}
@@ -304,7 +314,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		// with 0/0 projects planned/policy_checked/applied successfully because some users require
 		// the Atlantis status to be passing for all pull requests.
 		ctx.Log.Debug("setting VCS status to success with no projects found")
-		if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+		if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
 			ctx.Log.Warn("unable to update commit status: %s", err)
 		}
 	}
@@ -321,6 +331,7 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus, commandName command.Name) {
 	var numSuccess int
 	var numErrored int
+	var numNoChanges int
 	status := models.SuccessCommitStatus
 
 	switch commandName {
@@ -335,7 +346,8 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 			status = models.FailedCommitStatus
 		}
 	case command.Apply:
-		numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
+		numNoChanges = pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)
+		numSuccess = pullStatus.StatusCount(models.AppliedPlanStatus) + numNoChanges
 		numErrored = pullStatus.StatusCount(models.ErroredApplyStatus)
 
 		if numErrored > 0 {
@@ -365,8 +377,7 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		ctx.Pull,
 		status,
 		commandName,
-		numSuccess,
-		len(pullStatus.Projects),
+		models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored, NoChanges: numNoChanges},
 	); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}

@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package cmd
@@ -64,6 +55,7 @@ var testFlags = map[string]any{
 	AutoplanModules:                  false,
 	AutoplanModulesFromProjects:      "",
 	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
+	BlockedExtraArgsFlag:             "-chdir,--chdir,-plugin-dir,--plugin-dir",
 	AllowForkPRsFlag:                 true,
 	APISecretFlag:                    "",
 	AutoDiscoverModeFlag:             "auto",
@@ -132,6 +124,8 @@ var testFlags = map[string]any{
 	RedisPort:                        6379,
 	RedisTLSEnabled:                  false,
 	RedisDB:                          0,
+	RedisUsername:                    "",
+	RedisClusterAddresses:            "",
 	RepoAllowlistFlag:                "github.com/runatlantis/atlantis",
 	RepoConfigFlag:                   "",
 	RepoConfigJSONFlag:               "",
@@ -239,12 +233,12 @@ func getUserConfigKeysWithFlags() []string {
 	var ret []string
 	u := reflect.TypeFor[server.UserConfig]()
 
-	for i := 0; i < u.NumField(); i++ {
+	for field := range u.Fields() {
 
-		userConfigKey := u.Field(i).Tag.Get("mapstructure")
+		userConfigKey := field.Tag.Get("mapstructure")
 		// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
 		// Some fields are too complicated to have flags, so are only expressible in the config yaml
-		flagKey := u.Field(i).Tag.Get("flag")
+		flagKey := field.Tag.Get("flag")
 		if flagKey == "false" {
 			continue
 		}
@@ -1209,4 +1203,37 @@ func TestExecute_GiteaBaseURLPort(t *testing.T) {
 	}, t)
 	Ok(t, c.Execute())
 	Equals(t, "http://mydomain.com:7990", passedConfig.GiteaBaseURL)
+}
+
+func TestSanitizeKubernetesServiceLinks(t *testing.T) {
+	t.Log("Kubernetes service link env vars should be sanitized to defaults")
+	// Simulate Kubernetes injecting ATLANTIS_REDIS_PORT=tcp://10.x.x.x:6379
+	envKey := "ATLANTIS_REDIS_PORT"
+	os.Setenv(envKey, "tcp://10.96.0.15:6379") // nolint: errcheck
+	defer os.Unsetenv(envKey)
+
+	c := setupWithDefaults(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, DefaultRedisPort, passedConfig.RedisPort)
+}
+
+func TestSanitizeKubernetesServiceLinks_UDPIgnored(t *testing.T) {
+	t.Log("UDP service link env vars should also be sanitized")
+	envKey := "ATLANTIS_REDIS_PORT"
+	os.Setenv(envKey, "udp://10.96.0.15:6379") // nolint: errcheck
+	defer os.Unsetenv(envKey)
+
+	c := setupWithDefaults(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, DefaultRedisPort, passedConfig.RedisPort)
 }

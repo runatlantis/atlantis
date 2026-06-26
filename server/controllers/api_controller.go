@@ -40,6 +40,11 @@ type APIController struct {
 	WorkingDir                     events.WorkingDir                     `validate:"required"`
 	WorkingDirLocker               events.WorkingDirLocker               `validate:"required"`
 	CommitStatusUpdater            events.CommitStatusUpdater            `validate:"required"`
+	// PullReqStatusFetcher is optional. When set and the API request supplies a
+	// PR number, it is used to populate command.Context.PullRequestStatus so
+	// apply requirements like 'mergeable' and 'approved' evaluate against real
+	// VCS state instead of always failing.
+	PullReqStatusFetcher vcs.PullReqStatusFetcher
 	// SilenceVCSStatusNoProjects is whether API should set commit status if no projects are found
 	SilenceVCSStatusNoProjects bool
 }
@@ -149,6 +154,10 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
 
+	// The API apply endpoint runs plan first. Refresh PR status afterward so
+	// apply requirements evaluate the VCS state the plan phase just produced.
+	a.populatePullRequestStatus(ctx)
+
 	// We can now prepare and run the apply step
 	result, err := a.apiApply(request, ctx)
 	if err != nil {
@@ -248,13 +257,13 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		// When silence is enabled and no projects are found, don't set any VCS status
 		if !a.SilenceVCSStatusNoProjects {
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update plan status: %s", err)
 			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update policy check status: %s", err)
 			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update apply status: %s", err)
 			}
 		} else {
@@ -296,13 +305,13 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 		// When silence is enabled and no projects are found, don't set any VCS status
 		if !a.SilenceVCSStatusNoProjects {
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update plan status: %s", err)
 			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update policy check status: %s", err)
 			}
-			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, 0, 0); err != nil {
+			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update apply status: %s", err)
 			}
 		} else {
@@ -376,19 +385,37 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusForbidden, fmt.Errorf("repo not allowlisted")
 	}
 
-	return &request, &command.Context{
+	pull := models.PullRequest{
+		Num:        request.PR,
+		BaseBranch: request.Ref,
+		HeadBranch: request.Ref,
+		HeadCommit: request.Ref,
+		BaseRepo:   baseRepo,
+	}
+	ctx := &command.Context{
 		HeadRepo: baseRepo,
-		Pull: models.PullRequest{
-			Num:        request.PR,
-			BaseBranch: request.Ref,
-			HeadBranch: request.Ref,
-			HeadCommit: request.Ref,
-			BaseRepo:   baseRepo,
-		},
-		Scope: a.Scope,
-		Log:   a.Logger,
-		API:   true,
-	}, http.StatusOK, nil
+		Pull:     pull,
+		Scope:    a.Scope,
+		Log:      a.Logger,
+		API:      true,
+	}
+	a.populatePullRequestStatus(ctx)
+	return &request, ctx, http.StatusOK, nil
+}
+
+func (a *APIController) populatePullRequestStatus(ctx *command.Context) {
+	if ctx.Pull.Num <= 0 || a.PullReqStatusFetcher == nil {
+		return
+	}
+
+	status, err := a.PullReqStatusFetcher.FetchPullStatus(ctx.Log, ctx.Pull)
+	if err != nil {
+		ctx.PullRequestStatus = models.PullReqStatus{}
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+		return
+	}
+
+	ctx.PullRequestStatus = status
 }
 
 func (a *APIController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {

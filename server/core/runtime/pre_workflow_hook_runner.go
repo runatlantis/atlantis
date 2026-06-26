@@ -14,7 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
 type PreWorkflowHookRunner interface {
 	Run(ctx models.WorkflowHookCommandContext, command string, shell string, shellArgs string, path string) (string, string, error)
 }
@@ -47,6 +47,7 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		"USER_NAME":          ctx.User.Username,
 		"OUTPUT_STATUS_FILE": outputFilePath,
 		"COMMAND_NAME":       ctx.CommandName,
+		"PROJECT_NAME":       ctx.ProjectName,
 	}
 
 	finalEnvVars := baseEnvVars
