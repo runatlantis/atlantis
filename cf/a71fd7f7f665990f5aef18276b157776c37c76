@@ -1,0 +1,25 @@
+server/events/pre_workflow_hooks_command_runner.go
+  s_12c46f3ee857ef::t_a72e0999febe54 31-34,48,99-111
+  s_12c46f3ee857ef::t_4fc2fa4ad81ebe 112
+server/events/command_runner.go
+  s_12c46f3ee857ef::t_c71c8335e6a8a0 96-100,522,526-528
+server/events/command_runner_test.go
+  s_12c46f3ee857ef::t_6cde2aaefab4d6 701-722,725-727,751
+  s_12c46f3ee857ef::t_5ba8c489f5fe04 81-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "cfa71fd7f7f665990f5aef18276b157776c37c76",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
