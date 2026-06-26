@@ -49,6 +49,15 @@ In the case of transient errors when updating the merged branch, Atlantis will
 error for safety to avoid using a stale branch.
 :::
 
+:::tip NOTE
+When Atlantis is authenticated as a GitHub App and uses the `merge` checkout
+strategy for a GitHub pull request, it fetches the pull request head from the
+base repository's `pull/<PR number>/head` ref on `origin`. It does not create or
+update a separate `source` remote for the pull request's head repository. This
+avoids fetching forks that the GitHub App installation cannot access. The
+non-GitHub App checkout path still uses the `source` remote.
+:::
+
 :::warning
 Atlantis only performs this merge during the `terraform plan` phase. If another
 commit is pushed to `main` **after** Atlantis runs `plan`, nothing will happen.

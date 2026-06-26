@@ -7,10 +7,12 @@ package events
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -19,7 +21,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
-	"github.com/runatlantis/atlantis/server/utils"
 	"github.com/uber-go/tally/v4"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -141,7 +142,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+		log.Err("Unable to fetch pull status, this is likely a bug: %s", err)
 	}
 
 	scope := c.StatsScope.SubScope("autoplan")
@@ -155,8 +156,9 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 			log.Err("Unable to fetch user teams: %s", err)
 			return
 		}
+		directUserTeams := append([]string(nil), user.Teams...)
 
-		ok, err := c.checkUserPermissions(baseRepo, user, &CommentCommand{Name: command.Plan})
+		ok, err := c.checkUserPermissions(baseRepo, &user, "plan")
 		if err != nil {
 			log.Err("Unable to check user permissions: %s", err)
 			return
@@ -164,6 +166,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		if !ok {
 			return
 		}
+		c.addPolicyCheckHierarchyTeamsForPlan(baseRepo, &user, command.Plan, directUserTeams)
 	}
 
 	ctx := &command.Context{
@@ -185,7 +188,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		labels, err := c.VCSClient.GetPullLabels(ctx.Log, baseRepo, pull)
 		if err != nil {
 			ctx.Log.Err("Unable to get VCS pull/merge request labels: %s. Proceeding with autoplan.", err)
-		} else if utils.SlicesContains(labels, c.DisableAutoplanLabel) {
+		} else if slices.Contains(labels, c.DisableAutoplanLabel) {
 			ctx.Log.Info("Pull/merge request has disable auto plan label '%s' so not running autoplan.", c.DisableAutoplanLabel)
 			return
 		}
@@ -253,13 +256,130 @@ func (c *DefaultCommandRunner) commentUserDoesNotHavePermissions(baseRepo models
 	}
 }
 
-// checkUserPermissions performs the pre-flight authorization check.
-// This runs before the repo is cloned or projects are discovered, so only
-// repo-level context and any flags explicitly provided in the command
-// (workspace, project name) are available. The CHECK_TYPE env var is set
-// to "pre_flight" so external authorization scripts can distinguish this
-// from the later per-project check.
-func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user models.User, cmd *CommentCommand) (bool, error) {
+// fetchDescendantTeams fetches all descendant team slugs for the given team up to maxDepth
+// levels deep using an iterative BFS with a visited set to avoid duplicate API calls and
+// handle any cycles in unexpected hierarchy configurations.
+func fetchDescendantTeams(fetcher vcs.Client, logger logging.SimpleLogging, repo models.Repo, teamSlug string, maxDepth int) ([]string, error) {
+	if maxDepth <= 0 {
+		return nil, nil
+	}
+
+	type queueItem struct {
+		slug  string
+		depth int
+	}
+
+	visited := map[string]struct{}{teamSlug: {}}
+	queue := []queueItem{{slug: teamSlug, depth: 0}}
+	var result []string
+
+	for i := 0; i < len(queue); i++ {
+		current := queue[i]
+
+		if current.depth >= maxDepth {
+			continue
+		}
+
+		children, err := fetcher.GetChildTeams(logger, repo, current.slug)
+		if err != nil {
+			if current.slug == teamSlug {
+				return nil, err
+			}
+			logger.Warn("Could not fetch child teams for '%s': %s", current.slug, err)
+			continue
+		}
+
+		for _, child := range children {
+			if _, ok := visited[child]; ok {
+				continue
+			}
+			visited[child] = struct{}{}
+			result = append(result, child)
+			queue = append(queue, queueItem{slug: child, depth: current.depth + 1})
+		}
+	}
+
+	return result, nil
+}
+
+func teamSet(teams []string) map[string]struct{} {
+	result := make(map[string]struct{}, len(teams))
+	for _, team := range teams {
+		result[strings.ToLower(team)] = struct{}{}
+	}
+	return result
+}
+
+func (c *DefaultCommandRunner) addHierarchyTeamsForCommand(repo models.Repo, user *models.User, cmdName string) {
+	c.addHierarchyTeamsForCommandForTeams(repo, user, cmdName, user.Teams)
+}
+
+func (c *DefaultCommandRunner) addHierarchyTeamsForCommandForTeams(repo models.Repo, user *models.User, cmdName string, teams []string) {
+	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
+		return
+	}
+
+	ctx := models.TeamAllowlistCheckerContext{
+		BaseRepo:    repo,
+		CommandName: cmdName,
+		Log:         c.Logger,
+		Pull:        models.PullRequest{},
+		User:        *user,
+		Verbose:     false,
+		API:         false,
+	}
+
+	// Only direct user teams should authorize hierarchy grants. Parent teams inferred
+	// during this pass are appended for downstream direct-membership filters, not for
+	// chaining additional hierarchy grants.
+	directUserTeams := teamSet(teams)
+	currentUserTeams := teamSet(user.Teams)
+
+	const maxHierarchyDepth = 20
+	for _, allowedTeam := range c.TeamAllowlistChecker.AllTeams() {
+		if allowedTeam == "*" {
+			continue
+		}
+		normalizedAllowedTeam := strings.ToLower(allowedTeam)
+		if _, ok := currentUserTeams[normalizedAllowedTeam]; ok {
+			continue
+		}
+		if !c.TeamAllowlistChecker.IsCommandAllowedForTeam(ctx, allowedTeam, cmdName) {
+			continue
+		}
+		descendants, err := fetchDescendantTeams(c.VCSClient, c.Logger, repo, allowedTeam, maxHierarchyDepth)
+		if err != nil {
+			c.Logger.Warn("Could not fetch child teams for '%s': %s", allowedTeam, err)
+			continue
+		}
+		for _, descendant := range descendants {
+			if _, ok := directUserTeams[strings.ToLower(descendant)]; !ok {
+				continue
+			}
+			user.Teams = append(user.Teams, allowedTeam)
+			currentUserTeams[normalizedAllowedTeam] = struct{}{}
+			break
+		}
+	}
+}
+
+func (c *DefaultCommandRunner) addPolicyCheckHierarchyTeamsForPlan(repo models.Repo, user *models.User, cmdName command.Name, directUserTeams []string) {
+	if cmdName != command.Plan {
+		return
+	}
+	c.addHierarchyTeamsForCommandForTeams(repo, user, command.PolicyCheck.String(), directUserTeams)
+}
+
+// checkUserPermissions checks if the user has permissions to execute the command.
+// It first checks direct team membership against the allowlist. If that fails,
+// it expands each allowlisted team to include all its descendant teams (up to
+// 20 levels deep) via GetChildTeams on the VCS client and re-checks.
+// Non-GitHub VCS providers return nil from GetChildTeams, so the expansion
+// loop is effectively a no-op for them.
+// When a match is found via hierarchy, the matched allowlisted parent team is appended to
+// user.Teams so that subsequent per-project allowlist checks (which use direct membership
+// only) also pass.
+func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *models.User, cmdName string) (bool, error) {
 	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
 		return true, nil
 	}
@@ -279,11 +399,19 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user model
 		Workspace:   cmd.Workspace,
 		ProjectName: cmd.ProjectName,
 	}
-	ok := c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmd.Name.String())
-	if !ok {
-		return false, nil
+
+	// Fast path: user is a direct member of an allowlisted team.
+	if c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmdName) {
+		return true, nil
 	}
-	return true, nil
+
+	// Slow path: check if the user belongs to a descendant team of any allowlisted team.
+	c.addHierarchyTeamsForCommand(repo, user, cmdName)
+	ctx.User = *user
+	if c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmdName) {
+		return true, nil
+	}
+	return false, nil
 }
 
 // checkVarFilesInPlanCommandAllowlisted checks if paths in a 'plan' command are allowlisted.
@@ -327,8 +455,9 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			c.Logger.Err("Unable to fetch user teams: %s", err)
 			return
 		}
+		directUserTeams := append([]string(nil), user.Teams...)
 
-		ok, err := c.checkUserPermissions(baseRepo, user, cmd)
+		ok, err := c.checkUserPermissions(baseRepo, &user, cmd.Name.String())
 		if err != nil {
 			c.Logger.Err("Unable to check user permissions: %s", err)
 			return
@@ -337,6 +466,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			c.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, cmd)
 			return
 		}
+		c.addPolicyCheckHierarchyTeamsForPlan(baseRepo, &user, cmd.Name, directUserTeams)
 	}
 
 	// Check if the provided var files in a 'plan' command are allowlisted
@@ -356,7 +486,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+		log.Err("Unable to fetch pull status, this is likely a bug: %s", err)
 	}
 
 	ctx := &command.Context{
@@ -528,7 +658,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	}
 
 	if err != nil {
-		log.Err(err.Error())
+		log.Err("%s", err.Error())
 		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err), ""); commentErr != nil {
 			log.Err("unable to comment: %s", commentErr)
 		}

@@ -143,14 +143,14 @@ func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 		if strings.EqualFold(*c.User.UUID, me) {
 			// do the same crude filtering as github client does
 			body := strings.Split(c.Content.Raw, "\n")
-			logger.Debug("Body is %s", body)
+			logger.Debug("Body is %v", body)
 			if len(body) == 0 {
 				continue
 			}
 			firstLine := strings.ToLower(body[0])
 			if strings.Contains(firstLine, strings.ToLower(command)) {
 				// we found our old comment that references that command
-				logger.Debug("Deleting comment with id %s", *c.ID)
+				logger.Debug("Deleting comment with id %d", *c.ID)
 				err = b.DeletePullRequestComment(repo, pullNum, *c.ID)
 				if err != nil {
 					return err
@@ -392,4 +392,8 @@ func (b *Client) GetCloneURL(_ logging.SimpleLogging, _ models.VCSHostType, _ st
 
 func (b *Client) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
+}
+
+func (b *Client) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, _ string) ([]string, error) {
+	return nil, nil
 }

@@ -479,7 +479,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 						Dir: "project2",
 						Autoplan: valid.Autoplan{
 							Enabled:      true,
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 						},
 					},
 				},

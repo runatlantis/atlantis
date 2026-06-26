@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 )
 
 var githubUsername string

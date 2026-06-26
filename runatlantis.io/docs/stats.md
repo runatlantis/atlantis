@@ -2,6 +2,8 @@
 
 Atlantis exposes a set of metrics for each of its operations including errors, successes, and latencies.
 
+Latency and duration metrics are reported in seconds (for example, the `*_time` metrics in the Prometheus output below), while counter metrics such as successes and errors are unitless.
+
 ::: warning NOTE
 Currently Statsd and Prometheus is supported. See configuration below for details.
 :::

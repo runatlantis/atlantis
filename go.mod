@@ -1,6 +1,6 @@
 module github.com/runatlantis/atlantis
 
-go 1.25.8
+go 1.26.4
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2
@@ -9,14 +9,15 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
 	github.com/briandowns/spinner v1.23.2
-	github.com/cactus/go-statsd-client/v5 v5.1.0
+	github.com/cactus/go-statsd-client/v5 v5.0.0
+	github.com/cactus/go-statsd-client/v6 v6.0.0
 	github.com/drmaxgit/go-azuredevops v0.13.2
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/go-test/deep v1.1.1
 	github.com/gofri/go-github-ratelimit v1.1.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/google/go-github/v83 v83.0.0
+	github.com/google/go-github/v88 v88.0.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
@@ -39,19 +40,19 @@ require (
 	github.com/redis/go-redis/v9 v9.17.3
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
-	github.com/slack-go/slack v0.16.0
+	github.com/slack-go/slack v0.23.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/uber-go/tally/v4 v4.1.17
 	github.com/urfave/negroni/v3 v3.1.1
-	gitlab.com/gitlab-org/api/client-go v0.118.0
+	gitlab.com/gitlab-org/api/client-go v0.161.1
 	go.etcd.io/bbolt v1.4.3
 	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.1
-	golang.org/x/term v0.41.0
-	golang.org/x/text v0.35.0
+	golang.org/x/term v0.43.0
+	golang.org/x/text v0.37.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -137,16 +138,16 @@ require (
 	github.com/zclconf/go-cty v1.16.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.49.0 // indirect
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
+	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
 	golang.org/x/mod v0.35.0 // indirect
-	golang.org/x/net v0.52.0 // indirect
-	golang.org/x/oauth2 v0.27.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/time v0.8.0 // indirect
-	golang.org/x/tools v0.43.0 // indirect
-	google.golang.org/protobuf v1.36.7 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/time v0.12.0 // indirect
+	golang.org/x/tools v0.44.0 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 )
 
 tool (

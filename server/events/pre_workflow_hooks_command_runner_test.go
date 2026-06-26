@@ -289,7 +289,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 
-	t.Run("comment args passed to webhooks", func(t *testing.T) {
+	t.Run("comment args and projectname passed to webhooks", func(t *testing.T) {
 		preWorkflowHooksSetup(t)
 
 		var unlockCalled = newBool(false)
@@ -309,12 +309,16 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		}
 
 		planCmd := &events.CommentCommand{
-			Name:  command.Plan,
-			Flags: []string{"comment", "args"},
+			Name:        command.Plan,
+			Flags:       []string{"comment", "args"},
+			ProjectName: "*",
 		}
 
 		expectedCtx := pCtx
+		expectedCtx.HookDescription = "Pre workflow hook #0"
+		expectedCtx.HookStepName = "pre plan #0"
 		expectedCtx.EscapedCommentArgs = []string{"\\c\\o\\m\\m\\e\\n\\t", "\\a\\r\\g\\s"}
+		expectedCtx.ProjectName = "*"
 
 		preWh.GlobalCfg = globalCfg
 
@@ -322,14 +326,23 @@ func TestRunPreHooks_Clone(t *testing.T) {
 			events.DefaultRepoRelDir, "", command.Plan)).ThenReturn(unlockFn, nil)
 		When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
 			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
-		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand), Any[string](),
-			Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
+		When(whPreWorkflowHookRunner.Run(
+			ArgThat[models.WorkflowHookCommandContext](WorkflowHookCommandContextMatcher{expected: expectedCtx}),
+			Eq(testHook.RunCommand),
+			Any[string](),
+			Any[string](),
+			Eq(repoDir),
+		)).ThenReturn(result, runtimeDesc, nil)
 
 		err := preWh.RunPreHooks(ctx, planCmd)
 
 		Ok(t, err)
-		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
-			Eq(defaultShell), Eq(defaultShellArgs), Eq(repoDir))
+		whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(
+			ArgThat[models.WorkflowHookCommandContext](WorkflowHookCommandContextMatcher{expected: expectedCtx}),
+			Eq(testHook.RunCommand),
+			Eq(defaultShell),
+			Eq(defaultShellArgs),
+			Eq(repoDir))
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 

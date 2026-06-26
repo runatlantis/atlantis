@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/gofri/go-github-ratelimit/github_ratelimit"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -121,20 +121,24 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		return nil, fmt.Errorf("error initializing github rate limit transport: %w", err)
 	}
 
-	var graphqlURL string
 	var client *github.Client
 	if hostname == "github.com" {
-		client = github.NewClient(transportWithRateLimit)
-		graphqlURL = "https://api.github.com/graphql"
+		client, err = github.NewClient(github.WithHTTPClient(transportWithRateLimit))
+		if err != nil {
+			return nil, fmt.Errorf("creating github client: %w", err)
+		}
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
-		// TODO: Deprecated: Use NewClient(httpClient).WithEnterpriseURLs(baseURL, uploadURL) instead
-		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transportWithRateLimit) //nolint:staticcheck
+		client, err = github.NewClient(
+			github.WithHTTPClient(transportWithRateLimit),
+			github.WithEnterpriseURLs(apiURL.String(), apiURL.String()),
+		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("creating github enterprise client: %w", err)
 		}
-		graphqlURL = fmt.Sprintf("https://%s/api/graphql", apiURL.Host)
 	}
+
+	graphqlURL := resolveGraphQLURL(hostname)
 
 	// Use the client from shurcooL's githubv4 library for queries.
 	v4Client := githubv4.NewEnterpriseClient(graphqlURL, transportWithRateLimit)
@@ -1119,6 +1123,52 @@ func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.R
 		variables["teamCursor"] = githubv4.NewString(q.Organization.Teams.PageInfo.EndCursor)
 	}
 	return teamNames, nil
+}
+
+// GetChildTeams returns the slugs of the direct child teams of the given team.
+// Use this with fetchDescendantTeams in the command runner to expand an allowlisted team
+// to all its descendants, supporting GitHub team hierarchy.
+// https://docs.github.com/en/graphql/reference/objects#team
+func (g *Client) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error) {
+	logger.Debug("Getting child teams for GitHub team '%s'", teamSlug)
+	orgName := repo.Owner
+	variables := map[string]any{
+		"orgName":     githubv4.String(orgName),
+		"teamSlug":    githubv4.String(teamSlug),
+		"childCursor": (*githubv4.String)(nil),
+	}
+	var q struct {
+		Organization struct {
+			Team struct {
+				ChildTeams struct {
+					Nodes []struct {
+						Slug string
+					}
+					PageInfo struct {
+						EndCursor   githubv4.String
+						HasNextPage bool
+					}
+				} `graphql:"childTeams(first: 100, after: $childCursor)"`
+			} `graphql:"team(slug: $teamSlug)"`
+		} `graphql:"organization(login: $orgName)"`
+	}
+	var childSlugs []string
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	for {
+		err := g.v4Client.Query(ctx, &q, variables)
+		if err != nil {
+			return nil, err
+		}
+		for _, node := range q.Organization.Team.ChildTeams.Nodes {
+			childSlugs = append(childSlugs, node.Slug)
+		}
+		if !q.Organization.Team.ChildTeams.PageInfo.HasNextPage {
+			break
+		}
+		variables["childCursor"] = githubv4.NewString(q.Organization.Team.ChildTeams.PageInfo.EndCursor)
+	}
+	return childSlugs, nil
 }
 
 // ExchangeCode returns a newly created app's info

@@ -30,5 +30,7 @@ type Database interface {
 	UnlockCommand(cmdName command.Name) error
 	CheckCommandLock(cmdName command.Name) (*command.Lock, error)
 
+	// Ping checks the database connection health.
+	Ping() error
 	Close() error
 }

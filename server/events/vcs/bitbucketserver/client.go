@@ -376,3 +376,7 @@ func (b *Client) GetCloneURL(_ logging.SimpleLogging, _ models.VCSHostType, _ st
 func (b *Client) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
 }
+
+func (b *Client) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, _ string) ([]string, error) {
+	return nil, nil
+}
