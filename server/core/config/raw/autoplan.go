@@ -9,11 +9,19 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
+// terraformAutoplanIndicators are intentionally broad to preserve the default
+// autoplan behavior for changes inside existing projects.
+var terraformAutoplanIndicators = []string{
+	"*.tf*",
+	"terragrunt.hcl",
+	".terraform.lock.hcl",
+}
+
 // DefaultAutoPlanWhenModified is the default element in the when_modified
 // list if none is defined.
 func DefaultAutoPlanWhenModified() []string {
 	var ret []string
-	for _, indicator := range terraformProjectIndicators {
+	for _, indicator := range terraformAutoplanIndicators {
 		ret = append(ret, fmt.Sprintf("**/%s", indicator))
 	}
 	return ret

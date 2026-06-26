@@ -662,11 +662,53 @@ func TestIsTerraformProjectDir(t *testing.T) {
 			exp: true,
 		},
 		{
+			description: ".tf.json file",
+			files: map[string]string{
+				"foo.tf.json": "Some content",
+			},
+			exp: true,
+		},
+		{
 			description: "terragrunt.hcl file",
 			files: map[string]string{
 				"terragrunt.hcl": "Some content",
 			},
 			exp: true,
+		},
+		{
+			description: "tfvars-only directory",
+			files: map[string]string{
+				"vars.tfvars": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: "tfvars json-only directory",
+			files: map[string]string{
+				"vars.tfvars.json": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: "tfstate-only directory",
+			files: map[string]string{
+				"terraform.tfstate": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: "lockfile-only directory",
+			files: map[string]string{
+				".terraform.lock.hcl": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: "non-config tf suffix",
+			files: map[string]string{
+				"non.tf.suffix": "Some content",
+			},
+			exp: false,
 		},
 		{
 			description: ".tf file in a subdirectory",

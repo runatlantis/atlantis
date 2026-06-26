@@ -151,3 +151,7 @@ func TestAutoplan_ToValid(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultAutoPlanWhenModified(t *testing.T) {
+	Equals(t, []string{"**/*.tf*", "**/terragrunt.hcl", "**/.terraform.lock.hcl"}, raw.DefaultAutoPlanWhenModified())
+}

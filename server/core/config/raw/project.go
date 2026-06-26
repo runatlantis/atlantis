@@ -25,12 +25,12 @@ const (
 	UnDivergedRequirement = "undiverged"
 )
 
-// terraformProjectIndicators are files that suggest a directory
+// terraformProjectIndicators are configuration files that suggest a directory
 // should be treated as a Terraform/Terragrunt project.
 var terraformProjectIndicators = []string{
-	"*.tf*",
+	"*.tf",
+	"*.tf.json",
 	"terragrunt.hcl",
-	".terraform.lock.hcl",
 }
 
 type Project struct {
