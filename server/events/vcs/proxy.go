@@ -107,3 +107,7 @@ func (d *ClientProxy) GetCloneURL(logger logging.SimpleLogging, VCSHostType mode
 func (d *ClientProxy) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	return d.clients[repo.VCSHost.Type].GetPullLabels(logger, repo, pull)
 }
+
+func (d *ClientProxy) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error) {
+	return d.clients[repo.VCSHost.Type].GetChildTeams(logger, repo, teamSlug)
+}
