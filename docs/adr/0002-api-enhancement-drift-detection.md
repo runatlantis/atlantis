@@ -248,12 +248,32 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(...) (stri
 - Non-PR API calls (drift detection, emergency applies) should still respect other requirements like `undiverged`
 - API calls WITH a PR number should still enforce all requirements (maintains security for PR-based workflows)
 
+**Dependency Checks for Non-PR API Applies**:
+
+Non-PR API applies must also handle `depends_on` without relying on pull
+request status from a VCS event. Before building apply project contexts for
+`ctx.API && ctx.Pull.Num == 0`, seed `ctx.PullStatus` with a synthetic
+`models.PullStatus` containing every selected project and its dependencies.
+Each entry should use the project config's `ProjectName`, `RepoRelDir`, and
+`Workspace`, and start as `models.PlannedPlanStatus` unless the current
+operation already knows it has no changes. The existing project pool executor
+can then update dependency entries to `AppliedPlanStatus` or
+`PlannedNoChangesPlanStatus` after earlier execution groups complete.
+
+`ValidateProjectDependencies` must also return a clear failure when
+`ctx.PullStatus` is nil for a project with dependencies, or when a declared
+dependency is absent from the synthetic status. Non-PR API apply requests should
+therefore include dependent projects in the same request or fail before apply
+instead of panicking or treating the dependency as satisfied.
+
 **Files to Modify**:
 
 - `server/events/command/project_context.go` - Add `API` field
 - `server/events/project_command_context_builder.go` - Propagate `API` flag
+- `server/events/project_command_builder.go` - Seed synthetic `PullStatus` for non-PR API applies
 - `server/events/command_requirement_handler.go` - Skip PR-specific requirements
-- `server/events/command_requirement_handler_test.go` - Add test cases
+- `server/events/command_requirement_handler_test.go` - Add test cases for PR-specific requirements and dependency failures
+- `server/events/project_command_builder_test.go` - Add non-PR API apply dependency status coverage
 
 ---
 
@@ -308,7 +328,24 @@ type DriftSummary struct {
     Summary        string `json:"summary"` // e.g., "2 to import, 2 to add, 1 to change, 0 to destroy, 1 to forget"
 }
 
-// ParseDriftFromPlan extracts drift information from terraform plan output
+// DriftRepositoryKey identifies the VCS repository that owns drift status.
+// VCSHostType should be Repo.VCSHost.Type.String().
+type DriftRepositoryKey struct {
+    VCSHostType string `json:"type"`
+    Hostname    string `json:"hostname"`
+    Repository  string `json:"repository"`
+}
+
+// DriftProjectKey identifies an Atlantis project. ProjectName is optional in
+// atlantis.yaml, so Path and Workspace must be part of the storage key to avoid
+// collisions between unnamed projects in the same repository.
+type DriftProjectKey struct {
+    ProjectName string `json:"project_name,omitempty"`
+    Path        string `json:"path"`
+    Workspace   string `json:"workspace"`
+}
+
+// ParseDriftFromPlan extracts drift information from terraform plan output.
 func ParseDriftFromPlan(planOutput string) DriftSummary {
     stats := NewPlanSuccessStats(planOutput)
 
@@ -361,6 +398,9 @@ repository full name), the request source metadata (`Ref`), the project
 identity (`ProjectName`, `Path`, `Workspace`), the parsed drift summary, and
 `LastChecked`. `GET /api/drift/status` then filters and returns the persisted
 records for the requested VCS repository/project key.
+The repository key must not include a separate derived `RepoID`; derive
+`models.Repo.ID()` from the same hostname and repository fields only when a log
+message or downstream API call needs that string.
 
 If the implementation instead chooses to compute drift on demand, the status
 endpoint request shape must change to include the required `Ref`, VCS type,
@@ -370,44 +410,22 @@ With the endpoint shape above, storage is required.
 ```go
 // server/core/drift/storage.go
 
-// DriftRepositoryKey identifies the VCS repository that owns drift status.
-// RepoID should match models.Repo.ID(), which includes the VCS hostname and
-// repository full name; VCSHostType should be models.Repo.VCSHost.Type.String()
-// to prevent collisions if different VCS providers are configured with the
-// same hostname string. Hostname and Repository are kept separately so API
-// queries do not have to rebuild RepoID.
-type DriftRepositoryKey struct {
-    VCSHostType string `json:"type"`
-    Hostname    string `json:"hostname"`
-    Repository  string `json:"repository"`
-    RepoID      string `json:"repo_id"`
-}
-
-// DriftProjectKey identifies an Atlantis project. ProjectName is optional in
-// atlantis.yaml, so Path and Workspace must be part of the storage key to avoid
-// collisions between unnamed projects in the same repository.
-type DriftProjectKey struct {
-    ProjectName string `json:"project_name,omitempty"`
-    Path        string `json:"path"`
-    Workspace   string `json:"workspace"`
-}
-
 type DriftStorage interface {
-    StoreDriftStatus(repo DriftRepositoryKey, status ProjectDrift) error
-    GetDriftStatus(repo DriftRepositoryKey, key DriftProjectKey) (*ProjectDrift, error)
-    ListDriftStatus(repo DriftRepositoryKey) ([]ProjectDrift, error)
+    StoreDriftStatus(repo models.DriftRepositoryKey, status models.ProjectDrift) error
+    GetDriftStatus(repo models.DriftRepositoryKey, key models.DriftProjectKey) (*models.ProjectDrift, error)
+    ListDriftStatus(repo models.DriftRepositoryKey) ([]models.ProjectDrift, error)
 }
 
 // In-memory implementation for initial version
 type InMemoryDriftStorage struct {
     mu     sync.RWMutex
-    status map[DriftRepositoryKey]map[DriftProjectKey]ProjectDrift
+    status map[models.DriftRepositoryKey]map[models.DriftProjectKey]models.ProjectDrift
 }
 ```
 
 **Files to Create/Modify**:
 
-- `server/events/models/drift.go` - New drift response models
+- `server/events/models/drift.go` - New drift response, parser, and key models
 - `server/events/models/models.go` - Reuse or extend `NewPlanSuccessStats` for any new drift counters
 - `server/core/drift/storage.go` - Required drift status storage for `/api/drift/status`
 - `server/controllers/api_controller.go` - Add drift status endpoint
