@@ -166,6 +166,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 func TestPlanCommandRunner_IgnoredTargetedDirNoOp(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := setup(t)
+	planCommandRunner.DiscardApprovalOnPlan = true
 	scopeNull := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"}
@@ -189,6 +190,7 @@ func TestPlanCommandRunner_IgnoredTargetedDirNoOp(t *testing.T) {
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
 	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+	vcsClient.VerifyWasCalled(Never()).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
 }
 

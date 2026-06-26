@@ -79,6 +79,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 	}
 
 	cmds := make([]command.ProjectContext, 0)
+	keptCommentCommands := make([]*events.CommentCommand, 0)
 	for _, commentCommand := range cc {
 		projectCmds, err := cmdBuilder(ctx, commentCommand)
 		if err != nil {
@@ -87,10 +88,13 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 			}
 			return nil, nil, fmt.Errorf("failed to build command: %w", err)
 		}
-		cmds = append(cmds, projectCmds...)
+		for _, projectCmd := range projectCmds {
+			cmds = append(cmds, projectCmd)
+			keptCommentCommands = append(keptCommentCommands, commentCommand)
+		}
 	}
 
-	return cmds, cc, nil
+	return cmds, keptCommentCommands, nil
 }
 
 func (a *APIController) apiReportError(w http.ResponseWriter, code int, err error) {

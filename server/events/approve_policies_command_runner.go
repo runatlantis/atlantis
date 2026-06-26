@@ -48,17 +48,20 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	if err := a.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
-
 	projectCmds, err := a.prjCmdBuilder.BuildApprovePoliciesCommands(ctx, cmd)
+	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), err) {
+		return
+	}
 	if err != nil {
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
 		return
+	}
+
+	if err := a.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
 	if len(projectCmds) == 0 && a.SilenceNoProjects {

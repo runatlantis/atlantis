@@ -37,11 +37,17 @@ func (v *StateCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 			Failure: fmt.Sprintf("unknown state subcommand %s", cmd.SubName),
 		}
 	}
+	if ctx.CommandSkipped {
+		return
+	}
 	v.pullUpdater.updatePull(ctx, cmd, result)
 }
 
 func (v *StateCommandRunner) runRm(ctx *command.Context, cmd *CommentCommand) command.Result {
 	projectCmds, err := v.prjCmdBuilder.BuildStateRmCommands(ctx, cmd)
+	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), err) {
+		return command.Result{}
+	}
 	if err != nil {
 		ctx.Log.Warn("Error %s", err)
 	}

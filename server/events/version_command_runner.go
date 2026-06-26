@@ -37,6 +37,9 @@ func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	var err error
 	var projectCmds []command.ProjectContext
 	projectCmds, err = v.prjCmdBuilder.BuildVersionCommands(ctx, cmd)
+	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), err) {
+		return
+	}
 	if err != nil {
 		ctx.Log.Warn("Error %s", err)
 	}

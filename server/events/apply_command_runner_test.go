@@ -249,32 +249,54 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 }
 
 func TestApplyCommandRunner_IgnoredTargetedDirNoOp(t *testing.T) {
-	RegisterMockTestingT(t)
-	vcsClient := setup(t)
-	scopeNull := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
-	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "ignored"}
-	ctx := &command.Context{
-		User:     testdata.User,
-		Log:      logging.NewNoopLogger(t),
-		Scope:    scopeNull,
-		Pull:     modelPull,
-		HeadRepo: testdata.GithubRepo,
-		Trigger:  command.CommentTrigger,
+	cases := []struct {
+		description string
+		setup       func(*TestConfig)
+	}{
+		{
+			description: "global lock backend errors",
+			setup: func(tc *TestConfig) {
+				tc.applyLockCheckerErr = errors.New("lock backend down")
+			},
+		},
+		{
+			description: "global apply lock is active",
+			setup: func(tc *TestConfig) {
+				tc.applyLockCheckerReturn = locking.ApplyCommandLock{Locked: true}
+			},
+		},
 	}
 
-	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			vcsClient := setup(t, c.setup)
+			scopeNull := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "ignored"}
+			ctx := &command.Context{
+				User:     testdata.User,
+				Log:      logging.NewNoopLogger(t),
+				Scope:    scopeNull,
+				Pull:     modelPull,
+				HeadRepo: testdata.GithubRepo,
+				Trigger:  command.CommentTrigger,
+			}
 
-	applyCommandRunner.Run(ctx, cmd)
-	Assert(t, ctx.CommandSkipped, "expected ignored targeted dir to mark the command skipped")
+			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
 
-	vcsClient.VerifyWasCalled(Never()).CreateComment(
-		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
-		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
-	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
-	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+			applyCommandRunner.Run(ctx, cmd)
+			Assert(t, ctx.CommandSkipped, "expected ignored targeted dir to mark the command skipped")
+
+			vcsClient.VerifyWasCalled(Never()).CreateComment(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+			commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+			projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+		})
+	}
 }
 
 func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {

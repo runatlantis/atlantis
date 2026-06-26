@@ -59,6 +59,7 @@ var lockingLocker *lockingmocks.MockLocker
 var applyCommandRunner *events.ApplyCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
+var stateCommandRunner *events.StateCommandRunner
 var preWorkflowHooksCommandRunner events.PreWorkflowHooksCommandRunner
 var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 var cancellationTracker *mocks.MockCancellationTracker
@@ -226,6 +227,12 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.SilenceNoProjects,
 	)
 
+	stateCommandRunner = events.NewStateCommandRunner(
+		pullUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+	)
+
 	commentCommandRunnerByCmd := map[command.Name]events.CommentCommandRunner{
 		command.Plan:            planCommandRunner,
 		command.Apply:           applyCommandRunner,
@@ -233,6 +240,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
+		command.State:           stateCommandRunner,
 	}
 
 	preWorkflowHooksCommandRunner = mocks.NewMockPreWorkflowHooksCommandRunner()
@@ -475,16 +483,34 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 
 func TestRunCommentCommand_IgnoredTargetedDirNoOp(t *testing.T) {
 	cases := []struct {
-		name    string
-		command command.Name
+		name        string
+		commandName command.Name
+		subName     string
 	}{
 		{
-			name:    "plan",
-			command: command.Plan,
+			name:        "plan",
+			commandName: command.Plan,
 		},
 		{
-			name:    "apply",
-			command: command.Apply,
+			name:        "apply",
+			commandName: command.Apply,
+		},
+		{
+			name:        "approve_policies",
+			commandName: command.ApprovePolicies,
+		},
+		{
+			name:        "import",
+			commandName: command.Import,
+		},
+		{
+			name:        "version",
+			commandName: command.Version,
+		},
+		{
+			name:        "state rm",
+			commandName: command.State,
+			subName:     "rm",
 		},
 	}
 
@@ -493,14 +519,23 @@ func TestRunCommentCommand_IgnoredTargetedDirNoOp(t *testing.T) {
 			vcsClient := setup(t)
 			pull := &github.PullRequest{State: github.Ptr("open")}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-			cmd := &events.CommentCommand{Name: c.command, RepoRelDir: "ignored"}
+			cmd := &events.CommentCommand{Name: c.commandName, SubName: c.subName, RepoRelDir: "ignored"}
 
 			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-			if c.command == command.Plan {
+			switch c.commandName {
+			case command.Plan:
 				When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
-			} else {
+			case command.Apply:
 				When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+			case command.ApprovePolicies:
+				When(projectCommandBuilder.BuildApprovePoliciesCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+			case command.Import:
+				When(projectCommandBuilder.BuildImportCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+			case command.Version:
+				When(projectCommandBuilder.BuildVersionCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+			case command.State:
+				When(projectCommandBuilder.BuildStateRmCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
 			}
 
 			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)

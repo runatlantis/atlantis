@@ -44,6 +44,15 @@ func IsIgnoredTargetedDir(err error) bool {
 	return errors.Is(err, ErrIgnoredTargetedDir)
 }
 
+func MarkCommandSkippedIfIgnoredTargetedDir(ctx *command.Context, commandName command.Name, err error) bool {
+	if !IsIgnoredTargetedDir(err) {
+		return false
+	}
+	ctx.Log.Debug("ignoring targeted %s because the directory matches autodiscover.ignore_paths", commandName.String())
+	ctx.CommandSkipped = true
+	return true
+}
+
 func NewInstrumentedProjectCommandBuilder(
 	logger logging.SimpleLogging,
 	policyChecksSupported bool,

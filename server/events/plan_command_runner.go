@@ -206,19 +206,18 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
 	}
 
+	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
+	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, command.Plan, err) {
+		return
+	}
+
 	if p.DiscardApprovalOnPlan {
-		if err = p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
-			ctx.Log.Err("failed to remove approvals: %s", err)
+		if discardErr := p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); discardErr != nil {
+			ctx.Log.Err("failed to remove approvals: %s", discardErr)
 		}
 	}
 
-	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
 	if err != nil {
-		if IsIgnoredTargetedDir(err) {
-			ctx.Log.Debug("ignoring targeted plan because the directory matches autodiscover.ignore_paths")
-			ctx.CommandSkipped = true
-			return
-		}
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
