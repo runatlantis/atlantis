@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofri/go-github-ratelimit/github_ratelimit"
+	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
 	"github.com/google/go-github/v88/github"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -116,10 +116,7 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		return nil, fmt.Errorf("error initializing github authentication transport: %w", err)
 	}
 
-	transportWithRateLimit, err := github_ratelimit.NewRateLimitWaiterClient(transport.Transport)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing github rate limit transport: %w", err)
-	}
+	transportWithRateLimit := newSecondaryRateLimitHTTPClient(transport)
 
 	var client *github.Client
 	if hostname == "github.com" {
@@ -159,6 +156,12 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		maxCommentsPerCommand: maxCommentsPerCommand,
 		repoIdCache:           NewGitHubRepoIdCache(),
 	}, nil
+}
+
+func newSecondaryRateLimitHTTPClient(client *http.Client) *http.Client {
+	clientWithRateLimit := *client
+	clientWithRateLimit.Transport = github_ratelimit.NewSecondaryLimiter(client.Transport)
+	return &clientWithRateLimit
 }
 
 // GetModifiedFiles returns the names of files that were modified in the pull request
