@@ -211,16 +211,8 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
 			}
 
-			// Update the plan or apply commit status to failed
-			switch cmd.Name {
-			case command.Plan:
-				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
-					ctx.Log.Warn("Unable to update plan commit status: %s", err)
-				}
-			case command.Apply:
-				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
-					ctx.Log.Warn("Unable to update apply commit status: %s", err)
-				}
+			if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
+				ctx.Log.Warn("Unable to update plan commit status: %s", err)
 			}
 
 			return
