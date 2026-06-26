@@ -465,14 +465,14 @@ func (p *DefaultProjectCommandBuilder) ShouldIgnoreTargetedDir(ctx *command.Cont
 	if cmd.ProjectName != "" || cmd.RepoRelDir == "" || valid.ContainsDirGlobPattern(cmd.RepoRelDir) {
 		return false
 	}
-	repoCfg, ok := p.repoCfgForTargetedIgnore(ctx)
+	repoCfg, ok := p.repoCfgForTargetedIgnore(ctx, cmd.RepoRelDir)
 	if !ok {
 		return false
 	}
 	return p.shouldIgnoreTargetedDirFromCfg(ctx, repoCfg, cmd.RepoRelDir)
 }
 
-func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Context) (valid.RepoCfg, bool) {
+func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Context, repoRelDir string) (valid.RepoCfg, bool) {
 	if ctx.PreferLocalRepoCfgForTargetedIgnore {
 		if repoCfg, ok := p.repoCfgFromWorkingDir(ctx); ok {
 			return repoCfg, true
@@ -489,6 +489,9 @@ func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Con
 		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.HeadRepo, targetedIgnoreConfigRef(ctx.Pull), repoCfgFile)
 		if err != nil {
 			ctx.Log.Debug("unable to fetch %s while checking autodiscover.ignore_paths: %s", repoCfgFile, err)
+			if !p.VCSClient.SupportsSingleFileDownload(ctx.HeadRepo) && p.shouldIgnoreTargetedDirFromGlobalCfg(ctx, repoRelDir) {
+				return valid.RepoCfg{}, true
+			}
 			return valid.RepoCfg{}, false
 		} else if hasRepoCfg {
 			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
@@ -503,6 +506,12 @@ func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Con
 	}
 
 	return valid.RepoCfg{}, false
+}
+
+func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDirFromGlobalCfg(ctx *command.Context, repoRelDir string) bool {
+	repoCfg := valid.RepoCfg{}
+	return p.autoDiscoverModeEnabled(ctx, repoCfg) &&
+		p.isAutoDiscoverPathIgnored(ctx, repoCfg, filepath.Clean(repoRelDir))
 }
 
 func targetedIgnoreConfigRef(pull models.PullRequest) string {
