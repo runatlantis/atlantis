@@ -1,0 +1,39 @@
+e2e/go.mod
+  s_243a1a1edc15e5::t_07d508274d7faf 9,18-20,22
+runatlantis.io/docs/requirements.md
+  s_243a1a1edc15e5::t_f4a9c550325cd9 17-24
+server/events/vcs/gitlab/testdata/pipeline-remaining-approvals.json
+  s_243a1a1edc15e5::t_e5ca157933238a 36
+e2e/go.sum
+  s_243a1a1edc15e5::t_e9219c60c47f8c 27-28,35-42,45-46
+go.sum
+  s_243a1a1edc15e5::t_666847ba921190 474-475,520-521,594-595,681-682,807-808
+go.mod
+  s_243a1a1edc15e5::t_1d37736be74e38 49,141,144,147,149
+server/events/vcs/gitlab/client.go
+  s_243a1a1edc15e5::t_3021b56b756b8e 145-146,148-150,155-162
+  s_243a1a1edc15e5::t_120df9eb683df7 9,46-69,164-175,178,324-330,337,452,455,496,502,505,514,541,548
+  s_243a1a1edc15e5::t_5621435cca92ff 163
+server/events/vcs/gitlab/client_test.go
+  s_243a1a1edc15e5::t_5625f8dc4e8c86 159-161,166-173,175,192-195,214,1602-1603,1614
+  s_243a1a1edc15e5::t_6846d0b644fe90 163-165,174,180,182-187,189,191,196,198-212,216,218-225
+  s_243a1a1edc15e5::t_37f383008e9b11 1609-1612,1615-1616,1625-1628,1630-1631,1640-1660,1662-1663,1672-1676,1681,1690-1694,1707-1734,1743-1746,1758-1761,1773-1776,1788-1790,1792-1806,1811-1813,1815
+  s_243a1a1edc15e5::t_5d9474e35dc89b 152-158,176-179,181,215
+  s_243a1a1edc15e5::t_b4179ba6fe6fd1 162,1816,1826
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0032962fffdf66c726d5ec6f9770ae331ee587d0",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
