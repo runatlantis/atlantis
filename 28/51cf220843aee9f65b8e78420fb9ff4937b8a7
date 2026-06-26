@@ -1,0 +1,269 @@
+.clusterfuzzlite/build.sh
+  s_910e8274b91a65::t_edb1555dc0f8f3 7
+.github/renovate.json5
+  s_910e8274b91a65::t_a2876bdf43280f 130
+.github/workflows/atlantis-image.yml
+  s_910e8274b91a65::t_a725bf8918e0c5 39,43,76,80,89,94,100,114,146,160,220,224,226,230,263
+.github/workflows/clusterfuzzlite.yml
+  s_910e8274b91a65::t_2ffbec9b80f7a3 36,61
+.github/workflows/codeql.yml
+  s_910e8274b91a65::t_b812b9ffa34669 47,51,81,86,90,100,104,117,131
+.github/workflows/dependency-review.yml
+  s_910e8274b91a65::t_bbacaed01e291e 28,33
+.github/workflows/go-lint.yml
+  s_910e8274b91a65::t_1d2c5280ba3888 34,38,56,60,63,68,71,80
+.github/workflows/labeler.yml
+  s_910e8274b91a65::t_21bf433d35f5b5 23
+.github/workflows/markdown-lint.yml
+  s_910e8274b91a65::t_1f48c0d7393870 33,37,55,59,62,64,87
+.github/workflows/pr-lint.yml
+  s_910e8274b91a65::t_935ad6e0775cf4 19
+.github/workflows/pr-size-labeler.yml
+  s_910e8274b91a65::t_96a6b94114d0ba 16
+.github/workflows/release.yml
+  s_910e8274b91a65::t_90c2d512659f55 17,21,25,30
+.github/workflows/renovate-config.yml
+  s_910e8274b91a65::t_fda16726109e24 23,27,32
+.github/workflows/scorecard.yml
+  s_910e8274b91a65::t_7787250a4eba90 28,51,59
+.github/workflows/stale.yml
+  s_910e8274b91a65::t_5ec848f187f5f3 16,20
+.github/workflows/test.yml
+  s_910e8274b91a65::t_5943644b7201ee 40,44,65,69,72,126,134-135,143,147-148,162,180-181,188,192-193,207
+.github/workflows/testing-env-image.yml
+  s_910e8274b91a65::t_c405c7be7575d1 32,36,54,58,61,67,70,78,96
+.github/workflows/website.yml
+  s_910e8274b91a65::t_56134e96ca72d2 34,38,60,64,67,84,109,127
+.node-version
+  s_910e8274b91a65::t_91550ea20d92a3 1
+AGENTS.md
+  s_910e8274b91a65::t_0832edf0bbffd8 21,66-71
+AI_USAGE_POLICY.md
+  s_910e8274b91a65::t_1048f363cef4c9 34,36-37,39
+Dockerfile
+  s_910e8274b91a65::t_b3f8360334f74f 1,4,6,11,41,59-74,189,191,279-280
+Dockerfile.dev
+  s_910e8274b91a65::t_d6ff5551d3051a 1
+Makefile
+  s_910e8274b91a65::t_dc91a35cd13ca9 9-11,97-101
+cmd/help_fmt.go
+  s_910e8274b91a65::t_5f532eaa0c97f5 130,135
+cmd/server_test.go
+  s_910e8274b91a65::t_2902f943494986 234,236,239
+docker-compose.yml
+  s_910e8274b91a65::t_f01614d1936aa6 4
+e2e/github.go
+  s_910e8274b91a65::t_50d6f3171808ce 18,66,69,80,113
+e2e/go.mod
+  s_910e8274b91a65::t_58455e42be3bdf 3,7,20
+e2e/go.sum
+  s_910e8274b91a65::t_accc1ebf598687 12-13,41-42
+go.mod
+  s_910e8274b91a65::t_7c5f2c4d821637 3,19,53-54,140,143,146,148
+go.sum
+  s_910e8274b91a65::t_e508a9801e9bfe 230-231,508-509,584-585,657-658,664-665,676-677,726-727
+package-lock.json
+  s_910e8274b91a65::t_7e766c55c5569d 10,13,16,1627-1629,1661-1663,1710-1712,2271-2273,2277,2897-2899,2955-2957,3116-3118,3362-3364,3439-3441,3491-3493,3499,3516-3518,3530,3533,3540-3542,3546,3549,3552-3554,3556-3557,3563,4785-4787,4829-4831,4835-4836,4861-4863,4867,4924-4926,4931,4959-4961,5135-5137,5145,5193-5195
+package.json
+  s_910e8274b91a65::t_21eed873a1a1a3 6,9,12,19
+runatlantis.io/blog/2019/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage.md
+  s_910e8274b91a65::t_2934bb417724d8 18
+runatlantis.io/docs/api-endpoints.md
+  s_910e8274b91a65::t_0c8f85b9182e30 238
+runatlantis.io/docs/custom-workflows.md
+  s_910e8274b91a65::t_acee57d956afe1 583-585,628,703-707,745-751
+runatlantis.io/docs/policy-checking.md
+  s_910e8274b91a65::t_90366ef372f707 23,30,95,210-214
+runatlantis.io/docs/post-workflow-hooks.md
+  s_910e8274b91a65::t_b44c9a5e38e9ae 94-99
+runatlantis.io/docs/pre-workflow-hooks.md
+  s_910e8274b91a65::t_c5717b0318d4b1 91-96
+runatlantis.io/docs/repo-level-atlantis-yaml.md
+  s_910e8274b91a65::t_9a2edc37dfc2bf 419
+runatlantis.io/docs/server-configuration.md
+  s_910e8274b91a65::t_700e5f8625654e 57,59,62,67,320,1035
+runatlantis.io/docs/server-side-repo-config.md
+  s_910e8274b91a65::t_a40a36013f46d9 532-550,599-604,615-620
+scripts/fmt.sh
+  s_910e8274b91a65::t_19b746541b7e9e 5
+server/controllers/api_controller.go
+  s_910e8274b91a65::t_d0f68f2e419b67 251,254,257,299,302,305,379,381-391
+server/controllers/events/events_controller.go
+  s_910e8274b91a65::t_3eb0b92eb58553 19,897
+server/controllers/events/events_controller_e2e_test.go
+  s_910e8274b91a65::t_797f1fbc7d5198 20
+server/controllers/events/events_controller_test.go
+  s_910e8274b91a65::t_e1fc525928b5ba 20,896
+server/controllers/events/github_request_validator.go
+  s_910e8274b91a65::t_2d25007ad0fe88 13
+server/controllers/events/testdata/test-repos/policy-checks-custom-run-steps/exp-output-auto-policy-check.txt
+  s_910e8274b91a65::t_d9e2d8c69b11ed 19
+server/controllers/github_app_controller.go
+  s_910e8274b91a65::t_3b7262ebe3ab4b 87,155
+server/controllers/jobs_controller.go
+  s_910e8274b91a65::t_443aede5737d98 64,97
+server/controllers/locks_controller.go
+  s_910e8274b91a65::t_5b0d6df15a0921 99,155
+server/core/boltdb/boltdb.go
+  s_910e8274b91a65::t_b735396b1bfaaf 386
+server/core/boltdb/boltdb_test.go
+  s_910e8274b91a65::t_3d193fb274792c 961-962,978-979,998-1000,1024,1036
+server/core/config/parser_validator.go
+  s_910e8274b91a65::t_a17309622f2d0d 63-64,87-88,155-156
+server/core/config/parser_validator_test.go
+  s_910e8274b91a65::t_0908cef1a2c65c 85,90,95,105,1547-1548,1551-1554,1890-1891,1894-1897
+server/core/config/raw/global_cfg.go
+  s_910e8274b91a65::t_7f2a7ba920ecc3 14,110
+server/core/config/raw/policies.go
+  s_910e8274b91a65::t_9633b0250100f4 14-17,50,94
+server/core/config/raw/policies_test.go
+  s_910e8274b91a65::t_192ab80ab9f34e 205-206,213-214,246-247,257-259
+server/core/config/raw/step.go
+  s_910e8274b91a65::t_99da92370713e6 18,206,210,261
+server/core/config/valid/global_cfg.go
+  s_910e8274b91a65::t_b89fc4ee309990 13,343,388,495,498,501,504,507,510,513,516,520,529,587,698,710-711
+server/core/config/valid/global_cfg_test.go
+  s_910e8274b91a65::t_07a9eb7dff1883 559-560,563-566,608-609,612-615
+server/core/config/valid/policies.go
+  s_910e8274b91a65::t_c671c4afabfaf1 22-25
+server/core/redis/redis.go
+  s_910e8274b91a65::t_0aa320a2a21493 24,26,34,37,40,44-49,54,57-64,73,76,79-80,83-86,344,479
+server/core/redis/redis_test.go
+  s_910e8274b91a65::t_fed627eb0332ca 982-983,999-1000,1019-1021,1045,1057
+server/core/runtime/apply_step_runner.go
+  s_910e8274b91a65::t_2e9c9b1d1929e4 103-104,107,213-214,217
+server/core/runtime/models/shell_command_runner.go
+  s_910e8274b91a65::t_001be319d0b407 121,134,141-143,154-159,165-166,181
+server/core/runtime/policy/conftest_client.go
+  s_910e8274b91a65::t_116807344a5c60 15-17,191,230-235,245-246,252-256,258
+server/core/runtime/policy/conftest_client_test.go
+  s_910e8274b91a65::t_b071a5b7669dcd 166-168,172-174,179-182,193,206-207,218,220-221,231-232,243,286,308,329,331,340
+server/core/terraform/tfclient/terraform_client.go
+  s_910e8274b91a65::t_617cbd8cd8295f 373
+server/events/apply_command_runner.go
+  s_910e8274b91a65::t_7c24a98df25748 79-81,83,142,155,199,216-217
+server/events/apply_command_runner_test.go
+  s_910e8274b91a65::t_84f15c29bc9f40 10,47,50,213-214,223-224
+server/events/approve_policies_command_runner.go
+  s_910e8274b91a65::t_f342b555798cfb 71,107
+server/events/command/project_context.go
+  s_910e8274b91a65::t_41fa7b95feebea 213
+server/events/command/project_context_test.go
+  s_910e8274b91a65::t_36fe150fc4f6ad 37,56,75,102,107,112,139,144,149
+server/events/command/project_result.go
+  s_910e8274b91a65::t_dc1da4f06df673 50-52
+server/events/command_requirement_handler.go
+  s_910e8274b91a65::t_c6f2fbf380e352 72,74-75
+server/events/command_requirement_handler_test.go
+  s_910e8274b91a65::t_afbd0195921bf3 177
+server/events/command_runner.go
+  s_910e8274b91a65::t_94d278aa9bf0a3 13,22,144,188,348,520
+server/events/command_runner_internal_test.go
+  s_910e8274b91a65::t_916f12d53b5b96 17-21,86-88,103-104,165-166,192-194,243,263-264,271-277,280,286-287
+server/events/command_runner_test.go
+  s_910e8274b91a65::t_935f44fa831d54 22,427-428,451-452,549
+server/events/comment_parser.go
+  s_910e8274b91a65::t_af1fc396f634e9 390
+server/events/commit_status_updater.go
+  s_910e8274b91a65::t_1c59a1fdefa01f 27-29,47,60-62,66,68-70,73,77-81,111
+server/events/commit_status_updater_test.go
+  s_910e8274b91a65::t_8ab9f091b07954 87,94,108,115,131
+server/events/event_parser.go
+  s_910e8274b91a65::t_4f5e00b2e0e8b5 20,981-983
+server/events/event_parser_test.go
+  s_910e8274b91a65::t_d5584d7974102f 16,28,1327,1414-1415,1426-1427,1436,1438
+server/events/instrumented_pull_closed_executor.go
+  s_910e8274b91a65::t_2a01c88e478b74 48
+server/events/markdown_renderer_test.go
+  s_910e8274b91a65::t_9182446948e497 68,143,391-392,397-399,470-471,1035-1038,1258,1318-1319,1322-1325,1396-1397,1557-1560,1646,1855,2048,2107,2184,2296,2444,2599,2683,2924,3521,3663,4125,4181,4406
+server/events/mock_workingdir_test.go
+  s_910e8274b91a65::t_fba3c4f929b329 10-11
+server/events/mocks/mock_commit_status_updater.go
+  s_910e8274b91a65::t_8b3b4ab89c9c9a 45,49,180-181,191-193,196,230,232-238
+server/events/mocks/mock_event_parsing.go
+  s_910e8274b91a65::t_9ba8650b626acd 9
+server/events/mocks/mock_github_pull_getter.go
+  s_910e8274b91a65::t_2d99cff1d66c1c 7
+server/events/models/models.go
+  s_910e8274b91a65::t_bd570faf4f2953 400-404,407,409-411,417-418,432-433,435,445-450,455-460,462,533,546,549,583,612-613,615-616,740-741,745,749,752-759
+server/events/models/models_test.go
+  s_910e8274b91a65::t_68602d2e4588e2 46,123,140,589-591,601-603,613-616,626-629,632-635,638-641,653-656,659-662,665-668
+server/events/pending_plan_finder.go
+  s_910e8274b91a65::t_b4ececdea6d626 57
+server/events/pending_plan_finder_test.go
+  s_910e8274b91a65::t_e4a40b0432f9eb 7,25,27-28,37,42-44
+server/events/plan_command_runner.go
+  s_910e8274b91a65::t_92a4cd4eb4301b 132,135,138,236,249,252,255,317,348,378-379
+server/events/plan_command_runner_test.go
+  s_910e8274b91a65::t_6025a7d0d38593 10,150-151,160-161,565,784-785,794-795,860-861,1102-1103,1113-1114
+server/events/policy_check_command_runner.go
+  s_910e8274b91a65::t_0b3e593c26999b 51,96
+server/events/project_command_pool_executor_test.go
+  s_910e8274b91a65::t_6b37c664cbab1a 220-298
+server/events/project_command_runner.go
+  s_910e8274b91a65::t_f143244178f78d 194,202,209,356,367-370,380,385-388,496,521,576
+server/events/project_command_runner_test.go
+  s_910e8274b91a65::t_63fc832644020b 1412-1413,1438-1440,1443-1445,1470-1472,1475-1477,1502-1504,1507-1509,1535-1537,1540-1542,1564,1569-1571,1595,1600-1603,1634,1639,1645-1647,1650-1652,1683,1688,1694-1696,1699-1701,1732,1737,1743-1745,1748-1750,1782,1787,1793-1795,1798-1800,1832,1837,1843-1845,1848-1850
+server/events/project_finder.go
+  s_910e8274b91a65::t_ac389fa519a465 17,87,189
+server/events/pull_updater.go
+  s_910e8274b91a65::t_cc09e581dbb4bc 9,21,23,39
+server/events/templates/policy_check.tmpl
+  s_910e8274b91a65::t_29060ba699cad4 3
+server/events/vcs/bitbucketcloud/client.go
+  s_910e8274b91a65::t_c3ddeea593cb85 146,153
+server/events/vcs/common/git_cred_writer.go
+  s_910e8274b91a65::t_ad84a42db5a066 100,124
+server/events/vcs/common/git_cred_writer_test.go
+  s_910e8274b91a65::t_ff2a845a0fbccc 27,48,62,80,86,99,105,124
+server/events/vcs/gitea/client.go
+  s_910e8274b91a65::t_3bd577bee83949 213
+server/events/vcs/github/client.go
+  s_910e8274b91a65::t_031488bfbe5606 21,127,131-132,134
+server/events/vcs/github/client_internal_test.go
+  s_910e8274b91a65::t_cfd2cbd5bee8e5 18,25
+server/events/vcs/github/credentials.go
+  s_910e8274b91a65::t_4fd2b84f1437de 15,140-141,178-179
+server/events/vcs/github/instrumented_client.go
+  s_910e8274b91a65::t_bbb0854468b511 7
+server/events/vcs/github/mocks/mock_github_pull_request_getter.go
+  s_910e8274b91a65::t_06ccedb4075480 7
+server/events/vcs/github/testdata/fixtures.go
+  s_910e8274b91a65::t_c215eef3731f76 16
+server/events/vcs/github/token_rotator.go
+  s_910e8274b91a65::t_c7a1cb214fce90 60
+server/events/vcs/gitlab/client.go
+  s_910e8274b91a65::t_5afa29869d6bc1 320-323,325-326,328,337-340,343,498,578
+server/events/vcs/gitlab/client_test.go
+  s_910e8274b91a65::t_b099f0886b7721 862-863,872-873,891-892,901-902,920-921,969-970,979-980,989-990,1075,1077,1135,1138-1139,1171-1172,1182-1183,1194-1195,1206-1207,1217-1218,1229-1230,1254-1255,1276,1290-1291,1309
+server/events/working_dir.go
+  s_910e8274b91a65::t_add183310ce250 29,39-40,168-170,172-174,189-193,197,201-202,206-210,213,252-257,450-451,552-553,671,678,717
+server/logging/simple_logger.go
+  s_910e8274b91a65::t_a10c9b86eff3e6 169
+server/server.go
+  s_910e8274b91a65::t_44f8087f268350 490-491,689,1142,1152,1255,1302
+server/utils/slices.go
+  s_910e8274b91a65::t_ec85a731a2aa04 1-12
+testdrive/github.go
+  s_910e8274b91a65::t_11baf43c644b5f 12
+testdrive/testdrive.go
+  s_910e8274b91a65::t_7dc675287486e6 23,102
+testing/Dockerfile
+  s_910e8274b91a65::t_339149ae6647b8 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "2851cf220843aee9f65b8e78420fb9ff4937b8a7",
+  "prompts": {},
+  "sessions": {
+    "s_910e8274b91a65": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f005c-404e-7e43-8a07-c91e9a72c44e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
