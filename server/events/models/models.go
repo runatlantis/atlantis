@@ -1,16 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // Package models holds all models that are needed across packages.
@@ -19,6 +8,8 @@
 package models
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
@@ -30,6 +21,34 @@ import (
 
 	"github.com/runatlantis/atlantis/server/logging"
 )
+
+// HashPolicyItem returns the SHA-256 hex digest of a policy output item.
+func HashPolicyItem(item string) string {
+	h := sha256.Sum256([]byte(item))
+	return hex.EncodeToString(h[:])
+}
+
+// policyItemHashes returns deduplicated SHA-256 hex digests of substrings
+// matched by re in policyOutput, in first-seen order. If the regex produces
+// no matches (including when policyOutput is empty), the raw policyOutput
+// itself is hashed so there is always at least one hash.
+func policyItemHashes(policyOutput string, re *regexp.Regexp) []string {
+	matches := re.FindAllString(policyOutput, -1)
+	hashes := make([]string, 0, len(matches))
+	seen := make(map[string]struct{}, len(matches))
+	for _, m := range matches {
+		h := HashPolicyItem(m)
+		if _, ok := seen[h]; ok {
+			continue
+		}
+		seen[h] = struct{}{}
+		hashes = append(hashes, h)
+	}
+	if len(hashes) == 0 {
+		hashes = append(hashes, HashPolicyItem(policyOutput))
+	}
+	return hashes
+}
 
 type PullReqStatus struct {
 	ApprovalStatus  ApprovalStatus
@@ -72,7 +91,11 @@ func (r Repo) ID() string {
 // ex. https://github.com/runatlantis/atlantis.git OR
 //
 //	https://github.com/runatlantis/atlantis
-func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string) (Repo, error) {
+//
+// vcsHostname is the configured hostname for the VCS (may include a subpath
+// for GitLab, e.g. "acme.com/gitlab"). Pass empty string to skip the
+// enhanced host/subpath validation; non-GitLab callers always pass "".
+func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsUser string, vcsToken string, vcsHostname string) (Repo, error) {
 	if repoFullName == "" {
 		return Repo{}, errors.New("repoFullName can't be empty")
 	}
@@ -97,6 +120,18 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	// Azure DevOps also does not require .git at the end of clone urls.
 	if vcsHostType != BitbucketServer && vcsHostType != AzureDevops {
 		expClonePath := fmt.Sprintf("/%s.git", repoFullName)
+
+		if vcsHostType == Gitlab && vcsHostname != "" {
+			expectedHost, basePath, parseErr := ParseGitlabHostname(vcsHostname)
+			if parseErr != nil {
+				return Repo{}, fmt.Errorf("parsing configured gitlab hostname %q: %w", vcsHostname, parseErr)
+			}
+			if !strings.EqualFold(cloneURLParsed.Host, expectedHost) {
+				return Repo{}, fmt.Errorf("expected clone url host %q but had %q", expectedHost, cloneURLParsed.Host)
+			}
+			expClonePath = basePath + expClonePath
+		}
+
 		if expClonePath != cloneURLParsed.Path {
 			return Repo{}, fmt.Errorf("expected clone url to have path %q but had %q", expClonePath, cloneURLParsed.Path)
 		}
@@ -154,6 +189,13 @@ type MergeableStatus struct {
 	IsMergeable bool
 	// Short human readable explanation of why the PR is (or is not) mergeable
 	Reason string
+	// BlockingStatuses holds the names of the commit statuses that caused the
+	// pull request to be considered not mergeable because of the project's
+	// "Only allow merge if pipeline succeeds" setting. It lets per-project
+	// command requirement checks ignore statuses that belong to other projects
+	// in the same pull request (a failing plan in project B must not block an
+	// apply of project A). Currently only populated by the GitLab client.
+	BlockingStatuses []string
 }
 
 // PullRequest is a VCS pull request.
@@ -391,26 +433,90 @@ type PlanSuccess struct {
 	MergedAgain bool
 }
 
-type PolicySetResult struct {
-	PolicySetName string
-	PolicyOutput  string
-	Passed        bool
-	ReqApprovals  int
-	CurApprovals  int
+func NewPolicySetResult(policySetName string, policyOutput string, passed bool, reqApprovalCount int, policyItemRegex string) (*PolicySetResult, error) {
+	re, err := regexp.Compile(policyItemRegex)
+	if err != nil {
+		return nil, fmt.Errorf("compiling policy_item_regex %q for policy set %q: %w", policyItemRegex, policySetName, err)
+	}
+	hashes := policyItemHashes(policyOutput, re)
+	return &PolicySetResult{
+		PolicySetName:    policySetName,
+		PolicyOutput:     policyOutput,
+		Passed:           passed,
+		ReqApprovalCount: reqApprovalCount,
+		Hashes:           hashes,
+		PolicyItemRegex:  policyItemRegex,
+	}, nil
 }
 
-// PolicySetApproval tracks the number of approvals a given policy set has.
+type PolicySetResult struct {
+	PolicySetName    string
+	PolicyOutput     string
+	Passed           bool
+	ReqApprovalCount int
+	Approvals        []PolicySetApproval
+	Hashes           []string
+	PolicyItemRegex  string
+}
+
+type PolicySetApproval struct {
+	Approver string
+	Hashes   []string
+}
+
+// ApprovalCoversAllHashes reports whether approvalHashes contains every element of required.
+func ApprovalCoversAllHashes(approvalHashes, required []string) bool {
+	if len(required) == 0 {
+		return true
+	}
+	set := make(map[string]struct{}, len(approvalHashes))
+	for _, h := range approvalHashes {
+		set[h] = struct{}{}
+	}
+	for _, h := range required {
+		if _, ok := set[h]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// PolicySetStatus tracks the approval state for a given policy set.
 type PolicySetStatus struct {
-	PolicySetName string
-	Passed        bool
-	Approvals     int
+	PolicySetName   string
+	Passed          bool
+	Approvals       []PolicySetApproval
+	Hashes          []string
+	PolicyItemRegex string
+}
+
+// GetCurApprovals returns the number of approvals that cover all hashes in this policy set.
+func (pss *PolicySetStatus) GetCurApprovals() int {
+	n := 0
+	for _, approval := range pss.Approvals {
+		if ApprovalCoversAllHashes(approval.Hashes, pss.Hashes) {
+			n++
+		}
+	}
+	return n
+}
+
+func (pss *PolicySetStatus) OwnerHasFullyApproved(owner string) bool {
+	for _, approval := range pss.Approvals {
+		if approval.Approver == owner && ApprovalCoversAllHashes(approval.Hashes, pss.Hashes) {
+			return true
+		}
+	}
+	return false
 }
 
 // Summary regexes
 var (
 	reChangesOutside = regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
-	rePlanChanges    = regexp.MustCompile(`Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy.`)
-	reNoChanges      = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
+	rePlanChanges    = regexp.MustCompile(
+		`Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy(?:, (\d+) to forget)?\.`,
+	)
+	reNoChanges = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 )
 
 // Summary extracts summaries of plan changes from TerraformOutput.
@@ -423,38 +529,134 @@ func (p *PlanSuccess) Summary() string {
 }
 
 // DiffSummary extracts one line summary of plan changes from TerraformOutput.
+// When the output contains multiple "Plan:" lines (e.g. terragrunt stack run
+// plan, which prints one summary per unit), the counters are aggregated so the
+// rendered summary reflects the total across all units.
 func (p *PlanSuccess) DiffSummary() string {
-	if match := rePlanChanges.FindString(p.TerraformOutput); match != "" {
-		return match
+	stats := NewPlanSuccessStats(p.TerraformOutput)
+	if !stats.Changes {
+		return reNoChanges.FindString(p.TerraformOutput)
 	}
-	return reNoChanges.FindString(p.TerraformOutput)
+	switch {
+	case stats.Import > 0 && stats.Forget > 0:
+		return fmt.Sprintf("Plan: %d to import, %d to add, %d to change, %d to destroy, %d to forget.",
+			stats.Import, stats.Add, stats.Change, stats.Destroy, stats.Forget)
+	case stats.Import > 0:
+		return fmt.Sprintf("Plan: %d to import, %d to add, %d to change, %d to destroy.",
+			stats.Import, stats.Add, stats.Change, stats.Destroy)
+	case stats.Forget > 0:
+		return fmt.Sprintf("Plan: %d to add, %d to change, %d to destroy, %d to forget.",
+			stats.Add, stats.Change, stats.Destroy, stats.Forget)
+	default:
+		return fmt.Sprintf("Plan: %d to add, %d to change, %d to destroy.",
+			stats.Add, stats.Change, stats.Destroy)
+	}
 }
 
 // NoChanges returns true if the plan has no changes.
 func (p *PlanSuccess) NoChanges() bool {
+	if p.Stats().Changes {
+		return false
+	}
 	return reNoChanges.MatchString(p.TerraformOutput)
 }
 
 // Diff Markdown regexes
 var (
-	diffKeywordRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)([a-zA-Z_][\w]*\s*)(\s=\s|\s->\s|\(known after apply\)|\{)(.*)`)
-	diffResourceRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)((?:resource|data|module)\s+.+\{.*)`)
-	diffHeredocRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(<<)(.*)`)
-	diffColonRegex    = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {4,}[a-zA-Z_][\w-]*:.*)`)
-	diffListRegex     = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
-	diffTildeRegex    = regexp.MustCompile(`(?m)^~`)
+	diffKeywordRegex                  = regexp.MustCompile(`(?m)^( +)([-+~]\s)([a-zA-Z_][\w]*\s*)(\s=\s|\s->\s|\(known after apply\)|\{)(.*)`)
+	diffResourceRegex                 = regexp.MustCompile(`(?m)^( +)([-+~]\s)((?:resource|data|module)\s+.+\{.*)`)
+	diffHeredocRegex                  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(<<)(.*)`)
+	diffColonRegex                    = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {4,}[a-zA-Z_][\w-]*:.*)`)
+	diffListRegex                     = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
+	diffTildeRegex                    = regexp.MustCompile(`(?m)^~`)
+	diffHeredocAttributeStartRegex    = regexp.MustCompile(`^( *)([-+~]\s)?[a-zA-Z_][\w]*\s*=\s<<-?([a-zA-Z_][\w]*)\s*$`)
+	diffHeredocCollectionElementRegex = regexp.MustCompile(`^( *)([-+~]\s)<<-?([a-zA-Z_][\w]*)\s*$`)
+	diffHeredocContentLineRegex       = regexp.MustCompile(`^( +)([-+~]\s)(.*)`)
 )
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
-	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5")
-	formattedTerraformOutput = diffResourceRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
-	formattedTerraformOutput = diffHeredocRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3$4")
-	formattedTerraformOutput = diffColonRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
-	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
-	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
+	lines := strings.Split(p.TerraformOutput, "\n")
+	heredocDelimiter := ""
+	heredocTerminatorIndent := -1
+	heredocDiffMarkerIndent := -1
 
-	return strings.TrimSpace(formattedTerraformOutput)
+	for i, line := range lines {
+		if heredocDelimiter != "" {
+			if isDiffMarkdownHeredocEnd(line, heredocDelimiter, heredocTerminatorIndent) {
+				heredocDelimiter = ""
+				heredocTerminatorIndent = -1
+				heredocDiffMarkerIndent = -1
+				continue
+			}
+
+			if heredocDiffMarkerIndent >= 0 {
+				lines[i] = formatHeredocDiffMarkdownLine(line, heredocDiffMarkerIndent)
+			}
+			continue
+		}
+
+		if delimiter, terminatorIndent, diffMarkerIndent, ok := diffMarkdownHeredocStart(line); ok {
+			heredocDelimiter = delimiter
+			heredocTerminatorIndent = terminatorIndent
+			heredocDiffMarkerIndent = diffMarkerIndent
+		}
+
+		lines[i] = formatDiffMarkdownLine(line)
+	}
+
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func formatDiffMarkdownLine(line string) string {
+	formattedLine := diffKeywordRegex.ReplaceAllString(line, "$2$1$3$4$5")
+	formattedLine = diffResourceRegex.ReplaceAllString(formattedLine, "$2$1$3")
+	formattedLine = diffHeredocRegex.ReplaceAllString(formattedLine, "$2$1$3$4")
+	formattedLine = diffColonRegex.ReplaceAllString(formattedLine, "$2$1$3")
+	formattedLine = diffListRegex.ReplaceAllString(formattedLine, "$2$1$3")
+	formattedLine = diffTildeRegex.ReplaceAllString(formattedLine, "!")
+
+	return formattedLine
+}
+
+func diffMarkdownHeredocStart(line string) (string, int, int, bool) {
+	if heredocMatch := diffHeredocAttributeStartRegex.FindStringSubmatch(line); heredocMatch != nil {
+		return diffMarkdownHeredocState(heredocMatch[1], heredocMatch[2], heredocMatch[3], len(heredocMatch[1])+4)
+	}
+
+	if heredocMatch := diffHeredocCollectionElementRegex.FindStringSubmatch(line); heredocMatch != nil {
+		return diffMarkdownHeredocState(heredocMatch[1], heredocMatch[2], heredocMatch[3], len(heredocMatch[1])+len(heredocMatch[2])+2)
+	}
+
+	return "", -1, -1, false
+}
+
+func diffMarkdownHeredocState(indent string, marker string, delimiter string, diffMarkerIndent int) (string, int, int, bool) {
+	terminatorIndent := len(indent) + len(marker)
+	if !strings.HasPrefix(marker, "~") {
+		return delimiter, terminatorIndent, -1, true
+	}
+
+	// Terraform renders changed heredoc content diff markers two spaces deeper
+	// than the heredoc terminator.
+	return delimiter, terminatorIndent, diffMarkerIndent, true
+}
+
+func isDiffMarkdownHeredocEnd(line string, delimiter string, indent int) bool {
+	terminator := strings.Repeat(" ", indent) + delimiter
+	return line == terminator ||
+		line == terminator+"," ||
+		strings.HasPrefix(line, terminator+" -> ") ||
+		strings.HasPrefix(line, terminator+", -> ")
+}
+
+func formatHeredocDiffMarkdownLine(line string, diffMarkerIndent int) string {
+	matches := diffHeredocContentLineRegex.FindStringSubmatch(line)
+	if matches == nil || len(matches[1]) != diffMarkerIndent {
+		return line
+	}
+
+	return diffTildeRegex.ReplaceAllString(matches[2]+matches[1]+matches[3], "!")
 }
 
 // Stats returns plan change stats and contextual information.
@@ -525,7 +727,7 @@ func (p *PolicyCheckResults) Summary() string {
 func (p *PolicyCheckResults) PolicyCleared() bool {
 	passing := true
 	for _, policySetResult := range p.PolicySetResults {
-		if !policySetResult.Passed && (policySetResult.CurApprovals != policySetResult.ReqApprovals) {
+		if !policySetResult.Passed && (policySetResult.GetCurApprovals() < policySetResult.ReqApprovalCount) {
 			passing = false
 		}
 	}
@@ -538,13 +740,47 @@ func (p *PolicyCheckResults) PolicySummary() string {
 	for _, policySetResult := range p.PolicySetResults {
 		if policySetResult.Passed {
 			summary = append(summary, fmt.Sprintf("policy set: %s: passed.", policySetResult.PolicySetName))
-		} else if policySetResult.CurApprovals == policySetResult.ReqApprovals {
+		} else if policySetResult.GetCurApprovals() >= policySetResult.ReqApprovalCount {
 			summary = append(summary, fmt.Sprintf("policy set: %s: approved.", policySetResult.PolicySetName))
 		} else {
-			summary = append(summary, fmt.Sprintf("policy set: %s: requires: %d approval(s), have: %d.", policySetResult.PolicySetName, policySetResult.ReqApprovals, policySetResult.CurApprovals))
+			summary = append(summary, fmt.Sprintf("policy set: %s: requires: %d approval(s), have: %d.", policySetResult.PolicySetName, policySetResult.ReqApprovalCount, policySetResult.GetCurApprovals()))
 		}
 	}
 	return strings.Join(summary, "\n")
+}
+
+// GetCurApprovals returns the number of approvals that cover all hashes in this policy set result.
+func (p *PolicySetResult) GetCurApprovals() int {
+	n := 0
+	for _, approval := range p.Approvals {
+		if ApprovalCoversAllHashes(approval.Hashes, p.Hashes) {
+			n++
+		}
+	}
+	return n
+}
+
+// ApprovedHashes returns the deduplicated union of hashes across all approvals.
+func (p *PolicySetResult) ApprovedHashes() []string {
+	seen := make(map[string]struct{})
+	var result []string
+	for _, approval := range p.Approvals {
+		for _, h := range approval.Hashes {
+			if _, ok := seen[h]; !ok {
+				seen[h] = struct{}{}
+				result = append(result, h)
+			}
+		}
+	}
+	return result
+}
+
+func (p *PolicySetResult) PolicySetHashes(policyItemRegex string) ([]string, error) {
+	re, err := regexp.Compile(policyItemRegex)
+	if err != nil {
+		return nil, fmt.Errorf("compiling policy_item_regex %q: %w", policyItemRegex, err)
+	}
+	return policyItemHashes(p.PolicyOutput, re), nil
 }
 
 type VersionSuccess struct {
@@ -570,12 +806,23 @@ func (p PullStatus) StatusCount(status ProjectPlanStatus) int {
 	return c
 }
 
+// ProjectCounts holds the success/failure counts for a set of project operations.
+// For command.Apply: Errored counts projects with apply errors. NoChanges is a
+// subset of Success (projects that were already up to date count as successful).
+// NoChanges is ignored for all other commands.
+type ProjectCounts struct {
+	Success   int
+	Total     int
+	Errored   int
+	NoChanges int
+}
+
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
 	Workspace   string
 	RepoRelDir  string
 	ProjectName string
-	// PolicySetApprovals tracks the approval status of every PolicySet for a Project.
+	// PolicyStatus tracks the policy check status for each policy set.
 	PolicyStatus []PolicySetStatus
 	// Status is the status of where this project is at in the planning cycle.
 	Status ProjectPlanStatus
@@ -604,11 +851,11 @@ const (
 	// DiscardedPlanStatus means that there was an unapplied plan that was
 	// discarded due to a project being unlocked
 	DiscardedPlanStatus
-	// ErroredPolicyCheckStatus means that there was an unapplied plan that was
-	// discarded due to a project being unlocked
+	// ErroredPolicyCheckStatus means that the policy check errored or has
+	// failing policies.
 	ErroredPolicyCheckStatus
-	// PassedPolicyCheckStatus means that there was an unapplied plan that was
-	// discarded due to a project being unlocked
+	// PassedPolicyCheckStatus means that all policy checks passed or were
+	// approved.
 	PassedPolicyCheckStatus
 )
 
@@ -732,27 +979,48 @@ type WorkflowHookCommandContext struct {
 
 // PlanSuccessStats holds stats for a plan.
 type PlanSuccessStats struct {
-	Import, Add, Change, Destroy int
-	Changes, ChangesOutside      bool
+	Import, Add, Change, Destroy, Forget int
+	Changes, ChangesOutside              bool
 }
 
 func NewPlanSuccessStats(output string) PlanSuccessStats {
-	m := rePlanChanges.FindStringSubmatch(output)
+	matches := rePlanChanges.FindAllStringSubmatch(output, -1)
 
 	s := PlanSuccessStats{
 		ChangesOutside: reChangesOutside.MatchString(output),
-		Changes:        len(m) > 0,
+		Changes:        len(matches) > 0,
 	}
 
-	if s.Changes {
-		// We can skip checking the error here as we can assume
-		// Terraform output will always render an integer on these
-		// blocks.
-		s.Import, _ = strconv.Atoi(m[1])
-		s.Add, _ = strconv.Atoi(m[2])
-		s.Change, _ = strconv.Atoi(m[3])
-		s.Destroy, _ = strconv.Atoi(m[4])
+	// When the output contains multiple "Plan:" lines (e.g. terragrunt stack
+	// run plan produces one summary per unit), aggregate the counters so the
+	// stats reflect the total across all units.
+	//
+	// m[1] is the optional "X to import" group: it is an empty string for
+	// plans without import blocks. m[5] is the optional "X to forget" group:
+	// it is absent or empty for plans without forget blocks. All captures must
+	// be parsed leniently.
+	for _, m := range matches {
+		s.Import += parsePlanCount(m[1])
+		s.Add += parsePlanCount(m[2])
+		s.Change += parsePlanCount(m[3])
+		s.Destroy += parsePlanCount(m[4])
+		if len(m) > 5 && m[5] != "" {
+			s.Forget += parsePlanCount(m[5])
+		}
 	}
 
 	return s
+}
+
+// parsePlanCount converts a numeric capture group from rePlanChanges into an
+// int. The "to import" group is optional in the regexp, so an empty string is
+// a normal case (no import block) and must produce 0 rather than be treated
+// as a parse failure. A non-empty value that fails to parse is unreachable
+// given the (\d+) capture, but we return 0 defensively rather than panic.
+func parsePlanCount(s string) int {
+	if s == "" {
+		return 0
+	}
+	n, _ := strconv.Atoi(s)
+	return n
 }

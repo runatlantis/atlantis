@@ -1,16 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // Package tfclient handles the actual running of terraform commands.
@@ -381,7 +370,7 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 	log := ctx.Log.With("duration", dur)
 	if err != nil {
 		err = fmt.Errorf("running '%s' in '%s': %w", tfCmd, path, err)
-		log.Err(err.Error())
+		log.Err("%s", err.Error())
 		return ansi.Strip(string(out)), err
 	}
 	log.Info("Successfully ran '%s' in '%s'", tfCmd, path)

@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package cmd
@@ -135,6 +126,8 @@ const (
 	RedisPort                        = "redis-port"
 	RedisTLSEnabled                  = "redis-tls-enabled"
 	RedisInsecureSkipVerify          = "redis-insecure-skip-verify"
+	RedisUsername                    = "redis-username"
+	RedisClusterAddresses            = "redis-cluster-addresses"
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
@@ -427,6 +420,13 @@ var stringFlags = map[string]stringFlag{
 	},
 	RedisPassword: {
 		description: "The Redis Password for when using a Locking DB type of 'redis'.",
+	},
+	RedisUsername: {
+		description: "The Redis Username for when using a Locking DB type of 'redis'.",
+	},
+	RedisClusterAddresses: {
+		description: "Comma-delimited list of Redis cluster node addresses in the format 'host:port'. " +
+			"When set, Atlantis uses Redis Cluster mode instead of single-node mode.",
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
@@ -859,7 +859,23 @@ func (s *ServerCmd) preRun() error {
 	return nil
 }
 
+// sanitizeKubernetesServiceLinks detects Kubernetes service link environment
+// variables that collide with Atlantis's ATLANTIS_ env prefix and resets them
+// to their defaults. Kubernetes auto-creates env vars like
+// ATLANTIS_REDIS_PORT=tcp://10.x.x.x:6379 for services in the same namespace,
+// which viper picks up and fails to parse as integers.
+func (s *ServerCmd) sanitizeKubernetesServiceLinks() {
+	for name, f := range intFlags {
+		val := s.Viper.GetString(name)
+		if strings.HasPrefix(val, "tcp://") || strings.HasPrefix(val, "udp://") {
+			s.Viper.Set(name, f.defaultValue)
+		}
+	}
+}
+
 func (s *ServerCmd) run() error {
+	s.sanitizeKubernetesServiceLinks()
+
 	var userConfig server.UserConfig
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
@@ -1103,6 +1119,18 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if userConfig.TFEHostname != DefaultTFEHostname && userConfig.TFEToken == "" {
 		return fmt.Errorf("if setting --%s, must set --%s", TFEHostnameFlag, TFETokenFlag)
+	}
+
+	if userConfig.RedisClusterAddresses != "" {
+		if userConfig.RedisHost != "" {
+			return fmt.Errorf("--%s cannot be combined with --%s", RedisClusterAddresses, RedisHost)
+		}
+		if userConfig.RedisPort != DefaultRedisPort {
+			return fmt.Errorf("--%s cannot be combined with --%s", RedisClusterAddresses, RedisPort)
+		}
+		if userConfig.RedisDB != DefaultRedisDB {
+			return fmt.Errorf("--%s is not supported in cluster mode (Redis Cluster ignores the DB parameter)", RedisDB)
+		}
 	}
 
 	_, patternErr := patternmatcher.New(strings.Split(userConfig.AutoplanFileList, ","))

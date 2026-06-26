@@ -12,6 +12,9 @@ linters:
     misspell:
       ignore-rules:
         - noteable
+    modernize:
+      disable:
+        - newexpr
     revive:
       rules:
         - name: dot-imports
@@ -23,6 +26,12 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      # Allow hardcoded credentials in test fixtures (HTTP basic-auth URLs etc.)
+      - path: _test\.go
+        linters:
+          - gosec
+        text: "G101"
     paths:
       - third_party$
       - builtin$

@@ -54,17 +54,17 @@ Values are chosen in this order:
 ### `--allow-commands` <Badge text="v0.27.0+" type="info"/>
 
 ```bash
-atlantis server --allow-commands=version,plan,apply,unlock,approve_policies
+atlantis server --allow-commands=version,plan,apply,unlock,approve_policies,cancel
 # or
-ATLANTIS_ALLOW_COMMANDS='version,plan,apply,unlock,approve_policies'
+ATLANTIS_ALLOW_COMMANDS='version,plan,apply,unlock,approve_policies,cancel'
 ```
 
-List of allowed commands to be run on the Atlantis server, Defaults to `version,plan,apply,unlock,approve_policies`
+List of allowed commands to be run on the Atlantis server, Defaults to `version,plan,apply,unlock,approve_policies,cancel`
 
 Notes:
 
 - Accepts a comma separated list, ex. `command1,command2`.
-- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state`, `policy_check` and `all` are available.
+- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `cancel`, `import`, `state`, `policy_check` and `all` are available.
 - `policy_check` is an internal command that runs automatically after `plan` when [policy checking](policy-checking.md) is enabled. It must be explicitly allowlisted when using [`--gh-team-allowlist`](#gh-team-allowlist).
 - `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
 
@@ -317,7 +317,7 @@ Bitbucket username (usually an email) used for API authentication with Bitbucket
 
 **Note:**
 
-- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026(see [here](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
+- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026 (see [Atlassian's Bitbucket app password deprecation notice](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
 
 **Config file key:**
 
@@ -576,7 +576,7 @@ ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
 
 Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 
-Useful to enable for use with GitHub.
+Useful to enable for use with GitHub. Changed lines inside Terraform heredoc and multiline-string diffs are also formatted so diff-aware markdown renderers can color them.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
@@ -738,6 +738,8 @@ ATLANTIS_GH_HOSTNAME="my.github.enterprise.com"
 
 Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
 don't set. Defaults to `github.com`.
+
+For GitHub Enterprise Cloud, use the tenant hostname, for example `tenant.ghe.com`. Do not include a scheme or an `api.` prefix; Atlantis derives the REST and GraphQL API endpoints from the hostname.
 
 ### `--gh-org` <Badge text="v0.1.3+" type="info"/>
 
@@ -1032,7 +1034,7 @@ The locking database type to use for storing plan and apply locks. Defaults to `
 Notes:
 
 - If set to `boltdb`, only one process may have access to the boltdb instance.
-- If set to `redis`, then `--redis-host`, `--redis-port`, and `--redis-password` must be set.
+- If set to `redis`, use `--redis-host` and `--redis-port` for single-node mode, or `--redis-cluster-addresses` for Redis Cluster mode. Use `--redis-password` and (optionally) `--redis-username` only if your Redis deployment requires authentication.
 
 ### `--log-level` <Badge text="v0.1.3+" type="info"/>
 
@@ -1120,6 +1122,9 @@ This prevents merge requests from being merged until all Terraform applies are c
 
 When enabled, after running `atlantis plan`, the MR status will show as pending if there are changes
 to apply. Once all projects are successfully applied (or show no changes), the status will update to success.
+Projects with no Terraform changes are counted as up to date rather than applied. If a pull request has both
+up-to-date projects and projects still waiting to apply, the Atlantis apply commit status remains pending
+until all changed projects are applied.
 
 Defaults to `false`.
 
@@ -1144,6 +1149,16 @@ ATLANTIS_QUIET_POLICY_CHECKS=true
 ```
 
 Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
+
+### `--redis-cluster-addresses`
+
+```bash
+atlantis server --redis-cluster-addresses="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
+# or
+ATLANTIS_REDIS_CLUSTER_ADDRESSES="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
+```
+
+Comma-delimited list of Redis cluster node addresses in the format `host:port`. When set, Atlantis uses Redis Cluster mode instead of single-node mode. This is mutually exclusive with `--redis-host`/`--redis-port` (which are used for single-node mode).
 
 ### `--redis-db` <Badge text="v0.19.9+" type="info"/>
 
@@ -1209,6 +1224,16 @@ ATLANTIS_REDIS_TLS_ENABLED=false
 
 Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
 
+### `--redis-username`
+
+```bash
+atlantis server --redis-username="myuser"
+# or
+ATLANTIS_REDIS_USERNAME="myuser"
+```
+
+The Redis Username for when using a Locking DB type of `redis`. Useful when Redis is configured with ACL-based authentication.
+
 ### `--repo-allowlist` <Badge text="v0.13.0" type="info"/>
 
 ```bash
@@ -1228,7 +1253,7 @@ Notes:
 - An entry beginning with `!` negates it, ex. `github.com/foo/*,!github.com/foo/bar` will match all github repos in the `foo` owner _except_ `bar`.
 - For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
   - User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
-- For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
+- For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{owner}/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
 - Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo allowlist for each repository until the change is complete.
 
 Examples:
@@ -1242,7 +1267,7 @@ Examples:
 - Allowlist all repos in my GitHub Enterprise installation
   - `--repo-allowlist='github.yourcompany.com/*'`
 - Allowlist all repos under `myorg` project `myproject` on Azure DevOps
-  - `--repo-allowlist='myorg.visualstudio.com/myproject/*,dev.azure.com/myorg/myproject/*'`
+  - `--repo-allowlist='myorg.visualstudio.com/myorg/myproject/*,dev.azure.com/myorg/myproject/*'`
 - Allowlist all repositories
   - `--repo-allowlist='*'`
 

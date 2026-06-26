@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 // Package server handles the web server and executing commands that come in
@@ -496,8 +487,32 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
-		logger.Info("Utilizing Redis DB")
-		database, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
+		var clusterAddrs []string
+		if userConfig.RedisClusterAddresses != "" {
+			for addr := range strings.SplitSeq(userConfig.RedisClusterAddresses, ",") {
+				trimmed := strings.TrimSpace(addr)
+				if trimmed == "" {
+					continue
+				}
+				clusterAddrs = append(clusterAddrs, trimmed)
+			}
+		}
+		switch {
+		case len(clusterAddrs) > 0:
+			logger.Info("Utilizing Redis DB in cluster mode, addresses: %s", strings.Join(clusterAddrs, ", "))
+		default:
+			logger.Info("Utilizing Redis DB in single-node mode, host: %s, port: %d", userConfig.RedisHost, userConfig.RedisPort)
+		}
+		database, err = redis.NewWithConfig(redis.Config{
+			Hostname:           userConfig.RedisHost,
+			Port:               userConfig.RedisPort,
+			Password:           userConfig.RedisPassword,
+			Username:           userConfig.RedisUsername,
+			TLSEnabled:         userConfig.RedisTLSEnabled,
+			InsecureSkipVerify: userConfig.RedisInsecureSkipVerify,
+			DB:                 userConfig.RedisDB,
+			ClusterAddresses:   clusterAddrs,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -593,6 +608,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubTokenFile:    userConfig.GithubTokenFile,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
+		GitlabHostname:     userConfig.GitlabHostname,
 		GiteaUser:          userConfig.GiteaUser,
 		GiteaToken:         userConfig.GiteaToken,
 		AllowDraftPRs:      userConfig.PlanDrafts,
@@ -650,11 +666,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
 	}
+	projectFinder := &events.DefaultProjectFinder{}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
 		policyChecksEnabled,
 		parserValidator,
-		&events.DefaultProjectFinder{},
+		projectFinder,
 		vcsClient,
 		workingDir,
 		workingDirLocker,
@@ -693,7 +710,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	applyRequirementHandler := &events.DefaultCommandRequirementHandler{
-		WorkingDir: workingDir,
+		WorkingDir:    workingDir,
+		VCSStatusName: userConfig.VCSStatusName,
+		ProjectImpactResolver: events.NewUndivergedProjectImpactResolver(
+			parserValidator,
+			projectFinder,
+			globalCfg,
+			userConfig.AutoplanModulesFromProjects,
+			userConfig.AutoplanFileList,
+			userConfig.AutoDiscoverModeFlag,
+		),
 	}
 
 	cancellationTracker := events.NewCancellationTracker()
@@ -980,6 +1006,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:                     workingDir,
 		WorkingDirLocker:               workingDirLocker,
 		CommitStatusUpdater:            commitStatusUpdater,
+		PullReqStatusFetcher:           pullReqStatusFetcher,
 		SilenceVCSStatusNoProjects:     userConfig.SilenceVCSStatusNoProjects,
 	}
 
@@ -1068,6 +1095,7 @@ func (s *Server) Start() error {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
+	s.Router.HandleFunc("/readyz", s.Readyz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
@@ -1138,7 +1166,7 @@ func (s *Server) Start() error {
 		}
 
 		if err != nil && err != http.ErrServerClosed {
-			s.Logger.Err(err.Error())
+			s.Logger.Err("%s", err.Error())
 		}
 	}()
 	<-stop
@@ -1148,7 +1176,7 @@ func (s *Server) Start() error {
 
 	// flush stats before shutdown
 	if err := s.StatsCloser.Close(); err != nil {
-		s.Logger.Err(err.Error())
+		s.Logger.Err("%s", err.Error())
 	}
 
 	// Attempt to close the database
@@ -1251,7 +1279,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		CleanedBasePath:  s.AtlantisURL.Path,
 	})
 	if err != nil {
-		s.Logger.Err(err.Error())
+		s.Logger.Err("%s", err.Error())
 	}
 }
 
@@ -1298,9 +1326,26 @@ func mkSubDir(parentDir string, subDir string) (string, error) {
 	return fullDir, nil
 }
 
-// Healthz returns the health check response. It always returns a 200 currently.
+// Healthz returns the health check response. It always returns 200 if the
+// process is running. Use /readyz for dependency health checks.
+// Suitable for K8s liveness probes (should not depend on external services).
 func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Write(healthzData) // nolint: errcheck
+}
+
+// Readyz checks whether the server is ready to handle requests by verifying
+// connectivity to external dependencies (e.g. Redis). Returns 503 if any
+// dependency is unreachable. Suitable for K8s readiness probes.
+func (s *Server) Readyz(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.database != nil {
+		if err := s.database.Ping(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write(fmt.Appendf(nil, `{"status":"error","error":%q}`, err.Error())) // nolint: errcheck
+			return
+		}
+	}
 	w.Write(healthzData) // nolint: errcheck
 }
 
