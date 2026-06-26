@@ -1036,6 +1036,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:                workingDirLocker,
 		CommitStatusUpdater:             commitStatusUpdater,
 		PullReqStatusFetcher:            pullReqStatusFetcher,
+		PullStatusFetcher:               database,
 		LivePullHeadFetcher:             livePullHeadFetcher,
 		SilenceVCSStatusNoProjects:      userConfig.SilenceVCSStatusNoProjects,
 	}
