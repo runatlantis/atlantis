@@ -22,7 +22,7 @@
 
 **Mocks:** `make go-generate` (regenerate after interface changes) • `make regen-mocks` (delete & regenerate all)
 
-**Website (VitePress):** `npm install` (required first) • `npm run website:dev` (http://localhost:8080) • `npm run website:build` • `npm run website:lint` • `npm run e2e` (Playwright)
+**Website (VitePress):** `npm install` (required first) • `npm run website:dev` (<http://localhost:8080>) • `npm run website:build` • `npm run website:lint` • `npm run e2e` (Playwright)
 📁 Docs: `runatlantis.io/docs/*.md` • Config: `runatlantis.io/.vitepress/config.js`
 
 ## Architecture
@@ -47,6 +47,7 @@
 **Replicate CI locally:** `make test-all && make check-fmt` OR use Docker: `docker run --rm -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:latest sh -c "cd /atlantis && make test-all"`
 
 **E2E tests:** Complex setup (ngrok + credentials). CI handles it. Local optional. See `./scripts/e2e.sh` for details.
+
 - **GitHub E2E auth:** Supports two modes — GitHub App (preferred) via `ATLANTIS_GH_APP_ID` + `ATLANTIS_GH_APP_KEY` + `ATLANTIS_GH_APP_SLUG`, or PAT via `ATLANTIS_GH_USER` + `ATLANTIS_GH_TOKEN`. App auth avoids org 2FA restrictions.
 - **E2E test code:** `e2e/` has its own `go.mod` (separate module from root). Build: `cd e2e && make build`. Run: `make run`.
 - **Atlantis server in E2E:** Started by `scripts/e2e.sh` — reads GitHub auth from env vars automatically (viper). No explicit flags needed.
@@ -76,6 +77,14 @@
 **Plan statistics:** `models.NewPlanSuccessStats` parses Terraform/OpenTofu summary lines including `to forget`. Preserve import/add/change/destroy/forget counts when changing plan rendering or parser regexes.
 
 **GitHub App merge checkout:** In `server/events/working_dir.go`, `CheckoutMerge` with `GithubAppEnabled` and a PR number fetches `pull/<n>/head` from `origin` and intentionally skips the `source` remote. Preserve this fork-safe behavior when changing clone, fetch, or divergence logic.
+
+**GitHub Enterprise Cloud:** `*.ghe.com` hosts use `https://api.<tenant>.ghe.com/` for REST and `/graphql` on that API host for GraphQL, not the GitHub Enterprise Server `/api/v3` and `/api/graphql` paths. For GitHub App credentials on GHE Cloud, preserve the app-level JWT `/app` lookup used to derive the bot slug.
+
+**Pending plans:** `server/events/pending_plan_finder.go` should only scan workspace clone roots. Skip files, symlinks, and non-git directories under the pull directory before running `git ls-files` so stray directories do not look like pending Atlantis plans.
+
+**Working dir ref refresh:** After `server/events/working_dir.go` resets or redoes a merge for a newer ref, untracked `.tfplan` files must be removed while preserving `.terragrunt-cache`. Stale plan files from a previous ref must not survive branch or merge checkout refreshes.
+
+**Command output rendering:** `server/core/runtime/models/shell_command_runner.go` must preserve long single-line stdout/stderr output by keeping the enlarged scanner buffer. `PlanSuccess.DiffMarkdownFormattedTerraformOutput` should keep heredoc and multiline-string diff markers aligned so changed content remains colorized in markdown diff blocks.
 
 ## Known Issues
 
