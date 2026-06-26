@@ -165,12 +165,11 @@ RUN ./download-release.sh \
 FROM alpine:${ALPINE_TAG} AS alpine
 
 ARG ATLANTIS_PORT=4141
-ENV ATLANTIS_PORT=${ATLANTIS_PORT}
 
 EXPOSE ${ATLANTIS_PORT}
 
 HEALTHCHECK --interval=5m --timeout=3s \
-    CMD curl -f http://localhost:${ATLANTIS_PORT}/healthz || exit 1
+    CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # Set up the 'atlantis' user and adjust permissions
 RUN addgroup --gid 1000 atlantis && \
@@ -257,12 +256,11 @@ CMD ["server"]
 FROM debian-base AS debian
 
 ARG ATLANTIS_PORT=4141
-ENV ATLANTIS_PORT=${ATLANTIS_PORT}
 
 EXPOSE ${ATLANTIS_PORT}
 
 HEALTHCHECK --interval=5m --timeout=3s \
-    CMD curl -f http://localhost:${ATLANTIS_PORT}/healthz || exit 1
+    CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
