@@ -74,5 +74,5 @@ func newStatsReporter(cfg valid.Metrics) (tally.StatsReporter, error) {
 		return nil, fmt.Errorf("initializing statsd client: %w", err)
 	}
 
-	return tallystatsd.NewReporter(client, tallystatsd.Options{}), nil
+	return tallystatsd.NewReporter(newStatsdV6StatterAdapter(client), tallystatsd.Options{}), nil
 }
