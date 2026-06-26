@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	tally "github.com/uber-go/tally/v4"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -37,6 +38,30 @@ const (
 	// DefaultAbortOnExecutionOrderFail being false is the default setting for abort on execution group failures
 	DefaultAbortOnExecutionOrderFail = false
 )
+
+var ErrIgnoredTargetedDir = errors.New("targeted dir ignored by autodiscover.ignore_paths")
+
+func IsIgnoredTargetedDir(err error) bool {
+	return errors.Is(err, ErrIgnoredTargetedDir)
+}
+
+func MarkCommandSkippedIfIgnoredTargetedDir(ctx *command.Context, commandName command.Name, err error) bool {
+	if !IsIgnoredTargetedDir(err) {
+		return false
+	}
+	ctx.Log.Debug("ignoring targeted %s because the directory matches autodiscover.ignore_paths", commandName.String())
+	ctx.CommandSkipped = true
+	return true
+}
+
+func MarkCommandSkippedIfIgnoredTarget(ctx *command.Context, commandName command.Name, cmd *CommentCommand, ignorer ProjectTargetedDirIgnorer) bool {
+	if cmd.ProjectName != "" || cmd.RepoRelDir == "" || !ignorer.ShouldIgnoreTargetedDir(ctx, cmd) {
+		return false
+	}
+	ctx.Log.Debug("ignoring targeted %s because the directory matches autodiscover.ignore_paths", commandName.String())
+	ctx.CommandSkipped = true
+	return true
+}
 
 func NewInstrumentedProjectCommandBuilder(
 	logger logging.SimpleLogging,
@@ -152,6 +177,7 @@ func NewProjectCommandBuilder(
 }
 
 type ProjectPlanCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
 	BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error)
@@ -162,6 +188,7 @@ type ProjectPlanCommandBuilder interface {
 }
 
 type ProjectApplyCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildApplyCommands builds project Apply commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
@@ -169,11 +196,13 @@ type ProjectApplyCommandBuilder interface {
 }
 
 type ProjectApprovePoliciesCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildApprovePoliciesCommands builds project PolicyCheck commands for this ctx and comment.
 	BuildApprovePoliciesCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
 type ProjectVersionCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildVersionCommands builds project Version commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
@@ -181,6 +210,7 @@ type ProjectVersionCommandBuilder interface {
 }
 
 type ProjectImportCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildImportCommands builds project Import commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
@@ -188,10 +218,15 @@ type ProjectImportCommandBuilder interface {
 }
 
 type ProjectStateCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildStateRmCommands builds project state rm commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
 	BuildStateRmCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
+}
+
+type ProjectTargetedDirIgnorer interface {
+	ShouldIgnoreTargetedDir(ctx *command.Context, comment *CommentCommand) bool
 }
 
 //go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
@@ -410,6 +445,139 @@ func (p *DefaultProjectCommandBuilder) parseRepoCfg(ctx *command.Context, repoDi
 	}
 	ctx.Log.Info("successfully parsed %s file", repoCfgFile)
 	return repoCfg, true, nil
+}
+
+// shouldIgnoreTargetedDir checks whether a targeted -d command should be
+// silently skipped because the path matches autodiscover.ignore_paths. It only
+// applies when autodiscovery is active and the directory has no explicit project
+// config in the repo config file.
+func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDir(ctx *command.Context, repoDir string, repoRelDir string) bool {
+	if valid.ContainsDirGlobPattern(repoRelDir) {
+		return false
+	}
+	repoCfg, _, err := p.parseRepoCfg(ctx, repoDir)
+	if err != nil {
+		return false
+	}
+	return p.shouldIgnoreTargetedDirFromCfg(ctx, repoCfg, repoRelDir)
+}
+
+func (p *DefaultProjectCommandBuilder) ShouldIgnoreTargetedDir(ctx *command.Context, cmd *CommentCommand) bool {
+	if cmd.ProjectName != "" || cmd.RepoRelDir == "" || valid.ContainsDirGlobPattern(cmd.RepoRelDir) {
+		return false
+	}
+	repoCfg, ok := p.repoCfgForTargetedIgnore(ctx, cmd)
+	if !ok {
+		return false
+	}
+	return p.shouldIgnoreTargetedDirFromCfg(ctx, repoCfg, cmd.RepoRelDir)
+}
+
+func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Context, cmd *CommentCommand) (valid.RepoCfg, bool) {
+	repoRelDir := cmd.RepoRelDir
+	if ctx.PreferLocalRepoCfgForTargetedIgnore {
+		if repoCfg, ok, _ := p.repoCfgFromWorkingDir(ctx); ok {
+			return repoCfg, true
+		}
+	}
+
+	if p.needsLocalRepoCfgForTargetedIgnore(ctx) {
+		ctx.Log.Debug("not checking remote repo config for targeted ignore because merge checkout needs the merged local config")
+		return valid.RepoCfg{}, false
+	}
+
+	if p.VCSClient != nil {
+		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.HeadRepo, targetedIgnoreConfigRef(ctx.Pull), repoCfgFile)
+		if err != nil {
+			ctx.Log.Debug("unable to fetch %s while checking autodiscover.ignore_paths: %s", repoCfgFile, err)
+			if !p.VCSClient.SupportsSingleFileDownload(ctx.HeadRepo) && p.shouldIgnoreTargetedDirFromGlobalCfg(ctx, repoRelDir) {
+				// Do not let global ignore_paths hide an explicit project that only the
+				// cloned repo config can prove.
+				if cmd.Name == command.Plan {
+					return valid.RepoCfg{}, false
+				}
+				if repoCfg, ok, missing := p.repoCfgFromWorkingDir(ctx); ok {
+					return repoCfg, true
+				} else if !missing {
+					return valid.RepoCfg{}, false
+				}
+				return valid.RepoCfg{}, true
+			}
+			return valid.RepoCfg{}, false
+		} else if hasRepoCfg {
+			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+			if err != nil {
+				ctx.Log.Debug("unable to parse %s while checking autodiscover.ignore_paths: %s", repoCfgFile, err)
+				return valid.RepoCfg{}, false
+			} else {
+				return repoCfg, true
+			}
+		}
+		return valid.RepoCfg{}, true
+	}
+
+	return valid.RepoCfg{}, false
+}
+
+func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDirFromGlobalCfg(ctx *command.Context, repoRelDir string) bool {
+	repoCfg := valid.RepoCfg{}
+	return p.autoDiscoverModeEnabled(ctx, repoCfg) &&
+		p.isAutoDiscoverPathIgnored(ctx, repoCfg, filepath.Clean(repoRelDir))
+}
+
+func targetedIgnoreConfigRef(pull models.PullRequest) string {
+	if pull.HeadCommit != "" {
+		return pull.HeadCommit
+	}
+	return pull.HeadBranch
+}
+
+func (p *DefaultProjectCommandBuilder) repoCfgFromWorkingDir(ctx *command.Context) (valid.RepoCfg, bool, bool) {
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return valid.RepoCfg{}, false, errors.Is(err, os.ErrNotExist)
+	}
+	repoCfg, _, err := p.parseRepoCfg(ctx, repoDir)
+	if err != nil {
+		return valid.RepoCfg{}, false, false
+	}
+	return repoCfg, true, false
+}
+
+func (p *DefaultProjectCommandBuilder) needsLocalRepoCfgForTargetedIgnore(ctx *command.Context) bool {
+	return ctx.Pull.Num > 0 && workingDirUsesMergeCheckout(p.WorkingDir)
+}
+
+func workingDirUsesMergeCheckout(workingDir WorkingDir) bool {
+	checkoutMerge, ok := workingDir.(interface {
+		CheckoutMergeEnabled() bool
+	})
+	return ok && checkoutMerge.CheckoutMergeEnabled()
+}
+
+func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDirFromCfg(ctx *command.Context, repoCfg valid.RepoCfg, repoRelDir string) bool {
+	if !p.autoDiscoverModeEnabled(ctx, repoCfg) {
+		return false
+	}
+	cleanDir := filepath.Clean(repoRelDir)
+	for _, proj := range repoCfg.Projects {
+		if projectDirMatchesTargetedDir(proj.Dir, cleanDir) {
+			return false
+		}
+	}
+	return p.isAutoDiscoverPathIgnored(ctx, repoCfg, cleanDir)
+}
+
+func projectDirMatchesTargetedDir(projectDir string, cleanTargetDir string) bool {
+	cleanProjectDir := filepath.Clean(projectDir)
+	if cleanProjectDir == cleanTargetDir {
+		return true
+	}
+	if !valid.ContainsDirGlobPattern(cleanProjectDir) {
+		return false
+	}
+	return doublestar.MatchUnvalidated(filepath.ToSlash(cleanProjectDir), filepath.ToSlash(cleanTargetDir))
 }
 
 // isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery.
@@ -671,6 +839,16 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		return pcc, err
 	}
 
+	repoRelDir := DefaultRepoRelDir
+	if cmd.RepoRelDir != "" {
+		repoRelDir = cmd.RepoRelDir
+	}
+
+	if cmd.ProjectName == "" && cmd.RepoRelDir != "" && p.shouldIgnoreTargetedDir(ctx, defaultRepoDir, repoRelDir) {
+		ctx.Log.Debug("ignoring targeted plan for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
+		return pcc, ErrIgnoredTargetedDir
+	}
+
 	if p.RestrictFileList {
 		ctx.Log.Debug("'restrict-file-list' option is set, checking modified files")
 		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
@@ -741,11 +919,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		if err != nil {
 			return pcc, err
 		}
-	}
-
-	repoRelDir := DefaultRepoRelDir
-	if cmd.RepoRelDir != "" {
-		repoRelDir = cmd.RepoRelDir
 	}
 
 	return p.buildProjectCommandCtx(
@@ -914,6 +1087,16 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	}
 
 	var projCtx []command.ProjectContext
+	repoRelDir := DefaultRepoRelDir
+	if cmd.RepoRelDir != "" {
+		repoRelDir = cmd.RepoRelDir
+	}
+
+	if p.ShouldIgnoreTargetedDir(ctx, cmd) {
+		ctx.Log.Debug("ignoring targeted command for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
+		return projCtx, ErrIgnoredTargetedDir
+	}
+
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
 	if err != nil {
 		return projCtx, err
@@ -929,9 +1112,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		return projCtx, err
 	}
 
-	repoRelDir := DefaultRepoRelDir
-	if cmd.RepoRelDir != "" {
-		repoRelDir = cmd.RepoRelDir
+	if cmd.ProjectName == "" && cmd.RepoRelDir != "" && p.shouldIgnoreTargetedDir(ctx, repoDir, repoRelDir) {
+		ctx.Log.Debug("ignoring targeted command for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
+		return projCtx, ErrIgnoredTargetedDir
 	}
 
 	return p.buildProjectCommandCtx(

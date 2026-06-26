@@ -79,15 +79,29 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 	}
 
 	cmds := make([]command.ProjectContext, 0)
+	keptCommentCommands := make([]*events.CommentCommand, 0)
+	ignoredCommands := 0
+	nonIgnoredCommands := 0
 	for _, commentCommand := range cc {
 		projectCmds, err := cmdBuilder(ctx, commentCommand)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to build command: %v", err)
+			if events.IsIgnoredTargetedDir(err) {
+				ignoredCommands++
+				continue
+			}
+			return nil, nil, fmt.Errorf("failed to build command: %w", err)
 		}
-		cmds = append(cmds, projectCmds...)
+		nonIgnoredCommands++
+		for _, projectCmd := range projectCmds {
+			cmds = append(cmds, projectCmd)
+			keptCommentCommands = append(keptCommentCommands, commentCommand)
+		}
+	}
+	if ignoredCommands > 0 && nonIgnoredCommands == 0 {
+		return nil, nil, events.ErrIgnoredTargetedDir
 	}
 
-	return cmds, cc, nil
+	return cmds, keptCommentCommands, nil
 }
 
 func (a *APIController) apiReportError(w http.ResponseWriter, code int, err error) {
@@ -117,7 +131,9 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
 	}
-	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+	if !ctx.CommandSkipped {
+		defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+	}
 	if result.HasErrors() {
 		code = http.StatusInternalServerError
 	}
@@ -147,9 +163,18 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// We must first make the plan for all projects
-	_, err = a.apiPlan(request, ctx)
+	result, err := a.apiPlan(request, ctx)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if ctx.CommandSkipped {
+		response, err := json.Marshal(result)
+		if err != nil {
+			a.apiReportError(w, http.StatusInternalServerError, err)
+			return
+		}
+		a.respond(w, logging.Warn, code, "%s", string(response))
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
@@ -159,7 +184,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	a.populatePullRequestStatus(ctx)
 
 	// We can now prepare and run the apply step
-	result, err := a.apiApply(request, ctx)
+	result, err = a.apiApply(request, ctx)
 	if err != nil {
 		a.apiReportError(w, http.StatusInternalServerError, err)
 		return
@@ -248,6 +273,10 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) err
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
 	cmds, cc, err := request.getCommands(ctx, command.Plan, a.ProjectCommandBuilder.BuildPlanCommands)
+	if events.IsIgnoredTargetedDir(err) {
+		ctx.CommandSkipped = true
+		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -296,6 +325,10 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
 	cmds, cc, err := request.getCommands(ctx, command.Apply, a.ProjectCommandBuilder.BuildApplyCommands)
+	if events.IsIgnoredTargetedDir(err) {
+		ctx.CommandSkipped = true
+		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
