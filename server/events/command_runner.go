@@ -523,7 +523,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 	if targetInitiallyIgnored {
 		ctx.CommandSkipped = false
-		if !preWorkflowHooksMayUpdateRepo || preWorkflowHooksErr != nil {
+		if !preWorkflowHooksMayUpdateRepo {
 			return
 		}
 		ctx.PreferLocalRepoCfgForTargetedIgnore = true

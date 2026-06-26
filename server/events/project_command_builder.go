@@ -480,9 +480,6 @@ func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Con
 	}
 
 	if p.needsLocalRepoCfgForTargetedIgnore(ctx) {
-		if repoCfg, ok := p.repoCfgFromWorkingDir(ctx); ok {
-			return repoCfg, true
-		}
 		ctx.Log.Debug("not checking remote repo config for targeted ignore because merge checkout needs the merged local config")
 		return valid.RepoCfg{}, false
 	}

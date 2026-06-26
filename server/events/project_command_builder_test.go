@@ -1156,28 +1156,20 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirAllowsAuthoritative
 	workingDir.VerifyWasCalled(Never()).GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())
 }
 
-func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutUsesLocalConfig(t *testing.T) {
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutWithLocalConfigFailsOpen(t *testing.T) {
 	RegisterMockTestingT(t)
 
-	remoteAtlantisYAML := "version: 3\n" +
+	staleLocalAtlantisYAML := "version: 3\n" +
 		"autodiscover:\n" +
 		"  mode: enabled\n" +
 		"  ignore_paths:\n" +
 		"  - \"environments/prod/**\"\n"
-	localAtlantisYAML := "version: 3\n" +
-		"autodiscover:\n" +
-		"  mode: enabled\n" +
-		"  ignore_paths:\n" +
-		"  - \"environments/prod/**\"\n" +
-		"projects:\n" +
-		"- dir: environments/prod\n"
 
 	logger := logging.NewNoopLogger(t)
 	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
 	terraformClient := tfclientmocks.NewMockClient()
 	vcsClient := vcsmocks.NewMockClient()
-	When(vcsClient.GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Eq("feature"), Eq(valid.DefaultAtlantisFile))).ThenReturn(true, []byte(remoteAtlantisYAML), nil)
 
 	dataDir := t.TempDir()
 	workingDir := &events.FileWorkspace{
@@ -1193,7 +1185,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutUsesLo
 	}
 	repoDir := filepath.Join(dataDir, "repos", baseRepo.FullName, "1", events.DefaultWorkspace)
 	Ok(t, os.MkdirAll(repoDir, 0700))
-	Ok(t, os.WriteFile(filepath.Join(repoDir, valid.DefaultAtlantisFile), []byte(localAtlantisYAML), 0600))
+	Ok(t, os.WriteFile(filepath.Join(repoDir, valid.DefaultAtlantisFile), []byte(staleLocalAtlantisYAML), 0600))
 
 	userConfig := defaultUserConfig
 	builder := events.NewProjectCommandBuilder(
@@ -1228,7 +1220,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutUsesLo
 	}
 	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "environments/prod", Workspace: events.DefaultWorkspace}
 
-	Assert(t, !builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected merged local explicit project to prevent ignored-target skip")
+	Assert(t, !builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected merge checkout to avoid pre-clone skip from stale local config")
 	vcsClient.VerifyWasCalled(Never()).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())
 }
 

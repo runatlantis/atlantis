@@ -753,6 +753,40 @@ func TestRunCommentCommand_IgnoredTargetedDirPreHooksCanGenerateExplicitConfig(t
 	projectCommandRunner.VerifyWasCalledOnce().Plan(projectCtx)
 }
 
+func TestRunCommentCommand_IgnoredTargetedDirNonFatalPreHookErrorCanGenerateExplicitConfig(t *testing.T) {
+	setup(t)
+	configuredPreHooks := &configuredPreWorkflowHooksCommandRunner{hasHooks: true, err: errors.New("hook error")}
+	preWorkflowHooksCommandRunner = configuredPreHooks
+	ch.PreWorkflowHooksCommandRunner = configuredPreHooks
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "ignored",
+		Workspace:   events.DefaultWorkspace,
+		BaseRepo:    testdata.GithubRepo,
+		Pull:        modelPull,
+	}
+	ignoreChecks := 0
+
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
+		ignoreChecks++
+		return ReturnValues{ignoreChecks == 1}
+	})
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
+
+	Equals(t, 1, configuredPreHooks.calls)
+	Equals(t, 2, ignoreChecks)
+	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Eq(cmd))
+	projectCommandRunner.VerifyWasCalledOnce().Plan(projectCtx)
+}
+
 func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) {
 	t.Log("if an approve_policy command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
 	vcsClient := setup(t)
