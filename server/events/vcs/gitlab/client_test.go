@@ -149,68 +149,80 @@ func TestClient_SupportsCommonMark(t *testing.T) {
 
 func TestClient_GetModifiedFiles(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	cases := []struct {
-		attempts int
-	}{
-		{1}, {2}, {3},
-	}
+	pageOneDiffs := []byte(`[
+		{"old_path":"somefile.yaml","new_path":"somefile.yaml","renamed_file":false},
+		{"old_path":"old-name.yaml","new_path":"new-name.yaml","renamed_file":true}
+	]`)
+	pageTwoDiffs := []byte(`[
+		{"old_path":"second-page.yaml","new_path":"second-page.yaml","renamed_file":false}
+	]`)
+	mergeRequestPending := []byte(`{"changes_count":""}`)
+	mergeRequestReady := []byte(`{"changes_count":"3"}`)
+	mergeRequestAttempts := 0
 
-	changesPending, err := os.ReadFile("testdata/changes-pending.json")
-	Ok(t, err)
-
-	changesAvailable, err := os.ReadFile("testdata/changes-available.json")
-	Ok(t, err)
-
-	for _, c := range cases {
-		t.Run(fmt.Sprintf("Gitlab returns MR changes after %d attempts", c.attempts), func(t *testing.T) {
-			numAttempts := 0
-			testServer := httptest.NewServer(
-				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					switch r.RequestURI {
-					case "/api/v4/projects/lkysow%2Fatlantis-example/merge_requests/8312/changes?page=1&per_page=100":
-						w.WriteHeader(200)
-						numAttempts++
-						if numAttempts < c.attempts {
-							w.Write(changesPending) // nolint: errcheck
-							t.Logf("returning changesPending for attempt %d", numAttempts)
-							return
-						}
-						t.Logf("returning changesAvailable for attempt %d", numAttempts)
-						w.Write(changesAvailable) // nolint: errcheck
-					default:
-						t.Errorf("got unexpected request at %q", r.RequestURI)
-						http.Error(w, "not found", http.StatusNotFound)
-					}
-				}))
-
-			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
-			Ok(t, err)
-			client := &Client{
-				Client:          internalClient,
-				Version:         nil,
-				PollingInterval: time.Second * 0,
-				PollingTimeout:  time.Second * 10,
+	testServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v4/projects/runatlantis%2Fatlantis-example/merge_requests/8312":
+				mergeRequestAttempts++
+				w.WriteHeader(http.StatusOK)
+				if mergeRequestAttempts < 3 {
+					w.Write(mergeRequestPending) // nolint: errcheck
+					return
+				}
+				w.Write(mergeRequestReady) // nolint: errcheck
+			case "/api/v4/projects/runatlantis%2Fatlantis-example/merge_requests/8312/diffs?page=1&per_page=100":
+				Equals(t, 3, mergeRequestAttempts)
+				w.Header().Set("X-Next-Page", "2")
+				w.WriteHeader(http.StatusOK)
+				w.Write(pageOneDiffs) // nolint: errcheck
+			case "/api/v4/projects/runatlantis%2Fatlantis-example/merge_requests/8312/diffs?page=2&per_page=100":
+				w.WriteHeader(http.StatusOK)
+				w.Write(pageTwoDiffs) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
 			}
+		}))
+	defer testServer.Close()
 
-			filenames, err := client.GetModifiedFiles(
-				logger,
-				models.Repo{
-					FullName: "lkysow/atlantis-example",
-					Owner:    "lkysow",
-					Name:     "atlantis-example",
-				},
-				models.PullRequest{
-					Num: 8312,
-					BaseRepo: models.Repo{
-						FullName: "lkysow/atlantis-example",
-						Owner:    "lkysow",
-						Name:     "atlantis-example",
-					},
-				})
-			Ok(t, err)
-			Equals(t, []string{"somefile.yaml"}, filenames)
-		})
+	internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+	Ok(t, err)
+	client := &Client{
+		Client:          internalClient,
+		Version:         nil,
+		PollingInterval: time.Millisecond,
+		PollingTimeout:  time.Second,
 	}
+
+	filenames, err := client.GetModifiedFiles(
+		logger,
+		models.Repo{
+			FullName: "runatlantis/atlantis-example",
+			Owner:    "runatlantis",
+			Name:     "atlantis-example",
+		},
+		models.PullRequest{
+			Num: 8312,
+			BaseRepo: models.Repo{
+				FullName: "runatlantis/atlantis-example",
+				Owner:    "runatlantis",
+				Name:     "atlantis-example",
+			},
+		})
+	Ok(t, err)
+	Equals(t, 3, mergeRequestAttempts)
+	Equals(t, []string{"somefile.yaml", "new-name.yaml", "old-name.yaml", "second-page.yaml"}, filenames)
+}
+
+func TestLegacyMergeRequestUnmarshal(t *testing.T) {
+	var mr legacyMergeRequest
+	err := json.Unmarshal([]byte("{\"blocking_discussions_resolved\":true,\"detailed_merge_status\":\"not_approved\",\"merge_status\":\"can_be_merged\",\"approvals_before_merge\":2}"), &mr)
+	Ok(t, err)
+	Equals(t, true, mr.BlockingDiscussionsResolved)
+	Equals(t, "not_approved", mr.DetailedMergeStatus)
+	Equals(t, "can_be_merged", mr.MergeStatus)
+	Equals(t, 2, mr.ApprovalsBeforeMerge)
 }
 
 func TestClient_MergePull(t *testing.T) {
@@ -1587,14 +1599,21 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		mr                          *gitlab.MergeRequest
 		project                     *gitlab.Project
 		supportsDetailedMergeStatus bool
+		legacyMergeStatus           string
+		legacyApprovalsBeforeMerge  int
 		expected                    models.MergeableStatus
 	}{
 		{
 			description: "requires approvals",
 			mr: &gitlab.MergeRequest{
-				ApprovalsBeforeMerge: 2,
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "mergeable",
+				},
 			},
-			project: &gitlab.Project{},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			legacyApprovalsBeforeMerge:  2,
 			expected: models.MergeableStatus{
 				IsMergeable: false,
 				Reason:      "Still require 2 approvals",
@@ -1603,9 +1622,13 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		{
 			description: "blocking discussions unresolved",
 			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: false,
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: false,
+					DetailedMergeStatus:         "mergeable",
+				},
 			},
-			project: &gitlab.Project{},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
 			expected: models.MergeableStatus{
 				IsMergeable: false,
 				Reason:      "Blocking discussions unresolved",
@@ -1614,10 +1637,30 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		{
 			description: "work in progress",
 			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				WorkInProgress:              true,
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "mergeable",
+				},
+				WorkInProgress: true,
 			},
-			project: &gitlab.Project{},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Work in progress",
+			},
+		},
+		{
+			description: "draft",
+			mr: &gitlab.MergeRequest{
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "mergeable",
+					Draft:                       true,
+				},
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
 			expected: models.MergeableStatus{
 				IsMergeable: false,
 				Reason:      "Work in progress",
@@ -1626,12 +1669,16 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		{
 			description: "pipeline skipped and not allowed",
 			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				HeadPipeline:                &gitlab.Pipeline{Status: "skipped"},
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "mergeable",
+				},
+				HeadPipeline: &gitlab.Pipeline{Status: "skipped"},
 			},
 			project: &gitlab.Project{
 				AllowMergeOnSkippedPipeline: false,
 			},
+			supportsDetailedMergeStatus: true,
 			expected: models.MergeableStatus{
 				IsMergeable: false,
 				Reason:      "Pipeline was skipped",
@@ -1640,9 +1687,11 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		{
 			description: "pipeline skipped and is allowed",
 			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				HeadPipeline:                &gitlab.Pipeline{Status: "skipped"},
-				DetailedMergeStatus:         "mergeable",
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "mergeable",
+				},
+				HeadPipeline: &gitlab.Pipeline{Status: "skipped"},
 			},
 			supportsDetailedMergeStatus: true,
 			project: &gitlab.Project{
@@ -1655,8 +1704,34 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		{
 			description: "detailed merge status mergeable",
 			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				DetailedMergeStatus:         "mergeable",
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "mergeable",
+				},
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected:                    models.MergeableStatus{IsMergeable: true},
+		},
+		{
+			description: "detailed merge status ci_still_running",
+			mr: &gitlab.MergeRequest{
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "ci_still_running",
+				},
+			},
+			project:                     &gitlab.Project{},
+			supportsDetailedMergeStatus: true,
+			expected:                    models.MergeableStatus{IsMergeable: true},
+		},
+		{
+			description: "detailed merge status ci_must_pass",
+			mr: &gitlab.MergeRequest{
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "ci_must_pass",
+				},
 			},
 			project:                     &gitlab.Project{},
 			supportsDetailedMergeStatus: true,
@@ -1665,8 +1740,10 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		{
 			description: "detailed merge status need_rebase",
 			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				DetailedMergeStatus:         "need_rebase",
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "need_rebase",
+				},
 			},
 			project:                     &gitlab.Project{},
 			supportsDetailedMergeStatus: true,
@@ -1678,8 +1755,10 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		{
 			description: "detailed merge status not mergeable",
 			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				DetailedMergeStatus:         "blocked",
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "blocked",
+				},
 			},
 			project:                     &gitlab.Project{},
 			supportsDetailedMergeStatus: true,
@@ -1691,8 +1770,10 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		{
 			description: "detailed merge status can_be_merged (not a valid detailed status)",
 			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				DetailedMergeStatus:         "can_be_merged",
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "can_be_merged",
+				},
 			},
 			project:                     &gitlab.Project{},
 			supportsDetailedMergeStatus: true,
@@ -1704,19 +1785,35 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 		{
 			description: "legacy merge status can_be_merged",
 			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				MergeStatus:                 "can_be_merged",
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+				},
 			},
-			project:  &gitlab.Project{},
-			expected: models.MergeableStatus{IsMergeable: true},
+			project:           &gitlab.Project{},
+			legacyMergeStatus: "can_be_merged",
+			expected:          models.MergeableStatus{IsMergeable: true},
+		},
+		{
+			description: "legacy merge status can_be_merged when detailed status is unsupported",
+			mr: &gitlab.MergeRequest{
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+					DetailedMergeStatus:         "need_rebase",
+				},
+			},
+			project:           &gitlab.Project{},
+			legacyMergeStatus: "can_be_merged",
+			expected:          models.MergeableStatus{IsMergeable: true},
 		},
 		{
 			description: "legacy merge status cannot be merged",
 			mr: &gitlab.MergeRequest{
-				BlockingDiscussionsResolved: true,
-				MergeStatus:                 "cannot_be_merged",
+				BasicMergeRequest: gitlab.BasicMergeRequest{
+					BlockingDiscussionsResolved: true,
+				},
 			},
-			project: &gitlab.Project{},
+			project:           &gitlab.Project{},
+			legacyMergeStatus: "cannot_be_merged",
 			expected: models.MergeableStatus{
 				IsMergeable: false,
 				Reason:      "Merge status is cannot_be_merged",
@@ -1726,7 +1823,7 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
-			actual := isMergeable(c.mr, c.project, c.supportsDetailedMergeStatus)
+			actual := isMergeable(c.mr, c.project, c.supportsDetailedMergeStatus, c.legacyMergeStatus, c.legacyApprovalsBeforeMerge)
 			Equals(t, c.expected, actual)
 		})
 	}

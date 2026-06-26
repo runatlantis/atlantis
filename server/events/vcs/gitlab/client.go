@@ -6,6 +6,7 @@ package gitlab
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -40,6 +41,30 @@ type Client struct {
 	PollingTimeout time.Duration
 	// StatusRetryEnabled enables enhanced retry logic for pipeline status updates.
 	StatusRetryEnabled bool
+}
+
+// legacyMergeRequest captures fields that GitLab still returns in the API but
+// gitlab.com/gitlab-org/api/client-go no longer exposes on MergeRequest.
+type legacyMergeRequest struct {
+	gitlab.MergeRequest
+	MergeStatus          string `json:"merge_status"`
+	ApprovalsBeforeMerge int    `json:"approvals_before_merge"`
+}
+
+func (m *legacyMergeRequest) UnmarshalJSON(data []byte) error {
+	if err := m.MergeRequest.UnmarshalJSON(data); err != nil {
+		return err
+	}
+	var legacyFields struct {
+		MergeStatus          string `json:"merge_status"`
+		ApprovalsBeforeMerge int    `json:"approvals_before_merge"`
+	}
+	if err := json.Unmarshal(data, &legacyFields); err != nil {
+		return err
+	}
+	m.MergeStatus = legacyFields.MergeStatus
+	m.ApprovalsBeforeMerge = legacyFields.ApprovalsBeforeMerge
+	return nil
 }
 
 // commonMarkSupported is a version constraint that is true when this version of
@@ -117,38 +142,40 @@ func (g *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 	const maxPerPage = 100
 	var files []string
 	nextPage := 1
-	// Constructing the api url by hand so we can do pagination.
-	apiURL := fmt.Sprintf("projects/%s/merge_requests/%d/changes", url.QueryEscape(repo.FullName), pull.Num)
+	apiURL := fmt.Sprintf("/projects/%s/merge_requests/%d", repo.FullName, pull.Num)
+	pollingStart := time.Now()
 	for {
-		opts := gitlab.ListOptions{
-			Page:    nextPage,
-			PerPage: maxPerPage,
+		mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
+		if resp != nil {
+			logger.Debug("GET %s returned: %d", apiURL, resp.StatusCode)
 		}
-		req, err := g.Client.NewRequest("GET", apiURL, opts, nil)
 		if err != nil {
 			return nil, err
 		}
-		resp := new(gitlab.Response)
-		mr := new(gitlab.MergeRequest)
-		pollingStart := time.Now()
-		for {
-			resp, err = g.Client.Do(req, mr)
-			if resp != nil {
-				logger.Debug("GET %s returned: %d", apiURL, resp.StatusCode)
-			}
-			if err != nil {
-				return nil, err
-			}
-			if mr.ChangesCount != "" {
-				break
-			}
-			if time.Since(pollingStart) > g.PollingTimeout {
-				return nil, fmt.Errorf("giving up polling %q after %s", apiURL, g.PollingTimeout.String())
-			}
-			time.Sleep(g.PollingInterval)
+		if mr.ChangesCount != "" {
+			break
+		}
+		if time.Since(pollingStart) > g.PollingTimeout {
+			return nil, fmt.Errorf("giving up polling %q after %s", apiURL, g.PollingTimeout.String())
+		}
+		time.Sleep(g.PollingInterval)
+	}
+	for {
+		opts := &gitlab.ListMergeRequestDiffsOptions{
+			ListOptions: gitlab.ListOptions{
+				Page:    nextPage,
+				PerPage: maxPerPage,
+			},
+		}
+		diffs, resp, err := g.Client.MergeRequests.ListMergeRequestDiffs(repo.FullName, pull.Num, opts)
+		if resp != nil {
+			logger.Debug("GET /projects/%s/merge_requests/%d/diffs returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+		}
+		if err != nil {
+			return nil, err
 		}
 
-		for _, f := range mr.Changes {
+		for _, f := range diffs {
 			files = append(files, f.NewPath)
 
 			// If the file was renamed, we'll want to run plan in the directory
@@ -294,13 +321,20 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
 func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if GitLab merge request %d is mergeable", pull.Num)
-	mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
+	apiURL := fmt.Sprintf("projects/%s/merge_requests/%d", gitlab.PathEscape(repo.FullName), pull.Num)
+	req, err := g.Client.NewRequest("GET", apiURL, nil, nil)
+	if err != nil {
+		return models.MergeableStatus{}, err
+	}
+	lmr := &legacyMergeRequest{}
+	resp, err := g.Client.Do(req, lmr)
 	if resp != nil {
 		logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repo.FullName, pull.Num, resp.StatusCode)
 	}
 	if err != nil {
 		return models.MergeableStatus{}, err
 	}
+	mr := &lmr.MergeRequest
 
 	// Prevent nil pointer error when mr.HeadPipeline is empty
 	// See: https://github.com/runatlantis/atlantis/issues/1852
@@ -415,10 +449,10 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	if supportsDetailedMergeStatus {
 		logger.Debug("Detailed merge status: '%s'", mr.DetailedMergeStatus)
 	} else {
-		logger.Debug("Merge status: '%s'", mr.MergeStatus) //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
+		logger.Debug("Merge status: '%s'", lmr.MergeStatus)
 	}
 
-	res := isMergeable(mr, project, supportsDetailedMergeStatus)
+	res := isMergeable(mr, project, supportsDetailedMergeStatus, lmr.MergeStatus, lmr.ApprovalsBeforeMerge)
 	if !res.IsMergeable {
 		logger.Debug("Merge request is not mergeable")
 		return res, nil
@@ -459,16 +493,16 @@ func isSkippableAtlantisCommitStatus(statusName string, vcsStatusName string) bo
 
 // gitlabIsMergeable a pure function that encapsulates the tricky logic behind determining whether a gitlab MR is mergeable
 // It doesn't make any external calls and cannot error, so is much easier to test
-func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetailedMergeStatus bool) models.MergeableStatus {
+func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetailedMergeStatus bool, legacyMergeStatus string, legacyApprovalsBeforeMerge int) models.MergeableStatus {
 	isPipelineSkipped := false
 	if mr.HeadPipeline != nil {
 		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
 	}
 
-	if mr.ApprovalsBeforeMerge > 0 {
+	if legacyApprovalsBeforeMerge > 0 {
 		return models.MergeableStatus{
 			IsMergeable: false,
-			Reason:      fmt.Sprintf("Still require %d approvals", mr.ApprovalsBeforeMerge),
+			Reason:      fmt.Sprintf("Still require %d approvals", legacyApprovalsBeforeMerge),
 		}
 	}
 	if !mr.BlockingDiscussionsResolved {
@@ -477,7 +511,7 @@ func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetai
 			Reason:      "Blocking discussions unresolved",
 		}
 	}
-	if mr.WorkInProgress {
+	if mr.Draft || mr.WorkInProgress { //nolint:staticcheck // WorkInProgress is retained for older GitLab JSON responses.
 		return models.MergeableStatus{
 			IsMergeable: false,
 			Reason:      "Work in progress",
@@ -504,15 +538,14 @@ func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetai
 		}
 	}
 
-	mergeStatus := mr.MergeStatus //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
-	if mergeStatus == "can_be_merged" {
+	if legacyMergeStatus == "can_be_merged" {
 		return models.MergeableStatus{
 			IsMergeable: true,
 		}
 	}
 	return models.MergeableStatus{
 		IsMergeable: false,
-		Reason:      fmt.Sprintf("Merge status is %s", mergeStatus),
+		Reason:      fmt.Sprintf("Merge status is %s", legacyMergeStatus),
 	}
 }
 
