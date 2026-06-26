@@ -1,0 +1,26 @@
+server/events/pending_plan_finder.go
+  s_1475eaaa18ac58::t_bc698c5e79bcd3 49-54,67-70,72-73,75-77,79,114-125,130,133-134,136,139
+  s_1475eaaa18ac58::t_46e562668cff52 137
+  s_1475eaaa18ac58::t_7f3cf8ab8c0905 78
+  s_1475eaaa18ac58::t_19726b1346bbe0 61,74,126,128-129,131-132,135
+  s_1475eaaa18ac58::t_ffc9218afe735d 127,138
+  s_1475eaaa18ac58::t_d1af3b681c3f60 140
+server/events/pending_plan_finder_test.go
+  s_1475eaaa18ac58::t_e99916a166a21e 69-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "5983f48b462a956b55ea03a513e4d29fac511944",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
