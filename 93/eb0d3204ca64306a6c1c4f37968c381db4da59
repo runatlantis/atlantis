@@ -1,0 +1,37 @@
+server/events/command_requirement_handler.go
+  s_243a1a1edc15e5::t_a05d6cba8d782a 26,88,91,157,159,162-169,174,178-184
+server/events/command_requirement_handler_test.go
+  s_243a1a1edc15e5::t_addf8ea2c67137 56,102
+server/events/mock_workingdir_test.go
+  s_243a1a1edc15e5::t_288309f9121315 10-11,112-130,218-232,524-564,746-798
+server/events/mocks/mock_working_dir.go
+  s_243a1a1edc15e5::t_857345e8669008 112-130,218-232,524-564,746-798
+server/events/project_command_runner.go
+  s_243a1a1edc15e5::t_28c865bbb7f293 680-682,695,706-708,712-713,716-722
+server/events/project_command_runner_test.go
+  s_243a1a1edc15e5::t_aab9ff327cdb4f 11,288-474
+server/events/undiverged_project_impact.go
+  s_243a1a1edc15e5::t_64692bd5d8d76a 61-77,92-97
+server/events/undiverged_project_impact_test.go
+  s_243a1a1edc15e5::t_6f384a84006529 288-291
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_38cbf731d52618 57,62-64,69-71,321,326-344,361-376,404-420,423,427,488-496,506,527-539
+server/events/working_dir_test.go
+  s_243a1a1edc15e5::t_c58015457f2f9b 1209-1268
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.1",
+  "base_commit_sha": "93eb0d3204ca64306a6c1c4f37968c381db4da59",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
