@@ -4,12 +4,11 @@
 package events
 
 import (
-	"reflect"
-	"time"
-
 	pegomock "github.com/petergtz/pegomock/v4"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	logging "github.com/runatlantis/atlantis/server/logging"
+	"reflect"
+	"time"
 )
 
 type MockWorkingDir struct {
@@ -110,6 +109,25 @@ func (mock *MockWorkingDir) GetDivergedFiles(logger logging.SimpleLogging, clone
 	return _ret0, _ret1
 }
 
+func (mock *MockWorkingDir) GetDivergedFilesFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+	}
+	_params := []pegomock.Param{logger, cloneDir, pullRequest}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GetDivergedFilesFromPullHead", _params, []reflect.Type{reflect.TypeOf((*[]string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 []string
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].([]string)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
 func (mock *MockWorkingDir) GetGitUntrackedFiles(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) ([]string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
@@ -188,6 +206,21 @@ func (mock *MockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir s
 	}
 	_params := []pegomock.Param{logger, cloneDir, projectPath, autoplanWhenModified, pullRequest}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("HasDiverged", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
+	var _ret0 bool
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(bool)
+		}
+	}
+	return _ret0
+}
+
+func (mock *MockWorkingDir) HasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
+	}
+	_params := []pegomock.Param{logger, cloneDir, projectPath, autoplanWhenModified, pullRequest}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("HasDivergedFromPullHead", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
 	var _ret0 bool
 	if len(_result) != 0 {
 		if _result[0] != nil {
@@ -488,6 +521,47 @@ func (c *MockWorkingDir_GetDivergedFiles_OngoingVerification) GetAllCapturedArgu
 	return
 }
 
+func (verifier *VerifierMockWorkingDir) GetDivergedFilesFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) *MockWorkingDir_GetDivergedFilesFromPullHead_OngoingVerification {
+	_params := []pegomock.Param{logger, cloneDir, pullRequest}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetDivergedFilesFromPullHead", _params, verifier.timeout)
+	return &MockWorkingDir_GetDivergedFilesFromPullHead_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDir_GetDivergedFilesFromPullHead_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDir_GetDivergedFilesFromPullHead_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string, models.PullRequest) {
+	logger, cloneDir, pullRequest := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], cloneDir[len(cloneDir)-1], pullRequest[len(pullRequest)-1]
+}
+
+func (c *MockWorkingDir_GetDivergedFilesFromPullHead_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string, _param2 []models.PullRequest) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(logging.SimpleLogging)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(string)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]models.PullRequest, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(models.PullRequest)
+			}
+		}
+	}
+	return
+}
+
 func (verifier *VerifierMockWorkingDir) GetGitUntrackedFiles(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) *MockWorkingDir_GetGitUntrackedFiles_OngoingVerification {
 	_params := []pegomock.Param{logger, r, p, workspace}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GetGitUntrackedFiles", _params, verifier.timeout)
@@ -669,6 +743,59 @@ func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetCapturedArguments() 
 }
 
 func (c *MockWorkingDir_HasDiverged_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string, _param2 []string, _param3 [][]string, _param4 []models.PullRequest) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(logging.SimpleLogging)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(string)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(string)
+			}
+		}
+		if len(_params) > 3 {
+			_param3 = make([][]string, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.([]string)
+			}
+		}
+		if len(_params) > 4 {
+			_param4 = make([]models.PullRequest, len(c.methodInvocations))
+			for u, param := range _params[4] {
+				_param4[u] = param.(models.PullRequest)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWorkingDir) HasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) *MockWorkingDir_HasDivergedFromPullHead_OngoingVerification {
+	_params := []pegomock.Param{logger, cloneDir, projectPath, autoplanWhenModified, pullRequest}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "HasDivergedFromPullHead", _params, verifier.timeout)
+	return &MockWorkingDir_HasDivergedFromPullHead_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDir_HasDivergedFromPullHead_OngoingVerification struct {
+	mock              *MockWorkingDir
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDir_HasDivergedFromPullHead_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string, string, []string, models.PullRequest) {
+	logger, cloneDir, projectPath, autoplanWhenModified, pullRequest := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], cloneDir[len(cloneDir)-1], projectPath[len(projectPath)-1], autoplanWhenModified[len(autoplanWhenModified)-1], pullRequest[len(pullRequest)-1]
+}
+
+func (c *MockWorkingDir_HasDivergedFromPullHead_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string, _param2 []string, _param3 [][]string, _param4 []models.PullRequest) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {

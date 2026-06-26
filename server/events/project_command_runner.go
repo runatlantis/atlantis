@@ -191,7 +191,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	// include a link to view the progress of atlantis plan command in real
 	// time
 	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus, nil); err != nil {
-		ctx.Log.Err("updating project PR status", err)
+		ctx.Log.Err("updating project PR status: %s", err)
 	}
 
 	// ensures we are differentiating between project level command and overall command
@@ -199,14 +199,14 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 
 	if result.Error != nil || result.Failure != "" {
 		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus, &result); err != nil {
-			ctx.Log.Err("updating project PR status", err)
+			ctx.Log.Err("updating project PR status: %s", err)
 		}
 
 		return result
 	}
 
 	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus, &result); err != nil {
-		ctx.Log.Err("updating project PR status", err)
+		ctx.Log.Err("updating project PR status: %s", err)
 	}
 
 	return result
@@ -654,7 +654,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// can be run after the conftest step.
 	// Only log outputs as errors if policies did not pass, otherwise log at debug level
 	if !result.PolicyCleared() {
-		ctx.Log.Err(strings.Join(outputs, "\n"))
+		ctx.Log.Err("%s", strings.Join(outputs, "\n"))
 		failure = "Some policy sets did not pass."
 	} else {
 		ctx.Log.Debug("policy check outputs %s", strings.Join(outputs, "\n"))
@@ -677,6 +677,9 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Plan)
 	if err != nil {
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
 		return nil, "", err
 	}
 	defer unlockFn()
@@ -689,6 +692,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		}
 		return nil, "", err
 	}
+
 	mergedAgain, err := p.WorkingDir.MergeAgain(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
@@ -699,11 +703,23 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
+	// Validate requirements after refreshing the merge checkout so project path
+	// checks and plan execution use the same tree.
 	failure, err := p.CommandRequirementHandler.ValidatePlanProject(repoDir, ctx)
 	if failure != "" || err != nil {
+		if deleteErr := p.WorkingDir.DeletePlan(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName); deleteErr != nil {
+			ctx.Log.Err("error deleting stale plan after plan validation failure: %v", deleteErr)
+			return nil, failure, fmt.Errorf("deleting stale plan after plan validation failure: %w", deleteErr)
+		}
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
 		return nil, failure, err
 	}
 

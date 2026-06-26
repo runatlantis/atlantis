@@ -84,7 +84,7 @@ func (p *DefaultProjectFinder) DetermineWorkspaceFromHCL(log logging.SimpleLoggi
 			file, _ := parser.ParseHCLFile(fullPath)
 			workspace, err := findTFCloudWorkspaceFromFile(file)
 			if err != nil {
-				log.Warn(err.Error())
+				log.Warn("%s", err.Error())
 				return DefaultWorkspace, nil
 			}
 

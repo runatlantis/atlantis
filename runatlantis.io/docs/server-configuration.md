@@ -317,7 +317,7 @@ Bitbucket username (usually an email) used for API authentication with Bitbucket
 
 **Note:**
 
-- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026(see [here](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
+- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026 (see [Atlassian's Bitbucket app password deprecation notice](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
 
 **Config file key:**
 
@@ -576,7 +576,7 @@ ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
 
 Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 
-Useful to enable for use with GitHub.
+Useful to enable for use with GitHub. Changed lines inside Terraform heredoc and multiline-string diffs are also formatted so diff-aware markdown renderers can color them.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
@@ -738,6 +738,8 @@ ATLANTIS_GH_HOSTNAME="my.github.enterprise.com"
 
 Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
 don't set. Defaults to `github.com`.
+
+For GitHub Enterprise Cloud, use the tenant hostname, for example `tenant.ghe.com`. Do not include a scheme or an `api.` prefix; Atlantis derives the REST and GraphQL API endpoints from the hostname.
 
 ### `--gh-org` <Badge text="v0.1.3+" type="info"/>
 
@@ -1120,6 +1122,9 @@ This prevents merge requests from being merged until all Terraform applies are c
 
 When enabled, after running `atlantis plan`, the MR status will show as pending if there are changes
 to apply. Once all projects are successfully applied (or show no changes), the status will update to success.
+Projects with no Terraform changes are counted as up to date rather than applied. If a pull request has both
+up-to-date projects and projects still waiting to apply, the Atlantis apply commit status remains pending
+until all changed projects are applied.
 
 Defaults to `false`.
 

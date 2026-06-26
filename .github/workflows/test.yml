@@ -37,11 +37,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
         id: changes
         with:
@@ -59,17 +59,17 @@ jobs:
     runs-on: ubuntu-24.04
     # Use latest testing environment for automatic updates
     # Previous: ghcr.io/runatlantis/testing-env:latest@sha256:725981e9090c977f8055f5ec5ba7a63430a8f0337ab955978e6b8cc2cd0236c3
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:949bd6f67e6b110f8e497a0cebe695372069216c1e26d339f424273ac08f90a3
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:dc683c36e7fb8f26fcc8628fdcf328f42d3b1903e130aebb8484223fbdedfd98
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       # need to setup go toolchain explicitly
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
 
@@ -123,7 +123,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
@@ -131,8 +131,8 @@ jobs:
 
   e2e-github:
     runs-on: ubuntu-24.04
-    # dont run e2e tests on forked PRs
-    if: github.event.pull_request.head.repo.fork == false
+    # dont run e2e tests on forked PRs or Dependabot PRs, where repository secrets are unavailable
+    if: github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
     env:
       ATLANTIS_GH_APP_ID: ${{ secrets.ATLANTISBOT_GH_APP_ID }}
       ATLANTIS_GH_APP_KEY: ${{ secrets.ATLANTISBOT_GH_APP_KEY }}
@@ -140,12 +140,12 @@ jobs:
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
 
@@ -159,7 +159,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz ${NGROK_DOWNLOAD_URL}
+          wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
@@ -177,20 +177,20 @@ jobs:
           ./scripts/e2e.sh
   e2e-gitlab:
     runs-on: ubuntu-24.04
-    # dont run e2e tests on forked PRs
-    if: github.event.pull_request.head.repo.fork == false
+    # dont run e2e tests on forked PRs or Dependabot PRs, where repository secrets are unavailable
+    if: github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
     env:
       ATLANTIS_GITLAB_USER: ${{ secrets.ATLANTISBOT_GITLAB_USERNAME }}
       ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
 
@@ -204,7 +204,7 @@ jobs:
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz ${NGROK_DOWNLOAD_URL}
+          wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version

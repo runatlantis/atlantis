@@ -82,18 +82,23 @@ func TestParseRepoCfg_BadPermissions(t *testing.T) {
 func TestParseCfgs_InvalidYAML(t *testing.T) {
 	cases := []struct {
 		description string
-		input       string
+		input       []byte
 		expErr      string
 	}{
 		{
 			"random characters",
-			"slkjds",
+			[]byte("slkjds"),
 			"yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into",
 		},
 		{
 			"just a colon",
-			":",
+			[]byte(":"),
 			"yaml: did not find expected key",
+		},
+		{
+			"invalid merge key from fuzzing",
+			[]byte("? [foo]\n: bar\n<<: {}\nversion: 3\n"),
+			"parsing yaml: runtime error: hash of unhashable type []interface {}",
 		},
 	}
 
@@ -102,7 +107,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			confPath := filepath.Join(tmpDir, "atlantis.yaml")
-			err := os.WriteFile(confPath, []byte(c.input), 0600)
+			err := os.WriteFile(confPath, c.input, 0600)
 			Ok(t, err)
 			r := config.ParserValidator{}
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "", "")

@@ -60,8 +60,8 @@ func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.Global
 	var rawConfig raw.RepoCfg
 	decoder := yaml.NewDecoder(bytes.NewReader(configData))
 	decoder.KnownFields(true)
-	err = decoder.Decode(&rawConfig)
-	if err != nil && !errors.Is(err, io.EOF) {
+	err = decodeYAML(decoder, &rawConfig)
+	if err != nil {
 		return valid.RepoCfg{}, err
 	}
 
@@ -84,8 +84,8 @@ func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.G
 	decoder := yaml.NewDecoder(bytes.NewReader(repoCfgData))
 	decoder.KnownFields(true)
 
-	err := decoder.Decode(&rawConfig)
-	if err != nil && !errors.Is(err, io.EOF) {
+	err := decodeYAML(decoder, &rawConfig)
+	if err != nil {
 		return valid.RepoCfg{}, err
 	}
 
@@ -152,12 +152,26 @@ func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.Glo
 	decoder := yaml.NewDecoder(bytes.NewReader(configData))
 	decoder.KnownFields(true)
 
-	err = decoder.Decode(&rawCfg)
-	if err != nil && !errors.Is(err, io.EOF) {
+	err = decodeYAML(decoder, &rawCfg)
+	if err != nil {
 		return valid.GlobalCfg{}, err
 	}
 
 	return p.validateRawGlobalCfg(rawCfg, defaultCfg, "yaml")
+}
+
+func decodeYAML(decoder *yaml.Decoder, out any) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("parsing yaml: %v", recovered)
+		}
+	}()
+
+	err = decoder.Decode(out)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
 }
 
 // ParseGlobalCfgJSON parses a json string cfgJSON into global config.

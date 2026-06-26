@@ -233,12 +233,12 @@ func getUserConfigKeysWithFlags() []string {
 	var ret []string
 	u := reflect.TypeFor[server.UserConfig]()
 
-	for i := 0; i < u.NumField(); i++ {
+	for field := range u.Fields() {
 
-		userConfigKey := u.Field(i).Tag.Get("mapstructure")
+		userConfigKey := field.Tag.Get("mapstructure")
 		// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
 		// Some fields are too complicated to have flags, so are only expressible in the config yaml
-		flagKey := u.Field(i).Tag.Get("flag")
+		flagKey := field.Tag.Get("flag")
 		if flagKey == "false" {
 			continue
 		}
