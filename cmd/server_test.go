@@ -61,6 +61,7 @@ var testFlags = map[string]any{
 	APISecretFlag:                    "",
 	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
+	AutomergeMethodFlag:              "squash",
 	AutoplanFileListFlag:             "**/*.tf,**/*.yml",
 	BitbucketApiUserFlag:             "bitbucket-api-user",
 	BitbucketBaseURLFlag:             "https://bitbucket-base-url.com",
@@ -487,6 +488,55 @@ func TestExecute_ValidateCheckoutStrategy(t *testing.T) {
 	}, t)
 	err := c.Execute()
 	ErrEquals(t, "invalid checkout strategy: not one of branch or merge", err)
+}
+
+func TestExecute_ValidateAutomergeMethod(t *testing.T) {
+	cases := []struct {
+		description string
+		method      string
+		expectErr   string
+	}{
+		{
+			"empty method uses VCS default",
+			"",
+			"",
+		},
+		{
+			"merge",
+			"merge",
+			"",
+		},
+		{
+			"rebase",
+			"rebase",
+			"",
+		},
+		{
+			"squash",
+			"squash",
+			"",
+		},
+		{
+			"invalid method",
+			"fast-forward",
+			"invalid --automerge-method: must be one of [merge rebase squash]",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.description, func(t *testing.T) {
+			c := setupWithDefaults(map[string]any{
+				AutomergeMethodFlag: testCase.method,
+			}, t)
+
+			err := c.Execute()
+			if testCase.expectErr != "" {
+				ErrEquals(t, testCase.expectErr, err)
+			} else {
+				Ok(t, err)
+			}
+		})
+	}
 }
 
 func TestExecute_ValidateSSLConfig(t *testing.T) {

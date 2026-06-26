@@ -51,6 +51,7 @@ const (
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
+	AutomergeMethodFlag              = "automerge-method"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
@@ -239,6 +240,11 @@ var stringFlags = map[string]stringFlag{
 			"means projects will be discovered when no explicit projects are defined in repo config. Also supports 'enabled' (always " +
 			"discover projects) and 'disabled' (never discover projects).",
 		defaultValue: DefaultAutoDiscoverMode,
+	},
+	AutomergeMethodFlag: {
+		description: "Default merge method to use when automerging pull requests, unless overridden by the --auto-merge-method comment flag. " +
+			"Valid values are 'merge', 'rebase', and 'squash'. Currently only implemented for GitHub.",
+		defaultValue: "",
 	},
 	AutoplanModulesFromProjects: {
 		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
@@ -713,6 +719,10 @@ var int64Flags = map[string]int64Flag{
 // ValidLogLevels are the valid log levels that can be set
 var ValidLogLevels = []string{"debug", "info", "warn", "error"}
 
+// ValidAutomergeMethods are the valid merge methods that can be set for the
+// automerge-method flag.
+var ValidAutomergeMethods = []string{"merge", "rebase", "squash"}
+
 type stringFlag struct {
 	description  string
 	defaultValue string
@@ -1036,6 +1046,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if checkoutStrategy != CheckoutStrategyBranch && checkoutStrategy != CheckoutStrategyMerge {
 		return fmt.Errorf("invalid checkout strategy: not one of %s or %s",
 			CheckoutStrategyBranch, CheckoutStrategyMerge)
+	}
+
+	if userConfig.AutomergeMethod != "" && !slices.Contains(ValidAutomergeMethods, userConfig.AutomergeMethod) {
+		return fmt.Errorf("invalid --%s: must be one of %v", AutomergeMethodFlag, ValidAutomergeMethods)
 	}
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
