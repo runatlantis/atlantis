@@ -537,12 +537,20 @@ func (p *PlanSuccess) DiffSummary() string {
 	if !stats.Changes {
 		return reNoChanges.FindString(p.TerraformOutput)
 	}
-	if stats.Import > 0 {
+	switch {
+	case stats.Import > 0 && stats.Forget > 0:
+		return fmt.Sprintf("Plan: %d to import, %d to add, %d to change, %d to destroy, %d to forget.",
+			stats.Import, stats.Add, stats.Change, stats.Destroy, stats.Forget)
+	case stats.Import > 0:
 		return fmt.Sprintf("Plan: %d to import, %d to add, %d to change, %d to destroy.",
 			stats.Import, stats.Add, stats.Change, stats.Destroy)
+	case stats.Forget > 0:
+		return fmt.Sprintf("Plan: %d to add, %d to change, %d to destroy, %d to forget.",
+			stats.Add, stats.Change, stats.Destroy, stats.Forget)
+	default:
+		return fmt.Sprintf("Plan: %d to add, %d to change, %d to destroy.",
+			stats.Add, stats.Change, stats.Destroy)
 	}
-	return fmt.Sprintf("Plan: %d to add, %d to change, %d to destroy.",
-		stats.Add, stats.Change, stats.Destroy)
 }
 
 // NoChanges returns true if the plan has no changes.

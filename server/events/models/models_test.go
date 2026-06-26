@@ -537,8 +537,20 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 			"Plan: 6 to import, 8 to add, 10 to change, 12 to destroy.",
 		},
 		{
+			"dummy\nPlan: 0 to add, 0 to change, 0 to destroy, 2 to forget.",
+			"Plan: 0 to add, 0 to change, 0 to destroy, 2 to forget.",
+		},
+		{
+			"dummy\nPlan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.",
+			"Plan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.",
+		},
+		{
 			"unit1\nPlan: 5 to add, 0 to change, 0 to destroy.\nunit2\nNo changes. Infrastructure is up-to-date.",
 			"Plan: 5 to add, 0 to change, 0 to destroy.",
+		},
+		{
+			"unit1\nPlan: 2 to add, 0 to change, 0 to destroy, 3 to forget.\nunit2\nPlan: 4 to add, 1 to change, 0 to destroy, 5 to forget.",
+			"Plan: 6 to add, 1 to change, 0 to destroy, 8 to forget.",
 		},
 		{
 			"unit1\nPlan: 2 to add, 1 to change, 0 to destroy.\nunit2\nPlan: 3 to add, 0 to change, 1 to destroy.\nunit3\nPlan: 1 to add, 4 to change, 2 to destroy.",
