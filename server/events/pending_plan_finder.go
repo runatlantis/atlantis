@@ -4,13 +4,11 @@
 package events
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/utils"
@@ -52,24 +50,33 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 	if err != nil {
 		return nil, nil, err
 	}
+	absPullDir, err := filepath.Abs(pullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting absolute pull directory: %w", err)
+	}
+
 	var plans []PendingPlan
 	var absPaths []string
 	for _, workspaceDir := range workspaceDirs {
-		// Skip non-directory entries (files, symlinks) — workspace clones are always directories.
+		// Skip non-directory entries (files, symlinks); workspace clones are always directories.
 		if !workspaceDir.IsDir() {
 			continue
 		}
 
 		workspace := workspaceDir.Name()
-		repoDir := filepath.Join(pullDir, workspace)
+		repoDir, err := workspaceRepoDir(absPullDir, workspace)
+		if err != nil {
+			return nil, nil, err
+		}
 
-		// Skip directories that are not git repositories (e.g. stray directories
-		// left by external processes). Workspace clones always have a .git entry.
-		if _, statErr := os.Stat(filepath.Join(repoDir, ".git")); statErr != nil {
-			if os.IsNotExist(statErr) || errors.Is(statErr, syscall.ENOTDIR) {
-				continue
-			}
-			return nil, nil, fmt.Errorf("checking git repository in '%s': %w", repoDir, statErr)
+		// Skip directories that are not workspace clone roots (e.g. stray
+		// directories left by external processes).
+		workspaceIsGitRoot, err := isGitWorkTreeRoot(repoDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !workspaceIsGitRoot {
+			continue
 		}
 
 		// Any generated plans should be untracked by git since Atlantis created
@@ -102,6 +109,33 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 		}
 	}
 	return plans, absPaths, nil
+}
+
+func workspaceRepoDir(absPullDir, workspace string) (string, error) {
+	repoDir := filepath.Clean(filepath.Join(absPullDir, workspace))
+	rel, err := filepath.Rel(absPullDir, repoDir)
+	if err != nil {
+		return "", fmt.Errorf("checking workspace directory %q: %w", workspace, err)
+	}
+	if rel == "." || rel == ".." || filepath.IsAbs(rel) || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("workspace directory %q escapes pull directory %q", workspace, absPullDir)
+	}
+	return repoDir, nil
+}
+
+func isGitWorkTreeRoot(repoDir string) (bool, error) {
+	showPrefixCmd := exec.Command("git", "rev-parse", "--is-inside-work-tree", "--show-prefix") // nolint: gosec
+	showPrefixCmd.Dir = repoDir
+	showPrefixOut, err := showPrefixCmd.CombinedOutput()
+	if err != nil {
+		output := string(showPrefixOut)
+		if strings.Contains(output, "not a git repository") || strings.Contains(output, "must be run in a work tree") {
+			return false, nil
+		}
+		return false, fmt.Errorf("checking git repository in '%s' directory: %s: %w", repoDir, output, err)
+	}
+	lines := strings.Split(string(showPrefixOut), "\n")
+	return len(lines) >= 2 && lines[0] == "true" && lines[1] == "", nil
 }
 
 // deletePlans deletes all plans in pullDir.

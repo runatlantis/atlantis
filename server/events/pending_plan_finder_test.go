@@ -66,6 +66,29 @@ func TestPendingPlanFinder_FindSkipsNonDirEntries(t *testing.T) {
 	Equals(t, "default", plans[0].Workspace)
 }
 
+// Directories that are only inside a parent git repo are not workspace clone roots.
+func TestPendingPlanFinder_FindSkipsDirInsideParentGitRepo(t *testing.T) {
+	gitDirName := "default"
+	notGitDirName := "reviews"
+	tmpDir := DirStructure(t, map[string]any{
+		gitDirName: map[string]any{
+			"default.tfplan": nil,
+		},
+		notGitDirName: map[string]any{
+			"some_file.tfplan": nil,
+		},
+	})
+	runCmd(t, tmpDir, "git", "init")
+	runCmd(t, filepath.Join(tmpDir, gitDirName), "git", "init")
+
+	pf := &events.DefaultPendingPlanFinder{}
+	plans, err := pf.Find(tmpDir)
+
+	Ok(t, err)
+	Equals(t, 1, len(plans))
+	Equals(t, gitDirName, plans[0].Workspace)
+}
+
 // Test different directory structures.
 func TestPendingPlanFinder_Find(t *testing.T) {
 	cases := []struct {
