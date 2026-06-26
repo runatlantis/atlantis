@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	tally "github.com/uber-go/tally/v4"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -550,11 +551,22 @@ func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDirFromCfg(ctx *comma
 	}
 	cleanDir := filepath.Clean(repoRelDir)
 	for _, proj := range repoCfg.Projects {
-		if filepath.Clean(proj.Dir) == cleanDir {
+		if projectDirMatchesTargetedDir(proj.Dir, cleanDir) {
 			return false
 		}
 	}
 	return p.isAutoDiscoverPathIgnored(ctx, repoCfg, cleanDir)
+}
+
+func projectDirMatchesTargetedDir(projectDir string, cleanTargetDir string) bool {
+	cleanProjectDir := filepath.Clean(projectDir)
+	if cleanProjectDir == cleanTargetDir {
+		return true
+	}
+	if !valid.ContainsDirGlobPattern(cleanProjectDir) {
+		return false
+	}
+	return doublestar.MatchUnvalidated(filepath.ToSlash(cleanProjectDir), filepath.ToSlash(cleanTargetDir))
 }
 
 // isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery.
