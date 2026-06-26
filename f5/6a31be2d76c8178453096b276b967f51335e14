@@ -1,0 +1,126 @@
+server/events/templates/i18n/es/merged_again.tmpl
+  s_1475eaaa18ac58::t_5e2630d3e6d8fa 1-5
+server/events/templates/i18n/es/plan_success_unwrapped.tmpl
+  s_1475eaaa18ac58::t_5e2630d3e6d8fa 1-24
+server/events/templates/i18n/es/multi_project_plan_footer.tmpl
+  s_1475eaaa18ac58::t_420909061d8595 1-17
+server/events/templates/i18n/es/single_project_version_success.tmpl
+  s_1475eaaa18ac58::t_d0f7645d79d15e 1-7
+server/events/templates/i18n/es/log.tmpl
+  s_1475eaaa18ac58::t_229ec7eee746a0 1-11
+server/events/templates/i18n/es/multi_project_policy.tmpl
+  s_1475eaaa18ac58::t_68a4f904b017b6 1-29
+server/events/templates/i18n/es/failure_with_log.tmpl
+  s_1475eaaa18ac58::t_1b29c978f5dcfa 1-4
+server/events/markdown_renderer.go
+  s_1475eaaa18ac58::t_fc22f6fc25176a 11,18,22-28,33,52,58,149,151-165,168-173,189,196-197,200,202,207,279,297,355,360,369,371,373,375,377,379,381,383,385,390,392,394,400,406,408,410,412,417,420,423
+server/events/templates/i18n/es/single_project_version_unsuccessful.tmpl
+  s_1475eaaa18ac58::t_58b08d7dafad94 1-3
+server/events/templates/i18n/es/version_wrapped_success.tmpl
+  s_1475eaaa18ac58::t_7f6c17bd50506e 1-6
+server/i18n/locales/en.yaml
+  s_1475eaaa18ac58::t_b2d078c9d7858d 1-12
+server/events/templates/i18n/es/multi_project_apply_footer.tmpl
+  s_1475eaaa18ac58::t_c6a3ff936bd7f2 1-7
+server/events/templates/i18n/es/version_unwrapped_success.tmpl
+  s_1475eaaa18ac58::t_3f384068a02a22 1-5
+server/i18n/locales/es.yaml
+  s_1475eaaa18ac58::t_be58b36002ea62 1-12
+server/events/templates/i18n/es/multi_project_state_rm.tmpl
+  s_1475eaaa18ac58::t_cba79b6cb8d7f5 1-10
+server/events/templates/i18n/es/single_project_policy_unsuccessful.tmpl
+  s_1475eaaa18ac58::t_5196d5a98a0ae1 1-22
+server/events/templates/i18n/es/multi_project_policy_unsuccessful.tmpl
+  s_1475eaaa18ac58::t_ecc579794d77a9 1-31
+server/events/templates/i18n/es/apply_unwrapped_success.tmpl
+  s_1475eaaa18ac58::t_f49b6281552ec6 1-5
+server/i18n/i18n_test.go
+  s_1475eaaa18ac58::t_914dba629ab7d3 1-88
+server/events/templates/i18n/es/approve_all_projects.tmpl
+  s_1475eaaa18ac58::t_08399ea5216eae 1-8
+AGENTS.md
+  s_1475eaaa18ac58::t_42354ee7badb58 36,64
+server/events/markdown_renderer_test.go
+  s_1475eaaa18ac58::t_9f4153fc221bc0 243-260
+  s_1475eaaa18ac58::t_e220f927d79631 242
+  s_1475eaaa18ac58::t_3629673d469fa9 230-241
+  s_1475eaaa18ac58::t_470d4320e4846c 11,18,180-229,261-506
+server/i18n/i18n.go
+  s_1475eaaa18ac58::t_f297f754af2cc1 1-252
+server/events/templates/i18n/es/single_project_state_rm_success.tmpl
+  s_1475eaaa18ac58::t_0960869d5c0e8b 1-7
+server/events/templates/i18n/es/multi_project_header.tmpl
+  s_1475eaaa18ac58::t_bc922e0f6f14af 1-11
+cmd/server.go
+  s_1475eaaa18ac58::t_4f24d19f87e7ff 22,153-154,185,497-504,993-995,1054-1064
+server/events/templates/i18n/es/multi_project_version.tmpl
+  s_1475eaaa18ac58::t_f3eed690bb8d1a 1-10
+server/events/templates/i18n/es/unwrapped_err_with_log.tmpl
+  s_1475eaaa18ac58::t_1114df631c61bd 1-4
+server/events/templates/i18n/es/apply_wrapped_success.tmpl
+  s_1475eaaa18ac58::t_c9bc55b7987306 1-6
+server/events/templates/i18n/es/single_project_plan_unsuccessful.tmpl
+  s_1475eaaa18ac58::t_95de121aa4a4fe 1-7
+server/events/templates/i18n/es/policy_check_results_wrapped.tmpl
+  s_1475eaaa18ac58::t_bc565115b23652 1-51
+server/events/templates/i18n/es/multi_project_import.tmpl
+  s_1475eaaa18ac58::t_98461b207ba640 1-10
+server/events/templates/i18n/es/import_success_unwrapped.tmpl
+  s_1475eaaa18ac58::t_22fe2fd780032e 1-12
+server/events/templates/i18n/es/plan_success_wrapped.tmpl
+  s_1475eaaa18ac58::t_5e2630d3e6d8fa 1-28
+server/events/templates/i18n/es/state_rm_success_unwrapped.tmpl
+  s_1475eaaa18ac58::t_4e92cb5edb0670 1-12
+server/events/templates/i18n/es/multi_project_apply.tmpl
+  s_1475eaaa18ac58::t_a9b0117b26d8d0 1-11
+server/events/templates/policy_check_results_unwrapped.tmpl
+  s_1475eaaa18ac58::t_acade3c3d38e54 2
+server/events/templates/i18n/es/single_project_import_success.tmpl
+  s_1475eaaa18ac58::t_9f2368c627b367 1-7
+server/events/templates/i18n/es/policy_check.tmpl
+  s_1475eaaa18ac58::t_a39b2fab2541b0 1-37
+server/events/templates/i18n/es/unwrapped_err.tmpl
+  s_1475eaaa18ac58::t_fd5b2d9d692ee7 1-9
+server/events/templates/i18n/es/single_project_plan_success.tmpl
+  s_1475eaaa18ac58::t_14e5e952101ecf 1-18
+server/events/templates/policy_check_results_wrapped.tmpl
+  s_1475eaaa18ac58::t_af8830860109ec 3,40
+server/events/templates/i18n/es/wrapped_err.tmpl
+  s_1475eaaa18ac58::t_22626bcbfe6bcd 1-12
+runatlantis.io/docs/server-configuration.md
+  s_1475eaaa18ac58::t_d4990a295c124e 1037-1087
+server/server.go
+  s_1475eaaa18ac58::t_c5015617f4f366 67,483-486
+server/events/templates/i18n/es/policy_check_results_unwrapped.tmpl
+  s_1475eaaa18ac58::t_bbe323ef43c650 1-35
+server/events/templates/i18n/es/failure.tmpl
+  s_1475eaaa18ac58::t_dab4f0ab4b6d69 1-6
+cmd/server_test.go
+  s_1475eaaa18ac58::t_2b435fcbcbc7b2 111-112,1164-1245
+server/events/templates/i18n/es/state_rm_success_wrapped.tmpl
+  s_1475eaaa18ac58::t_217c53523cb6fe 1-14
+server/events/templates/i18n/es/import_success_wrapped.tmpl
+  s_1475eaaa18ac58::t_fa269710fd3d74 1-14
+server/events/templates/i18n/es/single_project_apply.tmpl
+  s_1475eaaa18ac58::t_7e612448dea99b 1-7
+server/user_config.go
+  s_1475eaaa18ac58::t_1e8eb8bdaee859 92-93
+server/events/templates/i18n/es/multi_project_plan.tmpl
+  s_1475eaaa18ac58::t_0e6c3a3043b894 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "f56a31be2d76c8178453096b276b967f51335e14",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
