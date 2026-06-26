@@ -23,6 +23,7 @@ type CommandRequirementHandler interface {
 
 type UndivergedProjectImpactResolver interface {
 	HasUndivergedImpact(ctx command.ProjectContext, repoDir string, workingDir WorkingDir) (handled bool, impacted bool, err error)
+	HasUndivergedImpactFromPullHead(ctx command.ProjectContext, repoDir string, workingDir WorkingDir) (handled bool, impacted bool, err error)
 }
 
 type DefaultCommandRequirementHandler struct {
@@ -84,10 +85,10 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 				return fmt.Sprintf("Pull request must be mergeable before running %s%s.", cmd, suffix), nil
 			}
 		case raw.UnDivergedRequirement:
-			diverged, err := a.hasUndivergedImpact(repoDir, ctx)
+			diverged, err := a.hasUndivergedImpact(repoDir, ctx, cmd)
 			if err != nil {
 				ctx.Log.Warn("evaluating undiverged requirement has failed, falling back to full divergence check: %s", err)
-				diverged = a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, nil, ctx.Pull)
+				diverged = a.hasDiverged(repoDir, ctx, cmd, nil)
 			}
 			if diverged {
 				return fmt.Sprintf("Default branch must be rebased onto pull request before running %s.", cmd), nil
@@ -153,17 +154,31 @@ func isAtlantisProjectPlanStatus(statusName, vcsStatusName string) bool {
 	return strings.HasPrefix(statusName, vcsStatusName+"/plan: ")
 }
 
-func (a *DefaultCommandRequirementHandler) hasUndivergedImpact(repoDir string, ctx command.ProjectContext) (bool, error) {
+func (a *DefaultCommandRequirementHandler) hasUndivergedImpact(repoDir string, ctx command.ProjectContext, cmd command.Name) (bool, error) {
 	if a.ProjectImpactResolver == nil {
-		return a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull), nil
+		return a.hasDiverged(repoDir, ctx, cmd, ctx.AutoplanWhenModified), nil
 	}
 
-	handled, impacted, err := a.ProjectImpactResolver.HasUndivergedImpact(ctx, repoDir, a.WorkingDir)
+	var handled bool
+	var impacted bool
+	var err error
+	if cmd == command.Plan {
+		handled, impacted, err = a.ProjectImpactResolver.HasUndivergedImpactFromPullHead(ctx, repoDir, a.WorkingDir)
+	} else {
+		handled, impacted, err = a.ProjectImpactResolver.HasUndivergedImpact(ctx, repoDir, a.WorkingDir)
+	}
 	if err != nil {
 		return false, err
 	}
 	if !handled {
-		return a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull), nil
+		return a.hasDiverged(repoDir, ctx, cmd, ctx.AutoplanWhenModified), nil
 	}
 	return impacted, nil
+}
+
+func (a *DefaultCommandRequirementHandler) hasDiverged(repoDir string, ctx command.ProjectContext, cmd command.Name, autoplanWhenModified []string) bool {
+	if cmd == command.Plan {
+		return a.WorkingDir.HasDivergedFromPullHead(ctx.Log, repoDir, ctx.RepoRelDir, autoplanWhenModified, ctx.Pull)
+	}
+	return a.WorkingDir.HasDiverged(ctx.Log, repoDir, ctx.RepoRelDir, autoplanWhenModified, ctx.Pull)
 }

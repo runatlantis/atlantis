@@ -53,7 +53,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 				ProjectPlanStatus: models.PassedPolicyCheckStatus,
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(false)
+				When(workingDir.HasDivergedFromPullHead(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(false)
 			},
 			wantErr: assert.NoError,
 		},
@@ -99,7 +99,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 				PlanRequirements: []string{raw.UnDivergedRequirement},
 			},
 			setup: func(workingDir *mocks.MockWorkingDir) {
-				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
+				When(workingDir.HasDivergedFromPullHead(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running plan.",
 			wantErr:     assert.NoError,

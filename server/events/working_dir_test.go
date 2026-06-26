@@ -1206,6 +1206,66 @@ func TestHasDiverged_WithEmptyPatterns(t *testing.T) {
 	Equals(t, true, hasDiverged)
 }
 
+func TestHasDivergedFromPullHead_FreshMergeCheckoutUsesPullHead(t *testing.T) {
+	repoDir := initRepo(t)
+
+	Ok(t, os.MkdirAll(filepath.Join(repoDir, "project1"), 0o755))
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "project1", "main.tf"), []byte("resource initial\n"), 0o600))
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1")
+
+	runCmd(t, repoDir, "git", "checkout", "-b", "stale-pr")
+	Ok(t, os.MkdirAll(filepath.Join(repoDir, "project2"), 0o755))
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "project2", "main.tf"), []byte("resource pr\n"), 0o600))
+	runCmd(t, repoDir, "git", "add", "project2/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project2")
+	headCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	runCmd(t, repoDir, "git", "checkout", "main")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "project1", "variables.tf"), []byte("variable base\n"), 0o600))
+	runCmd(t, repoDir, "git", "add", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "update project1")
+
+	prDir := filepath.Join(repoDir, "repos", "0", "default")
+	Ok(t, os.MkdirAll(prDir, 0o755))
+	runCmd(t, prDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, prDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, prDir, "git", "fetch", "source", "+refs/heads/stale-pr")
+	runCmd(t, prDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, prDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, prDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, prDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	logger := logging.NewNoopLogger(t)
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "stale-pr",
+		BaseBranch: "main",
+		HeadCommit: headCommit,
+	}
+
+	hasDiverged := wd.HasDiverged(logger, prDir, ".", []string{}, pullRequest)
+	Equals(t, false, hasDiverged)
+
+	hasDiverged = wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+
+	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{}, pullRequest)
+	Equals(t, true, hasDiverged)
+
+	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	Equals(t, true, hasDiverged)
+
+	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project2/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+}
+
 func TestHasDiverged_PatternHasDiverged(t *testing.T) {
 	// Initialize the git repo.
 	repoDir := initRepo(t)
