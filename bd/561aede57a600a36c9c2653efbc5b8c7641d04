@@ -1,0 +1,19 @@
+.github/workflows/clusterfuzzlite.yml
+  s_12c46f3ee857ef::t_608777c1ea877a 35,97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "bd561aede57a600a36c9c2653efbc5b8c7641d04",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
