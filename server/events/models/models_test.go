@@ -1770,8 +1770,8 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
       ~ input = [
           ~ <<-EOT
               first
-            - old
-            + new
+              - old
+              + new
             EOT,
         ]
       + triggers_replace = [
@@ -1783,8 +1783,8 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
 !       input = [
 !           <<-EOT
               first
--             old
-+             new
+-               old
++               new
             EOT,
         ]
 +       triggers_replace = [

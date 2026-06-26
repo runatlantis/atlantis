@@ -592,13 +592,11 @@ func formatDiffMarkdownLine(line string) string {
 
 func diffMarkdownHeredocStart(line string) (string, int, int, bool) {
 	if heredocMatch := diffHeredocAttributeStartRegex.FindStringSubmatch(line); heredocMatch != nil {
-		// Attribute heredoc content diff markers render two spaces deeper than the
-		// terminator. Collection element content diff markers align with it.
 		return diffMarkdownHeredocState(heredocMatch[1], heredocMatch[2], heredocMatch[3], len(heredocMatch[1])+4)
 	}
 
 	if heredocMatch := diffHeredocCollectionElementRegex.FindStringSubmatch(line); heredocMatch != nil {
-		return diffMarkdownHeredocState(heredocMatch[1], heredocMatch[2], heredocMatch[3], len(heredocMatch[1])+len(heredocMatch[2]))
+		return diffMarkdownHeredocState(heredocMatch[1], heredocMatch[2], heredocMatch[3], len(heredocMatch[1])+len(heredocMatch[2])+2)
 	}
 
 	return "", -1, -1, false
@@ -610,6 +608,8 @@ func diffMarkdownHeredocState(indent string, marker string, delimiter string, di
 		return delimiter, terminatorIndent, -1, true
 	}
 
+	// Terraform renders changed heredoc content diff markers two spaces deeper
+	// than the heredoc terminator.
 	return delimiter, terminatorIndent, diffMarkerIndent, true
 }
 
