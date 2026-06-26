@@ -214,7 +214,7 @@ func TestCheckUserPermissions(t *testing.T) {
 			cr := &DefaultCommandRunner{
 				Logger:               logger,
 				TeamAllowlistChecker: checker,
-				VCSClient: &childTeamVCSClient{children: tc.hierarchy},
+				VCSClient:            &childTeamVCSClient{children: tc.hierarchy},
 			}
 			user := models.User{Username: "testuser", Teams: tc.userTeams}
 			ok, checkErr := cr.checkUserPermissions(repo, &user, tc.cmdName)
