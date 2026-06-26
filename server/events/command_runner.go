@@ -208,7 +208,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		Name: command.Autoplan,
 	}
 
-	cmdRunner := buildCommentCommandRunner(c, cmd.CommandName())
+	cmdRunner := buildCommentCommandRunner(c, command.Plan)
 	if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
 		return
 	}
