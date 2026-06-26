@@ -120,6 +120,11 @@
     }
   ],
   customManagers: [
+    // Dockerfile pins backed by repology (apk/apt distro packages).
+    // Repology returns raw distro versions like "8.19.0-r0" or
+    // "1:9.2p1-2+deb12u10" — no "v" prefix, no semver shape — so we must
+    // NOT apply the GitHub-release-style extractVersionTemplate that the
+    // other manager below uses, otherwise Renovate filters every update out.
     {
       customType: 'regex',
       managerFilePatterns: [
@@ -127,7 +132,22 @@
         '/(^|/)Dockerfile\\.[^/]*$/',
       ],
       matchStrings: [
-        'renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION=(?<currentValue>.*)\\s',
+        'renovate: datasource=(?<datasource>repology) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION="?(?<currentValue>[^"\\s]+)"?',
+      ],
+      versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}loose{{/if}}',
+    },
+    // Dockerfile pins backed by github-releases / docker / other
+    // vX.Y.Z sources. Renovate's regex engine is RE2 — no lookahead —
+    // so we enumerate non-repology datasources explicitly instead of
+    // using a negative lookahead.
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        '/(^|/)Dockerfile$/',
+        '/(^|/)Dockerfile\\.[^/]*$/',
+      ],
+      matchStrings: [
+        'renovate: datasource=(?<datasource>github-releases|github-tags|docker) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION=(?<currentValue>.*)\\s',
       ],
       versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}',
       extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',

@@ -15,7 +15,6 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/utils"
 )
 
 const (
@@ -203,11 +202,11 @@ func (s Step) Validate() error {
 		sort.Strings(argKeys)
 
 		// Validate keys common for all the steps.
-		if utils.SlicesContains(argKeys, ShellArgKey) && !utils.SlicesContains(argKeys, CommandArgKey) {
+		if slices.Contains(argKeys, ShellArgKey) && !slices.Contains(argKeys, CommandArgKey) {
 			return fmt.Errorf("workflow steps only support %q key in combination with %q key",
 				ShellArgKey, CommandArgKey)
 		}
-		if utils.SlicesContains(argKeys, ShellArgsArgKey) && !utils.SlicesContains(argKeys, ShellArgKey) {
+		if slices.Contains(argKeys, ShellArgsArgKey) && !slices.Contains(argKeys, ShellArgKey) {
 			return fmt.Errorf("workflow steps only support %q key in combination with %q key",
 				ShellArgsArgKey, ShellArgKey)
 		}
@@ -258,7 +257,7 @@ func (s Step) Validate() error {
 				return fmt.Errorf("env steps must have a %q key set", NameArgKey)
 			}
 			delete(argMap, NameArgKey)
-			if utils.SlicesContains(argKeys, ValueArgKey) && utils.SlicesContains(argKeys, CommandArgKey) {
+			if slices.Contains(argKeys, ValueArgKey) && slices.Contains(argKeys, CommandArgKey) {
 				return fmt.Errorf("env steps only support one of the %q or %q keys, found both",
 					ValueArgKey, CommandArgKey)
 			}

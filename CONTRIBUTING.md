@@ -1,9 +1,13 @@
-# Contributing <!-- omit in toc -->
+# Contributing
 
-# Table of Contents <!-- omit in toc -->
+# Table of Contents
+
+<!-- toc -->
+
 - [Reporting Issues](#reporting-issues)
 - [Reporting Security Issues](#reporting-security-issues)
 - [Creating a Pull Request](#creating-a-pull-request)
+  - [Resolving Comments](#resolving-comments)
 - [Developing](#developing)
   - [Updating The Website](#updating-the-website)
   - [Running Atlantis Locally](#running-atlantis-locally)
@@ -17,9 +21,8 @@
     - [Errors](#errors)
     - [Testing](#testing)
     - [Mocks](#mocks)
-- [Backporting Fixes](#backporting-fixes)
-  - [Manual Backporting Fixes](#manual-backporting-fixes)
-- [Creating a New Release](#creating-a-new-release)
+
+<!-- tocstop -->
 
 # Reporting Issues
 * When reporting issues, please include the output of `atlantis version`.
@@ -38,6 +41,12 @@ We take security issues seriously. Please report a security vulnerability to the
   * Link to any issues, including one you may have made
 
 If you have any questions about the contribution process, see [Atlantis Contributors on Slack](https://cloud-native.slack.com/archives/C07T45G27EZ).
+
+## Resolving Comments
+
+It is the PR author's responsibility to review and resolve all comments on their PRs. Even if no change is made, it's still important to engage with the feedback from the community.
+
+This also applies to comments from Copilot, see our [AI Usage Policy](AI_USAGE_POLICY.md#copilot) for more details.
 
 # Developing
 

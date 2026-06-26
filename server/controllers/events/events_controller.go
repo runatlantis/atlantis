@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -33,6 +33,7 @@ import (
 const githubHeader = "X-Github-Event"
 const gitlabHeader = "X-Gitlab-Event"
 const azuredevopsHeader = "Request-Id"
+const azuredevopsServerHeader = "X-VSS-ActivityId"
 
 const giteaHeader = "X-Gitea-Event"
 const giteaEventTypeHeader = "X-Gitea-Event-Type"
@@ -142,7 +143,7 @@ func (e *VCSEventsController) Post(w http.ResponseWriter, r *http.Request) {
 			e.handleBitbucketServerPost(w, r)
 			return
 		}
-	} else if r.Header.Get(azuredevopsHeader) != "" {
+	} else if r.Header.Get(azuredevopsHeader) != "" || r.Header.Get(azuredevopsServerHeader) != "" {
 		if !e.supportsHost(models.AzureDevops) {
 			e.respond(w, logging.Debug, http.StatusBadRequest, "Ignoring request since not configured to support AzureDevops")
 			return
@@ -288,7 +289,13 @@ func (e *VCSEventsController) handleAzureDevopsPost(w http.ResponseWriter, r *ht
 	}
 	e.Logger.Debug("request valid")
 
-	azuredevopsReqID := "Request-Id=" + r.Header.Get("Request-Id")
+	header := azuredevopsHeader
+	reqID := r.Header.Get(azuredevopsHeader)
+	if reqID == "" {
+		header = azuredevopsServerHeader
+		reqID = r.Header.Get(azuredevopsServerHeader)
+	}
+	azuredevopsReqID := fmt.Sprintf("%s=%s", header, reqID)
 	event, err := azuredevops.ParseWebHook(payload)
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Failed parsing webhook: %v %s", err, azuredevopsReqID)
@@ -886,8 +893,9 @@ func (e *VCSEventsController) supportsHost(h models.VCSHostType) bool {
 func (e *VCSEventsController) respond(w http.ResponseWriter, lvl logging.LogLevel, code int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	e.Logger.Log(lvl, response)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(code)
-	fmt.Fprintln(w, response)
+	fmt.Fprintln(w, response) // #nosec G705 -- response body is served as text/plain, not interpreted as HTML
 }
 
 // commentNotAllowlisted comments on the pull request that the repo is not

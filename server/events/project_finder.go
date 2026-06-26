@@ -11,10 +11,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/utils"
 
 	"github.com/moby/patternmatcher"
 
@@ -84,7 +84,7 @@ func (p *DefaultProjectFinder) DetermineWorkspaceFromHCL(log logging.SimpleLoggi
 			file, _ := parser.ParseHCLFile(fullPath)
 			workspace, err := findTFCloudWorkspaceFromFile(file)
 			if err != nil {
-				log.Warn(err.Error())
+				log.Warn("%s", err.Error())
 				return DefaultWorkspace, nil
 			}
 
@@ -186,7 +186,7 @@ func (p *DefaultProjectFinder) DetermineProjectsViaConfig(log logging.SimpleLogg
 	for _, project := range config.Projects {
 		log.Debug("checking if project at dir %q workspace %q was modified", project.Dir, project.Workspace)
 
-		if utils.SlicesContains(dependentProjects, project.Dir) {
+		if slices.Contains(dependentProjects, project.Dir) {
 			projects = append(projects, project)
 			continue
 		}

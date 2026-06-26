@@ -1,14 +1,14 @@
-# syntax=docker/dockerfile:1@sha256:2780b5c3bab67f1f76c781860de469442999ed1a0d7992a5efdf2cffc0e3d769
+# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
 # what distro is the image being built for
 ARG ALPINE_TAG=3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
-ARG DEBIAN_TAG=12.13-slim@sha256:f9c6a2fd2ddbc23e336b6257a5245e31f996953ef06cd13a59fa0a1df2d5c252
+ARG DEBIAN_TAG=13.5-slim@sha256:28de0877c2189802884ccd20f15ee41c203573bd87bb6b883f5f46362d24c5c2
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.25.8-alpine@sha256:8e02eb337d9e0ea459e041f1ee5eece41cbb61f1d83e7d883a3e2fb4862063fa
+ARG GOLANG_TAG=1.26.4-alpine@sha256:3ad57304ad93bbec8548a0437ad9e06a455660655d9af011d58b993f6f615648
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.14.8
+ARG DEFAULT_TERRAFORM_VERSION=1.14.9
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.11.6
+ARG DEFAULT_OPENTOFU_VERSION=1.12.3
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.66.0
 
@@ -38,7 +38,7 @@ WORKDIR /app
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
 # renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
-ENV BUILDER_BASH_VERSION="5.3.3-r1"
+ENV BUILDER_BASH_VERSION="5.3.9-r1"
 
 RUN apk add --no-cache \
     bash=${BUILDER_BASH_VERSION}
@@ -56,22 +56,22 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Define package versions for Debian
-# renovate: datasource=repology depName=debian_12/ca-certificates versioning=loose
-ENV DEBIAN_CA_CERTIFICATES_VERSION="20230311+deb12u1"
-# renovate: datasource=repology depName=debian_12/curl versioning=loose
-ENV DEBIAN_CURL_VERSION="7.88.1-10+deb12u14"
-# renovate: datasource=repology depName=debian_12/git versioning=loose
-ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u2"
-# renovate: datasource=repology depName=debian_12/unzip versioning=loose
-ENV DEBIAN_UNZIP_VERSION="6.0-28"
-# renovate: datasource=repology depName=debian_12/openssh-server versioning=loose
-ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u9"
-# renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
-ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
-# renovate: datasource=repology depName=debian_12/gnupg versioning=loose
-ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1+deb12u2"
-# renovate: datasource=repology depName=debian_12/openssl versioning=loose
-ENV DEBIAN_OPENSSL_VERSION="3.0.17-1~deb12u2"
+# renovate: datasource=repology depName=debian_13/ca-certificates versioning=loose
+ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419"
+# renovate: datasource=repology depName=debian_13/curl versioning=loose
+ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u3"
+# renovate: datasource=repology depName=debian_13/git versioning=loose
+ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
+# renovate: datasource=repology depName=debian_13/unzip versioning=loose
+ENV DEBIAN_UNZIP_VERSION="6.0-29"
+# renovate: datasource=repology depName=debian_13/openssh-server versioning=loose
+ENV DEBIAN_OPENSSH_SERVER_VERSION="1:10.0p1-7+deb13u4"
+# renovate: datasource=repology depName=debian_13/dumb-init versioning=loose
+ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-3"
+# renovate: datasource=repology depName=debian_13/gnupg versioning=loose
+ENV DEBIAN_GNUPG_VERSION="2.4.7-21+deb13u1"
+# renovate: datasource=repology depName=debian_13/openssl versioning=loose
+ENV DEBIAN_OPENSSL_VERSION="3.5.6-1~deb13u2"
 
 # Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
 RUN groupadd --gid 1000 atlantis && \
@@ -186,9 +186,9 @@ COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # renovate: datasource=repology depName=alpine_3_23/ca-certificates versioning=loose
-ENV CA_CERTIFICATES_VERSION="20260413-r0"
+ENV CA_CERTIFICATES_VERSION="20260611-r0"
 # renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
-ENV CURL_VERSION="8.17.0-r1"
+ENV CURL_VERSION="8.19.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/git versioning=loose
 ENV GIT_VERSION="2.52.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/unzip versioning=loose
@@ -276,8 +276,8 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 # trees, not the entire image). Post-pass: if getcap still reports any
 # "path = cap_set" line under that scope, the build fails. Strip may use
 # 2>/dev/null and setcap || true; verification is the hard guarantee.
-# renovate: datasource=repology depName=debian_12/libcap2-bin versioning=loose
-ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u2+b2"
+# renovate: datasource=repology depName=debian_13/libcap2-bin versioning=loose
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.75-10+deb13u1+b1"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     apt-get update && \
