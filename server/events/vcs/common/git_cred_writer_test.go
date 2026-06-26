@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -54,6 +55,10 @@ func TestWriteGitCreds_Appends(t *testing.T) {
 // Test that if the file already exists and it already has the line expected
 // we do nothing.
 func TestWriteGitCreds_NoModification(t *testing.T) {
+	if runtime.GOOS == "windows" {
+        t.Skip("file permission semantics differ on Windows")
+    }
+
 	logger := logging.NewNoopLogger(t)
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
@@ -130,6 +135,10 @@ func TestWriteGitCreds_AppendApp(t *testing.T) {
 // Test that if we can't read the existing file to see if the contents will be
 // the same that we just error out.
 func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
+	if runtime.GOOS == "windows" {
+    t.Skip("file permission semantics differ on Windows")
+	}
+
 	logger := logging.NewNoopLogger(t)
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
@@ -145,6 +154,10 @@ func TestWriteGitCreds_ErrIfCannotRead(t *testing.T) {
 
 // Test that if we can't write, we error out.
 func TestWriteGitCreds_ErrIfCannotWrite(t *testing.T) {
+	 if runtime.GOOS == "windows" {
+        t.Skip("filesystem error messages differ on Windows")
+    }
+
 	logger := logging.NewNoopLogger(t)
 	credsFile := "/this/dir/does/not/exist/.git-credentials" // nolint: gosec
 	expErr := fmt.Sprintf("writing generated .git-credentials file with user, token and hostname to %s: open %s: no such file or directory", credsFile, credsFile)
