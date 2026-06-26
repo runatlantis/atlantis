@@ -328,11 +328,12 @@ func ParseDriftFromPlan(planOutput string) DriftSummary {
 **New Drift Status Endpoint**:
 
 ```go
-// GET /api/drift/status?type=github&hostname=github.com&repository=org/repo
+// GET /api/drift/status?type=Github&hostname=github.com&repository=org/repo
 //   &project=myproject&path=.&workspace=default
-// type, hostname, and repository identify the VCS repository. Project, path,
-// and workspace are optional filters; path and workspace identify unnamed
-// Atlantis projects.
+// type must use the canonical models.VCSHostType.String() value. Type,
+// hostname, and repository identify the VCS repository. Project, path, and
+// workspace are optional filters; path and workspace identify unnamed Atlantis
+// projects.
 type DriftStatusResponse struct {
     Repository DriftRepositoryKey `json:"repository"`
     Projects   []ProjectDrift    `json:"projects"`
@@ -506,9 +507,9 @@ func (g *Client) CreateBranch(
     }
 
     // Create new branch
-    _, _, err = g.client.Git.CreateRef(g.ctx, owner, repoName, &github.Reference{
-        Ref:    github.String("refs/heads/" + branchName),
-        Object: &github.GitObject{SHA: ref.Object.SHA},
+    _, _, err = g.client.Git.CreateRef(g.ctx, owner, repoName, github.CreateRef{
+        Ref: "refs/heads/" + branchName,
+        SHA: ref.Object.GetSHA(),
     })
     if err != nil {
         return fmt.Errorf("failed to create branch %s: %w", branchName, err)
@@ -529,8 +530,14 @@ func (g *Client) CreatePullRequest(
     opts vcs.CreatePullRequestOptions,
 ) (models.PullRequest, error) {
     labels := gitlab.LabelOptions(opts.Labels)
+    title := opts.Title
+    if opts.Draft {
+        // GitLab's create-MR API uses a title prefix to create draft MRs.
+        title = "Draft: " + title
+    }
+
     mr, _, err := g.Client.MergeRequests.CreateMergeRequest(repo.FullName, &gitlab.CreateMergeRequestOptions{
-        Title:        gitlab.String(opts.Title),
+        Title:        gitlab.String(title),
         Description:  gitlab.String(opts.Body),
         SourceBranch: gitlab.String(opts.HeadBranch),
         TargetBranch: gitlab.String(opts.BaseBranch),
